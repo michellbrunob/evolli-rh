@@ -292,8 +292,11 @@ export function QuadroDeColaboradores({
     >
       {dados ? (
         <p className="dashboard__so-impressao">
-          {empresa} · {TITULO_DO_QUADRO} · {nomeDoMes(0)} a{" "}
-          {nomeDoMes(periodo.meses - 1)} de {String(periodo.ano)}
+          {empresa} · {TITULO_DO_QUADRO} ·{" "}
+          {periodo.meses > 1
+            ? `${nomeDoMes(0)} a ${nomeDoMes(periodo.meses - 1)}`
+            : nomeDoMes(0)}{" "}
+          de {String(periodo.ano)}
         </p>
       ) : null}
       <div className="dashboard__bloco-cabeca">

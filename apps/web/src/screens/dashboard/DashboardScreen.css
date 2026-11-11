@@ -949,7 +949,12 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   display: grid;
   gap: var(--space-xxs);
   width: max-content;
-  max-width: min(16rem, 50%);
+  /* Só o espaço livre do lado escolhido (colunas inteiras), descontada a
+     folga: nunca sobre a coluna inspecionada, nunca além da borda. */
+  max-width: min(
+    16rem,
+    calc(var(--espaco) / var(--colunas) * 100% - var(--space-xxs))
+  );
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--hairline);
   border-top: 3px solid var(--evolli-azul);
@@ -958,6 +963,14 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   color: var(--color-ink);
   font-size: var(--text-caption);
   pointer-events: none;
+}
+
+/* Um mês só: nenhuma coluna livre ao lado — o painel entra no fluxo, abaixo
+   das barras e dentro do quadro. */
+.dashboard__dica-mes--abaixo {
+  position: static;
+  max-width: 100%;
+  margin-top: var(--space-xs);
 }
 
 .dashboard__dica-mes--depois {

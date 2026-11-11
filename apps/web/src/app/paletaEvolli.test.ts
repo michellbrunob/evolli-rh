@@ -134,6 +134,36 @@ describe("T207 — paleta Evolli (P-1): só no menu, no Dashboard e no seletor",
     expect(semFaixa).not.toMatch(/--evolli-/);
   });
 
+  it("as regras do menu lateral não alcançam fora da navegação (o ícone dos cartões do Hub usa a mesma classe)", () => {
+    const css = readFileSync("src/app/PainelNavigation.css", "utf8");
+    const regras = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+      seletores: m[1]!
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+      corpo: m[2]!,
+    }));
+    const naRaiz = (seletor: string) =>
+      /^\.painel-nav(--trilho)?\s/.test(seletor);
+    for (const { seletores, corpo } of regras) {
+      for (const seletor of seletores) {
+        // A classe do ícone também está no Hub: nenhuma cor sem a raiz.
+        if (/\.painel-nav__icone/.test(seletor) && /(^|\s)color:/.test(corpo)) {
+          expect(naRaiz(seletor), seletor).toBe(true);
+        }
+        // Toda regra da paleta no menu fica sob a raiz da navegação.
+        if (/--evolli-/.test(corpo)) {
+          expect(naRaiz(seletor), seletor).toBe(true);
+        }
+      }
+    }
+    // O Hub dá a cor do próprio ícone.
+    expect(readFileSync("src/app/HubPosLogin.css", "utf8")).toMatch(
+      /\.hub__cartao-icone \{[^}]*color: var\(--color-action\)/,
+    );
+  });
+
   it("nenhuma outra tela do produto usa os tokens Evolli", () => {
     for (const arquivo of [
       "src/app/HubPosLogin.css",

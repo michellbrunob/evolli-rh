@@ -14,7 +14,7 @@
  *
  * As barras continuam decorativas; a tabela equivalente segue embaixo.
  */
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { TipoMovimentacao } from "../../api/movimentacaoClient";
 import {
   ROTULO_DA_MOVIMENTACAO,
@@ -40,6 +40,29 @@ export interface GraficoMensalProps {
   readonly rotuloDoSaldo?: string;
 }
 
+/** Onde o painel do mês abre e quantas colunas ele pode ocupar. */
+export interface PosicaoDoPainel {
+  readonly lado: "depois" | "antes" | "abaixo";
+  readonly espaco: number;
+}
+
+/**
+ * Ao lado da coluna, no lado com mais colunas livres, com a largura limitada
+ * a elas: nunca cobre a barra inspecionada e nunca passa da borda. Com um mês
+ * só (janeiro do ano corrente) não há lado livre: abre abaixo das barras.
+ */
+export function posicaoDoPainel(
+  aberto: number,
+  meses: number,
+): PosicaoDoPainel {
+  if (meses <= 1) return { lado: "abaixo", espaco: 1 };
+  const direita = meses - aberto - 1;
+  const esquerda = aberto;
+  return direita >= esquerda
+    ? { lado: "depois", espaco: direita }
+    : { lado: "antes", espaco: esquerda };
+}
+
 function sinal(n: number): string {
   if (n > 0) return `+${String(n)}`;
   if (n < 0) return `−${String(Math.abs(n))}`;
@@ -63,6 +86,16 @@ export function GraficoMensal({
   const botoesRef = useRef<(HTMLButtonElement | null)[]>([]);
   /** O mês com o painel aberto (ponteiro ou foco), ou nenhum. */
   const [aberto, setAberto] = useState<number | null>(null);
+  // Escape fecha o painel de qualquer lugar (WCAG 1.4.13), mesmo aberto só
+  // pelo ponteiro e com o foco fora do gráfico; o foco não sai de onde está.
+  useEffect(() => {
+    if (aberto === null) return undefined;
+    function aoTeclar(evento: globalThis.KeyboardEvent) {
+      if (evento.key === "Escape") setAberto(null);
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, [aberto]);
   /** O mês que recebe o Tab do grupo (o último focado). */
   const [daVez, setDaVez] = useState(meses - 1);
 
@@ -82,21 +115,12 @@ export function GraficoMensal({
     if (evento.key === "ArrowLeft") alvo = Math.max(i - 1, 0);
     if (evento.key === "Home") alvo = 0;
     if (evento.key === "End") alvo = meses - 1;
-    if (evento.key === "Escape") {
-      if (aberto !== null) {
-        evento.preventDefault();
-        setAberto(null);
-      }
-      return;
-    }
     if (alvo === null) return;
     evento.preventDefault();
     focar(alvo);
   }
 
-  /** Ao lado da coluna: à direita na primeira metade, à esquerda na segunda. */
-  const alinhamento =
-    aberto === null ? "" : aberto < Math.ceil(meses / 2) ? "depois" : "antes";
+  const posicao = aberto === null ? null : posicaoDoPainel(aberto, meses);
 
   return (
     <div
@@ -175,10 +199,11 @@ export function GraficoMensal({
           <div
             id={idPainel}
             role="tooltip"
-            className={`dashboard__dica-mes dashboard__dica-mes--${alinhamento}`}
+            className={`dashboard__dica-mes dashboard__dica-mes--${posicao?.lado ?? "depois"}`}
             style={{
               ["--coluna" as string]: String(aberto),
               ["--colunas" as string]: String(meses),
+              ["--espaco" as string]: String(posicao?.espaco ?? 1),
             }}
           >
             <p className="dashboard__dica-mes-titulo">

@@ -3,7 +3,8 @@
  *
  * CSV: o mesmo conteúdo que o bloco mostra, com BOM UTF-8 e ponto e vírgula
  * (abre direto nas planilhas comuns em português). Valor indisponível é "—",
- * nunca zero. Nenhum dado pessoal: só números agregados do bloco.
+ * nunca zero. Nenhum dado pessoal: só números agregados do bloco. Texto que
+ * começaria uma fórmula na planilha é guardado como texto.
  *
  * PDF: a impressão nativa do navegador, que oferece "Salvar como PDF". Antes
  * de imprimir, tudo o que não é o bloco escolhido (menu lateral, cabeçalho,
@@ -21,8 +22,18 @@ const FIM_DE_LINHA = "\r\n";
 /** Marca de ordem de bytes (U+FEFF): planilhas reconhecem o UTF-8. */
 const BOM = String.fromCharCode(0xfeff);
 
+/**
+ * Texto que começa com `=`, `+`, `-`, `@`, tabulação ou CR seria lido como
+ * fórmula pela planilha (um nome de departamento, por exemplo). O apóstrofo à
+ * frente faz a planilha guardar o conteúdo como texto, sem perder nada.
+ */
+const INICIO_DE_FORMULA = /^[=+\-@\t\r]/;
+
 function celula(valor: CelulaDoCsv): string {
-  const texto = valor === null ? INDISPONIVEL_NO_CSV : String(valor);
+  let texto = valor === null ? INDISPONIVEL_NO_CSV : String(valor);
+  if (typeof valor === "string" && INICIO_DE_FORMULA.test(texto)) {
+    texto = `'${texto}`;
+  }
   return /[;"\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 

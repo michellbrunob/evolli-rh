@@ -72,6 +72,11 @@
 
 .painel-nav__icone {
   flex: 0 0 auto;
+}
+
+/* A cor do ícone só vale dentro da navegação: o Hub usa o mesmo ícone e dá a
+   cor dele pelo próprio cartão. */
+.painel-nav .painel-nav__icone {
   color: var(--color-ink-subtle);
 }
 
@@ -99,7 +104,7 @@
   font-weight: var(--weight-strong);
 }
 
-.painel-nav__destino--ativo .painel-nav__icone {
+.painel-nav .painel-nav__destino--ativo .painel-nav__icone {
   color: var(--color-action);
 }
 
@@ -256,44 +261,45 @@
   }
 }
 
-/* T207 — paleta Evolli (P-1). A navegação mora na faixa azul-marinho: itens
+/* T207 — paleta Evolli (P-1), só dentro da raiz `.painel-nav` (o ícone também
+   aparece no Hub). A navegação mora na faixa azul-marinho: itens
    em texto claro, hover em marinho realçado, item ativo em azul sólido com
    texto branco e a barra indicadora em verde-água — forma e superfície, além
    do `aria-current`; nunca só cor. */
-.painel-nav__destino,
-.painel-nav__cabecalho {
+.painel-nav .painel-nav__destino,
+.painel-nav .painel-nav__cabecalho {
   color: var(--evolli-sobre-marinho-suave);
 }
 
-.painel-nav__icone,
-.painel-nav__seta,
-.painel-nav__sub {
+.painel-nav .painel-nav__icone,
+.painel-nav .painel-nav__seta,
+.painel-nav .painel-nav__sub {
   color: var(--evolli-sobre-marinho-suave);
 }
 
-.painel-nav__destino:hover,
-.painel-nav__cabecalho:hover {
+.painel-nav .painel-nav__destino:hover,
+.painel-nav .painel-nav__cabecalho:hover {
   background: var(--evolli-marinho-realce);
   color: var(--evolli-sobre-marinho);
 }
 
-.painel-nav__destino--ativo,
-.painel-nav__destino--ativo:hover {
+.painel-nav .painel-nav__destino--ativo,
+.painel-nav .painel-nav__destino--ativo:hover {
   background: var(--evolli-azul);
   color: var(--evolli-sobre-marinho);
 }
 
-.painel-nav__destino--ativo .painel-nav__icone,
-.painel-nav__destino--ativo .painel-nav__sub {
+.painel-nav .painel-nav__destino--ativo .painel-nav__icone,
+.painel-nav .painel-nav__destino--ativo .painel-nav__sub {
   color: var(--evolli-sobre-marinho);
 }
 
-.painel-nav__destino--ativo::before,
-.painel-nav__cabecalho--contem-ativo::before {
+.painel-nav .painel-nav__destino--ativo::before,
+.painel-nav .painel-nav__cabecalho--contem-ativo::before {
   background: var(--evolli-verde-agua);
 }
 
-.painel-nav__cabecalho--contem-ativo {
+.painel-nav .painel-nav__cabecalho--contem-ativo {
   color: var(--evolli-sobre-marinho);
 }
 
@@ -305,28 +311,30 @@
   color: var(--evolli-sobre-marinho);
 }
 
-.painel-nav__submenu {
+.painel-nav .painel-nav__submenu {
   border-left-color: var(--evolli-marinho-divisa);
 }
 
-.painel-nav__destino--sub.painel-nav__destino--ativo::before {
+.painel-nav .painel-nav__destino--sub.painel-nav__destino--ativo::before {
   background: var(--evolli-verde-agua);
 }
 
-.painel-nav__descricao {
+.painel-nav .painel-nav__descricao {
   color: var(--evolli-sobre-marinho-suave);
 }
 
-.painel-nav__modulos--secundario {
+.painel-nav .painel-nav__modulos--secundario {
   border-top-color: var(--evolli-marinho-divisa);
 }
 
-.painel-nav__modulos--secundario .painel-nav__cabecalho,
-.painel-nav__modulos--secundario .painel-nav__destino {
+.painel-nav .painel-nav__modulos--secundario .painel-nav__cabecalho,
+.painel-nav .painel-nav__modulos--secundario .painel-nav__destino {
   color: var(--evolli-sobre-marinho-suave);
 }
 
-.painel-nav__modulos--secundario .painel-nav__destino--ativo,
-.painel-nav__modulos--secundario .painel-nav__cabecalho--contem-ativo {
+.painel-nav .painel-nav__modulos--secundario .painel-nav__destino--ativo,
+.painel-nav
+  .painel-nav__modulos--secundario
+  .painel-nav__cabecalho--contem-ativo {
   color: var(--evolli-sobre-marinho);
 }

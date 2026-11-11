@@ -41,6 +41,7 @@ import {
   LIMITE_DA_SERIE,
   LIMITE_DA_SERIE_TEXTO,
 } from "./DashboardScreen";
+import { posicaoDoPainel } from "./GraficoMensal";
 
 vi.mock("../../api/colaboradoresClient", async () => {
   const actual = await vi.importActual<
@@ -286,6 +287,8 @@ const bloco = (nome: RegExp | string) =>
   screen.getByRole("region", { name: nome });
 const indicador = (nome: string) => screen.getByRole("article", { name: nome });
 const SERIE = "Quadro de colaboradores";
+/** T207 — o grupo neutro da Distribuição do time. */
+const GRUPO_NEUTRO_DO_TESTE = "Outros (agrupados por privacidade)";
 /** T207 — o quadro na vista de tabela (gráfico é a vista padrão). */
 const EM_TABELA = { quadro: "tabela" } as const;
 /** "—" à vista e "indisponível" ao leitor: o texto da célula sem fonte. */
@@ -598,6 +601,76 @@ describe("T205 — série mensal (E-4)", () => {
 });
 
 describe("T205 — falhas e nova tentativa", () => {
+  it("nova tentativa dos totais, troca de aba antes da resposta: o foco não pula para um título depois", async () => {
+    servidorDosContadores.mockRejectedValueOnce(new Error("rede"));
+    const { rerender } = render(<Tela aba="visao-geral" />);
+    await lido();
+    const pendente = adiada<ListagemColaboradoresApi>();
+    servidorDosContadores.mockReturnValueOnce(pendente.promessa);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Tentar de novo os totais de pessoas",
+      }),
+    );
+    rerender(<Tela aba="movimentacao" />);
+    await act(async () => {
+      pendente.resolver(listagem(contadores()));
+    });
+    const atualizar = screen.getByRole("button", { name: "Atualizar" });
+    act(() => atualizar.focus());
+    // A aba Pessoas tem o título que a nova tentativa pediria (mesmo id).
+    rerender(<Tela aba="pessoas" />);
+    await assentar();
+    expect(atualizar).toHaveFocus();
+    rerender(<Tela aba="visao-geral" />);
+    await assentar();
+    expect(atualizar).toHaveFocus();
+  });
+
+  it("nova tentativa dos totais e troca direta para Pessoas (que tem o mesmo título): o foco não é levado", async () => {
+    servidorDosContadores.mockRejectedValueOnce(new Error("rede"));
+    const { rerender } = render(<Tela aba="visao-geral" />);
+    await lido();
+    const pendente = adiada<ListagemColaboradoresApi>();
+    servidorDosContadores.mockReturnValueOnce(pendente.promessa);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Tentar de novo os totais de pessoas",
+      }),
+    );
+    rerender(<Tela aba="pessoas" />);
+    const atualizar = screen.getByRole("button", { name: "Atualizar" });
+    act(() => atualizar.focus());
+    await act(async () => {
+      pendente.resolver(listagem(contadores()));
+    });
+    await assentar();
+    // O título "Pessoas ativas por tipo de vínculo" existe nesta aba, mas o
+    // pedido foi feito na Visão Geral: o foco fica onde a pessoa está.
+    expect(atualizar).toHaveFocus();
+  });
+
+  it("nova tentativa da série com o alvo ausente na aba atual: o pedido de foco é descartado", async () => {
+    vi.mocked(listarMovimentacoes).mockRejectedValueOnce(new Error("rede"));
+    const { rerender } = render(<Tela aba="movimentacao" />);
+    await lido();
+    servidorDeMovimentacoes(MOVIMENTACOES_PADRAO());
+    const pendente = adiada<ResultadoPaginado<MovimentacaoApi>>();
+    vi.mocked(listarMovimentacoes).mockReturnValueOnce(pendente.promessa);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tentar de novo as movimentações" }),
+    );
+    rerender(<Tela aba="pessoas" />);
+    await act(async () => {
+      pendente.resolver({ itens: [], pagina: 1, tamanhoPagina: 100, total: 0 });
+    });
+    const atualizar = screen.getByRole("button", { name: "Atualizar" });
+    act(() => atualizar.focus());
+    rerender(<Tela aba="movimentacao" />);
+    await assentar();
+    expect(atualizar).toHaveFocus();
+  });
+
   it("totais de pessoas falham: alerta e nova tentativa no lugar; a série continua; sucesso leva o foco ao Resumo", async () => {
     servidorDosContadores.mockRejectedValueOnce(new Error("rede"));
     render(<Tela />);
@@ -1285,6 +1358,62 @@ describe("T207 — Visão Geral ampliada: ordem e quadro mensal", () => {
   });
 });
 
+describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca além da borda)", () => {
+  it("em todo ano de 1 a 12 meses e todo mês: o lado com mais espaço, a largura limitada a ele", () => {
+    for (let meses = 1; meses <= 12; meses += 1) {
+      for (let i = 0; i < meses; i += 1) {
+        const p = posicaoDoPainel(i, meses);
+        if (meses === 1) {
+          expect(p).toEqual({ lado: "abaixo", espaco: 1 });
+          continue;
+        }
+        const direita = meses - i - 1;
+        const esquerda = i;
+        if (p.lado === "depois") {
+          expect(p.espaco).toBe(direita);
+          expect(direita).toBeGreaterThanOrEqual(esquerda);
+          // Começa depois da coluna e termina até a borda direita.
+          expect((i + 1 + p.espaco) / meses).toBeLessThanOrEqual(1);
+        } else {
+          expect(p.lado).toBe("antes");
+          expect(p.espaco).toBe(esquerda);
+          expect(esquerda).toBeGreaterThan(direita);
+          // Termina antes da coluna e começa a partir da borda esquerda.
+          expect((i - p.espaco) / meses).toBeGreaterThanOrEqual(0);
+        }
+        expect(p.espaco).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("janeiro do ano corrente (um mês só): o painel abre abaixo das barras, dentro do quadro", async () => {
+    vi.setSystemTime(new Date(2026, 0, 20, 12));
+    servidorDeMovimentacoes([mov("admissao", "2026-01-10")]);
+    render(<Tela />);
+    await lido();
+    const janeiro = within(bloco(SERIE)).getByRole("button", {
+      name: "Janeiro de 2026",
+    });
+    fireEvent.mouseEnter(janeiro);
+    const dica = screen.getByRole("tooltip");
+    expect(dica).toHaveClass("dashboard__dica-mes--abaixo");
+    expect(dica.style.getPropertyValue("--espaco")).toBe("1");
+  });
+
+  it("junho num ano de 11 meses: à direita, com o espaço que sobra (5 colunas), sem passar da borda", async () => {
+    render(<Tela />);
+    await lido();
+    fireEvent.mouseEnter(
+      within(bloco(SERIE)).getByRole("button", { name: "Junho de 2026" }),
+    );
+    const dica = screen.getByRole("tooltip");
+    expect(dica).toHaveClass("dashboard__dica-mes--depois");
+    expect(dica.style.getPropertyValue("--coluna")).toBe("5");
+    expect(dica.style.getPropertyValue("--espaco")).toBe("5");
+    expect(dica.style.getPropertyValue("--colunas")).toBe("11");
+  });
+});
+
 describe("T207 — gráfico mensal interativo", () => {
   const grupoDosMeses = () =>
     within(bloco(SERIE)).getByRole("group", {
@@ -1388,6 +1517,18 @@ describe("T207 — gráfico mensal interativo", () => {
     expect(dica()).toHaveTextContent("Março de 2026");
   });
 
+  it("aberto pelo ponteiro, com o foco em outro lugar: Escape fecha o painel do mês (1.4.13) e o foco não sai", async () => {
+    render(<Tela />);
+    await lido();
+    const resumo = screen.getByRole("heading", { level: 2, name: "Resumo" });
+    act(() => resumo.focus());
+    fireEvent.mouseEnter(mes("Abril de 2026"));
+    expect(dica()).not.toBeNull();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(dica()).toBeNull();
+    expect(resumo).toHaveFocus();
+  });
+
   it("foco sai do gráfico: o painel fecha", async () => {
     render(<Tela />);
     await lido();
@@ -1415,25 +1556,88 @@ describe("T207 — gráfico mensal interativo", () => {
 });
 
 describe("T207 — Distribuição do time e Tempo de casa", () => {
-  it("distribuição: só departamento, maior grupo primeiro, pequenos e sem departamento juntos e sem nome", async () => {
+  it.each(["pessoas", "movimentacao"] as const)(
+    "%s: as pessoas ativas não são lidas (só a Visão Geral as usa), nem em Atualizar",
+    async (aba) => {
+      render(<Tela aba={aba} />);
+      await lido();
+      fireEvent.click(screen.getByRole("button", { name: "Atualizar" }));
+      await lido();
+      await assentar();
+      expect(servidorDosAtivos).not.toHaveBeenCalled();
+    },
+  );
+
+  it("chegar à Visão Geral por outra aba lê as pessoas ativas uma vez; voltar não lê de novo", async () => {
+    const { rerender } = render(<Tela aba="pessoas" />);
+    await lido();
+    expect(servidorDosAtivos).not.toHaveBeenCalled();
+    rerender(<Tela aba="visao-geral" />);
+    await waitFor(() =>
+      expect(bloco("Distribuição do time")).toHaveTextContent(
+        "10 pessoas ativas",
+      ),
+    );
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(1);
+    rerender(<Tela aba="movimentacao" />);
+    rerender(<Tela aba="visao-geral" />);
+    await assentar();
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(1);
+    expect(bloco("Distribuição do time")).toHaveTextContent(
+      "10 pessoas ativas",
+    );
+  });
+
+  it("sair da Visão Geral no meio da leitura do time: a leitura volta ao retornar, sem misturar", async () => {
+    const pendente = adiada<ListagemColaboradoresApi>();
+    servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
+    const { rerender } = render(<Tela aba="visao-geral" />);
+    await waitFor(() => expect(servidorDosAtivos).toHaveBeenCalledTimes(1));
+    rerender(<Tela aba="pessoas" />);
+    await act(async () => {
+      pendente.resolver({
+        itens: Array.from({ length: 4 }, (_, i) =>
+          ativo(`velho-${i}`, "2020-01-01", "Antigo"),
+        ),
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 4,
+        contadores: contadores(),
+      });
+    });
+    rerender(<Tela aba="visao-geral" />);
+    await waitFor(() =>
+      expect(bloco("Distribuição do time")).toHaveTextContent(
+        "10 pessoas ativas",
+      ),
+    );
+    expect(servidorDosAtivos).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Antigo")).toBeNull();
+  });
+
+  it("distribuição: só departamento, maior grupo primeiro; pequenos, sem departamento e (se o neutro ficaria com 1 ou 2) o menor departamento juntos e sem nome", async () => {
     render(<Tela />);
     await lido();
     const b = bloco("Distribuição do time");
     expect(b.querySelector(".dashboard__destaque")).toHaveTextContent(
-      "10 pessoas em 3 departamentos",
+      "10 pessoas ativas",
     );
+    // Jurídico (1) e a pessoa sem departamento dariam um neutro de 2: Vendas
+    // (o menor departamento exibido) entra nele.
     expect(
       within(b)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
     ).toEqual([
       "Operações5 pessoas · 50%",
-      "Vendas3 pessoas · 30%",
-      "Grupos com menos de 3 pessoas ou sem departamento2 pessoas · 20%",
+      `${GRUPO_NEUTRO_DO_TESTE}5 pessoas · 50%`,
     ]);
     expect(screen.queryByText(/Jurídico/)).toBeNull();
+    expect(within(b).queryByText(/Vendas/)).toBeNull();
+    // A quantidade de departamentos não aparece (deduziria os pequenos).
+    expect(b).not.toHaveTextContent(/\d+ departamentos?/);
     expect(b).toHaveTextContent(
-      "Departamentos com menos de 3 pessoas, e quem não tem departamento vigente, ficam juntos",
+      "Departamentos com menos de 3 pessoas e quem não tem departamento vigente ficam num grupo sem nome; se esse grupo ficaria com 1 ou 2 pessoas, o menor departamento entra nele.",
     );
     // Nenhum nome de pessoa aparece no Dashboard.
     expect(screen.queryByText(/Pessoa sintética/)).toBeNull();
@@ -1465,6 +1669,47 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     expect(
       bloco("Tempo de casa").querySelector(".dashboard__destaque"),
     ).toHaveTextContent("2 anos na mediana");
+  });
+
+  it("dois departamentos com o mesmo nome: duas linhas, chave pelo id (sem aviso de chave repetida)", async () => {
+    const comDepartamento = (id: string, depId: string) => {
+      const a = ativo(id, "2025-05-09", "Operações");
+      return {
+        ...a,
+        vinculos: [
+          {
+            ...a.vinculos[0]!,
+            lotacaoVigente: {
+              cargo: null,
+              departamento: { id: depId, codigo: depId, nome: "Operações" },
+            },
+          },
+        ],
+      };
+    };
+    servidorDeAtivos([
+      ...["a1", "a2", "a3"].map((id) => comDepartamento(id, "d-op-norte")),
+      ...["b1", "b2", "b3"].map((id) => comDepartamento(id, "d-op-sul")),
+    ]);
+    const erros = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      render(<Tela />);
+      await lido();
+      expect(
+        within(bloco("Distribuição do time"))
+          .getAllByRole("listitem")
+          .map((li) => li.textContent),
+      ).toEqual(["Operações3 pessoas · 50%", "Operações3 pessoas · 50%"]);
+      escolher("Distribuição do time", "Ver como tabela");
+      expect(
+        within(bloco("Distribuição do time")).getAllByRole("row"),
+      ).toHaveLength(1 + 2 + 1);
+      expect(erros.mock.calls.some((c) => /same key/i.test(String(c[0])))).toBe(
+        false,
+      );
+    } finally {
+      erros.mockRestore();
+    }
   });
 
   it("menos de 3 pessoas ativas: os dois blocos não exibem nada, por privacidade", async () => {
@@ -1601,7 +1846,7 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
       ),
     );
     expect(bloco("Distribuição do time")).toHaveTextContent(
-      "10 pessoas em 3 departamentos",
+      "10 pessoas ativas",
     );
     await act(async () => {
       antiga.resolver({
@@ -1615,7 +1860,7 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
       });
     });
     expect(bloco("Distribuição do time")).toHaveTextContent(
-      "10 pessoas em 3 departamentos",
+      "10 pessoas ativas",
     );
     expect(screen.queryByText("Antigo")).toBeNull();
   });
@@ -1678,16 +1923,28 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
       .join("\n");
   };
 
-  it("painel do mês: dentro do quadro (absoluto, não fixo), camada baixa, no máximo metade da largura", () => {
+  it("painel do mês: dentro do quadro (absoluto, não fixo), camada baixa, largura limitada ao espaço do lado escolhido", () => {
     const dica = regra(".dashboard__dica-mes");
     expect(dica).toMatch(/position:\s*absolute/);
     expect(dica).not.toMatch(/position:\s*fixed/);
     expect(dica).toMatch(/z-index:\s*2;/);
-    expect(dica).toMatch(/max-width:\s*min\(16rem,\s*50%\)/);
+    expect(dica).toMatch(
+      /max-width:\s*min\(\s*16rem,\s*calc\(var\(--espaco\) \/ var\(--colunas\) \* 100% - var\(--space-xxs\)\)\s*\)/,
+    );
+    // Um mês só: no fluxo, abaixo das colunas (sem cobrir a coluna).
+    const abaixo = regra(".dashboard__dica-mes--abaixo");
+    expect(abaixo).toMatch(/position:\s*static/);
+    expect(abaixo).toMatch(/max-width:\s*100%/);
     expect(dica).toMatch(/pointer-events:\s*none/);
     expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
-    expect(regra(".dashboard__dica-mes--depois")).toMatch(/left:/);
-    expect(regra(".dashboard__dica-mes--antes")).toMatch(/right:/);
+    // Depois da coluna: começa na borda direita dela (coluna + 1).
+    expect(regra(".dashboard__dica-mes--depois")).toMatch(
+      /left:\s*calc\(\(var\(--coluna\) \+ 1\) \/ var\(--colunas\) \* 100%\)/,
+    );
+    // Antes da coluna: termina na borda esquerda dela.
+    expect(regra(".dashboard__dica-mes--antes")).toMatch(
+      /right:\s*calc\(\(var\(--colunas\) - var\(--coluna\)\) \/ var\(--colunas\) \* 100%\)/,
+    );
   });
 
   it("grade e quadro em uma coluna que encolhe; faixas quebram em duas linhas no celular", () => {
@@ -1710,9 +1967,6 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
 // T207 — refino: título e informação do quadro, menu de ações, vistas,
 // CSV e PDF reais, e os mesmos números em todas as formas.
 // ---------------------------------------------------------------------------
-
-const GRUPO_NEUTRO_DO_TESTE =
-  "Grupos com menos de 3 pessoas ou sem departamento";
 
 const acoesDo = (nome: string) =>
   screen.getByRole("button", { name: `Ações: ${nome}` });
@@ -1810,6 +2064,24 @@ describe("T207 — Quadro de colaboradores: título, subtítulo e informação",
       screen.getByRole("heading", { level: 2, name: "Resumo" }).focus(),
     );
     expect(painelDaInfo()).not.toBeVisible();
+  });
+
+  it("aberto pelo ponteiro, com o foco em outro lugar: Escape fecha (1.4.13) e o foco não sai de onde estava", async () => {
+    render(<Tela />);
+    await lido();
+    const resumo = screen.getByRole("heading", { level: 2, name: "Resumo" });
+    act(() => resumo.focus());
+    fireEvent.mouseEnter(info().parentElement!);
+    expect(painelDaInfo()).toBeVisible();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(painelDaInfo()).not.toBeVisible();
+    expect(resumo).toHaveFocus();
+    // Fixado pelo clique, também fecha.
+    fireEvent.click(info());
+    act(() => resumo.focus());
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(painelDaInfo()).not.toBeVisible();
+    expect(resumo).toHaveFocus();
   });
 
   it("pressionar o botão e soltar fora (sem clique) não impede o foco pelo teclado de abrir depois", async () => {
@@ -2342,6 +2614,58 @@ describe("T207 — Exportar PDF (impressão do navegador)", () => {
     imprimir.mockRestore();
   });
 
+  it("navegador sem 'afterprint': desmontar a tela remove as marcações da impressão", async () => {
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    const { unmount } = render(<Tela />);
+    await lido();
+    escolher(SERIE, "Exportar PDF");
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    expect(document.querySelector("[data-fora-da-impressao]")).not.toBeNull();
+    unmount();
+    expect(document.querySelector("[data-fora-da-impressao]")).toBeNull();
+    expect(document.querySelector("[data-bloco-impresso]")).toBeNull();
+    expect(
+      document.documentElement.classList.contains("evolli-imprimindo-bloco"),
+    ).toBe(false);
+    imprimir.mockRestore();
+  });
+
+  it("navegador sem 'afterprint': trocar de aba remove as marcações (o Ctrl+P seguinte imprime a página)", async () => {
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    const { rerender } = render(<Tela aba="visao-geral" />);
+    await lido();
+    escolher(SERIE, "Exportar PDF");
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    rerender(<Tela aba="pessoas" />);
+    expect(document.querySelector("[data-fora-da-impressao]")).toBeNull();
+    expect(
+      document.documentElement.classList.contains("evolli-imprimindo-bloco"),
+    ).toBe(false);
+    imprimir.mockRestore();
+  });
+
+  it("em janeiro do ano corrente, o cabeçalho da impressão diz só o mês (sem 'Janeiro a Janeiro')", async () => {
+    vi.setSystemTime(new Date(2026, 0, 20, 12));
+    servidorDeMovimentacoes([mov("admissao", "2026-01-10")]);
+    let cabecalho: string | null = null;
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {
+      cabecalho =
+        document.querySelector("[data-bloco-impresso] .dashboard__so-impressao")
+          ?.textContent ?? null;
+    });
+    render(<Tela />);
+    await lido();
+    escolher(SERIE, "Exportar PDF");
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    expect(cabecalho).toBe(
+      "Empresa Sintética Alfa · Quadro de colaboradores · Janeiro de 2026",
+    );
+    act(() => {
+      window.dispatchEvent(new Event("afterprint"));
+    });
+    imprimir.mockRestore();
+  });
+
   it("tela desmontada antes de a impressão abrir: nada é impresso nem marcado", async () => {
     const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
     const { unmount } = render(<Tela />);
@@ -2374,14 +2698,12 @@ describe("T207 — Distribuição e Tempo de casa: gráfico, tabela e exportaç�
     expect(linhas).toEqual([
       ["Grupo", "Pessoas", "Percentual"],
       ["Operações", "5", "50%"],
-      ["Vendas", "3", "30%"],
-      [GRUPO_NEUTRO_DO_TESTE, "2", "20%"],
+      [GRUPO_NEUTRO_DO_TESTE, "5", "50%"],
       ["Total", "10", "100%"],
     ]);
     expect(doGrafico).toEqual([
       "Operações5 pessoas · 50%",
-      "Vendas3 pessoas · 30%",
-      `${GRUPO_NEUTRO_DO_TESTE}2 pessoas · 20%`,
+      `${GRUPO_NEUTRO_DO_TESTE}5 pessoas · 50%`,
     ]);
     expect(
       within(bloco("Distribuição do time")).queryByRole("list"),
@@ -2399,8 +2721,7 @@ describe("T207 — Distribuição e Tempo de casa: gráfico, tabela e exportaç�
     expect(linhasDoCsv(texto)).toEqual([
       ["Grupo", "Pessoas", "Percentual"],
       ["Operações", "5", "50%"],
-      ["Vendas", "3", "30%"],
-      [GRUPO_NEUTRO_DO_TESTE, "2", "20%"],
+      [GRUPO_NEUTRO_DO_TESTE, "5", "50%"],
     ]);
     expect(texto).not.toMatch(/Jurídico|Pessoa sintética/);
   });

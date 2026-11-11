@@ -46,11 +46,18 @@ export function InfoComoCalculamos({
       if (alvo instanceof Node && raizRef.current?.contains(alvo)) return;
       fechar();
     }
+    // Escape fecha de qualquer lugar (WCAG 1.4.13), mesmo aberto só pelo
+    // ponteiro e com o foco fora daqui; o foco não sai de onde está.
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") fechar();
+    }
     document.addEventListener("pointerdown", aoPressionarFora);
     document.addEventListener("mousedown", aoPressionarFora);
+    document.addEventListener("keydown", aoTeclar);
     return () => {
       document.removeEventListener("pointerdown", aoPressionarFora);
       document.removeEventListener("mousedown", aoPressionarFora);
+      document.removeEventListener("keydown", aoTeclar);
     };
   }, [aberto]);
 
@@ -60,13 +67,6 @@ export function InfoComoCalculamos({
       className="dashboard__info dashboard__sem-impressao"
       onMouseEnter={() => setPorPonteiro(true)}
       onMouseLeave={() => setPorPonteiro(false)}
-      onKeyDown={(evento) => {
-        if (evento.key === "Escape" && aberto) {
-          evento.preventDefault();
-          evento.stopPropagation();
-          fechar();
-        }
-      }}
       onBlur={(evento) => {
         const destino = evento.relatedTarget;
         if (destino instanceof Node && raizRef.current?.contains(destino)) {

@@ -249,13 +249,17 @@ export function fraseResumo(
 // com o mesmo teto das séries (20 páginas = 2.000 pessoas). Acima do teto, a
 // leitura é marcada como excedida e nenhum número é mostrado.
 //
-// De cada pessoa ativa, só o VÍNCULO PRINCIPAL (o primeiro, na ordem do
-// servidor: ativo antes de previsto e encerrado): a data de admissão dele e o
-// departamento da lotação vigente. Nenhum dado pessoal é lido.
+// A listagem devolve o cadastro listado de cada pessoa ativa (inclusive o
+// nome). Daqui só sai, do VÍNCULO PRINCIPAL (o primeiro, na ordem do servidor:
+// ativo antes de previsto e encerrado), o id da pessoa, a data de admissão e o
+// departamento da lotação vigente; o resto é descartado na leitura, sem ser
+// guardado nem exibido. A leitura só acontece na Visão Geral.
 //
 // Privacidade: nenhum grupo com menos de `MINIMO_DO_GRUPO` pessoas aparece
-// com nome ou número exato — grupos pequenos são somados num grupo neutro, e
-// com menos de 3 pessoas no total nada é exibido.
+// com nome ou número exato, nem pode ser deduzido — grupos pequenos são
+// somados num grupo neutro (que, se ficasse com 1 ou 2 pessoas, recebe também
+// o menor departamento), a quantidade de departamentos não é exibida, e com
+// menos de 3 pessoas no total nada é exibido.
 // ---------------------------------------------------------------------------
 
 export const MINIMO_DO_GRUPO = 3;
@@ -332,8 +336,10 @@ export async function lerTimeDeHoje(
   return { tipo: "excedido" };
 }
 
-/** Um grupo exibível: nome e quantidade (sempre >= `MINIMO_DO_GRUPO`). */
+/** Um grupo exibível: id, nome e quantidade (sempre >= `MINIMO_DO_GRUPO`). */
 export interface GrupoDoTime {
+  /** Id do departamento: chave estável (nomes podem se repetir). */
+  readonly id: string;
   readonly nome: string;
   readonly pessoas: number;
 }
@@ -343,13 +349,12 @@ export type DistribuicaoDoTime =
   | {
       readonly tipo: "distribuida";
       readonly total: number;
-      /** Departamentos com pelo menos `MINIMO_DO_GRUPO` pessoas. */
+      /** Departamentos exibidos com nome (cada um com 3 ou mais pessoas). */
       readonly grupos: readonly GrupoDoTime[];
-      /** Quantos departamentos têm ao menos uma pessoa (com nome). */
-      readonly departamentos: number;
       /**
-       * Pessoas somadas no grupo neutro: departamentos pequenos e quem não
-       * tem departamento vigente. `0` quando não há.
+       * Pessoas somadas no grupo neutro: departamentos pequenos, quem não tem
+       * departamento vigente e, se preciso, o menor departamento. `0` ou ao
+       * menos `MINIMO_DO_GRUPO`.
        */
       readonly agrupadas: number;
     };
@@ -357,7 +362,10 @@ export type DistribuicaoDoTime =
 /**
  * Pessoas ativas por departamento da lotação vigente. Departamento com menos
  * de `MINIMO_DO_GRUPO` pessoas, e as pessoas sem departamento vigente, vão
- * para um grupo neutro, sem nome. Ordem: maior grupo primeiro, depois nome.
+ * para um grupo neutro, sem nome. Se o grupo neutro ficaria com 1 ou 2
+ * pessoas, o menor departamento exibido entra nele, até o neutro ter ao menos
+ * `MINIMO_DO_GRUPO` (ou ficarem só ele e nenhum nome). Ordem: maior grupo
+ * primeiro, depois nome.
  */
 export function distribuirPorDepartamento(
   pessoas: readonly PessoaAtivaDoTime[],
@@ -373,6 +381,7 @@ export function distribuirPorDepartamento(
     }
     const atual = porId.get(p.departamento.id);
     porId.set(p.departamento.id, {
+      id: p.departamento.id,
       nome: p.departamento.nome,
       pessoas: (atual?.pessoas ?? 0) + 1,
     });
@@ -383,18 +392,17 @@ export function distribuirPorDepartamento(
     .sort(
       (a, b) => b.pessoas - a.pessoas || a.nome.localeCompare(b.nome, "pt-BR"),
     );
-  const agrupadas =
+  let agrupadas =
     semDepartamento +
     todos
       .filter((g) => g.pessoas < MINIMO_DO_GRUPO)
       .reduce((soma, g) => soma + g.pessoas, 0);
-  return {
-    tipo: "distribuida",
-    total,
-    grupos,
-    departamentos: todos.length,
-    agrupadas,
-  };
+  // Grupo neutro de 1 ou 2 pessoas entregaria o tamanho de um grupo pequeno:
+  // o menor departamento exibido (o último na ordem) entra nele.
+  while (agrupadas > 0 && agrupadas < MINIMO_DO_GRUPO && grupos.length > 0) {
+    agrupadas += grupos.pop()!.pessoas;
+  }
+  return { tipo: "distribuida", total, grupos, agrupadas };
 }
 
 /** Faixas de tempo de casa, em meses completos `[de, ate)`. */

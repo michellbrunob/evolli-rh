@@ -635,4 +635,43 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
       /\.seletor-empresa__opcao:focus-visible[\s\S]*?outline: var\(--focus-width\) solid var\(--evolli-azul\)/,
     );
   });
+
+  it("selo 'Atual' abaixo do nome, na coluna do texto; o nome só quebra entre palavras (faixa estreita)", () => {
+    const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+    const regra = (seletor: string) => {
+      const blocos: string[] = [];
+      let inicio = css.indexOf(`\n${seletor} {`);
+      while (inicio >= 0) {
+        blocos.push(css.slice(inicio, css.indexOf("}", inicio)));
+        inicio = css.indexOf(`\n${seletor} {`, inicio + 1);
+      }
+      expect(blocos.length, seletor).toBeGreaterThan(0);
+      return blocos.join("\n");
+    };
+    // Duas colunas (monograma e textos): o selo desce para a coluna 2.
+    expect(regra(".seletor-empresa__opcao")).toMatch(
+      /grid-template-columns:\s*auto minmax\(0,\s*1fr\)/,
+    );
+    expect(regra(".seletor-empresa__atual")).toMatch(/grid-column:\s*2;/);
+    // A regra que vale é a última do arquivo para o nome: só entre palavras.
+    const ultima = [
+      ...css.matchAll(/\n\.seletor-empresa__opcao-nome \{([^}]*)\}/g),
+    ].at(-1)![1]!;
+    expect(ultima).toMatch(/overflow-wrap:\s*break-word/);
+    expect(ultima).not.toMatch(/word-break:\s*break-all/);
+  });
+
+  it("no DOM, o selo 'Atual' vem depois do nome e do código, dentro da opção atual", async () => {
+    montar();
+    await abrirLista();
+    const marcada = screen
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("aria-current") === "true")!;
+    const textos = marcada.querySelector(".seletor-empresa__opcao-textos")!;
+    const selo = marcada.querySelector(".seletor-empresa__atual")!;
+    expect(selo).toHaveTextContent("Atual");
+    expect(
+      textos.compareDocumentPosition(selo) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });

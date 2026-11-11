@@ -2,7 +2,8 @@
  * T207 — blocos do time na Visão Geral: Distribuição do time (por
  * departamento) e Tempo de casa. Só pessoas ativas hoje, só o vínculo
  * principal, só a empresa da sessão — e nenhum grupo com menos de 3 pessoas
- * aparece com nome ou número exato (ver `dashboardDados.ts`).
+ * aparece com nome ou número exato, nem pode ser deduzido pelos outros números
+ * do bloco (ver `dashboardDados.ts`).
  *
  * Com dado real, cada bloco tem gráfico e tabela (os mesmos números) e o
  * menu de reticências: trocar a vista, baixar o CSV e imprimir só o bloco.
@@ -45,7 +46,7 @@ interface PropsDoBloco {
 const TEXTO_DO_TETO =
   "Mais de 2.000 pessoas ativas: o limite desta visão. Os números não são exibidos para não mostrar um total incompleto.";
 
-export const GRUPO_NEUTRO = "Grupos com menos de 3 pessoas ou sem departamento";
+export const GRUPO_NEUTRO = "Outros (agrupados por privacidade)";
 
 function Carregando() {
   return (
@@ -73,8 +74,9 @@ function porcentagem(parte: number, total: number): string {
   return `${Math.round((parte / total) * 100)}%`;
 }
 
-/** Linha de um bloco do time: nome e quantidade (já seguros). */
+/** Linha de um bloco do time: chave estável, nome e quantidade (já seguros). */
 interface LinhaDoTime {
+  readonly chave: string;
   readonly nome: string;
   readonly pessoas: number;
   readonly neutro?: boolean;
@@ -171,7 +173,7 @@ function TabelaDoTime({
         </thead>
         <tbody>
           {linhas.map((l) => (
-            <tr key={l.nome}>
+            <tr key={l.chave}>
               <th scope="row">{l.nome}</th>
               <td>{l.pessoas}</td>
               <td>{porcentagem(l.pessoas, total)}</td>
@@ -240,9 +242,20 @@ export function DistribuicaoDoTimeBloco({
       conteudo = <PoucaGente assunto="a distribuição" />;
     } else {
       const linhas: LinhaDoTime[] = [
-        ...d.grupos.map((g) => ({ nome: g.nome, pessoas: g.pessoas })),
+        ...d.grupos.map((g) => ({
+          chave: g.id,
+          nome: g.nome,
+          pessoas: g.pessoas,
+        })),
         ...(d.agrupadas > 0
-          ? [{ nome: GRUPO_NEUTRO, pessoas: d.agrupadas, neutro: true }]
+          ? [
+              {
+                chave: "neutro",
+                nome: GRUPO_NEUTRO,
+                pessoas: d.agrupadas,
+                neutro: true,
+              },
+            ]
           : []),
       ];
       acoes = acoesDoBloco({
@@ -263,8 +276,7 @@ export function DistribuicaoDoTimeBloco({
         <>
           <p className="dashboard__destaque">
             <span className="dashboard__destaque-valor">{String(d.total)}</span>{" "}
-            {d.total === 1 ? "pessoa" : "pessoas"} em{" "}
-            {plural(d.departamentos, "departamento", "departamentos")}
+            pessoas ativas
           </p>
           {vista === "tabela" ? (
             <TabelaDoTime
@@ -278,7 +290,7 @@ export function DistribuicaoDoTimeBloco({
               <div className="dashboard__barra-tipos" aria-hidden="true">
                 {linhas.map((l, i) => (
                   <span
-                    key={l.nome}
+                    key={l.chave}
                     className={
                       l.neutro
                         ? "dashboard__barra-tipo dashboard__barra-grupo--neutro"
@@ -290,7 +302,7 @@ export function DistribuicaoDoTimeBloco({
               </div>
               <ul className="dashboard__grupos">
                 {linhas.map((l, i) => (
-                  <li key={l.nome} className="dashboard__grupo">
+                  <li key={l.chave} className="dashboard__grupo">
                     <span
                       className={
                         l.neutro
@@ -310,8 +322,10 @@ export function DistribuicaoDoTimeBloco({
             </>
           )}
           <p className="dashboard__explicacao">
-            Departamentos com menos de {MINIMO_DO_GRUPO} pessoas, e quem não tem
-            departamento vigente, ficam juntos para não identificar ninguém.
+            Departamentos com menos de {MINIMO_DO_GRUPO} pessoas e quem não tem
+            departamento vigente ficam num grupo sem nome; se esse grupo ficaria
+            com 1 ou 2 pessoas, o menor departamento entra nele. Assim nenhum
+            número permite identificar alguém.
           </p>
           <ComoCalculamos assunto="distribuição do time">
             <p>
@@ -375,6 +389,7 @@ export function TempoDeCasaBloco({
       conteudo = <PoucaGente assunto="o tempo de casa" />;
     } else {
       const linhas: LinhaDoTime[] = t.faixas.map((f) => ({
+        chave: f.rotulo,
         nome: f.rotulo,
         pessoas: f.pessoas,
       }));

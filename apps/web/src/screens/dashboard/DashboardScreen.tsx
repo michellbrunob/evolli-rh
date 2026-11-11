@@ -77,6 +77,7 @@ import {
   type VistaDoBloco,
 } from "./componentesDoDashboard";
 import { QuadroDeColaboradores } from "./QuadroDeColaboradores";
+import { limparImpressao } from "./exportacao";
 import { DistribuicaoDoTimeBloco, TempoDeCasaBloco } from "./BlocosDoTime";
 import { GraficoMensal } from "./GraficoMensal";
 import "./DashboardScreen.css";
@@ -236,11 +237,23 @@ export function DashboardScreen({
       vivaRef.current = false;
     };
   }, []);
+  /** Há uma leitura das pessoas ativas valendo agora. */
+  const timeEmLeituraRef = useRef(false);
   /** Só a leitura mais recente de cada parte vale. */
   const geracaoRef = useRef({ leitura: 0, contadores: 0, series: 0, time: 0 });
   const contadorDeAvisosRef = useRef(0);
   /** `id` do elemento que recebe o foco depois do próximo desenho. */
   const focoRef = useRef<string | null>(null);
+  /** A aba exibida agora (lida depois de cada espera). */
+  const abaRef = useRef(aba);
+  abaRef.current = aba;
+  /**
+   * Pede o foco para depois do próximo desenho — só se a pessoa continua na
+   * aba em que pediu a nova tentativa. Trocou de aba no meio: nada de foco.
+   */
+  function pedirFoco(id: string, abaDoPedido: AbaDoDashboard) {
+    if (abaRef.current === abaDoPedido) focoRef.current = id;
+  }
 
   const lerContadores = useCallback(async (): Promise<boolean> => {
     const geracao = ++geracaoRef.current.contadores;
@@ -303,16 +316,19 @@ export function DashboardScreen({
   const lerTime = useCallback(async (): Promise<boolean> => {
     const geracao = ++geracaoRef.current.time;
     const vale = () => vivaRef.current && geracao === geracaoRef.current.time;
+    timeEmLeituraRef.current = true;
     try {
       const lido = await lerTimeDeHoje(
         (query) => listarColaboradores(query),
         vale,
       );
       if (!vale()) return false;
+      timeEmLeituraRef.current = false;
       setTime({ tipo: "dados", dados: lido });
       return true;
     } catch {
       if (!vale()) return false;
+      timeEmLeituraRef.current = false;
       setTime(proximaFalha);
       return false;
     }
@@ -349,11 +365,15 @@ export function DashboardScreen({
           ? s
           : { tipo: "carregando" },
       );
-      setTime((p) => (p.tipo === "dados" ? p : { tipo: "carregando" }));
+      // As pessoas ativas só são lidas onde são usadas: na Visão Geral.
+      const comTime = abaRef.current === "visao-geral";
+      if (comTime) {
+        setTime((p) => (p.tipo === "dados" ? p : { tipo: "carregando" }));
+      }
       const [okContadores, dadosSeries, okTime] = await Promise.all([
         lerContadores(),
         lerSeries(anoLido),
-        lerTime(),
+        comTime ? lerTime() : Promise.resolve(false),
       ]);
       if (!vivaRef.current || geracao !== geracaoRef.current.leitura) return;
       setLendo(false);
@@ -379,35 +399,59 @@ export function DashboardScreen({
       geracaoRef.current.series += 1;
       geracaoRef.current.contadores += 1;
       geracaoRef.current.time += 1;
+      timeEmLeituraRef.current = false;
       setLendo(false);
       return;
     }
     void lerTudo(ano);
   }, [lerDados, ano, lerTudo]);
 
+  // As pessoas ativas de hoje: só na Visão Geral. Chegar a ela sem o time lido
+  // (vindo de outra aba) lê uma vez; sair no meio da leitura a invalida, e a
+  // volta lê de novo — nada de outra aba é desenhado depois.
+  const leTime = lerDados && aba === "visao-geral";
+  const timeRef = useRef(time);
+  timeRef.current = time;
+  useEffect(() => {
+    if (!leTime) {
+      if (timeEmLeituraRef.current) {
+        geracaoRef.current.time += 1;
+        timeEmLeituraRef.current = false;
+      }
+      return;
+    }
+    if (timeEmLeituraRef.current || timeRef.current.tipo !== "carregando") {
+      return;
+    }
+    void lerTime();
+  }, [leTime, lerTime]);
+
   async function novaTentativaDosContadores() {
+    const abaDoPedido = abaRef.current;
     if (contadores.tipo !== "erro" || contadores.relendo) return;
     setContadores(emNovaLeitura);
     if (await lerContadores()) {
-      focoRef.current = ids.pessoas;
+      pedirFoco(ids.pessoas, abaDoPedido);
       concluir(`Totais de pessoas lidos em {instante}.`);
     }
   }
 
   async function novaTentativaDaSerie() {
+    const abaDoPedido = abaRef.current;
     if (series.tipo !== "erro" || series.relendo) return;
     setSeries(emNovaLeitura);
     if ((await lerSeries(ano)) !== null) {
-      focoRef.current = ids.serie;
+      pedirFoco(ids.serie, abaDoPedido);
       concluir(`Movimentações de ${ano} lidas em {instante}.`);
     }
   }
 
   async function novaTentativaDoTime() {
+    const abaDoPedido = abaRef.current;
     if (time.tipo !== "erro" || time.relendo) return;
     setTime(emNovaLeitura);
     if (await lerTime()) {
-      focoRef.current = ids.distribuicao;
+      pedirFoco(ids.distribuicao, abaDoPedido);
       concluir(`Distribuição e tempo de casa lidos em {instante}.`);
     }
   }
@@ -427,11 +471,17 @@ export function DashboardScreen({
   useEffect(() => {
     const id = focoRef.current;
     if (id === null) return;
-    const alvo = document.getElementById(id);
-    if (!alvo) return;
+    // O pedido vale uma vez: com o alvo ausente (outra aba), é descartado.
     focoRef.current = null;
-    alvo.focus();
+    document.getElementById(id)?.focus();
   });
+  // Trocar de aba descarta um pedido de foco ainda não atendido.
+  useEffect(() => {
+    focoRef.current = null;
+  }, [aba]);
+  // A preparação de uma impressão não depende só do `afterprint` (que nem todo
+  // navegador dispara): trocar de aba ou sair da tela também a desfaz.
+  useEffect(() => () => limparImpressao(), [aba]);
 
   // ---- Abas: setas, Home e End movem o foco; Enter e Espaço ativam --------
   function aoTeclarNaAba(evento: KeyboardEvent<HTMLButtonElement>) {

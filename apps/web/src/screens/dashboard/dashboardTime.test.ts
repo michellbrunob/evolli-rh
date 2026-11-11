@@ -150,7 +150,7 @@ describe("T207 — distribuirPorDepartamento (privacidade)", () => {
     });
   });
 
-  it("departamento pequeno e sem departamento vão para o grupo neutro; ordem por tamanho e nome", () => {
+  it("departamento pequeno e sem departamento vão para o grupo neutro; ordem por tamanho e nome; chave pelo id", () => {
     const d = distribuirPorDepartamento([
       ...varias(3, null, "Vendas"),
       ...varias(5, null, "Operações"),
@@ -162,16 +162,77 @@ describe("T207 — distribuirPorDepartamento (privacidade)", () => {
       tipo: "distribuida",
       total: 14,
       grupos: [
-        { nome: "Operações", pessoas: 5 },
-        { nome: "Atendimento", pessoas: 3 },
-        { nome: "Vendas", pessoas: 3 },
+        { id: "d-Operações", nome: "Operações", pessoas: 5 },
+        { id: "d-Atendimento", nome: "Atendimento", pessoas: 3 },
+        { id: "d-Vendas", nome: "Vendas", pessoas: 3 },
       ],
-      departamentos: 4,
       agrupadas: 3,
     });
-    if (d.tipo !== "distribuida") return;
     // Nenhum nome de grupo pequeno sai da função.
     expect(JSON.stringify(d)).not.toContain("Jurídico");
+  });
+
+  it("grupo neutro de 1 ou 2 pessoas nunca aparece: o menor departamento entra nele", () => {
+    // Sem a junção: Operações 5, Vendas 3 e um grupo neutro de 2 — o tamanho
+    // exato de um grupo pequeno.
+    expect(
+      distribuirPorDepartamento([
+        ...varias(5, null, "Operações"),
+        ...varias(3, null, "Vendas"),
+        ...varias(2, null, "Jurídico"),
+      ]),
+    ).toEqual({
+      tipo: "distribuida",
+      total: 10,
+      grupos: [{ id: "d-Operações", nome: "Operações", pessoas: 5 }],
+      agrupadas: 5,
+    });
+  });
+
+  it("um só departamento grande e 1 pessoa fora dele: tudo no grupo neutro", () => {
+    expect(
+      distribuirPorDepartamento([
+        ...varias(9, null, "Comercial"),
+        ...varias(1, null, "Diretoria"),
+      ]),
+    ).toEqual({ tipo: "distribuida", total: 10, grupos: [], agrupadas: 10 });
+  });
+
+  it("a quantidade de departamentos não sai da função (não permite deduzir departamentos pequenos)", () => {
+    const d = distribuirPorDepartamento([
+      ...varias(5, null, "Operações"),
+      ...varias(1, null, "Jurídico"),
+      ...varias(1, null, "Diretoria"),
+      ...varias(1, null, null),
+    ]);
+    expect(Object.keys(d).sort()).toEqual([
+      "agrupadas",
+      "grupos",
+      "tipo",
+      "total",
+    ]);
+  });
+
+  it("em qualquer composição: grupos com nome têm 3 ou mais, o neutro tem 0 ou 3 ou mais, e a soma é o total", () => {
+    const nomes = ["A", "B", "C", "D"];
+    for (let codigo = 0; codigo < 6 ** 4 * 4; codigo += 1) {
+      let resto = codigo;
+      const pessoas: PessoaAtivaDoTime[] = [];
+      for (const nome of nomes) {
+        pessoas.push(...varias(resto % 6, null, nome));
+        resto = Math.floor(resto / 6);
+      }
+      pessoas.push(...varias(resto % 4, null, null));
+      const d = distribuirPorDepartamento(pessoas);
+      if (d.tipo !== "distribuida") continue;
+      for (const g of d.grupos) {
+        expect(g.pessoas).toBeGreaterThanOrEqual(MINIMO_DO_GRUPO);
+      }
+      expect(d.agrupadas === 0 || d.agrupadas >= MINIMO_DO_GRUPO).toBe(true);
+      expect(d.grupos.reduce((s, g) => s + g.pessoas, 0) + d.agrupadas).toBe(
+        d.total,
+      );
+    }
   });
 
   it("todos sem departamento: só o grupo neutro", () => {
@@ -179,7 +240,6 @@ describe("T207 — distribuirPorDepartamento (privacidade)", () => {
       tipo: "distribuida",
       total: 4,
       grupos: [],
-      departamentos: 0,
       agrupadas: 4,
     });
   });
