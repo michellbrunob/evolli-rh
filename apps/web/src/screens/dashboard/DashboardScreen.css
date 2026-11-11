@@ -939,19 +939,19 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 }
 
 /* Painel do mês: dentro do quadro (nunca por cima de modal, guarda ou
-   menu). Ao lado da coluna inspecionada, no lado com mais colunas livres e
-   com a largura limitada a elas (ver `posicaoDoPainel`): nunca cobre a
-   própria barra e nunca passa da borda. Sem largura útil ao lado, abre
-   abaixo das barras (`--abaixo`). */
+   menu). Abre logo abaixo da faixa das colunas (barras e nomes dos meses),
+   alinhado ao mês aberto e estendido para o lado com mais colunas livres,
+   com a largura limitada a elas (ver `posicaoDoPainel`): não cobre nenhum
+   mês, e nunca passa da borda. Sem largura útil, entra no fluxo (`--abaixo`). */
 .dashboard__dica-mes {
   position: absolute;
-  top: 0;
+  top: 100%;
   z-index: 2;
   display: grid;
   gap: var(--space-xxs);
   width: max-content;
-  /* Só o espaço livre do lado escolhido (colunas inteiras), com uma folga
-     antes da borda: nunca sobre a coluna inspecionada, nunca além da borda. */
+  /* No máximo a largura das colunas livres do lado escolhido, com uma folga:
+     como o painel começa na borda do próprio mês, nunca passa da borda. */
   max-width: min(
     16rem,
     calc(var(--espaco) / var(--colunas) * 100% - var(--space-xxs))
@@ -974,15 +974,16 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   margin-top: var(--space-xs);
 }
 
-/* Encostado na coluna vizinha, sem margem: o ponteiro vai da coluna ao
-   painel sem passar por uma fresta de outra coluna (que trocaria o mês), e o
-   painel recebe o ponteiro (WCAG 1.4.13). */
+/* Debaixo do próprio mês, sem margem: o ponteiro desce da coluna ao painel
+   sem cruzar outro mês, e o painel recebe o ponteiro (WCAG 1.4.13) sem
+   encobrir coluna nenhuma — a varredura pelos meses continua livre.
+   "depois": começa na borda esquerda do mês; "antes": termina na direita. */
 .dashboard__dica-mes--depois {
-  left: calc((var(--coluna) + 1) / var(--colunas) * 100%);
+  left: calc(var(--coluna) / var(--colunas) * 100%);
 }
 
 .dashboard__dica-mes--antes {
-  right: calc((var(--colunas) - var(--coluna)) / var(--colunas) * 100%);
+  right: calc((var(--colunas) - var(--coluna) - 1) / var(--colunas) * 100%);
 }
 
 .dashboard__dica-mes-titulo {

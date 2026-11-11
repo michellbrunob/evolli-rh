@@ -1361,7 +1361,7 @@ describe("T207 — Visão Geral ampliada: ordem e quadro mensal", () => {
   });
 });
 
-describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca além da borda)", () => {
+describe("T207 — posição do painel do mês (nunca sobre um mês, nunca além da borda)", () => {
   it("em todo ano de 1 a 12 meses e todo mês: o lado com mais espaço, a largura limitada a ele", () => {
     for (let meses = 1; meses <= 12; meses += 1) {
       for (let i = 0; i < meses; i += 1) {
@@ -1375,13 +1375,15 @@ describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca alé
         if (p.lado === "depois") {
           expect(p.espaco).toBe(direita);
           expect(direita).toBeGreaterThanOrEqual(esquerda);
-          // Começa depois da coluna e termina até a borda direita.
+          // Começa na borda esquerda do mês (abaixo das colunas); com no
+          // máximo `espaco` colunas, termina antes da borda direita.
           expect((i + 1 + p.espaco) / meses).toBeLessThanOrEqual(1);
         } else {
           expect(p.lado).toBe("antes");
           expect(p.espaco).toBe(esquerda);
           expect(esquerda).toBeGreaterThan(direita);
-          // Termina antes da coluna e começa a partir da borda esquerda.
+          // Termina na borda direita do mês (abaixo das colunas); com no
+          // máximo `espaco` colunas, começa depois da borda esquerda.
           expect((i - p.espaco) / meses).toBeGreaterThanOrEqual(0);
         }
         expect(p.espaco).toBeGreaterThan(0);
@@ -1456,7 +1458,7 @@ describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca alé
     }
   });
 
-  it("CSS: o painel recebe o ponteiro (WCAG 1.4.13) e encosta na coluna vizinha, sem fresta que troque o mês no caminho", () => {
+  it("CSS: o painel recebe o ponteiro (WCAG 1.4.13) e fica rente ao mês, sem margem que abra caminho por outro mês", () => {
     const css = readFileSync(
       "src/screens/dashboard/DashboardScreen.css",
       "utf8",
@@ -1476,6 +1478,68 @@ describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca alé
       ".dashboard__dica-mes--antes",
     ]) {
       expect(regra(lado), lado).not.toMatch(/margin-(left|right):/);
+    }
+  });
+
+  it("CSS (G1): o painel lateral abre abaixo da faixa das colunas, alinhado ao mês aberto — não cobre nenhum outro mês", () => {
+    const css = readFileSync(
+      "src/screens/dashboard/DashboardScreen.css",
+      "utf8",
+    );
+    const regra = (seletor: string) => {
+      const blocos: string[] = [];
+      let inicio = css.indexOf(`\n${seletor} {`);
+      while (inicio >= 0) {
+        blocos.push(css.slice(inicio, css.indexOf("}", inicio)));
+        inicio = css.indexOf(`\n${seletor} {`, inicio + 1);
+      }
+      return blocos.join("\n");
+    };
+    // A área do gráfico é a referência do painel; abaixo dela, nada de mês.
+    expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
+    const painel = regra(".dashboard__dica-mes");
+    expect(painel).toMatch(/position:\s*absolute/);
+    expect(painel).toMatch(/\btop:\s*100%;/);
+    expect(painel).not.toMatch(/\btop:\s*0;/);
+    // "depois": começa na borda esquerda do mês aberto.
+    expect(regra(".dashboard__dica-mes--depois")).toMatch(
+      /left:\s*calc\(var\(--coluna\) \/ var\(--colunas\) \* 100%\);/,
+    );
+    // "antes": termina na borda direita do mês aberto.
+    expect(regra(".dashboard__dica-mes--antes")).toMatch(
+      /right:\s*calc\(\s*\(var\(--colunas\) - var\(--coluna\) - 1\) \/ var\(--colunas\) \* 100%\s*\);/,
+    );
+  });
+
+  it("G1: o painel lateral fica na área do gráfico, logo depois da faixa das colunas, e os nomes dos meses ficam dentro das colunas", async () => {
+    render(<Tela />);
+    await lido();
+    const area = bloco(SERIE).querySelector<HTMLElement>(
+      ".dashboard__area-grafico",
+    )!;
+    const marco = within(bloco(SERIE)).getByRole("button", {
+      name: "Março de 2026",
+    });
+    fireEvent.mouseEnter(marco);
+    const painel = screen.getByRole("tooltip");
+    expect(painel).toHaveClass("dashboard__dica-mes--depois");
+    // Só a faixa das colunas e o painel: `top: 100%` é o fim da faixa.
+    expect([...area.children]).toEqual([
+      area.querySelector(".dashboard__colunas"),
+      painel,
+    ]);
+    for (const coluna of area.querySelectorAll(".dashboard__coluna")) {
+      expect(coluna.querySelector(".dashboard__mes")).not.toBeNull();
+    }
+    // O painel recebe o ponteiro: entrar nele mantém o mês.
+    fireEvent.mouseEnter(painel);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Março de 2026");
+    // Varredura: cada mês, um depois do outro, abre o próprio painel.
+    for (const nome of ["Abril", "Maio", "Junho"]) {
+      fireEvent.mouseEnter(
+        within(bloco(SERIE)).getByRole("button", { name: `${nome} de 2026` }),
+      );
+      expect(screen.getByRole("tooltip")).toHaveTextContent(`${nome} de 2026`);
     }
   });
 
@@ -2198,13 +2262,15 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
     // O painel recebe o ponteiro (WCAG 1.4.13): sem `pointer-events: none`.
     expect(dica).not.toMatch(/pointer-events:\s*none/);
     expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
-    // Depois da coluna: começa na borda direita dela (coluna + 1).
+    // G1 — abaixo da faixa das colunas, sem cobrir mês nenhum.
+    expect(dica).toMatch(/\btop:\s*100%;/);
+    // "depois": começa na borda esquerda do próprio mês.
     expect(regra(".dashboard__dica-mes--depois")).toMatch(
-      /left:\s*calc\(\(var\(--coluna\) \+ 1\) \/ var\(--colunas\) \* 100%\)/,
+      /left:\s*calc\(var\(--coluna\) \/ var\(--colunas\) \* 100%\)/,
     );
-    // Antes da coluna: termina na borda esquerda dela.
+    // "antes": termina na borda direita do próprio mês.
     expect(regra(".dashboard__dica-mes--antes")).toMatch(
-      /right:\s*calc\(\(var\(--colunas\) - var\(--coluna\)\) \/ var\(--colunas\) \* 100%\)/,
+      /right:\s*calc\(\s*\(var\(--colunas\) - var\(--coluna\) - 1\) \/ var\(--colunas\) \* 100%\s*\)/,
     );
   });
 

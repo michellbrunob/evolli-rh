@@ -9,8 +9,8 @@
  *
  * Teclado: setas, Home e End percorrem os meses; Escape fecha o painel e o
  * foco fica no mês. O painel fica dentro do quadro (sem posição fixa), então
- * não passa por cima de modal, guarda ou menu, e fica ao lado da coluna
- * (nunca sobre a barra inspecionada, nunca além da borda).
+ * não passa por cima de modal, guarda ou menu, e abre logo abaixo da faixa
+ * das colunas, alinhado ao mês (nunca sobre um mês, nunca além da borda).
  *
  * As barras continuam decorativas. Os mesmos números ficam em tabela: na
  * aba Movimentação, logo abaixo do gráfico; no Quadro de colaboradores, na
@@ -59,11 +59,12 @@ export interface PosicaoDoPainel {
 export const LARGURA_UTIL_MINIMA_DO_PAINEL = 160;
 
 /**
- * Ao lado da coluna, no lado com mais colunas livres, com a largura limitada
- * a elas: nunca cobre a barra inspecionada e nunca passa da borda. Sem lado
- * livre (um mês só) ou sem largura útil nele (gráfico estreito, ano curto),
- * abre abaixo das barras, na largura do gráfico. `larguraDoGrafico` é a
- * largura medida em px; 0 (sem layout) vale só a regra das colunas.
+ * Abaixo das colunas, a partir do mês e para o lado com mais colunas livres,
+ * com a largura limitada a elas: nunca cobre um mês e nunca passa da borda.
+ * Sem lado livre (um mês só) ou sem largura útil nele (gráfico estreito, ano
+ * curto), entra no fluxo abaixo das barras, na largura do gráfico.
+ * `larguraDoGrafico` é a largura medida em px; 0 (sem layout) vale só a
+ * regra das colunas.
  */
 export function posicaoDoPainel(
   aberto: number,
