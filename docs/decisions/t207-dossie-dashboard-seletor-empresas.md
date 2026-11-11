@@ -3,10 +3,10 @@
 ## 1. Situação
 
 - **Estado:** implementada e validada localmente, em revisão na PR #200 (Draft), sem Ready e sem
-  merge (seções 16 a 20). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
+  merge (seções 16 a 22). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
   conforme a recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no
-  mesmo dia. Os achados da revisão adversarial da PR foram corrigidos na própria entrega (seção
-  20). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
+  mesmo dia. Os achados das revisões adversariais da PR foram corrigidos na própria entrega
+  (seções 20, 21 e 22). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
   produto.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
@@ -363,7 +363,8 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
     livres e com a largura limitada a elas — nunca sobre a coluna, nunca além da borda; sem
     largura útil ao lado (um mês só, ano curto ou gráfico estreito, pela largura medida do
     gráfico), abre abaixo das barras; o texto de cada linha encolhe e quebra, nunca passa da
-    caixa; é a descrição do botão focado, sem
+    caixa; o painel recebe o ponteiro (WCAG 1.4.13): encosta na coluna vizinha, sem fresta de outra
+    coluna, e o ponteiro vai da coluna ao painel sem trocar de mês; é a descrição do botão focado, sem
     região viva; aberto pelo ponteiro, Escape fecha de qualquer lugar sem mover o foco;
   - tabela: Mês, Ativos no fim, Entradas, Saídas e Turnover, com total.
 - **Menu de ações (reticências):** só nos blocos com dado real (Quadro de colaboradores,
@@ -419,9 +420,16 @@ tabela, nem no CSV.
   2 pessoas, o menor departamento exibido entra nele, até ter ao menos 3; e a quantidade de
   departamentos não é exibida. No Tempo de casa, faixa com 1 ou 2 pessoas se junta à vizinha até
   ter 3. Pessoas sem data de admissão legível ficam fora do cálculo; com 1 ou 2 delas, o aviso
-  não diz quantas ("Há pessoas sem data de admissão legível…"), e com 3 ou mais diz o número.
-  Assim toda contagem de pessoas exibida nos dois blocos é exata e é 0 ou pelo menos 3, e nenhum
-  grupo pequeno pode ser deduzido pelos outros números do bloco. Nenhum nome de pessoa aparece no Dashboard nem nos
+  não diz quantas ("Há pessoas sem data de admissão legível…"), e com 3 ou mais diz o número. Se
+  o corte de 3 vier da falta de datas legíveis (3 ou mais pessoas ativas, menos de 3 com data), o
+  aviso diz isso, e não "menos de 3 pessoas ativas". Assim toda contagem de pessoas exibida nos
+  dois blocos é exata e é 0 ou pelo menos 3, e nenhum grupo pequeno pode ser deduzido pelos
+  outros números do mesmo bloco.
+- **Limite conhecido aprovado (diferença entre blocos):** a Distribuição mostra o total de pessoas
+  ativas, e as faixas do Tempo de casa somam só quem tem data de admissão legível. A diferença
+  entre os dois indica quantas pessoas não têm data legível — inclusive 1 ou 2. Por decisão
+  aprovada, o total da Distribuição continua exibido. É um dado de qualidade do cadastro (a
+  data de admissão é obrigatória), não um atributo da pessoa. Nenhum nome de pessoa aparece no Dashboard nem nos
   arquivos.
 - **Dados lidos:** a listagem de pessoas ativas devolve o cadastro listado de cada uma (inclusive o
   nome); a tela usa só o id, a data de admissão e o departamento do vínculo principal, e descarta o
@@ -477,7 +485,7 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.1 Testes automatizados
 
-- `DashboardScreen.test.tsx` (128 testes): as garantias da T205 reescritas sobre a estrutura nova
+- `DashboardScreen.test.tsx` (135 testes): as garantias da T205 reescritas sobre a estrutura nova
   (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
   subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
   por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
@@ -490,7 +498,7 @@ Cada um com teste que falhava antes da correção:
 - `dashboardTime.test.ts` (23 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
   abandono), distribuição com grupo neutro, mediana e faixas, e a composição exaustiva de faixas
   (0 a 4 pessoas em cada uma) sem nenhuma faixa entre 1 e 2.
-- `App.dashboard.test.tsx` (34 testes): rota, ano, histórico, papéis, abas no shell, "Dashboard"
+- `App.dashboard.test.tsx` (35 testes): rota, ano, histórico, papéis, abas no shell, "Dashboard"
   na barra só visual e título único com o foco, vista vinda de quem monta o shell, contrato de
   CSS do nome na barra.
 - `AutenticacaoApp.test.tsx` (90 testes, 3 novos): a vista sobrevive à volta pelo Hub; outra
@@ -500,7 +508,7 @@ Cada um com teste que falhava antes da correção:
 - `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (44, com o selo "Atual"
   abaixo do nome) e `paletaEvolli.test.ts` (15, com as regras do menu fora do Hub): rota das abas,
   seletor e paleta.
-- Suíte web completa: 129 arquivos, 3640 testes. API unitária: 60 suítes, 1472 testes. E2E
+- Suíte web completa: 129 arquivos, 3648 testes. API unitária: 60 suítes, 1472 testes. E2E
   serial com PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e
   build verdes. A API não mudou; a API unitária e o E2E rodaram como regressão. (Numa rodada da
   validação anterior, um teste de Nova admissão — arquivo que a T207 não altera — estourou o
@@ -509,8 +517,8 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.2 Mutações
 
-56 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20 e
-7 da revisão final da seção 21).
+62 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20,
+7 da revisão da seção 21 e 6 da seção 22).
 
 Da primeira bateria, 33 que continuam válidas:
 
@@ -639,9 +647,11 @@ correção, ou mutação detectada quando a proteção já existia):
    375 px, os 11 meses ficaram com a caixa no quadro, o texto na caixa, nenhuma coluna coberta e
    sem rolagem lateral (junho abre abaixo).
 3. **Contagem de 1 ou 2 no Tempo de casa (R3):** "1 pessoa sem data de admissão legível…" expunha
-   uma contagem individual (e com concordância errada). Agora, com 1 ou 2, o aviso não tem número;
-   com 3 ou mais, o número aparece com concordância. Os testes falhavam sem a correção; a frase
-   sobre as contagens foi corrigida aqui e na PR (seção 16.4).
+   uma contagem individual na frase (e com concordância errada). Agora, com 1 ou 2, o aviso não
+   tem número; com 3 ou mais, o número aparece com concordância. A quantidade continua dedutível
+   pela diferença entre o total da Distribuição e as faixas do Tempo de casa — limite conhecido
+   aprovado (seção 16.4). Os testes falhavam sem a correção; a frase sobre as contagens foi
+   corrigida aqui e na PR.
 4. **Comentários desatualizados (R4):** o do CSS do painel do mês e o do cabeçalho do gráfico, sem
    mudança funcional.
 5. **Provas que faltavam (R5):** a mesma conta que sai e entra começa no gráfico (o logout apaga a
@@ -651,3 +661,33 @@ correção, ou mutação detectada quando a proteção já existia):
 
 **Ícone do Hub:** azul `#0066cc`, da regra própria do Hub (`.hub__cartao-icone`); a correção da
 seção 20 (item 3) só impede que a cor do menu lateral alcance o ícone.
+
+## 22. Terceira revisão adversarial da PR #200
+
+Achados corrigidos na própria entrega, cada um com prova de falha (teste que falhava no head
+anterior) e mutação detectada:
+
+1. **"Tentar de novo" ainda travava por outro caminho (F1):** falha das pessoas ativas → nova
+   tentativa → Remuneração ou Clima e saúde (abas sem dados) → Pessoas ou Movimentação → Visão
+   Geral. O ramo das abas sem dados também invalida a leitura e agora desfaz o estado de releitura;
+   o botão volta habilitado e funciona.
+2. **Teste intermitente do CSV (F2):** o auxiliar dos testes restaurava `URL.revokeObjectURL` (que
+   o ambiente de teste não tem) antes do temporizador da exportação, gerando um erro solto em
+   parte das execuções. Agora ele espera a liberação acontecer. A prova atrasa o temporizador e
+   falhava sempre no head anterior; o arquivo passou 5 vezes seguidas sem erro solto.
+3. **Comentário da preferência do menu (F3):** voltou para cima do estado que ele descreve, sem
+   mudança funcional.
+4. **Motivo do corte no Tempo de casa (F4):** com 3 ou mais pessoas ativas e menos de 3 com data
+   legível, o aviso dizia "menos de 3 pessoas ativas". Agora diz "menos de 3 pessoas com data de
+   admissão legível".
+5. **Documentos e comentários (F5):** seções 21 e 22 citadas no estado; comentário do painel
+   "abaixo" (também vale para gráfico estreito); limite conhecido da diferença entre blocos (F6)
+   registrado como aprovado (seção 16.4), sem esconder o total da Distribuição.
+6. **Painel do mês alcançável pelo ponteiro (F7, WCAG 1.4.13):** saiu o `pointer-events: none`, e o
+   painel passou a encostar na coluna vizinha (sem a margem que deixava à mostra uma fresta de
+   outra coluna). Ao vivo, no desktop e a 375 px, o ponteiro vai da coluna ao painel sem trocar de
+   mês, e o centro do painel recebe o ponteiro.
+7. **Marca do Evolli invisível na faixa marinho (achado da validação visual):** a paleta da faixa
+   pinta o texto de branco, e o símbolo da marca, que usa essa cor no fundo, virava um quadrado
+   branco com as barras brancas. A faixa passou a usar a variante clara do símbolo (quadrado claro,
+   barras em azul), a mesma da tela de entrada. O teste falhava no head anterior.

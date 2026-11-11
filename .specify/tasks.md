@@ -3341,8 +3341,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         novo" que travava ao trocar de aba, texto do painel do mês dentro da caixa (abaixo das
         barras sem largura útil), nenhuma contagem de 1 ou 2 no Tempo de casa, comentários e
         provas do logout e do descarte do nome.
-      - **Validação local:** web 129 arquivos, 3640 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
-        20 suítes, 1017 testes; scripts 182 testes; 56 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
+      - **Terceira revisão da PR #200 (seção 22 do dossiê):** "Tentar de novo" que travava
+        passando por uma aba sem dados, teste intermitente do CSV, comentário do menu recolhido,
+        motivo do corte no Tempo de casa, documentos, painel do mês alcançável pelo ponteiro e a
+        marca do Evolli visível na faixa marinho; diferença entre o total da Distribuição e as
+        faixas do Tempo de casa registrada como limite conhecido aprovado.
+      - **Validação local:** web 129 arquivos, 3648 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
+        20 suítes, 1017 testes; scripts 182 testes; 62 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
 
 ## Regra obrigatória para as próximas tarefas
