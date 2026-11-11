@@ -12,9 +12,18 @@
  * não passa por cima de modal, guarda ou menu, e fica ao lado da coluna
  * (nunca sobre a barra inspecionada, nunca além da borda).
  *
- * As barras continuam decorativas; a tabela equivalente segue embaixo.
+ * As barras continuam decorativas. Os mesmos números ficam em tabela: na
+ * aba Movimentação, logo abaixo do gráfico; no Quadro de colaboradores, na
+ * vista de tabela (menu de ações).
  */
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type { TipoMovimentacao } from "../../api/movimentacaoClient";
 import {
   ROTULO_DA_MOVIMENTACAO,
@@ -46,21 +55,36 @@ export interface PosicaoDoPainel {
   readonly espaco: number;
 }
 
+/** Largura útil mínima ao lado da coluna (px); com menos, abre abaixo. */
+export const LARGURA_UTIL_MINIMA_DO_PAINEL = 160;
+
 /**
  * Ao lado da coluna, no lado com mais colunas livres, com a largura limitada
- * a elas: nunca cobre a barra inspecionada e nunca passa da borda. Com um mês
- * só (janeiro do ano corrente) não há lado livre: abre abaixo das barras.
+ * a elas: nunca cobre a barra inspecionada e nunca passa da borda. Sem lado
+ * livre (um mês só) ou sem largura útil nele (gráfico estreito, ano curto),
+ * abre abaixo das barras, na largura do gráfico. `larguraDoGrafico` é a
+ * largura medida em px; 0 (sem layout) vale só a regra das colunas.
  */
 export function posicaoDoPainel(
   aberto: number,
   meses: number,
+  larguraDoGrafico = 0,
 ): PosicaoDoPainel {
-  if (meses <= 1) return { lado: "abaixo", espaco: 1 };
+  const abaixo: PosicaoDoPainel = { lado: "abaixo", espaco: meses };
+  if (meses <= 1) return abaixo;
   const direita = meses - aberto - 1;
   const esquerda = aberto;
-  return direita >= esquerda
-    ? { lado: "depois", espaco: direita }
-    : { lado: "antes", espaco: esquerda };
+  const lado: PosicaoDoPainel =
+    direita >= esquerda
+      ? { lado: "depois", espaco: direita }
+      : { lado: "antes", espaco: esquerda };
+  if (
+    larguraDoGrafico > 0 &&
+    (lado.espaco / meses) * larguraDoGrafico < LARGURA_UTIL_MINIMA_DO_PAINEL
+  ) {
+    return abaixo;
+  }
+  return lado;
 }
 
 function sinal(n: number): string {
@@ -86,6 +110,19 @@ export function GraficoMensal({
   const botoesRef = useRef<(HTMLButtonElement | null)[]>([]);
   /** O mês com o painel aberto (ponteiro ou foco), ou nenhum. */
   const [aberto, setAberto] = useState<number | null>(null);
+  /** Largura do gráfico (px), medida com o painel aberto; 0 sem layout. */
+  const areaRef = useRef<HTMLDivElement | null>(null);
+  const [largura, setLargura] = useState(0);
+  // Antes do desenho: o painel já nasce no lugar certo, e acompanha a
+  // largura enquanto estiver aberto.
+  useLayoutEffect(() => {
+    if (aberto === null) return undefined;
+    const medir = () =>
+      setLargura(areaRef.current?.getBoundingClientRect().width ?? 0);
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [aberto]);
   // Escape fecha o painel de qualquer lugar (WCAG 1.4.13), mesmo aberto só
   // pelo ponteiro e com o foco fora do gráfico; o foco não sai de onde está.
   useEffect(() => {
@@ -120,7 +157,8 @@ export function GraficoMensal({
     focar(alvo);
   }
 
-  const posicao = aberto === null ? null : posicaoDoPainel(aberto, meses);
+  const posicao =
+    aberto === null ? null : posicaoDoPainel(aberto, meses, largura);
 
   return (
     <div
@@ -139,7 +177,7 @@ export function GraficoMensal({
           </span>
         ))}
       </div>
-      <div className="dashboard__area-grafico">
+      <div ref={areaRef} className="dashboard__area-grafico">
         <div className="dashboard__colunas" role="group" aria-label={rotulo}>
           {indices.map((i) => (
             <button

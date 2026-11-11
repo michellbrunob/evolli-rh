@@ -443,8 +443,10 @@ export function TempoDeCasaBloco({
           )}
           {t.semData > 0 ? (
             <p className="dashboard__nota">
-              {plural(t.semData, "pessoa sem", "pessoas sem")} data de admissão
-              legível não entram no cálculo.
+              {/* Com 1 ou 2, nenhuma contagem: só o aviso. */}
+              {t.semData < MINIMO_DO_GRUPO
+                ? "Há pessoas sem data de admissão legível; elas não entram no cálculo."
+                : `${String(t.semData)} pessoas sem data de admissão legível não entram no cálculo.`}
             </p>
           ) : null}
           <p className="dashboard__explicacao">

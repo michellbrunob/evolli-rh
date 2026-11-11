@@ -939,9 +939,10 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 }
 
 /* Painel do mês: dentro do quadro (nunca por cima de modal, guarda ou
-   menu) e AO LADO da coluna inspecionada — à direita na primeira metade do
-   ano, à esquerda na segunda —, então nunca cobre a própria barra e nunca
-   passa da borda (no máximo metade da largura do gráfico). */
+   menu). Ao lado da coluna inspecionada, no lado com mais colunas livres e
+   com a largura limitada a elas (ver `posicaoDoPainel`): nunca cobre a
+   própria barra e nunca passa da borda. Sem largura útil ao lado, abre
+   abaixo das barras (`--abaixo`). */
 .dashboard__dica-mes {
   position: absolute;
   top: 0;
@@ -985,6 +986,8 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 
 .dashboard__dica-mes-titulo {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--evolli-marinho);
   font-weight: var(--weight-strong);
 }
@@ -995,21 +998,29 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   margin: 0;
 }
 
+/* Cada linha encolhe e, sem espaço, o valor desce para baixo do nome: o
+   conteúdo nunca passa da caixa do painel. */
 .dashboard__dica-mes-lista > div {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-md);
+  gap: 0 var(--space-md);
+  min-width: 0;
 }
 
 .dashboard__dica-mes-lista dt {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xxs);
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--color-ink-muted);
 }
 
 .dashboard__dica-mes-lista dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: var(--weight-strong);
   font-variant-numeric: tabular-nums;
 }

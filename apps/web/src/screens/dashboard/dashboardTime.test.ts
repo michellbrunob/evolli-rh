@@ -97,6 +97,29 @@ describe("T207 — lerTimeDeHoje", () => {
     });
   });
 
+  it("descarta o nome e tudo o que não usa: só id, data de admissão e departamento", async () => {
+    const listar = vi.fn().mockResolvedValue({
+      itens: [
+        {
+          ...item("c-1", "2025-02-01", "Operações"),
+          nome: "Pessoa Sintética Um",
+          situacao: "ativo",
+        },
+      ],
+      total: 1,
+    });
+    const lido = await lerTimeDeHoje(listar);
+    if (lido.tipo !== "completo") throw new Error(lido.tipo);
+    const pessoa = lido.pessoas[0]!;
+    expect(Object.keys(pessoa).sort()).toEqual([
+      "dataAdmissao",
+      "departamento",
+      "id",
+    ]);
+    expect("nome" in pessoa).toBe(false);
+    expect(JSON.stringify(lido)).not.toContain("Pessoa Sintética Um");
+  });
+
   it("sem vínculo: sem data e sem departamento; página incompleta encerra", async () => {
     const listar = vi
       .fn()

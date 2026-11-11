@@ -41,7 +41,10 @@ import {
   LIMITE_DA_SERIE,
   LIMITE_DA_SERIE_TEXTO,
 } from "./DashboardScreen";
-import { posicaoDoPainel } from "./GraficoMensal";
+import {
+  LARGURA_UTIL_MINIMA_DO_PAINEL,
+  posicaoDoPainel,
+} from "./GraficoMensal";
 
 vi.mock("../../api/colaboradoresClient", async () => {
   const actual = await vi.importActual<
@@ -1400,6 +1403,87 @@ describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca alé
     expect(dica.style.getPropertyValue("--espaco")).toBe("1");
   });
 
+  it("com a largura real do gráfico: lado só quando há largura útil; senão, abaixo", () => {
+    for (const largura of [240, 291, 375, 700, 1200]) {
+      for (let meses = 1; meses <= 12; meses += 1) {
+        for (let i = 0; i < meses; i += 1) {
+          const p = posicaoDoPainel(i, meses, largura);
+          if (p.lado !== "abaixo") {
+            expect((p.espaco / meses) * largura).toBeGreaterThanOrEqual(
+              LARGURA_UTIL_MINIMA_DO_PAINEL,
+            );
+          }
+        }
+      }
+    }
+    // Ano de 3 meses a 375 px (gráfico com ~291 px): fevereiro abre abaixo.
+    expect(posicaoDoPainel(1, 3, 291).lado).toBe("abaixo");
+    // Sem layout medido (largura 0), vale só a regra das colunas.
+    expect(posicaoDoPainel(1, 3, 0).lado).toBe("depois");
+  });
+
+  it("junho a 375 px (gráfico estreito): sem largura útil ao lado, o painel abre abaixo", async () => {
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const medir = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains("dashboard__area-grafico")) {
+          return {
+            width: 291,
+            height: 144,
+            top: 0,
+            left: 0,
+            right: 291,
+            bottom: 144,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return original.call(this);
+      });
+    try {
+      render(<Tela />);
+      await lido();
+      fireEvent.mouseEnter(
+        within(bloco(SERIE)).getByRole("button", { name: "Junho de 2026" }),
+      );
+      expect(screen.getByRole("tooltip")).toHaveClass(
+        "dashboard__dica-mes--abaixo",
+      );
+    } finally {
+      medir.mockRestore();
+    }
+  });
+
+  it("CSS: o conteúdo do painel encolhe e quebra (nunca transborda a caixa)", () => {
+    const css = readFileSync(
+      "src/screens/dashboard/DashboardScreen.css",
+      "utf8",
+    );
+    /** Todas as regras com exatamente este seletor, juntas. */
+    const regra = (seletor: string) => {
+      const blocos: string[] = [];
+      let inicio = css.indexOf(`\n${seletor} {`);
+      while (inicio >= 0) {
+        blocos.push(css.slice(inicio, css.indexOf("}", inicio)));
+        inicio = css.indexOf(`\n${seletor} {`, inicio + 1);
+      }
+      return blocos.join("\n");
+    };
+    const linha = regra(".dashboard__dica-mes-lista > div");
+    expect(linha).toMatch(/flex-wrap:\s*wrap/);
+    expect(linha).toMatch(/min-width:\s*0/);
+    for (const parte of [
+      ".dashboard__dica-mes-lista dt",
+      ".dashboard__dica-mes-lista dd",
+      ".dashboard__dica-mes-titulo",
+    ]) {
+      expect(regra(parte), parte).toMatch(/min-width:\s*0/);
+      expect(regra(parte), parte).toMatch(/overflow-wrap:\s*anywhere/);
+    }
+  });
+
   it("junho num ano de 11 meses: à direita, com o espaço que sobra (5 colunas), sem passar da borda", async () => {
     render(<Tela />);
     await lido();
@@ -1588,6 +1672,40 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     );
   });
 
+  it("'Tentar de novo' do time em curso e troca de aba: ao voltar, o botão funciona de novo", async () => {
+    servidorDosAtivos.mockRejectedValueOnce(new Error("rede"));
+    const { rerender } = render(<Tela aba="visao-geral" />);
+    await lido();
+    const pendente = adiada<ListagemColaboradoresApi>();
+    servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
+    const tentar = () =>
+      screen.getByRole("button", {
+        name: "Tentar de novo as pessoas ativas de hoje",
+      });
+    fireEvent.click(tentar());
+    expect(tentar()).toHaveAttribute("aria-disabled", "true");
+    rerender(<Tela aba="pessoas" />);
+    // A resposta da tentativa abandonada chega depois: não vale mais.
+    await act(async () => {
+      pendente.resolver({
+        itens: [],
+        pagina: 1,
+        tamanhoPagina: 100,
+        total: 0,
+        contadores: contadores(),
+      });
+    });
+    rerender(<Tela aba="visao-geral" />);
+    await assentar();
+    expect(tentar()).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(tentar());
+    await waitFor(() =>
+      expect(bloco("Distribuição do time")).toHaveTextContent(
+        "10 pessoas ativas",
+      ),
+    );
+  });
+
   it("sair da Visão Geral no meio da leitura do time: a leitura volta ao retornar, sem misturar", async () => {
     const pendente = adiada<ListagemColaboradoresApi>();
     servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
@@ -1659,6 +1777,39 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     expect(b).not.toHaveTextContent(/menos de 3$/);
     expect(b).toHaveTextContent(
       "Faixa com menos de 3 pessoas se junta à faixa vizinha",
+    );
+  });
+
+  it.each([1, 2])(
+    "tempo de casa com %i pessoa(s) sem data legível: aviso sem número (nunca uma contagem de 1 ou 2)",
+    async (semData) => {
+      servidorDeAtivos([
+        ...TIME_PADRAO(),
+        ...Array.from({ length: semData }, (_, i) =>
+          ativo(`sem-data-${i}`, "sem-data", "Operações"),
+        ),
+      ]);
+      render(<Tela />);
+      await lido();
+      const b = bloco("Tempo de casa");
+      expect(b).toHaveTextContent(
+        "Há pessoas sem data de admissão legível; elas não entram no cálculo.",
+      );
+      expect(b).not.toHaveTextContent(/\b[12] pessoas? sem data/);
+    },
+  );
+
+  it("tempo de casa com 3 ou mais sem data legível: o número aparece, com concordância", async () => {
+    servidorDeAtivos([
+      ...TIME_PADRAO(),
+      ...Array.from({ length: 3 }, (_, i) =>
+        ativo(`sem-data-${i}`, "sem-data", "Operações"),
+      ),
+    ]);
+    render(<Tela />);
+    await lido();
+    expect(bloco("Tempo de casa")).toHaveTextContent(
+      "3 pessoas sem data de admissão legível não entram no cálculo.",
     );
   });
 

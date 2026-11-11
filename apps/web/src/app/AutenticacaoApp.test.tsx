@@ -2643,6 +2643,24 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     expect(emTabela()).toBe(false);
   });
 
+  it("a mesma conta sai e entra de novo: a vista escolhida é apagada pelo logout", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    await verComoTabela();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    await screen.findByLabelText(/^E-mail\b/i);
+    // A MESMA conta e a mesma empresa: só o logout pode apagar a vista.
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_PADRAO as never);
+    preencherEEntrar();
+    await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    await acoesDoQuadro();
+    expect(emTabela()).toBe(false);
+  });
+
   it("outra empresa abre no gráfico — e a vista antiga não volta com a empresa antiga", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);

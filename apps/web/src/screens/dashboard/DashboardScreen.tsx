@@ -417,6 +417,10 @@ export function DashboardScreen({
       if (timeEmLeituraRef.current) {
         geracaoRef.current.time += 1;
         timeEmLeituraRef.current = false;
+        // Uma nova tentativa abandonada não deixa "Tentar de novo" travado.
+        setTime((p) =>
+          p.tipo === "erro" && p.relendo ? { ...p, relendo: false } : p,
+        );
       }
       return;
     }
