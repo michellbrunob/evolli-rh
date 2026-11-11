@@ -3300,7 +3300,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         entrega.
 
 104.  **T207 - Dashboard funcional e seletor de empresas**
-      - **Estado:** **implementada e validada localmente**, sem push, PR, promoção ou merge.
+      - **Estado:** **implementada e validada localmente**, em revisão na PR #200 (Draft), sem
+        Ready e sem merge.
         Branch `codex/t207-dashboard-seletor-empresas`, a partir do squash
         `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto. Validação visual aprovada
@@ -3330,9 +3331,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         agrupamento mínimo de 3 pessoas; ativos no fim e turnover como "—" por falta de fonte e
         regra aprovada, nunca zero; eNPS e Quem é o time indisponíveis. Achados da
         implementação corrigidos com teste que falhava antes (seção 17 do dossiê).
-      - **Validação final local:** web 128 arquivos e 3598 testes; API unitária 60 suítes e
-        1472 testes; E2E serial com PostgreSQL real 20 suítes e 1017 testes; scripts 182 testes;
-        35 mutações, todas detectadas; lint, typecheck e build verdes.
+      - **Revisão adversarial da PR #200 (seção 20 do dossiê):** nove achados corrigidos na
+        entrega, cada um com teste que falhava antes: privacidade da Distribuição (grupo neutro
+        sempre 0 ou 3 ou mais, sem a quantidade de departamentos), painel do mês dentro do quadro
+        em todo mês, paleta do menu fora do Hub, CSV sem fórmula, foco pendurado entre abas,
+        limpeza da impressão, Escape global nos painéis, pessoas ativas lidas só na Visão Geral e
+        ajustes de texto e documentação.
+      - **Validação local:** web 129 arquivos, 3631 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
+        20 suítes, 1017 testes; scripts 182 testes; 49 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
+        do squash e `git diff --check` verdes.
 
 ## Regra obrigatória para as próximas tarefas
 

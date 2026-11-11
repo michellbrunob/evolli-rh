@@ -2,14 +2,18 @@
 
 ## 1. Situação
 
-- **Estado:** implementada e validada localmente, sem push, PR, promoção ou merge (seções 16 a
-  19). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10, conforme a
-  recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no mesmo dia. A
-  preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de produto.
+- **Estado:** implementada e validada localmente, em revisão na PR #200 (Draft), sem Ready e sem
+  merge (seções 16 a 20). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
+  conforme a recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no
+  mesmo dia. Os achados da revisão adversarial da PR foram corrigidos na própria entrega (seção
+  20). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
+  produto.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
-- **Fora desta preparação:** código de produto, API, schema, migration, RBAC, auditoria, seed,
-  Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
+- **Fora da preparação (seções 2 a 15):** código de produto, API, schema, migration, RBAC,
+  auditoria, seed, Docker, dependências, lockfile, workflow, push, PR, promoção e merge. A
+  implementação (seções 16 a 20) também não toca API, schema, migration, RBAC, auditoria, seed,
+  Docker, dependências, lockfile nem workflow.
 
 ## 2. Objetivo
 
@@ -319,7 +323,7 @@ o seletor não mostra documento fiscal nem as ações de adicionar e gerenciar e
 ## 16. Entrega
 
 Implementada e validada localmente, com a validação visual aprovada pela proprietária em
-2026-11-10. Sem push, PR, promoção ou merge. Só web e testes.
+2026-11-10. Em revisão na PR #200 (Draft), sem Ready e sem merge. Só web, testes e documentação.
 
 ### 16.1 Decisões preservadas
 
@@ -355,8 +359,10 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
 - **Quadro de colaboradores:** título, subtítulo, botão de informação, pessoas ativas hoje e os
   totais de entradas, saídas e saldo do ano. Duas vistas com os mesmos números:
   - gráfico: um botão por mês (uma parada de Tab; setas, Home e End sem volta; Escape fecha o
-    painel e o foco fica no mês); o painel do mês fica ao lado da coluna, dentro do quadro, e é a
-    descrição do botão focado, sem região viva;
+    painel e o foco fica no mês); o painel do mês fica ao lado da coluna, no lado com mais colunas
+    livres e com a largura limitada a elas — nunca sobre a coluna, nunca além da borda; com um mês
+    só (janeiro do ano corrente), abre abaixo das barras; é a descrição do botão focado, sem
+    região viva; aberto pelo ponteiro, Escape fecha de qualquer lugar sem mover o foco;
   - tabela: Mês, Ativos no fim, Entradas, Saídas e Turnover, com total.
 - **Menu de ações (reticências):** só nos blocos com dado real (Quadro de colaboradores,
   Distribuição do time e Tempo de casa). "Ver como tabela" ou "Ver como gráfico", "Baixar CSV" e
@@ -367,7 +373,9 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
   do navegador para a mesma conta na mesma empresa; outra conta, outra empresa ou o logout a
   apagam. Nada em armazenamento do navegador.
 - **Distribuição do time e Tempo de casa:** gráfico e tabela, com os grupos e faixas já seguros
-  (seção 16.4).
+  (seção 16.4). As pessoas ativas de hoje só são lidas na Visão Geral (a única aba que as usa).
+- **Botão de informação:** abre por ponteiro, foco ou clique; o primeiro clique (ou Enter) fixa e o
+  segundo fecha; Escape fecha de qualquer lugar, sem mover o foco; clique e foco fora fecham.
 
 ### 16.3 Dados reais e indisponíveis
 
@@ -403,21 +411,34 @@ tabela, nem no CSV.
 - **Teto de leitura:** as pessoas ativas de hoje são lidas de 100 em 100 até 2.000; acima disso os
   dois blocos do time mostram só o aviso do limite. Cada tipo de movimentação também para em
   2.000 no ano.
-- **Privacidade:** com menos de 3 pessoas ativas, Distribuição e Tempo de casa não são exibidos;
-  departamentos com menos de 3 pessoas e quem não tem departamento vigente formam um grupo neutro,
-  sem nome; faixa de tempo de casa com 1 ou 2 pessoas se junta à vizinha até ter 3, então todo
-  número exibido é exato e nada pode ser deduzido pela diferença para o total. Nenhum nome de
-  pessoa aparece no Dashboard nem nos arquivos.
+- **Privacidade:** com menos de 3 pessoas ativas, Distribuição e Tempo de casa não são exibidos.
+  Na Distribuição, departamentos com menos de 3 pessoas e quem não tem departamento vigente formam
+  um grupo neutro, sem nome ("Outros (agrupados por privacidade)"); se esse grupo ficaria com 1 ou
+  2 pessoas, o menor departamento exibido entra nele, até ter ao menos 3; e a quantidade de
+  departamentos não é exibida. No Tempo de casa, faixa com 1 ou 2 pessoas se junta à vizinha até
+  ter 3. Assim todo número exibido é exato, é 0 ou pelo menos 3, e nenhum grupo pequeno pode ser
+  deduzido pelos outros números do bloco. Nenhum nome de pessoa aparece no Dashboard nem nos
+  arquivos.
+- **Dados lidos:** a listagem de pessoas ativas devolve o cadastro listado de cada uma (inclusive o
+  nome); a tela usa só o id, a data de admissão e o departamento do vínculo principal, e descarta o
+  resto na leitura, sem guardar nem exibir.
+- **Subtítulo do quadro:** "Pessoas ativas no fim de cada mês e quem entrou e saiu" é o texto
+  definido pela proprietária para o bloco. Enquanto não houver fonte histórica nem regra aprovada,
+  a coluna "Ativos no fim" fica "—" (lida como "indisponível"), a nota do quadro e o botão de
+  informação dizem por quê, e nenhum número de ativos por mês é calculado no navegador.
 
 ### 16.5 Exportação
 
 - **CSV:** gerado no navegador com os números que o bloco mostra; BOM UTF-8, ponto e vírgula,
   cabeçalho legível, um mês (ou grupo, ou faixa) por linha, "—" no que não tem fonte, sem linha
-  de total, sem dado pessoal. O nome do arquivo leva o bloco, a empresa e o ano (ou "hoje").
+  de total, sem dado pessoal. Texto que começa com `=`, `+`, `-`, `@`, tabulação ou CR (um nome de
+  departamento, por exemplo) recebe um apóstrofo à frente e é guardado como texto, nunca como
+  fórmula. O nome do arquivo leva o bloco, a empresa e o ano (ou "hoje").
 - **PDF:** a impressão do navegador, que oferece "Salvar como PDF". Antes de abrir, tudo o que não
   é o bloco escolhido (menu lateral, cabeçalho, outros blocos) sai da impressão; a folha leva a
-  empresa, o bloco e o período; menu e informação não são impressos; ao fim da impressão a página
-  volta como estava. A ação diz, na descrição e no anúncio, que o destino "Salvar como PDF" está
+  empresa, o bloco e o período (com um mês só, "Janeiro de AAAA"); menu e informação não são
+  impressos; ao fim da impressão a página volta como estava — e também ao trocar de aba ou sair da
+  tela, para não depender só do aviso de fim de impressão do navegador. A ação diz, na descrição e no anúncio, que o destino "Salvar como PDF" está
   na impressão. Nenhuma dependência nova e nenhum arquivo gerado fora do navegador.
 
 ## 17. Achados corrigidos durante a implementação
@@ -452,7 +473,7 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.1 Testes automatizados
 
-- `DashboardScreen.test.tsx` (105 testes): as garantias da T205 reescritas sobre a estrutura nova
+- `DashboardScreen.test.tsx` (121 testes): as garantias da T205 reescritas sobre a estrutura nova
   (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
   subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
   por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
@@ -462,7 +483,7 @@ Cada um com teste que falhava antes da correção:
   limpeza depois, Distribuição e Tempo de casa com gráfico, tabela, CSV e impressão, privacidade,
   teto, falha com um único alerta, respostas atrasadas, desmontagem, hora da leitura uma vez por
   aba e o contrato de CSS a 375 px.
-- `dashboardTime.test.ts` (18 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
+- `dashboardTime.test.ts` (22 testes, novo): leitura das pessoas ativas (páginas, teto, repetidos,
   abandono), distribuição com grupo neutro, mediana e faixas, e a composição exaustiva de faixas
   (0 a 4 pessoas em cada uma) sem nenhuma faixa entre 1 e 2.
 - `App.dashboard.test.tsx` (34 testes): rota, ano, histórico, papéis, abas no shell, "Dashboard"
@@ -470,17 +491,23 @@ Cada um com teste que falhava antes da correção:
   CSS do nome na barra.
 - `AutenticacaoApp.test.tsx` (89 testes, 2 novos): a vista sobrevive à volta pelo Hub, e outra
   conta (depois do logout) ou outra empresa começam no gráfico.
-- `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (42) e
-  `paletaEvolli.test.ts` (14): rota das abas, seletor e paleta, como na primeira implementação.
-- Suíte web completa: 128 arquivos, 3598 testes. Numa rodada anterior, um teste de Nova admissão (arquivo que a T207 não
-  altera) estourou o limite de 5 s sob carga; sozinho, o arquivo passou com 263 de 263, e a rodada
-  seguinte da suíte completa passou inteira. API unitária: 60 suítes, 1472 testes. E2E serial com
-  PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e build verdes. A
-  API não mudou; a API unitária e o E2E rodaram como regressão.
+- `exportacao.test.ts` (10 testes, novo): CSV com BOM, separador, "—", texto que começaria uma
+  fórmula guardado como texto, escape de aspas e quebras, e o nome do arquivo.
+- `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (44, com o selo "Atual"
+  abaixo do nome) e `paletaEvolli.test.ts` (15, com as regras do menu fora do Hub): rota das abas,
+  seletor e paleta.
+- Suíte web completa: 129 arquivos, 3631 testes. API unitária: 60 suítes, 1472 testes. E2E
+  serial com PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e
+  build verdes. A API não mudou; a API unitária e o E2E rodaram como regressão. (Numa rodada da
+  validação anterior, um teste de Nova admissão — arquivo que a T207 não altera — estourou o
+  limite de 5 s sob carga; sozinho, passou com 263 de 263, e as rodadas completas seguintes
+  passaram inteiras.)
 
 ### 18.2 Mutações
 
-35 mutações temporárias, todas detectadas:
+49 mutações temporárias, todas detectadas.
+
+Da primeira bateria, 33 que continuam válidas:
 
 - privacidade: departamento de 2 pessoas exibido, distribuição com menos de 3 pessoas, faixa
   pequena que não se junta;
@@ -493,16 +520,27 @@ Cada um com teste que falhava antes da correção:
   já desmontada;
 - menu: Escape sem devolver o foco, setas sem volta, clique fora sem fechar, menu atrás do
   cabeçalho fixo, rolagem sem caixa desenhada, menu num bloco sem dados;
-- informação: Escape sem fechar, foco sem abrir;
-- gráfico: painel sobre a coluna inspecionada, Escape sem fechar o painel;
+- informação: foco sem abrir; gráfico: painel começando sobre a coluna inspecionada;
 - tela e shell: hora da leitura repetida ao lado de "Atualizar", vista sem repasse ao shell, vista
   que sobrevive à troca de empresa, nome da barra anunciado ao leitor, cor da paleta no
   cabeçalho, aba inválida aceita na rota;
 - seletor e paleta: busca já com 8 empresas, Escape sem fechar, faixa lateral sem o marinho.
 
-Na primeira rodada, duas sobreviveram e foram tratadas: uma era equivalente (a deduplicação usa um
-mapa por id, então tirar só o desvio não mudava a contagem) e foi trocada por uma que remove de
-fato a deduplicação; a outra revelou o achado 10 da seção 17.
+Das proteções da revisão (seção 20), 16: grupo neutro sem a junção do menor departamento,
+quantidade de departamentos de volta ao resultado, chave da lista pelo nome, lado do painel com
+menos colunas livres, mês único sem o painel abaixo, largura de metade do gráfico, cor do ícone do
+menu sem a raiz da navegação, CSV sem neutralizar fórmula, foco atendido depois de trocar de aba,
+impressão sem limpeza ao trocar de aba ou sair, informação e painel do mês sem Escape global,
+pessoas ativas lidas em todas as abas, Visão Geral sem ler as pessoas ativas ao chegar, selo
+"Atual" sem a coluna do texto e cabeçalho "Janeiro a Janeiro".
+
+Equivalências tratadas: na validação, a mutação que só tirava o desvio da deduplicação não mudava
+a contagem (o mapa é por id) e foi trocada por uma que remove a deduplicação; a outra
+sobrevivente revelou o achado 10 da seção 17. Na revisão, a regra antiga de lado do painel
+escolhia o mesmo lado da nova (o defeito era a largura) e foi trocada pela escolha do lado
+menor; a mutação do foco entre abas ganhou o teste da troca direta para Pessoas. Com o Escape
+global, o Escape local de cada painel virou código duplicado e saiu; as duas mutações dele foram
+substituídas pelas do Escape global.
 
 ### 18.3 Validação local no navegador
 
@@ -539,3 +577,43 @@ texto, imagem, cor, ícone, dado ou endereço delas entrou em código, teste, co
 - **Diálogo de impressão:** o conteúdo impresso é preparado e testado; a geração do PDF é do
   navegador.
 - **Vista após recarregar:** volta ao gráfico (seção 16.2).
+- **Foco de entrada acima de 640 px:** vai ao título da tela, que está fora da vista (a barra
+  mostra o nome); o leitor de tela anuncia o título e o Tab seguinte vai às abas. É o padrão de
+  entrada adotado nas telas do shell.
+- **Mediana do tempo de casa:** com 3 pessoas, é o tempo de uma delas — medida agregada com o
+  mínimo de 3, como decidido.
+
+## 20. Revisão adversarial da PR #200
+
+Os achados da revisão, todos corrigidos na própria entrega, cada um com teste escrito antes da
+correção (que falhava sem ela) e mutação detectada:
+
+1. **Distribuição — grupo pequeno deduzível:** o grupo neutro podia aparecer com 1 ou 2 pessoas, e
+   "N pessoas em M departamentos" contava também os departamentos pequenos. Agora o menor
+   departamento entra no grupo neutro até ele ter 3, e a quantidade de departamentos não é
+   exibida; o teste percorre todas as composições de até 4 departamentos com 0 a 5 pessoas e até
+   3 sem departamento.
+2. **Painel do mês além da borda:** com número ímpar de meses o painel do meio passava da borda, e
+   em janeiro abria fora do quadro. Agora fica no lado com mais colunas livres, com a largura
+   limitada a elas, e com um mês só abre abaixo das barras (seção 16.2); o teste cobre todos os
+   meses de anos de 1 a 12 meses.
+3. **Paleta no Hub:** a cor do ícone do menu valia para a mesma classe no Hub. As regras de cor do
+   menu passaram a valer só dentro da navegação; o Hub volta a dar a cor pelo próprio cartão.
+4. **CSV com fórmula:** um nome de departamento começando com `=` virava fórmula na planilha.
+   Agora é guardado como texto (seção 16.5).
+5. **Foco pendurado:** uma nova tentativa seguida de troca de aba deixava um pedido de foco que,
+   depois, levava o foco a um título. Agora o pedido só vale na aba em que foi feito, e é
+   descartado ao trocar de aba ou quando o alvo não existe.
+6. **Impressão sem limpeza:** sem o aviso de fim de impressão do navegador, as marcações ficavam.
+   Agora também são desfeitas ao trocar de aba e ao sair da tela.
+7. **Escape global (WCAG 1.4.13):** os painéis de informação e do mês, abertos pelo ponteiro, só
+   fechavam com o foco dentro. Agora Escape fecha de qualquer lugar, sem mover o foco; o Escape
+   local de cada painel, que ficou duplicado, saiu.
+8. **Leitura desnecessária:** as pessoas ativas eram lidas também nas abas Pessoas e Movimentação.
+   Agora só na Visão Geral (ao chegar, uma vez; sair no meio invalida a leitura). O comentário do
+   código sobre o que é lido foi corrigido (seção 16.4).
+9. **Textos e documentação:** o selo "Atual" do seletor ganhou teste (posição abaixo do nome e
+   quebra só entre palavras; a prova de falha é a mutação que tira a coluna do selo); o cabeçalho
+   de impressão em janeiro deixou de dizer "Janeiro a Janeiro"; a lista de departamentos usa o id
+   como chave (dois departamentos com o mesmo nome); o estado da entrega passou a dizer "PR #200
+   em Draft"; o limite do subtítulo do quadro foi registrado (seção 16.4).

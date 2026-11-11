@@ -3106,11 +3106,11 @@ squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
 42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T207.
 
-## Dashboard funcional e seletor de empresas — T207 (implementada e validada localmente)
+## Dashboard funcional e seletor de empresas — T207 (validada localmente, PR #200 em Draft)
 
-| Tarefa | Estado                                         | Resultado principal                                                                    |
-| ------ | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
-| T207   | **Implementada** (validada localmente, sem PR) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
+| Tarefa | Estado                                                   | Resultado principal                                                                    |
+| ------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| T207   | **Implementada** (validada localmente, PR #200 em Draft) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
 
 **Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
@@ -3141,11 +3141,16 @@ tela de empresas; mudança global de cor; promoção e merge.
 e tabela, painel por mês, informação "Como calculamos", menu de ações, CSV e impressão para salvar
 em PDF; Distribuição do time e Tempo de casa com agrupamento mínimo de 3 pessoas; ativos no fim e
 turnover como "—" por falta de fonte e regra aprovada; validação visual aprovada pela
-proprietária em 2026-11-10. Sem push, PR, promoção ou merge.
+proprietária em 2026-11-10. Em revisão na PR #200 (Draft), sem Ready e sem merge.
 
-**Validação final local:** web 128 arquivos e 3598 testes; API unitária 60 suítes e 1472
-testes; E2E serial com PostgreSQL real 20 suítes e 1017 testes; scripts 182 testes; 35 mutações,
-todas detectadas; lint, typecheck e build verdes.
+**Revisão adversarial da PR #200 (seção 20 do dossiê):** nove achados corrigidos na entrega,
+cada um com teste que falhava antes (privacidade da Distribuição, painel do mês, paleta fora do
+Hub, CSV sem fórmula, foco entre abas, limpeza da impressão, Escape global, leitura só na Visão
+Geral, textos e documentação).
+
+**Validação local:** web 129 arquivos, 3631 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts
+182 testes; 49 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+`git diff --check` verdes.
 
 ## Próxima ação autorizável
 
