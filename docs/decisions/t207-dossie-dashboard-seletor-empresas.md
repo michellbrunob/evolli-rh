@@ -3,10 +3,10 @@
 ## 1. Situação
 
 - **Estado:** implementada e validada localmente, em revisão na PR #200 (Draft), sem Ready e sem
-  merge (seções 16 a 24). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
+  merge (seções 16 a 25). As decisões V-1 a V-6, E-1 a E-4 e P-1 foram aprovadas em 2026-11-10,
   conforme a recomendação (seção 13.1), e a validação visual foi aprovada pela proprietária no
   mesmo dia. Os achados das revisões adversariais da PR foram corrigidos na própria entrega
-  (seções 20 a 24). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
+  (seções 20 a 25). A preparação (levantamento e decisões, seções 2 a 15) foi feita antes, sem código de
   produto.
 - **Branch:** `codex/t207-dashboard-seletor-empresas`, a partir do squash
   `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199).
@@ -367,8 +367,10 @@ V-1 a V-6, E-1 a E-4 e P-1 valem como aprovadas (seção 13), com estes detalhes
     alinhado ao mês aberto: pela borda esquerda do mês quando se
     estende para o lado depois, pela borda direita quando se estende para o lado antes — o lado com
     mais colunas livres, com a largura limitada a elas; não cobre nenhum mês e nunca passa da
-    borda; sem largura útil (um mês só, ano curto ou gráfico estreito, pela largura medida do
-    gráfico), entra no fluxo abaixo das barras, na largura do gráfico; o texto de cada linha
+    borda; sem largura útil — pelo menos 210 px livres ao lado, a largura natural do painel mais
+    a folga (um mês só, ano curto ou gráfico estreito, pela largura medida do gráfico) —, usa a
+    largura total abaixo das barras; assim o texto não quebra ao lado e, a 375 px, a vaga fica na
+    altura-base em todos os meses da Visão Geral e da Movimentação; o texto de cada linha
     encolhe e quebra, nunca passa da caixa; o painel recebe o ponteiro (WCAG 1.4.13): o ponteiro
     desce da coluna ao painel sem cruzar outro mês, e a varredura de Janeiro a Novembro alcança
     todos os meses sem sair do gráfico; é a descrição do botão focado, sem
@@ -492,7 +494,7 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.1 Testes automatizados
 
-- `DashboardScreen.test.tsx` (137 testes): as garantias da T205 reescritas sobre a estrutura nova
+- `DashboardScreen.test.tsx` (140 testes): as garantias da T205 reescritas sobre a estrutura nova
   (nenhuma removida); cinco abas, rota e foco; cards honestos; Quadro de colaboradores (título,
   subtítulo, informação por ponteiro, foco, clique e Escape, sem região viva), gráfico com painel
   por mês (teclado, ponteiro, Escape, `aria-describedby`, posição), tabela com "—" lido como
@@ -515,7 +517,7 @@ Cada um com teste que falhava antes da correção:
 - `rotasDoShell.dashboard.test.ts` (24), `SeletorEmpresaAtiva.test.tsx` (44, com o selo "Atual"
   abaixo do nome) e `paletaEvolli.test.ts` (15, com as regras do menu fora do Hub): rota das abas,
   seletor e paleta.
-- Suíte web completa: 129 arquivos, 3650 testes. API unitária: 60 suítes, 1472 testes. E2E
+- Suíte web completa: 129 arquivos, 3653 testes. API unitária: 60 suítes, 1472 testes. E2E
   serial com PostgreSQL real: 20 suítes, 1017 testes. Scripts: 182 testes. Lint, typecheck e
   build verdes. A API não mudou; a API unitária e o E2E rodaram como regressão. (Numa rodada da
   validação anterior, um teste de Nova admissão — arquivo que a T207 não altera — estourou o
@@ -524,8 +526,8 @@ Cada um com teste que falhava antes da correção:
 
 ### 18.2 Mutações
 
-67 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20,
-7 da revisão da seção 21, 6 da seção 22, 2 da seção 23 e 3 da seção 24).
+68 mutações temporárias, todas detectadas (33 da primeira bateria, 16 da revisão da seção 20,
+7 da revisão da seção 21, 6 da seção 22, 2 da seção 23, 3 da seção 24 e 1 da seção 25).
 
 Da primeira bateria, 33 que continuam válidas:
 
@@ -747,7 +749,31 @@ vaga cresce com o painel, também no fluxo. Na impressão, a vaga não ocupa esp
   painel e o mês continua o mesmo; a seta leva ao mês seguinte com o painel ligado ao botão.
 - Ao vivo, a 375 px: varredura dos 11 meses e toque, sem coluna nem controle de outro bloco
   coberto, texto dentro da caixa e sem rolagem horizontal; Escape fecha e o foco fica no mês.
-  Em quatro meses (abril, maio, julho e agosto), o texto quebra e a vaga cresce com o painel, no
-  fluxo, empurrando o que vem depois enquanto o painel está aberto.
+  Em quatro meses (abril, maio, julho e agosto), o texto quebrava e a vaga crescia com o painel,
+  no fluxo, empurrando o que vem depois enquanto o painel estava aberto — corrigido na seção 25.
 - Ao vivo, a 1440 px: os 11 meses dentro da vaga e do gráfico, alinhados ao mês (desvio de até
   1 px, do intervalo entre colunas), sem coluna nem controle de outro bloco coberto.
+
+## 25. Largura útil mínima do painel no celular (M1)
+
+**Vaga crescendo no celular (M1):** na validação da aba Movimentação a 375 px, o painel aberto
+ao lado do mês ficava estreito demais para os rótulos mais longos (transferências e mudanças de
+cargo): o texto quebrava e a vaga crescia até 62 px em maio e julho (21 px em abril e agosto),
+acima do limite aprovado para o celular.
+
+Correção: a largura útil mínima ao lado do mês passou de 160 para 210 px — a largura natural do
+painel (cerca de 195 a 204 px, medida no navegador) mais a folga. Sem esse espaço lateral, o painel
+usa a largura total abaixo do gráfico; com ele, segue alinhado ao mês. Com o gráfico de 305 px (a
+375 px), abril a agosto passam à largura total; janeiro a março e setembro a novembro seguem ao
+lado. No desktop, nada muda.
+
+- Prova de falha: falhavam no head anterior a escolha do modo com o gráfico de 305 px (ao lado só
+  com pelo menos 210 px livres) e, no DOM, maio e julho da Movimentação e abril, maio, julho e
+  agosto da Visão Geral na largura total.
+- Mutação detectada: o limite de volta a 160 px.
+- Ao vivo, a 375 px, na Visão Geral e na Movimentação: varredura de janeiro a novembro com o
+  ponteiro, toque e setas, com a vaga em 163 px em todos os meses, nenhuma coluna, tabela ou
+  controle coberto, texto dentro da caixa e sem rolagem horizontal; Escape fecha e o foco fica no
+  mês; na Movimentação, também Home e End, e Tab sai do gráfico e fecha o painel.
+- Ao vivo, a 1024 px, nas duas abas: os 11 meses continuam ao lado, alinhados ao mês (desvio de
+  até 1 px), com a vaga em 163 px e nada coberto.

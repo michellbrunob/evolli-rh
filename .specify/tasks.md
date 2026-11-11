@@ -3350,8 +3350,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         da faixa das colunas, alinhado ao mês aberto, sem cobrir os meses vizinhos (G1).
       - **Vaga do painel do mês (seção 24 do dossiê):** o painel ficou numa vaga reservada no
         próprio gráfico, no fluxo, sem cobrir controle de outro bloco (H1).
-      - **Validação local:** web 129 arquivos, 3650 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
-        20 suítes, 1017 testes; scripts 182 testes; 67 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
+      - **Largura útil mínima no celular (seção 25 do dossiê):** sem 210 px livres ao lado, o
+        painel usa a largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1).
+      - **Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
+        20 suítes, 1017 testes; scripts 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
 
 ## Regra obrigatória para as próximas tarefas
