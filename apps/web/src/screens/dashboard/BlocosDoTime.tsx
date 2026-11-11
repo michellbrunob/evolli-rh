@@ -56,15 +56,22 @@ function Carregando() {
   );
 }
 
-function PoucaGente({ assunto }: { readonly assunto: string }) {
+function PoucaGente({
+  assunto,
+  quem = "pessoas ativas",
+}: {
+  readonly assunto: string;
+  /** Quem falta: "pessoas ativas" ou, no tempo de casa, as que têm data. */
+  readonly quem?: string;
+}) {
   return (
     <div className="dashboard__vazio-quadro">
       <p className="dashboard__selo dashboard__selo--estado">
         Não exibido por privacidade
       </p>
       <p className="dashboard__vazio-texto">
-        Com menos de {MINIMO_DO_GRUPO} pessoas ativas, {assunto} não é mostrado
-        para não identificar ninguém.
+        Com menos de {MINIMO_DO_GRUPO} {quem}, {assunto} não é mostrado para não
+        identificar ninguém.
       </p>
     </div>
   );
@@ -386,7 +393,17 @@ export function TempoDeCasaBloco({
   } else {
     const t = calcularTempoDeCasa(time.pessoas);
     if (t.tipo === "pouca-gente") {
-      conteudo = <PoucaGente assunto="o tempo de casa" />;
+      // Com 3 ou mais ativas, o corte veio da falta de datas legíveis.
+      conteudo = (
+        <PoucaGente
+          assunto="o tempo de casa"
+          quem={
+            time.pessoas.length >= MINIMO_DO_GRUPO
+              ? "pessoas com data de admissão legível"
+              : "pessoas ativas"
+          }
+        />
+      );
     } else {
       const linhas: LinhaDoTime[] = t.faixas.map((f) => ({
         chave: f.rotulo,

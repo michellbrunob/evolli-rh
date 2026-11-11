@@ -400,6 +400,11 @@ export function DashboardScreen({
       geracaoRef.current.contadores += 1;
       geracaoRef.current.time += 1;
       timeEmLeituraRef.current = false;
+      // Uma nova tentativa do time abandonada aqui não deixa "Tentar de novo"
+      // travado na volta à Visão Geral.
+      setTime((p) =>
+        p.tipo === "erro" && p.relendo ? { ...p, relendo: false } : p,
+      );
       setLendo(false);
       return;
     }

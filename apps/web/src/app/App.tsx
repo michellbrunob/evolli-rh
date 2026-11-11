@@ -1650,7 +1650,9 @@ export function App({
         >
           <div className="app-shell__cabecalho-lateral">
             <span className="app-shell__marca">
-              <MarcaEvolli />
+              {/* T207 — a faixa é marinho e pinta o texto de branco: o símbolo
+                  usa a variante clara (quadrado claro, barras em azul). */}
+              <MarcaEvolli tom="clara" />
               <span className="app-shell__marca-texto">
                 <span className="app-shell__marca-nome">Evolli RH</span>
                 <span className="app-shell__marca-tag">

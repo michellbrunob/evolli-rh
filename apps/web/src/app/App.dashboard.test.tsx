@@ -488,3 +488,21 @@ describe("T207 — Dashboard na barra superior do shell", () => {
     );
   });
 });
+
+describe("T207 — marca do Evolli na faixa lateral marinho", () => {
+  it("o símbolo aparece: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
+    montar("#/dashboard?ano=2026");
+    await esperarLeitura(2026);
+    const simbolo = document.querySelector<SVGElement>(
+      ".app-shell__sidebar .app-shell__marca-simbolo",
+    )!;
+    expect(simbolo).not.toBeNull();
+    const fundo = simbolo.querySelector(":scope > rect")!.getAttribute("fill");
+    const barras = simbolo.querySelector(":scope > g")!.getAttribute("fill");
+    // A faixa pinta o texto de branco: o fundo não pode depender dessa cor.
+    expect(fundo).not.toBe("currentColor");
+    expect(fundo).toBe("var(--surface-canvas)");
+    expect(barras).toBe("var(--color-action)");
+    expect(barras).not.toBe(fundo);
+  });
+});

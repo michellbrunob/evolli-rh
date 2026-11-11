@@ -1456,6 +1456,48 @@ describe("T207 — posição do painel do mês (nunca sobre a coluna, nunca alé
     }
   });
 
+  it("CSS: o painel recebe o ponteiro (WCAG 1.4.13) e encosta na coluna vizinha, sem fresta que troque o mês no caminho", () => {
+    const css = readFileSync(
+      "src/screens/dashboard/DashboardScreen.css",
+      "utf8",
+    );
+    const regra = (seletor: string) => {
+      const blocos: string[] = [];
+      let inicio = css.indexOf(`\n${seletor} {`);
+      while (inicio >= 0) {
+        blocos.push(css.slice(inicio, css.indexOf("}", inicio)));
+        inicio = css.indexOf(`\n${seletor} {`, inicio + 1);
+      }
+      return blocos.join("\n");
+    };
+    expect(regra(".dashboard__dica-mes")).not.toMatch(/pointer-events:\s*none/);
+    for (const lado of [
+      ".dashboard__dica-mes--depois",
+      ".dashboard__dica-mes--antes",
+    ]) {
+      expect(regra(lado), lado).not.toMatch(/margin-(left|right):/);
+    }
+  });
+
+  it("ponteiro: do mês para o painel, o painel continua no mesmo mês; sair do gráfico fecha", async () => {
+    render(<Tela />);
+    await lido();
+    const grafico = bloco(SERIE).querySelector<HTMLElement>(
+      ".dashboard__grafico",
+    )!;
+    fireEvent.mouseEnter(
+      within(bloco(SERIE)).getByRole("button", { name: "Março de 2026" }),
+    );
+    const painel = screen.getByRole("tooltip");
+    // O painel está dentro do gráfico: entrar nele não é sair do gráfico.
+    expect(grafico).toContainElement(painel);
+    fireEvent.mouseOver(painel);
+    fireEvent.mouseEnter(painel);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Março de 2026");
+    fireEvent.mouseLeave(grafico);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("CSS: o conteúdo do painel encolhe e quebra (nunca transborda a caixa)", () => {
     const css = readFileSync(
       "src/screens/dashboard/DashboardScreen.css",
@@ -1706,6 +1748,44 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     );
   });
 
+  it.each(["remuneracao", "clima-e-saude"] as const)(
+    "'Tentar de novo' do time em curso → %s (sem dados) → Pessoas → Visão Geral: o botão volta habilitado e funciona",
+    async (semDados) => {
+      servidorDosAtivos.mockRejectedValueOnce(new Error("rede"));
+      const { rerender } = render(<Tela aba="visao-geral" />);
+      await lido();
+      const pendente = adiada<ListagemColaboradoresApi>();
+      servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
+      const tentar = () =>
+        screen.getByRole("button", {
+          name: "Tentar de novo as pessoas ativas de hoje",
+        });
+      fireEvent.click(tentar());
+      expect(tentar()).toHaveAttribute("aria-disabled", "true");
+      rerender(<Tela aba={semDados} />);
+      await act(async () => {
+        pendente.resolver({
+          itens: [],
+          pagina: 1,
+          tamanhoPagina: 100,
+          total: 0,
+          contadores: contadores(),
+        });
+      });
+      rerender(<Tela aba="pessoas" />);
+      await lido();
+      rerender(<Tela aba="visao-geral" />);
+      await assentar();
+      expect(tentar()).not.toHaveAttribute("aria-disabled", "true");
+      fireEvent.click(tentar());
+      await waitFor(() =>
+        expect(bloco("Distribuição do time")).toHaveTextContent(
+          "10 pessoas ativas",
+        ),
+      );
+    },
+  );
+
   it("sair da Visão Geral no meio da leitura do time: a leitura volta ao retornar, sem misturar", async () => {
     const pendente = adiada<ListagemColaboradoresApi>();
     servidorDosAtivos.mockReturnValueOnce(pendente.promessa);
@@ -1798,6 +1878,35 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
       expect(b).not.toHaveTextContent(/\b[12] pessoas? sem data/);
     },
   );
+
+  it("tempo de casa com 3 ou mais ativos, mas menos de 3 com data legível: o motivo é a falta de datas, não de pessoas ativas", async () => {
+    servidorDeAtivos([
+      ...Array.from({ length: 2 }, (_, i) =>
+        ativo(`com-data-${i}`, "2025-05-09", "Operações"),
+      ),
+      ...Array.from({ length: 3 }, (_, i) =>
+        ativo(`sem-data-${i}`, "sem-data", "Operações"),
+      ),
+    ]);
+    render(<Tela />);
+    await lido();
+    const b = bloco("Tempo de casa");
+    expect(b).toHaveTextContent(
+      "Com menos de 3 pessoas com data de admissão legível, o tempo de casa não é mostrado para não identificar ninguém.",
+    );
+    expect(b).not.toHaveTextContent("menos de 3 pessoas ativas");
+    // A Distribuição, ao lado, mostra as 5 pessoas ativas.
+    expect(bloco("Distribuição do time")).toHaveTextContent("5 pessoas ativas");
+  });
+
+  it("menos de 3 pessoas ativas: o tempo de casa diz que são poucas pessoas ativas", async () => {
+    servidorDeAtivos(TIME_PADRAO().slice(0, 2));
+    render(<Tela />);
+    await lido();
+    expect(bloco("Tempo de casa")).toHaveTextContent(
+      "Com menos de 3 pessoas ativas, o tempo de casa não é mostrado",
+    );
+  });
 
   it("tempo de casa com 3 ou mais sem data legível: o número aparece, com concordância", async () => {
     servidorDeAtivos([
@@ -2086,7 +2195,8 @@ describe("T207 — Visão Geral em 375 px (CSS)", () => {
     const abaixo = regra(".dashboard__dica-mes--abaixo");
     expect(abaixo).toMatch(/position:\s*static/);
     expect(abaixo).toMatch(/max-width:\s*100%/);
-    expect(dica).toMatch(/pointer-events:\s*none/);
+    // O painel recebe o ponteiro (WCAG 1.4.13): sem `pointer-events: none`.
+    expect(dica).not.toMatch(/pointer-events:\s*none/);
     expect(regra(".dashboard__area-grafico")).toMatch(/position:\s*relative/);
     // Depois da coluna: começa na borda direita dela (coluna + 1).
     expect(regra(".dashboard__dica-mes--depois")).toMatch(
@@ -2138,7 +2248,10 @@ async function capturarDownload(acao: () => void) {
     blobs.push(b);
     return "blob:sintetico";
   }) as typeof URL.createObjectURL;
-  URL.revokeObjectURL = vi.fn();
+  const revogadas: string[] = [];
+  URL.revokeObjectURL = vi.fn((url: string) => {
+    revogadas.push(url);
+  });
   const nomes: string[] = [];
   const clique = vi
     .spyOn(HTMLAnchorElement.prototype, "click")
@@ -2156,6 +2269,10 @@ async function capturarDownload(acao: () => void) {
     leitor.onload = () => ok(leitor.result as ArrayBuffer);
     leitor.readAsArrayBuffer(blob);
   });
+  // A exportação libera o endereço num temporizador: o ambiente só volta ao
+  // original depois dessa liberação (no jsdom, `revokeObjectURL` não existe;
+  // restaurar antes deixaria o temporizador chamar `undefined`).
+  await vi.waitFor(() => expect(revogadas).toHaveLength(nomes.length));
   URL.createObjectURL = original.criar;
   URL.revokeObjectURL = original.revogar;
   return {
@@ -2163,6 +2280,7 @@ async function capturarDownload(acao: () => void) {
     nome: nomes[0],
     tipo: blob.type,
     downloads: nomes.length,
+    revogadas,
   };
 }
 
@@ -2629,6 +2747,32 @@ describe("T207 — os mesmos números no gráfico, no painel, na tabela e no CSV
 });
 
 describe("T207 — CSV real do quadro", () => {
+  it("mesmo com o temporizador da liberação atrasado (máquina carregada), o ambiente só é restaurado depois dela — sem erro solto", async () => {
+    render(<Tela />);
+    await lido();
+    const real = window.setTimeout.bind(window);
+    const atrasar = vi
+      .spyOn(window, "setTimeout")
+      .mockImplementation(((
+        fn: TimerHandler,
+        ms?: number,
+        ...resto: unknown[]
+      ) =>
+        real(
+          fn,
+          /revokeObjectURL/.test(String(fn)) ? 30 : ms,
+          ...resto,
+        )) as typeof window.setTimeout);
+    try {
+      const { revogadas } = await capturarDownload(() =>
+        escolher(SERIE, "Baixar CSV"),
+      );
+      expect(revogadas).toEqual(["blob:sintetico"]);
+    } finally {
+      atrasar.mockRestore();
+    }
+  });
+
   it("arquivo com BOM, ponto e vírgula, cabeçalho claro, um mês por linha até hoje, empresa e ano no nome", async () => {
     render(<Tela />);
     await lido();

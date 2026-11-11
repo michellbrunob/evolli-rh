@@ -950,8 +950,8 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   display: grid;
   gap: var(--space-xxs);
   width: max-content;
-  /* Só o espaço livre do lado escolhido (colunas inteiras), descontada a
-     folga: nunca sobre a coluna inspecionada, nunca além da borda. */
+  /* Só o espaço livre do lado escolhido (colunas inteiras), com uma folga
+     antes da borda: nunca sobre a coluna inspecionada, nunca além da borda. */
   max-width: min(
     16rem,
     calc(var(--espaco) / var(--colunas) * 100% - var(--space-xxs))
@@ -963,25 +963,26 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   background: var(--surface-canvas);
   color: var(--color-ink);
   font-size: var(--text-caption);
-  pointer-events: none;
 }
 
-/* Um mês só: nenhuma coluna livre ao lado — o painel entra no fluxo, abaixo
-   das barras e dentro do quadro. */
+/* Sem largura útil ao lado — um mês só, ano curto ou gráfico estreito (pela
+   largura medida em `posicaoDoPainel`) —: o painel entra no fluxo, abaixo das
+   barras e dentro do quadro. */
 .dashboard__dica-mes--abaixo {
   position: static;
   max-width: 100%;
   margin-top: var(--space-xs);
 }
 
+/* Encostado na coluna vizinha, sem margem: o ponteiro vai da coluna ao
+   painel sem passar por uma fresta de outra coluna (que trocaria o mês), e o
+   painel recebe o ponteiro (WCAG 1.4.13). */
 .dashboard__dica-mes--depois {
   left: calc((var(--coluna) + 1) / var(--colunas) * 100%);
-  margin-left: var(--space-xxs);
 }
 
 .dashboard__dica-mes--antes {
   right: calc((var(--colunas) - var(--coluna)) / var(--colunas) * 100%);
-  margin-right: var(--space-xxs);
 }
 
 .dashboard__dica-mes-titulo {

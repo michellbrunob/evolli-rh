@@ -198,15 +198,6 @@ export function AutenticacaoApp() {
    */
   const [edicoesPerdidas, setEdicoesPerdidas] = useState(false);
   /**
-   * T206 — menu lateral recolhido, lembrado só nesta aba e só em memória.
-   *
-   * Fica aqui, e não no shell, para sobreviver à volta pelo Hub (que desmonta
-   * o shell). Vale para UMA conta numa UMA empresa: `chave` é a mesma da
-   * árvore, e outra conta, outra empresa ou o logout a apagam — nada passa
-   * de um contexto para outro. Nunca há `localStorage`, `sessionStorage`,
-   * cookie ou URL.
-   */
-  /**
    * T207 — gráfico ou tabela em cada bloco do Dashboard: a mesma regra do
    * menu recolhido (só nesta aba, só em memória, uma conta numa empresa;
    * outra conta, outra empresa ou o logout apagam).
@@ -215,6 +206,15 @@ export function AutenticacaoApp() {
     readonly chave: string;
     readonly vistas: Readonly<Partial<Record<BlocoComVista, VistaDoBloco>>>;
   } | null>(null);
+  /**
+   * T206 — menu lateral recolhido, lembrado só nesta aba e só em memória.
+   *
+   * Fica aqui, e não no shell, para sobreviver à volta pelo Hub (que desmonta
+   * o shell). Vale para UMA conta numa UMA empresa: `chave` é a mesma da
+   * árvore, e outra conta, outra empresa ou o logout a apagam — nada passa
+   * de um contexto para outro. Nunca há `localStorage`, `sessionStorage`,
+   * cookie ou URL.
+   */
   const [preferenciaDoMenu, setPreferenciaDoMenu] = useState<{
     readonly chave: string;
     readonly recolhido: boolean;
