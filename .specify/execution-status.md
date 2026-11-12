@@ -3172,27 +3172,34 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (em preparação)
+## Configurações: Meu Perfil — T208 (em implementação)
 
-| Tarefa | Estado            | Resultado principal                                                           |
-| ------ | ----------------- | ----------------------------------------------------------------------------- |
-| T208   | **Em preparação** | Levantamento e decisões para começar Configurações pelo submódulo Meu Perfil. |
+| Tarefa | Estado                                 | Resultado principal                                                |
+| ------ | -------------------------------------- | ------------------------------------------------------------------ |
+| T208   | **Implementada e validada localmente** | Configurações › Meu perfil, somente leitura, para todos os papéis. |
 
-**Escopo da preparação:** levantamento e preparação de decisão, no
-[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md):
+**Entrega:** detalhada no [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md)
+(seções 15 a 19):
 
-- rotas, shell, autenticação, sessão, conta de acesso e permissões por papel; contratos web e
-  API existentes (`GET /v1/users/me`); campos disponíveis e permitidos;
-- delimitação de Meu Perfil, matriz de campos, papéis e contratos; o que é possível agora e o que
-  depende de API, schema, RBAC, auditoria ou decisão de produto;
-- acessibilidade, foco, guarda de saída, troca de empresa, URL e 375 px;
-- menor primeira fatia (Meu Perfil somente leitura, só web) e decisões MP-1 a MP-8 para
-  aprovação.
+- decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas;
+- rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; item próprio do menu para quem
+  tem o shell e cartão do Hub para os demais papéis; papel desconhecido sem acesso;
+- só leitura, só web, com os dados da sessão de `GET /v1/users/me` e sem chamada nova: e-mail de
+  acesso, papel, empresa ativa e data de criação da conta; sem controle de edição;
+- rótulo "Perfil" do Hub trocado por "Papel"; Segurança e Sessões ativas sem mudança;
+- achados do navegador corrigidos: foco no título na recarga, item atual da navegação interna
+  visível e gaveta do celular presa à altura da tela (defeito anterior, da T206).
 
-**Próximos submódulos (só inventariados):** Segurança, Empresas e Equipe e permissões.
+**Validação local:** web 133 arquivos, 3725 testes; API unitária 60 suítes, 1472 testes; E2E
+serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações, todas
+detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+`git diff --check` verdes.
 
-**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed, Docker,
-dependências, lockfile, workflow, push, PR, promoção e merge.
+**Pendente:** validação visual humana; push, PR, promoção e merge só com ordem.
+
+**Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
+Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
+lockfile e workflow.
 
 ## Próxima ação autorizável
 

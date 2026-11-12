@@ -1,8 +1,9 @@
 # T208 — Configurações: Meu Perfil (dossiê de preparação)
 
-- **Estado:** em preparação. Só levantamento e decisão: nenhum código de produto, API, schema,
-  migration, RBAC, auditoria, seed, Docker, dependência, lockfile ou workflow. A implementação
-  começa só depois da aprovação das decisões da seção 13.
+- **Estado:** implementada e validada localmente, em branch local, sem push, PR, promoção ou
+  merge. As decisões MP-1 a MP-8 da seção 13 foram aprovadas (seção 15) e a primeira fatia está
+  descrita nas seções 16 a 19. Só web: nenhuma mudança de API, schema, migration, RBAC,
+  auditoria, seed, Docker, dependência, lockfile ou workflow.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -269,3 +270,89 @@ Cada um vira uma tarefa própria, só com ordem.
 
 Código de produto, API, schema, migration, RBAC, auditoria, seed, Docker, dependências, lockfile,
 workflow, push, PR, promoção e merge; Segurança, Empresas e Equipe e permissões (seção 9).
+
+## 15. Decisões aprovadas
+
+As decisões MP-1 a MP-8 foram aprovadas em 2026-11-12 como recomendadas na seção 13, sem
+alternativa. A implementação seguiu esse recorte; nenhuma decisão nova foi tomada nela.
+
+## 16. Implementação
+
+- **Rota:** `#/configuracoes/meu-perfil`, na tabela fechada de rotas do shell
+  (`apps/web/src/app/rotasDoShell.ts`). O atalho `#/configuracoes` abre a mesma tela, e a URL é
+  corrigida no lugar para a forma canônica. Qualquer outro caminho em `#/configuracoes/` não é
+  rota.
+- **Quem acessa (MP-3):** o destino `configuracoes` entra na capacidade de todos os nove papéis
+  conhecidos (`apps/web/src/app/mapaNavegacao.ts`); papel desconhecido continua sem destino
+  nenhum. Quem tem o shell vê o item no menu; os demais papéis, o cartão no Hub.
+- **Menu (MP-2):** grupo próprio da conta, numa lista separada, abaixo dos módulos de trabalho e
+  acima de Demonstração, com ícone próprio. No menu recolhido vira ícone do trilho com a dica;
+  na gaveta do celular, escolher o item fecha a gaveta.
+- **Tela (MP-1, MP-4):** `apps/web/src/screens/configuracoes/MeuPerfilScreen.tsx`, somente
+  leitura. Trilha "Configurações › Meu perfil", título "Configurações", navegação interna com um
+  único item ("Meu perfil", atual) e quatro dados: e-mail de acesso, papel (pelo rótulo), empresa
+  ativa (nome e código, ou "Nenhuma empresa ativa") e data de criação da conta (só a data). Um
+  aviso diz que a edição ainda não está disponível. Não há botão, campo, item inativo nem
+  identificador interno, CPF, contato, dado de colaborador, foto, telefone, idioma ou
+  preferência.
+- **Dados:** os quatro valores vêm da sessão já carregada por `GET /v1/users/me`; a tela não faz
+  chamada nova.
+- **Foco:** quando a tela abre com o pedido de foco do shell ou sem nada focado (recarga), o
+  título recebe o foco; quem chega pelo menu mantém o foco no item do menu. O `main` é nomeado
+  pelo título.
+- **Hub (MP-8):** o rótulo "Perfil" passou a "Papel", e os textos de apoio dizem "seu papel".
+- **Segurança e Sessões ativas (MP-7):** continuam nos painéis da barra superior, sem mudança.
+- **Gaveta do celular (defeito anterior, da T206):** a gaveta não tinha altura presa à tela,
+  porque o navegador aplica a caixas fixas o `align-self: flex-start` do desktop; ela crescia
+  com o conteúdo e o pé do menu (Configurações e Demonstração) ficava fora de alcance a 375 px.
+  A regra móvel da barra lateral ganhou `align-self: stretch`
+  (`apps/web/src/app/app-shell.css`); a gaveta passa a ter a altura da tela e rola.
+
+## 17. Achados da validação no navegador
+
+Com dados sintéticos do seed local, a validação no navegador encontrou três defeitos; cada um foi
+corrigido com teste que falha antes e com mutação própria:
+
+1. Na recarga da rota, o foco ficava no documento, e não no título.
+2. O item atual da navegação interna tinha o mesmo tom do fundo da página e não se distinguia;
+   ganhou fundo de contraste, borda de ação à esquerda e peso de texto.
+3. A gaveta do celular crescia além da altura da tela (seção 16).
+
+Depois das correções, a validação confirmou:
+
+- **RH:** item no menu, na lista da conta, marcado como atual; os quatro dados; nenhum controle;
+  voltar e avançar; recarga com foco no título; a 375 px, sem rolagem horizontal e com alvo de
+  44 px; gaveta com a altura da tela, rolável, que fecha ao escolher Configurações e devolve o
+  foco ao botão Menu; Hub com "Papel" e o cartão de Configurações.
+- **Master técnico:** sem empresa, "Nenhuma empresa ativa"; ao trocar de empresa pelo seletor, a
+  tela é remontada em Meu perfil, com anúncio e foco no título.
+- **Gestor:** item no menu e dados corretos.
+- **Colaborador:** Hub só com o cartão de Configurações; abre pelo teclado, com foco no título;
+  nenhum dado proibido.
+- **Menu recolhido:** ícone no trilho, com dica e marcação de atual.
+- **URL:** caminho inválido leva ao destino inicial do papel; `#/configuracoes` vira a rota
+  canônica.
+
+## 18. Evidências
+
+- **Testes novos (68):** rota e atalho (10); tela, dados proibidos, ausência de controles e CSS
+  (21); shell com todos os papéis, menu, histórico, recarga, foco, link de pular, teclado, menu
+  recolhido, gaveta, CSS da gaveta e guarda de saída (32); sessão, Hub, master com e sem
+  empresa e troca de empresa (5). Testes existentes de menu, Hub e shell foram ajustados ao
+  novo grupo, ao novo cartão e ao rótulo "Papel".
+- **Mutações:** 22, todas detectadas (rota, atalho, capacidade por papel, menu, título e foco,
+  conta da sessão, rótulo do Hub, conteúdo da tela, dado proibido, botão inativo, item
+  decorativo, gaveta e CSS de 375 px).
+- **Bateria local:** web 133 arquivos, 3725 testes; API unitária 60 suítes, 1472 testes; E2E
+  serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; lint sem aviso,
+  typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
+
+## 19. Limites
+
+- **Fragmento desconhecido na URL:** um caminho que não é rota leva ao destino inicial do papel,
+  mas, quando esse destino não tem rota própria, o fragmento digitado permanece na barra de
+  endereço. É o comportamento anterior à T208, não alterado.
+- **Sem edição:** nome de exibição (MP-5), e-mail e senha (MP-6) seguem fora; Segurança, Empresas
+  e Equipe e permissões continuam só inventariados (seção 9).
+- **Gaveta do celular:** a correção da seção 16 vale para todo o menu móvel, não só para
+  Configurações.

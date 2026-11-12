@@ -3361,18 +3361,30 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         20 suítes, 1017 testes; scripts 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
 
-105.  **T208 - Configurações: Meu Perfil (preparação)**
-      - **Estado:** **em preparação**. Branch `codex/t208-configuracoes-meu-perfil`, a partir do
-        squash `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
-      - **Objetivo:** começar o módulo Configurações pelo submódulo Meu Perfil, uma entrega por
-        vez: levantar, com evidência no código, nos contratos e no RBAC, rotas, shell,
-        autenticação, sessão, conta e permissões; delimitar Meu Perfil; matriz de campos, papéis
-        e contratos; separar o possível agora do que depende de decisão; propor a menor primeira
-        fatia e as decisões MP-1 a MP-8 para aprovação, no
-        [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md).
-      - **Próximos submódulos (só inventariados):** Segurança, Empresas e Equipe e permissões.
-      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
-        Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
+105.  **T208 - Configurações: Meu Perfil**
+      - **Estado:** **implementada e validada localmente**, sem push, PR, promoção ou merge.
+        Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
+        `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
+      - **Preparação:** levantamento e decisões MP-1 a MP-8 no
+        [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md), aprovadas em
+        2026-11-12 como recomendadas (seção 15).
+      - **Entrega:** rota `#/configuracoes/meu-perfil` (e o atalho `#/configuracoes`) com Meu
+        perfil somente leitura, só web, com os dados da sessão de `GET /v1/users/me`, sem chamada
+        nova: e-mail de acesso, papel, empresa ativa e data de criação da conta, e um aviso de que
+        a edição ainda não está disponível. Configurações é item próprio do menu para quem tem o
+        shell e cartão do Hub para os demais papéis; navegação interna só com Meu perfil; o
+        rótulo "Perfil" do Hub passou a "Papel"; Segurança e Sessões ativas seguem na barra
+        superior (seção 16).
+      - **Achados do navegador, corrigidos (seção 17):** foco no título na recarga; item atual
+        da navegação interna visível sobre o fundo; gaveta do celular presa à altura da tela,
+        com rolagem (defeito anterior, da T206).
+      - **Validação local:** web 133 arquivos, 3725 testes; API unitária 60 suítes, 1472 testes;
+        E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
+        todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+        `git diff --check` verdes.
+      - **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança,
+        Empresas e Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker,
+        dependências, lockfile e workflow.
 
 ## Regra obrigatória para as próximas tarefas
 
