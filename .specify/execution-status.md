@@ -3172,11 +3172,11 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (implementada e validada localmente)
+## Configurações: Meu Perfil — T208 (em implementação, entrega em PR Draft #201)
 
-| Tarefa | Estado                                 | Resultado principal                                                |
-| ------ | -------------------------------------- | ------------------------------------------------------------------ |
-| T208   | **Implementada e validada localmente** | Configurações › Meu perfil, somente leitura, para todos os papéis. |
+| Tarefa | Estado                                                               | Resultado principal                                                |
+| ------ | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| T208   | **Em implementação** (entrega em PR Draft #201, validada localmente) | Configurações › Meu perfil, somente leitura, para todos os papéis. |
 
 **Entrega:** detalhada no [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md)
 (seções 15 a 20):
@@ -3199,11 +3199,11 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Pendente:** push, PR Draft, revisão, promoção e merge, só com ordem.
+**Pendente:** revisão da PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
 Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
-lockfile e workflow.
+lockfile e workflow; Ready for review e merge.
 
 ## Próxima ação autorizável
 

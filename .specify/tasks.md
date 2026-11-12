@@ -3362,8 +3362,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         do squash e `git diff --check` verdes.
 
 105.  **T208 - Configurações: Meu Perfil**
-      - **Estado:** **implementada e validada localmente**, com a validação visual humana aprovada
-        em 2026-11-12; sem push, PR, revisão de PR, promoção ou merge.
+      - **Estado:** **em implementação — entrega em PR Draft #201**, validada localmente, com a
+        validação visual humana aprovada em 2026-11-12; sem Ready for review e sem merge.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
@@ -3386,7 +3386,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         `git diff --check` verdes.
       - **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança,
         Empresas e Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker,
-        dependências, lockfile e workflow.
+        dependências, lockfile e workflow; Ready for review e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

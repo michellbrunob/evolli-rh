@@ -1,7 +1,7 @@
 # T208 — Configurações: Meu Perfil (dossiê de preparação)
 
-- **Estado:** implementada e validada localmente, com a validação visual humana aprovada em
-  2026-11-12 (seção 20); em branch local, sem push, PR, revisão de PR, promoção ou merge. As
+- **Estado:** em implementação — entrega em PR Draft #201, validada localmente, com a validação
+  visual humana aprovada em 2026-11-12 (seção 20); sem Ready for review e sem merge. As
   decisões MP-1 a MP-8 da seção 13 foram aprovadas (seção 15), seguem sem alteração e a primeira
   fatia está descrita nas seções 16 a 20. Só web: nenhuma mudança de API, schema, migration, RBAC,
   auditoria, seed, Docker, dependência, lockfile ou workflow.
@@ -386,6 +386,7 @@ Depois das correções, a validação confirmou:
   (MP-3); só os quatro dados (MP-4); nenhum campo, botão ou controle de edição (MP-5, MP-6);
   Segurança e Sessões ativas intocadas (MP-7); "Papel" no Hub (MP-8).
 - **Limites conhecidos:** os da seção 19.
+- **Entrega:** PR Draft #201 contra `main`; Ready for review e merge só com ordem.
 - **Contagens finais:** as da seção 18, refeitas no HEAD final da branch: web 133 arquivos,
   3725 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes,
   1017 testes; scripts 182 testes; 22 mutações, todas detectadas.
