@@ -18,6 +18,7 @@ import { UsersService } from "./users.service";
 import { CreateUserDto } from "../auth/dto/create-user.dto";
 import { UpdateUserRoleDto } from "../auth/dto/update-user-role.dto";
 import { ListarUsuariosQueryDto } from "./dto/listar-usuarios-query.dto";
+import { AtualizarPerfilProprioDto } from "./dto/atualizar-perfil-proprio.dto";
 import { SessionGuard } from "../auth/session/session.guard";
 import { CsrfGuard } from "../auth/csrf/csrf.guard";
 import { AuthorizationGuard } from "../auth/authorization/authorization.guard";
@@ -63,6 +64,46 @@ export class UsersController {
    */
   @Get("me")
   async getMe(@CurrentUser() user: AccessUser) {
+    return this.projetarAtor(user);
+  }
+
+  /**
+   * T208 — Configurações › Meu perfil: a própria pessoa salva o próprio
+   * perfil. Hoje, só o nome de exibição (ver `AtualizarPerfilProprioDto`).
+   *
+   * `own_account`/`manage` é a única permissão: vale para todo papel, sempre
+   * sobre a conta da sessão — a rota não tem `:id`, então não há alvo de
+   * outra conta a escolher. Responde com o ator inteiro, na mesma projeção de
+   * `GET /users/me`, para a tela seguir com o que o servidor gravou.
+   */
+  @Patch("me")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("own_account", "manage")
+  async atualizarMe(
+    @Body() dto: AtualizarPerfilProprioDto,
+    @CurrentUser() user: AccessUser,
+    @Req() req: Request,
+  ) {
+    const perfil = await this.usersService.atualizarPerfilProprio(
+      {
+        nomeExibicao: dto.nomeExibicao,
+        perfilAtualizadoEmLido:
+          dto.perfilAtualizadoEmLido === null
+            ? null
+            : new Date(dto.perfilAtualizadoEmLido),
+      },
+      { actor: user, metadata: extractRequestMetadata(req) },
+    );
+    return this.projetarAtor({ ...user, ...perfil });
+  }
+
+  /**
+   * A projeção do ator que o SPA recebe: `toSafeUser`, o perfil (T208) e o
+   * contexto da sessão. O nome de exibição e a data da última alteração do
+   * perfil saem SÓ aqui — `toSafeUser`, usado na listagem de Contas de
+   * acesso, não os carrega.
+   */
+  private async projetarAtor(user: AccessUser) {
     const comContexto = user as AccessUser & { podeTrocarEmpresa?: boolean };
 
     const empresaAtiva =
@@ -75,6 +116,8 @@ export class UsersController {
 
     return {
       ...toSafeUser(user),
+      nomeExibicao: user.nomeExibicao ?? null,
+      perfilAtualizadoEm: user.perfilAtualizadoEm ?? null,
       mfaAvailable: this.mfaConfig.isEnabled(),
       podeTrocarEmpresa: comContexto.podeTrocarEmpresa === true,
       empresaAtiva,

@@ -1,4 +1,8 @@
-import { Injectable, UnprocessableEntityException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  UnprocessableEntityException,
+} from "@nestjs/common";
 import { AccessRole, AccessUser, Prisma } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { PasswordHashService } from "../auth/password/password-hash.service";
@@ -38,6 +42,20 @@ export interface CreateUserInput {
 export interface AuditActorContext {
   actor: AccessUser;
   metadata: SessionRequestMetadata;
+}
+
+/** T208 — o que a própria pessoa grava em Meu perfil, já normalizado. */
+export interface PerfilProprioInput {
+  /** `null` limpa o nome: a interface volta ao e-mail. */
+  nomeExibicao: string | null;
+  /** A versão que a tela leu (`null`: o perfil nunca foi salvo). */
+  perfilAtualizadoEmLido: Date | null;
+}
+
+/** T208 — o perfil gravado, como volta para a tela. */
+export interface PerfilProprio {
+  nomeExibicao: string | null;
+  perfilAtualizadoEm: Date | null;
 }
 
 @Injectable()
@@ -142,6 +160,63 @@ export class UsersService {
     });
 
     return toSafeUser(user);
+  }
+
+  /**
+   * T208 — a própria pessoa salva o próprio perfil (Configurações › Meu
+   * perfil). Autorização já aplicada (`own_account`/`manage`).
+   *
+   * - **Alvo é sempre a conta da sessão** (`auditCtx.actor.id`); não existe
+   *   id vindo da requisição.
+   * - **Só o nome de exibição** é escrito, mais a data da última alteração do
+   *   perfil. Papel, e-mail, empresa, unidade, equipe e situação nunca são
+   *   tocados aqui.
+   * - **Concorrência otimista:** a escrita só acontece se o perfil ainda está
+   *   na versão que a tela leu. Se outra sessão salvou antes, nada é gravado
+   *   e a resposta é 409 — a edição concorrente não é sobrescrita. A condição
+   *   vai no próprio `UPDATE`, então duas gravações simultâneas não passam
+   *   as duas.
+   * - **Auditoria** na mesma transação (ADR 0004 §2), sem o conteúdo do nome.
+   */
+  async atualizarPerfilProprio(
+    input: PerfilProprioInput,
+    auditCtx: AuditActorContext,
+  ): Promise<PerfilProprio> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const gravados = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: input.perfilAtualizadoEmLido,
+        },
+        data: {
+          nomeExibicao: input.nomeExibicao,
+          perfilAtualizadoEm: agora,
+        },
+      });
+      if (gravados.count !== 1) {
+        throw new ConflictException();
+      }
+
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "conta_perfil_atualizado",
+          resource: "access_user",
+          resourceId: auditCtx.actor.id,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
+
+      return { nomeExibicao: input.nomeExibicao, perfilAtualizadoEm: agora };
+    });
   }
 
   async disable(

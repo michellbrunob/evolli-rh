@@ -66,6 +66,14 @@ model AccessUser {
 
   status AccessUserStatus @default(active)
 
+  // T208 — Configuracoes > Meu perfil. Nome de exibicao proprio da conta
+  // (global, nao por empresa), opcional: sem ele, a interface usa o e-mail.
+  // `perfilAtualizadoEm` muda SO quando a propria pessoa salva o perfil — ao
+  // contrario de `updatedAt`, que tambem muda com senha, papel e desativacao —
+  // e e a versao da concorrencia otimista de `PATCH /v1/users/me`.
+  nomeExibicao       String?   @map("nome_exibicao") @db.VarChar(80)
+  perfilAtualizadoEm DateTime? @map("perfil_atualizado_em")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -377,6 +385,11 @@ enum AuditAction {
   acesso_contexto_empresa_trocado     @map("acesso.contexto_empresa.trocado")
   acesso_empresa_autorizada_concedida @map("acesso.empresa_autorizada.concedida")
   acesso_empresa_autorizada_revogada  @map("acesso.empresa_autorizada.revogada")
+
+  // T208 — a propria pessoa salvou o proprio perfil (Configuracoes > Meu
+  // perfil). O evento nao guarda o conteudo do nome de exibicao: a trilha so
+  // diz quem, quando e de onde.
+  conta_perfil_atualizado @map("conta.perfil.atualizado")
 
   organizacao_empresa_criada     @map("organizacao.empresa.criada")
   organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")
