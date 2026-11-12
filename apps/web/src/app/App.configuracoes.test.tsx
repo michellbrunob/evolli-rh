@@ -5,6 +5,7 @@
  * desconhecido, foco no título, link de pular e a guarda de saída.
  */
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { useEdicaoEmAndamento } from "./edicoesPendentes";
@@ -230,6 +231,22 @@ describe("T208 — menu, histórico e foco", () => {
     fireEvent.click(itemDoMenu());
     expect(tituloDeConfiguracoes()).toBeInTheDocument();
     expect(menu).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("T208 — gaveta do celular alcança o pé do menu (CSS)", () => {
+  it("presa entre o topo e o pé da tela, a gaveta estica (align-self) e rola: Configurações e Demonstração ficam alcançáveis", () => {
+    const css = readFileSync("src/app/app-shell.css", "utf8");
+    const movel = css.slice(css.indexOf("@media (max-width: 834px)"));
+    const inicio = movel.indexOf("\n  .app-shell__sidebar {");
+    const regra = movel.slice(inicio, movel.indexOf("}", inicio));
+    expect(regra).toMatch(/position:\s*fixed/);
+    expect(regra).toMatch(/top:\s*0/);
+    expect(regra).toMatch(/bottom:\s*0/);
+    // Sem isto, o `align-self: flex-start` do desktop faz a gaveta crescer
+    // com o conteúdo (o navegador aplica `align-self` a caixas fixas) e o
+    // que passa da altura da tela deixa de ser alcançável.
+    expect(regra).toMatch(/align-self:\s*stretch/);
   });
 });
 
