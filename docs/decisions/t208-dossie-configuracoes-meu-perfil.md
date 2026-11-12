@@ -3,10 +3,9 @@
 - **Estado:** em implementação, **ampliada antes do Ready por decisão de produto** (seção 21). A
   entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
   leitura das seções 16 a 20 (validado localmente, validação visual aprovada em 2026-11-12) é a
-  **base existente, não a entrega final**. A ampliação está em levantamento: as decisões MPA-1 a
-  MPA-11 (seção 21.8) aguardam aprovação, e nada dela foi implementado. As decisões MP-1 a MP-8
-  da seção 13 seguem sem alteração. Até aqui, só web: nenhuma mudança de API, schema, migration,
-  RBAC, auditoria, seed, Docker, dependência, lockfile ou workflow.
+  **base existente, não a entrega final**. As decisões MPA-1 a MPA-11 (seção 21.8) foram
+  aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22), e a ampliação está em implementação
+  local, sem push. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -511,7 +510,7 @@ administrativa nem em log).
 | MPA-2  | Foto                               | Indisponível: iniciais do nome de exibição (ou do e-mail), sem botão de envio                                                                                                                                                       | Upload em tarefa própria, com storage e política de retenção                  |
 | MPA-3  | Cargo                              | Fora de Meu Perfil: é dado da lotação, mantido pelo RH e por empresa                                                                                                                                                                | Exibir só leitura o cargo do vínculo DP-23 na empresa ativa (contrato novo)   |
 | MPA-4  | Telefone                           | Fora: a conta não tem telefone nem finalidade para ele; o contato do colaborador segue com o RH                                                                                                                                     | Coluna de telefone na conta, com finalidade definida                          |
-| MPA-5  | E-mail e confirmação               | Só leitura, sem selo de confirmação; texto dizendo que a troca é feita pela administração                                                                                                                                           | Troca com verificação por e-mail, depois de integrar um provedor              |
+| MPA-5  | E-mail e confirmação               | Só leitura e indisponível para alteração até existir fluxo próprio com verificação; sem selo de confirmação                                                                                                                         | Troca com verificação por e-mail, depois de integrar um provedor              |
 | MPA-6  | Senha                              | Em Segurança, tarefa própria: troca logada com senha atual, política vigente, revogação das outras sessões e auditoria nova                                                                                                         | Troca logada já na T208                                                       |
 | MPA-7  | Google                             | Indisponível e não exibido (sem OIDC)                                                                                                                                                                                               | Linha informativa de indisponibilidade                                        |
 | MPA-8  | Segundo fator                      | Continua no painel atual; estado por conta e desligamento próprio vão para Segurança                                                                                                                                                | Mostrar o estado em Meu Perfil (contrato novo)                                |
@@ -527,3 +526,34 @@ começa.
 
 Implementação de qualquer item da 21.6; produto, API, schema, migration, RBAC, banco, seed,
 Docker, dependências, lockfile e workflows; Ready for review e merge.
+
+## 22. Aprovação da ampliação (2026-11-12)
+
+As decisões MPA-1 a MPA-11 foram aprovadas em 2026-11-12, com uma correção: **MPA-5** passa a
+dizer que o e-mail é somente leitura e fica indisponível para alteração até existir fluxo próprio
+com verificação. Nenhuma tela afirma que a administração consegue trocá-lo (nenhuma rota faz
+isso hoje, seção 21.3).
+
+Escopo funcional aprovado para a ampliação:
+
+1. **Nome de exibição:** campo próprio da conta, opcional. Sem valor, a interface usa o e-mail.
+   Preenchido, exige texto real de 2 a 80 caracteres após normalização e remoção de espaços nas
+   extremidades; valor vazio limpa o nome e restaura o e-mail. A pessoa só edita o próprio.
+2. **Persistência e concorrência:** colunas próprias da conta para o nome de exibição e a data da
+   última alteração do perfil; migration, contrato, serviço e `PATCH /v1/users/me`, que aceita só
+   o nome de exibição, com concorrência otimista (conflito compreensível, sem sobrescrever edição
+   concorrente). A data da última alteração do perfil muda só quando o perfil é salvo, não em
+   troca de senha, papel ou desativação. Evento de auditoria próprio, sem o conteúdo do nome.
+3. **Meu Perfil na web:** seções de identificação, contato e formas de entrada; iniciais no lugar
+   da foto, sem envio de arquivo; o nome de exibição é o único campo editável; e-mail, papel,
+   empresa ativa, criação da conta e última alteração são dados reais, só leitura; cargo e
+   telefone não aparecem; formas de entrada mostram só "e-mail e senha" (sem Google, segundo
+   fator ou sessões); rodapé de edição com descartar e salvar só quando há alteração; guarda de
+   saída que não pergunta com o formulário limpo, pergunta com o nome alterado e bloqueia a
+   saída durante o salvamento; navegação interna só com Meu perfil.
+4. **Permissões e isolamento:** `own_account` é a única permissão para editar o próprio perfil;
+   todos os papéis só alteram a própria conta; empresa, papel, e-mail e identificadores internos
+   não mudam por esta rota; o nome é global da conta, não por empresa, e não entra na listagem
+   de Contas de acesso.
+5. **Fora:** foto, cargo, telefone, alteração de e-mail, senha, Google, segundo fator e sessões;
+   dependências, lockfile, Docker e workflows.

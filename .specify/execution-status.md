@@ -3180,9 +3180,10 @@ resolvida no primeiro commit da T208.
 
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
-decisões MPA-1 a MPA-11, que aguardam aprovação, estão na seção 21 do
+decisões MPA-1 a MPA-11, aprovadas em 2026-11-12 com a MPA-5 corrigida (seção 22), estão na seção 21 do
 [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); nada da ampliação foi
-implementado. A referência visual foi usada só como inspiração local e não é registrada.
+implementação local em andamento, sem push. A referência visual foi usada só como inspiração
+local e não é registrada.
 
 **Base existente:** detalhada no dossiê (seções 15 a 20):
 
@@ -3204,7 +3205,7 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Pendente:** aprovação das decisões MPA-1 a MPA-11 e implementação da ampliação; revisão da
+**Pendente:** implementação e validação da ampliação aprovada; revisão da
 PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e

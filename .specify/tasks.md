@@ -3370,9 +3370,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         cargo, telefone, e-mail e confirmação, data de alteração, senha, Google, segundo fator e
         sessões por domínio (conta, colaborador, empresa e autenticação), com privacidade, LGPD,
         auditoria, RBAC, isolamento por empresa e sessões; primeira fatia proposta (nome de
-        exibição editável, com API, migration e auditoria) e decisões MPA-1 a MPA-11 aguardando
-        aprovação. Nada da ampliação foi implementado. A referência visual foi usada só como
-        inspiração local e não é registrada.
+        exibição editável, com API, migration e auditoria). Decisões MPA-1 a MPA-11 aprovadas em
+        2026-11-12, com a MPA-5 corrigida (e-mail só leitura e indisponível para alteração até
+        existir fluxo próprio com verificação); escopo aprovado na seção 22; implementação local
+        em andamento, sem push. A referência visual foi usada só como inspiração local e não é
+        registrada.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
