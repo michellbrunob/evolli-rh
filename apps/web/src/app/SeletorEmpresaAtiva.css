@@ -257,3 +257,113 @@
     transition: transform 120ms ease;
   }
 }
+
+/* T207 — paleta Evolli (P-1) e lista "Empresas da conta" (E-1). O cartão é
+   claro sobre a faixa azul-marinho; o monograma é azul com iniciais
+   brancas (contraste acima de 4,5:1); a empresa atual soma superfície,
+   ícone, o texto "Atual" e `aria-current`. */
+.seletor-empresa__cartao {
+  border-color: var(--hairline);
+  background: var(--surface-canvas);
+  color: var(--evolli-marinho);
+}
+
+.seletor-empresa__botao:hover,
+.seletor-empresa__botao[aria-expanded="true"] {
+  border-color: var(--evolli-azul);
+}
+
+.seletor-empresa__monograma {
+  background: var(--evolli-azul);
+  color: var(--evolli-sobre-marinho);
+}
+
+.seletor-empresa__monograma--opcao {
+  width: 32px;
+  height: 32px;
+  background: var(--evolli-azul-suave);
+  color: var(--evolli-marinho);
+}
+
+.seletor-empresa__opcao[aria-current="true"] {
+  border-color: var(--evolli-azul);
+  background: var(--evolli-azul-suave);
+}
+
+.seletor-empresa__opcao[aria-current="true"]
+  .seletor-empresa__monograma--opcao {
+  background: var(--evolli-azul);
+  color: var(--evolli-sobre-marinho);
+}
+
+.seletor-empresa__atual {
+  background: var(--evolli-azul);
+  color: var(--evolli-sobre-marinho);
+}
+
+.seletor-empresa__opcao:focus-visible,
+.seletor-empresa__busca-campo:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
+  outline-offset: 1px;
+}
+
+.seletor-empresa__titulo-lista {
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.seletor-empresa__busca {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: 0 var(--space-xs);
+}
+
+.seletor-empresa__busca-rotulo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.seletor-empresa__busca-campo {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+/* No trilho, o monograma é o próprio controle. */
+.seletor-empresa--compacto .seletor-empresa__cartao {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* No Hub (fundo claro), o cartão mantém o contorno. */
+.seletor-empresa--hub .seletor-empresa__cartao {
+  border-color: var(--hairline);
+}
+
+/* Na faixa estreita, o selo "Atual" ao lado do nome espremia o texto até
+   quebrar no meio das palavras: o selo desce para baixo do nome, na coluna
+   do texto, e o nome só quebra entre palavras (ou numa palavra que não cabe
+   sozinha). */
+.seletor-empresa__opcao {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-sm);
+  row-gap: var(--space-xxs);
+  align-items: center;
+}
+
+.seletor-empresa__atual {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.seletor-empresa__opcao-nome {
+  overflow-wrap: break-word;
+}

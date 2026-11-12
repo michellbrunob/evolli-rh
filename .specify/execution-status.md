@@ -3061,11 +3061,11 @@ squash `c2c83622fd84bba9af73da3af96a4d5cb255b6a3`, CI de push 3/3 verde, run
 42798080671); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T206.
 
-## Shell com menu lateral fixo e recolhível — T206 (em implementação, validada localmente)
+## Shell com menu lateral fixo e recolhível — T206 (integrada)
 
-| Tarefa | Estado                                     | Resultado principal                                                                                        |
-| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| T206   | **Em implementação** (validada localmente) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                        |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| T206   | **Integrada** (PR #199, squash `512d249`) | Menu lateral preso à esquerda, recolhível em trilho de ícones, com o conteúdo ocupando a largura liberada. |
 
 **Escopo:** só shell e navegação na web, registrado no
 [dossiê](../docs/decisions/t206-shell-menu-lateral.md):
@@ -3081,7 +3081,7 @@ resolvida no primeiro commit da T206.
   permissões por papel preservadas; sem rolagem horizontal em desktop, largura
   intermediária e 375 px.
 
-**Entregue (validada localmente):** a implementação descrita nas seções 4 a 11 do dossiê —
+**Entregue (PR #199):** a implementação descrita nas seções 4 a 11 do dossiê —
 faixa da altura da janela presa à esquerda, sem trava de largura no corpo; trilho de 72 px com
 os mesmos botões e o texto visualmente oculto; módulo com submenu e empresa compacta que
 expandem o menu no mesmo gesto; item ativo herdado pelo cabeçalho do módulo oculto; dica
@@ -3099,7 +3099,73 @@ sem acesso ao shell, em desktop, largura intermediária e 375 px.
 - regras do Dashboard, de Colaboradores e das fichas;
 - identidade visual, ativos de marca e logotipo;
 - menu, seção, trilha de navegação, exportação ou IA sem contrato real;
-- promoção e merge.
+- promoção.
+
+**Observação de relatório:** a integração funcional da T206 está concluída (PR #199,
+squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
+42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T207.
+
+## Dashboard funcional e seletor de empresas — T207 (validada localmente, PR #200 em Draft)
+
+| Tarefa | Estado                                                   | Resultado principal                                                                    |
+| ------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| T207   | **Implementada** (validada localmente, PR #200 em Draft) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
+
+**Escopo da preparação (concluída):** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
+
+- Dashboard: rota, permissões, empresa ativa, URL, troca de empresa, foco, teclado,
+  anúncios, carregamento, erro, respostas atrasadas e 375 px; abas Visão Geral, Pessoas,
+  Movimentação, Remuneração e Clima e saúde, cada uma com rota e estado funcional;
+  inventário do que existe com dado real e do que exige contrato novo;
+- seletor de empresa ativa: controle compacto, lista das empresas da conta, empresa
+  atual, troca da T189, faixa expandida, trilho e celular, teclado, foco e leitores de
+  tela; ações de adicionar e gerenciar empresas só com rota, permissão e produto reais;
+- decisões V-1 a V-6 (Dashboard) e E-1 a E-4 (seletor) para aprovação.
+
+**Decisões aprovadas (2026-11-10):** V-1 a V-6, E-1 a E-4 e P-1, conforme a recomendação do
+dossiê (seção 13).
+
+**Escopo da implementação:** cinco abas com rota e ano compartilhado; Visão Geral, Pessoas e
+Movimentação só com dados reais; cards honestos para turnover, absenteísmo e custo por pessoa;
+Remuneração e Clima e saúde com estado de indisponibilidade; seletor de empresa com lista
+"Empresas da conta" e busca acima de 8 empresas; paleta Evolli no menu lateral, no Dashboard e no
+seletor.
+
+**Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
+lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos históricos calculados;
+tela de empresas; mudança global de cor; promoção e merge.
+
+**Entrega validada localmente (seções 16 a 19 do dossiê):** Quadro de colaboradores com gráfico
+e tabela, painel por mês, informação "Como calculamos", menu de ações, CSV e impressão para salvar
+em PDF; Distribuição do time e Tempo de casa com agrupamento mínimo de 3 pessoas; ativos no fim e
+turnover como "—" por falta de fonte e regra aprovada; validação visual aprovada pela
+proprietária em 2026-11-10. Em revisão na PR #200 (Draft), sem Ready e sem merge.
+
+**Revisão adversarial da PR #200 (seção 20 do dossiê):** nove achados corrigidos na entrega,
+cada um com teste que falhava antes (privacidade da Distribuição, painel do mês, paleta fora do
+Hub, CSV sem fórmula, foco entre abas, limpeza da impressão, Escape global, leitura só na Visão
+Geral, textos e documentação).
+
+**Revisão final da PR #200 (seção 21 do dossiê):** R1 a R5 corrigidos, com prova de falha.
+
+**Terceira revisão da PR #200 (seção 22 do dossiê):** F1 a F5 e F7 corrigidos, com prova de
+falha; marca do Evolli visível na faixa marinho; diferença entre blocos registrada como limite
+conhecido aprovado (F6).
+
+**Revisão final da PR #200 (seção 23 do dossiê):** painel do mês abaixo da faixa das colunas,
+alinhado ao mês aberto, sem cobrir os meses vizinhos (G1), com prova de falha.
+
+**Vaga do painel do mês (seção 24 do dossiê):** painel numa vaga reservada no próprio gráfico, no
+fluxo, sem cobrir controle de outro bloco (H1), com prova de falha.
+
+**Largura útil mínima no celular (seção 25 do dossiê):** sem 210 px livres ao lado, o painel usa a
+largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com prova de falha.
+
+**Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts
+182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+`git diff --check` verdes.
 
 ## Próxima ação autorizável
 

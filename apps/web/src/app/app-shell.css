@@ -115,6 +115,20 @@
   color: var(--color-ink);
 }
 
+/* T207 — nome da tela atual, junto da área principal. Só visual (o título
+   da tela continua sendo o h1 dela); some onde a barra não tem espaço. Nas
+   cores neutras do cabeçalho (a paleta Evolli fica no menu e no Dashboard). */
+.app-shell__tela-atual {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Grupo de ações reais, encostado na borda oposta. */
 .app-shell__acoes {
   display: flex;
@@ -472,10 +486,54 @@
     flex-direction: column;
   }
 
+  /* T207 — sem espaço para o nome da tela; o título dela segue logo abaixo. */
+  .app-shell__tela-atual {
+    display: none;
+  }
+
   /* Em telas muito estreitas as ações quebram em duas linhas em vez de
      empurrar a largura da página. */
   .app-shell__acoes {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+}
+
+/* T207 — paleta Evolli na faixa lateral (P-1): estrutura em azul-marinho,
+   marca e textos claros. Escopado à faixa: o cabeçalho, o conteúdo e as
+   demais telas não mudam de cor. Contraste: branco e o texto suave sobre o
+   marinho passam de 4,5:1; o foco dentro da faixa é branco, porque o azul
+   de ação sobre o marinho fica abaixo de 3:1. */
+.app-shell__sidebar {
+  background: var(--evolli-marinho);
+  border-right-color: var(--evolli-marinho);
+  color: var(--evolli-sobre-marinho);
+  scrollbar-color: var(--evolli-marinho-divisa) var(--evolli-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca {
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca-nome {
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__marca-tag {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.app-shell__sidebar .app-shell__recolher {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.app-shell__sidebar .app-shell__recolher:hover {
+  background: var(--evolli-marinho-realce);
+  color: var(--evolli-sobre-marinho);
+}
+
+.app-shell__sidebar .app-shell__recolher:focus-visible,
+.app-shell__sidebar .painel-nav :focus-visible,
+.app-shell__sidebar .seletor-empresa__botao:focus-visible {
+  outline-color: var(--evolli-sobre-marinho);
 }

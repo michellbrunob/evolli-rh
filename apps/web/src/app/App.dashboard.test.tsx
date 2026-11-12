@@ -12,6 +12,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
@@ -123,9 +124,10 @@ function montar(
   );
 }
 
-const anoDaTabela = () =>
-  screen.getByRole("table").getAttribute("aria-label") ??
-  screen.getByRole("table").querySelector("caption")?.textContent;
+/** T207 — os totais do Quadro de colaboradores (a tabela é uma das vistas). */
+const totaisDoQuadro = () =>
+  document.querySelector(".dashboard__bloco--quadro .dashboard__totais")
+    ?.textContent;
 
 function statusDoDashboard() {
   return document.querySelector<HTMLElement>(".dashboard [role=status]")!;
@@ -173,7 +175,7 @@ describe("T205 — rota do Dashboard no shell", () => {
   it("recarga mantém o ano da URL", async () => {
     const { unmount } = montar("#/dashboard?ano=2024");
     await esperarLeitura(2024);
-    expect(anoDaTabela()).toMatch(/em 2024$/);
+    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2024");
     unmount();
     montar("#/dashboard?ano=2024");
     await esperarLeitura(2024);
@@ -190,9 +192,7 @@ describe("T205 — rota do Dashboard no shell", () => {
     );
     expect(window.history.length).toBe(entradas + 1);
     await esperarLeitura(2025);
-    expect(
-      within(screen.getByRole("table")).getAllByRole("row").at(-1),
-    ).toHaveTextContent("Total20+2");
+    expect(totaisDoQuadro()).toBe("Entradas2Saídas0Saldo+2");
 
     navegadorVaiPara("#/dashboard?ano=2026");
     await esperarLeitura(2026);
@@ -282,7 +282,9 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     montar("#/dashboard?ano=2025");
     await esperarLeitura(2025);
     const entradas = window.history.length;
-    const link = screen.getByRole("link", { name: /Pessoas ativas hoje/ });
+    const link = screen.getByRole("link", {
+      name: "Abrir na listagem de Colaboradores: pessoas ativas",
+    });
     link.focus();
     fireEvent.click(link);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
@@ -309,13 +311,198 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     );
     navegadorVaiPara("#/dashboard?ano=2026");
     await esperarLeitura(2026);
-    fireEvent.click(
-      screen.getByRole("link", { name: /Pessoas em admissão hoje/ }),
-    );
+    fireEvent.click(screen.getByRole("link", { name: /^Em admissão/ }));
     await waitFor(() =>
       expect(window.location.hash).toBe(
         "#/pessoas/colaboradores?aba=em-admissao",
       ),
     );
+  });
+});
+
+describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
+  const aba = (nome: string) =>
+    within(
+      screen.getByRole("tablist", { name: "Seções do Dashboard" }),
+    ).getByRole("tab", { name: nome });
+
+  it.each([
+    ["#/dashboard/pessoas?ano=2024", "Pessoas"],
+    ["#/dashboard/movimentacao?ano=2024", "Movimentação"],
+    ["#/dashboard/remuneracao?ano=2024", "Remuneração"],
+    ["#/dashboard/clima-e-saude?ano=2024", "Clima e saúde"],
+  ])("recarga em %s abre a aba e o ano da URL", async (rota, nome) => {
+    const entradas = window.history.length;
+    montar(rota);
+    expect(await screen.findByRole("tab", { name: nome })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(window.location.hash).toBe(rota);
+    expect(window.history.length).toBe(entradas);
+    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2024");
+  });
+
+  it.each([
+    ["#/dashboard/inexistente?ano=2024", "#/dashboard?ano=2024"],
+    ["#/dashboard/visao-geral?ano=2024", "#/dashboard?ano=2024"],
+    ["#/dashboard/pessoas?ano=2099", "#/dashboard/pessoas?ano=2026"],
+  ])(
+    "aba ou ano inválido (%s): corrigido no lugar, sem entrada nova",
+    async (rota, certa) => {
+      window.history.replaceState(null, "", `/${rota}`);
+      const entradas = window.history.length;
+      render(<App papelDoAtor="rh" empresaAtiva={EMPRESA} />);
+      await waitFor(() => expect(window.location.hash).toBe(certa));
+      expect(window.history.length).toBe(entradas);
+    },
+  );
+
+  it("trocar de aba empilha no mesmo ano; voltar e avançar percorrem as abas", async () => {
+    montar("#/dashboard?ano=2025");
+    await esperarLeitura(2025);
+    const entradas = window.history.length;
+    fireEvent.click(aba("Movimentação"));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard/movimentacao?ano=2025"),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
+    // O ano é compartilhado: trocar de ano na aba mantém a aba.
+    fireEvent.click(screen.getByRole("button", { name: "Ano anterior" }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard/movimentacao?ano=2024"),
+    );
+
+    navegadorVaiPara("#/dashboard/movimentacao?ano=2025");
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2025"),
+    );
+    expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
+    navegadorVaiPara("#/dashboard?ano=2025");
+    await waitFor(() =>
+      expect(aba("Visão Geral")).toHaveAttribute("aria-selected", "true"),
+    );
+  });
+
+  it("pelo menu, o Dashboard volta à Visão Geral no ano corrente", async () => {
+    montar("#/dashboard/pessoas?ano=2024");
+    await screen.findByRole("tab", { name: "Pessoas" });
+    const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
+    fireEvent.click(
+      within(nav).getByRole("button", { name: /^Jornada Visão/ }),
+    );
+    await screen.findByRole("heading", { level: 1, name: "Visão do período" });
+    fireEvent.click(within(nav).getByRole("button", { name: /^Dashboard/ }));
+    await waitFor(() =>
+      expect(window.location.hash).toBe("#/dashboard?ano=2026"),
+    );
+    expect(aba("Visão Geral")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it.each(["gestor", "colaborador", "admin_tecnico"])(
+    "%s: a rota de uma aba do Dashboard não monta o Dashboard",
+    async (papel) => {
+      montar("#/dashboard/pessoas?ano=2026", papel);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(
+        screen.queryByRole("tablist", { name: "Seções do Dashboard" }),
+      ).toBeNull();
+      expect(window.location.hash).not.toMatch(/^#\/dashboard/);
+    },
+  );
+
+  it("master_tecnico sem empresa ativa: orientação em qualquer aba, sem abas nem consulta", async () => {
+    montar("#/dashboard/movimentacao?ano=2026", "master_tecnico", null);
+    expect(
+      await screen.findByText(
+        "Escolha uma empresa ativa no menu para ver o Dashboard.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+});
+
+describe("T207 — Dashboard na barra superior do shell", () => {
+  const naBarra = () =>
+    document.querySelector<HTMLElement>(
+      ".app-shell__topbar .app-shell__tela-atual",
+    );
+
+  it("o nome da tela aparece na barra, só visual: o título da tela continua único e recebe o foco", async () => {
+    montar("#/dashboard?ano=2026");
+    await esperarLeitura(2026);
+    expect(naBarra()).toHaveTextContent("Dashboard");
+    expect(naBarra()).toHaveAttribute("aria-hidden", "true");
+    expect(naBarra()!.tagName).not.toMatch(/^H\d$/);
+    expect(naBarra()).not.toHaveAttribute("tabindex");
+    expect(screen.getAllByRole("heading", { name: "Dashboard" })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Dashboard" }),
+    ).toHaveFocus();
+  });
+
+  it("em outra tela, a barra não diz Dashboard", async () => {
+    montar("#/pessoas/colaboradores");
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(naBarra()).toBeNull();
+  });
+
+  it("vista do quadro vinda de quem monta o shell; a troca volta para ele", async () => {
+    const aoTrocar = vi.fn();
+    window.history.replaceState(null, "", "/#/dashboard?ano=2026");
+    render(
+      <ComGuardaDeSaida>
+        <App
+          papelDoAtor="rh"
+          empresaAtiva={EMPRESA}
+          vistasDoDashboard={{ quadro: "tabela" }}
+          onVistaDoDashboardChange={aoTrocar}
+        />
+      </ComGuardaDeSaida>,
+    );
+    await esperarLeitura(2026);
+    const quadro = document.querySelector<HTMLElement>(
+      ".dashboard__bloco--quadro",
+    )!;
+    expect(within(quadro).getByRole("table")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ações: Quadro de colaboradores" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Ver como gráfico" }));
+    expect(aoTrocar).toHaveBeenCalledWith("quadro", "grafico");
+  });
+
+  it("CSS: cor neutra do cabeçalho; some na barra estreita, dentro do bloco de 640 px que já existia", () => {
+    const css = readFileSync("src/app/app-shell.css", "utf8");
+    const regra = css.match(/\n\.app-shell__tela-atual \{([^}]*)\}/)![1]!;
+    expect(regra).toMatch(/color:\s*var\(--color-ink\)/);
+    expect(regra).not.toMatch(/--evolli-/);
+    expect(css.match(/@media \(max-width: 640px\)/g)).toHaveLength(1);
+    expect(css).toMatch(
+      /@media \(max-width: 640px\) \{[^@]*\.app-shell__tela-atual \{\s*display: none;/,
+    );
+  });
+});
+
+describe("T207 — marca do Evolli na faixa lateral marinho", () => {
+  it("o símbolo aparece: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
+    montar("#/dashboard?ano=2026");
+    await esperarLeitura(2026);
+    const simbolo = document.querySelector<SVGElement>(
+      ".app-shell__sidebar .app-shell__marca-simbolo",
+    )!;
+    expect(simbolo).not.toBeNull();
+    const fundo = simbolo.querySelector(":scope > rect")!.getAttribute("fill");
+    const barras = simbolo.querySelector(":scope > g")!.getAttribute("fill");
+    // A faixa pinta o texto de branco: o fundo não pode depender dessa cor.
+    expect(fundo).not.toBe("currentColor");
+    expect(fundo).toBe("var(--surface-canvas)");
+    expect(barras).toBe("var(--color-action)");
+    expect(barras).not.toBe(fundo);
   });
 });

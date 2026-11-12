@@ -205,6 +205,17 @@ function SimboloEmpresa() {
 
 const ROTULO_GLOBAL = "Acesso global — todas as empresas";
 
+/**
+ * T207 (E-1) — acima deste número de empresas, o painel ganha uma busca que
+ * filtra a lista já carregada (nada é pedido ao servidor). Até ele, a lista
+ * inteira cabe à vista e a busca seria só mais um passo.
+ */
+export const LIMITE_SEM_BUSCA = 8;
+
+function normalizarBusca(texto: string): string {
+  return texto.trim().toLocaleLowerCase("pt-BR");
+}
+
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
   const letras = partes.slice(0, 2).map((p) => p.charAt(0));
@@ -230,10 +241,13 @@ export function SeletorEmpresaAtiva({
   const resumo = useResumoDasEdicoes();
   const [aberto, setAberto] = useState(false);
   const [troca, setTroca] = useState<EstadoTroca>({ tipo: "ocioso" });
+  /** T207 — o filtro da busca (só com mais de `LIMITE_SEM_BUSCA` empresas). */
+  const [busca, setBusca] = useState("");
 
   const raizRef = useRef<HTMLDivElement | null>(null);
   const botaoRef = useRef<HTMLButtonElement | null>(null);
   const listaRef = useRef<HTMLUListElement | null>(null);
+  const buscaRef = useRef<HTMLInputElement | null>(null);
   const confirmacaoRef = useRef<HTMLDivElement | null>(null);
   /** Foco pedido para depois do desenho que abre o painel. */
   const focarListaRef = useRef(false);
@@ -242,6 +256,7 @@ export function SeletorEmpresaAtiva({
   const idPainel = `${id}-painel`;
   const idTituloLista = `${id}-titulo-lista`;
   const idConfirmacao = `${id}-confirmacao`;
+  const idBusca = `${id}-busca`;
 
   // Durante uma releitura, a lista anterior segura o botão no lugar.
   const itensConhecidos =
@@ -250,7 +265,17 @@ export function SeletorEmpresaAtiva({
       : opcoes.tipo === "carregando"
         ? (opcoes.anteriores ?? null)
         : null;
-  const itens = opcoes.tipo === "carregadas" ? opcoes.itens : [];
+  const todas = opcoes.tipo === "carregadas" ? opcoes.itens : [];
+  const comBusca = todas.length > LIMITE_SEM_BUSCA;
+  const termo = comBusca ? normalizarBusca(busca) : "";
+  const itens =
+    termo === ""
+      ? todas
+      : todas.filter(
+          (e) =>
+            normalizarBusca(e.nome).includes(termo) ||
+            normalizarBusca(e.codigo).includes(termo),
+        );
   const ehAtual = (empresa: EmpresaDoContextoApi) =>
     empresaAtiva?.id !== undefined
       ? empresa.id === empresaAtiva.id
@@ -265,6 +290,7 @@ export function SeletorEmpresaAtiva({
 
   const fechar = useCallback((devolverFoco: boolean) => {
     setAberto(false);
+    setBusca("");
     setTroca((t) =>
       t.tipo === "confirmando" ||
       t.tipo === "falha" ||
@@ -275,9 +301,15 @@ export function SeletorEmpresaAtiva({
     if (devolverFoco) botaoRef.current?.focus();
   }, []);
 
-  // Foco na abertura: a empresa atual, ou a primeira opção habilitada.
+  // Foco na abertura: a busca, quando há; senão a empresa atual, ou a
+  // primeira opção habilitada.
   useEffect(() => {
     if (!aberto || !focarListaRef.current) return;
+    if (buscaRef.current) {
+      focarListaRef.current = false;
+      buscaRef.current.focus();
+      return;
+    }
     const botoes = [
       ...(listaRef.current?.querySelectorAll<HTMLButtonElement>(
         "button:not([disabled])",
@@ -372,6 +404,17 @@ export function SeletorEmpresaAtiva({
           ? botoes.length - 1
           : (indice - 1 + botoes.length) % botoes.length;
     botoes[proximo]!.focus();
+  }
+
+  /** T207 — da busca, seta para baixo leva à primeira empresa da lista. */
+  function aoTeclarNaBusca(evento: KeyboardEventReact<HTMLInputElement>) {
+    if (evento.key !== "ArrowDown") return;
+    const primeiro = listaRef.current?.querySelector<HTMLButtonElement>(
+      "button:not([disabled])",
+    );
+    if (!primeiro) return;
+    evento.preventDefault();
+    primeiro.focus();
   }
 
   async function trocarPara(empresa: EmpresaDoContextoApi) {
@@ -548,8 +591,37 @@ export function SeletorEmpresaAtiva({
           ) : null}
 
           <p className="seletor-empresa__titulo-lista" id={idTituloLista}>
-            Empresas autorizadas
+            Empresas da conta
           </p>
+          {comBusca ? (
+            <div className="seletor-empresa__busca">
+              <label
+                htmlFor={idBusca}
+                className="seletor-empresa__busca-rotulo"
+              >
+                Buscar empresa por nome ou código
+              </label>
+              <input
+                id={idBusca}
+                ref={buscaRef}
+                type="search"
+                className="seletor-empresa__busca-campo"
+                value={busca}
+                autoComplete="off"
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={aoTeclarNaBusca}
+              />
+              <p className="seletor-empresa__nota" role="status">
+                {termo === ""
+                  ? ""
+                  : itens.length === 0
+                    ? "Nenhuma empresa encontrada."
+                    : itens.length === 1
+                      ? "1 empresa encontrada."
+                      : `${itens.length} empresas encontradas.`}
+              </p>
+            </div>
+          ) : null}
           {opcoes.tipo === "carregando" ? (
             <p className="seletor-empresa__nota" role="status">
               Carregando empresas…
@@ -572,6 +644,12 @@ export function SeletorEmpresaAtiva({
                       disabled={!atual && opcoesTravadas}
                       onClick={() => escolher(empresa)}
                     >
+                      <span
+                        className="seletor-empresa__monograma seletor-empresa__monograma--opcao"
+                        aria-hidden="true"
+                      >
+                        {iniciais(empresa.nome)}
+                      </span>
                       <span className="seletor-empresa__opcao-textos">
                         <span className="seletor-empresa__opcao-nome">
                           {empresa.nome}

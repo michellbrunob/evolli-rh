@@ -3264,7 +3264,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         foram corrigidos dentro da entrega.
 
 103.  **T206 - Shell com menu lateral fixo e recolhível**
-      - **Estado:** **em implementação, validada localmente**. Branch
+      - **Estado:** **integrada** em `main` pela PR #199, squash
+        `512d24914519fed335a900b18cab690832e8f121`, com a CI de push 3/3 verde (run
+        42823908545); branch preservada. Implementada na branch
         `codex/t206-shell-menu-lateral`, a partir do squash
         `c2c83622fd84bba9af73da3af96a4d5cb255b6a3` (T205 integrada, PR #198).
       - **Objetivo:** o menu passa a ser uma faixa lateral real e estável, presa à esquerda da
@@ -3289,7 +3291,70 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile e workflows; regras do Dashboard, de Colaboradores e das fichas;
         identidade visual, ativos de marca e logotipo; menu, seção, trilha de navegação,
-        exportação ou IA sem contrato real; promoção e merge.
+        exportação ou IA sem contrato real; promoção.
+      - **Observação de relatório:** a integração funcional da T206 está concluída; a única
+        pendência administrativa era a sua convergência no Spec Kit, resolvida no primeiro
+        commit da T207. Os achados da validação local e da revisão (dica fora do lugar, foco no
+        `body` ao atravessar o breakpoint, alvos de 38 px na gaveta, foco ao abrir um produto
+        pelo Hub e dica do botão de recolher atrás do cabeçalho) foram corrigidos dentro da
+        entrega.
+
+104.  **T207 - Dashboard funcional e seletor de empresas**
+      - **Estado:** **implementada e validada localmente**, em revisão na PR #200 (Draft), sem
+        Ready e sem merge.
+        Branch `codex/t207-dashboard-seletor-empresas`, a partir do squash
+        `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199). A preparação
+        (dossiê e decisões) foi feita antes, sem código de produto. Validação visual aprovada
+        pela proprietária em 2026-11-10.
+      - **Objetivo:** levantar, com evidência no código, nos contratos, no RBAC e nas decisões,
+        como completar o Dashboard como produto funcional (Visão Geral e as abas Pessoas,
+        Movimentação, Remuneração e Clima e saúde, sem aba decorativa nem métrica sem dado
+        real) e como evoluir o seletor de empresa ativa, no
+        [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md): inventário de
+        dados reais, lacunas, riscos, escopo, fora de escopo e decisões V-1 a V-6 e E-1 a E-4
+        para aprovação antes da implementação.
+      - **Decisões aprovadas (2026-11-10):** V-1 a V-6, E-1 a E-4 e P-1, conforme a
+        recomendação (seção 13 do dossiê): cinco abas com rota (`#/dashboard?ano=AAAA` e
+        `#/dashboard/<aba>?ano=AAAA`); Visão Geral, Pessoas e Movimentação com dados reais;
+        turnover, absenteísmo e custo por pessoa como cards honestos, sem número; Remuneração e
+        Clima e saúde com estado de indisponibilidade; "Como calculamos" só nos indicadores
+        reais; seletor com iniciais, nome e código, lista "Empresas da conta" e busca acima de
+        8 empresas, sem documento fiscal nem ações de adicionar e gerenciar; paleta Evolli no
+        menu lateral, no Dashboard e no seletor.
+      - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
+        dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
+        históricos calculados; tela de empresas; mudança global de cor; promoção e merge.
+      - **Entrega (seções 16 a 19 do dossiê):** Visão Geral com "Dashboard" na barra superior,
+        momento da leitura uma vez por aba, Quadro de colaboradores (botão de informação,
+        gráfico e tabela com os mesmos números, painel por mês, menu de ações, CSV e impressão
+        para salvar em PDF), Distribuição do time e Tempo de casa com gráfico e tabela e
+        agrupamento mínimo de 3 pessoas; ativos no fim e turnover como "—" por falta de fonte e
+        regra aprovada, nunca zero; eNPS e Quem é o time indisponíveis. Achados da
+        implementação corrigidos com teste que falhava antes (seção 17 do dossiê).
+      - **Revisão adversarial da PR #200 (seção 20 do dossiê):** nove achados corrigidos na
+        entrega, cada um com teste que falhava antes: privacidade da Distribuição (grupo neutro
+        sempre 0 ou 3 ou mais, sem a quantidade de departamentos), painel do mês dentro do quadro
+        em todo mês, paleta do menu fora do Hub, CSV sem fórmula, foco pendurado entre abas,
+        limpeza da impressão, Escape global nos painéis, pessoas ativas lidas só na Visão Geral e
+        ajustes de texto e documentação.
+      - **Revisão final da PR #200 (seção 21 do dossiê):** R1 a R5 corrigidos — "Tentar de
+        novo" que travava ao trocar de aba, texto do painel do mês dentro da caixa (abaixo das
+        barras sem largura útil), nenhuma contagem de 1 ou 2 no Tempo de casa, comentários e
+        provas do logout e do descarte do nome.
+      - **Terceira revisão da PR #200 (seção 22 do dossiê):** "Tentar de novo" que travava
+        passando por uma aba sem dados, teste intermitente do CSV, comentário do menu recolhido,
+        motivo do corte no Tempo de casa, documentos, painel do mês alcançável pelo ponteiro e a
+        marca do Evolli visível na faixa marinho; diferença entre o total da Distribuição e as
+        faixas do Tempo de casa registrada como limite conhecido aprovado.
+      - **Revisão final da PR #200 (seção 23 do dossiê):** o painel do mês passou a abrir abaixo
+        da faixa das colunas, alinhado ao mês aberto, sem cobrir os meses vizinhos (G1).
+      - **Vaga do painel do mês (seção 24 do dossiê):** o painel ficou numa vaga reservada no
+        próprio gráfico, no fluxo, sem cobrir controle de outro bloco (H1).
+      - **Largura útil mínima no celular (seção 25 do dossiê):** sem 210 px livres ao lado, o
+        painel usa a largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1).
+      - **Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
+        20 suítes, 1017 testes; scripts 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
+        do squash e `git diff --check` verdes.
 
 ## Regra obrigatória para as próximas tarefas
 
