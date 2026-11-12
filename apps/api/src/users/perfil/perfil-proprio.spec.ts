@@ -12,7 +12,6 @@ import { ConflictException, ValidationPipe } from "@nestjs/common";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { AccessRole, AccessUser } from "@prisma/client";
 import {
-  NOME_EXIBICAO_MAXIMO,
   nomeExibicaoValido,
   normalizarNomeExibicao,
   tamanhoEmCaracteres,
@@ -63,14 +62,13 @@ describe("T208 — validação do nome de exibição", () => {
   });
 
   it("de 2 a 80 caracteres, contados por caractere (um emoji vale um)", () => {
+    // Os números aprovados (MPA-1), não a constante: o teste prende a regra.
     expect(nomeExibicaoValido("Al")).toBe(true);
     expect(nomeExibicaoValido("A")).toBe(false);
-    expect(nomeExibicaoValido("a".repeat(NOME_EXIBICAO_MAXIMO))).toBe(true);
-    expect(nomeExibicaoValido("a".repeat(NOME_EXIBICAO_MAXIMO + 1))).toBe(
-      false,
-    );
-    const comEmoji = "😀".repeat(NOME_EXIBICAO_MAXIMO - 1) + "a";
-    expect(comEmoji.length).toBeGreaterThan(NOME_EXIBICAO_MAXIMO);
+    expect(nomeExibicaoValido("a".repeat(80))).toBe(true);
+    expect(nomeExibicaoValido("a".repeat(81))).toBe(false);
+    const comEmoji = "😀".repeat(79) + "a";
+    expect(comEmoji.length).toBeGreaterThan(80);
     expect(nomeExibicaoValido(comEmoji)).toBe(true);
   });
 
@@ -127,7 +125,7 @@ describe("T208 — corpo de PATCH /v1/users/me", () => {
 
   it.each([
     ["curto", "A"],
-    ["longo", "a".repeat(NOME_EXIBICAO_MAXIMO + 1)],
+    ["longo", "a".repeat(81)],
     ["sem letra", "123"],
     ["número", 123],
   ])("recusa nome %s (400)", async (_caso, nomeExibicao) => {
