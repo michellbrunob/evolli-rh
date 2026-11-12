@@ -4,8 +4,11 @@
   entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
   leitura das seções 16 a 20 (validado localmente, validação visual aprovada em 2026-11-12) é a
   **base existente, não a entrega final**. As decisões MPA-1 a MPA-11 (seção 21.8) foram
-  aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22), e a ampliação está em implementação
-  local, sem push. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
+  aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22). A ampliação — nome de exibição
+  editável, com migration, `PATCH /v1/users/me` e auditoria — está **implementada e validada
+  localmente** (seções 23 a 26), em commits locais, sem push: a PR #201 ainda aponta para o código
+  anterior à ampliação. Aguarda a validação visual humana. As decisões MP-1 a MP-8 da seção 13
+  seguem sem alteração.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -557,3 +560,126 @@ Escopo funcional aprovado para a ampliação:
    de Contas de acesso.
 5. **Fora:** foto, cargo, telefone, alteração de e-mail, senha, Google, segundo fator e sessões;
    dependências, lockfile, Docker e workflows.
+
+## 23. Implementação da ampliação
+
+- **Migration aditiva** `20261112120000_perfil_proprio_conta`:
+  - `access_user.nome_exibicao`, opcional, com CHECK de 2 a 80 caracteres e sem espaço nas
+    extremidades;
+  - `access_user.perfil_atualizado_em`, opcional;
+  - o valor `conta.perfil.atualizado` em `AuditAction`.
+
+  Contas existentes ficam sem nome e sem data. Nenhum privilégio muda.
+
+- **`PATCH /v1/users/me`** (`apps/api/src/users/users.controller.ts`):
+  - `own_account`/`manage` é a única permissão, com CSRF;
+  - a rota não tem `:id`, então o alvo é sempre a conta da sessão;
+  - o corpo aceita só `nomeExibicao` e `perfilAtualizadoEmLido`. Este segundo campo não é dado do
+    perfil: é a versão que a tela leu, a pré-condição da concorrência otimista;
+  - qualquer outro campo (id, e-mail, papel, empresa, situação) é recusado com 400.
+- **Normalização** (`apps/api/src/users/perfil/nome-exibicao.util.ts`):
+  - forma NFC, espaços juntados e aparados;
+  - vazio limpa o nome;
+  - 2 a 80 caracteres contados por caractere, ao menos uma letra, nenhum caractere de controle ou
+    invisível.
+- **Concorrência:** a condição de versão vai no próprio `UPDATE`. Versão velha ou gravação
+  simultânea respondem 409, e nada é sobrescrito.
+- **`perfilAtualizadoEm`** muda só quando a própria pessoa salva o perfil.
+- **Auditoria:** evento `conta.perfil.atualizado`, na mesma transação, sem o conteúdo do nome (a
+  trilha não tem campo de conteúdo).
+- **Projeções:** `GET /v1/users/me` passa a devolver `nomeExibicao` e `perfilAtualizadoEm`.
+  `toSafeUser`, usado pela listagem de Contas de acesso, não os carrega.
+- **Tela** (`apps/web/src/screens/configuracoes/MeuPerfilScreen.tsx`), em três seções:
+  - **Identificação:** iniciais no lugar da foto, sem envio de arquivo; nome de exibição
+    editável; papel; empresa ativa; criação da conta; última alteração do perfil;
+  - **Contato:** e-mail de acesso, só leitura, com o aviso de que a alteração ainda não está
+    disponível;
+  - **Formas de entrada:** só "e-mail e senha".
+
+  Cargo, telefone, Google, segundo fator e sessões não aparecem. Sem nome, a tela usa o e-mail.
+
+- **Edição:**
+  - rodapé com Descartar e Salvar só quando o nome normalizado difere do salvo;
+  - validação espelhada antes de enviar;
+  - conflito (409) com o texto mantido e a opção de carregar os dados atuais;
+  - sessão encerrada (401) com aviso para entrar de novo;
+  - demais falhas em alerta;
+  - sucesso anunciado uma vez, na região de status.
+- **Guarda de saída:**
+  - limpo, sair não pergunta;
+  - alterado, pergunta (menu, Hub e a confirmação do seletor de empresa);
+  - salvando, a saída fica bloqueada.
+- **Sessão:** o ator devolvido pelo servidor substitui o da sessão; mesma conta e empresa, então
+  a árvore não remonta. Navegação interna só com Meu perfil. Cartão do Hub com a descrição nova.
+
+## 24. Achados da validação no navegador (ampliação)
+
+Validação com dados sintéticos do seed local e o banco local migrado. Cada achado foi corrigido
+com teste que falha antes e mutação própria:
+
+1. **Linhas pela largura da janela.** A 1024 px, com o menu aberto, o painel tinha 443 px, e a
+   regra de duas colunas espremia o campo do nome em 129 px. As linhas passaram a depender da
+   largura do próprio painel (consulta de contêiner, 40rem).
+2. **Token CSRF renovado por outra aba.** Com duas abas da mesma sessão, salvar na aba com a
+   versão antiga caía em falha genérica (403), em vez de chegar ao conflito. O cliente agora
+   descarta o token, renova e reenvia uma vez; reenviar com a mesma versão é seguro.
+3. **Sessão encerrada.** Achado na revisão da própria entrega: o 401 mostrava a falha genérica,
+   que manda tentar de novo. Passou a dizer para entrar de novo.
+
+Depois das correções, a validação confirmou:
+
+- **RH:**
+  - nome salvo normalizado, com anúncio, rodapé recolhido e foco no campo;
+  - a guarda pergunta ao sair com o nome alterado, e "Continuar editando" mantém o texto;
+  - recarga com o nome persistido e o foco no título;
+  - erro de tamanho pelo teclado;
+  - conflito entre duas abas, com "Carregar os dados atuais";
+  - a 375 px, sem rolagem horizontal, botões de 44 px e rodapé preso ao pé.
+- **Colaborador:** Hub só com o cartão Configurações e a descrição nova; abre pelo teclado com
+  foco no título; salva o próprio nome.
+- **Master técnico sem empresa:** "Nenhuma empresa ativa"; salva o nome.
+- **Master técnico com empresa:** com o nome alterado, a troca para a Alfa pede confirmação no
+  seletor; "Trocar e descartar" volta com o nome salvo e a empresa nova.
+- **Gestor:** abre pelo menu e salva o nome.
+
+## 25. Evidências da ampliação
+
+- **API:**
+  - unitários: 39 testes novos (`users/perfil/perfil-proprio.spec.ts`);
+  - E2E com PostgreSQL real: suíte nova `perfil-proprio`, com 29 testes. Cobre migration sem
+    diferença para o schema, CHECK do banco, os nove papéis, normalização, limpeza, tamanho,
+    rota de outra conta, campos proibidos, CSRF e sessão, conflito e gravação simultânea, a data
+    do perfil intocada por papel/senha/desativação, conta desativada, nome global na troca de
+    empresa e ausência na listagem.
+- **Web:**
+  - tela: 46 testes;
+  - shell: mais 3 de guarda de saída;
+  - sessão: mais 3 (ator atualizado sem remontar, recarga, troca de empresa com confirmação);
+  - cliente: mais 4 (PATCH, 409, reenvio no CSRF renovado, 403 sem código);
+  - Hub: descrição atualizada.
+- **Mutações:** 58, todas detectadas: 22 da base (alvos atualizados para a tela nova),
+  13 da API, 1 do banco e 22 da web da ampliação.
+- **Bateria local:**
+  - web 133 arquivos, 3760 testes;
+  - API unitária 61 suítes, 1511 testes;
+  - E2E serial com PostgreSQL real 21 suítes, 1046 testes;
+  - scripts 182 testes;
+  - lint sem aviso, typecheck, build, Prettier, `spec:check`, prévia do squash e
+    `git diff --check` verdes.
+
+## 26. Limites da ampliação
+
+- **Versão no corpo:** além do nome de exibição, o corpo do `PATCH` leva a versão lida. É a
+  pré-condição de concorrência, não um dado alterável.
+- **Menu do shell para papéis sem capacidade de trabalho** (anterior à T208, sem mudança):
+  - Colaboradores, Estrutura, Jornada e Contas de acesso aparecem para financeiro, colaborador,
+    auditor, DPO e administração técnica, e o servidor recusa as leituras;
+  - antes, esses papéis já chegavam ao shell pelos itens de Demonstração do Hub; a T208 torna o
+    caminho mais comum.
+
+  Corrigir isso muda a navegação de outros papéis e exige decisão própria.
+
+- **Fora desta entrega:** foto, cargo, telefone, alteração de e-mail, senha, Google, segundo fator
+  e sessões continuam fora (seção 22).
+- **Banco local:** a migration foi aplicada no banco local da prévia para a validação no
+  navegador. Isso não é artefato versionado.

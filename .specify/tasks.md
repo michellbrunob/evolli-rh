@@ -3372,9 +3372,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         auditoria, RBAC, isolamento por empresa e sessões; primeira fatia proposta (nome de
         exibição editável, com API, migration e auditoria). Decisões MPA-1 a MPA-11 aprovadas em
         2026-11-12, com a MPA-5 corrigida (e-mail só leitura e indisponível para alteração até
-        existir fluxo próprio com verificação); escopo aprovado na seção 22; implementação local
-        em andamento, sem push. A referência visual foi usada só como inspiração local e não é
-        registrada.
+        existir fluxo próprio com verificação); escopo aprovado na seção 22. A referência visual
+        foi usada só como inspiração local e não é registrada.
+      - **Ampliação implementada e validada localmente (seções 23 a 26), sem push:** migration
+        aditiva (`nome_exibicao`, `perfil_atualizado_em`, auditoria `conta.perfil.atualizado`);
+        `PATCH /v1/users/me` com `own_account`/`manage`, só o nome de exibição e concorrência
+        otimista (409 sem sobrescrever); Meu perfil em identificação, contato e formas de entrada,
+        com o nome como único campo editável, rodapé de edição só com alteração e guarda de
+        saída. Achados do navegador corrigidos: linhas pela largura do painel, reenvio no token
+        CSRF renovado por outra aba e aviso de sessão encerrada.
+      - **Validação local da ampliação:** web 133 arquivos, 3760 testes; API unitária 61 suítes,
+        1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046 testes; scripts 182 testes;
+        58 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do
+        squash e `git diff --check` verdes.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no

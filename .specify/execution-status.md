@@ -3182,8 +3182,15 @@ resolvida no primeiro commit da T208.
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
 decisões MPA-1 a MPA-11, aprovadas em 2026-11-12 com a MPA-5 corrigida (seção 22), estão na seção 21 do
 [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); nada da ampliação foi
-implementação local em andamento, sem push. A referência visual foi usada só como inspiração
-local e não é registrada.
+a ampliação está implementada e validada localmente (seções 23 a 26), em commits locais, sem
+push. A referência visual foi usada só como inspiração local e não é registrada.
+
+**Ampliação:** nome de exibição editável — migration aditiva, `PATCH /v1/users/me` com
+`own_account`/`manage`, concorrência otimista e auditoria sem conteúdo; tela em identificação,
+contato e formas de entrada, com guarda de saída. Validação local: web 133 arquivos, 3760
+testes; API unitária 61 suítes, 1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046
+testes; scripts 182 testes; 58 mutações, todas detectadas; lint, typecheck, build, Prettier,
+`spec:check`, prévia do squash e `git diff --check` verdes.
 
 **Base existente:** detalhada no dossiê (seções 15 a 20):
 
@@ -3205,7 +3212,7 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Pendente:** implementação e validação da ampliação aprovada; revisão da
+**Pendente:** validação visual humana da ampliação; push e revisão da
 PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
