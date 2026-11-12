@@ -48,6 +48,14 @@ export interface SafeAccessUserApi {
    * R-2 da T162.
    */
   empresaAtiva?: { id: string; codigo: string; nome: string } | null;
+  /**
+   * T208 — Configurações › Meu perfil: o nome de exibição da própria conta
+   * (`null` sem nome: a tela usa o e-mail) e a data da última vez que o
+   * perfil foi salvo (`null` se nunca foi). Só `GET`/`PATCH /users/me` trazem;
+   * a listagem de Contas de acesso, não.
+   */
+  nomeExibicao?: string | null;
+  perfilAtualizadoEm?: string | null;
 }
 
 /**
@@ -143,6 +151,32 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
  */
 export async function obterUsuarioAtual(): Promise<SafeAccessUserApi> {
   const res = await apiFetch(`${USERS_ENDPOINT}/me`);
+  return jsonOrThrow(res);
+}
+
+/**
+ * T208 — a própria pessoa salva o próprio perfil (`PATCH /users/me`). Só o
+ * nome de exibição (vazio ou `null` limpa); `perfilAtualizadoEmLido` é a
+ * versão que a tela leu — se outra sessão salvou antes, a resposta é 409
+ * (`ApiError` com `status` 409) e nada é sobrescrito. Volta o ator inteiro,
+ * na mesma forma de `GET /users/me`.
+ */
+export async function atualizarPerfilProprio(entrada: {
+  readonly nomeExibicao: string | null;
+  readonly perfilAtualizadoEmLido: string | null;
+}): Promise<SafeAccessUserApi> {
+  const token = await getCsrf();
+  const res = await apiFetch(`${USERS_ENDPOINT}/me`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-csrf-token": token,
+    },
+    body: JSON.stringify({
+      nomeExibicao: entrada.nomeExibicao,
+      perfilAtualizadoEmLido: entrada.perfilAtualizadoEmLido,
+    }),
+  });
   return jsonOrThrow(res);
 }
 

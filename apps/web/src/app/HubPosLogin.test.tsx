@@ -196,7 +196,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       .getAllByRole("button")
       .find((b) => b.classList.contains("hub__cartao"))!;
     expect(cartao.querySelector(".hub__cartao-descricao")).toHaveTextContent(
-      /Meu perfil: o e-mail de acesso, o papel, a empresa ativa e a data de criação da sua conta\. Somente consulta\./,
+      /^Meu perfil: o seu nome de exibição e os dados da sua conta de acesso\.$/,
     );
     fireEvent.click(cartao);
     expect(abrir).toHaveBeenCalledWith("configuracoes");

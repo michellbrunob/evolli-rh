@@ -15,7 +15,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
 import { refreshCsrfToken } from "../api/csrfClient";
-import { obterUsuarioAtual } from "../api/usersClient";
+import { atualizarPerfilProprio, obterUsuarioAtual } from "../api/usersClient";
 import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
@@ -40,7 +40,11 @@ vi.mock("../api/usersClient", async () => {
     await vi.importActual<typeof import("../api/usersClient")>(
       "../api/usersClient",
     );
-  return { ...actual, obterUsuarioAtual: vi.fn() };
+  return {
+    ...actual,
+    obterUsuarioAtual: vi.fn(),
+    atualizarPerfilProprio: vi.fn(),
+  };
 });
 vi.mock("../api/contextoEmpresarialClient", async () => {
   const actual = await vi.importActual<
@@ -190,5 +194,109 @@ describe("T208 — Meu perfil a partir da sessão", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Configurações" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("T208 — o nome de exibição na sessão", () => {
+  const campo = () => screen.getByRole("textbox", { name: "Nome de exibição" });
+  const navegacao = () => document.getElementById("navegacao-lateral")!;
+  const menu = (nome: RegExp) =>
+    within(navegacao()).getByRole("button", { name: nome });
+
+  it("salvar troca o ator da sessão sem remontar: sair e voltar mostra o nome salvo, sem ler /users/me de novo", async () => {
+    vi.mocked(atualizarPerfilProprio).mockResolvedValue({
+      ...ATOR,
+      nomeExibicao: "Nome Salvo",
+      perfilAtualizadoEm: "2026-11-12T15:00:00.000Z",
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    fireEvent.change(campo(), { target: { value: "Nome Salvo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() =>
+      expect(within(painel()).getByRole("status")).toHaveTextContent(
+        "Perfil salvo.",
+      ),
+    );
+    expect(atualizarPerfilProprio).toHaveBeenCalledWith({
+      nomeExibicao: "Nome Salvo",
+      perfilAtualizadoEmLido: null,
+    });
+
+    fireEvent.click(menu(/^Jornada Visão/));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Configurações" }),
+      ).toBeNull(),
+    );
+    fireEvent.click(menu(/^Configurações/));
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    expect(campo()).toHaveValue("Nome Salvo");
+    expect(valor("Última alteração do perfil")).toBe("12/11/2026 às 12:00");
+    expect(obterUsuarioAtual).toHaveBeenCalledTimes(1);
+  });
+
+  it("recarga: o nome vem de /users/me", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR,
+      nomeExibicao: "Nome Do Servidor",
+      perfilAtualizadoEm: "2026-11-11T12:00:00.000Z",
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    expect(campo()).toHaveValue("Nome Do Servidor");
+  });
+
+  it("trocar de empresa com o nome alterado pergunta antes; depois de salvo, o nome segue na empresa nova (é da conta)", async () => {
+    vi.mocked(atualizarPerfilProprio).mockResolvedValue({
+      ...ATOR,
+      nomeExibicao: "Nome Global",
+      perfilAtualizadoEm: "2026-11-12T15:00:00.000Z",
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    fireEvent.change(campo(), { target: { value: "Nome Global" } });
+
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /Empresa ativa/ }),
+    );
+    await within(navegacao()).findByRole("list", { name: "Empresas da conta" });
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /^Empresa Beta/ }),
+    );
+    // A confirmação é a do próprio seletor (T189): nomeia a edição.
+    const aviso = await within(navegacao()).findByRole("alert");
+    expect(aviso).toHaveTextContent("Há edição em andamento em: Meu perfil");
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
+    expect(campo()).toHaveValue("Nome Global");
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() =>
+      expect(within(painel()).getByRole("status")).toHaveTextContent(
+        "Perfil salvo.",
+      ),
+    );
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR,
+      companyId: BETA.id,
+      empresaAtiva: BETA,
+      nomeExibicao: "Nome Global",
+      perfilAtualizadoEm: "2026-11-12T15:00:00.000Z",
+    } as never);
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /Empresa ativa/ }),
+    );
+    await within(navegacao()).findByRole("list", { name: "Empresas da conta" });
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /^Empresa Beta/ }),
+    );
+    await waitFor(() =>
+      expect(valor("Empresa ativa")).toBe("Empresa Beta (BETA)"),
+    );
+    expect(campo()).toHaveValue("Nome Global");
   });
 });

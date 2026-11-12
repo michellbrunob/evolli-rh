@@ -67,7 +67,7 @@ import {
 } from "react";
 import "./tokens.css";
 import "./app-shell.css";
-import { ROTULO_PAPEL } from "../api/usersClient";
+import { ROTULO_PAPEL, type SafeAccessUserApi } from "../api/usersClient";
 import { MarcaEvolli } from "./IconeModulo";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
@@ -449,11 +449,18 @@ function conteudoDoDestino(
     readonly onTrocarVista?:
       ((bloco: BlocoComVista, vista: VistaDoBloco) => void) | undefined;
   },
-  // T208 — a conta da sessão, para Configurações › Meu perfil (só leitura).
+  // T208 — a conta da sessão, para Configurações › Meu perfil, e quem
+  // recebe o ator depois que a própria pessoa salva o perfil.
   contaDoAtor: ContaDoMeuPerfil | null,
+  onContaAtualizada?: (ator: SafeAccessUserApi) => void,
 ) {
   if (destinoId === "configuracoes") {
-    return <MeuPerfilScreen conta={contaDoAtor} />;
+    return (
+      <MeuPerfilScreen
+        conta={contaDoAtor}
+        onContaAtualizada={onContaAtualizada}
+      />
+    );
   }
   if (destinoId === "dashboard") {
     return (
@@ -753,6 +760,12 @@ export interface AppProps {
    * montam `App` sozinho), a tela mostra "—".
    */
   contaDoAtor?: ContaDoMeuPerfil | null;
+  /**
+   * T208 — o ator como o servidor devolveu depois que a própria pessoa salvou
+   * o perfil. O `AutenticacaoApp` troca o ator da sessão por ele: mesma conta
+   * e mesma empresa, então a árvore não remonta.
+   */
+  onContaAtualizada?: (ator: SafeAccessUserApi) => void;
 }
 
 export function App({
@@ -772,6 +785,7 @@ export function App({
   vistasDoDashboard,
   onVistaDoDashboardChange,
   contaDoAtor = null,
+  onContaAtualizada,
 }: AppProps = {}) {
   // Inicialização SÍNCRONA com o papel já resolvido. O `AutenticacaoApp` só
   // monta este componente depois de `GET /v1/users/me` concluir com sucesso,
@@ -1897,6 +1911,7 @@ export function App({
                 onTrocarVista: onVistaDoDashboardChange,
               },
               contaDoAtor,
+              onContaAtualizada,
             )}
           </main>
 

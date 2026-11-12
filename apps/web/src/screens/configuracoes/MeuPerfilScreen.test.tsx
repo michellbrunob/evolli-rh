@@ -1,33 +1,93 @@
 /**
- * T208 — Configurações › Meu perfil: só leitura, só os quatro campos aprovados
- * (MP-4), nenhum dado proibido, nenhum controle de edição, navegação interna
- * com um item só e o layout que não vaza rolagem horizontal a 375 px.
+ * T208 — Configurações › Meu perfil (MP-1 a MP-8; ampliação MPA-1 a MPA-11).
+ *
+ * A tela: três seções (identificação, contato, formas de entrada); o nome de
+ * exibição como único campo editável; iniciais no lugar da foto; rodapé de
+ * edição só com alteração; salvar, descartar, validação, conflito e falha,
+ * com um anúncio por desfecho; o registro na guarda de saída; nenhum dado
+ * proibido; e o layout que não vaza rolagem horizontal a 375 px.
  */
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { ROTULO_PAPEL } from "../../api/usersClient";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ApiError,
+  ROTULO_PAPEL,
+  atualizarPerfilProprio,
+  obterUsuarioAtual,
+  type SafeAccessUserApi,
+} from "../../api/usersClient";
+import {
+  ProvedorDeEdicoes,
+  RegistroDeEdicoes,
+} from "../../app/edicoesPendentes";
 import {
   CONFIGURACOES_TITULO_ID,
   MeuPerfilScreen,
+  ROTULO_DA_EDICAO_DO_PERFIL,
   type ContaDoMeuPerfil,
 } from "./MeuPerfilScreen";
+import { iniciaisDe } from "./nomeExibicao";
+
+vi.mock("../../api/usersClient", async () => {
+  const actual = await vi.importActual<typeof import("../../api/usersClient")>(
+    "../../api/usersClient",
+  );
+  return {
+    ...actual,
+    atualizarPerfilProprio: vi.fn(),
+    obterUsuarioAtual: vi.fn(),
+  };
+});
 
 const EMPRESA = {
   id: "empresa-sintetica-id-interno",
   codigo: "ALFA",
   nome: "Empresa Alfa",
 };
+const VERSAO = "2026-11-10T13:00:00.000Z";
 const CONTA: ContaDoMeuPerfil = {
   email: "pessoa.teste@example.test",
   role: "rh",
   createdAt: "2026-03-15T12:00:00.000Z",
   empresaAtiva: EMPRESA,
+  nomeExibicao: null,
+  perfilAtualizadoEm: null,
 };
 
-const painel = () => screen.getByRole("region", { name: "Meu perfil" });
+function ator(parcial: Partial<SafeAccessUserApi> = {}): SafeAccessUserApi {
+  return {
+    id: "conta-id-interno",
+    email: CONTA.email,
+    role: "rh",
+    companyId: EMPRESA.id,
+    unitId: null,
+    teamId: null,
+    status: "active",
+    createdAt: CONTA.createdAt,
+    empresaAtiva: EMPRESA,
+    nomeExibicao: null,
+    perfilAtualizadoEm: null,
+    ...parcial,
+  };
+}
 
-/** Pares rótulo → valor da lista de dados, na ordem da tela. */
+beforeEach(() => {
+  vi.mocked(atualizarPerfilProprio).mockReset();
+  vi.mocked(obterUsuarioAtual).mockReset();
+});
+
+const painel = () => screen.getByRole("region", { name: "Meu perfil" });
+const campo = () =>
+  screen.getByRole("textbox", { name: "Nome de exibição" }) as HTMLInputElement;
+const salvar = () => screen.queryByRole("button", { name: "Salvar" });
+const descartar = () => screen.queryByRole("button", { name: "Descartar" });
+const status = () => screen.getByRole("status");
+const nomeExibido = () =>
+  painel().querySelector(".configuracoes__nome-exibido");
+const iniciais = () => painel().querySelector(".configuracoes__iniciais");
+
+/** Pares rótulo → valor das listas de dados, na ordem da tela. */
 function dados(): [string, string][] {
   return [...painel().querySelectorAll(".configuracoes__dado")].map((par) => [
     par.querySelector("dt")!.textContent ?? "",
@@ -35,75 +95,132 @@ function dados(): [string, string][] {
   ]);
 }
 
+function digitar(valor: string) {
+  fireEvent.change(campo(), { target: { value: valor } });
+}
+
+async function clicarSalvar() {
+  await act(async () => {
+    fireEvent.click(salvar()!);
+  });
+}
+
+/** Uma promessa que o teste resolve quando quiser. */
+function adiada<T>() {
+  let resolver!: (v: T) => void;
+  const promessa = new Promise<T>((res) => {
+    resolver = res;
+  });
+  return { promessa, resolver };
+}
+
 describe("T208 — o que Meu perfil mostra", () => {
-  it("exatamente e-mail, papel, empresa ativa e data de criação, nessa ordem", () => {
+  it("três seções reais: identificação, contato e formas de entrada, nessa ordem", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
+    expect(
+      within(painel())
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual(["Identificação", "Contato", "Formas de entrada"]);
+  });
+
+  it("dados reais, só leitura: papel, empresa, criação, última alteração, e-mail e a forma de entrada", () => {
+    render(
+      <MeuPerfilScreen conta={{ ...CONTA, perfilAtualizadoEm: VERSAO }} />,
+    );
     expect(dados()).toEqual([
-      ["E-mail de acesso", "pessoa.teste@example.test"],
       ["Papel", "RH"],
       ["Empresa ativa", "Empresa Alfa (ALFA)"],
       ["Conta criada em", "15/03/2026"],
+      ["Última alteração do perfil", "10/11/2026 às 10:00"],
+      ["E-mail de acesso", "pessoa.teste@example.test"],
+      ["E-mail e senha", "Em uso"],
     ]);
-    const data = painel().querySelector("time")!;
-    expect(data).toHaveAttribute("dateTime", "2026-03-15T12:00:00.000Z");
+    const datas = painel().querySelectorAll("time");
+    expect(datas[0]).toHaveAttribute("dateTime", CONTA.createdAt);
+    expect(datas[1]).toHaveAttribute("dateTime", VERSAO);
+  });
+
+  it("perfil nunca salvo: 'Ainda não alterado'", () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    expect(dados()).toContainEqual([
+      "Última alteração do perfil",
+      "Ainda não alterado",
+    ]);
   });
 
   it("sem empresa ativa (escopo global), diz isso — não inventa empresa", () => {
-    render(
-      <MeuPerfilScreen
-        conta={{ ...CONTA, role: "master_tecnico", empresaAtiva: null }}
-      />,
-    );
-    expect(dados()[1]).toEqual(["Papel", "Master técnico"]);
-    expect(dados()[2]).toEqual(["Empresa ativa", "Nenhuma empresa ativa"]);
+    render(<MeuPerfilScreen conta={{ ...CONTA, empresaAtiva: null }} />);
+    expect(dados()).toContainEqual(["Empresa ativa", "Nenhuma empresa ativa"]);
   });
 
   it.each(Object.entries(ROTULO_PAPEL))(
     "papel %s aparece pelo rótulo (%s), nunca pelo código",
-    (papel, rotulo) => {
-      render(<MeuPerfilScreen conta={{ ...CONTA, role: papel }} />);
-      expect(dados()[1]).toEqual(["Papel", rotulo]);
+    (codigo, rotulo) => {
+      render(<MeuPerfilScreen conta={{ ...CONTA, role: codigo }} />);
+      expect(dados()).toContainEqual(["Papel", rotulo]);
     },
   );
 
-  it("sem conta (shell montado sem ator), cada valor é '—'", () => {
+  it("sem nome: o e-mail é o nome exibido e as iniciais saem dele", () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    expect(nomeExibido()).toHaveTextContent("pessoa.teste@example.test");
+    expect(iniciais()).toHaveTextContent("PT");
+    expect(campo().value).toBe("");
+  });
+
+  it("com nome: o nome é o exibido, as iniciais saem dele, e o campo vem preenchido", () => {
+    render(
+      <MeuPerfilScreen conta={{ ...CONTA, nomeExibicao: "Ana Maria Lima" }} />,
+    );
+    expect(nomeExibido()).toHaveTextContent("Ana Maria Lima");
+    expect(iniciais()).toHaveTextContent("AL");
+    expect(iniciais()).toHaveAttribute("aria-hidden", "true");
+    expect(campo().value).toBe("Ana Maria Lima");
+  });
+
+  it("iniciais: uma palavra, acento e símbolos", () => {
+    expect(iniciaisDe("Ângela", "x@example.test")).toBe("Â");
+    expect(iniciaisDe(null, "joao_da-silva@example.test")).toBe("JS");
+    expect(iniciaisDe(null, "...@example.test")).toBe("?");
+  });
+
+  it("sem conta (shell montado sem ator): '—' e nenhum campo", () => {
     render(<MeuPerfilScreen conta={null} />);
-    expect(dados().map(([, valor]) => valor)).toEqual(["—", "—", "—", "—"]);
+    for (const [, valor] of dados().filter(([r]) => r !== "E-mail e senha")) {
+      expect(valor).toBe("—");
+    }
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 
   it("título único de página, trilha Configurações › Meu perfil", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
-    const titulos = screen.getAllByRole("heading", { level: 1 });
-    expect(titulos).toHaveLength(1);
-    expect(titulos[0]).toHaveTextContent("Configurações");
-    expect(titulos[0]).toHaveAttribute("id", CONFIGURACOES_TITULO_ID);
+    const titulo = screen.getByRole("heading", { level: 1 });
+    expect(titulo).toHaveTextContent("Configurações");
+    expect(titulo).toHaveAttribute("id", CONFIGURACOES_TITULO_ID);
     const trilha = screen.getByRole("navigation", {
       name: "Trilha de navegação",
     });
-    expect(
-      within(trilha)
-        .getAllByRole("listitem")
-        .map((li) => li.textContent?.replace("›", "").trim()),
-    ).toEqual(["Configurações", "Meu perfil"]);
-    expect(within(trilha).getByText("Meu perfil")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(trilha).toHaveTextContent("Configurações");
+    expect(trilha).toHaveTextContent("Meu perfil");
   });
 
   it("navegação interna só com Meu perfil, no grupo Sua conta — nenhum item sem tela", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
     const interna = screen.getByRole("navigation", { name: "Configurações" });
-    const lista = within(interna).getByRole("list", { name: "Sua conta" });
-    expect(within(lista).getAllByRole("listitem")).toHaveLength(1);
-    expect(interna.textContent).not.toMatch(
+    const links = within(interna).getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveTextContent("Meu perfil");
+    expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(within(interna).getByRole("list")).toHaveAccessibleName("Sua conta");
+    expect(interna).not.toHaveTextContent(
       /Segurança|Empresas|Equipe|Permiss|Sessões/,
     );
   });
 });
 
 describe("T208 — o que Meu perfil NÃO mostra nem oferece", () => {
-  it("nenhum identificador interno, documento, contato, foto, idioma ou preferência", () => {
+  it("nenhum identificador interno, documento, cargo, telefone, Google, segundo fator ou sessão", () => {
     render(
       <MeuPerfilScreen
         conta={
@@ -131,23 +248,258 @@ describe("T208 — o que Meu perfil NÃO mostra nem oferece", () => {
       expect(texto).not.toContain(proibido);
     }
     expect(texto).not.toMatch(
-      /CPF|CNPJ|Telefone|Celular|Foto|Idioma|Fuso|Preferênc|Situação|Unidade|Endereço|Nome completo/i,
+      /CPF|CNPJ|Telefone|Celular|Cargo|Google|segundo fator|2º fator|Sessões|Sessão|Segurança|Idioma|Fuso|Preferênc|Situação|Unidade|Endereço|Nome completo/i,
     );
   });
 
-  it("nenhum campo, botão ou controle de edição; a indisponibilidade é dita em texto", () => {
+  it("o nome de exibição é o único campo; sem envio de foto; sem botões com o formulário limpo", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
-    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(document.querySelectorAll("input, select, textarea")).toHaveLength(
-      0,
+      1,
     );
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(
       document.querySelectorAll("[disabled], [aria-disabled]"),
     ).toHaveLength(0);
-    expect(painel()).toHaveTextContent(
-      "A edição destes dados ainda não está disponível.",
+  });
+
+  it("o e-mail diz que a alteração não está disponível — sem prometer que alguém troca", () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    const contato = screen.getByRole("region", { name: "Contato" });
+    expect(contato).toHaveTextContent(
+      "A alteração do e-mail ainda não está disponível.",
     );
+    expect(contato).not.toHaveTextContent(/administra|suporte|fale com/i);
+  });
+});
+
+describe("T208 — editar o nome: rodapé, descartar e salvar", () => {
+  it("o rodapé aparece só com alteração; espaço a mais não conta", () => {
+    render(<MeuPerfilScreen conta={{ ...CONTA, nomeExibicao: "Ana" }} />);
+    expect(salvar()).toBeNull();
+    digitar("  Ana   ");
+    expect(salvar()).toBeNull();
+    digitar("Ana Lima");
+    expect(salvar()).toBeInTheDocument();
+    expect(descartar()).toBeInTheDocument();
+  });
+
+  it("Descartar volta ao salvo, esconde o rodapé e devolve o foco ao campo", () => {
+    render(<MeuPerfilScreen conta={{ ...CONTA, nomeExibicao: "Ana" }} />);
+    digitar("Outro Nome");
+    fireEvent.click(descartar()!);
+    expect(campo().value).toBe("Ana");
+    expect(salvar()).toBeNull();
+    expect(document.activeElement).toBe(campo());
+    expect(atualizarPerfilProprio).not.toHaveBeenCalled();
+  });
+
+  it("Salvar envia o nome normalizado e a versão lida; aplica a resposta; um anúncio só", async () => {
+    const resposta = ator({
+      nomeExibicao: "Ana Lima",
+      perfilAtualizadoEm: "2026-11-12T15:30:00.000Z",
+    });
+    vi.mocked(atualizarPerfilProprio).mockResolvedValue(resposta);
+    const aoAtualizar = vi.fn();
+    render(
+      <MeuPerfilScreen
+        conta={{ ...CONTA, perfilAtualizadoEm: VERSAO }}
+        onContaAtualizada={aoAtualizar}
+      />,
+    );
+    digitar("  Ana    Lima ");
+    await clicarSalvar();
+    expect(atualizarPerfilProprio).toHaveBeenCalledTimes(1);
+    expect(atualizarPerfilProprio).toHaveBeenCalledWith({
+      nomeExibicao: "Ana Lima",
+      perfilAtualizadoEmLido: VERSAO,
+    });
+    expect(aoAtualizar).toHaveBeenCalledWith(resposta);
+    expect(campo().value).toBe("Ana Lima");
+    expect(nomeExibido()).toHaveTextContent("Ana Lima");
+    expect(dados()).toContainEqual([
+      "Última alteração do perfil",
+      "12/11/2026 às 12:30",
+    ]);
+    expect(salvar()).toBeNull();
+    expect(status()).toHaveTextContent("Perfil salvo.");
+    expect(screen.queryAllByRole("alert")).toHaveLength(0);
+    expect(document.activeElement).toBe(campo());
+  });
+
+  it("limpar o nome envia null e volta ao e-mail", async () => {
+    vi.mocked(atualizarPerfilProprio).mockResolvedValue(
+      ator({ nomeExibicao: null, perfilAtualizadoEm: VERSAO }),
+    );
+    render(<MeuPerfilScreen conta={{ ...CONTA, nomeExibicao: "Ana" }} />);
+    digitar("   ");
+    await clicarSalvar();
+    expect(atualizarPerfilProprio).toHaveBeenCalledWith({
+      nomeExibicao: null,
+      perfilAtualizadoEmLido: null,
+    });
+    expect(nomeExibido()).toHaveTextContent("pessoa.teste@example.test");
+  });
+
+  it("enquanto salva: campo só leitura, botões desabilitados, segundo envio ignorado", async () => {
+    const pendente = adiada<SafeAccessUserApi>();
+    vi.mocked(atualizarPerfilProprio).mockReturnValue(pendente.promessa);
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar("Ana");
+    await clicarSalvar();
+    expect(campo()).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: "Salvando…" })).toBeDisabled();
+    expect(descartar()).toBeDisabled();
+    fireEvent.submit(campo().form!);
+    expect(atualizarPerfilProprio).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      pendente.resolver(
+        ator({ nomeExibicao: "Ana", perfilAtualizadoEm: VERSAO }),
+      );
+    });
+    expect(campo()).not.toHaveAttribute("readonly");
+  });
+});
+
+describe("T208 — validação, conflito e falha", () => {
+  it.each([
+    ["curto", "A", "Use ao menos 2 caracteres"],
+    ["longo", "a".repeat(81), "Use no máximo 80 caracteres"],
+    ["sem letra", "1234", "Use ao menos uma letra."],
+  ])(
+    "nome %s: erro no campo, foco nele, nada enviado",
+    async (_caso, valor, mensagem) => {
+      render(<MeuPerfilScreen conta={CONTA} />);
+      digitar(valor);
+      await clicarSalvar();
+      expect(atualizarPerfilProprio).not.toHaveBeenCalled();
+      const alerta = screen.getByRole("alert");
+      expect(alerta).toHaveTextContent(mensagem);
+      expect(campo()).toHaveAttribute("aria-invalid", "true");
+      expect(campo().getAttribute("aria-describedby")).toContain(alerta.id);
+      expect(document.activeElement).toBe(campo());
+      expect(status()).toHaveTextContent("");
+      // Digitar de novo tira o erro.
+      digitar("Ana");
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(campo()).not.toHaveAttribute("aria-invalid");
+    },
+  );
+
+  it("80 caracteres passam; um emoji conta como um caractere", async () => {
+    vi.mocked(atualizarPerfilProprio).mockResolvedValue(ator());
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar(`${"😀".repeat(79)}a`);
+    await clicarSalvar();
+    expect(atualizarPerfilProprio).toHaveBeenCalledTimes(1);
+  });
+
+  it("conflito (409): diz o que houve, mantém o texto e oferece carregar os dados atuais", async () => {
+    vi.mocked(atualizarPerfilProprio).mockRejectedValue(
+      new ApiError(409, "Conflito ao processar a requisição."),
+    );
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(
+      ator({
+        nomeExibicao: "Salvo Em Outra Sessao",
+        perfilAtualizadoEm: VERSAO,
+      }),
+    );
+    const aoAtualizar = vi.fn();
+    render(<MeuPerfilScreen conta={CONTA} onContaAtualizada={aoAtualizar} />);
+    digitar("Meu Texto");
+    await clicarSalvar();
+    const alerta = screen.getByRole("alert");
+    expect(alerta).toHaveTextContent("alterado em outra sessão");
+    expect(alerta).toHaveTextContent("Nada foi salvo");
+    expect(campo().value).toBe("Meu Texto");
+    expect(salvar()).toBeInTheDocument();
+    expect(status()).toHaveTextContent("");
+    expect(aoAtualizar).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(
+        within(alerta).getByRole("button", {
+          name: "Carregar os dados atuais",
+        }),
+      );
+    });
+    expect(obterUsuarioAtual).toHaveBeenCalledTimes(1);
+    expect(campo().value).toBe("Salvo Em Outra Sessao");
+    expect(salvar()).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(status()).toHaveTextContent("Dados atuais carregados.");
+    expect(aoAtualizar).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(campo());
+  });
+
+  it("recusa do servidor (400): erro no campo, sem anúncio de sucesso", async () => {
+    vi.mocked(atualizarPerfilProprio).mockRejectedValue(
+      new ApiError(400, "Requisição inválida."),
+    );
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar("Ana");
+    await clicarSalvar();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Este nome não foi aceito",
+    );
+    expect(campo()).toHaveAttribute("aria-invalid", "true");
+    expect(status()).toHaveTextContent("");
+  });
+
+  it.each([
+    ["erro do servidor", () => new ApiError(500, "Erro")],
+    ["sem rede", () => new TypeError("Failed to fetch")],
+  ])("falha (%s): alerta único, nada perdido", async (_caso, erro) => {
+    vi.mocked(atualizarPerfilProprio).mockRejectedValue(erro());
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar("Ana");
+    await clicarSalvar();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Não foi possível concluir agora. Nada foi alterado",
+    );
+    expect(campo().value).toBe("Ana");
+    expect(salvar()).toBeInTheDocument();
+    expect(status()).toHaveTextContent("");
+  });
+});
+
+describe("T208 — a edição se declara à guarda de saída", () => {
+  function montarComRegistro(conta: ContaDoMeuPerfil) {
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <MeuPerfilScreen conta={conta} />
+      </ProvedorDeEdicoes>,
+    );
+    return registro;
+  }
+
+  it("limpo: nada pendente; alterado: pendente; de volta ao salvo: nada", () => {
+    const registro = montarComRegistro({ ...CONTA, nomeExibicao: "Ana" });
+    expect(registro.obter().pendentes).toEqual([]);
+    digitar("Ana Lima");
+    expect(registro.obter().pendentes).toEqual([ROTULO_DA_EDICAO_DO_PERFIL]);
+    digitar("Ana");
+    expect(registro.obter().pendentes).toEqual([]);
+  });
+
+  it("salvando: declara salvamento em curso (a guarda bloqueia a saída)", async () => {
+    const pendente = adiada<SafeAccessUserApi>();
+    vi.mocked(atualizarPerfilProprio).mockReturnValue(pendente.promessa);
+    const registro = montarComRegistro(CONTA);
+    digitar("Ana");
+    await clicarSalvar();
+    expect(registro.obter().salvando).toEqual([ROTULO_DA_EDICAO_DO_PERFIL]);
+    await act(async () => {
+      pendente.resolver(
+        ator({ nomeExibicao: "Ana", perfilAtualizadoEm: VERSAO }),
+      );
+    });
+    expect(registro.obter().salvando).toEqual([]);
+    expect(registro.obter().pendentes).toEqual([]);
   });
 });
 
@@ -155,7 +507,7 @@ describe("T208 — layout a 375 px (CSS)", () => {
   const css = readFileSync(
     "src/screens/configuracoes/MeuPerfilScreen.css",
     "utf8",
-  );
+  ).replace(/\r\n/g, "\n");
   const regra = (seletor: string) => {
     const inicio = css.indexOf(`\n${seletor} {`);
     if (inicio < 0) return "";
@@ -173,11 +525,38 @@ describe("T208 — layout a 375 px (CSS)", () => {
     expect(regra(".configuracoes__painel")).toMatch(/min-width:\s*0/);
   });
 
-  it("e-mail e empresa longos quebram dentro da caixa", () => {
+  it("linhas de rótulo e valor: empilhadas por padrão, lado a lado só a partir de 1024 px", () => {
+    expect(css).toMatch(
+      /\n\.configuracoes__linha,\n\.configuracoes__linha\.evolli-field \{\n\s*display: grid;\n\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+    expect(css).toMatch(
+      /@media \(min-width: 1024px\) \{\s*\.configuracoes__linha,\s*\.configuracoes__linha\.evolli-field \{\s*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
+    );
+  });
+
+  it("e-mail, empresa e nome longos quebram dentro da caixa", () => {
     expect(regra(".configuracoes__dado dd")).toMatch(
       /overflow-wrap:\s*anywhere/,
     );
     expect(regra(".configuracoes__dado dd")).toMatch(/min-width:\s*0/);
+    expect(regra(".configuracoes__nome-exibido")).toMatch(
+      /overflow-wrap:\s*anywhere/,
+    );
+  });
+
+  it("rodapé preso ao pé da área visível, com ações de 44 px que quebram linha", () => {
+    expect(regra(".configuracoes__rodape")).toMatch(/position:\s*sticky/);
+    expect(regra(".configuracoes__rodape")).toMatch(/bottom:\s*0/);
+    expect(regra(".configuracoes__rodape")).toMatch(/flex-wrap:\s*wrap/);
+    expect(regra(".configuracoes__rodape-acoes > *")).toMatch(
+      /min-height:\s*44px/,
+    );
+  });
+
+  it("a região de status nunca some do layout (display: none calaria o anúncio)", () => {
+    expect(css).not.toMatch(
+      /configuracoes__anuncio[^{]*\{[^}]*display:\s*none/,
+    );
   });
 
   it("o item atual se distingue do fundo da página (superfície, filete e peso), não só por um tom", () => {
@@ -195,7 +574,7 @@ describe("T208 — layout a 375 px (CSS)", () => {
 
   it("sem posição fixa nem largura mínima que force rolagem", () => {
     expect(css).not.toMatch(/position:\s*fixed/);
-    // Declarações de propriedade (não a consulta de mídia de 720 px).
+    // Declarações de propriedade (não as consultas de mídia).
     expect(css).not.toMatch(/^\s+min-width:\s*[1-9]/m);
     expect(css).not.toMatch(/^\s+(min-)?width:\s*\d{3,}px/m);
   });

@@ -15,6 +15,18 @@ import {
   redefinirLarguraDaJanela,
 } from "../test/viewport";
 import type { ContaDoMeuPerfil } from "../screens/configuracoes/MeuPerfilScreen";
+import {
+  atualizarPerfilProprio,
+  type SafeAccessUserApi,
+} from "../api/usersClient";
+
+vi.mock("../api/usersClient", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/usersClient")>(
+      "../api/usersClient",
+    );
+  return { ...actual, atualizarPerfilProprio: vi.fn() };
+});
 
 vi.mock("../api/contextoEmpresarialClient", async () => {
   const actual = await vi.importActual<
@@ -38,6 +50,8 @@ const CONTA: ContaDoMeuPerfil = {
   role: "rh",
   createdAt: "2026-03-15T12:00:00.000Z",
   empresaAtiva: EMPRESA,
+  nomeExibicao: null,
+  perfilAtualizadoEm: null,
 };
 
 const PAPEIS = [
@@ -286,5 +300,95 @@ describe("T208 — guarda de saída sem regressão", () => {
       }),
     );
     expect(tituloDeConfiguracoes()).toBeInTheDocument();
+  });
+});
+
+describe("T208 — guarda de saída da própria edição de Meu perfil", () => {
+  const campo = () => screen.getByRole("textbox", { name: "Nome de exibição" });
+  const irParaHorario = () =>
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /^Jornada Visão/ }),
+    );
+
+  function abrirComShell() {
+    window.history.replaceState(null, "", `/${ROTA}`);
+    render(
+      <ComGuardaDeSaida>
+        <App
+          papelDoAtor="rh"
+          empresaAtiva={EMPRESA}
+          contaDoAtor={{ ...CONTA, nomeExibicao: "Ana" }}
+        />
+      </ComGuardaDeSaida>,
+    );
+  }
+
+  it("formulário limpo: sair pelo menu não pergunta nada", () => {
+    abrirComShell();
+    irParaHorario();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(tituloDeConfiguracoes()).toBeNull();
+  });
+
+  it("nome alterado: sair pergunta; 'Continuar editando' mantém o texto; 'Sair sem salvar' sai", () => {
+    abrirComShell();
+    fireEvent.change(campo(), { target: { value: "Ana Lima" } });
+    irParaHorario();
+    const dialogo = screen.getByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("Meu perfil");
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(campo()).toHaveValue("Ana Lima");
+
+    irParaHorario();
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    expect(tituloDeConfiguracoes()).toBeNull();
+  });
+
+  it("salvando: a saída fica bloqueada até o salvamento terminar", async () => {
+    let concluir!: (ator: SafeAccessUserApi) => void;
+    vi.mocked(atualizarPerfilProprio).mockReturnValue(
+      new Promise<SafeAccessUserApi>((resolver) => {
+        concluir = resolver;
+      }),
+    );
+    abrirComShell();
+    fireEvent.change(campo(), { target: { value: "Ana Lima" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    });
+    irParaHorario();
+    const dialogo = screen.getByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("Aguarde o salvamento terminar");
+    expect(
+      within(dialogo).queryByRole("button", { name: "Sair sem salvar" }),
+    ).toBeNull();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Entendi" }));
+    expect(tituloDeConfiguracoes()).toBeInTheDocument();
+
+    await act(async () => {
+      concluir({
+        id: "conta-sintetica",
+        email: CONTA.email,
+        role: "rh",
+        companyId: EMPRESA.id,
+        unitId: null,
+        teamId: null,
+        status: "active",
+        createdAt: CONTA.createdAt,
+        empresaAtiva: EMPRESA,
+        nomeExibicao: "Ana Lima",
+        perfilAtualizadoEm: "2026-11-12T15:00:00.000Z",
+      });
+    });
+    // Salvo: limpo de novo, e sair não pergunta.
+    irParaHorario();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(tituloDeConfiguracoes()).toBeNull();
   });
 });

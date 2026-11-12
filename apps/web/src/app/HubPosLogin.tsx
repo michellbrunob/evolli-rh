@@ -125,9 +125,9 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   "administracao-lideranca":
     "Atribuição de gestores a equipes, com vigência e histórico.",
   "contas-acesso": "Contas de acesso, papéis e redefinição de segundo fator.",
-  // T208 — só o que Meu perfil mostra hoje, sem edição.
+  // T208 — Meu perfil: o nome de exibição (o único dado editável) e a conta.
   configuracoes:
-    "Meu perfil: o e-mail de acesso, o papel, a empresa ativa e a data de criação da sua conta. Somente consulta.",
+    "Meu perfil: o seu nome de exibição e os dados da sua conta de acesso.",
 };
 
 /** Ícone do grupo a que o destino pertence — mesma identidade da barra lateral. */

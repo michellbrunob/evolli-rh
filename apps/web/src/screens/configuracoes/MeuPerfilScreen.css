@@ -2,7 +2,9 @@
  * T208 — Configurações › Meu perfil. Só tokens já existentes (`tokens.css`):
  * sem novo hexadecimal, sem sombra, sem gradiente e sem a paleta do
  * Dashboard. Duas colunas (navegação interna e painel) a partir de 720 px;
- * abaixo disso, uma coluna só, sem rolagem horizontal a 375 px.
+ * abaixo disso, uma coluna só, sem rolagem horizontal a 375 px. Dentro do
+ * painel, as linhas viram rótulo à esquerda e valor à direita só a partir de
+ * 1024 px; antes, um embaixo do outro.
  */
 
 .configuracoes {
@@ -95,37 +97,186 @@
   color: var(--color-ink-muted);
 }
 
-.configuracoes__dados {
-  display: grid;
-  gap: var(--space-md);
-  margin: 0;
-}
-
-.configuracoes__dado {
-  display: grid;
-  gap: var(--space-xxs);
+.configuracoes__formulario {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
-.configuracoes__dado dt {
+/* Cada seção separada da anterior por um filete. */
+.configuracoes__secao {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-lg) 0;
+  border-top: 1px solid var(--divider-soft);
+}
+
+.configuracoes__secao-titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__secao-texto {
+  margin: var(--space-xxs) 0 0;
   font-size: var(--text-caption);
-  color: var(--color-ink-subtle);
+  color: var(--color-ink-muted);
+}
+
+/* Iniciais no lugar da foto: círculo com as letras, decorativo (o nome está
+   ao lado, em texto). */
+.configuracoes__identidade {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+  padding: var(--space-xs) 0;
+}
+
+.configuracoes__iniciais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+  font-weight: var(--weight-bold);
+}
+
+.configuracoes__identidade-texto {
+  min-width: 0;
+}
+
+.configuracoes__nome-exibido {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.configuracoes__identidade-nota {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__dados {
+  display: grid;
+  margin: 0;
+}
+
+/* Linha: rótulo e valor. Um embaixo do outro até 1024 px; a partir daí, lado
+   a lado. Um filete entre linhas. */
+.configuracoes__linha,
+.configuracoes__linha.evolli-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xxs);
+  min-width: 0;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--divider-soft);
+}
+
+@media (min-width: 1024px) {
+  .configuracoes__linha,
+  .configuracoes__linha.evolli-field {
+    grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+    gap: var(--space-lg);
+    align-items: start;
+  }
+}
+
+.configuracoes__dado dt,
+.configuracoes__rotulo-texto {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
 }
 
 /* E-mail e nome de empresa longos quebram dentro da caixa. */
 .configuracoes__dado dd {
   margin: 0;
   min-width: 0;
-  color: var(--color-ink);
-  font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
   overflow-wrap: anywhere;
 }
 
-.configuracoes__aviso {
-  margin: var(--space-lg) 0 0;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  background: var(--surface-neutral);
-  color: var(--color-ink-muted);
+.configuracoes__rotulo,
+.configuracoes__valor {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.configuracoes__ajuda {
+  margin: 0;
   font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Enquanto salva, o campo fica só leitura e o tom diz isso. */
+.configuracoes__valor input:read-only {
+  background: var(--surface-neutral);
+}
+
+.configuracoes__falha {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+.configuracoes__falha-texto {
+  margin: 0;
+}
+
+/* Rodapé de edição: só existe com alteração. Preso ao pé da área visível
+   enquanto a tela rola, para Salvar não sumir. */
+.configuracoes__rodape {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-canvas);
+}
+
+.configuracoes__rodape-texto {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__rodape-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.configuracoes__rodape-acoes > * {
+  min-height: 44px;
+}
+
+/* Região de status sempre presente (para o leitor de tela anunciar), sem
+   ocupar espaço quando vazia. */
+.configuracoes__anuncio {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-success-ink);
 }
