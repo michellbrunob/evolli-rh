@@ -3,8 +3,9 @@
  * sem novo hexadecimal, sem sombra, sem gradiente e sem a paleta do
  * Dashboard. Duas colunas (navegação interna e painel) a partir de 720 px;
  * abaixo disso, uma coluna só, sem rolagem horizontal a 375 px. Dentro do
- * painel, as linhas viram rótulo à esquerda e valor à direita só a partir de
- * 1024 px; antes, um embaixo do outro.
+ * painel, as linhas viram rótulo à esquerda e valor à direita só quando o
+ * PRÓPRIO painel tem 40rem — não a janela: com o menu aberto, a 1024 px o
+ * painel tem menos de 450 px, e a regra pela janela espremia o campo.
  */
 
 .configuracoes {
@@ -77,6 +78,7 @@
 }
 
 .configuracoes__painel {
+  container-type: inline-size;
   min-width: 0;
   padding: var(--space-lg);
   border: 1px solid var(--hairline);
@@ -171,8 +173,8 @@
   margin: 0;
 }
 
-/* Linha: rótulo e valor. Um embaixo do outro até 1024 px; a partir daí, lado
-   a lado. Um filete entre linhas. */
+/* Linha: rótulo e valor. Um embaixo do outro; lado a lado quando o painel
+   tem 40rem. Um filete entre linhas. */
 .configuracoes__linha,
 .configuracoes__linha.evolli-field {
   display: grid;
@@ -183,7 +185,7 @@
   border-top: 1px solid var(--divider-soft);
 }
 
-@media (min-width: 1024px) {
+@container (min-width: 40rem) {
   .configuracoes__linha,
   .configuracoes__linha.evolli-field {
     grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);

@@ -525,13 +525,20 @@ describe("T208 — layout a 375 px (CSS)", () => {
     expect(regra(".configuracoes__painel")).toMatch(/min-width:\s*0/);
   });
 
-  it("linhas de rótulo e valor: empilhadas por padrão, lado a lado só a partir de 1024 px", () => {
+  it("linhas de rótulo e valor: empilhadas por padrão; lado a lado só quando o PAINEL tem 40rem (não a janela)", () => {
     expect(css).toMatch(
       /\n\.configuracoes__linha,\n\.configuracoes__linha\.evolli-field \{\n\s*display: grid;\n\s*grid-template-columns: minmax\(0, 1fr\);/,
     );
-    expect(css).toMatch(
-      /@media \(min-width: 1024px\) \{\s*\.configuracoes__linha,\s*\.configuracoes__linha\.evolli-field \{\s*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
+    // Achado no navegador: a 1024 px, com o menu aberto, o painel tinha
+    // 443 px e a regra pela JANELA espremia o campo em 129 px. A decisão é
+    // pela largura do próprio painel.
+    expect(regra(".configuracoes__painel")).toMatch(
+      /container-type:\s*inline-size/,
     );
+    expect(css).toMatch(
+      /@container \(min-width: 40rem\) \{\s*\.configuracoes__linha,\s*\.configuracoes__linha\.evolli-field \{\s*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
+    );
+    expect(css).not.toMatch(/@media \(min-width: 1024px\)/);
   });
 
   it("e-mail, empresa e nome longos quebram dentro da caixa", () => {
