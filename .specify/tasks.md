@@ -3300,9 +3300,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         entrega.
 
 104.  **T207 - Dashboard funcional e seletor de empresas**
-      - **Estado:** **implementada e validada localmente**, em revisão na PR #200 (Draft), sem
-        Ready e sem merge.
-        Branch `codex/t207-dashboard-seletor-empresas`, a partir do squash
+      - **Estado:** **integrada** em `main` pela PR #200, squash
+        `25903aa742d8f3f304dd7b3597eaed12ed83649a`, com a CI de push 3/3 verde (run
+        43204739130); branch remota preservada. Implementada na branch
+        `codex/t207-dashboard-seletor-empresas`, a partir do squash
         `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto. Validação visual aprovada
         pela proprietária em 2026-11-10.
@@ -3323,7 +3324,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         menu lateral, no Dashboard e no seletor.
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
-        históricos calculados; tela de empresas; mudança global de cor; promoção e merge.
+        históricos calculados; tela de empresas; mudança global de cor.
+      - **Observação de relatório:** a integração funcional da T207 está concluída; promoção a
+        Ready e merge por squash foram feitos por ordem explícita da proprietária em 2026-11-12,
+        e a única pendência administrativa era a sua convergência no Spec Kit, resolvida no
+        primeiro commit da T208.
       - **Entrega (seções 16 a 19 do dossiê):** Visão Geral com "Dashboard" na barra superior,
         momento da leitura uma vez por aba, Quadro de colaboradores (botão de informação,
         gráfico e tabela com os mesmos números, painel por mês, menu de ações, CSV e impressão
