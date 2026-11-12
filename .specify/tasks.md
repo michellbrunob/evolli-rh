@@ -3362,12 +3362,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         do squash e `git diff --check` verdes.
 
 105.  **T208 - Configurações: Meu Perfil**
-      - **Estado:** **implementada e validada localmente**, sem push, PR, promoção ou merge.
+      - **Estado:** **implementada e validada localmente**, com a validação visual humana aprovada
+        em 2026-11-12; sem push, PR, revisão de PR, promoção ou merge.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
         [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md), aprovadas em
-        2026-11-12 como recomendadas (seção 15).
+        2026-11-12 como recomendadas (seção 15) e conferidas sem alteração (seção 20).
       - **Entrega:** rota `#/configuracoes/meu-perfil` (e o atalho `#/configuracoes`) com Meu
         perfil somente leitura, só web, com os dados da sessão de `GET /v1/users/me`, sem chamada
         nova: e-mail de acesso, papel, empresa ativa e data de criação da conta, e um aviso de que

@@ -3172,16 +3172,16 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (em implementação)
+## Configurações: Meu Perfil — T208 (implementada e validada localmente)
 
 | Tarefa | Estado                                 | Resultado principal                                                |
 | ------ | -------------------------------------- | ------------------------------------------------------------------ |
 | T208   | **Implementada e validada localmente** | Configurações › Meu perfil, somente leitura, para todos os papéis. |
 
 **Entrega:** detalhada no [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md)
-(seções 15 a 19):
+(seções 15 a 20):
 
-- decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas;
+- decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas e conferidas sem alteração;
 - rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; item próprio do menu para quem
   tem o shell e cartão do Hub para os demais papéis; papel desconhecido sem acesso;
 - só leitura, só web, com os dados da sessão de `GET /v1/users/me` e sem chamada nova: e-mail de
@@ -3195,7 +3195,9 @@ serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 muta�
 detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 `git diff --check` verdes.
 
-**Pendente:** validação visual humana; push, PR, promoção e merge só com ordem.
+**Validação visual:** aprovada pela validação humana em 2026-11-12.
+
+**Pendente:** push, PR Draft, revisão, promoção e merge, só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
 Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker, dependências,

@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T208",
-    "status": "configuracoes_meu_perfil_em_implementacao",
-    "reason": "T207 integrada em main pela PR #200 (squash 25903aa742d8f3f304dd7b3597eaed12ed83649a), com a CI de push 3/3 verde (run 43204739130); branch remota preservada. A T208 implementa a primeira fatia de Configuracoes, o submodulo Meu Perfil, conforme as decisoes MP-1 a MP-8 aprovadas (docs/decisions/t208-dossie-configuracoes-meu-perfil.md): rota #/configuracoes/meu-perfil, somente leitura e so web, com os dados da sessao de GET /v1/users/me (e-mail de acesso, papel, empresa ativa e data de criacao da conta), item proprio do menu para quem tem o shell e cartao do Hub para os demais papeis, rotulo Papel no Hub. Validada localmente; sem push, PR, promocao ou merge. Sem API, schema, migration, RBAC, auditoria, seed, Docker, dependencia, lockfile ou workflow."
+    "status": "configuracoes_meu_perfil_implementada_validada_localmente",
+    "reason": "T207 integrada em main pela PR #200 (squash 25903aa742d8f3f304dd7b3597eaed12ed83649a), com a CI de push 3/3 verde (run 43204739130); branch remota preservada. A T208 implementa a primeira fatia de Configuracoes, o submodulo Meu Perfil, conforme as decisoes MP-1 a MP-8 aprovadas (docs/decisions/t208-dossie-configuracoes-meu-perfil.md): rota #/configuracoes/meu-perfil, somente leitura e so web, com os dados da sessao de GET /v1/users/me (e-mail de acesso, papel, empresa ativa e data de criacao da conta), item proprio do menu para quem tem o shell e cartao do Hub para os demais papeis, rotulo Papel no Hub. Implementada e validada localmente, com a validacao visual humana aprovada em 2026-11-12; sem push, PR, revisao, promocao ou merge. Sem API, schema, migration, RBAC, auditoria, seed, Docker, dependencia, lockfile ou workflow."
   },
   "openDeliveries": [
     {
       "id": "T208",
       "pullRequest": null,
-      "status": "configuracoes_meu_perfil_em_implementacao"
+      "status": "configuracoes_meu_perfil_implementada_validada_localmente"
     }
   ],
   "requiredArtifacts": [

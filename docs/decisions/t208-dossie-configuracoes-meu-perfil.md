@@ -1,8 +1,9 @@
 # T208 — Configurações: Meu Perfil (dossiê de preparação)
 
-- **Estado:** implementada e validada localmente, em branch local, sem push, PR, promoção ou
-  merge. As decisões MP-1 a MP-8 da seção 13 foram aprovadas (seção 15) e a primeira fatia está
-  descrita nas seções 16 a 19. Só web: nenhuma mudança de API, schema, migration, RBAC,
+- **Estado:** implementada e validada localmente, com a validação visual humana aprovada em
+  2026-11-12 (seção 20); em branch local, sem push, PR, revisão de PR, promoção ou merge. As
+  decisões MP-1 a MP-8 da seção 13 foram aprovadas (seção 15), seguem sem alteração e a primeira
+  fatia está descrita nas seções 16 a 20. Só web: nenhuma mudança de API, schema, migration, RBAC,
   auditoria, seed, Docker, dependência, lockfile ou workflow.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
@@ -356,3 +357,23 @@ Depois das correções, a validação confirmou:
   e Equipe e permissões continuam só inventariados (seção 9).
 - **Gaveta do celular:** a correção da seção 16 vale para todo o menu móvel, não só para
   Configurações.
+
+## 20. Validação final
+
+- **Validação visual:** aprovada pela validação humana em 2026-11-12, na prévia local com dados
+  sintéticos, sobre o código desta branch (seção 17).
+- **Perfis e cenários verificados no navegador:** RH (menu, voltar e avançar, recarga, 375 px,
+  gaveta do celular, Hub); master técnico sem empresa e com empresa, com troca pelo seletor;
+  gestor (menu); colaborador (Hub e teclado); menu recolhido; URL inválida e atalho
+  `#/configuracoes`. Os nove papéis conhecidos e o papel desconhecido estão cobertos nos testes
+  (seção 18).
+- **Correções encontradas na validação:** as três da seção 17 (foco na recarga, item atual da
+  navegação interna e gaveta do celular), cada uma com teste que falha antes e mutação própria.
+- **Decisões:** MP-1 a MP-8 conferidas no código e sem alteração desde a preparação: tela sem
+  chamada nova e sem mudança na API (MP-1); rota própria (MP-2); os nove papéis com o destino
+  (MP-3); só os quatro dados (MP-4); nenhum campo, botão ou controle de edição (MP-5, MP-6);
+  Segurança e Sessões ativas intocadas (MP-7); "Papel" no Hub (MP-8).
+- **Limites conhecidos:** os da seção 19.
+- **Contagens finais:** as da seção 18, refeitas no HEAD final da branch: web 133 arquivos,
+  3725 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes,
+  1017 testes; scripts 182 testes; 22 mutações, todas detectadas.
