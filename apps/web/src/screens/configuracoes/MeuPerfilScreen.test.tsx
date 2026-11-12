@@ -180,6 +180,14 @@ describe("T208 — layout a 375 px (CSS)", () => {
     expect(regra(".configuracoes__dado dd")).toMatch(/min-width:\s*0/);
   });
 
+  it("o item atual se distingue do fundo da página (superfície, filete e peso), não só por um tom", () => {
+    const atual = regra(".configuracoes__item--atual");
+    expect(atual).toMatch(/background:\s*var\(--surface-canvas\)/);
+    expect(atual).not.toMatch(/background:\s*var\(--surface-neutral\)/);
+    expect(atual).toMatch(/border-left:\s*3px solid var\(--color-action\)/);
+    expect(atual).toMatch(/font-weight:\s*var\(--weight-strong\)/);
+  });
+
   it("o item da navegação interna tem alvo de 44 px e foco visível", () => {
     expect(regra(".configuracoes__item")).toMatch(/min-height:\s*44px/);
     expect(regra(".configuracoes__item:focus-visible")).toMatch(/outline:/);

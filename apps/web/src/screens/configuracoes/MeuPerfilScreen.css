@@ -61,8 +61,11 @@
   text-decoration: none;
 }
 
+/* Sobre o fundo neutro da página: superfície clara, filete na cor de ação e
+   peso — o item atual não depende de um tom só. */
 .configuracoes__item--atual {
-  background: var(--surface-neutral);
+  background: var(--surface-canvas);
+  border-left: 3px solid var(--color-action);
   font-weight: var(--weight-strong);
 }
 
