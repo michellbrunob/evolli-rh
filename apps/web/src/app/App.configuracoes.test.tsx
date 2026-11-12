@@ -177,6 +177,21 @@ describe("T208 — menu, histórico e foco", () => {
     );
   });
 
+  it("recarga (sem foco em lugar nenhum): o título recebe o foco", () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    montar(ROTA, "dp");
+    expect(document.activeElement).toBe(tituloDeConfiguracoes());
+  });
+
+  it("pelo menu: o foco fica no item do menu, não é tomado pela tela", () => {
+    montar(null, "colaborador");
+    const item = itemDoMenu();
+    item.focus();
+    fireEvent.click(item);
+    expect(tituloDeConfiguracoes()).toBeInTheDocument();
+    expect(document.activeElement).toBe(itemDoMenu());
+  });
+
   it("o link de pular leva o foco ao conteúdo sem trocar de tela", () => {
     montar(ROTA, "rh");
     fireEvent.click(

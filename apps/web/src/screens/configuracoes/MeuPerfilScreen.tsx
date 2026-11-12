@@ -23,6 +23,7 @@
  * A navegação interna tem um item só, Meu perfil. Segurança, Empresas e
  * Equipe e permissões não aparecem até terem tela.
  */
+import { useEffect } from "react";
 import { ROTULO_PAPEL, type SafeAccessUserApi } from "../../api/usersClient";
 import { PageHeader, TrilhaNavegacao } from "../../components";
 import { AUSENTE, formatarInstante } from "../../format/data";
@@ -54,6 +55,18 @@ export function MeuPerfilScreen({ conta }: MeuPerfilScreenProps) {
   const papel =
     conta === null ? AUSENTE : (ROTULO_PAPEL[conta.role] ?? conta.role);
   const empresa = conta?.empresaAtiva ?? null;
+
+  // Ao abrir sem foco em lugar nenhum (a recarga da rota, o "voltar" do
+  // navegador), o título — como o Dashboard. Vindo do menu ou de um cartão,
+  // o foco já está em outro lugar e não é tomado.
+  useEffect(() => {
+    const ativo = document.activeElement;
+    if (ativo !== null && ativo !== document.body) return;
+    const titulo = document.getElementById(CONFIGURACOES_TITULO_ID);
+    if (!titulo) return;
+    titulo.setAttribute("tabindex", "-1");
+    titulo.focus();
+  }, []);
 
   return (
     <div className="configuracoes">
