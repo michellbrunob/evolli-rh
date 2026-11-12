@@ -35,6 +35,7 @@ import {
   obterUsuarioAtual,
   type SafeAccessUserApi,
 } from "../../api/usersClient";
+import { falhaPorSessaoExpirada } from "../../api/csrfClient";
 import { Button, PageHeader, TrilhaNavegacao } from "../../components";
 import { AUSENTE, formatarInstante } from "../../format/data";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
@@ -101,7 +102,7 @@ function perfilDe(conta: {
   };
 }
 
-type Falha = "conflito" | "geral" | null;
+type Falha = "conflito" | "sessao" | "geral" | null;
 
 export function MeuPerfilScreen({
   conta,
@@ -202,6 +203,9 @@ export function MeuPerfilScreen({
       if (!montadoRef.current) return;
       if (erroDoEnvio instanceof ApiError && erroDoEnvio.status === 409) {
         setFalha("conflito");
+      } else if (falhaPorSessaoExpirada(erroDoEnvio)) {
+        // Tentar de novo não adianta: a sessão acabou. O texto fica no campo.
+        setFalha("sessao");
       } else if (
         erroDoEnvio instanceof ApiError &&
         erroDoEnvio.status === 400
@@ -475,6 +479,12 @@ export function MeuPerfilScreen({
                   Carregar os dados atuais
                 </Button>
               </div>
+            ) : null}
+            {falha === "sessao" ? (
+              <p className="configuracoes__falha" role="alert">
+                A sua sessão terminou. Entre de novo para salvar; nada foi
+                alterado.
+              </p>
             ) : null}
             {falha === "geral" ? (
               <p className="configuracoes__falha" role="alert">

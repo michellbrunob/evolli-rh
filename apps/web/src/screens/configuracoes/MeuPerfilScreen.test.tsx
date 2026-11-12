@@ -448,6 +448,21 @@ describe("T208 — validação, conflito e falha", () => {
     expect(status()).toHaveTextContent("");
   });
 
+  it("sessão encerrada (401): diz para entrar de novo, sem prometer que tentar de novo resolve", async () => {
+    vi.mocked(atualizarPerfilProprio).mockRejectedValue(
+      new ApiError(401, "Não autorizado."),
+    );
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar("Ana");
+    await clicarSalvar();
+    const alerta = screen.getByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "A sua sessão terminou. Entre de novo para salvar; nada foi alterado.",
+    );
+    expect(alerta).not.toHaveTextContent("tente de novo");
+    expect(campo().value).toBe("Ana");
+  });
+
   it.each([
     ["erro do servidor", () => new ApiError(500, "Erro")],
     ["sem rede", () => new TypeError("Failed to fetch")],
