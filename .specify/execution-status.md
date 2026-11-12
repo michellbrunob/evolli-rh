@@ -3172,6 +3172,28 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
+## Configurações: Meu Perfil — T208 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                           |
+| ------ | ----------------- | ----------------------------------------------------------------------------- |
+| T208   | **Em preparação** | Levantamento e decisões para começar Configurações pelo submódulo Meu Perfil. |
+
+**Escopo da preparação:** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md):
+
+- rotas, shell, autenticação, sessão, conta de acesso e permissões por papel; contratos web e
+  API existentes (`GET /v1/users/me`); campos disponíveis e permitidos;
+- delimitação de Meu Perfil, matriz de campos, papéis e contratos; o que é possível agora e o que
+  depende de API, schema, RBAC, auditoria ou decisão de produto;
+- acessibilidade, foco, guarda de saída, troca de empresa, URL e 375 px;
+- menor primeira fatia (Meu Perfil somente leitura, só web) e decisões MP-1 a MP-8 para
+  aprovação.
+
+**Próximos submódulos (só inventariados):** Segurança, Empresas e Equipe e permissões.
+
+**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed, Docker,
+dependências, lockfile, workflow, push, PR, promoção e merge.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em

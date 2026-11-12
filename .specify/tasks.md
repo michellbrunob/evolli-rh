@@ -3326,7 +3326,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
         históricos calculados; tela de empresas; mudança global de cor.
       - **Observação de relatório:** a integração funcional da T207 está concluída; promoção a
-        Ready e merge por squash foram feitos por ordem explícita da proprietária em 2026-11-12,
+        Ready e merge por squash foram feitos por ordem explícita em 2026-11-12,
         e a única pendência administrativa era a sua convergência no Spec Kit, resolvida no
         primeiro commit da T208.
       - **Entrega (seções 16 a 19 do dossiê):** Visão Geral com "Dashboard" na barra superior,
@@ -3360,6 +3360,19 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
         20 suítes, 1017 testes; scripts 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
+
+105.  **T208 - Configurações: Meu Perfil (preparação)**
+      - **Estado:** **em preparação**. Branch `codex/t208-configuracoes-meu-perfil`, a partir do
+        squash `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
+      - **Objetivo:** começar o módulo Configurações pelo submódulo Meu Perfil, uma entrega por
+        vez: levantar, com evidência no código, nos contratos e no RBAC, rotas, shell,
+        autenticação, sessão, conta e permissões; delimitar Meu Perfil; matriz de campos, papéis
+        e contratos; separar o possível agora do que depende de decisão; propor a menor primeira
+        fatia e as decisões MP-1 a MP-8 para aprovação, no
+        [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md).
+      - **Próximos submódulos (só inventariados):** Segurança, Empresas e Equipe e permissões.
+      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
+        Docker, dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Regra obrigatória para as próximas tarefas
 

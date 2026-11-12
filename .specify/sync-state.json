@@ -3,7 +3,7 @@
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-12",
   "lastIntegratedTask": 207,
-  "lastRecordedTask": 207,
+  "lastRecordedTask": 208,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,11 +11,17 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T207",
-    "status": "integrada",
-    "reason": "T207 integrada em main pela PR #200 (squash 25903aa742d8f3f304dd7b3597eaed12ed83649a), com a CI de push 3/3 verde (run 43204739130); branch remota preservada. Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluido (docs/decisions/t207-dossie-dashboard-seletor-empresas.md). Nenhuma entrega aberta ate a abertura da proxima tarefa."
+    "id": "T208",
+    "status": "configuracoes_meu_perfil_em_preparacao",
+    "reason": "T207 integrada em main pela PR #200 (squash 25903aa742d8f3f304dd7b3597eaed12ed83649a), com a CI de push 3/3 verde (run 43204739130); branch remota preservada. A T208 prepara o inicio do modulo Configuracoes pelo submodulo Meu Perfil (docs/decisions/t208-dossie-configuracoes-meu-perfil.md): levantamento de rotas, shell, autenticacao, sessao, conta, permissoes e contratos; matriz de campos, papeis e contratos; separacao entre o possivel agora e o que depende de decisao; menor primeira fatia (Meu Perfil somente leitura, so web, com GET /v1/users/me) e decisoes MP-1 a MP-8 para aprovacao. Seguranca, Empresas e Equipe e permissoes ficam so inventariados. So preparacao: sem codigo de produto, API, banco, schema, migration, RBAC, auditoria, seed ou dependencia."
   },
-  "openDeliveries": [],
+  "openDeliveries": [
+    {
+      "id": "T208",
+      "pullRequest": null,
+      "status": "configuracoes_meu_perfil_em_preparacao"
+    }
+  ],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",
