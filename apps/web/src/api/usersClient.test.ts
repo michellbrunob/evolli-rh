@@ -3,6 +3,7 @@ import {
   ApiError,
   type SafeAccessUserApi,
   alterarPapel,
+  atualizarPerfilProprio,
   criarConta,
   desativarConta,
   listarUsuarios,
@@ -449,6 +450,81 @@ describe("usersClient", () => {
       );
       expect(erro).toBeInstanceOf(ApiError);
       expect((erro as ApiError).status).toBe(404);
+    });
+  });
+
+  describe("T208 — atualizarPerfilProprio", () => {
+    const ENTRADA = {
+      nomeExibicao: "Ana Lima",
+      perfilAtualizadoEmLido: "2026-11-10T13:00:00.000Z",
+    };
+    const RESPOSTA = {
+      ...usuarioSintetico,
+      nomeExibicao: "Ana Lima",
+      perfilAtualizadoEm: "2026-11-12T15:00:00.000Z",
+    };
+
+    it("PATCH /v1/users/me com CSRF e só o nome e a versão lida no corpo", async () => {
+      setCsrfToken("token-sintetico");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, RESPOSTA));
+      const resultado = await atualizarPerfilProprio(ENTRADA);
+      const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+      expect(url).toBe("/v1/users/me");
+      expect(init.method).toBe("PATCH");
+      expect(init.headers).toMatchObject({ "x-csrf-token": "token-sintetico" });
+      expect(JSON.parse(init.body as string)).toEqual(ENTRADA);
+      expect(resultado).toEqual(RESPOSTA);
+    });
+
+    it("409: ApiError com status 409 (conflito), sem repetir", async () => {
+      setCsrfToken("token-sintetico");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(409, { message: "Conflito." }));
+      await expect(atualizarPerfilProprio(ENTRADA)).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("403 csrf_invalido (outra aba renovou o token): renova e reenvia UMA vez a mesma versão", async () => {
+      // Achado no navegador: com duas abas, a segunda renovou o token CSRF da
+      // sessão e a gravação da primeira caía como falha genérica, em vez de
+      // chegar ao servidor e receber o conflito (ou passar).
+      setCsrfToken("token-velho");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          jsonResponse(403, {
+            message: "Acesso negado.",
+            codigo: "csrf_invalido",
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { csrfToken: "token-novo" }))
+        .mockResolvedValueOnce(jsonResponse(409, { message: "Conflito." }));
+      await expect(atualizarPerfilProprio(ENTRADA)).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const reenvio = fetchMock.mock.calls[2]! as [string, RequestInit];
+      expect(reenvio[0]).toBe("/v1/users/me");
+      expect(reenvio[1].headers).toMatchObject({
+        "x-csrf-token": "token-novo",
+      });
+      expect(JSON.parse(reenvio[1].body as string)).toEqual(ENTRADA);
+    });
+
+    it("403 sem código (permissão): não reenvia", async () => {
+      setCsrfToken("token-sintetico");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(403, { message: "Acesso negado." }));
+      await expect(atualizarPerfilProprio(ENTRADA)).rejects.toBeInstanceOf(
+        ApiError,
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 });

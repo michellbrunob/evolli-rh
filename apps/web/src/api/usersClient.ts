@@ -1,4 +1,9 @@
-import { clearCsrfToken, getCsrfToken, refreshCsrfToken } from "./csrfClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  getCsrfToken,
+  refreshCsrfToken,
+} from "./csrfClient";
 
 const BASE = "/v1";
 const USERS_ENDPOINT = `${BASE}/users`;
@@ -160,23 +165,35 @@ export async function obterUsuarioAtual(): Promise<SafeAccessUserApi> {
  * versão que a tela leu — se outra sessão salvou antes, a resposta é 409
  * (`ApiError` com `status` 409) e nada é sobrescrito. Volta o ator inteiro,
  * na mesma forma de `GET /users/me`.
+ *
+ * 403 `csrf_invalido`: a sessão vale, mas outra aba renovou o token CSRF desta
+ * sessão (achado no navegador). O pedido não foi aplicado, e reenviar com a
+ * MESMA versão lida é seguro — se outra aba já salvou, o reenvio recebe o
+ * conflito. Então: descartar o token, renovar e repetir UMA vez (mesmo
+ * desenho da troca de empresa, T189).
  */
 export async function atualizarPerfilProprio(entrada: {
   readonly nomeExibicao: string | null;
   readonly perfilAtualizadoEmLido: string | null;
 }): Promise<SafeAccessUserApi> {
-  const token = await getCsrf();
-  const res = await apiFetch(`${USERS_ENDPOINT}/me`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": token,
-    },
-    body: JSON.stringify({
-      nomeExibicao: entrada.nomeExibicao,
-      perfilAtualizadoEmLido: entrada.perfilAtualizadoEmLido,
-    }),
+  const corpo = JSON.stringify({
+    nomeExibicao: entrada.nomeExibicao,
+    perfilAtualizadoEmLido: entrada.perfilAtualizadoEmLido,
   });
+  const enviar = async () =>
+    apiFetch(`${USERS_ENDPOINT}/me`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": await getCsrf(),
+      },
+      body: corpo,
+    });
+  let res = await enviar();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
   return jsonOrThrow(res);
 }
 
