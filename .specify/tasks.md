@@ -3372,8 +3372,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Entrega:** rota `#/configuracoes/meu-perfil` (e o atalho `#/configuracoes`) com Meu
         perfil somente leitura, só web, com os dados da sessão de `GET /v1/users/me`, sem chamada
         nova: e-mail de acesso, papel, empresa ativa e data de criação da conta, e um aviso de que
-        a edição ainda não está disponível. Configurações é item próprio do menu para quem tem o
-        shell e cartão do Hub para os demais papéis; navegação interna só com Meu perfil; o
+        a edição ainda não está disponível. Os nove papéis acessam Configurações pelo cartão no
+        Hub e, depois da entrada no shell, pelo item próprio do menu lateral; para financeiro,
+        colaborador, auditor, DPO e administração técnica, é o único cartão do Hub. Navegação interna só com Meu perfil; o
         rótulo "Perfil" do Hub passou a "Papel"; Segurança e Sessões ativas seguem na barra
         superior (seção 16).
       - **Achados do navegador, corrigidos (seção 17):** foco no título na recarga; item atual

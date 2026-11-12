@@ -3182,8 +3182,10 @@ resolvida no primeiro commit da T208.
 (seções 15 a 20):
 
 - decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas e conferidas sem alteração;
-- rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; item próprio do menu para quem
-  tem o shell e cartão do Hub para os demais papéis; papel desconhecido sem acesso;
+- rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; os nove papéis acessam pelo
+  cartão no Hub e, depois da entrada no shell, pelo item próprio do menu lateral; para
+  financeiro, colaborador, auditor, DPO e administração técnica, é o único cartão do Hub; papel
+  desconhecido sem acesso;
 - só leitura, só web, com os dados da sessão de `GET /v1/users/me` e sem chamada nova: e-mail de
   acesso, papel, empresa ativa e data de criação da conta; sem controle de edição;
 - rótulo "Perfil" do Hub trocado por "Papel"; Segurança e Sessões ativas sem mudança;

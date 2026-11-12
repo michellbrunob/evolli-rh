@@ -174,6 +174,9 @@ para aprovação.
 | `auditor`, `dpo` | Hub                                   | Não             | Não              | Pelo Hub                   |
 | `admin_tecnico`  | Hub (bootstrap)                       | Não             | Não              | Pelo Hub                   |
 
+A última coluna registra a proposta de preparação. O comportamento implementado está na seção
+16: os nove papéis têm o cartão no Hub e, depois da entrada no shell, o item no menu lateral.
+
 `GET /v1/users/me` não exige papel; `own_account` vale para todos. Quem não tem empresa ativa
 (`master_tecnico` em modo global) vê "nenhuma empresa ativa".
 
@@ -230,7 +233,8 @@ Cada um vira uma tarefa própria, só com ordem.
   ativa") e "conta criada em";
 - texto honesto de que a edição dos dados da conta ainda não está disponível, sem botão
   desabilitado nem campo falso;
-- entrada pelo menu lateral para quem tem shell e pelo Hub para os demais papéis (MP-3);
+- entrada pelo menu lateral para quem tem shell e pelo Hub para os demais papéis (MP-3; na
+  implementação, os nove papéis têm o cartão no Hub e o item no menu, seção 16);
 - sem leitura nova à API: usa o ator já carregado; a troca de empresa atualiza pela remontagem.
 
 ## 11. Acessibilidade, foco, guarda, troca de empresa, URL e 375 px
@@ -277,6 +281,11 @@ workflow, push, PR, promoção e merge; Segurança, Empresas e Equipe e permiss�
 As decisões MP-1 a MP-8 foram aprovadas em 2026-11-12 como recomendadas na seção 13, sem
 alternativa. A implementação seguiu esse recorte; nenhuma decisão nova foi tomada nela.
 
+Sobre a redação de MP-3: a decisão aprovada ("pelo menu quem tem shell; pelo Hub os demais")
+não muda. Como toda sessão passa pelo Hub antes do shell, salvo quando abre por uma rota
+conhecida na URL, a entrada fica assim para todos os papéis autenticados: o cartão no Hub e,
+depois da entrada no shell, o item no menu lateral (seção 16).
+
 ## 16. Implementação
 
 - **Rota:** `#/configuracoes/meu-perfil`, na tabela fechada de rotas do shell
@@ -285,7 +294,10 @@ alternativa. A implementação seguiu esse recorte; nenhuma decisão nova foi to
   rota.
 - **Quem acessa (MP-3):** o destino `configuracoes` entra na capacidade de todos os nove papéis
   conhecidos (`apps/web/src/app/mapaNavegacao.ts`); papel desconhecido continua sem destino
-  nenhum. Quem tem o shell vê o item no menu; os demais papéis, o cartão no Hub.
+  nenhum. Os nove papéis acessam Configurações pelo cartão no Hub; depois da entrada no shell,
+  o item Configurações também está no menu lateral. Para `financeiro`, `colaborador`,
+  `auditor`, `dpo` e `admin_tecnico`, Configurações é o único cartão do Hub; para `rh`, `dp`,
+  `master_tecnico` e `gestor`, aparece junto dos outros módulos.
 - **Menu (MP-2):** grupo próprio da conta, numa lista separada, abaixo dos módulos de trabalho e
   acima de Demonstração, com ícone próprio. No menu recolhido vira ícone do trilho com a dica;
   na gaveta do celular, escolher o item fecha a gaveta.
