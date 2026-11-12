@@ -3172,14 +3172,19 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (em implementação, entrega em PR Draft #201)
+## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
 
-| Tarefa | Estado                                                               | Resultado principal                                                |
-| ------ | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| T208   | **Em implementação** (entrega em PR Draft #201, validada localmente) | Configurações › Meu perfil, somente leitura, para todos os papéis. |
+| Tarefa | Estado                                                           | Resultado principal                                                                                 |
+| ------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação em levantamento. |
 
-**Entrega:** detalhada no [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md)
-(seções 15 a 20):
+**Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
+leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
+decisões MPA-1 a MPA-11, que aguardam aprovação, estão na seção 21 do
+[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); nada da ampliação foi
+implementado. A referência visual foi usada só como inspiração local e não é registrada.
+
+**Base existente:** detalhada no dossiê (seções 15 a 20):
 
 - decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas e conferidas sem alteração;
 - rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; os nove papéis acessam pelo
@@ -3199,7 +3204,8 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Pendente:** revisão da PR #201; Ready for review e merge só com ordem.
+**Pendente:** aprovação das decisões MPA-1 a MPA-11 e implementação da ampliação; revisão da
+PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
 Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker, dependências,

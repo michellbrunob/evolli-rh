@@ -1,10 +1,12 @@
 # T208 — Configurações: Meu Perfil (dossiê de preparação)
 
-- **Estado:** em implementação — entrega em PR Draft #201, validada localmente, com a validação
-  visual humana aprovada em 2026-11-12 (seção 20); sem Ready for review e sem merge. As
-  decisões MP-1 a MP-8 da seção 13 foram aprovadas (seção 15), seguem sem alteração e a primeira
-  fatia está descrita nas seções 16 a 20. Só web: nenhuma mudança de API, schema, migration, RBAC,
-  auditoria, seed, Docker, dependência, lockfile ou workflow.
+- **Estado:** em implementação, **ampliada antes do Ready por decisão de produto** (seção 21). A
+  entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
+  leitura das seções 16 a 20 (validado localmente, validação visual aprovada em 2026-11-12) é a
+  **base existente, não a entrega final**. A ampliação está em levantamento: as decisões MPA-1 a
+  MPA-11 (seção 21.8) aguardam aprovação, e nada dela foi implementado. As decisões MP-1 a MP-8
+  da seção 13 seguem sem alteração. Até aqui, só web: nenhuma mudança de API, schema, migration,
+  RBAC, auditoria, seed, Docker, dependência, lockfile ou workflow.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -390,3 +392,138 @@ Depois das correções, a validação confirmou:
 - **Contagens finais:** as da seção 18, refeitas no HEAD final da branch: web 133 arquivos,
   3725 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes,
   1017 testes; scripts 182 testes; 22 mutações, todas detectadas.
+
+## 21. Ampliação de Meu Perfil (levantamento, 2026-11-12)
+
+### 21.1 Decisão e estado
+
+- **Ampliação antes do Ready:** por decisão de produto, a T208 foi ampliada antes de ir para
+  revisão. Meu Perfil passa a mirar uma tela de perfil com dados de exibição, contato e formas de
+  entrada, e não só a consulta das seções 16 a 20.
+- **PR #201:** continua em Draft. Nada desta seção foi implementado; esta etapa é só levantamento
+  e proposta.
+- **Base existente:** o Meu Perfil somente leitura (rota, menu, Hub, quatro dados, foco, 375 px) é
+  a base sobre a qual a ampliação será construída. Não é a entrega final da T208.
+- **Referência visual:** a experiência proposta usou como inspiração apenas material visual
+  privado, consultado localmente. Ele não é registrado, descrito nem citado no repositório; tudo
+  aqui usa só identidade, componentes, textos e dados do Evolli.
+
+### 21.2 Experiência proposta (padrões do Evolli)
+
+- Cabeçalho com trilha "Configurações › Meu perfil", título e descrição; navegação interna à
+  esquerda, em grupos, só com itens que têm tela (regra das seções 4 e 16).
+- O painel de Meu Perfil em seções com título e descrição curta; dentro delas, linhas de rótulo
+  (com ajuda) à esquerda e valor ou campo à direita, separadas por divisores; uma coluna abaixo
+  de 720 px.
+- Rodapé de ações do painel com a data da última alteração do perfil e as ações de descartar e
+  salvar, ativas só com mudança pendente e integradas à guarda de saída (T200).
+- Campo indisponível não vira controle falso: ou fica fora da tela, ou aparece como texto que diz
+  por quê (regra de MP-1 mantida).
+
+### 21.3 Mapa de dados por domínio
+
+| Item                  | Domínio               | Existe hoje                                                                                                                 | Dado real hoje                              | Para exibir ou editar                                                                   |
+| --------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Nome de exibição      | Conta                 | Não: `AccessUser` não tem nome (`schema.prisma:57-70`)                                                                      | Não                                         | Coluna nova, migration, rota de edição, auditoria                                       |
+| Nome civil            | Colaborador           | `Colaborador.nome`, mantido pelo RH                                                                                         | Sim, só para `rh`, `dp`, `master`           | Vínculo conta↔colaborador (DP-23) e leitura de autoatendimento, hoje inexistente        |
+| Foto                  | Conta ou colaborador  | Não: não há storage nem upload no repositório (`documentos.module.ts:12-19`)                                                | Não                                         | Storage, validação de arquivo, retenção e LGPD; tarefa própria                          |
+| Cargo                 | Colaborador (lotação) | `AlocacaoOrganizacional.cargoId`, por empresa (`schema.prisma:1143-1188`)                                                   | Sim, mantido pelo RH                        | Leitura de autoatendimento pelo vínculo DP-23; nunca edição pela própria pessoa         |
+| Telefone              | Colaborador           | `ContatoColaborador.celular`/`telefone`, por empresa, com trilha LGPD (`schema.prisma:2134`)                                | Sim, mantido pelo RH                        | Na conta não existe; exigiria coluna e finalidade                                       |
+| E-mail de acesso      | Autenticação e conta  | `AccessUser.email`, único, identificador de login                                                                           | Sim (já exibido)                            | Troca exige verificação, unicidade, auditoria e sessões; nenhuma rota troca e-mail hoje |
+| Confirmação de e-mail | Autenticação          | Não: sem registro de verificação; o envio usa `NoopEmailNotifier`, que não envia nada (`noop-email-notifier.service.ts:12`) | Não                                         | Provedor de e-mail, token de verificação, estado na conta                               |
+| Data de alteração     | Conta                 | `AccessUser.updatedAt`, que muda também com senha, papel e desativação (`@updatedAt`)                                       | Não serve como alteração do perfil          | Coluna própria (`perfil_atualizado_em`)                                                 |
+| Senha                 | Autenticação          | Só recuperação pública (`auth.controller.ts:284-301`); política de 15 caracteres no mínimo (`password-policy.service.ts:7`) | Sim (só o hash)                             | Rota autenticada de troca, com senha atual, revogação de sessões e auditoria nova       |
+| Google                | Autenticação          | Não: só a interface prevista para OIDC/SSO futuro (`credential-verifier.interface.ts:11`)                                   | Não                                         | Integração OIDC completa; tarefa própria                                                |
+| Segundo fator (TOTP)  | Autenticação          | Cadastro e confirmação (`mfa.controller.ts:48-76`); `AccessMfaTotp` com estado por conta (`schema.prisma:282`)              | No banco; o contrato só traz `mfaAvailable` | Contrato de estado por conta e desligamento próprio                                     |
+| Sessões               | Autenticação          | `GET`/`DELETE /v1/auth/sessions` (`auth.controller.ts:161-232`); painel da barra superior                                   | Sim                                         | Só mudança de lugar (Segurança)                                                         |
+| Papel                 | Conta                 | `AccessUser.role`; ninguém altera o próprio (`rbac.evaluator.ts:190-194`)                                                   | Sim (já exibido)                            | Nunca editável aqui                                                                     |
+| Empresa ativa         | Sessão e empresa      | `AccessSession.empresaAtivaId`; troca da T189                                                                               | Sim (já exibida)                            | A troca segue no seletor                                                                |
+
+### 21.4 Restrições transversais
+
+- **Privacidade e LGPD:** nome de exibição, foto e telefone são dados pessoais. Coletar exige
+  finalidade clara e necessidade (minimização); a conta hoje guarda só o e-mail. Telefone e
+  cargo já existem no colaborador, sob regras e trilha do RH; copiá-los para a conta criaria duas
+  fontes do mesmo dado.
+- **Auditoria:** a trilha é só acréscimo e sem conteúdo antes/depois (`schema.prisma:594-641`).
+  `AuditAction` tem senha, sessões e 2º fator, mas **não tem** evento de edição do próprio
+  perfil; edição nova exige valor novo no enum (migration).
+- **Confirmação de e-mail:** impossível hoje: não há provedor de e-mail integrado (a recuperação
+  de senha gera o token, mas o e-mail não sai). Nenhuma tela pode afirmar que o e-mail foi
+  confirmado.
+- **Upload de foto:** bloqueado por construção no repositório (Documentos é só metadado, ADR
+  0011); exige storage, tipo e tamanho validados, retenção e exclusão.
+- **Alteração de senha:** não há rota autenticada nem reautenticação em uso (`reauthenticatedAt`
+  só é gravado ao criar a sessão, `session.service.ts:81`). A redefinição pública já revoga todas
+  as sessões e audita (`auth.service.ts:335`); a troca logada deve seguir o mesmo padrão.
+- **RBAC:** `own_account` já permite `read` e `manage` só sobre a própria conta
+  (`rbac.evaluator.ts:73-85`), mas nenhuma rota usa `manage`. Papel, e-mail, empresa e situação
+  não podem ser alterados pela própria pessoa.
+- **Isolamento por empresa:** a conta é global à pessoa, não por empresa; colaborador, cargo e
+  contatos são por empresa. Dado da conta não pode trazer dado de colaborador de outra empresa,
+  e a listagem administrativa (`GET /v1/users`) não deve ganhar dados de perfil sem decisão.
+- **Sessões:** a edição de dados de exibição não precisa revogar sessões; troca de senha e de
+  e-mail precisam.
+
+### 21.5 O que existe, o que exige contrato novo e o que fica indisponível
+
+- **Com dados reais hoje, sem contrato novo:** e-mail de acesso, papel, empresa ativa e data de
+  criação da conta (a base atual); sessões e cadastro do 2º fator, nos painéis atuais.
+- **Exige contrato novo (API, schema, migration, auditoria):** nome de exibição; data da última
+  alteração do perfil; estado do 2º fator por conta; troca de senha logada; leitura do cargo ou
+  do nome civil pelo vínculo DP-23.
+- **Indisponível até integração externa ou decisão própria:** foto (storage); confirmação e troca
+  de e-mail (provedor de e-mail); entrada com Google (OIDC); telefone na conta (sem finalidade).
+
+### 21.6 Primeira fatia funcional proposta
+
+**Meu Perfil com nome de exibição editável**, sobre a base atual:
+
+- **API:** migration que acrescenta a `access_user` duas colunas opcionais, `nome_exibicao` e
+  `perfil_atualizado_em`, e um valor novo em `AuditAction` para a edição do próprio perfil;
+  `PATCH /v1/users/me` com `own_account`/`manage`, alvo sempre a conta da sessão, lista fechada
+  de campos (só o nome de exibição), validação (aparar espaços, 2 a 80 caracteres, vazio limpa o
+  nome) e concorrência otimista pela data da última alteração (409 em conflito);
+  `GET /v1/users/me` passa a devolver o nome de exibição e a data da última alteração; a
+  listagem administrativa não muda.
+- **Web:** a tela reorganizada nas seções da 21.2 (dados de exibição, contato de acesso e formas
+  de entrada), com o nome de exibição editável, iniciais no lugar da foto, e-mail só leitura,
+  papel, empresa ativa e criação; rodapé com a última alteração e as ações de descartar e
+  salvar; guarda de saída, foco, erros por campo e 375 px.
+- **Testes:** unitários (DTO, avaliador e serviço: só a própria conta, campos fora da lista
+  recusados, conflito); E2E com PostgreSQL real para todos os papéis (edita a própria conta; não
+  altera papel, e-mail, empresa ou situação; CSRF; conta inativa; auditoria gravada sem
+  conteúdo; conflito); smoke da migration; web com todos os papéis, guarda de saída, conflito e
+  375 px; mutações dos pontos novos.
+
+### 21.7 Verificações necessárias para a fatia
+
+Bateria completa (web, API unitária, E2E serial com PostgreSQL, scripts), smoke da migration em
+banco vazio, mutações dos pontos novos, validação no navegador com dados sintéticos para papéis
+com e sem empresa ativa, e revisão de privacidade (o nome de exibição não aparece na listagem
+administrativa nem em log).
+
+### 21.8 Decisões para aprovação
+
+| Id     | Tema                               | Recomendação                                                                                                                                                                                                                        | Alternativa                                                                   |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| MPA-1  | Nome de exibição                   | Campo próprio da conta, opcional, 2 a 80 caracteres, editável pela própria pessoa; sem nome, a tela usa o e-mail                                                                                                                    | Nome civil do colaborador vinculado, só leitura (não cobre conta sem vínculo) |
+| MPA-2  | Foto                               | Indisponível: iniciais do nome de exibição (ou do e-mail), sem botão de envio                                                                                                                                                       | Upload em tarefa própria, com storage e política de retenção                  |
+| MPA-3  | Cargo                              | Fora de Meu Perfil: é dado da lotação, mantido pelo RH e por empresa                                                                                                                                                                | Exibir só leitura o cargo do vínculo DP-23 na empresa ativa (contrato novo)   |
+| MPA-4  | Telefone                           | Fora: a conta não tem telefone nem finalidade para ele; o contato do colaborador segue com o RH                                                                                                                                     | Coluna de telefone na conta, com finalidade definida                          |
+| MPA-5  | E-mail e confirmação               | Só leitura, sem selo de confirmação; texto dizendo que a troca é feita pela administração                                                                                                                                           | Troca com verificação por e-mail, depois de integrar um provedor              |
+| MPA-6  | Senha                              | Em Segurança, tarefa própria: troca logada com senha atual, política vigente, revogação das outras sessões e auditoria nova                                                                                                         | Troca logada já na T208                                                       |
+| MPA-7  | Google                             | Indisponível e não exibido (sem OIDC)                                                                                                                                                                                               | Linha informativa de indisponibilidade                                        |
+| MPA-8  | Segundo fator                      | Continua no painel atual; estado por conta e desligamento próprio vão para Segurança                                                                                                                                                | Mostrar o estado em Meu Perfil (contrato novo)                                |
+| MPA-9  | Sessões                            | Continuam no painel atual; vão para Segurança na tarefa própria                                                                                                                                                                     | Mover já na T208                                                              |
+| MPA-10 | Permissões, auditoria e isolamento | `PATCH /v1/users/me` com `own_account`/`manage`, sem id na URL, lista fechada de campos, concorrência otimista, evento de auditoria novo sem conteúdo; nome de exibição global da conta e fora da listagem administrativa           | Expor o nome de exibição também em Contas de acesso                           |
+| MPA-11 | Meu Perfil × Segurança             | Meu Perfil: dados de exibição e da conta (nome, iniciais, e-mail, papel, empresa, datas) e, em formas de entrada, só o texto "e-mail e senha". Segurança (senha, 2º fator, sessões): submódulo próprio, no menu interno só com tela | Formas de entrada inteiras só em Segurança                                    |
+
+Aprovadas, as decisões levam a fatia da 21.6 para dentro da T208, que passa a incluir API,
+schema, migration, RBAC (uso de `own_account`/`manage`) e auditoria; sem a aprovação, nada disso
+começa.
+
+### 21.9 Fora de escopo desta etapa
+
+Implementação de qualquer item da 21.6; produto, API, schema, migration, RBAC, banco, seed,
+Docker, dependências, lockfile e workflows; Ready for review e merge.

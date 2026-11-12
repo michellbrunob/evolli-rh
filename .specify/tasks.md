@@ -3362,8 +3362,17 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         do squash e `git diff --check` verdes.
 
 105.  **T208 - Configurações: Meu Perfil**
-      - **Estado:** **em implementação — entrega em PR Draft #201**, validada localmente, com a
-        validação visual humana aprovada em 2026-11-12; sem Ready for review e sem merge.
+      - **Estado:** **em implementação, ampliada antes do Ready por decisão de produto**; a
+        entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
+        leitura abaixo (validado localmente, validação visual aprovada em 2026-11-12) é a base
+        existente, não a entrega final.
+      - **Ampliação (seção 21 do dossiê, em levantamento):** mapa de nome de exibição, foto,
+        cargo, telefone, e-mail e confirmação, data de alteração, senha, Google, segundo fator e
+        sessões por domínio (conta, colaborador, empresa e autenticação), com privacidade, LGPD,
+        auditoria, RBAC, isolamento por empresa e sessões; primeira fatia proposta (nome de
+        exibição editável, com API, migration e auditoria) e decisões MPA-1 a MPA-11 aguardando
+        aprovação. Nada da ampliação foi implementado. A referência visual foi usada só como
+        inspiração local e não é registrada.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
