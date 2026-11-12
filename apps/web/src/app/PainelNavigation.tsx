@@ -323,7 +323,12 @@ export function PainelNavigation({
     />
   );
 
-  const principais = grupos.filter(({ grupo }) => !grupo.secundario);
+  const principais = grupos.filter(
+    ({ grupo }) => !grupo.secundario && !grupo.daConta,
+  );
+  // T208 — a própria conta (Configurações): lista própria, separada dos
+  // módulos de trabalho, antes de Demonstração.
+  const daConta = grupos.filter(({ grupo }) => grupo.daConta);
   const secundarios = grupos.filter(({ grupo }) => grupo.secundario);
 
   return (
@@ -333,6 +338,12 @@ export function PainelNavigation({
       aria-label="Navegação do painel"
     >
       <ul className="painel-nav__modulos">{principais.map(renderizar)}</ul>
+
+      {daConta.length > 0 ? (
+        <ul className="painel-nav__modulos painel-nav__modulos--conta">
+          {daConta.map(renderizar)}
+        </ul>
+      ) : null}
 
       {secundarios.length > 0 ? (
         <ul className="painel-nav__modulos painel-nav__modulos--secundario">

@@ -128,6 +128,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Minha equipe",
         "Administração da liderança",
         "Contas de acesso",
+        "Configurações",
       ],
     ],
     // T182 — o DP consulta as jornadas e, sem a aba Horários, a aba padrão
@@ -142,6 +143,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Jornadas de trabalho",
         "Jornada",
         "Contas de acesso",
+        "Configurações",
       ],
     ],
     [
@@ -153,14 +155,17 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Jornadas de trabalho",
         "Jornada",
         "Contas de acesso",
+        "Configurações",
       ],
     ],
-    ["gestor", ["Minha equipe"]],
-    ["financeiro", []],
-    ["colaborador", []],
-    ["auditor", []],
-    ["dpo", []],
-    ["admin_tecnico", []],
+    // T208 — Configurações (Meu perfil) é de toda conta: `own_account` vale
+    // para qualquer papel, e a tela só mostra o que `/users/me` já trouxe.
+    ["gestor", ["Minha equipe", "Configurações"]],
+    ["financeiro", ["Configurações"]],
+    ["colaborador", ["Configurações"]],
+    ["auditor", ["Configurações"]],
+    ["dpo", ["Configurações"]],
+    ["admin_tecnico", ["Configurações"]],
   ];
 
   it.each(ESPERADO)(
@@ -171,14 +176,47 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     },
   );
 
-  it("papel sem capacidade funcional vê o aviso, e nenhum cartão", async () => {
-    montar({ papel: "colaborador", podeTrocarEmpresa: false });
+  it("papel desconhecido não recebe nada: vê o aviso, e nenhum cartão", async () => {
+    montar({ papel: "papel_desconhecido", podeTrocarEmpresa: false });
     expect(
-      await screen.findByText(
-        /Nenhum produto está liberado para o seu perfil/i,
-      ),
+      await screen.findByText(/Nenhum produto está liberado para o seu papel/i),
     ).toBeInTheDocument();
     expect(cartoesVisiveis()).toEqual([]);
+  });
+
+  it("T208 — quem chega pelo Hub abre Configurações pelo cartão, que diz o que mostra", async () => {
+    const abrir = vi.fn();
+    montar({
+      papel: "colaborador",
+      podeTrocarEmpresa: false,
+      onAbrirDestino: abrir,
+    });
+    await waitFor(() => expect(cartoesVisiveis()).toEqual(["Configurações"]));
+    const cartao = screen
+      .getAllByRole("button")
+      .find((b) => b.classList.contains("hub__cartao"))!;
+    expect(cartao.querySelector(".hub__cartao-descricao")).toHaveTextContent(
+      /Meu perfil: o e-mail de acesso, o papel, a empresa ativa e a data de criação da sua conta\. Somente consulta\./,
+    );
+    fireEvent.click(cartao);
+    expect(abrir).toHaveBeenCalledWith("configuracoes");
+    expect(
+      screen.queryByText(/Nenhum produto está liberado/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("T208 (MP-8) — o contexto da sessão diz Papel, não Perfil", async () => {
+    montar({ papel: "dp", podeTrocarEmpresa: false });
+    await screen.findByText("Empresa B");
+    const contexto = document.querySelector(".hub__contexto")!;
+    const rotulos = [...contexto.querySelectorAll("dt")].map(
+      (dt) => dt.textContent,
+    );
+    expect(rotulos).toContain("Papel");
+    expect(rotulos).not.toContain("Perfil");
+    expect(
+      screen.getByText(/não está liberado para o seu papel/i),
+    ).toBeInTheDocument();
   });
 
   it("nenhum papel recebe cartão de destino demonstrativo", () => {
@@ -464,7 +502,7 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(9));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(10));
     for (const destino of capacidadeFuncionalDe("rh")) {
       // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(

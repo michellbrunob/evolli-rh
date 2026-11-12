@@ -88,6 +88,11 @@ import {
   JORNADAS_TRABALHO_TITULO_ID,
   JornadasTrabalhoScreen,
 } from "../screens/horarios";
+import {
+  CONFIGURACOES_TITULO_ID,
+  MeuPerfilScreen,
+  type ContaDoMeuPerfil,
+} from "../screens/configuracoes/MeuPerfilScreen";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import {
   DASHBOARD_TITULO_ID,
@@ -258,6 +263,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
+  configuracoes: CONFIGURACOES_TITULO_ID,
 };
 
 /**
@@ -443,7 +449,12 @@ function conteudoDoDestino(
     readonly onTrocarVista?:
       ((bloco: BlocoComVista, vista: VistaDoBloco) => void) | undefined;
   },
+  // T208 — a conta da sessão, para Configurações › Meu perfil (só leitura).
+  contaDoAtor: ContaDoMeuPerfil | null,
 ) {
+  if (destinoId === "configuracoes") {
+    return <MeuPerfilScreen conta={contaDoAtor} />;
+  }
   if (destinoId === "dashboard") {
     return (
       <DashboardScreen
@@ -735,6 +746,13 @@ export interface AppProps {
     bloco: BlocoComVista,
     vista: VistaDoBloco,
   ) => void;
+  /**
+   * T208 — a conta da sessão (e-mail, papel, empresa ativa e criação), para
+   * Configurações › Meu perfil. Desce do `AutenticacaoApp`, que já leu
+   * `GET /v1/users/me`: a tela não faz leitura própria. Ausente (testes que
+   * montam `App` sozinho), a tela mostra "—".
+   */
+  contaDoAtor?: ContaDoMeuPerfil | null;
 }
 
 export function App({
@@ -753,6 +771,7 @@ export function App({
   onMenuRecolhidoChange,
   vistasDoDashboard,
   onVistaDoDashboardChange,
+  contaDoAtor = null,
 }: AppProps = {}) {
   // Inicialização SÍNCRONA com o papel já resolvido. O `AutenticacaoApp` só
   // monta este componente depois de `GET /v1/users/me` concluir com sucesso,
@@ -1877,6 +1896,7 @@ export function App({
                 vistas: vistasDoDashboard,
                 onTrocarVista: onVistaDoDashboardChange,
               },
+              contaDoAtor,
             )}
           </main>
 

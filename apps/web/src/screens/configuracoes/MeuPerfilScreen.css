@@ -1,0 +1,128 @@
+/**
+ * T208 — Configurações › Meu perfil. Só tokens já existentes (`tokens.css`):
+ * sem novo hexadecimal, sem sombra, sem gradiente e sem a paleta do
+ * Dashboard. Duas colunas (navegação interna e painel) a partir de 720 px;
+ * abaixo disso, uma coluna só, sem rolagem horizontal a 375 px.
+ */
+
+.configuracoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.configuracoes > * {
+  min-width: 0;
+}
+
+.configuracoes__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (min-width: 720px) {
+  .configuracoes__corpo {
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  }
+}
+
+.configuracoes__navegacao {
+  min-width: 0;
+}
+
+.configuracoes__grupo {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.configuracoes__itens {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Alvo de 44 px; o item atual não depende só de cor: peso, superfície e
+   `aria-current="page"`. */
+.configuracoes__item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  text-decoration: none;
+}
+
+.configuracoes__item--atual {
+  background: var(--surface-neutral);
+  font-weight: var(--weight-strong);
+}
+
+.configuracoes__item:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.configuracoes__painel {
+  min-width: 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.configuracoes__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__texto {
+  margin: var(--space-xs) 0 var(--space-md);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__dados {
+  display: grid;
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.configuracoes__dado {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.configuracoes__dado dt {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+/* E-mail e nome de empresa longos quebram dentro da caixa. */
+.configuracoes__dado dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.configuracoes__aviso {
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}

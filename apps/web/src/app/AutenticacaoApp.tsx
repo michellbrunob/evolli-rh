@@ -683,6 +683,14 @@ export function AutenticacaoApp() {
         empresaAtiva={ator.empresaAtiva ?? null}
         // T189 — e o seletor do menu lateral, com o mesmo poder de troca.
         podeTrocarEmpresa={podeTrocarEmpresa}
+        // T208 — Configurações › Meu perfil: só os campos que a tela exibe,
+        // do mesmo ator (nenhuma leitura nova).
+        contaDoAtor={{
+          email: ator.email,
+          role: ator.role,
+          createdAt: ator.createdAt,
+          empresaAtiva: ator.empresaAtiva ?? null,
+        }}
         onEmpresaTrocada={aoTrocarEmpresa}
         onDestinoAlterado={(destinoId) => {
           destinoExibidoRef.current = destinoId;

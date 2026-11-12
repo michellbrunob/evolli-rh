@@ -77,6 +77,13 @@ export interface GrupoNavegacao {
    */
   readonly secundario?: boolean;
   /**
+   * T208 — grupo da própria conta (Configurações): vai numa lista própria,
+   * depois dos módulos de trabalho e antes de Demonstração, separado deles. É
+   * funcional — mostra dados reais da conta —, mas não é um módulo de
+   * trabalho: é onde a pessoa vê a própria conta.
+   */
+  readonly daConta?: boolean;
+  /**
    * T178 — mostra o cabeçalho do módulo mesmo com um único item na barra.
    *
    * A regra geral (`PainelNavigation`) funde módulo e destino quando há um só
@@ -327,7 +334,23 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
       },
       // Auditoria NÃO entra aqui. A API existe (`GET /v1/audit`), mas não há
       // tela — e um item de menu sem tela é exatamente a promessa vazia que
-      // esta tarefa existe para eliminar. Configurações idem: não há tela.
+      // esta tarefa existe para eliminar.
+    ],
+  },
+  {
+    // T208 — Configurações: a própria conta. Por ora, um só submódulo com
+    // tela (Meu perfil, só leitura, com o que `GET /v1/users/me` já trouxe).
+    // Segurança, Empresas e Equipe e permissões não aparecem até existirem.
+    titulo: "Configurações",
+    icone: "configuracoes",
+    daConta: true,
+    destinos: [
+      {
+        id: "configuracoes",
+        label: "Configurações",
+        subRotulo: "Meu perfil",
+        estado: "funcional",
+      },
     ],
   },
   {
@@ -527,6 +550,7 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
  * | `contas-acesso`           | `other_account` read    | `rh`, `dp`, `master_tecnico`     |
+ * | `configuracoes` (T208)    | `own_account` read      | todos os papéis                  |
  *
  * Os dois casos que surpreendem, e por isso valem dito:
  *
@@ -546,8 +570,13 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * **Papel ausente da tabela recebe lista vazia** — negação por padrão, igual ao
  * avaliador. `financeiro` lê `centro_custo`, que é aba de Estrutura mas não a
  * padrão; `colaborador`, `auditor`, `dpo` e `admin_tecnico` não têm capacidade
- * funcional nenhuma hoje. Para todos eles o Hub diz isso, em vez de inventar um
- * produto.
+ * funcional de trabalho nenhuma hoje.
+ *
+ * **T208 — Configurações é de toda conta.** `own_account` (ler a própria conta)
+ * vale para qualquer papel no avaliador, e Meu perfil não faz requisição
+ * própria: mostra o que `GET /v1/users/me` já trouxe na sessão. Por isso todo
+ * papel conhecido recebe `configuracoes` — pelo menu, quem tem shell; pelo Hub,
+ * os demais. Papel desconhecido continua sem nada.
  *
  * **Continua não sendo autorização.** O servidor decide cada requisição; esta
  * tabela só evita oferecer o que ele recusaria.
@@ -565,6 +594,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "equipe",
     "administracao-lideranca",
     "contas-acesso",
+    "configuracoes",
   ],
   dp: [
     "dashboard",
@@ -574,6 +604,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "jornadas-trabalho",
     "ponto",
     "contas-acesso",
+    "configuracoes",
   ],
   master_tecnico: [
     "dashboard",
@@ -582,8 +613,14 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "jornadas-trabalho",
     "ponto",
     "contas-acesso",
+    "configuracoes",
   ],
-  gestor: ["equipe"],
+  gestor: ["equipe", "configuracoes"],
+  financeiro: ["configuracoes"],
+  colaborador: ["configuracoes"],
+  auditor: ["configuracoes"],
+  dpo: ["configuracoes"],
+  admin_tecnico: ["configuracoes"],
 };
 
 /**

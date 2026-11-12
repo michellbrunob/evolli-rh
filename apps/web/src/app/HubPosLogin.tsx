@@ -125,6 +125,9 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   "administracao-lideranca":
     "Atribuição de gestores a equipes, com vigência e histórico.",
   "contas-acesso": "Contas de acesso, papéis e redefinição de segundo fator.",
+  // T208 — só o que Meu perfil mostra hoje, sem edição.
+  configuracoes:
+    "Meu perfil: o e-mail de acesso, o papel, a empresa ativa e a data de criação da sua conta. Somente consulta.",
 };
 
 /** Ícone do grupo a que o destino pertence — mesma identidade da barra lateral. */
@@ -228,7 +231,7 @@ export function HubPosLogin({
           </h1>
           <p className="hub__intro">
             Estes são os produtos que o seu acesso abre hoje. O que não aparece
-            aqui não está liberado para o seu perfil.
+            aqui não está liberado para o seu papel.
           </p>
 
           <ContextoDaSessao
@@ -246,7 +249,7 @@ export function HubPosLogin({
             </h2>
             {produtos.length === 0 ? (
               <p className="hub__vazio">
-                Nenhum produto está liberado para o seu perfil no momento. Se
+                Nenhum produto está liberado para o seu papel no momento. Se
                 você precisa de acesso a algum módulo, fale com quem administra
                 o Evolli RH na sua empresa.
               </p>
@@ -304,7 +307,9 @@ interface ContextoDaSessaoProps {
 /**
  * O contexto da sessão.
  *
- * `Conta` e `Perfil` são texto, porque nada neles é editável. `Empresa` é o
+ * `Conta` e `Papel` são texto, porque nada neles é editável. T208 — o
+ * rótulo era "Perfil"; virou "Papel" (MP-8) para não colidir com
+ * Configurações › Meu perfil. `Empresa` é o
  * `SeletorEmpresaAtiva` (T189) — o MESMO componente do topo do menu lateral:
  * só leitura para quem não troca ou tem uma empresa só; lista das
  * autorizadas, com a atual marcada, para quem o servidor deixa trocar.
@@ -324,7 +329,7 @@ function ContextoDaSessao({
         <dd>{email}</dd>
       </div>
       <div className="hub__contexto-item">
-        <dt>Perfil</dt>
+        <dt>Papel</dt>
         <dd>{rotuloDoPapel}</dd>
       </div>
       <div className="hub__contexto-item hub__contexto-item--empresa">

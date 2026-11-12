@@ -47,7 +47,16 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "nova-admissao": "#/pessoas/nova-admissao",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
+  // T208 — Configurações abre no único submódulo com tela: Meu perfil.
+  configuracoes: "#/configuracoes/meu-perfil",
 };
+
+/**
+ * T208 — `#/configuracoes` sozinho leva ao único submódulo com tela (Meu
+ * perfil); a primeira exibição escreve a forma canônica no lugar. Outro
+ * caminho (`#/configuracoes/seguranca`) não é rota: não há tela atrás dele.
+ */
+const ROTA_DO_MODULO_CONFIGURACOES = "#/configuracoes";
 
 /** O fragmento da URL do destino, ou `null` se ele não tem rota própria. */
 export function rotaDoDestino(destinoId: string): string | null {
@@ -413,6 +422,7 @@ export function rotaDoDashboard(
  */
 export function destinoDaRota(fragmento: string): string | null {
   if (dashboardDaRota(fragmento) !== null) return "dashboard";
+  if (fragmento === ROTA_DO_MODULO_CONFIGURACOES) return "configuracoes";
   if (fichaDaRota(fragmento) !== null) return "pessoas";
   if (listagemDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(
