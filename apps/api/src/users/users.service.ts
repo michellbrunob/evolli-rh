@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { AccessRole, AccessUser, Prisma } from "@prisma/client";
@@ -219,6 +220,115 @@ export class UsersService {
     });
   }
 
+  /**
+   * T208 — a própria pessoa grava (envia ou substitui) a própria foto (ADR
+   * 0018). `foto` já é a imagem REGRAVADA pelo servidor; o arquivo enviado
+   * nunca chega aqui. A gravação entra na versão do perfil: versão
+   * desatualizada responde 409 e nada é sobrescrito. Auditoria na mesma
+   * transação, sem nenhum dado da imagem.
+   */
+  async gravarFotoPropria(
+    foto: Buffer,
+    perfilAtualizadoEmLido: Date | null,
+    auditCtx: AuditActorContext,
+  ): Promise<{ perfilAtualizadoEm: Date }> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const versao = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: perfilAtualizadoEmLido,
+        },
+        data: { perfilAtualizadoEm: agora },
+      });
+      if (versao.count !== 1) throw new ConflictException();
+
+      await tx.accessUserFoto.upsert({
+        where: { userId: auditCtx.actor.id },
+        create: { userId: auditCtx.actor.id, conteudo: foto, gravadaEm: agora },
+        update: { conteudo: foto, gravadaEm: agora },
+      });
+
+      await this.auditService.record(
+        this.eventoDaConta(auditCtx, "conta_foto_enviada", auditCtx.actor.id),
+        tx,
+      );
+      return { perfilAtualizadoEm: agora };
+    });
+  }
+
+  /**
+   * T208 — a própria pessoa remove a própria foto: os bytes são apagados na
+   * hora (sem lixeira). Versão desatualizada responde 409; sem foto, 404 — e
+   * a versão não muda (a transação é desfeita).
+   */
+  async removerFotoPropria(
+    perfilAtualizadoEmLido: Date | null,
+    auditCtx: AuditActorContext,
+  ): Promise<{ perfilAtualizadoEm: Date }> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const versao = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: perfilAtualizadoEmLido,
+        },
+        data: { perfilAtualizadoEm: agora },
+      });
+      if (versao.count !== 1) throw new ConflictException();
+
+      const removidas = await tx.accessUserFoto.deleteMany({
+        where: { userId: auditCtx.actor.id },
+      });
+      if (removidas.count === 0) throw new NotFoundException();
+
+      await this.auditService.record(
+        this.eventoDaConta(auditCtx, "conta_foto_removida", auditCtx.actor.id),
+        tx,
+      );
+      return { perfilAtualizadoEm: agora };
+    });
+  }
+
+  /** T208 — os bytes da própria foto, ou `null` se não houver. */
+  async lerFotoPropria(userId: string): Promise<Buffer | null> {
+    const foto = await this.prisma.accessUserFoto.findUnique({
+      where: { userId },
+      select: { conteudo: true },
+    });
+    return foto === null ? null : Buffer.from(foto.conteudo);
+  }
+
+  /** T208 — a versão da foto (instante da gravação), sem ler os bytes. */
+  async versaoDaFotoPropria(userId: string): Promise<Date | null> {
+    const foto = await this.prisma.accessUserFoto.findUnique({
+      where: { userId },
+      select: { gravadaEm: true },
+    });
+    return foto?.gravadaEm ?? null;
+  }
+
+  /** Evento de auditoria de ação sobre uma conta, sem conteúdo. */
+  private eventoDaConta(
+    auditCtx: AuditActorContext,
+    action: "conta_foto_enviada" | "conta_foto_removida",
+    resourceId: string,
+  ) {
+    return {
+      actorType: "user" as const,
+      actorUserId: auditCtx.actor.id,
+      actorRole: auditCtx.actor.role,
+      companyId: auditCtx.actor.companyId,
+      action,
+      resource: "access_user" as const,
+      resourceId,
+      ip: auditCtx.metadata.ip,
+      userAgent: auditCtx.metadata.userAgent,
+      result: "success" as const,
+      requestId: auditCtx.metadata.requestId,
+    };
+  }
+
   async disable(
     targetUserId: string,
     auditCtx: AuditActorContext,
@@ -231,6 +341,18 @@ export class UsersService {
         where: { id: targetUserId },
         data: { status: "disabled" },
       });
+
+      // T208 (ADR 0018, FP-4) — desativar a conta apaga a foto na mesma
+      // transação; o evento de remoção sai só se havia foto.
+      const fotosRemovidas = await tx.accessUserFoto.deleteMany({
+        where: { userId: targetUserId },
+      });
+      if (fotosRemovidas.count > 0) {
+        await this.auditService.record(
+          this.eventoDaConta(auditCtx, "conta_foto_removida", targetUserId),
+          tx,
+        );
+      }
 
       await this.auditService.record(
         {
