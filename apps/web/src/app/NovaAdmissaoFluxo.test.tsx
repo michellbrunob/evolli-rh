@@ -286,16 +286,16 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
       }),
     );
   }
-  // T195 — quatro etapas: "Continuar" até a revisão. Nela, "Confirmar
+  // T195 — quatro etapas: "Próxima etapa" até a revisão. Nela, "Confirmar
   // admissão" só valida e abre a confirmação (T179); quem grava é
   // "Confirmar cadastro".
-  for (const etapa of ["Dados básicos", "Dados profissionais", "Endereço"]) {
+  for (const etapa of ["Dados pessoais", "Dados profissionais", "Endereço"]) {
     expect(
       screen.getByRole("heading", { level: 2, name: new RegExp(etapa) }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
   }
-  fireEvent.click(screen.getByRole("button", { name: "Confirmar admissão" }));
+  fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
   const confirmacao = await screen.findByRole("dialog", {
     name: "Confirmar cadastro de colaborador?",
   });
@@ -694,6 +694,52 @@ describe("T176/T178 — Nova admissão: rota, voltar e cancelar", () => {
   });
 });
 
+describe("T209 — assistente da Nova admissão no App (permissões e voltar)", () => {
+  it.each(["rh", "dp"])(
+    "%s vê o assistente: cabeçalho com voltar, etapas, rodapé com progresso e ações",
+    async (papel) => {
+      render(<App papelDoAtor={papel} />);
+      await abrirNovaAdmissaoPelaListagem();
+      expect(
+        screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("navigation", { name: "Etapas do cadastro" }),
+      ).toBeInTheDocument();
+      const rodape = document.querySelector<HTMLElement>(
+        ".nova-admissao__rodape",
+      )!;
+      expect(rodape).toHaveTextContent("Etapa 1 de 4 · 25%");
+      expect(
+        within(rodape).getByRole("button", { name: "Próxima etapa" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("'Voltar para Colaboradores' sem dados volta à listagem, na rota dela", async () => {
+    render(<App papelDoAtor="rh" />);
+    await abrirNovaAdmissaoPelaListagem();
+    await screen.findByText("Empresa Sintética (teste)");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(ROTA_COLABORADORES);
+  });
+
+  it("master_tecnico pela URL não vê o assistente", async () => {
+    window.location.hash = ROTA;
+    render(<App papelDoAtor="master_tecnico" />);
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(
+      screen.queryByRole("button", { name: "Voltar para Colaboradores" }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".nova-admissao__rodape")).toBeNull();
+  });
+});
+
 describe("T176 — rota recusada para quem não admite", () => {
   /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
   const SEM_ACESSO = [
@@ -972,12 +1018,12 @@ describe("T179 — empresa sem referências, pelo papel que o shell conhece", ()
       fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
         target: { value: "1990-05-20" },
       });
-      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+      fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
       // T180 — o "+" do cadastro rápido é só do RH.
       expect(
         screen.queryByRole("button", { name: "Cadastrar novo cargo" }) !== null,
       ).toBe(comMais);
-      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+      fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
       await waitFor(() => expect(aviso).toHaveFocus());
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(admitirColaborador).not.toHaveBeenCalled();

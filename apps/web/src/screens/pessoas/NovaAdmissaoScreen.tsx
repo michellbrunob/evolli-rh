@@ -72,8 +72,8 @@
  *
  * ## T195 — quatro etapas
  *
- * A página é um fluxo guiado (fatia 2 do dossiê da T194): **Dados básicos**
- * (dados pessoais e contatos), **Dados profissionais e lotação** (vínculo,
+ * A página é um fluxo guiado (fatia 2 do dossiê da T194): **Dados pessoais**
+ * (dados pessoais e contatos), **Dados profissionais e vínculo** (vínculo,
  * lotação e, para o RH, jornada), **Endereço** e **Revisão e conclusão**. Os
  * campos, as regras, as máscaras e o contrato são os de sempre; só a
  * disposição mudou.
@@ -81,14 +81,14 @@
  * - Os quatro painéis ficam montados e só o da etapa atual aparece (`hidden`):
  *   "Voltar", o indicador e "Editar" nunca perdem nada, nem o estado interno
  *   das máscaras e do CEP.
- * - "Continuar" (ou Enter) valida SÓ a etapa atual; com erro, a etapa fica e
+ * - "Próxima etapa" (ou Enter) valida SÓ a etapa atual; com erro, a etapa fica e
  *   o foco vai ao primeiro campo inválido. O indicador volta a qualquer etapa
  *   alcançada e, para ir adiante, valida as etapas do caminho, uma a uma: não
  *   há salto sem validar.
  * - Ao mudar de etapa, o foco vai ao título dela.
  * - A revisão mostra o que foi digitado (opcional em branco não aparece),
  *   cada bloco com "Editar", e avisa que documentos virão em entrega própria
- *   — nada de arquivo aqui. "Confirmar admissão" valida TUDO e abre a mesma
+ *   — nada de arquivo aqui. "Concluir" valida TUDO e abre a mesma
  *   confirmação da T179; erro, inclusive recusa do servidor, abre a etapa do
  *   primeiro campo a corrigir.
  * - Sem rascunho no servidor nem no navegador: recarregar a página começa do
@@ -112,6 +112,8 @@ import {
   Surface,
   TrilhaNavegacao,
 } from "../../components";
+import { ChevronLeft } from "lucide-react";
+import { IconButton } from "../../ui";
 import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
 import {
   type AdmissaoRegistradaApi,
@@ -301,8 +303,11 @@ type Erros = Partial<Record<CampoErro, string>>;
  * T195 — as quatro etapas do cadastro individual, na ordem da tela.
  */
 const ETAPAS = [
-  "Dados básicos",
-  "Dados profissionais e lotação",
+  // T209 — títulos fiéis aos dados reais de cada etapa: dados pessoais e
+  // contatos; vínculo, lotação e jornada; endereço; revisão. Não há etapa de
+  // documentos (não há upload nem armazenamento nesta página).
+  "Dados pessoais",
+  "Dados profissionais e vínculo",
   "Endereço",
   "Revisão e conclusão",
 ] as const;
@@ -1447,10 +1452,10 @@ export function NovaAdmissaoScreen({
   }
 
   /**
-   * T179 — "Salvar" (T195: "Confirmar admissão", na revisão): só valida, e
+   * T179 — "Salvar" (T195: "Concluir", na revisão): só valida, e
    * TUDO. Com falha, o foco vai ao primeiro campo inválido (T195: na etapa
    * dele); sem falha, abre a confirmação. Nada é enviado aqui. T195 — antes da
-   * revisão, o envio do formulário (Enter ou "Continuar") avança uma etapa.
+   * revisão, o envio do formulário (Enter ou "Próxima etapa") avança uma etapa.
    */
   function pedirConfirmacao(evento: React.FormEvent) {
     evento.preventDefault();
@@ -1865,12 +1870,23 @@ export function NovaAdmissaoScreen({
       {/* T178 — "Colaboradores" na trilha é o MESMO caminho do Cancelar:
           com dados digitados, pede a confirmação de descarte antes de sair. */}
       <TrilhaDaNovaAdmissao onColaboradores={pedirCancelamento} />
-      <PageHeader
-        headingLevel={1}
-        titleId={NOVA_ADMISSAO_TITULO_ID}
-        title="Nova admissão"
-        description="Registre a admissão de um colaborador na empresa ativa, em quatro etapas. Ao concluir, uma só operação cria o colaborador, o vínculo previsto e o ato de admissão; a efetivação continua sendo feita depois, pelo RH ou DP."
-      />
+      {/* T209 — cabeçalho próprio do assistente: "Voltar para Colaboradores"
+          é o mesmo caminho do Cancelar (com dados digitados, a guarda
+          pergunta antes de sair). */}
+      <header className="nova-admissao__cabecalho">
+        <IconButton
+          label="Voltar para Colaboradores"
+          icon={<ChevronLeft size={18} />}
+          className="nova-admissao__voltar"
+          onClick={pedirCancelamento}
+        />
+        <PageHeader
+          headingLevel={1}
+          titleId={NOVA_ADMISSAO_TITULO_ID}
+          title="Nova admissão"
+          description="Registre a admissão em quatro etapas. Nada é gravado antes da confirmação final."
+        />
+      </header>
 
       <Surface
         as="section"
@@ -1926,638 +1942,671 @@ export function NovaAdmissaoScreen({
           </div>
         ) : null}
 
-        <p className="nova-admissao__texto nova-admissao__legenda">
-          Campos com * são obrigatórios. Os marcados como opcionais podem ficar
-          em branco.
-        </p>
-        <section
-          className="nova-admissao__grupo"
-          aria-labelledby="nova-admissao-grupo-empresa"
-        >
-          <h2
-            id="nova-admissao-grupo-empresa"
-            className="nova-admissao__grupo-titulo"
-          >
-            Empresa
-          </h2>
-          {carregandoOpcoes ? (
-            <p className="nova-admissao__texto" role="status">
-              Carregando a empresa ativa…
-            </p>
-          ) : empresa ? (
-            <dl className="nova-admissao__leitura">
-              <dt>Empresa ativa</dt>
-              <dd id="nova-admissao-empresa">
-                <strong>{empresa.nome}</strong> ({empresa.codigo})
-                <span className="nova-admissao__ajuda">
-                  {" "}
-                  — a empresa em que você está trabalhando. Não é editável aqui.
-                </span>
-              </dd>
-            </dl>
-          ) : null}
-          {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
-              fica visível desde o carregamento e recebe o foco ao tentar
-              salvar. */}
-          {referenciasFaltando.length > 0 ? (
-            <p
-              id={ID_DO_CAMPO.referencias}
-              className="nova-admissao__sem-referencias"
-              role="alert"
-              tabIndex={-1}
-            >
-              {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
-            </p>
-          ) : null}
-        </section>
-
         {/* T195 — o indicador das etapas e os quatro painéis; só o da etapa
             atual aparece, e nenhum perde o que foi digitado. */}
-        <IndicadorDeEtapas
-          atual={etapa}
-          alcancada={etapaAlcancada}
-          desabilitado={salvando}
-          onIr={(alvo) => irParaEtapa(alvo)}
-        />
-
-        {painelDaEtapa(
-          0,
-          <>
+        {/* T209 — assistente: as etapas à esquerda (no desktop) e o
+            conteúdo da etapa atual em uma coluna, organizado por seções. */}
+        <div className="nova-admissao__corpo">
+          <IndicadorDeEtapas
+            atual={etapa}
+            alcancada={etapaAlcancada}
+            desabilitado={salvando}
+            onIr={(alvo) => irParaEtapa(alvo)}
+          />
+          <div className="nova-admissao__conteudo">
+            {/* T209 — a legenda e a empresa ativa abrem a coluna do conteúdo,
+                para as etapas começarem logo abaixo do cabeçalho. */}
+            <p className="nova-admissao__texto nova-admissao__legenda">
+              Campos com * são obrigatórios. Os marcados como opcionais podem
+              ficar em branco.
+            </p>
             <section
               className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-dados-pessoais"
+              aria-labelledby="nova-admissao-grupo-empresa"
             >
-              <h3
-                id="nova-admissao-grupo-dados-pessoais"
+              <h2
+                id="nova-admissao-grupo-empresa"
                 className="nova-admissao__grupo-titulo"
               >
-                Dados pessoais
-              </h3>
-              {/* T178 — disposição em linhas (pedido da proprietária): nome e
+                Empresa
+              </h2>
+              {carregandoOpcoes ? (
+                <p className="nova-admissao__texto" role="status">
+                  Carregando a empresa ativa…
+                </p>
+              ) : empresa ? (
+                <dl className="nova-admissao__leitura">
+                  <dt>Empresa ativa</dt>
+                  <dd id="nova-admissao-empresa">
+                    <strong>{empresa.nome}</strong> ({empresa.codigo})
+                    <span className="nova-admissao__ajuda">
+                      {" "}
+                      — a empresa em que você está trabalhando. Não é editável
+                      aqui.
+                    </span>
+                  </dd>
+                </dl>
+              ) : null}
+              {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
+              fica visível desde o carregamento e recebe o foco ao tentar
+              salvar. */}
+              {referenciasFaltando.length > 0 ? (
+                <p
+                  id={ID_DO_CAMPO.referencias}
+                  className="nova-admissao__sem-referencias"
+                  role="alert"
+                  tabIndex={-1}
+                >
+                  {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
+                </p>
+              ) : null}
+            </section>
+            {painelDaEtapa(
+              0,
+              <>
+                <section
+                  className="nova-admissao__grupo"
+                  aria-labelledby="nova-admissao-grupo-dados-pessoais"
+                >
+                  <h3
+                    id="nova-admissao-grupo-dados-pessoais"
+                    className="nova-admissao__grupo-titulo"
+                  >
+                    Dados pessoais
+                  </h3>
+                  {/* T178 — disposição em linhas (pedido da proprietária): nome e
               e-mail pessoal; data de nascimento, sexo e saudação; estado
               civil, nacionalidade e naturalidade; escolaridade e curso; pai e
               mãe. Em tela estreita cada linha vira uma coluna só. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <FormField
-                  id={ID_DO_CAMPO.nome}
-                  label="Nome completo"
-                  required
-                  help="2 a 160 caracteres."
-                  {...(erros.nome ? { error: erros.nome } : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="text"
-                      maxLength={160}
-                      autoComplete="off"
-                      value={campos.nome}
-                      onChange={(e) =>
-                        atualizar("nome", e.target.value, "nome")
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                {/* O e-mail pessoal é o MESMO campo dos contatos (T169): mesmo
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    <FormField
+                      id={ID_DO_CAMPO.nome}
+                      label="Nome completo"
+                      required
+                      help="2 a 160 caracteres."
+                      {...(erros.nome ? { error: erros.nome } : {})}
+                    >
+                      {(control) => (
+                        <input
+                          type="text"
+                          maxLength={160}
+                          autoComplete="off"
+                          value={campos.nome}
+                          onChange={(e) =>
+                            atualizar("nome", e.target.value, "nome")
+                          }
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                    {/* O e-mail pessoal é o MESMO campo dos contatos (T169): mesmo
                 estado e validação, e segue em `contatos.emailPessoal`. Só a
                 posição na tela é de Dados pessoais. T179 — opcional. */}
-                <FormField
-                  id={ID_DO_CAMPO.emailPessoal}
-                  label={rotuloOpcional("E-mail pessoal")}
-                  {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="email"
-                      maxLength={254}
-                      autoComplete="off"
-                      value={contatos.emailPessoal}
-                      onChange={(e) =>
-                        atualizarContato("emailPessoal", e.target.value)
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                <FormField
-                  id={ID_DO_CAMPO.dataNascimento}
-                  label={ROTULO_DATA_NASCIMENTO}
-                  required
-                  {...(erros.dataNascimento
-                    ? { error: erros.dataNascimento }
-                    : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="date"
-                      value={perfil.dataNascimento}
-                      onChange={(e) =>
-                        atualizarPerfil("dataNascimento", e.target.value)
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                {campoSexo()}
-                {campoPerfil("saudacao")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                {campoPerfil("estadoCivil")}
-                {campoPerfil("nacionalidade")}
-                {campoPerfil("naturalidade")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoPerfil("escolaridade")}
-                {campoPerfil("curso")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoPerfil("nomePai")}
-                {campoPerfil("nomeMae")}
-              </div>
-            </section>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-contatos"
-            >
-              <h3
-                id="nova-admissao-grupo-contatos"
-                className="nova-admissao__grupo-titulo"
-              >
-                Contatos
-              </h3>
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                O e-mail pessoal fica em Dados pessoais, ao lado do nome.
-              </p>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <FormField
-                  id={ID_DO_CAMPO.celular}
-                  label={rotuloOpcional("Celular")}
-                  help={DICA_DE_FORMATO.telefone}
-                  {...(erros.celular ? { error: erros.celular } : {})}
-                >
-                  {(control) => (
-                    <CampoMascarado
-                      mascara="telefone"
-                      value={contatos.celular}
-                      onValorChange={(valor) =>
-                        atualizarContato("celular", valor)
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.telefone}
-                  label={rotuloOpcional("Telefone")}
-                  help={DICA_DE_FORMATO.telefone}
-                  {...(erros.telefone ? { error: erros.telefone } : {})}
-                >
-                  {(control) => (
-                    <CampoMascarado
-                      mascara="telefone"
-                      value={contatos.telefone}
-                      onValorChange={(valor) =>
-                        atualizarContato("telefone", valor)
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...control}
-                    />
-                  )}
-                </FormField>
-              </div>
-            </section>
-          </>,
-        )}
-
-        {painelDaEtapa(
-          1,
-          <>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-vinculo"
-            >
-              <h3
-                id="nova-admissao-grupo-vinculo"
-                className="nova-admissao__grupo-titulo"
-              >
-                Vínculo
-              </h3>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                <FormField
-                  id={ID_DO_CAMPO.matricula}
-                  label={rotuloOpcional("Matrícula")}
-                  help="Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco."
-                  {...(erros.matricula ? { error: erros.matricula } : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="text"
-                      maxLength={32}
-                      autoComplete="off"
-                      value={campos.matricula}
-                      onChange={(e) =>
-                        atualizar(
-                          "matricula",
-                          e.target.value.toUpperCase(),
-                          "matricula",
-                        )
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.tipo}
-                  label="Tipo de vínculo"
-                  required
-                  {...(erros.tipo ? { error: erros.tipo } : {})}
-                >
-                  {(control) => (
-                    <select
-                      value={campos.tipo}
-                      onChange={(e) =>
-                        atualizar("tipo", e.target.value as TipoVinculo, "tipo")
-                      }
-                      {...control}
+                    <FormField
+                      id={ID_DO_CAMPO.emailPessoal}
+                      label={rotuloOpcional("E-mail pessoal")}
+                      {...(erros.emailPessoal
+                        ? { error: erros.emailPessoal }
+                        : {})}
                     >
-                      <option value="">Selecione…</option>
-                      {(Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]).map(
-                        (tipo) => (
-                          <option key={tipo} value={tipo}>
-                            {ROTULO_TIPO_VINCULO[tipo]}
-                          </option>
-                        ),
+                      {(control) => (
+                        <input
+                          type="email"
+                          maxLength={254}
+                          autoComplete="off"
+                          value={contatos.emailPessoal}
+                          onChange={(e) =>
+                            atualizarContato("emailPessoal", e.target.value)
+                          }
+                          {...control}
+                        />
                       )}
-                    </select>
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.dataAdmissao}
-                  label="Data de admissão"
-                  required
-                  help="Data futura deixa o ato de admissão programado para ela."
-                  {...(erros.dataAdmissao ? { error: erros.dataAdmissao } : {})}
+                    </FormField>
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--3">
+                    <FormField
+                      id={ID_DO_CAMPO.dataNascimento}
+                      label={ROTULO_DATA_NASCIMENTO}
+                      required
+                      {...(erros.dataNascimento
+                        ? { error: erros.dataNascimento }
+                        : {})}
+                    >
+                      {(control) => (
+                        <input
+                          type="date"
+                          value={perfil.dataNascimento}
+                          onChange={(e) =>
+                            atualizarPerfil("dataNascimento", e.target.value)
+                          }
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                    {campoSexo()}
+                    {campoPerfil("saudacao")}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--3">
+                    {campoPerfil("estadoCivil")}
+                    {campoPerfil("nacionalidade")}
+                    {campoPerfil("naturalidade")}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {campoPerfil("escolaridade")}
+                    {campoPerfil("curso")}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {campoPerfil("nomePai")}
+                    {campoPerfil("nomeMae")}
+                  </div>
+                </section>
+                <section
+                  className="nova-admissao__grupo"
+                  aria-labelledby="nova-admissao-grupo-contatos"
                 >
-                  {(control) => (
-                    <input
-                      type="date"
-                      value={campos.dataAdmissao}
-                      onChange={(e) =>
-                        atualizar(
-                          "dataAdmissao",
-                          e.target.value,
-                          "dataAdmissao",
-                        )
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-              </div>
-            </section>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-lotacao"
-            >
-              <h3
-                id="nova-admissao-grupo-lotacao"
-                className="nova-admissao__grupo-titulo"
-              >
-                Lotação inicial
-              </h3>
-              {/* T179 — um seletor por referência. T196 — Departamento,
+                  <h3
+                    id="nova-admissao-grupo-contatos"
+                    className="nova-admissao__grupo-titulo"
+                  >
+                    Contatos
+                  </h3>
+                  <p className="nova-admissao__texto nova-admissao__ajuda">
+                    O e-mail pessoal fica em Dados pessoais, ao lado do nome.
+                  </p>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    <FormField
+                      id={ID_DO_CAMPO.celular}
+                      label={rotuloOpcional("Celular")}
+                      help={DICA_DE_FORMATO.telefone}
+                      {...(erros.celular ? { error: erros.celular } : {})}
+                    >
+                      {(control) => (
+                        <CampoMascarado
+                          mascara="telefone"
+                          value={contatos.celular}
+                          onValorChange={(valor) =>
+                            atualizarContato("celular", valor)
+                          }
+                          limparAvisos={limpezaDosAvisos}
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                    <FormField
+                      id={ID_DO_CAMPO.telefone}
+                      label={rotuloOpcional("Telefone")}
+                      help={DICA_DE_FORMATO.telefone}
+                      {...(erros.telefone ? { error: erros.telefone } : {})}
+                    >
+                      {(control) => (
+                        <CampoMascarado
+                          mascara="telefone"
+                          value={contatos.telefone}
+                          onValorChange={(valor) =>
+                            atualizarContato("telefone", valor)
+                          }
+                          limparAvisos={limpezaDosAvisos}
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                  </div>
+                </section>
+              </>,
+            )}
+
+            {painelDaEtapa(
+              1,
+              <>
+                <section
+                  className="nova-admissao__grupo"
+                  aria-labelledby="nova-admissao-grupo-vinculo"
+                >
+                  <h3
+                    id="nova-admissao-grupo-vinculo"
+                    className="nova-admissao__grupo-titulo"
+                  >
+                    Vínculo
+                  </h3>
+                  <div className="nova-admissao__linha nova-admissao__linha--3">
+                    <FormField
+                      id={ID_DO_CAMPO.matricula}
+                      label={rotuloOpcional("Matrícula")}
+                      help="Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco."
+                      {...(erros.matricula ? { error: erros.matricula } : {})}
+                    >
+                      {(control) => (
+                        <input
+                          type="text"
+                          maxLength={32}
+                          autoComplete="off"
+                          value={campos.matricula}
+                          onChange={(e) =>
+                            atualizar(
+                              "matricula",
+                              e.target.value.toUpperCase(),
+                              "matricula",
+                            )
+                          }
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                    <FormField
+                      id={ID_DO_CAMPO.tipo}
+                      label="Tipo de vínculo"
+                      required
+                      {...(erros.tipo ? { error: erros.tipo } : {})}
+                    >
+                      {(control) => (
+                        <select
+                          value={campos.tipo}
+                          onChange={(e) =>
+                            atualizar(
+                              "tipo",
+                              e.target.value as TipoVinculo,
+                              "tipo",
+                            )
+                          }
+                          {...control}
+                        >
+                          <option value="">Selecione…</option>
+                          {(
+                            Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]
+                          ).map((tipo) => (
+                            <option key={tipo} value={tipo}>
+                              {ROTULO_TIPO_VINCULO[tipo]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </FormField>
+                    <FormField
+                      id={ID_DO_CAMPO.dataAdmissao}
+                      label="Data de admissão"
+                      required
+                      help="Data futura deixa o ato de admissão programado para ela."
+                      {...(erros.dataAdmissao
+                        ? { error: erros.dataAdmissao }
+                        : {})}
+                    >
+                      {(control) => (
+                        <input
+                          type="date"
+                          value={campos.dataAdmissao}
+                          onChange={(e) =>
+                            atualizar(
+                              "dataAdmissao",
+                              e.target.value,
+                              "dataAdmissao",
+                            )
+                          }
+                          {...control}
+                        />
+                      )}
+                    </FormField>
+                  </div>
+                </section>
+                <section
+                  className="nova-admissao__grupo"
+                  aria-labelledby="nova-admissao-grupo-lotacao"
+                >
+                  <h3
+                    id="nova-admissao-grupo-lotacao"
+                    className="nova-admissao__grupo-titulo"
+                  >
+                    Lotação inicial
+                  </h3>
+                  {/* T179 — um seletor por referência. T196 — Departamento,
                   Cargo, Unidade e Centro de custo são escolhidos pela busca
                   no servidor, de 20 em 20; em duas colunas, para o campo de
                   busca caber ao lado dos botões de 44 px. Departamento e
                   Cargo (obrigatórios) primeiro; a Área logo abaixo do
                   Departamento que a filtra; os demais opcionais depois. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.departamento}
-                  rotulo="Departamento"
-                  rotuloVisivel="Departamento"
-                  plural="departamentos"
-                  nenhum="Nenhum"
-                  ativo="ativo"
-                  obrigatorio
-                  {...(erros.departamento ? { erro: erros.departamento } : {})}
-                  escolhida={referenciaPorId(
-                    opcoes.departamentos,
-                    campos.departamentoId,
-                  )}
-                  onEscolher={(r) => {
-                    if (r) conhecer("departamentos", r);
-                    void selecionarDepartamento(r?.id ?? "");
-                  }}
-                  listar={consultaDe(listarDepartamentos)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.departamento}
-                  acao={botaoNovaReferencia("departamento")}
-                  criacao={criacaoDe("departamento")}
-                  aviso={avisoDaCriacao.departamento}
-                />
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.cargo}
-                  rotulo="Cargo"
-                  rotuloVisivel="Cargo"
-                  plural="cargos"
-                  nenhum="Nenhum"
-                  ativo="ativo"
-                  obrigatorio
-                  {...(erros.cargo ? { erro: erros.cargo } : {})}
-                  escolhida={referenciaPorId(opcoes.cargos, campos.cargoId)}
-                  onEscolher={(r) => {
-                    if (r) conhecer("cargos", r);
-                    atualizar("cargoId", r?.id ?? "", "cargo", "lotacao");
-                  }}
-                  listar={consultaDe(listarCargos)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.cargo}
-                  acao={botaoNovaReferencia("cargo")}
-                  criacao={criacaoDe("cargo")}
-                  aviso={avisoDaCriacao.cargo}
-                />
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {seletorDeLotacao({
-                  campo: "area",
-                  rotulo: "Área",
-                  obrigatorio: false,
-                  valor: campos.areaId,
-                  lista: areas,
-                  aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
-                  ajuda:
-                    "Escolha antes o departamento: a lista mostra só as áreas dele.",
-                  vazio: campos.departamentoId
-                    ? carregandoAreas
-                      ? "Carregando áreas…"
-                      : "Nenhuma área ativa neste departamento"
-                    : "Escolha antes o departamento",
-                  desabilitado: !campos.departamentoId || carregandoAreas,
-                })}
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.unidade}
-                  rotulo="Unidade"
-                  rotuloVisivel={rotuloOpcional("Unidade")}
-                  plural="unidades"
-                  nenhum="Nenhuma"
-                  ativo="ativa"
-                  obrigatorio={false}
-                  {...(erros.unidade ? { erro: erros.unidade } : {})}
-                  escolhida={referenciaPorId(opcoes.unidades, campos.unidadeId)}
-                  onEscolher={(r) => {
-                    if (r) conhecer("unidades", r);
-                    atualizar("unidadeId", r?.id ?? "", "unidade", "lotacao");
-                  }}
-                  listar={consultaDe(listarUnidades)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.unidade}
-                  acao={botaoNovaReferencia("unidade")}
-                  criacao={criacaoDe("unidade")}
-                  aviso={avisoDaCriacao.unidade}
-                />
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {seletorDeLotacao({
-                  campo: "equipe",
-                  rotulo: "Equipe",
-                  obrigatorio: false,
-                  valor: campos.equipeId,
-                  lista: opcoes.equipes,
-                  aoMudar: (id) =>
-                    atualizar("equipeId", id, "equipe", "lotacao"),
-                  vazio: "Nenhuma equipe ativa",
-                })}
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.centroCusto}
-                  rotulo="Centro de custo"
-                  rotuloVisivel={rotuloOpcional("Centro de custo")}
-                  plural="centros de custo"
-                  nenhum="Nenhum"
-                  ativo="ativo"
-                  obrigatorio={false}
-                  {...(erros.centroCusto ? { erro: erros.centroCusto } : {})}
-                  escolhida={referenciaPorId(
-                    opcoes.centrosCusto,
-                    campos.centroCustoId,
-                  )}
-                  onEscolher={(r) => {
-                    if (r) conhecer("centrosCusto", r);
-                    atualizar(
-                      "centroCustoId",
-                      r?.id ?? "",
-                      "centroCusto",
-                      "lotacao",
-                    );
-                  }}
-                  listar={consultaDe(listarCentrosCusto)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.centroCusto}
-                  criacao={criacaoDe("centroCusto")}
-                  aviso={avisoDaCriacao.centroCusto}
-                />
-              </div>
-              {erros.lotacao ? (
-                <p
-                  className="nova-admissao__erro-geral"
-                  role="alert"
-                  id={ID_DO_CAMPO.lotacao}
-                  tabIndex={-1}
-                >
-                  {erros.lotacao}
-                </p>
-              ) : null}
-            </section>
-            {/* T183 — jornada de trabalho OPCIONAL, só para o RH: o DP admite,
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    <SeletorDeReferencia
+                      id={ID_DO_CAMPO.departamento}
+                      rotulo="Departamento"
+                      rotuloVisivel="Departamento"
+                      plural="departamentos"
+                      nenhum="Nenhum"
+                      ativo="ativo"
+                      obrigatorio
+                      {...(erros.departamento
+                        ? { erro: erros.departamento }
+                        : {})}
+                      escolhida={referenciaPorId(
+                        opcoes.departamentos,
+                        campos.departamentoId,
+                      )}
+                      onEscolher={(r) => {
+                        if (r) conhecer("departamentos", r);
+                        void selecionarDepartamento(r?.id ?? "");
+                      }}
+                      listar={consultaDe(listarDepartamentos)}
+                      desabilitado={carregandoOpcoes}
+                      versao={versaoDaBusca.departamento}
+                      acao={botaoNovaReferencia("departamento")}
+                      criacao={criacaoDe("departamento")}
+                      aviso={avisoDaCriacao.departamento}
+                    />
+                    <SeletorDeReferencia
+                      id={ID_DO_CAMPO.cargo}
+                      rotulo="Cargo"
+                      rotuloVisivel="Cargo"
+                      plural="cargos"
+                      nenhum="Nenhum"
+                      ativo="ativo"
+                      obrigatorio
+                      {...(erros.cargo ? { erro: erros.cargo } : {})}
+                      escolhida={referenciaPorId(opcoes.cargos, campos.cargoId)}
+                      onEscolher={(r) => {
+                        if (r) conhecer("cargos", r);
+                        atualizar("cargoId", r?.id ?? "", "cargo", "lotacao");
+                      }}
+                      listar={consultaDe(listarCargos)}
+                      desabilitado={carregandoOpcoes}
+                      versao={versaoDaBusca.cargo}
+                      acao={botaoNovaReferencia("cargo")}
+                      criacao={criacaoDe("cargo")}
+                      aviso={avisoDaCriacao.cargo}
+                    />
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {seletorDeLotacao({
+                      campo: "area",
+                      rotulo: "Área",
+                      obrigatorio: false,
+                      valor: campos.areaId,
+                      lista: areas,
+                      aoMudar: (id) =>
+                        atualizar("areaId", id, "area", "lotacao"),
+                      ajuda:
+                        "Escolha antes o departamento: a lista mostra só as áreas dele.",
+                      vazio: campos.departamentoId
+                        ? carregandoAreas
+                          ? "Carregando áreas…"
+                          : "Nenhuma área ativa neste departamento"
+                        : "Escolha antes o departamento",
+                      desabilitado: !campos.departamentoId || carregandoAreas,
+                    })}
+                    <SeletorDeReferencia
+                      id={ID_DO_CAMPO.unidade}
+                      rotulo="Unidade"
+                      rotuloVisivel={rotuloOpcional("Unidade")}
+                      plural="unidades"
+                      nenhum="Nenhuma"
+                      ativo="ativa"
+                      obrigatorio={false}
+                      {...(erros.unidade ? { erro: erros.unidade } : {})}
+                      escolhida={referenciaPorId(
+                        opcoes.unidades,
+                        campos.unidadeId,
+                      )}
+                      onEscolher={(r) => {
+                        if (r) conhecer("unidades", r);
+                        atualizar(
+                          "unidadeId",
+                          r?.id ?? "",
+                          "unidade",
+                          "lotacao",
+                        );
+                      }}
+                      listar={consultaDe(listarUnidades)}
+                      desabilitado={carregandoOpcoes}
+                      versao={versaoDaBusca.unidade}
+                      acao={botaoNovaReferencia("unidade")}
+                      criacao={criacaoDe("unidade")}
+                      aviso={avisoDaCriacao.unidade}
+                    />
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {seletorDeLotacao({
+                      campo: "equipe",
+                      rotulo: "Equipe",
+                      obrigatorio: false,
+                      valor: campos.equipeId,
+                      lista: opcoes.equipes,
+                      aoMudar: (id) =>
+                        atualizar("equipeId", id, "equipe", "lotacao"),
+                      vazio: "Nenhuma equipe ativa",
+                    })}
+                    <SeletorDeReferencia
+                      id={ID_DO_CAMPO.centroCusto}
+                      rotulo="Centro de custo"
+                      rotuloVisivel={rotuloOpcional("Centro de custo")}
+                      plural="centros de custo"
+                      nenhum="Nenhum"
+                      ativo="ativo"
+                      obrigatorio={false}
+                      {...(erros.centroCusto
+                        ? { erro: erros.centroCusto }
+                        : {})}
+                      escolhida={referenciaPorId(
+                        opcoes.centrosCusto,
+                        campos.centroCustoId,
+                      )}
+                      onEscolher={(r) => {
+                        if (r) conhecer("centrosCusto", r);
+                        atualizar(
+                          "centroCustoId",
+                          r?.id ?? "",
+                          "centroCusto",
+                          "lotacao",
+                        );
+                      }}
+                      listar={consultaDe(listarCentrosCusto)}
+                      desabilitado={carregandoOpcoes}
+                      versao={versaoDaBusca.centroCusto}
+                      criacao={criacaoDe("centroCusto")}
+                      aviso={avisoDaCriacao.centroCusto}
+                    />
+                  </div>
+                  {erros.lotacao ? (
+                    <p
+                      className="nova-admissao__erro-geral"
+                      role="alert"
+                      id={ID_DO_CAMPO.lotacao}
+                      tabIndex={-1}
+                    >
+                      {erros.lotacao}
+                    </p>
+                  ) : null}
+                </section>
+                {/* T183 — jornada de trabalho OPCIONAL, só para o RH: o DP admite,
             mas não atribui jornada. A vigência começa na data de admissão. */}
-            {papelDoAtor === "rh" ? (
-              <section
-                className="nova-admissao__grupo"
-                aria-labelledby="nova-admissao-grupo-jornada"
-              >
-                <h3
-                  id="nova-admissao-grupo-jornada"
-                  className="nova-admissao__grupo-titulo"
-                >
-                  Jornada de trabalho
-                </h3>
-                <div className="nova-admissao__linha nova-admissao__linha--3">
-                  <FormField
-                    id={ID_DO_CAMPO.jornada}
-                    label={rotuloOpcional("Jornada de trabalho")}
-                    help="Só jornadas ativas. A vigência começa na data de admissão."
-                    {...(erros.jornada ? { error: erros.jornada } : {})}
+                {papelDoAtor === "rh" ? (
+                  <section
+                    className="nova-admissao__grupo"
+                    aria-labelledby="nova-admissao-grupo-jornada"
                   >
-                    {(control) => (
-                      <select
-                        value={campos.tabelaHorarioId}
-                        onChange={(e) =>
-                          atualizar(
-                            "tabelaHorarioId",
-                            e.target.value,
-                            "jornada",
-                          )
-                        }
-                        disabled={carregandoOpcoes}
-                        {...control}
+                    <h3
+                      id="nova-admissao-grupo-jornada"
+                      className="nova-admissao__grupo-titulo"
+                    >
+                      Jornada de trabalho
+                    </h3>
+                    <div className="nova-admissao__linha nova-admissao__linha--3">
+                      <FormField
+                        id={ID_DO_CAMPO.jornada}
+                        label={rotuloOpcional("Jornada de trabalho")}
+                        help="Só jornadas ativas. A vigência começa na data de admissão."
+                        {...(erros.jornada ? { error: erros.jornada } : {})}
                       >
-                        <option value="">Sem jornada por enquanto</option>
-                        {opcoes.jornadas.map((j) => (
-                          <option key={j.id} value={j.id}>
-                            {rotuloDaJornada(j)}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </FormField>
-                </div>
-                {jornadasIndisponiveis ? (
-                  <p className="nova-admissao__texto">
-                    Não foi possível carregar as jornadas. A admissão pode
-                    seguir sem jornada; atribua depois, na ficha do colaborador.
-                  </p>
-                ) : !carregandoJornadas && opcoes.jornadas.length === 0 ? (
-                  <p className="nova-admissao__texto">
-                    Nenhuma jornada ativa nesta empresa. A admissão segue sem
-                    jornada.
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
-          </>,
-        )}
-
-        {painelDaEtapa(
-          2,
-          <>
-            <div className="nova-admissao__grupo">
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                Todo o endereço é opcional. Com país Brasil, o CEP pode sugerir
-                logradouro, bairro, cidade e estado; tudo continua editável.
-              </p>
-              {/* T178 — país e CEP; logradouro (largo) e número (estreito);
-              complemento e bairro; cidade e estado. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("pais")}
-                {/* T178 — CEP com consulta assistida, só para o Brasil. Com outro
-                país não há botão nem consulta: o CEP é só texto. */}
-                <div className="nova-admissao__cep">
-                  {campoEndereco(
-                    "cep",
-                    cepAssistido ? () => void buscarCep("saida") : undefined,
-                  )}
-                  {cepAssistido ? (
-                    <div className="nova-admissao__cep-acoes">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        id={ID_BOTAO_BUSCAR_CEP}
-                        aria-disabled={cep.tipo === "buscando"}
-                        aria-describedby="nova-admissao-cep-status"
-                        onClick={() => {
-                          if (cep.tipo === "buscando") return;
-                          void buscarCep("botao");
-                        }}
-                      >
-                        {cep.tipo === "buscando"
-                          ? "Buscando CEP…"
-                          : "Buscar CEP"}
-                      </Button>
-                      {/* A única região viva do bloco: anuncia o resultado sem
-                      mover o foco. Sempre montada, para que o anúncio saia. */}
-                      <p
-                        id="nova-admissao-cep-status"
-                        className="nova-admissao__texto nova-admissao__cep-status"
-                        role="status"
-                      >
-                        {cep.tipo === "buscando"
-                          ? "Buscando CEP…"
-                          : cep.tipo === "aviso" || cep.tipo === "sugerido"
-                            ? cep.mensagem
-                            : ""}
+                        {(control) => (
+                          <select
+                            value={campos.tabelaHorarioId}
+                            onChange={(e) =>
+                              atualizar(
+                                "tabelaHorarioId",
+                                e.target.value,
+                                "jornada",
+                              )
+                            }
+                            disabled={carregandoOpcoes}
+                            {...control}
+                          >
+                            <option value="">Sem jornada por enquanto</option>
+                            {opcoes.jornadas.map((j) => (
+                              <option key={j.id} value={j.id}>
+                                {rotuloDaJornada(j)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </FormField>
+                    </div>
+                    {jornadasIndisponiveis ? (
+                      <p className="nova-admissao__texto">
+                        Não foi possível carregar as jornadas. A admissão pode
+                        seguir sem jornada; atribua depois, na ficha do
+                        colaborador.
                       </p>
-                      {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="subtle"
-                          onClick={usarEnderecoDoCep}
-                        >
-                          Usar endereço do CEP
-                        </Button>
+                    ) : !carregandoJornadas && opcoes.jornadas.length === 0 ? (
+                      <p className="nova-admissao__texto">
+                        Nenhuma jornada ativa nesta empresa. A admissão segue
+                        sem jornada.
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
+              </>,
+            )}
+
+            {painelDaEtapa(
+              2,
+              <>
+                <div className="nova-admissao__grupo">
+                  <p className="nova-admissao__texto nova-admissao__ajuda">
+                    Todo o endereço é opcional. Com país Brasil, o CEP pode
+                    sugerir logradouro, bairro, cidade e estado; tudo continua
+                    editável.
+                  </p>
+                  {/* T178 — país e CEP; logradouro (largo) e número (estreito);
+              complemento e bairro; cidade e estado. */}
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {campoEndereco("pais")}
+                    {/* T178 — CEP com consulta assistida, só para o Brasil. Com outro
+                país não há botão nem consulta: o CEP é só texto. */}
+                    <div className="nova-admissao__cep">
+                      {campoEndereco(
+                        "cep",
+                        cepAssistido
+                          ? () => void buscarCep("saida")
+                          : undefined,
+                      )}
+                      {cepAssistido ? (
+                        <div className="nova-admissao__cep-acoes">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            id={ID_BOTAO_BUSCAR_CEP}
+                            aria-disabled={cep.tipo === "buscando"}
+                            aria-describedby="nova-admissao-cep-status"
+                            onClick={() => {
+                              if (cep.tipo === "buscando") return;
+                              void buscarCep("botao");
+                            }}
+                          >
+                            {cep.tipo === "buscando"
+                              ? "Buscando CEP…"
+                              : "Buscar CEP"}
+                          </Button>
+                          {/* A única região viva do bloco: anuncia o resultado sem
+                      mover o foco. Sempre montada, para que o anúncio saia. */}
+                          <p
+                            id="nova-admissao-cep-status"
+                            className="nova-admissao__texto nova-admissao__cep-status"
+                            role="status"
+                          >
+                            {cep.tipo === "buscando"
+                              ? "Buscando CEP…"
+                              : cep.tipo === "aviso" || cep.tipo === "sugerido"
+                                ? cep.mensagem
+                                : ""}
+                          </p>
+                          {cep.tipo === "sugerido" &&
+                          cep.mantidos.length > 0 ? (
+                            <Button
+                              type="button"
+                              variant="subtle"
+                              onClick={usarEnderecoDoCep}
+                            >
+                              Usar endereço do CEP
+                            </Button>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
-                  ) : null}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--larga-estreita">
+                    {campoEndereco("logradouro")}
+                    {campoEndereco("numero")}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {campoEndereco("complemento")}
+                    {campoEndereco("bairro")}
+                  </div>
+                  <div className="nova-admissao__linha nova-admissao__linha--2">
+                    {campoEndereco("cidade")}
+                    {campoEndereco("estado")}
+                  </div>
                 </div>
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--larga-estreita">
-                {campoEndereco("logradouro")}
-                {campoEndereco("numero")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("complemento")}
-                {campoEndereco("bairro")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("cidade")}
-                {campoEndereco("estado")}
-              </div>
-            </div>
-          </>,
-        )}
+              </>,
+            )}
 
-        {painelDaEtapa(
-          3,
-          <>
-            <p className="nova-admissao__texto">
-              Confira os dados antes de concluir. Para corrigir algo, use
-              Editar: o que você já digitou continua aqui.
-            </p>
-            <BlocoDaRevisao
-              titulo={ETAPAS[0]}
-              id="nova-admissao-revisao-basicos"
-              linhas={linhasBasicas}
-              onEditar={() => irParaEtapa(0)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[1]}
-              id="nova-admissao-revisao-profissionais"
-              linhas={linhasProfissionais}
-              onEditar={() => irParaEtapa(1)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[2]}
-              id="nova-admissao-revisao-endereco"
-              linhas={linhasDoEndereco}
-              onEditar={() => irParaEtapa(2)}
-            />
-            <p className="nova-admissao__texto nova-admissao__ajuda">
-              Campos opcionais em branco não aparecem neste resumo.
-            </p>
-            {/* T195 — decisão aprovada: documentos em entrega própria. Nada de
+            {painelDaEtapa(
+              3,
+              <>
+                <p className="nova-admissao__texto">
+                  Confira os dados antes de concluir. Para corrigir algo, use
+                  Editar: o que você já digitou continua aqui.
+                </p>
+                <BlocoDaRevisao
+                  titulo={ETAPAS[0]}
+                  id="nova-admissao-revisao-basicos"
+                  linhas={linhasBasicas}
+                  onEditar={() => irParaEtapa(0)}
+                />
+                <BlocoDaRevisao
+                  titulo={ETAPAS[1]}
+                  id="nova-admissao-revisao-profissionais"
+                  linhas={linhasProfissionais}
+                  onEditar={() => irParaEtapa(1)}
+                />
+                <BlocoDaRevisao
+                  titulo={ETAPAS[2]}
+                  id="nova-admissao-revisao-endereco"
+                  linhas={linhasDoEndereco}
+                  onEditar={() => irParaEtapa(2)}
+                />
+                <p className="nova-admissao__texto nova-admissao__ajuda">
+                  Campos opcionais em branco não aparecem neste resumo.
+                </p>
+                {/* T195 — decisão aprovada: documentos em entrega própria. Nada de
                 arquivo, upload ou armazenamento nesta página. */}
-            <section
-              className="nova-admissao__documentos"
-              aria-labelledby="nova-admissao-documentos-titulo"
-            >
-              <h3
-                id="nova-admissao-documentos-titulo"
-                className="nova-admissao__subtitulo"
-              >
-                Documentos
-              </h3>
-              <p className="nova-admissao__texto">
-                Documentos serão liberados em uma próxima etapa do Evolli.
-              </p>
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                Por enquanto, nenhum arquivo é pedido nem enviado neste
-                cadastro.
-              </p>
-            </section>
-          </>,
-        )}
+                <section
+                  className="nova-admissao__documentos"
+                  aria-labelledby="nova-admissao-documentos-titulo"
+                >
+                  <h3
+                    id="nova-admissao-documentos-titulo"
+                    className="nova-admissao__subtitulo"
+                  >
+                    Documentos
+                  </h3>
+                  <p className="nova-admissao__texto">
+                    Documentos serão liberados em uma próxima etapa do Evolli.
+                  </p>
+                  <p className="nova-admissao__texto nova-admissao__ajuda">
+                    Por enquanto, nenhum arquivo é pedido nem enviado neste
+                    cadastro.
+                  </p>
+                </section>
+              </>,
+            )}
+          </div>
+        </div>
 
         {erros.geral ? (
           <p
@@ -2597,47 +2646,51 @@ export function NovaAdmissaoScreen({
           </div>
         ) : null}
 
-        <FormActions>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={pedirCancelamento}
-            disabled={salvando}
-          >
-            Cancelar
-          </Button>
-          {etapa > 0 ? (
+        {/* T209 — rodapé fixo do assistente: o progresso e as ações. */}
+        <div className="nova-admissao__rodape">
+          <ProgressoDaAdmissao atual={etapa} />
+          <div className="nova-admissao__rodape-acoes">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => irParaEtapa((etapa - 1) as IndiceEtapa)}
+              onClick={pedirCancelamento}
               disabled={salvando}
             >
-              Voltar
+              Cancelar
             </Button>
-          ) : null}
-          {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
+            {etapa > 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => irParaEtapa((etapa - 1) as IndiceEtapa)}
+                disabled={salvando}
+              >
+                Voltar
+              </Button>
+            ) : null}
+            {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
               botão (envio implícito do navegador). Num seletor, Enter é do
               próprio seletor: avança-se com Tab até aqui e Enter.
 
               Revisão final — o botão é o mesmo nas quatro etapas e fica no
-              mesmo lugar: o 2º clique de um duplo clique em "Continuar" na
-              etapa 3 caía em "Confirmar admissão" e abria a confirmação sem a
+              mesmo lugar: o 2º clique de um duplo clique em "Próxima etapa" na
+              etapa 3 caía em "Concluir" e abria a confirmação sem a
               revisão ter sido lida. Clique repetido (`detail` > 1, a contagem
               do próprio navegador) é ignorado; teclado e envio implícito têm
               `detail` 0 e seguem normais. */}
-          <Button
-            type="submit"
-            variant="primary"
-            id={etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR}
-            disabled={salvando || (carregandoOpcoes && etapa > 0)}
-            onClick={(evento) => {
-              if (evento.detail > 1) evento.preventDefault();
-            }}
-          >
-            {etapa === ULTIMA_ETAPA ? "Confirmar admissão" : "Continuar"}
-          </Button>
-        </FormActions>
+            <Button
+              type="submit"
+              variant="primary"
+              id={etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR}
+              disabled={salvando || (carregandoOpcoes && etapa > 0)}
+              onClick={(evento) => {
+                if (evento.detail > 1) evento.preventDefault();
+              }}
+            >
+              {etapa === ULTIMA_ETAPA ? "Concluir" : "Próxima etapa"}
+            </Button>
+          </div>
+        </div>
       </form>
 
       {/* T179 — confirmação antes de gravar: confirmação curta, o uso de
@@ -2838,23 +2891,11 @@ function IndicadorDeEtapas({
   readonly desabilitado: boolean;
   readonly onIr: (alvo: IndiceEtapa) => void;
 }) {
-  const progresso = ((atual + 1) / ETAPAS.length) * 100;
   return (
     <nav className="nova-admissao__etapas" aria-label="Etapas do cadastro">
-      <div className="nova-admissao__progresso">
-        <p
-          id="nova-admissao-progresso"
-          className="nova-admissao__progresso-texto"
-        >
-          Etapa {atual + 1} de {ETAPAS.length} · {progresso}%
-        </p>
-        <progress
-          className="nova-admissao__progresso-barra"
-          max={100}
-          value={progresso}
-          aria-labelledby="nova-admissao-progresso"
-        />
-      </div>
+      <p className="nova-admissao__etapas-rotulo" aria-hidden="true">
+        Etapas
+      </p>
       <ol className="nova-admissao__etapas-lista">
         {ETAPAS.map((titulo, i) => {
           const indice = i as IndiceEtapa;
@@ -2913,6 +2954,30 @@ function IndicadorDeEtapas({
         })}
       </ol>
     </nav>
+  );
+}
+
+/**
+ * T209 — o progresso do assistente, no rodapé fixo: texto e barra com os
+ * mesmos números (a barra é nomeada pelo texto).
+ */
+function ProgressoDaAdmissao({ atual }: { readonly atual: IndiceEtapa }) {
+  const progresso = ((atual + 1) / ETAPAS.length) * 100;
+  return (
+    <div className="nova-admissao__progresso">
+      <p
+        id="nova-admissao-progresso"
+        className="nova-admissao__progresso-texto"
+      >
+        Etapa {atual + 1} de {ETAPAS.length} · {progresso}%
+      </p>
+      <progress
+        className="nova-admissao__progresso-barra"
+        max={100}
+        value={progresso}
+        aria-labelledby="nova-admissao-progresso"
+      />
+    </div>
   );
 }
 

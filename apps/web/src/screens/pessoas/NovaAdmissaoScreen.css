@@ -518,3 +518,145 @@ button.nova-admissao__etapa-passo:focus-visible {
     display: none;
   }
 }
+
+/* ---- T209 — assistente de etapas: cabeçalho com "Voltar para
+   Colaboradores", as etapas à esquerda (fixas ao rolar) quando a página tem
+   espaço, o conteúdo da etapa em uma coluna e o rodapé fixo com o progresso e
+   as ações. Pela largura da própria página (o menu lateral aberto estreita o
+   conteúdo). Só tokens. ---- */
+.nova-admissao {
+  container-type: inline-size;
+  max-width: 72rem;
+}
+
+.nova-admissao__cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--divisor);
+}
+
+.nova-admissao__cabecalho > .evolli-page-header {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nova-admissao__voltar {
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+}
+
+.nova-admissao__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--secao-espaco);
+  align-items: start;
+  min-width: 0;
+}
+
+.nova-admissao__conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+  max-width: 48rem;
+}
+
+.nova-admissao__etapas-rotulo {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@container (min-width: 52rem) {
+  .nova-admissao__corpo {
+    grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  }
+
+  .nova-admissao__etapas {
+    position: sticky;
+    top: var(--space-lg);
+    padding-right: var(--secao-espaco-compacto);
+    border-right: var(--divisor);
+  }
+
+  .nova-admissao__etapas-lista {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.nova-admissao__rodape {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-lg);
+  min-width: 0;
+  padding: var(--space-md) 0;
+  border-top: var(--divisor);
+  background: var(--surface-neutral);
+}
+
+.nova-admissao__rodape > .nova-admissao__progresso {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 20rem;
+}
+
+.nova-admissao__rodape-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+/* Celular: duas linhas em grade — o progresso com Cancelar ao lado e, abaixo,
+   Voltar no tamanho do texto e a ação principal (envio) com o resto. A
+   ordem de tabulação continua a visual (progresso, Cancelar, Voltar,
+   principal); nada alarga a tela. */
+@media (max-width: 640px) {
+  .nova-admissao__rodape {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .nova-admissao__rodape > .nova-admissao__progresso {
+    grid-column: 1 / 3;
+    grid-row: 1;
+    max-width: none;
+  }
+
+  .nova-admissao__rodape-acoes {
+    display: contents;
+  }
+
+  .nova-admissao__rodape-acoes > :first-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .nova-admissao__rodape-acoes > :nth-child(2):not([type="submit"]) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .nova-admissao__rodape-acoes > [type="submit"] {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .nova-admissao__rodape-acoes > [type="submit"]:nth-child(2) {
+    grid-column: 1 / 4;
+  }
+}

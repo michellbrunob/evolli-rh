@@ -649,3 +649,44 @@ conversão automática; importação (Bloco C segue pausado).
 - **Limites:** com o painel do navegador oculto (sem pintura), animações e o foco de entrada do
   menu pelo teclado ficam parados; nos testes (jsdom) o foco vai ao primeiro item. No menu do
   Radix, a busca por letra é nova; o resto do teclado segue o que já existia.
+
+## 26. Nova admissão como assistente de etapas
+
+- **Layout:** cabeçalho próprio ("Nova admissão", descrição curta e o botão "Voltar para
+  Colaboradores", que segue o mesmo caminho do Cancelar e passa pela guarda de saída); etapas à
+  esquerda, fixas ao rolar, quando a página tem pelo menos 52rem (pela largura da própria
+  página: o menu lateral aberto estreita o conteúdo); conteúdo da etapa em uma coluna (até
+  48rem), organizado por seções; rodapé fixo com o progresso ("Etapa X de 4 · N%" e barra),
+  Cancelar, Voltar (a partir da etapa 2) e "Próxima etapa" ou "Concluir". Em 375 px, as etapas
+  ficam em linha acima do conteúdo e o rodapé vira uma grade de duas linhas (progresso e
+  Cancelar; Voltar e a ação principal larga), sem rolagem horizontal.
+- **Etapas com os dados reais** (os títulos pedidos foram usados só onde batem com os campos):
+  1. **Dados pessoais** — Dados pessoais: nome completo\*, e-mail pessoal, data de nascimento\*,
+     sexo, saudação, estado civil, nacionalidade, naturalidade, escolaridade, curso, nome do pai,
+     nome da mãe; Contatos: celular, telefone.
+  2. **Dados profissionais e vínculo** — Vínculo: matrícula, tipo de vínculo\*, data de
+     admissão\*; Lotação inicial: departamento\*, cargo\*, área, unidade, equipe, centro de
+     custo; Jornada de trabalho.
+  3. **Endereço** — país, CEP (com sugestão pelo CEP), logradouro, número, complemento, bairro,
+     cidade, estado.
+  4. **Revisão e conclusão** (no lugar de "Documentos e revisão") — o que foi digitado, por
+     bloco, com "Editar"; aviso de que documentos ainda não são pedidos. "Concluir" abre a mesma
+     confirmação de antes; só ela grava.
+- **Lacunas que exigem decisão (nada foi criado):** CPF e RG não existem no contrato da admissão
+  (DP-ADM-04 segue aberto); envio de documentos depende do armazenamento de arquivos (Nível 2);
+  não há modelo de foto do colaborador (a foto da conta não é reutilizada); não há rascunho
+  persistente (sem "Salvar rascunho"); nome social e gênero não existem no cadastro.
+- **Preservado:** contrato da API, validações do servidor, idempotência, CSRF, auditoria,
+  permissões (só RH e DP abrem a página; `master_tecnico` não vê), isolamento por empresa,
+  validação por etapa com foco no primeiro campo inválido, foco no título de cada etapa, Enter
+  como "Próxima etapa", guarda de saída (Cancelar, "Voltar para Colaboradores", trilha, menu,
+  navegador) e troca de empresa. Só web: sem API, migration, RBAC ou dependência nova.
+- **Testes:** fluxo entre etapas e rodapé por etapa; validação por etapa e foco; Escape na
+  pergunta de saída (mantém etapa e dados, foco volta ao botão); "Sair sem salvar"; Enter;
+  ausência de foto, CPF, RG, upload e rascunho; RH e DP com o assistente, `master_tecnico` sem;
+  contrato de CSS (desktop e 375 px). As suítes antigas foram ajustadas aos rótulos novos.
+- **Navegador (banco próprio da T209, RH):** 1440 px com etapas à esquerda (240 px, fixas) e
+  conteúdo em 768 px; 1024 px com o menu aberto cai para uma coluna; 375 px sem rolagem
+  horizontal, botões de 44 px e rodapé de 131 px; validação da etapa 1 com foco no campo; guarda
+  com Escape devolvendo o foco a "Voltar para Colaboradores" e os dados mantidos. DP coberto
+  pelos testes de integração (não validado no navegador nesta rodada).

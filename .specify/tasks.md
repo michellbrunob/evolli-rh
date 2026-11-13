@@ -3446,6 +3446,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fundação de interface (seção 25; ADR 0019):** Tailwind 4 sem preflight (prefixo
         `ev`), Radix (menu, diálogo, painel lateral, tooltip) e Lucide; camada `src/ui`;
         Colaboradores migrado. Bateria: web 138 arquivos, 3960 testes (na rodada completa, 3 testes de tempo, 2 da guarda T200 e 1 da Nova admissão, falharam sob carga e passaram isolados); lint, typecheck e build da web verdes; CSS final 26,5 kB comprimido.
+      - **Nova admissão como assistente (seção 26):** cabeçalho próprio com "Voltar para
+        Colaboradores", etapas à esquerda no desktop, conteúdo em uma coluna e rodapé fixo com
+        progresso e ações; etapas com os dados reais (Dados pessoais; Dados profissionais e
+        vínculo; Endereço; Revisão e conclusão); lacunas registradas (CPF/RG, documentos, foto,
+        rascunho, nome social). Só web.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

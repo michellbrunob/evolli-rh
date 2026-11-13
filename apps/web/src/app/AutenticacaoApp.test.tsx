@@ -1621,10 +1621,10 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     const titulo = await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e lotação$/,
+      name: /Dados profissionais e vínculo$/,
     });
 
     await trocarPeloMenuPara("Empresa Beta");
@@ -1920,7 +1920,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
 
   /**
    * Nova admissão com o cadastro rápido de departamento aberto, pelo caminho
-   * que a interface oferece (T195): a etapa 1 é preenchida, "Continuar" leva
+   * que a interface oferece (T195): a etapa 1 é preenchida, "Próxima etapa" leva
    * à etapa 2 e o "+" abre o modal. Nesse estado a Nova admissão também é
    * edição pendente — não há como abrir o "+" com ela vazia. Que o modal,
    * sozinho, conte como pendência só com código ou nome digitados (e vazio
@@ -1935,10 +1935,10 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e lotação$/,
+      name: /Dados profissionais e vínculo$/,
     });
     const mais = await screen.findByRole("button", {
       name: "Cadastrar novo departamento",
@@ -1976,10 +1976,10 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     ]
       .filter((painel) => !painel.hasAttribute("hidden"))
       .map((painel) => painel.querySelector("h2")?.textContent);
-    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e lotação"]);
+    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e vínculo"]);
     expect(
       document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
-    ).toHaveTextContent("Etapa 2: Dados profissionais e lotação, etapa atual");
+    ).toHaveTextContent("Etapa 2: Dados profissionais e vínculo, etapa atual");
   }
 
   it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
