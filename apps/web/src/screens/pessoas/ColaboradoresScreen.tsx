@@ -1226,7 +1226,7 @@ export function ColaboradoresScreen({
         headingLevel={1}
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
-        description="Acompanhe quem está ativo, em admissão ou desligado, filtre pela lotação e pelo tipo de vínculo e abra a ficha de cada pessoa."
+        description="Quem está ativo, em admissão ou desligado, com a ficha de cada pessoa a um clique."
         actions={
           /* T194 — "Adicionar colaborador" abre o painel das formas de
              entrada. Só o que existe: nada de exportar. */
@@ -1279,27 +1279,41 @@ export function ColaboradoresScreen({
             </Button>
           </div>
         ) : (
-          <>
-            <dl className="colaboradores-screen__cartoes">
-              {(
-                [
-                  ["Ativos", contadores?.ativos],
-                  ["Em admissão", contadores?.emAdmissao],
-                  ["Desligados", contadores?.desligados],
+          /* T209 — faixa de indicadores: dois painéis (lado a lado quando
+             há espaço). À esquerda, "Ativos" em destaque e os demais totais
+             como fatos menores; à direita, a distribuição dos ativos por
+             tipo. Só números que o servidor conta (nada de ausência,
+             salário ou outro dado sem contrato). */
+          <div className="colaboradores-screen__faixa">
+            <div className="colaboradores-screen__painel-totais">
+              <dl className="colaboradores-screen__cartoes">
+                {(
                   [
-                    empresaAtiva
-                      ? "Total nesta empresa"
-                      : "Total no seu escopo",
-                    contadores?.total,
-                  ],
-                ] as const
-              ).map(([rotulo, numero]) => (
-                <div key={rotulo} className="colaboradores-screen__cartao">
-                  <dt>{rotulo}</dt>
-                  <dd>{valor(numero)}</dd>
-                </div>
-              ))}
-            </dl>
+                    ["Ativos", contadores?.ativos],
+                    ["Em admissão", contadores?.emAdmissao],
+                    ["Desligados", contadores?.desligados],
+                    [
+                      empresaAtiva
+                        ? "Total nesta empresa"
+                        : "Total no seu escopo",
+                      contadores?.total,
+                    ],
+                  ] as const
+                ).map(([rotulo, numero], i) => (
+                  <div
+                    key={rotulo}
+                    className={
+                      i === 0
+                        ? "colaboradores-screen__cartao colaboradores-screen__cartao--destaque"
+                        : "colaboradores-screen__cartao"
+                    }
+                  >
+                    <dt>{rotulo}</dt>
+                    <dd>{valor(numero)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
             <div className="colaboradores-screen__distribuicao">
               <h3 className="colaboradores-screen__distribuicao-titulo">
                 Ativos por tipo de vínculo
@@ -1340,7 +1354,7 @@ export function ColaboradoresScreen({
                 </>
               )}
             </div>
-          </>
+          </div>
         )}
       </section>
 

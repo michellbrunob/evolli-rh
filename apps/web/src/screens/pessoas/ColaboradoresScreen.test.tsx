@@ -7060,6 +7060,214 @@ describe("T209 — contrato de CSS da listagem operacional e do menu (375 px)", 
   });
 });
 
+// ---------------------------------------------------------------------------
+// T209 — refinamento da listagem: cabeçalho enxuto com só as ações reais,
+// faixa de indicadores (ativos em destaque e a distribuição por tipo) e barra
+// de busca e filtros em linha. Nada de indicador, aba ou ação sem contrato.
+// ---------------------------------------------------------------------------
+describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () => {
+  const CONTADORES_REAIS: ContadoresColaboradoresApi = {
+    ativos: 7,
+    inativos: 5,
+    emAdmissao: 2,
+    desligados: 3,
+    total: 12,
+    ativosPorTipo: {
+      clt: 5,
+      estagio: 0,
+      pj: 2,
+      temporario: 0,
+      outro_controlado: 0,
+    },
+  };
+
+  it("cabeçalho: título, descrição curta e só a ação que existe (sem exportar)", async () => {
+    render(<ColaboradoresScreen onNovaAdmissao={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const titulo = screen.getByRole("heading", {
+      level: 1,
+      name: "Colaboradores",
+    });
+    const cabecalho = titulo.closest(".evolli-page-header") as HTMLElement;
+    expect(cabecalho).toHaveTextContent(
+      "Quem está ativo, em admissão ou desligado, com a ficha de cada pessoa a um clique.",
+    );
+    expect(
+      within(cabecalho).getByRole("button", { name: /Adicionar colaborador/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /export/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /export/i })).toBeNull();
+  });
+
+  it("faixa: 'Ativos' em destaque, os demais totais como fatos, e a distribuição ao lado", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador1]),
+      contadores: CONTADORES_REAIS,
+    });
+    render(
+      <ColaboradoresScreen
+        empresaAtiva={{ nome: "Empresa Teste A", codigo: "TA" }}
+      />,
+    );
+    const regiao = await screen.findByRole("region", {
+      name: "Totais de Empresa Teste A, sem filtros",
+    });
+    await waitFor(() =>
+      expect(
+        regiao.querySelector(".colaboradores-screen__cartao--destaque dd"),
+      ).toHaveTextContent("7"),
+    );
+    const faixa = regiao.querySelector(".colaboradores-screen__faixa")!;
+    expect(faixa).not.toBeNull();
+    // Dois painéis, na ordem: totais e distribuição.
+    expect([...faixa.children].map((p) => p.className.split(" ")[0])).toEqual([
+      "colaboradores-screen__painel-totais",
+      "colaboradores-screen__distribuicao",
+    ]);
+    const destaque = regiao.querySelector(
+      ".colaboradores-screen__cartao--destaque",
+    )!;
+    expect(destaque.querySelector("dt")).toHaveTextContent("Ativos");
+    expect(
+      [
+        ...regiao.querySelectorAll(
+          ".colaboradores-screen__cartao:not(.colaboradores-screen__cartao--destaque) dt",
+        ),
+      ].map((dt) => dt.textContent),
+    ).toEqual(["Em admissão", "Desligados", "Total nesta empresa"]);
+  });
+
+  it("nada de indicador, aba ou ação sem contrato: ausência, salário, CPF, contato, exportação, férias, escala, organograma", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador1]),
+      contadores: CONTADORES_REAIS,
+    });
+    render(
+      <ColaboradoresScreen onNovaAdmissao={vi.fn()} onAbrirFicha={vi.fn()} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const visivel = document.body.textContent ?? "";
+    for (const proibido of [
+      /ausent/i,
+      /sal[aá]rio/i,
+      /\bCPF\b/,
+      /telefone/i,
+      /e-mail/i,
+      /exportar/i,
+      /f[eé]rias/i,
+      /escala/i,
+      /organograma/i,
+      /calend[aá]rio/i,
+    ]) {
+      expect(visivel).not.toMatch(proibido);
+    }
+    expect(
+      within(screen.getByRole("tablist", { name: "Grupos de colaboradores" }))
+        .getAllByRole("tab")
+        .map((t) => t.textContent?.replace(/\d+$/, "")),
+    ).toEqual([
+      "Ativos",
+      "Em admissão",
+      "Desligados",
+      "Todos",
+      "Jornada de trabalho",
+    ]);
+  });
+
+  it("a barra de busca e filtros mantém rótulos, ordem e o botão de buscar", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const barra = document.querySelector(".colaboradores-screen__filtros")!;
+    expect(
+      [...barra.querySelectorAll("label")].map((l) => l.textContent),
+    ).toEqual([
+      "Buscar por nome ou matrícula",
+      "Departamento",
+      "Cargo",
+      "Tipo de vínculo",
+    ]);
+    expect(
+      within(barra as HTMLElement).getByRole("button", { name: "Buscar" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("T209 — contrato de CSS da faixa de indicadores e da barra de filtros", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/ColaboradoresScreen.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const inicio = css.indexOf("/* ---- T209 — faixa de indicadores");
+  const bloco = inicio > -1 ? css.slice(inicio) : "";
+
+  it("o bloco existe e usa só tokens", () => {
+    expect(inicio).toBeGreaterThan(-1);
+    expect(bloco).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(bloco).not.toMatch(/\brgba?\(|\bhsla?\(/);
+  });
+
+  it("faixa: uma coluna por padrão; dois painéis lado a lado quando o contêiner tem espaço, com divisória", () => {
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__indicadores \{[^}]*container-type: inline-size;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__faixa \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*min-width: 0;/,
+    );
+    expect(bloco).toMatch(
+      /@container \(min-width: 36rem\) \{[^@]*\.colaboradores-screen__faixa \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/,
+    );
+    expect(bloco).toMatch(
+      /@container \(min-width: 36rem\) \{[^@]*\.colaboradores-screen__distribuicao \{[^}]*border-left: 1px solid var\(--divider-soft\);/,
+    );
+  });
+
+  it("'Ativos' em destaque ocupa a linha toda; os demais totais são menores", () => {
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__cartao--destaque \{[^}]*grid-column: 1 \/ -1;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__cartao--destaque dd \{[^}]*font-size: var\(--text-display\);/,
+    );
+  });
+
+  it("a barra em linha vale só acima de 640 px: no celular, a coluna da T178 continua", () => {
+    const linha =
+      /@media \(min-width: 641px\) \{([\s\S]*?)\n\}/.exec(bloco)?.[1] ?? "";
+    expect(linha).toMatch(
+      /\.colaboradores-screen__filtros \{[^}]*align-items: flex-end;/,
+    );
+    expect(linha).toMatch(
+      /\.colaboradores-screen__filtros > \.evolli-field \{[^}]*flex: 1 1 10rem;/,
+    );
+    expect(linha).toMatch(
+      /\.colaboradores-screen__filtros > \.colaboradores-screen__busca \{[^}]*flex: 2 1 18rem;/,
+    );
+    // Fora da mídia, nenhuma regra de flex nos filtros (anularia a coluna).
+    const foraDaMidia = bloco.replace(
+      /@media \(min-width: 641px\) \{[\s\S]*?\n\}/,
+      "",
+    );
+    expect(foraDaMidia).not.toMatch(
+      /\.colaboradores-screen__filtros[^{]*\{[^}]*flex:/,
+    );
+    expect(foraDaMidia).not.toMatch(
+      /\.colaboradores-screen__filtros \{[^}]*align-items:/,
+    );
+  });
+
+  it("barra de filtros: campos alinhados pela base, que quebram linha e encolhem", () => {
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__filtros \{[^}]*align-items: flex-end;[^}]*min-width: 0;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__filtros > \.evolli-field \{[^}]*flex: 1 1 10rem;[^}]*min-width: 0;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__filtros > \.colaboradores-screen__busca \{[^}]*flex: 2 1 18rem;/,
+    );
+  });
+});
+
 /**
  * T200 — as telas montadas como no shell: com o registro de edições e a
  * guarda de saída (sem ela, a saída não pergunta).

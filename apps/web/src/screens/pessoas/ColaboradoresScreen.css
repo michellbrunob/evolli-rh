@@ -852,3 +852,91 @@
 .colaboradores-screen__menu-item:focus {
   background: var(--status-info-surface);
 }
+
+/* ---- T209 — faixa de indicadores e barra de filtros. A faixa reúne os
+   totais (com "Ativos" em destaque) e a distribuição por tipo; dois painéis
+   lado a lado quando o PRÓPRIO bloco tem espaço (não a janela: o menu
+   lateral aberto estreita o conteúdo). A barra de busca e filtros fica numa
+   linha, alinhada pela base dos campos, e quebra linha antes de alargar a
+   página. Só tokens. ---- */
+.colaboradores-screen__indicadores {
+  container-type: inline-size;
+}
+
+.colaboradores-screen__faixa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.colaboradores-screen__painel-totais {
+  min-width: 0;
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartoes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartao {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartao dd {
+  font-size: var(--text-lead);
+}
+
+.colaboradores-screen__cartao--destaque {
+  grid-column: 1 / -1;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.colaboradores-screen__cartao--destaque dt {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__cartao--destaque dd {
+  font-size: var(--text-display);
+}
+
+@container (min-width: 36rem) {
+  .colaboradores-screen__faixa {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .colaboradores-screen__distribuicao {
+    align-content: start;
+    padding-left: var(--space-lg);
+    border-left: 1px solid var(--divider-soft);
+  }
+}
+
+.colaboradores-screen__filtros select {
+  width: 100%;
+}
+
+/* Acima de 640 px: uma linha que quebra. Abaixo, vale a coluna do celular
+   (lá, um `flex-basis` viraria ALTURA — o vão da T172). */
+@media (min-width: 641px) {
+  .colaboradores-screen__filtros {
+    align-items: flex-end;
+    gap: var(--space-sm) var(--space-md);
+    min-width: 0;
+  }
+
+  .colaboradores-screen__filtros > .evolli-field {
+    flex: 1 1 10rem;
+    min-width: 0;
+  }
+
+  .colaboradores-screen__filtros > .colaboradores-screen__busca {
+    flex: 2 1 18rem;
+    flex-wrap: nowrap;
+  }
+}
