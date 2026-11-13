@@ -14,15 +14,17 @@
  * cartão-rótulo): teclado, leitor de tela e estado desabilitado vêm do
  * navegador, sem ARIA inventado. O botão do rodapé inicia a forma escolhida.
  *
- * A janela é o `Modal` (foco preso, Escape, foco devolvido a quem abriu), na
- * posição lateral. Sem formulário a salvar, nunca vira edição pendente
+ * A janela é o `Sheet` da camada `src/ui` (T209, Radix): entra pela direita,
+ * foco no título, foco preso, Escape e clique no fundo fecham, foco devolvido
+ * a quem abriu, fundo inerte e rolagem travada. Sem formulário a salvar,
+ * nunca vira edição pendente
  * (T189): abrir e fechar não pedem confirmação, e a troca de empresa segue
  * livre. Ícones: SVG desenhado aqui, com geometria simples, sempre
  * `aria-hidden` — nenhum vem de conjunto de terceiros (decisão da T159).
  */
 import { useId, useState } from "react";
 import type { ReactNode } from "react";
-import { Button, Modal } from "../../components";
+import { Button, Sheet } from "../../ui";
 import "./PainelAdicionarColaborador.css";
 
 export const TITULO_PAINEL_ADICIONAR = "Adicionar colaborador";
@@ -149,19 +151,18 @@ export function PainelAdicionarColaborador({
   }
 
   return (
-    <Modal
+    <Sheet
       aberto={aberto}
       titulo={TITULO_PAINEL_ADICIONAR}
       descricao="Escolha o caminho mais prático para trazer alguém para a equipe."
-      posicao="lateral"
       icone={<IconeAdicionarPessoa />}
       onFechar={onFechar}
       rodape={
         <>
-          <Button type="button" variant="secondary" onClick={onFechar}>
+          <Button variant="secondary" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button type="button" onClick={iniciar}>
+          <Button variant="primary" onClick={iniciar}>
             {ROTULO_INICIAR_CADASTRO}
           </Button>
         </>
@@ -245,6 +246,6 @@ export function PainelAdicionarColaborador({
           );
         })}
       </fieldset>
-    </Modal>
+    </Sheet>
   );
 }

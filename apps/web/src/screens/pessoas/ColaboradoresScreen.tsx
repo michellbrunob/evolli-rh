@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   Button,
-  DataTable,
   EmptyState,
   FormField,
   PageHeader,
@@ -58,6 +57,22 @@ import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
+import {
+  Card,
+  Input,
+  Select,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TabsList,
+  TabsPanel,
+  TabsTrigger,
+} from "../../ui";
 import "./ColaboradoresScreen.css";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -939,21 +954,6 @@ export function ColaboradoresScreen({
     trocar();
   }
 
-  function aoTeclarNaAba(evento: KeyboardEvent<HTMLButtonElement>) {
-    const atual = ABAS_DA_LISTAGEM.indexOf(
-      (evento.currentTarget.dataset.aba ?? aba) as AbaDaListagem,
-    );
-    const n = ABAS_DA_LISTAGEM.length;
-    let alvo: number | null = null;
-    if (evento.key === "ArrowRight") alvo = (atual + 1) % n;
-    if (evento.key === "ArrowLeft") alvo = (atual - 1 + n) % n;
-    if (evento.key === "Home") alvo = 0;
-    if (evento.key === "End") alvo = n - 1;
-    if (alvo === null) return;
-    evento.preventDefault();
-    document.getElementById(idDaAba(ABAS_DA_LISTAGEM[alvo]!))?.focus();
-  }
-
   /**
    * T178 — enviar a busca. Um termo novo relê pelo efeito (na página 1); o
    * MESMO termo reenviado também relê, porque reenviar é pedir de novo.
@@ -1246,7 +1246,7 @@ export function ColaboradoresScreen({
       {/* T199 — indicadores do escopo inteiro, como o servidor os contou:
           não acompanham aba, busca nem filtros (o rótulo diz isso). Sem
           região viva: o número não é anunciado a cada filtro. */}
-      <section
+      <Card
         className="colaboradores-screen__indicadores"
         aria-labelledby="colaboradores-indicadores-titulo"
       >
@@ -1357,27 +1357,25 @@ export function ColaboradoresScreen({
             </div>
           </div>
         )}
-      </section>
+      </Card>
 
       <div className="colaboradores-screen__painel">
-        <div
-          role="tablist"
-          aria-label="Grupos de colaboradores"
+        {/* T209 — Tabs da camada `src/ui` (ativação manual: setas, Home e
+            End só movem o foco; clique, Enter ou Espaço trocam). */}
+        <TabsList
+          label="Grupos de colaboradores"
           className="colaboradores-screen__abas"
         >
           {ABAS_DA_LISTAGEM.map((a) => {
             const selecionada = a === aba;
             const numero = contadores ? totalDaAba(a, contadores) : null;
             return (
-              <button
+              <TabsTrigger
                 key={a}
-                type="button"
-                role="tab"
                 id={idDaAba(a)}
                 data-aba={a}
-                aria-selected={selecionada}
-                aria-controls={idDoPainel}
-                tabIndex={selecionada ? 0 : -1}
+                selected={selecionada}
+                controls={idDoPainel}
                 className={
                   selecionada
                     ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
@@ -1389,7 +1387,6 @@ export function ColaboradoresScreen({
                   ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
                   : {})}
                 onClick={() => trocarAba(a)}
-                onKeyDown={aoTeclarNaAba}
               >
                 {ROTULO_DA_ABA[a]}
                 {numero !== null ? (
@@ -1400,15 +1397,14 @@ export function ColaboradoresScreen({
                     {numero}
                   </span>
                 ) : null}
-              </button>
+              </TabsTrigger>
             );
           })}
-        </div>
+        </TabsList>
 
-        <section
-          role="tabpanel"
+        <TabsPanel
           id={idDoPainel}
-          aria-labelledby={idDaAba(aba)}
+          labelledBy={idDaAba(aba)}
           className="colaboradores-screen__painel-conteudo"
         >
           {aba === "jornada" ? (
@@ -1447,7 +1443,7 @@ export function ColaboradoresScreen({
                     label="Buscar por nome ou matrícula"
                   >
                     {(control) => (
-                      <input
+                      <Input
                         ref={campoBuscaRef}
                         type="search"
                         maxLength={BUSCA_COLABORADORES_MAXIMO}
@@ -1488,7 +1484,7 @@ export function ColaboradoresScreen({
                         : {})}
                     >
                       {(control) => (
-                        <select
+                        <Select
                           value={departamentoId ?? ""}
                           onChange={(e) =>
                             mudarEstado({
@@ -1512,13 +1508,13 @@ export function ColaboradoresScreen({
                                 </option>
                               ))
                             : null}
-                        </select>
+                        </Select>
                       )}
                     </FormField>
 
                     <FormField id="colaboradores-filtro-cargo" label="Cargo">
                       {(control) => (
-                        <select
+                        <Select
                           value={cargoId ?? ""}
                           onChange={(e) =>
                             mudarEstado({
@@ -1542,7 +1538,7 @@ export function ColaboradoresScreen({
                                 </option>
                               ))
                             : null}
-                        </select>
+                        </Select>
                       )}
                     </FormField>
                   </>
@@ -1553,7 +1549,7 @@ export function ColaboradoresScreen({
                   label="Tipo de vínculo"
                 >
                   {(control) => (
-                    <select
+                    <Select
                       value={tipo ?? ""}
                       onChange={(e) =>
                         mudarEstado({
@@ -1571,7 +1567,7 @@ export function ColaboradoresScreen({
                           {ROTULO_TIPO_DE_VINCULO[t]}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                 </FormField>
 
@@ -1813,13 +1809,37 @@ export function ColaboradoresScreen({
                       })()
                     )
                   ) : (
-                    <DataTable
-                      caption={`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
-                      captionVisible={false}
-                      columns={colunasColaboradores}
-                      rows={colaboradores}
-                      rowKey={(c) => c.id}
-                    />
+                    /* T209 — primitivas de tabela da camada `src/ui`: a
+                       mesma semântica e as mesmas classes do DataTable. */
+                    <TableContainer
+                      label={`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
+                    >
+                      <Table>
+                        <TableCaption visible={false}>
+                          {`Colaboradores — ${ROTULO_DA_ABA[aba]}`}
+                        </TableCaption>
+                        <TableHeader>
+                          <TableRow>
+                            {colunasColaboradores.map((coluna) => (
+                              <TableHead key={coluna.key}>
+                                {coluna.header}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {colaboradores.map((c) => (
+                            <TableRow key={c.id}>
+                              {colunasColaboradores.map((coluna) => (
+                                <TableCell key={coluna.key}>
+                                  {coluna.cell(c)}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )}
 
                   {/* T164/R-2 — a navegação fica fora do ramo que troca na
@@ -1833,7 +1853,7 @@ export function ColaboradoresScreen({
                   <div className="colaboradores-screen__rodape-tabela">
                     <label className="colaboradores-screen__tamanho">
                       <span>Itens por página</span>
-                      <select
+                      <Select
                         value={String(tamanho)}
                         onChange={(evento) =>
                           trocarTamanho(evento.target.value)
@@ -1844,7 +1864,7 @@ export function ColaboradoresScreen({
                             {n}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
                       <nav
@@ -1919,7 +1939,7 @@ export function ColaboradoresScreen({
               )}
             </>
           )}
-        </section>
+        </TabsPanel>
       </div>
 
       <Surface

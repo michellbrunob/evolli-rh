@@ -4423,8 +4423,11 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
         within(painel).getByRole("heading", { level: 2 }),
       );
       fechar();
-      expect(screen.queryByRole("dialog")).toBeNull();
-      expect(document.activeElement).toBe(botaoAdicionar());
+      // T209 — o Sheet (Radix) desmonta e devolve o foco no ciclo seguinte.
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() =>
+        expect(document.activeElement).toBe(botaoAdicionar()),
+      );
       expect(onNovaAdmissao).not.toHaveBeenCalled();
     },
   );
@@ -7385,6 +7388,62 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
         ".colaboradores-screen__barra-tipos .colaboradores-screen__barra-tipo--aprendiz",
       ),
     ).not.toBeNull();
+  });
+});
+
+describe("T209 — Colaboradores sobre a camada de interface (src/ui)", () => {
+  it("busca, filtros e tamanho de página são os controles nativos da camada", async () => {
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(
+      screen.getByRole("searchbox", { name: "Buscar por nome ou matrícula" }),
+    ).toHaveAttribute("data-ui", "input");
+    for (const rotulo of [
+      "Departamento",
+      "Cargo",
+      "Tipo de vínculo",
+      "Itens por página",
+    ]) {
+      const controle = screen.getByLabelText(rotulo);
+      expect(controle.tagName).toBe("SELECT");
+      expect(controle).toHaveAttribute("data-ui", "select");
+    }
+  });
+
+  it("abas, indicadores e tabela vêm da camada, com as mesmas classes e semântica", async () => {
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    const abas = within(
+      screen.getByRole("tablist", { name: "Grupos de colaboradores" }),
+    ).getAllByRole("tab");
+    expect(abas[0]).toHaveAttribute("data-state", "active");
+    expect(abas[1]).toHaveAttribute("data-state", "inactive");
+    const indicadores = document.querySelector(
+      ".colaboradores-screen__indicadores",
+    )!;
+    expect(indicadores.className).toMatch(
+      /ev:border-\[var\(--divisor-cor-forte\)\]/,
+    );
+    expect(tabela.closest('[role="region"]')).toHaveClass("evolli-datatable");
+    expect(within(tabela).getAllByRole("columnheader")[0]).toHaveAttribute(
+      "scope",
+      "col",
+    );
+  });
+
+  it("o painel 'Adicionar colaborador' é o Sheet da camada", async () => {
+    render(<ColaboradoresScreen onNovaAdmissao={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Adicionar colaborador/ })[0]!,
+    );
+    const painel = await screen.findByRole("dialog", {
+      name: "Adicionar colaborador",
+    });
+    expect(painel).toHaveAttribute("data-lado", "direita");
+    expect(painel).toHaveAttribute("aria-modal", "true");
   });
 });
 

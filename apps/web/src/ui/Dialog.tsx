@@ -127,6 +127,7 @@ function Janela({
         <RadixDialog.Overlay className="ev-janela__fundo ev:fixed ev:inset-0 ev:z-[100] ev:bg-[rgb(29_29_31/45%)]" />
         <RadixDialog.Content
           data-lado={lado}
+          aria-modal="true"
           className={cn(
             "ev-janela ev:fixed ev:z-[100] ev:flex ev:flex-col ev:bg-[var(--surface-canvas)] ev:outline-none",
             lado === "direita"
