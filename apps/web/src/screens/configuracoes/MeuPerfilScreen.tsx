@@ -810,7 +810,8 @@ export function MeuPerfilScreen({
               <div className="configuracoes__falha" role="alert">
                 <p className="configuracoes__falha-texto">
                   O seu perfil foi alterado em outra sessão depois que esta tela
-                  foi aberta. Nada foi salvo; o seu texto continua no campo.
+                  foi aberta. Nada foi salvo; o que você alterou continua na
+                  tela.
                 </p>
                 <Button
                   type="button"

@@ -894,6 +894,11 @@ describe("T208 — foto de perfil: enviar", () => {
     expect(
       screen.getByRole("group", { name: "Prévia da nova foto" }),
     ).toBeInTheDocument();
+    // A frase vale para o nome e para a foto: nada de "texto no campo".
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "o que você alterou continua na tela",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/texto|campo/);
   });
 
   it("sessão encerrada (401): diz para entrar de novo", async () => {
