@@ -3386,7 +3386,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         58 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do
         squash e `git diff --check` verdes.
       - **Foto de perfil (seções 27 e 28 do dossiê; ADR 0018):** decisões FP-1 a FP-8 aprovadas
-        em 2026-11-13; implementada e validada localmente, sem push. PostgreSQL em tabela própria
+        em 2026-11-13; implementada e validada localmente, com a validação visual aprovada em
+        2026-11-13 (seção 29), sem push. PostgreSQL em tabela própria
         (`access_user_foto`), `GET`/`PUT`/`DELETE /v1/users/me/foto` só da titular, validação pelo
         conteúdo, 5 MB, 128 px e 25 milhões de pixels, regravação no servidor em JPEG 256 × 256
         sem metadados (dependência `sharp` 0.35.5), entrega privada sem cache persistente, remoção

@@ -3213,12 +3213,13 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Foto de perfil:** decisões FP-1 a FP-8 aprovadas em 2026-11-13
 ([ADR 0018](../docs/adr/0018-foto-de-perfil-da-conta-no-postgresql.md)); implementada e validada
-localmente, sem push (seções 27 e 28 do dossiê). Validação local: web 133 arquivos, 3797 testes;
+localmente, com a validação visual aprovada em 2026-11-13, sem push (seções 27 a 29 do
+dossiê). Validação local: web 133 arquivos, 3797 testes;
 API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes;
 scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
 `spec:check`, prévia do squash e `git diff --check` verdes.
 
-**Pendente:** validação visual humana do nome de exibição e da foto; push e revisão da
+**Pendente:** push da ampliação (nome de exibição e foto) para a PR #201 e revisão da
 PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
