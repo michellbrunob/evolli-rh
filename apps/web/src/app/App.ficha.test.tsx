@@ -2809,13 +2809,20 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
     window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&pagina=2`);
     const { unmount } = render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
-    const entradas = window.history.length;
+    // Empilhar é `pushState` com a URL nova (o tamanho do histórico depende
+    // da ordem dos testes: entradas à frente são truncadas).
+    const empilhar = vi.spyOn(window.history, "pushState");
 
     fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
     await waitFor(() =>
       expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`),
     );
-    expect(window.history.length).toBe(entradas + 1);
+    expect(empilhar).toHaveBeenCalledWith(
+      expect.anything(),
+      "",
+      expect.stringContaining(`${LISTAGEM}?aba=todos&tamanho=50`),
+    );
+    empilhar.mockRestore();
     await waitFor(() =>
       expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 }),
     );
@@ -2837,11 +2844,13 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
 
   it("tamanho inválido na URL cai em 20 e é corrigido no lugar; nada inválido vira consulta", async () => {
     window.history.replaceState(null, "", `/${LISTAGEM}?tamanho=1000`);
-    const entradas = window.history.length;
+    const empilhar = vi.spyOn(window.history, "pushState");
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     await waitFor(() => expect(window.location.hash).toBe(LISTAGEM));
-    expect(window.history.length).toBe(entradas);
+    // Corrigida no lugar: nenhuma entrada nova.
+    expect(empilhar).not.toHaveBeenCalled();
+    empilhar.mockRestore();
     for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
       expect([1, 20, 100]).toContain(consulta?.tamanhoPagina);
       expect(consulta?.tamanhoPagina).not.toBe(1000);
@@ -2876,7 +2885,7 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
-    const entradas = window.history.length;
+    const empilhar = vi.spyOn(window.history, "pushState");
     const botao = within(tabela).getByRole("button", {
       name: `Ações: ${ana.nome}`,
     });
@@ -2884,7 +2893,12 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
-    expect(window.history.length).toBe(entradas + 1);
+    expect(empilhar).toHaveBeenCalledWith(
+      expect.anything(),
+      "",
+      expect.stringContaining(rotaDe(ana, "documentos")),
+    );
+    empilhar.mockRestore();
     expect(abaSelecionada()).toHaveTextContent("Documentos");
 
     fireEvent.click(
