@@ -3225,6 +3225,30 @@ resolvida no primeiro commit da T209.
 
 **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
+## Colaboradores — T209 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                                   |
+| ------ | ----------------- | ------------------------------------------------------------------------------------- |
+| T209   | **Em preparação** | Levantamento e decisões para tornar Colaboradores uma área de trabalho do RH e do DP. |
+
+**Escopo da preparação:** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t209-dossie-colaboradores.md):
+
+- rotas, URL, listagem, abas, busca, filtros, paginação, indicadores, tabela, ficha, entrada de
+  colaboradores e contratos da API; isolamento por empresa e comportamento por papel;
+- exposição de campos (sem CPF, salário nem contatos na listagem), exportação, importação e
+  ações em lote;
+- acessibilidade, foco, teclado, URL, respostas atrasadas, 375 px, guarda de saída e troca de
+  empresa;
+- classificação em contratos atuais, dependências de API, migration, RBAC, auditoria ou decisão
+  e itens indisponíveis; primeira fatia proposta e decisões C-1 a C-15 para aprovação.
+
+**Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
+registrado.
+
+**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed, Docker,
+dependências, lockfile, workflow, push, PR, promoção e merge.
+
 ## Próxima ação autorizável
 
 1. ~~**Decidir o pacote da T150**~~ — **cumprido pela T151.** O proprietário aprovou o recorte em

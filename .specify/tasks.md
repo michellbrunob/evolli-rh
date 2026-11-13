@@ -3420,6 +3420,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         `git diff --check` verdes.
       - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
+106.  **T209 - Colaboradores (preparação)**
+      - **Estado:** **em preparação**. Branch `codex/t209-colaboradores`, a partir do squash
+        `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201).
+      - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
+        e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
+        abas, busca, filtros, paginação, indicadores, tabela, ficha, permissões, isolamento por
+        empresa, exportação, importação e exposição de campos; separar o que cabe nos contratos
+        atuais, o que exige API, migration, RBAC, auditoria ou decisão e o que fica
+        indisponível; propor a primeira fatia (listagem operacional, atalhos por pessoa e
+        importação CSV sobre o contrato atual de admissão) e as decisões C-1 a C-15 para
+        aprovação, no [dossiê](../docs/decisions/t209-dossie-colaboradores.md).
+      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
+        Docker, dependências, lockfile, workflow, push, PR, promoção e merge; CPF, salário,
+        contatos na listagem e exportação de pessoas.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
