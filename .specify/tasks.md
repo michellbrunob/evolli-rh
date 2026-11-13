@@ -3437,6 +3437,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         animação reutilizável dos painéis laterais (Modal lateral, sem temporizador, com
         movimento reduzido); massa sintética por tipo no banco próprio da prévia (Aprendiz
         indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
+      - **Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento
+        pelo fundo do painel lateral, com a guarda de alterações, aprovado; Aprendiz autorizado
+        como próxima ampliação da T209, em levantamento (seção 23, decisões AP-1 a AP-9
+        pendentes; nada implementado).
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

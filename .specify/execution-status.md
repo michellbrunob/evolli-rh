@@ -3259,6 +3259,11 @@ de filtros; padrão de divisões sutis com tokens, aplicado ao shell e a Colabor
 módulo); animação reutilizável dos painéis laterais; massa sintética por tipo no banco próprio da
 prévia (Aprendiz indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
 
+**Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento pelo
+fundo do painel lateral, com a guarda de alterações, aprovado. **Próxima ampliação:** Aprendiz
+como tipo de vínculo, em levantamento (seção 23; decisões AP-1 a AP-9 pendentes; nada
+implementado).
+
 **Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
 registrado.
 

@@ -508,3 +508,76 @@ controles e números reais do Evolli.
 - **Limite do ambiente:** o painel do navegador estava oculto (sem pintura): as animações não
   avançam e o `animationend` não é despachado por si; a desmontagem foi confirmada com o evento
   nativo. Capturas de tela não foram feitas.
+
+## 22. Aprovações de 2026-11-13 (depois da validação visual)
+
+- **Visual dos blocos atuais da listagem: aprovado** — Blocos A e B, faixa de indicadores,
+  barra de filtros, divisões sutis e animação do painel lateral (seções 14 a 21).
+- **Fechamento pelo fundo do painel lateral, com a guarda de alterações: aprovado** — o clique
+  no fundo pede o fechamento pelo caminho do "Fechar" (confirmação com alteração pendente;
+  nada fecha durante um envio). Na janela central, o fundo segue sem fechar.
+- **Inclusão de Aprendiz: autorizada como próxima ampliação da T209, a começar pelo
+  levantamento** (seção 23). Nenhum código, migration ou dado foi alterado para isso.
+
+## 23. Levantamento: Aprendiz como tipo de vínculo (próxima ampliação)
+
+Retoma a D16 (aprovada) e a D21 (pendente) da T194 (seção 5.1 daquele dossiê). Só leitura.
+
+### 23.1 Onde o tipo de vínculo vive hoje
+
+- **Banco:** `enum TipoVinculo { clt, estagio, pj, temporario, outro_controlado }`, usado só
+  em `VinculoFuncional.tipo` (`apps/api/prisma/schema.prisma:986-992`, `:1122`). Incluir um
+  valor é migration aditiva (`ALTER TYPE "TipoVinculo" ADD VALUE 'aprendiz'`); o valor novo
+  não pode ser usado na mesma transação da migration.
+- **API:** a lista fechada `TIPOS_VINCULO` valida admissão, novo vínculo e filtros
+  (`apps/api/src/pessoas/dto/pessoas.dto.ts:42-48`); os contadores `ativosPorTipo` têm uma
+  chave por tipo (`colaborador.service.ts:328-334`); ponto e solicitações repetem a lista em
+  DTOs próprios (`apps/api/src/ponto/dto/ponto.dto.ts`,
+  `apps/api/src/solicitacoes/solicitacoes.ts`, `solicitacoes.types.ts`,
+  `apps/api/src/solicitacoes-pessoas/dto/solicitacoes-pessoas.dto.ts`).
+- **Web:** `TIPOS_DE_VINCULO` (URL e filtros, `rotasDoShell.ts:192-198`); rótulos e cores
+  da distribuição (`ColaboradoresScreen`, `DashboardScreen`); opções da Nova admissão; ficha,
+  Dados contratuais, Histórico funcional, Equipe, ponto e solicitações, cada um com rótulo
+  por tipo; clientes da API (`colaboradoresClient`, `movimentacaoClient`, `pontoClient`,
+  `solicitacoesPessoasClient`).
+- **Sem prazo no vínculo:** o vínculo tem admissão e desligamento, mas **não** tem data de
+  término prevista; o contrato de aprendizagem é por prazo determinado.
+- **Data de nascimento:** obrigatória na admissão (perfil pessoal, T177), então a idade na
+  admissão é calculável; **deficiência não existe** no Evolli (dado sensível).
+
+### 23.2 Regras legais a confirmar (Jurídico, RH e DP — nada adotado)
+
+Referência geral da CLT (arts. 428 a 433), a confirmar com o Jurídico pela redação vigente:
+contrato por prazo determinado e limitado; faixa etária, com exceção para pessoa com
+deficiência; jornada reduzida; vínculo com programa e entidade formadora; cota por
+estabelecimento; hipóteses próprias de término.
+
+### 23.3 Proposta de fatia (mínima, sem regra legal no sistema)
+
+1. Migration aditiva com `aprendiz` no enum; `TIPOS_VINCULO` e as demais listas da API e da
+   web com o novo valor, na ordem CLT, Estágio, **Aprendiz**, PJ, Temporário, Outro
+   controlado.
+2. Rótulo "Aprendiz" em todos os pontos de 23.1; cor própria na distribuição (Colaboradores e
+   Dashboard), de token já existente, com contraste conferido.
+3. Contadores `ativosPorTipo` com a chave nova; filtro por tipo e URL (`tipo=aprendiz`).
+4. Nova admissão e novo vínculo aceitando Aprendiz, **sem campo extra**.
+5. Testes que falham antes, E2E com PostgreSQL real (admissão, listagem, contadores, filtro,
+   isolamento e permissões), mutações e validação no navegador; massa sintética de Aprendiz
+   no banco próprio da prévia.
+
+### 23.4 Decisões para aprovação
+
+| Id   | Decisão                       | Recomendação                                                                                 | Alternativa                                        |
+| ---- | ----------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| AP-1 | Escopo da ampliação           | fatia mínima de 23.3: só o tipo, sem regra legal no sistema                                  | tipo com as regras de AP-2 a AP-6                  |
+| AP-2 | Prazo determinado             | fora desta fatia; registrar como pendência (exige campo novo e migration)                    | data de término prevista obrigatória para Aprendiz |
+| AP-3 | Idade na admissão             | sem validação (bloquear erraria a exceção de deficiência, dado que o Evolli não tem)         | aviso não bloqueante pela data de nascimento       |
+| AP-4 | Programa e entidade formadora | fora (dado novo, com ficha de tratamento)                                                    | registrar curso e entidade                         |
+| AP-5 | Jornada                       | sem validação; a jornada segue pela tabela de horário existente                              | alerta de jornada acima do limite                  |
+| AP-6 | Término e conversão           | pelos fluxos atuais (desligamento; outro tipo = novo vínculo)                                | fluxo próprio de conversão                         |
+| AP-7 | Cota                          | fora (relatório futuro)                                                                      | indicador de cota                                  |
+| AP-8 | Ordem e rótulo                | "Aprendiz", depois de Estágio                                                                | no fim da lista                                    |
+| AP-9 | Onde aparece                  | em todos os pontos de 23.1 (Colaboradores, Dashboard, ficha, histórico, ponto, solicitações) | só Pessoas, com os demais em fatia própria         |
+
+**Fora desta ampliação:** CPF, deficiência, salário, programa de aprendizagem, cota, prazo e
+conversão automática; importação (Bloco C segue pausado).
