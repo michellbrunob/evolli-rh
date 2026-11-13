@@ -3439,8 +3439,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
       - **Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento
         pelo fundo do painel lateral, com a guarda de alterações, aprovado; Aprendiz autorizado
-        como próxima ampliação da T209, em levantamento (seção 23, decisões AP-1 a AP-9
-        pendentes; nada implementado).
+        como próxima ampliação da T209 (seção 23).
+      - **Aprendiz (seção 24):** AP-1 a AP-9 aprovadas; migration aditiva
+        `20261113180000_tipo_vinculo_aprendiz`; tipo propagado à API e a todas as superfícies
+        que exibem, filtram ou contam o tipo; cor própria; sem regra legal. Bateria: web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

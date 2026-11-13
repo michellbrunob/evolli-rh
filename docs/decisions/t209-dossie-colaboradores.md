@@ -581,3 +581,36 @@ estabelecimento; hipóteses próprias de término.
 
 **Fora desta ampliação:** CPF, deficiência, salário, programa de aprendizagem, cota, prazo e
 conversão automática; importação (Bloco C segue pausado).
+
+## 24. Aprendiz implementado (fatia mínima, AP-1 a AP-9 aprovadas em 2026-11-13)
+
+- **Migration:** `20261113180000_tipo_vinculo_aprendiz`, só
+  `ALTER TYPE "TipoVinculo" ADD VALUE 'aprendiz' AFTER 'estagio'`; nenhum dado existente lido
+  ou alterado (teste de E2E confere o SQL e a ordem do enum no PostgreSQL).
+- **API:** catálogo controlado `TIPOS_VINCULO` (admissão, novo vínculo e filtro `tipoVinculo`)
+  e contadores `ativosPorTipo` com a chave `aprendiz`, na ordem CLT, Estágio, Aprendiz, PJ,
+  Temporário, Outro controlado. RBAC e auditoria sem mudança.
+- **Web (superfícies atualizadas):** Colaboradores (filtro, coluna Tipo, distribuição, URL
+  `tipo=aprendiz` e chip), Nova admissão (opção, sem campo extra), ficha (cabeçalho, Dados
+  contratuais, Registros de ponto, Solicitações), Dados contratuais da empresa, Histórico
+  funcional, Dashboard (distribuição, link para a listagem filtrada e tabela) e Equipe; cliente
+  `colaboradoresClient`. Cor própria `--cor-tipo-aprendiz` (contraste acima de 3:1 sobre o
+  branco e o fundo do Dashboard, por teste).
+- **Fora (AP-2 a AP-7):** prazo, término, conversão, cota, programa, entidade formadora,
+  jornada e idade; nenhuma alegação de conformidade legal. O desligamento de sempre encerra o
+  vínculo (provado em E2E).
+- **Testes que falham antes:** API unitária, web (19) e o E2E dedicado
+  `tipo-vinculo-aprendiz.e2e-spec.ts` (migration, admissão por RH e DP, negação a master
+  técnico, gestor e colaborador, outra empresa, variações recusadas, filtro, grupos,
+  contadores por empresa, master global e escopado, desligamento).
+- **Bateria:** web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
+- **Prévia (banco próprio da T209):** migration aplicada; massa "Teste T209 … Aprendiz": Alfa
+  10 ativos por RH, 2 ativos por DP e 2 em admissão; Beta 2 ativos. No navegador: legenda
+  "Aprendiz: 12" com a cor própria, filtro com 12 e URL `?tipo=aprendiz`, aba Em admissão com
+  2, Dashboard "Aprendiz: 12 pessoas (13%)" e o link levando à listagem filtrada, ficha com
+  "Aprendiz" no cabeçalho, em Dados contratuais, Registros de ponto e Solicitações; Nova
+  admissão com a opção depois de Estágio, para RH e DP; 375 px sem rolagem horizontal da
+  página.
+- **Limites:** o Histórico funcional (aba de Pessoas) foi coberto por teste de contrato do
+  rótulo, não visto no navegador; testes de tempo da Nova admissão (5 s) oscilam sob carga da
+  máquina, sem relação com o Aprendiz.

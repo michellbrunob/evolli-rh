@@ -3260,9 +3260,9 @@ módulo); animação reutilizável dos painéis laterais; massa sintética por t
 prévia (Aprendiz indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
 
 **Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento pelo
-fundo do painel lateral, com a guarda de alterações, aprovado. **Próxima ampliação:** Aprendiz
-como tipo de vínculo, em levantamento (seção 23; decisões AP-1 a AP-9 pendentes; nada
-implementado).
+fundo do painel lateral, com a guarda de alterações, aprovado. **Aprendiz (seção 24):** AP-1 a AP-9
+aprovadas e implementadas na fatia mínima (migration aditiva, API e superfícies web, sem regra
+legal). Bateria: web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
 
 **Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
 registrado.
