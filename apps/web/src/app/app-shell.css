@@ -74,7 +74,7 @@
   top: 0;
   z-index: 30;
   background: var(--surface-canvas);
-  border-bottom: 1px solid var(--divider-soft);
+  border-bottom: var(--divisor);
 }
 
 .app-shell__topbar-inner {
@@ -219,7 +219,7 @@
   gap: var(--space-lg);
   padding: var(--space-lg) var(--space-sm);
   background: var(--surface-canvas);
-  border-right: 1px solid var(--divider-soft);
+  border-right: var(--divisor);
   position: sticky;
   top: 0;
   align-self: flex-start;
@@ -329,7 +329,7 @@
 
 /* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
 .app-shell__footer {
-  border-top: 1px solid var(--hairline);
+  border-top: var(--divisor-forte);
   background: var(--surface-canvas);
 }
 

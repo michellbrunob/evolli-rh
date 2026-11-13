@@ -7278,3 +7278,87 @@ function render(
 ) {
   return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
 }
+
+// ---------------------------------------------------------------------------
+// T209 — divisões sutis em Colaboradores, com os tokens de divisão (sem cor
+// nova): cabeçalho da página, faixa de indicadores (divisores entre os
+// totais), abas e busca/filtros, tabela (cabeçalho, linhas e hover) e o
+// rodapé da paginação. Escopadas à tela: o componente de tabela compartilhado
+// não muda para as demais telas.
+// ---------------------------------------------------------------------------
+describe("T209 — contrato de CSS das divisões em Colaboradores", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/ColaboradoresScreen.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const inicio = css.indexOf("/* ---- T209 — divisões");
+  const bloco = inicio > -1 ? css.slice(inicio) : "";
+  const regra = (seletor: string) => {
+    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return (
+      new RegExp(`(^|\\n)${escapado}\\s*\\{([^}]*)\\}`).exec(bloco)?.[2] ?? ""
+    );
+  };
+
+  it("o bloco existe e usa só tokens (nenhuma cor literal nem borda em px solta)", () => {
+    expect(inicio).toBeGreaterThan(-1);
+    expect(bloco).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(bloco).not.toMatch(/\brgba?\(|\bhsla?\(/);
+    expect(bloco).not.toMatch(/\d+px solid/);
+  });
+
+  it("cabeçalho da página e faixa de ações separados do resto por um divisor", () => {
+    expect(regra(".colaboradores-screen > .evolli-page-header")).toMatch(
+      /padding-bottom: var\(--secao-espaco-compacto\);[^]*border-bottom: var\(--divisor\);/,
+    );
+  });
+
+  it("indicadores: divisores entre os totais menores; o painel inteiro com a borda de card", () => {
+    expect(regra(".colaboradores-screen__indicadores")).toMatch(
+      /border: var\(--borda-card\);/,
+    );
+    expect(
+      regra(".colaboradores-screen__fato + .colaboradores-screen__fato"),
+    ).toMatch(
+      /padding-left: var\(--space-sm\);[^]*border-left: var\(--divisor\);/,
+    );
+  });
+
+  it("abas e área de busca/filtros separadas por divisores", () => {
+    expect(regra(".colaboradores-screen__abas")).toMatch(
+      /border-bottom: var\(--divisor-forte\);/,
+    );
+    expect(regra(".colaboradores-screen__filtros")).toMatch(
+      /padding-bottom: var\(--secao-espaco-compacto\);[^]*border-bottom: var\(--divisor\);/,
+    );
+  });
+
+  it("tabela: borda e linhas com os tokens; hover da linha só aqui", () => {
+    expect(regra(".colaboradores-screen .evolli-datatable")).toMatch(
+      /border: var\(--borda-tabela\);/,
+    );
+    expect(regra(".colaboradores-screen .evolli-datatable__th")).toMatch(
+      /border-bottom: var\(--divisor-forte\);/,
+    );
+    expect(regra(".colaboradores-screen .evolli-datatable__td")).toMatch(
+      /border-bottom: var\(--divisor\);/,
+    );
+    expect(
+      regra(".colaboradores-screen .evolli-datatable__table tbody tr:hover"),
+    ).toMatch(/background: var\(--estado-hover-superficie\);/);
+  });
+
+  it("rodapé da paginação separado da tabela por um divisor", () => {
+    expect(regra(".colaboradores-screen__rodape-tabela")).toMatch(
+      /padding-top: var\(--secao-espaco-compacto\);[^]*border-top: var\(--divisor\);/,
+    );
+  });
+
+  it("o componente de tabela compartilhado não ganha hover para as outras telas", () => {
+    const dataTable = readFileSync(
+      "src/components/DataTable.css",
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+    expect(dataTable).not.toMatch(/tr:hover/);
+  });
+});

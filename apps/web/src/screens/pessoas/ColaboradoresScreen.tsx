@@ -1305,7 +1305,7 @@ export function ColaboradoresScreen({
                     className={
                       i === 0
                         ? "colaboradores-screen__cartao colaboradores-screen__cartao--destaque"
-                        : "colaboradores-screen__cartao"
+                        : "colaboradores-screen__cartao colaboradores-screen__fato"
                     }
                   >
                     <dt>{rotulo}</dt>

@@ -128,6 +128,28 @@
      da área principal, que é onde a medida de leitura importa. */
   --sidebar-width: 272px;
   --shell-max: 1440px;
+
+  /* T209 — divisões sutis entre blocos (padrão reutilizável). Só nomes
+     semânticos sobre os valores que já existiam: nenhuma cor nova, e quem
+     troca um literal por um destes tokens não muda nenhum pixel. Rollout: a
+     estrutura do shell e Colaboradores primeiro; cada módulo recebe as
+     divisões quando for aberto para evolução (dossiê da T209). */
+  --divisor-cor: var(--divider-soft);
+  --divisor-cor-forte: var(--hairline);
+  --divisor-cor-sobre-marinho: var(--evolli-marinho-divisa);
+  --borda-espessura: 1px;
+  --divisor: var(--borda-espessura) solid var(--divisor-cor);
+  --divisor-forte: var(--borda-espessura) solid var(--divisor-cor-forte);
+  --secao-espaco: var(--space-lg);
+  --secao-espaco-compacto: var(--space-md);
+  --borda-card: var(--divisor-forte);
+  --borda-tabela: var(--divisor);
+  --borda-painel: var(--divisor-forte);
+  --estado-hover-superficie: var(--surface-pearl);
+  --estado-ativo-cor: var(--color-action);
+  --estado-ativo-espessura: 3px;
+  --estado-selecao-superficie: var(--status-info-surface);
+  --foco-anel: var(--focus-width) solid var(--color-action);
 }
 
 *,

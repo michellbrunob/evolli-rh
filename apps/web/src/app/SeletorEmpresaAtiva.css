@@ -17,6 +17,14 @@
   max-width: 32rem;
 }
 
+/* T209 — no menu lateral, a empresa ativa se separa da navegação por um
+   divisor sobre o marinho (o padrão de divisões da T209). */
+.seletor-empresa--menu {
+  min-width: 0;
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--borda-espessura) solid var(--divisor-cor-sobre-marinho);
+}
+
 .seletor-empresa__cartao {
   /* Posicionado: o texto só para leitor de tela (absoluto) fica contido
      aqui e não escapa para alargar a página (lição da T188). */

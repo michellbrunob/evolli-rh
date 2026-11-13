@@ -940,3 +940,50 @@
     flex-wrap: nowrap;
   }
 }
+
+/* ---- T209 — divisões sutis (padrão da T209, tokens de `tokens.css`):
+   cabeçalho da página, faixa de indicadores, abas e busca/filtros, tabela e
+   o rodapé da paginação. A tabela compartilhada só muda aqui dentro. ---- */
+.colaboradores-screen > .evolli-page-header {
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen__indicadores {
+  border: var(--borda-card);
+}
+
+.colaboradores-screen__fato + .colaboradores-screen__fato {
+  padding-left: var(--space-sm);
+  border-left: var(--divisor);
+}
+
+.colaboradores-screen__abas {
+  border-bottom: var(--divisor-forte);
+}
+
+.colaboradores-screen__filtros {
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen .evolli-datatable {
+  border: var(--borda-tabela);
+}
+
+.colaboradores-screen .evolli-datatable__th {
+  border-bottom: var(--divisor-forte);
+}
+
+.colaboradores-screen .evolli-datatable__td {
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen .evolli-datatable__table tbody tr:hover {
+  background: var(--estado-hover-superficie);
+}
+
+.colaboradores-screen__rodape-tabela {
+  padding-top: var(--secao-espaco-compacto);
+  border-top: var(--divisor);
+}
