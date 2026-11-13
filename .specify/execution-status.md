@@ -3225,11 +3225,11 @@ resolvida no primeiro commit da T209.
 
 **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
-## Colaboradores — T209 (em preparação)
+## Colaboradores — T209 (em implementação local)
 
-| Tarefa | Estado            | Resultado principal                                                                   |
-| ------ | ----------------- | ------------------------------------------------------------------------------------- |
-| T209   | **Em preparação** | Levantamento e decisões para tornar Colaboradores uma área de trabalho do RH e do DP. |
+| Tarefa | Estado                     | Resultado principal                                                               |
+| ------ | -------------------------- | --------------------------------------------------------------------------------- |
+| T209   | **Em implementação local** | Listagem operacional e ações por pessoa em Colaboradores; importação CSV pausada. |
 
 **Escopo da preparação:** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t209-dossie-colaboradores.md):
@@ -3242,6 +3242,11 @@ resolvida no primeiro commit da T209.
   empresa;
 - classificação em contratos atuais, dependências de API, migration, RBAC, auditoria ou decisão
   e itens indisponíveis; primeira fatia proposta e decisões C-1 a C-15 para aprovação.
+
+**Aprovação (2026-11-13):** C-1 a C-15 aprovadas, com a C-10 corrigida (sem data de
+nascimento na planilha). O Bloco C (importação CSV) está pausado: a admissão exige a data de
+nascimento (seção 13 do dossiê). Seguem os Blocos A e B, sem push, PR, Ready ou merge até a
+validação visual.
 
 **Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
 registrado.

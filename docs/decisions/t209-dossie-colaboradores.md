@@ -1,8 +1,10 @@
 # T209 — Colaboradores (dossiê de preparação)
 
-- **Estado:** em preparação. Este dossiê traz o levantamento, só em leitura, do módulo
-  Colaboradores e propõe a primeira fatia funcional da T209, com as decisões C-1 a C-15
-  (seção 10) **pendentes de aprovação**. Nenhum código de produto foi alterado.
+- **Estado:** **em implementação local**. As decisões C-1 a C-15 (seção 10) foram
+  **aprovadas em 2026-11-13**, com a C-10 corrigida (seção 13). O **Bloco C (importação CSV)
+  está pausado**: o contrato atual de admissão exige a data de nascimento, que a C-10 corrigida
+  exclui da planilha (seção 13.2). A T209 segue com os **Blocos A e B**, sem push, PR, Ready ou
+  merge até a validação visual.
 - **Base:** `main` em `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201).
 - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma **área de trabalho do RH e
   do DP**: listagem operacional, atalhos por pessoa e entrada de várias pessoas de uma vez, numa
@@ -141,14 +143,14 @@ Todos os controladores ficam em `apps/api/src/pessoas/`. **Não existe `DELETE`*
 
 ## 4. Exposição de campos
 
-| Campo                                                                                 | Listagem hoje | Proposta T209                                                      | Base                           |
-| ------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------ | ------------------------------ |
-| Nome, matrícula, cargo, departamento, jornada, tipo, situação, admissão, desligamento | sim           | mantém                                                             | T184–T199                      |
-| Data de nascimento                                                                    | não           | **não** na listagem; só entra na importação, como exige o cadastro | ficha de dados pessoais (T177) |
-| E-mail pessoal, celular, telefone                                                     | não           | **não** (nem na importação, C-10)                                  | ficha de contatos; T199 §6     |
-| Endereço e demais dados pessoais                                                      | não           | **não**                                                            | ficha de dados pessoais        |
-| CPF                                                                                   | inexistente   | **indisponível**                                                   | `DP-ADM-04`, `DP-FLX-05`       |
-| Salário e remuneração                                                                 | inexistente   | **indisponível**                                                   | DP-14, DP-18                   |
+| Campo                                                                                 | Listagem hoje | Proposta T209                                         | Base                           |
+| ------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------- | ------------------------------ |
+| Nome, matrícula, cargo, departamento, jornada, tipo, situação, admissão, desligamento | sim           | mantém                                                | T184–T199                      |
+| Data de nascimento                                                                    | não           | **não** (nem na listagem nem na importação; seção 13) | ficha de dados pessoais (T177) |
+| E-mail pessoal, celular, telefone                                                     | não           | **não** (nem na importação, C-10)                     | ficha de contatos; T199 §6     |
+| Endereço e demais dados pessoais                                                      | não           | **não**                                               | ficha de dados pessoais        |
+| CPF                                                                                   | inexistente   | **indisponível**                                      | `DP-ADM-04`, `DP-FLX-05`       |
+| Salário e remuneração                                                                 | inexistente   | **indisponível**                                      | DP-14, DP-18                   |
 
 ## 5. Comportamento por papel
 
@@ -284,23 +286,23 @@ do push.
 
 ## 10. Decisões para aprovação
 
-| Id   | Decisão                              | Recomendação                                                                                                                                                                                                                         | Alternativa                                          |
-| ---- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| C-1  | Recorte da T209                      | **Blocos A, B e C** (fatia maior, para o prazo)                                                                                                                                                                                      | A e B; importação em tarefa própria                  |
-| C-2  | Tamanho da página                    | 20, 50 e 100; padrão 20; na URL como `tamanho`                                                                                                                                                                                       | só 20 e 50; fora da URL                              |
-| C-3  | Paginação                            | numerada com primeira/última e "Mostrando X–Y de Z"                                                                                                                                                                                  | manter anterior/próxima                              |
-| C-4  | Ações por linha                      | menu de atalhos às abas da ficha permitidas ao papel; sem mutação                                                                                                                                                                    | só o nome como hoje                                  |
-| C-5  | Desligar a partir da listagem        | **fora** da T209 (segue no Histórico funcional)                                                                                                                                                                                      | atalho na linha (decisão de produto e URL)           |
-| C-6  | Aviso de auditoria                   | "Admissões, alterações e a leitura de contatos geram trilha de auditoria; o suporte técnico apenas consulta."                                                                                                                        | remover a frase de auditoria                         |
-| C-7  | Gravação da importação (D11 da T194) | uma admissão por linha, `POST /v1/colaboradores` com `Idempotency-Key` própria, envio sequencial                                                                                                                                     | lote e verificação no servidor (contrato novo)       |
-| C-8  | Formato (D10 da T194)                | só CSV UTF-8, separador `;` ou `,` detectado, cabeçalho fixo                                                                                                                                                                         | também .xlsx (dependência nova)                      |
-| C-9  | Quem importa e limite (D12 da T194)  | RH e DP da empresa ativa; até 200 linhas e 1 MB por arquivo; master técnico não                                                                                                                                                      | só RH; outro limite                                  |
-| C-10 | Colunas da planilha                  | obrigatórias: nome, data de nascimento, tipo de vínculo, data de admissão, código do departamento, código do cargo; opcionais: matrícula e código da unidade. Motivo fixo `admissao_inicial`. Sem contatos, endereço, CPF ou salário | incluir e-mail pessoal e celular (ficha de contatos) |
-| C-11 | Origem da importação (`DP-FLX-17`)   | **sem registro** nesta fatia; a admissão fica igual à do cadastro individual                                                                                                                                                         | migration aditiva com a origem                       |
-| C-12 | Ficha de tratamento da importação    | escrever na T209, antes do código (arquivo só no navegador, sem guarda, relatório sem valores)                                                                                                                                       | —                                                    |
-| C-13 | Referência inexistente na planilha   | recusar a linha; **sem criação** de departamento ou cargo pela importação                                                                                                                                                            | criar pelo código (G1 da T197)                       |
-| C-14 | Exportação de pessoas                | **indisponível** (`DP-ADM-03` aberto)                                                                                                                                                                                                | CSV com auditoria e ação `export` (outra tarefa)     |
-| C-15 | Seleção, ações em lote e ordenação   | **indisponíveis** na T209                                                                                                                                                                                                            | tarefa própria com contrato                          |
+| Id   | Decisão                              | Recomendação                                                                                                                                                                                                                                        | Alternativa                                          |
+| ---- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| C-1  | Recorte da T209                      | **Blocos A, B e C** (fatia maior, para o prazo)                                                                                                                                                                                                     | A e B; importação em tarefa própria                  |
+| C-2  | Tamanho da página                    | 20, 50 e 100; padrão 20; na URL como `tamanho`                                                                                                                                                                                                      | só 20 e 50; fora da URL                              |
+| C-3  | Paginação                            | numerada com primeira/última e "Mostrando X–Y de Z"                                                                                                                                                                                                 | manter anterior/próxima                              |
+| C-4  | Ações por linha                      | menu de atalhos às abas da ficha permitidas ao papel; sem mutação                                                                                                                                                                                   | só o nome como hoje                                  |
+| C-5  | Desligar a partir da listagem        | **fora** da T209 (segue no Histórico funcional)                                                                                                                                                                                                     | atalho na linha (decisão de produto e URL)           |
+| C-6  | Aviso de auditoria                   | "Admissões, alterações e a leitura de contatos geram trilha de auditoria; o suporte técnico apenas consulta."                                                                                                                                       | remover a frase de auditoria                         |
+| C-7  | Gravação da importação (D11 da T194) | uma admissão por linha, `POST /v1/colaboradores` com `Idempotency-Key` própria, envio sequencial                                                                                                                                                    | lote e verificação no servidor (contrato novo)       |
+| C-8  | Formato (D10 da T194)                | só CSV UTF-8, separador `;` ou `,` detectado, cabeçalho fixo                                                                                                                                                                                        | também .xlsx (dependência nova)                      |
+| C-9  | Quem importa e limite (D12 da T194)  | RH e DP da empresa ativa; até 200 linhas e 1 MB por arquivo; master técnico não                                                                                                                                                                     | só RH; outro limite                                  |
+| C-10 | Colunas da planilha                  | **corrigida (seção 13):** obrigatórias: nome, tipo de vínculo, data de admissão, departamento e cargo existentes; opcionais: matrícula e unidade existente. Sem data de nascimento, contatos, endereço, CPF, salário ou qualquer outro dado pessoal | incluir e-mail pessoal e celular (ficha de contatos) |
+| C-11 | Origem da importação (`DP-FLX-17`)   | **sem registro** nesta fatia; a admissão fica igual à do cadastro individual                                                                                                                                                                        | migration aditiva com a origem                       |
+| C-12 | Ficha de tratamento da importação    | escrever na T209, antes do código (arquivo só no navegador, sem guarda, relatório sem valores)                                                                                                                                                      | —                                                    |
+| C-13 | Referência inexistente na planilha   | recusar a linha; **sem criação** de departamento ou cargo pela importação                                                                                                                                                                           | criar pelo código (G1 da T197)                       |
+| C-14 | Exportação de pessoas                | **indisponível** (`DP-ADM-03` aberto)                                                                                                                                                                                                               | CSV com auditoria e ação `export` (outra tarefa)     |
+| C-15 | Seleção, ações em lote e ordenação   | **indisponíveis** na T209                                                                                                                                                                                                                           | tarefa própria com contrato                          |
 
 ## 11. Fora de escopo
 
@@ -311,6 +313,36 @@ técnico; API, migration, RBAC, seed, Docker e workflows; Ready for review e mer
 
 ## 12. Próximo passo
 
-Com C-1 a C-15 aprovadas, a implementação começa nesta branch (`codex/t209-colaboradores`),
-pela ficha de tratamento (se C-12) e pelos testes com falha antes. Sem aprovação, nada de
-produto é alterado.
+Implementar os Blocos A e B nesta branch (`codex/t209-colaboradores`), com testes que falham
+antes, e levar à validação visual. O Bloco C só volta com decisão própria (seção 13.2).
+
+## 13. Aprovação (2026-11-13)
+
+### 13.1 Decisões aprovadas
+
+- **C-1 a C-15 aprovadas** como recomendadas na seção 10, com a **C-10 corrigida**: a planilha
+  **não tem data de nascimento**. Colunas obrigatórias: nome, tipo de vínculo, data de admissão,
+  departamento existente e cargo existente; opcionais: matrícula e unidade existente. Não são
+  aceitos CPF, salário, contato, e-mail, telefone, endereço, nascimento, gênero, documento, foto
+  nem qualquer outro dado pessoal; arquivo com coluna proibida ou desconhecida é recusado.
+- **Bloco A:** tamanho de página 20, 50 e 100 (padrão 20), na URL pelo parâmetro canônico
+  `tamanho`; paginação numerada com primeira e última página, preservando filtros e busca;
+  "Mostrando X–Y de Z"; cancelamento das requisições antigas ao mudar busca, filtro, aba,
+  página, tamanho ou empresa e ao desmontar a tela; aviso de auditoria só com o que é auditado.
+- **Bloco B:** menu "Ações" por linha, só com atalhos às abas da ficha que o papel vê; nenhuma
+  edição, desligamento, ação em lote ou controle decorativo.
+
+### 13.2 Conferência do contrato para o Bloco C
+
+- **Referências:** Departamento, Cargo e Unidade têm `codigo` **único por empresa** no banco
+  (`@@unique([empresaId, codigo])`, `apps/api/prisma/schema.prisma:792`, `:820`, `:917`), e os
+  catálogos o expõem com paginação e `total` (`apps/web/src/api/organizacaoClient.ts:27-31`,
+  `:132-140`). O mapeamento por código seria seguro, lendo todas as páginas, sem truncar.
+- **Bloqueio:** a admissão exige `perfilPessoal.dataNascimento`
+  (`apps/api/src/pessoas/dto/pessoas.dto.ts`, `AdmitirColaboradorDto`, `@IsDefined`;
+  `apps/api/src/pessoas/dados-pessoais/dados-pessoais.dto.ts:75-80`), e o banco a grava como
+  obrigatória (`schema.prisma:2330`). Sem a data na planilha, toda linha seria recusada.
+- **Decisão (2026-11-13):** **pausar o Bloco C** e entregar A e B. Não há API nova, mudança da
+  obrigatoriedade nem coluna de nascimento. O Bloco C volta só com decisão própria: perfil
+  opcional na admissão (mudança de API e de regra da T177/T179) ou outra solução aprovada. A
+  entrada "Importar planilha" do painel continua indisponível, com o motivo de hoje.
