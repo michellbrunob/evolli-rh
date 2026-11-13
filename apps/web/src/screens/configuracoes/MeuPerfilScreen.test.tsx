@@ -9,7 +9,7 @@
  */
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   ROTULO_PAPEL,
@@ -95,6 +95,23 @@ beforeEach(() => {
     value: revogarUrl,
     configurable: true,
   });
+});
+
+// Como o navegador: elemento desabilitado não recebe foco. Sem isto, o jsdom
+// aceitava o foco num botão ainda desabilitado pelo envio, e o defeito que o
+// navegador mostrou (foco caindo no `body` depois de enviar a foto) passava.
+const focarOriginal = HTMLElement.prototype.focus;
+beforeEach(() => {
+  HTMLElement.prototype.focus = function focarSeHabilitado(
+    this: HTMLElement,
+    opcoes?: FocusOptions,
+  ) {
+    if ((this as HTMLButtonElement).disabled) return;
+    focarOriginal.call(this, opcoes);
+  };
+});
+afterEach(() => {
+  HTMLElement.prototype.focus = focarOriginal;
 });
 
 const painel = () => screen.getByRole("region", { name: "Meu perfil" });
@@ -1036,5 +1053,74 @@ describe("T208 — foto de perfil: layout a 375 px (CSS)", () => {
     expect(css).toMatch(
       /\.configuracoes__foto-acoes > button,\n\.configuracoes__previa-acoes > button \{\n\s*min-height:\s*44px/,
     );
+  });
+});
+
+describe("T208 — foto de perfil: o foco volta ao botão depois que ele se reabilita", () => {
+  // No navegador, o estado "enviando" chega ao DOM antes da resposta: o
+  // botão da foto fica desabilitado enquanto espera. Achado no navegador: o
+  // foco era pedido com o botão ainda desabilitado e caía no `body`. Aqui a
+  // resposta só chega DEPOIS de a tela mostrar o envio em curso.
+  function pendente<T>() {
+    let resolver!: (v: T) => void;
+    let rejeitar!: (e: unknown) => void;
+    const promessa = new Promise<T>((res, rej) => {
+      resolver = res;
+      rejeitar = rej;
+    });
+    return { promessa, resolver, rejeitar };
+  }
+
+  it("depois de enviar: foco em 'Trocar foto'", async () => {
+    const envio = pendente<SafeAccessUserApi>();
+    vi.mocked(enviarFotoPropria).mockReturnValue(envio.promessa);
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(botao("Enviar foto")).toBeDisabled();
+    await act(async () => {
+      envio.resolver(
+        ator({ fotoVersao: VERSAO_FOTO, perfilAtualizadoEm: VERSAO_FOTO }),
+      );
+    });
+    expect(document.activeElement).toBe(botao("Trocar foto"));
+  });
+
+  it("depois de uma recusa do servidor: foco em 'Enviar foto'", async () => {
+    const envio = pendente<SafeAccessUserApi>();
+    vi.mocked(enviarFotoPropria).mockReturnValue(envio.promessa);
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    await act(async () => {
+      envio.rejeitar(new ApiError(422, "x", "foto_pequena"));
+    });
+    expect(document.activeElement).toBe(botao("Enviar foto"));
+  });
+
+  it("depois de remover: foco em 'Enviar foto'", async () => {
+    const remocao = pendente<SafeAccessUserApi>();
+    vi.mocked(removerFotoPropria).mockReturnValue(remocao.promessa);
+    render(<MeuPerfilScreen conta={{ ...CONTA, fotoVersao: VERSAO_FOTO }} />);
+    await act(async () => {
+      fireEvent.click(botao("Remover foto")!);
+    });
+    await act(async () => {
+      fireEvent.click(botao("Remover a foto")!);
+    });
+    await act(async () => {
+      remocao.resolver(
+        ator({ fotoVersao: null, perfilAtualizadoEm: VERSAO_FOTO }),
+      );
+    });
+    expect(document.activeElement).toBe(botao("Enviar foto"));
   });
 });

@@ -239,8 +239,18 @@ export function MeuPerfilScreen({
     onContaAtualizada?.(ator);
   }
 
-  function focarEscolherFoto() {
+  // O foco no botão da foto fica PENDENTE até ele se reabilitar: durante o
+  // envio ou a remoção ele está desabilitado, e o navegador ignora foco em
+  // elemento desabilitado (achado no navegador: o foco caía no `body`).
+  const [focarFotoPendente, setFocarFotoPendente] = useState(false);
+  useEffect(() => {
+    if (!focarFotoPendente || ocupado) return;
     escolherFotoRef.current?.focus();
+    setFocarFotoPendente(false);
+  }, [focarFotoPendente, ocupado]);
+
+  function focarEscolherFoto() {
+    setFocarFotoPendente(true);
   }
 
   function descartarPrevia() {
