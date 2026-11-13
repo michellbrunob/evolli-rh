@@ -3212,7 +3212,10 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Pendente:** validação visual humana da ampliação; push e revisão da
+**Foto de perfil (em preparação):** levantamento e decisões FP-1 a FP-8 na seção 27 do
+dossiê, aguardando aprovação; nada implementado.
+
+**Pendente:** validação visual humana da ampliação; aprovação das decisões FP-1 a FP-8; push e revisão da
 PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e

@@ -7,8 +7,9 @@
   aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22). A ampliação — nome de exibição
   editável, com migration, `PATCH /v1/users/me` e auditoria — está **implementada e validada
   localmente** (seções 23 a 26), em commits locais, sem push: a PR #201 ainda aponta para o código
-  anterior à ampliação. Aguarda a validação visual humana. As decisões MP-1 a MP-8 da seção 13
-  seguem sem alteração.
+  anterior à ampliação. Aguarda a validação visual humana. A **foto de perfil** é uma ampliação
+  **em preparação** (seção 27): só levantamento, decisões FP-1 a FP-8 aguardando aprovação, nada
+  implementado. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -683,3 +684,180 @@ Depois das correções, a validação confirmou:
   e sessões continuam fora (seção 22).
 - **Banco local:** a migration foi aplicada no banco local da prévia para a validação no
   navegador. Isso não é artefato versionado.
+
+## 27. Foto de perfil — levantamento (em preparação, 2026-11-13)
+
+Etapa só de leitura e documentação: nenhum código, schema, migration, dependência ou
+configuração foi alterado. A PR #201 continua em Draft. A foto de perfil é uma ampliação
+**em preparação** dentro da T208; as decisões FP-1 a FP-8 (27.9) aguardam aprovação.
+
+### 27.1 O que existe hoje
+
+- **Nenhum armazenamento de arquivo em uso.**
+  - Documentos é só metadado: "nenhum controller ou service de upload, conteúdo, versão de
+    arquivo ou storage existe" (`apps/api/src/documentos/documentos.module.ts:12-19`; ADR 0011).
+  - Não há dependência de cliente S3, de processamento de imagem nem de detecção de tipo de
+    arquivo (`apps/api/package.json`, `apps/web/package.json`).
+  - O `multer` só chega como dependência indireta de `@nestjs/platform-express`, sem tipos
+    declarados no projeto.
+- **Cloudflare R2 aprovado, mas só para conteúdo documental e ainda fechado** (ADR 0013,
+  `docs/adr/0013-armazenamento-privado-cloudflare-r2.md`). Ele depende dos portões de Nível 2
+  ainda abertos (`docs/decisions/etapa2-documentos-admissao-aprovacoes-pendentes.md`, tabela
+  "Nível 2"):
+  - credencial de armazenamento (`DP-2E-04`);
+  - limites técnicos (`DP-2E-05`);
+  - antivírus e quarentena (`DP-2E-09`);
+  - acesso a conteúdo (`DP-2E-13`);
+  - retenção e descarte do conteúdo (`DP-2E-15`);
+  - MFA obrigatório.
+
+  O `plan.md` (seção 10, item 3) manda manter "anexos, upload, R2" fora de qualquer fatia até
+  esses portões fecharem.
+
+- **Regra de introdução de infraestrutura:** "Não introduzir IdP, SSO, Redis, fila, storage ou
+  outro provedor por antecipação: cada decisão material exige ADR" (`.specify/plan.md`, seção 2).
+- **Regra de dado pessoal:** foto só entra com "finalidade, acesso restrito, auditoria, retenção e
+  contrato" declarados (`.specify/execution-status.md`, decisões do cadastro; `.specify/tasks.md`,
+  mesma regra).
+- **Sessão:** cada requisição autenticada carrega a linha inteira da conta (`include: { user:
+true }`, `apps/api/src/auth/session/session.service.ts:93-95`). Bytes de imagem na própria
+  `access_user` iriam junto em toda requisição.
+- **Entrega HTTP:**
+  - o `helmet` padrão já envia `X-Content-Type-Options: nosniff` e
+    `Cross-Origin-Resource-Policy: same-origin` (`apps/api/src/main.ts:23`);
+  - o corpo JSON tem o limite padrão do Nest (100 kB), sem configuração própria;
+  - a web chama a API pela mesma origem.
+- **Backup:** o runbook usa `pg_dump` do banco inteiro (`infra/postgres/runbook-backup-restore.md`).
+  A retenção de backups é decisão pendente da Etapa 0
+  (`docs/decisions/etapa0-seguranca-operacional-pendente.md`).
+- **Seed, Docker e CI:** nada de arquivo. O seed não cria conteúdo documental; o Docker sobe só
+  o PostgreSQL; a CI roda a mesma bateria com PostgreSQL efêmero.
+
+### 27.2 Opções de persistência
+
+| Opção                                 | Situação                                                                                                      | Leitura                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| A. PostgreSQL, tabela própria (bytea) | Sem provedor novo; cabe no backup e na CI atuais; exige ADR própria por ser decisão material de armazenamento | Menor arquitetura para uma foto real nesta T208, se a imagem for pequena e normalizada |
+| B. Cloudflare R2 (ADR 0013)           | Aprovado só para conteúdo documental; depende de DP-2E-04, 05, 09, 13, 15 e MFA obrigatório                   | Inviável sem fechar os portões; estender a ADR 0013 à foto também exige decisão        |
+| C. Sistema de arquivos do servidor    | Não há volume, caminho nem política; quebra a regra de não introduzir storage                                 | Descartada                                                                             |
+| D. Sem foto (só iniciais)             | É o estado atual                                                                                              | Honesto, mas não entrega foto real                                                     |
+
+### 27.3 Desenho mínimo proposto (opção A)
+
+- **Tabela `access_user_foto`**, separada de `access_user`:
+  - chave = conta;
+  - conteúdo binário;
+  - tipo, largura, altura e tamanho, com CHECK;
+  - `criada_em`.
+
+  Fica separada para não viajar em toda requisição de sessão. Uma foto por conta; global da
+  conta, não por empresa, como o nome de exibição.
+
+- **Formato guardado:** só JPEG 256 × 256 px, até 100 kB.
+- **No navegador:** a pessoa escolhe JPEG, PNG ou WebP de até 5 MB e com ao menos 128 × 128 px. O
+  navegador faz o corte quadrado central e reduz a imagem para 256 × 256. A reconversão para
+  JPEG descarta metadados.
+- **Validação real no servidor, sem confiar na extensão nem no tipo declarado:**
+  - assinatura JPEG;
+  - dimensões lidas do cabeçalho, exatamente 256 × 256;
+  - recusa de segmentos de metadado (EXIF/XMP) e de dados após o fim da imagem;
+  - limite de bytes aplicado antes de ler o corpo.
+
+  Decodificar e reconverter a imagem no servidor só é possível com uma dependência nova de
+  processamento de imagem. Isso muda o lockfile e precisa de aprovação (FP-3).
+
+- **Rotas, todas sobre a própria conta, sem `:id`:**
+  - `PUT /v1/users/me/foto`, com corpo binário e versão lida do perfil no cabeçalho;
+  - `DELETE /v1/users/me/foto`;
+  - `GET /v1/users/me/foto`.
+
+  As gravações usam `own_account`/`manage` e CSRF. A leitura exige só a sessão. O ator ganha a
+  data da foto, que versiona a URL.
+
+- **Concorrência:** a foto entra na mesma versão do perfil (`perfilAtualizadoEm`). Versão velha
+  responde 409 e nada é sobrescrito, como o nome.
+- **Entrega:**
+  - só pela API, sem URL pública e sem URL persistida;
+  - `Content-Type` fixo;
+  - `nosniff`, `Content-Disposition: inline` e CSP `default-src 'none'; sandbox` na resposta;
+  - `Cache-Control: private, no-cache` com ETag, de modo que o navegador revalida e recebe 304;
+  - a URL leva `?v=` com a data da foto, para trocar na hora.
+- **Sem foto ou com falha de carga:** iniciais, como hoje.
+- **Quem vê:** só a própria pessoa, em Meu perfil. Listagens, ficha, Hub, gestor e Contas de
+  acesso não mostram fotos.
+
+### 27.4 Privacidade, segurança e auditoria
+
+- **Finalidade:** identificação visual da própria conta na interface.
+- **Acesso:** só a titular.
+- **Retenção:** até a remoção pela própria pessoa ou a desativação da conta (FP-4).
+- **Auditoria:** eventos novos de envio e de remoção, na mesma transação, sem conteúdo, hash,
+  tamanho, dimensões ou nome do arquivo (a trilha não tem campo de conteúdo).
+- **Acesso indevido:** sem rota com `:id`, não há como pedir a foto de outra conta. Sessão
+  vencida responde 401 e conta desativada perde a sessão.
+- **Backup:** fotos removidas continuam nos backups até a retenção deles, que segue pendente na
+  Etapa 0. Isso precisa constar na decisão de retenção.
+- **Arquivo malicioso:**
+  - a foto só é servida como imagem, com `nosniff` e CSP restritiva, e só para a titular;
+  - a validação estrutural reduz o risco;
+  - a reconversão no servidor o eliminaria, mas depende de dependência nova (FP-3).
+
+  Essa combinação substitui o antivírus da ADR 0013 só para a foto, e só se aprovada (FP-1).
+
+### 27.5 Interface
+
+- Em Identificação, as iniciais dão lugar à foto quando ela existe.
+- **Envio:**
+  - um botão "Escolher foto" abre o seletor nativo de arquivo, que tem rótulo e funciona pelo
+    teclado;
+  - a prévia mostra o corte central, com "Usar esta foto" e "Cancelar";
+  - erros por arquivo (tipo, tamanho, dimensões) aparecem em alerta, com o foco voltando ao
+    botão.
+- **Remoção:** "Remover foto" pede confirmação.
+- **Guarda de saída:** prévia não confirmada conta como edição pendente; envio em curso bloqueia
+  a saída.
+- **Anúncio:** um por desfecho.
+- **Layout:** a 375 px, a foto tem tamanho fixo e as ações quebram linha, sem rolagem horizontal.
+- **Fluxo próprio:** a foto não entra no rodapé do nome. Gravar foto e nome juntos traria falha
+  parcial entre duas requisições.
+
+### 27.6 Impacto
+
+| Área          | Impacto da opção A                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| API           | Três rotas novas, validação estrutural do JPEG, cabeçalhos de entrega e corpo binário com limite próprio                  |
+| Schema        | Tabela nova e dois valores novos de auditoria (migration aditiva)                                                         |
+| RBAC          | Nenhuma permissão nova: `own_account` (`read`/`manage`)                                                                   |
+| Docker e seed | Nenhum                                                                                                                    |
+| Dependências  | Nenhuma no desenho com validação estrutural; uma nova se a reconversão no servidor for aprovada (FP-3)                    |
+| Testes        | Unitários do validador; E2E com imagens sintéticas geradas no teste; web com seleção de arquivo, prévia, remoção e guarda |
+| CI            | Mesma bateria; só muda se entrar dependência nativa nova                                                                  |
+| Backup        | `pg_dump` passa a carregar as fotos (até 100 kB por conta)                                                                |
+
+### 27.7 Se a infraestrutura não for aprovada
+
+Sem a opção A aprovada e sem os portões do R2, a tela continua com as iniciais e a frase atual,
+sem botão de envio, sem campo inativo e sem promessa de data.
+
+### 27.8 Riscos de prazo
+
+- **Opção A:** sem dependência externa. Os riscos são:
+  - a validação estrutural do JPEG (código próprio, com testes);
+  - o comportamento do corte e da redução em navegadores com imagens grandes (por isso o limite
+    de 5 MB na entrada);
+  - a aprovação de retenção.
+- **Opção B:** depende de portões que exigem decisões de TI, Segurança, DPO e Jurídico, e de MFA
+  obrigatório. Não cabe nesta T208.
+
+### 27.9 Decisões para aprovação
+
+| Id   | Tema                         | Recomendação                                                                                                                                                                                           | Alternativa                                                       |
+| ---- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| FP-1 | Onde armazenar               | PostgreSQL, tabela própria `access_user_foto`, com ADR própria que registra a exceção para foto de conta, fora do conteúdo documental                                                                  | Cloudflare R2, só depois dos portões de Nível 2                   |
+| FP-2 | Formatos, tamanho, dimensões | Entrada JPEG/PNG/WebP até 5 MB e ao menos 128 × 128 px; guardado JPEG 256 × 256 até 100 kB                                                                                                             | Guardar WebP (codificação no navegador não é uniforme)            |
+| FP-3 | Corte e redimensionamento    | Corte quadrado central e redução no navegador; servidor valida a estrutura e recusa metadados; sem dependência nova                                                                                    | Reconversão no servidor com dependência nova de imagem (lockfile) |
+| FP-4 | Remoção e fallback           | A própria pessoa remove a qualquer momento, com exclusão imediata dos bytes; sem foto, iniciais; desativação da conta apaga a foto                                                                     | Manter a foto após a desativação                                  |
+| FP-5 | Auditoria                    | Eventos próprios de envio e remoção, sem conteúdo, hash, tamanho ou nome do arquivo                                                                                                                    | Um evento só, "perfil atualizado"                                 |
+| FP-6 | Cache e invalidação          | Só pela API, `private, no-cache` com ETag; URL versionada pela data da foto; nada público ou persistido                                                                                                | `private, max-age` curto sem revalidação                          |
+| FP-7 | Migração e compatibilidade   | Migration aditiva (tabela e auditoria); contas atuais sem foto; ator ganha só um campo opcional                                                                                                        | —                                                                 |
+| FP-8 | Escopo nesta T208            | Entra: enviar, pré-visualizar, substituir e remover a própria foto, vista só pela titular em Meu perfil. Fica fora: foto de colaborador, foto vista por outros, R2, antivírus, editor de enquadramento | Também mostrar a foto no topo do shell para a própria pessoa      |

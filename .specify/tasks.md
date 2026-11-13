@@ -3385,6 +3385,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046 testes; scripts 182 testes;
         58 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do
         squash e `git diff --check` verdes.
+      - **Foto de perfil (em preparação, seção 27 do dossiê):** levantamento de armazenamento
+        (nenhum em uso; R2 aprovado só para conteúdo documental e preso aos portões de Nível 2),
+        persistência, validação, entrega, privacidade, auditoria, interface e impacto; desenho
+        mínimo com PostgreSQL em tabela própria e decisões FP-1 a FP-8 aguardando aprovação. Nada
+        implementado.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
