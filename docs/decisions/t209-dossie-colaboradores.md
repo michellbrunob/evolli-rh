@@ -417,3 +417,94 @@ Só web; **sem API, migration, RBAC, auditoria nova ou dependência**.
 - **Ambiente local (não é do produto):** com `core.autocrlf`, os arquivos da worktree saem em
   CRLF; dois testes de contrato de CSS do shell (T206), que procuram `\n`, falham nessa
   condição e passam com o arquivo em LF, como no repositório e na CI.
+
+## 17. Refinamento da listagem (ordem de 2026-11-13)
+
+Inspiração local na referência privada, sem copiar marca, textos, dados nem layout. Só
+controles e números reais do Evolli.
+
+- **Cabeçalho:** título, descrição curta e só a ação que existe ("Adicionar colaborador",
+  para quem admite). **Sem "Exportar"**: não há contrato (C-14).
+- **Faixa de indicadores:** dois painéis quando o próprio bloco tem 36rem (um embaixo do outro
+  antes): "Ativos" em destaque, com Em admissão, Desligados e Total como fatos menores; ao lado,
+  a distribuição dos ativos por tipo de vínculo (barra decorativa e legenda em texto, só tipos
+  com gente). **Sem** ausências, salário, CPF, contatos ou qualquer número sem contrato.
+- **Abas:** as existentes (Ativos, Em admissão, Desligados, Todos, Jornada de trabalho).
+  **Não** foram criadas Férias, Escala, Organograma ou outra aba sem visão real.
+- **Busca e filtros:** numa linha alinhada pela base acima de 640 px; no celular, a coluna de
+  antes.
+- **Teste de guarda:** a tela não mostra ausência, salário, CPF, telefone, e-mail,
+  exportação, férias, escala, organograma nem calendário.
+
+## 18. Massa sintética por tipo de vínculo (banco próprio da prévia)
+
+- **Banco próprio da T209:** contêiner Postgres isolado (projeto compose `evolli-t209`),
+  com papéis, schema e extensões pelos scripts de `infra/postgres`, migrations do Prisma da
+  própria worktree, bootstrap e seed sintético do projeto. A prévia deixou de usar o banco
+  da T207. Credenciais locais geradas para ele e guardadas fora do repositório.
+- **Pelos fluxos normais** (`POST /v1/colaboradores` como RH, e a efetivação da admissão em
+  `POST /v1/movimentacoes/:id/efetivar`), com nomes "Teste T209 …":
+  - Empresa Demo Alfa: 25 CLT, 25 PJ e 25 Estágio, admitidos e efetivados (ativos), além de
+    130 admissões previstas ("Pessoa Sintética T209 …", em admissão);
+  - Empresa Demo Beta: 2 CLT, 2 PJ e 2 Estágio, admitidos e efetivados.
+- **Aprendiz não foi criado:** o tipo não existe no contrato (`TipoVinculo`: CLT, Estágio,
+  PJ, Temporário e Outro controlado). A D16 da T194 o aprova, mas exige enum e migration
+  (seção 8.2); não foi simulado com outro tipo.
+- **Validação no navegador (RH da Alfa):** Ativos 79 (4 do seed + 75), distribuição
+  "CLT: 29, Estágio: 25, PJ: 25", Todos 209; Ativos em 4 páginas de 20 ("Mostrando 61–79 de
+  79"); Todos com 100 por página em 3 páginas; filtro PJ com 25; busca "Teste T209 Alfa
+  Estagio" com 25 em 2 páginas, mantida ao paginar e fora da URL; busca "Beta" sem resultado.
+  **Isolamento:** o RH da Beta vê só os 7 da Beta ("CLT: 3, Estágio: 2, PJ: 2"); o RH com
+  duas empresas vê 79 ativos na Alfa e, depois da troca, só os 7 da Beta.
+
+## 19. Padrão de divisões sutis
+
+- **Tokens** em `apps/web/src/app/tokens.css`, só nomes semânticos sobre valores que já
+  existiam (nenhuma cor nova): `--divisor-cor`, `--divisor-cor-forte`,
+  `--divisor-cor-sobre-marinho`, `--borda-espessura`, `--divisor`, `--divisor-forte`,
+  `--secao-espaco`, `--secao-espaco-compacto`, `--borda-card`, `--borda-tabela`,
+  `--borda-painel`, `--estado-hover-superficie`, `--estado-ativo-cor`,
+  `--estado-ativo-espessura`, `--estado-selecao-superficie` e `--foco-anel`.
+- **Estrutura compartilhada:** cabeçalho superior, menu lateral, rodapé e o pé do menu
+  (conta e demonstração) passaram a usar os tokens, com os mesmos pixels; o seletor de empresa
+  do menu ganhou um divisor sobre o marinho, separando-o da navegação.
+- **Colaboradores:** divisor sob o cabeçalho da página; borda de card na faixa e divisores
+  entre os totais menores; abas e área de busca/filtros separadas; tabela com borda, cabeçalho
+  e linhas pelos tokens e hover de linha (só nesta tela); rodapé da paginação separado.
+- **Sem regressão:** no navegador, os estilos calculados de todo o shell no Dashboard e em
+  Configurações foram comparados antes e depois: a única diferença é o divisor do seletor de
+  empresa. O componente de tabela compartilhado não mudou.
+- **Rollout:** cada módulo recebe as divisões quando for aberto para evolução funcional ou
+  visual, trocando literais pelos tokens (mesmos pixels) e acrescentando divisões só onde
+  houver blocos independentes, com teste de contrato de CSS e conferência no navegador
+  (desktop e 375 px). Telas não revisadas não recebem divisões novas em lote.
+
+## 20. Animação reutilizável dos painéis laterais
+
+- **Onde:** no `Modal` com `posicao="lateral"` (`apps/web/src/components/Modal.tsx` e
+  `.css`); qualquer painel lateral futuro herda o padrão, sem copiar CSS ou lógica. Aplicado
+  primeiro ao painel "Adicionar colaborador". A janela central não muda.
+- **Movimento:** o painel entra deslizando da direita (200 ms) e sai para a direita
+  (160 ms); o fundo aparece e some por opacidade; tokens `--movimento-painel-entrada`,
+  `--movimento-painel-saida` e `--movimento-curva`.
+- **Sem temporizador:** ao fechar, foco devolvido ao gatilho, rolagem destravada e teclado
+  solto na hora; o painel fica montado, inerte, fora da árvore acessível e sem receber clique,
+  até o `animationend` da própria caixa. Sem animação calculada (`prefers-reduced-motion`),
+  sai no mesmo quadro. Reabrir durante a saída a cancela.
+- **Fundo:** no painel lateral, clicar no fundo pede o fechamento pelo caminho do "Fechar"
+  (pede confirmação com alteração pendente; não fecha durante um envio). Antes da T209, o fundo
+  não fechava; na janela central, continua sem fechar.
+- **Navegador:** a animação de entrada roda (`evolli-painel-entra`, 0,2 s), o foco vai ao
+  título, Escape e o fundo iniciam a saída com foco no gatilho e rolagem livre; a desmontagem
+  foi conferida com o `animationend` nativo; em 375 px, tela inteira sem rolagem lateral; a
+  gaveta do menu no celular sem regressão.
+
+## 21. Validação desta etapa
+
+- **Testes que falham antes:** refinamento (6), divisões (29) e animação (10) falharam antes da
+  implementação; mutações: refinamento 9 de 9, animação 10 de 10 (uma sobrevivente foi
+  morta com teste novo).
+- **Bateria proporcional (só web mudou):** web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
+- **Limite do ambiente:** o painel do navegador estava oculto (sem pintura): as animações não
+  avançam e o `animationend` não é despachado por si; a desmontagem foi confirmada com o evento
+  nativo. Capturas de tela não foram feitas.

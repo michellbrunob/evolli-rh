@@ -3432,6 +3432,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         primeira e última, "Mostrando X–Y de Z", cancelamento das leituras antigas, aviso de
         auditoria fiel; menu "Ações" por linha com atalhos às abas da ficha que o papel vê. Só
         web; sem API, migration, RBAC ou dependência.
+      - **Refinamento, divisões e animação (seções 17 a 21):** faixa de indicadores e barra de
+        filtros; padrão de divisões sutis (tokens, shell e Colaboradores, com rollout por módulo);
+        animação reutilizável dos painéis laterais (Modal lateral, sem temporizador, com
+        movimento reduzido); massa sintética por tipo no banco próprio da prévia (Aprendiz
+        indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

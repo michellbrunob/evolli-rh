@@ -3254,6 +3254,11 @@ fiel; menu "Ações" por linha com atalhos às abas da ficha que o papel vê. S�
 
 **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
 
+**Refinamento, divisões e animação (seções 17 a 21 do dossiê):** faixa de indicadores e barra
+de filtros; padrão de divisões sutis com tokens, aplicado ao shell e a Colaboradores (rollout por
+módulo); animação reutilizável dos painéis laterais; massa sintética por tipo no banco próprio da
+prévia (Aprendiz indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
+
 **Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
 registrado.
 
