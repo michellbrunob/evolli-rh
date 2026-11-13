@@ -211,7 +211,7 @@ describe("T208 — limites contra arquivo inadequado", () => {
   });
 });
 
-function corpo(conteudo: Buffer[], contentLength?: number) {
+function corpo(conteudo: Buffer[], contentLength?: number, terminar = true) {
   const fluxo = new PassThrough() as unknown as Request & PassThrough;
   (fluxo as unknown as { headers: Record<string, string> }).headers =
     contentLength === undefined
@@ -219,7 +219,7 @@ function corpo(conteudo: Buffer[], contentLength?: number) {
       : { "content-length": String(contentLength) };
   setImmediate(() => {
     for (const parte of conteudo) fluxo.write(parte);
-    fluxo.end();
+    if (terminar) fluxo.end();
   });
   return fluxo;
 }
@@ -249,7 +249,9 @@ describe("T208 — leitura do corpo com teto de 5 MB", () => {
   });
 
   it("acima do teto de descarte, a conexão é cortada (ninguém prende o servidor)", async () => {
-    const fluxo = corpo([Buffer.alloc(15), Buffer.alloc(15)]);
+    // O cliente NUNCA termina de mandar: só o corte libera a conexão. (Um
+    // fluxo que termina se autodestrói e esconderia a falta do corte.)
+    const fluxo = corpo([Buffer.alloc(15), Buffer.alloc(15)], undefined, false);
     const cortar = jest.spyOn(fluxo, "destroy");
     await expect(lerCorpoLimitado(fluxo, 10, 20)).rejects.toBeInstanceOf(
       PayloadTooLargeException,
