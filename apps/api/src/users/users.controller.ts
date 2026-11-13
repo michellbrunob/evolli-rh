@@ -1,23 +1,58 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
+  Res,
+  StreamableFile,
+  UnsupportedMediaTypeException,
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Request } from "express";
+import { Request, Response } from "express";
 import { AccessUser } from "@prisma/client";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "../auth/dto/create-user.dto";
 import { UpdateUserRoleDto } from "../auth/dto/update-user-role.dto";
 import { ListarUsuariosQueryDto } from "./dto/listar-usuarios-query.dto";
+import { AtualizarPerfilProprioDto } from "./dto/atualizar-perfil-proprio.dto";
+import {
+  FotoRecusada,
+  lerCorpoLimitado,
+  normalizarFotoDePerfil,
+} from "./perfil/foto-perfil.processamento";
+import { RecusaDeNegocioException } from "../common/erros/recusa-por-campo";
+
+/**
+ * T208 — cabeçalho com a versão do perfil que a tela leu, nas gravações da
+ * foto (o corpo é o arquivo). `nenhuma` = perfil nunca salvo.
+ */
+const CABECALHO_VERSAO_DO_PERFIL = "x-evolli-perfil-versao";
+const SEM_VERSAO = "nenhuma";
+const ISO_ESTRITO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export function versaoLida(valor: string | undefined): Date | null {
+  if (valor === SEM_VERSAO) return null;
+  if (typeof valor !== "string" || !ISO_ESTRITO.test(valor)) {
+    throw new BadRequestException();
+  }
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime()) || data.toISOString() !== valor) {
+    throw new BadRequestException();
+  }
+  return data;
+}
 import { SessionGuard } from "../auth/session/session.guard";
 import { CsrfGuard } from "../auth/csrf/csrf.guard";
 import { AuthorizationGuard } from "../auth/authorization/authorization.guard";
@@ -63,6 +98,125 @@ export class UsersController {
    */
   @Get("me")
   async getMe(@CurrentUser() user: AccessUser) {
+    return this.projetarAtor(user);
+  }
+
+  /**
+   * T208 — Configurações › Meu perfil: a própria pessoa salva o próprio
+   * perfil. Hoje, só o nome de exibição (ver `AtualizarPerfilProprioDto`).
+   *
+   * `own_account`/`manage` é a única permissão: vale para todo papel, sempre
+   * sobre a conta da sessão — a rota não tem `:id`, então não há alvo de
+   * outra conta a escolher. Responde com o ator inteiro, na mesma projeção de
+   * `GET /users/me`, para a tela seguir com o que o servidor gravou.
+   */
+  @Patch("me")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("own_account", "manage")
+  async atualizarMe(
+    @Body() dto: AtualizarPerfilProprioDto,
+    @CurrentUser() user: AccessUser,
+    @Req() req: Request,
+  ) {
+    const perfil = await this.usersService.atualizarPerfilProprio(
+      {
+        nomeExibicao: dto.nomeExibicao,
+        perfilAtualizadoEmLido:
+          dto.perfilAtualizadoEmLido === null
+            ? null
+            : new Date(dto.perfilAtualizadoEmLido),
+      },
+      { actor: user, metadata: extractRequestMetadata(req) },
+    );
+    return this.projetarAtor({ ...user, ...perfil });
+  }
+
+  /**
+   * T208 — a própria foto (ADR 0018), só para a titular: sem `:id`, não há
+   * como pedir a de outra conta. Imagem privada: sem cache persistente, sem
+   * farejar tipo, sem executar nada (CSP `sandbox`) e exibida no lugar.
+   */
+  @Get("me/foto")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("own_account", "read")
+  async lerMinhaFoto(
+    @CurrentUser() user: AccessUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const foto = await this.usersService.lerFotoPropria(user.id);
+    if (foto === null) throw new NotFoundException();
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "no-store",
+      "Content-Disposition": "inline",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "X-Content-Type-Options": "nosniff",
+    });
+    return new StreamableFile(foto);
+  }
+
+  /**
+   * T208 — a própria pessoa envia ou substitui a própria foto (ADR 0018).
+   * O corpo é o arquivo (`application/octet-stream`, até 5 MB); a versão do
+   * perfil vai no cabeçalho `x-evolli-perfil-versao`. O servidor reconhece o
+   * formato pelo conteúdo, limita pixels, decodifica e REGRAVA a imagem como
+   * JPEG 256 × 256 sem metadados; só essa imagem nova é guardada.
+   */
+  @Put("me/foto")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("own_account", "manage")
+  async enviarMinhaFoto(
+    @CurrentUser() user: AccessUser,
+    @Headers(CABECALHO_VERSAO_DO_PERFIL) versao: string | undefined,
+    @Req() req: Request,
+  ) {
+    const tipo = String(req.headers["content-type"] ?? "").split(";")[0] ?? "";
+    if (tipo.trim().toLowerCase() !== "application/octet-stream") {
+      req.resume();
+      throw new UnsupportedMediaTypeException();
+    }
+    const lida = versaoLida(versao);
+    const enviado = await lerCorpoLimitado(req);
+    let foto: Buffer;
+    try {
+      foto = await normalizarFotoDePerfil(enviado);
+    } catch (erro) {
+      if (erro instanceof FotoRecusada) {
+        throw new RecusaDeNegocioException(erro.motivo);
+      }
+      throw erro;
+    }
+    const { perfilAtualizadoEm } = await this.usersService.gravarFotoPropria(
+      foto,
+      lida,
+      { actor: user, metadata: extractRequestMetadata(req) },
+    );
+    return this.projetarAtor({ ...user, perfilAtualizadoEm });
+  }
+
+  /** T208 — a própria pessoa remove a própria foto: os bytes são apagados. */
+  @Delete("me/foto")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("own_account", "manage")
+  async removerMinhaFoto(
+    @CurrentUser() user: AccessUser,
+    @Headers(CABECALHO_VERSAO_DO_PERFIL) versao: string | undefined,
+    @Req() req: Request,
+  ) {
+    const { perfilAtualizadoEm } = await this.usersService.removerFotoPropria(
+      versaoLida(versao),
+      { actor: user, metadata: extractRequestMetadata(req) },
+    );
+    return this.projetarAtor({ ...user, perfilAtualizadoEm });
+  }
+
+  /**
+   * A projeção do ator que o SPA recebe: `toSafeUser`, o perfil (T208) e o
+   * contexto da sessão. O nome de exibição e a data da última alteração do
+   * perfil saem SÓ aqui — `toSafeUser`, usado na listagem de Contas de
+   * acesso, não os carrega.
+   */
+  private async projetarAtor(user: AccessUser) {
     const comContexto = user as AccessUser & { podeTrocarEmpresa?: boolean };
 
     const empresaAtiva =
@@ -75,6 +229,13 @@ export class UsersController {
 
     return {
       ...toSafeUser(user),
+      nomeExibicao: user.nomeExibicao ?? null,
+      perfilAtualizadoEm: user.perfilAtualizadoEm ?? null,
+      // T208 — versão da foto (instante da gravação) ou `null` sem foto. Só
+      // a versão: os bytes saem por `GET /users/me/foto`, para a titular.
+      fotoVersao:
+        (await this.usersService.versaoDaFotoPropria(user.id))?.toISOString() ??
+        null,
       mfaAvailable: this.mfaConfig.isEnabled(),
       podeTrocarEmpresa: comContexto.podeTrocarEmpresa === true,
       empresaAtiva,

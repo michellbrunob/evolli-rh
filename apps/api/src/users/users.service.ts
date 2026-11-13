@@ -1,4 +1,9 @@
-import { Injectable, UnprocessableEntityException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from "@nestjs/common";
 import { AccessRole, AccessUser, Prisma } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { PasswordHashService } from "../auth/password/password-hash.service";
@@ -38,6 +43,20 @@ export interface CreateUserInput {
 export interface AuditActorContext {
   actor: AccessUser;
   metadata: SessionRequestMetadata;
+}
+
+/** T208 — o que a própria pessoa grava em Meu perfil, já normalizado. */
+export interface PerfilProprioInput {
+  /** `null` limpa o nome: a interface volta ao e-mail. */
+  nomeExibicao: string | null;
+  /** A versão que a tela leu (`null`: o perfil nunca foi salvo). */
+  perfilAtualizadoEmLido: Date | null;
+}
+
+/** T208 — o perfil gravado, como volta para a tela. */
+export interface PerfilProprio {
+  nomeExibicao: string | null;
+  perfilAtualizadoEm: Date | null;
 }
 
 @Injectable()
@@ -144,6 +163,172 @@ export class UsersService {
     return toSafeUser(user);
   }
 
+  /**
+   * T208 — a própria pessoa salva o próprio perfil (Configurações › Meu
+   * perfil). Autorização já aplicada (`own_account`/`manage`).
+   *
+   * - **Alvo é sempre a conta da sessão** (`auditCtx.actor.id`); não existe
+   *   id vindo da requisição.
+   * - **Só o nome de exibição** é escrito, mais a data da última alteração do
+   *   perfil. Papel, e-mail, empresa, unidade, equipe e situação nunca são
+   *   tocados aqui.
+   * - **Concorrência otimista:** a escrita só acontece se o perfil ainda está
+   *   na versão que a tela leu. Se outra sessão salvou antes, nada é gravado
+   *   e a resposta é 409 — a edição concorrente não é sobrescrita. A condição
+   *   vai no próprio `UPDATE`, então duas gravações simultâneas não passam
+   *   as duas.
+   * - **Auditoria** na mesma transação (ADR 0004 §2), sem o conteúdo do nome.
+   */
+  async atualizarPerfilProprio(
+    input: PerfilProprioInput,
+    auditCtx: AuditActorContext,
+  ): Promise<PerfilProprio> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const gravados = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: input.perfilAtualizadoEmLido,
+        },
+        data: {
+          nomeExibicao: input.nomeExibicao,
+          perfilAtualizadoEm: agora,
+        },
+      });
+      if (gravados.count !== 1) {
+        throw new ConflictException();
+      }
+
+      await this.auditService.record(
+        {
+          actorType: "user",
+          actorUserId: auditCtx.actor.id,
+          actorRole: auditCtx.actor.role,
+          companyId: auditCtx.actor.companyId,
+          action: "conta_perfil_atualizado",
+          resource: "access_user",
+          resourceId: auditCtx.actor.id,
+          ip: auditCtx.metadata.ip,
+          userAgent: auditCtx.metadata.userAgent,
+          result: "success",
+          requestId: auditCtx.metadata.requestId,
+        },
+        tx,
+      );
+
+      return { nomeExibicao: input.nomeExibicao, perfilAtualizadoEm: agora };
+    });
+  }
+
+  /**
+   * T208 — a própria pessoa grava (envia ou substitui) a própria foto (ADR
+   * 0018). `foto` já é a imagem REGRAVADA pelo servidor; o arquivo enviado
+   * nunca chega aqui. A gravação entra na versão do perfil: versão
+   * desatualizada responde 409 e nada é sobrescrito. Auditoria na mesma
+   * transação, sem nenhum dado da imagem.
+   */
+  async gravarFotoPropria(
+    foto: Buffer,
+    perfilAtualizadoEmLido: Date | null,
+    auditCtx: AuditActorContext,
+  ): Promise<{ perfilAtualizadoEm: Date }> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const versao = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: perfilAtualizadoEmLido,
+        },
+        data: { perfilAtualizadoEm: agora },
+      });
+      if (versao.count !== 1) throw new ConflictException();
+
+      await tx.accessUserFoto.upsert({
+        where: { userId: auditCtx.actor.id },
+        create: { userId: auditCtx.actor.id, conteudo: foto, gravadaEm: agora },
+        update: { conteudo: foto, gravadaEm: agora },
+      });
+
+      await this.auditService.record(
+        this.eventoDaConta(auditCtx, "conta_foto_enviada", auditCtx.actor.id),
+        tx,
+      );
+      return { perfilAtualizadoEm: agora };
+    });
+  }
+
+  /**
+   * T208 — a própria pessoa remove a própria foto: os bytes são apagados na
+   * hora (sem lixeira). Versão desatualizada responde 409; sem foto, 404 — e
+   * a versão não muda (a transação é desfeita).
+   */
+  async removerFotoPropria(
+    perfilAtualizadoEmLido: Date | null,
+    auditCtx: AuditActorContext,
+  ): Promise<{ perfilAtualizadoEm: Date }> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const versao = await tx.accessUser.updateMany({
+        where: {
+          id: auditCtx.actor.id,
+          perfilAtualizadoEm: perfilAtualizadoEmLido,
+        },
+        data: { perfilAtualizadoEm: agora },
+      });
+      if (versao.count !== 1) throw new ConflictException();
+
+      const removidas = await tx.accessUserFoto.deleteMany({
+        where: { userId: auditCtx.actor.id },
+      });
+      if (removidas.count === 0) throw new NotFoundException();
+
+      await this.auditService.record(
+        this.eventoDaConta(auditCtx, "conta_foto_removida", auditCtx.actor.id),
+        tx,
+      );
+      return { perfilAtualizadoEm: agora };
+    });
+  }
+
+  /** T208 — os bytes da própria foto, ou `null` se não houver. */
+  async lerFotoPropria(userId: string): Promise<Buffer | null> {
+    const foto = await this.prisma.accessUserFoto.findUnique({
+      where: { userId },
+      select: { conteudo: true },
+    });
+    return foto === null ? null : Buffer.from(foto.conteudo);
+  }
+
+  /** T208 — a versão da foto (instante da gravação), sem ler os bytes. */
+  async versaoDaFotoPropria(userId: string): Promise<Date | null> {
+    const foto = await this.prisma.accessUserFoto.findUnique({
+      where: { userId },
+      select: { gravadaEm: true },
+    });
+    return foto?.gravadaEm ?? null;
+  }
+
+  /** Evento de auditoria de ação sobre uma conta, sem conteúdo. */
+  private eventoDaConta(
+    auditCtx: AuditActorContext,
+    action: "conta_foto_enviada" | "conta_foto_removida",
+    resourceId: string,
+  ) {
+    return {
+      actorType: "user" as const,
+      actorUserId: auditCtx.actor.id,
+      actorRole: auditCtx.actor.role,
+      companyId: auditCtx.actor.companyId,
+      action,
+      resource: "access_user" as const,
+      resourceId,
+      ip: auditCtx.metadata.ip,
+      userAgent: auditCtx.metadata.userAgent,
+      result: "success" as const,
+      requestId: auditCtx.metadata.requestId,
+    };
+  }
+
   async disable(
     targetUserId: string,
     auditCtx: AuditActorContext,
@@ -156,6 +341,18 @@ export class UsersService {
         where: { id: targetUserId },
         data: { status: "disabled" },
       });
+
+      // T208 (ADR 0018, FP-4) — desativar a conta apaga a foto na mesma
+      // transação; o evento de remoção sai só se havia foto.
+      const fotosRemovidas = await tx.accessUserFoto.deleteMany({
+        where: { userId: targetUserId },
+      });
+      if (fotosRemovidas.count > 0) {
+        await this.auditService.record(
+          this.eventoDaConta(auditCtx, "conta_foto_removida", targetUserId),
+          tx,
+        );
+      }
 
       await this.auditService.record(
         {

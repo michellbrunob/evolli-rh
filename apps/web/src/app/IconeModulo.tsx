@@ -30,6 +30,7 @@ export type IconeModuloId =
   | "jornada"
   | "lideranca"
   | "administracao"
+  | "configuracoes"
   | "demonstracao";
 
 export interface IconeModuloProps {
@@ -84,6 +85,14 @@ const TRACOS: Readonly<Record<IconeModuloId, ReactNode>> = {
     <>
       <circle cx="6.75" cy="13.25" r="3.5" />
       <path d="M9.25 10.75 16.5 3.5M13.5 6.5l2 2M15.25 4.75l2 2" />
+    </>
+  ),
+  // T208 — engrenagem: um anel com oito dentes retos e o eixo ao centro.
+  configuracoes: (
+    <>
+      <circle cx="10" cy="10" r="4.75" />
+      <circle cx="10" cy="10" r="1.75" />
+      <path d="M10 2.5v2.75M10 14.75v2.75M2.5 10h2.75M14.75 10h2.75M4.7 4.7l1.94 1.94M13.36 13.36l1.94 1.94M4.7 15.3l1.94-1.94M13.36 6.64l1.94-1.94" />
     </>
   ),
   // Retângulo tracejado: a convenção de "maquete", não de capacidade.

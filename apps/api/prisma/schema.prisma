@@ -66,12 +66,24 @@ model AccessUser {
 
   status AccessUserStatus @default(active)
 
+  // T208 — Configuracoes > Meu perfil. Nome de exibicao proprio da conta
+  // (global, nao por empresa), opcional: sem ele, a interface usa o e-mail.
+  // `perfilAtualizadoEm` muda SO quando a propria pessoa salva o perfil — ao
+  // contrario de `updatedAt`, que tambem muda com senha, papel e desativacao —
+  // e e a versao da concorrencia otimista de `PATCH /v1/users/me`.
+  nomeExibicao       String?   @map("nome_exibicao") @db.VarChar(80)
+  perfilAtualizadoEm DateTime? @map("perfil_atualizado_em")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions            AccessSession[]
   passwordResetTokens AccessPasswordResetToken[]
   auditEvents         AuditEvent[]
+
+  // T208 — foto de perfil (ADR 0018), em tabela propria: a sessao carrega a
+  // conta a cada requisicao e os bytes da foto nunca viajam junto.
+  foto AccessUserFoto?
 
   // Etapa 0 — Segurança (T125): MFA TOTP. Um fator TOTP por conta (no máximo),
   // challenges temporarios de login e códigos de recuperação de uso único.
@@ -156,6 +168,20 @@ model AccessUser {
 // (ADR 0003 §5). `csrfTokenHash` é o token synchronizer vinculado à sessão
 // (ADR 0003 §6) — extensão técnica desta implementação, não altera o
 // desenho aprovado.
+/// T208 — foto de perfil da propria conta (ADR 0018). Uma linha por conta;
+/// os bytes sao sempre a imagem REGRAVADA pelo servidor (JPEG 256x256, sem
+/// metadados), nunca o arquivo enviado. Vista so pela titular.
+model AccessUserFoto {
+  userId    String   @id @map("user_id")
+  conteudo  Bytes
+  /// Muda a cada envio; e a versao que a tela usa para trocar a imagem.
+  gravadaEm DateTime @map("gravada_em")
+
+  user AccessUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("access_user_foto")
+}
+
 model AccessSession {
   id            String @id @default(uuid())
   tokenHash     String @unique @map("token_hash")
@@ -377,6 +403,16 @@ enum AuditAction {
   acesso_contexto_empresa_trocado     @map("acesso.contexto_empresa.trocado")
   acesso_empresa_autorizada_concedida @map("acesso.empresa_autorizada.concedida")
   acesso_empresa_autorizada_revogada  @map("acesso.empresa_autorizada.revogada")
+
+  // T208 — a propria pessoa salvou o proprio perfil (Configuracoes > Meu
+  // perfil). O evento nao guarda o conteudo do nome de exibicao: a trilha so
+  // diz quem, quando e de onde.
+  conta_perfil_atualizado @map("conta.perfil.atualizado")
+
+  // T208 — foto de perfil da propria conta (ADR 0018): envio (inclui
+  // substituicao) e remocao. Sem conteudo, hash, nome, tamanho ou dimensoes.
+  conta_foto_enviada @map("conta.foto.enviada")
+  conta_foto_removida @map("conta.foto.removida")
 
   organizacao_empresa_criada     @map("organizacao.empresa.criada")
   organizacao_empresa_atualizada @map("organizacao.empresa.atualizada")

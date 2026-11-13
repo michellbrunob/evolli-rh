@@ -683,6 +683,21 @@ export function AutenticacaoApp() {
         empresaAtiva={ator.empresaAtiva ?? null}
         // T189 — e o seletor do menu lateral, com o mesmo poder de troca.
         podeTrocarEmpresa={podeTrocarEmpresa}
+        // T208 — Configurações › Meu perfil: só os campos que a tela exibe,
+        // do mesmo ator. Salvo o perfil, o ator devolvido pelo servidor
+        // substitui o da sessão (mesma conta e empresa: a árvore não remonta).
+        contaDoAtor={{
+          email: ator.email,
+          role: ator.role,
+          createdAt: ator.createdAt,
+          empresaAtiva: ator.empresaAtiva ?? null,
+          nomeExibicao: ator.nomeExibicao ?? null,
+          perfilAtualizadoEm: ator.perfilAtualizadoEm ?? null,
+          fotoVersao: ator.fotoVersao ?? null,
+        }}
+        onContaAtualizada={(atualizado) => {
+          if (atualizado.id === atorRef.current?.id) setAtor(atualizado);
+        }}
         onEmpresaTrocada={aoTrocarEmpresa}
         onDestinoAlterado={(destinoId) => {
           destinoExibidoRef.current = destinoId;

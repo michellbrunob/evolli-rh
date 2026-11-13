@@ -1,0 +1,346 @@
+/**
+ * T208 — Configurações › Meu perfil. Só tokens já existentes (`tokens.css`):
+ * sem novo hexadecimal, sem sombra, sem gradiente e sem a paleta do
+ * Dashboard. Duas colunas (navegação interna e painel) a partir de 720 px;
+ * abaixo disso, uma coluna só, sem rolagem horizontal a 375 px. Dentro do
+ * painel, as linhas viram rótulo à esquerda e valor à direita só quando o
+ * PRÓPRIO painel tem 40rem — não a janela: com o menu aberto, a 1024 px o
+ * painel tem menos de 450 px, e a regra pela janela espremia o campo.
+ */
+
+.configuracoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.configuracoes > * {
+  min-width: 0;
+}
+
+.configuracoes__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (min-width: 720px) {
+  .configuracoes__corpo {
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  }
+}
+
+.configuracoes__navegacao {
+  min-width: 0;
+}
+
+.configuracoes__grupo {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.configuracoes__itens {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Alvo de 44 px; o item atual não depende só de cor: peso, superfície e
+   `aria-current="page"`. */
+.configuracoes__item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  text-decoration: none;
+}
+
+/* Sobre o fundo neutro da página: superfície clara, filete na cor de ação e
+   peso — o item atual não depende de um tom só. */
+.configuracoes__item--atual {
+  background: var(--surface-canvas);
+  border-left: 3px solid var(--color-action);
+  font-weight: var(--weight-strong);
+}
+
+.configuracoes__item:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.configuracoes__painel {
+  container-type: inline-size;
+  min-width: 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.configuracoes__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__texto {
+  margin: var(--space-xs) 0 var(--space-md);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__formulario {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Cada seção separada da anterior por um filete. */
+.configuracoes__secao {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-lg) 0;
+  border-top: 1px solid var(--divider-soft);
+}
+
+.configuracoes__secao-titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__secao-texto {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Iniciais no lugar da foto: círculo com as letras, decorativo (o nome está
+   ao lado, em texto). */
+.configuracoes__identidade {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+  padding: var(--space-xs) 0;
+}
+
+.configuracoes__iniciais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+  font-weight: var(--weight-bold);
+}
+
+.configuracoes__identidade-texto {
+  min-width: 0;
+}
+
+.configuracoes__nome-exibido {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.configuracoes__identidade-nota {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__dados {
+  display: grid;
+  margin: 0;
+}
+
+/* Linha: rótulo e valor. Um embaixo do outro; lado a lado quando o painel
+   tem 40rem. Um filete entre linhas. */
+.configuracoes__linha,
+.configuracoes__linha.evolli-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xxs);
+  min-width: 0;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--divider-soft);
+}
+
+@container (min-width: 40rem) {
+  .configuracoes__linha,
+  .configuracoes__linha.evolli-field {
+    grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+    gap: var(--space-lg);
+    align-items: start;
+  }
+}
+
+.configuracoes__dado dt,
+.configuracoes__rotulo-texto {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+/* E-mail e nome de empresa longos quebram dentro da caixa. */
+.configuracoes__dado dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.configuracoes__rotulo,
+.configuracoes__valor {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.configuracoes__ajuda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Enquanto salva, o campo fica só leitura e o tom diz isso. */
+.configuracoes__valor input:read-only {
+  background: var(--surface-neutral);
+}
+
+.configuracoes__falha {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+.configuracoes__falha-texto {
+  margin: 0;
+}
+
+/* Rodapé de edição: só existe com alteração. Preso ao pé da área visível
+   enquanto a tela rola, para Salvar não sumir. */
+.configuracoes__rodape {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-canvas);
+}
+
+.configuracoes__rodape-texto {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.configuracoes__rodape-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.configuracoes__rodape-acoes > * {
+  min-height: 44px;
+}
+
+/* Região de status sempre presente (para o leitor de tela anunciar), sem
+   ocupar espaço quando vazia. */
+.configuracoes__anuncio {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-success-ink);
+}
+
+/* T208 — foto de perfil (ADR 0018). Círculo do mesmo tamanho das iniciais;
+   a imagem preenche o quadrado sem distorcer. */
+.configuracoes__foto {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+.configuracoes__foto-acoes,
+.configuracoes__previa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.configuracoes__foto-acoes > button,
+.configuracoes__previa-acoes > button {
+  min-height: 44px;
+}
+
+.configuracoes__foto-acoes > .configuracoes__ajuda {
+  flex: 1 1 100%;
+}
+
+/* Prévia local: o quadrado mostra o mesmo corte central que o servidor faz. */
+.configuracoes__previa,
+.configuracoes__confirmacao {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.configuracoes__confirmacao > p {
+  margin: 0;
+}
+
+.configuracoes__previa-titulo {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__previa-imagem {
+  width: 10rem;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  object-position: center;
+}

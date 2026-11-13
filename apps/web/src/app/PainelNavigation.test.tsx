@@ -46,7 +46,7 @@ function botoesDeDestino(): HTMLElement[] {
 
 describe("estrutura dos grupos", () => {
   // T205 — o Dashboard vem antes de todos (D-9).
-  it("o Dashboard e os cinco módulos operacionais vêm antes de Demonstração", () => {
+  it("o Dashboard e os cinco módulos operacionais, depois Configurações (T208), vêm antes de Demonstração", () => {
     expect(GRUPOS.map((g) => g.titulo)).toEqual([
       "Dashboard",
       "Gestão de Pessoas",
@@ -54,8 +54,18 @@ describe("estrutura dos grupos", () => {
       "Jornada",
       "Liderança",
       "Administração",
+      "Configurações",
       "Demonstração",
     ]);
+  });
+
+  it("T208 — só Configurações é grupo da conta, com um único destino funcional", () => {
+    const daConta = GRUPOS.filter((g) => g.daConta);
+    expect(daConta.map((g) => g.titulo)).toEqual(["Configurações"]);
+    expect(daConta[0]!.secundario).toBeFalsy();
+    expect(
+      daConta[0]!.destinos.map((d) => [d.id, d.label, d.estado, d.papeis]),
+    ).toEqual([["configuracoes", "Configurações", "funcional", undefined]]);
   });
 
   it("só Demonstração tem descrição, e ela diz que nada ali grava", () => {
@@ -100,6 +110,10 @@ describe("o estado declarado bate com o código", () => {
   const TELA_PADRAO: Readonly<Record<string, string>> = {
     // T205 — o Dashboard lê colaboradores e movimentações: funcional.
     dashboard: "src/screens/dashboard/DashboardScreen.tsx",
+    // T208 — Meu perfil mostra o que `GET /v1/users/me` trouxe na sessão:
+    // depende do contrato e dos rótulos de `usersClient`, sem requisição
+    // própria. Funcional: dado real do servidor, não fixture.
+    configuracoes: "src/screens/configuracoes/MeuPerfilScreen.tsx",
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
@@ -583,10 +597,27 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
       />,
     );
     const listas = listasDeModulo();
-    expect(listas).toHaveLength(2);
+    // T208 — operacionais, a própria conta (Configurações) e Demonstração.
+    expect(listas).toHaveLength(3);
 
     const operacionais = listas[0]!;
-    const secundaria = listas[1]!;
+    const daConta = listas[1]!;
+    const secundaria = listas[2]!;
+    expect(daConta).toHaveClass("painel-nav__modulos--conta");
+    expect(
+      within(daConta).getByRole("button", { name: /^Configurações/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(operacionais).queryByRole("button", { name: /^Configurações/ }),
+    ).toBeNull();
+    expect(
+      operacionais.compareDocumentPosition(daConta) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      daConta.compareDocumentPosition(secundaria) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(secundaria).toHaveClass("painel-nav__modulos--secundario");
     // Ordem no documento: a lista secundária vem depois.
     expect(

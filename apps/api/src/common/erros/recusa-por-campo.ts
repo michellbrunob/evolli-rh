@@ -72,7 +72,13 @@ export class CamposRecusadosException extends UnprocessableEntityException {
 
 /** Códigos públicos de recusa sem campo próprio. */
 export type CodigoDeRecusa =
-  "idempotencia_conteudo_divergente" | "csrf_invalido";
+  | "idempotencia_conteudo_divergente"
+  | "csrf_invalido"
+  // T208 — foto de perfil recusada pelo conteúdo (ADR 0018).
+  | "foto_formato_invalido"
+  | "foto_pequena"
+  | "foto_grande_demais"
+  | "foto_invalida";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência

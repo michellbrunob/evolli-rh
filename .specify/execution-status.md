@@ -3106,11 +3106,11 @@ squash `512d24914519fed335a900b18cab690832e8f121`, CI de push 3/3 verde, run
 42823908545); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T207.
 
-## Dashboard funcional e seletor de empresas — T207 (validada localmente, PR #200 em Draft)
+## Dashboard funcional e seletor de empresas — T207 (integrada)
 
-| Tarefa | Estado                                                   | Resultado principal                                                                    |
-| ------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| T207   | **Implementada** (validada localmente, PR #200 em Draft) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
+| Tarefa | Estado                                    | Resultado principal                                                                    |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| T207   | **Integrada** (PR #200, squash `25903aa`) | Dashboard funcional com cinco abas e dados reais, e seletor de empresa ativa evoluído. |
 
 **Escopo da preparação (concluída):** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t207-dossie-dashboard-seletor-empresas.md):
@@ -3135,13 +3135,13 @@ seletor.
 
 **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
 lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos históricos calculados;
-tela de empresas; mudança global de cor; promoção e merge.
+tela de empresas; mudança global de cor.
 
 **Entrega validada localmente (seções 16 a 19 do dossiê):** Quadro de colaboradores com gráfico
 e tabela, painel por mês, informação "Como calculamos", menu de ações, CSV e impressão para salvar
 em PDF; Distribuição do time e Tempo de casa com agrupamento mínimo de 3 pessoas; ativos no fim e
 turnover como "—" por falta de fonte e regra aprovada; validação visual aprovada pela
-proprietária em 2026-11-10. Em revisão na PR #200 (Draft), sem Ready e sem merge.
+proprietária em 2026-11-10. Integrada pela PR #200.
 
 **Revisão adversarial da PR #200 (seção 20 do dossiê):** nove achados corrigidos na entrega,
 cada um com teste que falhava antes (privacidade da Distribuição, painel do mês, paleta fora do
@@ -3166,6 +3166,65 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 **Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts
 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 `git diff --check` verdes.
+
+**Observação de relatório:** a integração funcional da T207 está concluída (PR #200, squash
+`25903aa742d8f3f304dd7b3597eaed12ed83649a`, CI de push 3/3 verde, run 43204739130; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T208.
+
+## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
+
+| Tarefa | Estado                                                           | Resultado principal                                                                                                                         |
+| ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição e foto de perfil) validada localmente. |
+
+**Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
+leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
+decisões MPA-1 a MPA-11, aprovadas em 2026-11-12 com a MPA-5 corrigida (seção 22), estão na seção 21 do
+[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); a ampliação está implementada e validada localmente (seções 23 a 26), com a validação visual
+aprovada em 2026-11-13. A referência visual foi usada só como inspiração local e não é registrada.
+
+**Ampliação:** nome de exibição editável — migration aditiva, `PATCH /v1/users/me` com
+`own_account`/`manage`, concorrência otimista e auditoria sem conteúdo; tela em identificação,
+contato e formas de entrada, com guarda de saída. Validação local: web 133 arquivos, 3760
+testes; API unitária 61 suítes, 1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046
+testes; scripts 182 testes; 58 mutações, todas detectadas; lint, typecheck, build, Prettier,
+`spec:check`, prévia do squash e `git diff --check` verdes.
+
+**Base existente:** detalhada no dossiê (seções 15 a 20):
+
+- decisões MP-1 a MP-8 aprovadas em 2026-11-12 como recomendadas e conferidas sem alteração;
+- rota `#/configuracoes/meu-perfil`, atalho `#/configuracoes`; os nove papéis acessam pelo
+  cartão no Hub e, depois da entrada no shell, pelo item próprio do menu lateral; para
+  financeiro, colaborador, auditor, DPO e administração técnica, é o único cartão do Hub; papel
+  desconhecido sem acesso;
+- só leitura, só web, com os dados da sessão de `GET /v1/users/me` e sem chamada nova: e-mail de
+  acesso, papel, empresa ativa e data de criação da conta; sem controle de edição;
+- rótulo "Perfil" do Hub trocado por "Papel"; Segurança e Sessões ativas sem mudança;
+- achados do navegador corrigidos: foco no título na recarga, item atual da navegação interna
+  visível e gaveta do celular presa à altura da tela (defeito anterior, da T206).
+
+**Validação local:** web 133 arquivos, 3725 testes; API unitária 60 suítes, 1472 testes; E2E
+serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações, todas
+detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+`git diff --check` verdes.
+
+**Validação visual:** aprovada pela validação humana em 2026-11-12.
+
+**Foto de perfil:** decisões FP-1 a FP-8 aprovadas em 2026-11-13
+([ADR 0018](../docs/adr/0018-foto-de-perfil-da-conta-no-postgresql.md)); implementada e validada
+localmente, com a validação visual aprovada em 2026-11-13 (seções 27 a 29 do dossiê). Validação local: web 133 arquivos, 3797 testes;
+API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes;
+scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
+`spec:check`, prévia do squash e `git diff --check` verdes.
+
+**Envio:** a ampliação (nome de exibição e foto) vai à PR #201, em Draft, por ordem de
+2026-11-13.
+
+**Pendente:** revisão da
+PR #201; Ready for review e merge só com ordem.
+
+**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Próxima ação autorizável
 

@@ -794,7 +794,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // cabeçalhos de módulo expansível: Gestão de Pessoas
     // (`sempreComoModulo`), Estrutura (dois itens desde a T182), Liderança e
     // Demonstração. O Dashboard é item único: módulo e destino fundidos.
-    expect(botoes).toHaveLength(20);
+    // T208 — Configurações também é item único (a própria conta): 21.
+    expect(botoes).toHaveLength(21);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))

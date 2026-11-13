@@ -453,6 +453,11 @@
     flex-basis: auto;
     height: auto;
     max-height: none;
+    /* T208 — presa entre o topo e o pé da tela. O `align-self: flex-start`
+       do desktop vale também para caixa fixa, e faria a gaveta crescer com
+       o conteúdo: o que passa da altura da tela (Configurações, Demonstração)
+       ficaria fora de alcance, sem rolagem. */
+    align-self: stretch;
     border-right: 1px solid var(--hairline);
   }
 

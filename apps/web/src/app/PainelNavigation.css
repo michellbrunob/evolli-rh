@@ -39,6 +39,19 @@
   border-top: 1px solid var(--divider-soft);
 }
 
+/* T208 — a própria conta (Configurações) também desce para o pé da barra,
+   separada dos módulos de trabalho por um filete, logo acima de
+   Demonstração. Com as duas listas no pé, só a primeira empurra. */
+.painel-nav__modulos--conta {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.painel-nav__modulos--conta + .painel-nav__modulos--secundario {
+  margin-top: var(--space-md);
+}
+
 .painel-nav__modulo {
   margin: 0;
 }
@@ -323,7 +336,8 @@
   color: var(--evolli-sobre-marinho-suave);
 }
 
-.painel-nav .painel-nav__modulos--secundario {
+.painel-nav .painel-nav__modulos--secundario,
+.painel-nav .painel-nav__modulos--conta {
   border-top-color: var(--evolli-marinho-divisa);
 }
 

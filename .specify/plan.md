@@ -81,7 +81,9 @@ aprovação quando homologado. Enquanto uma alçada não estiver definida, a aç
 | Documentos               | Cloudflare R2 aprovado pela ADR 0013; conteúdo ainda desabilitado    | metadados no PostgreSQL; objeto em bucket privado por ambiente, com autorização temporária, quarentena e controle de acesso          |
 
 Sessões permanecem no PostgreSQL até métrica real justificar Redis (ADR 0003). Não introduzir IdP,
-SSO, Redis, fila, storage ou outro provedor por antecipação: cada decisão material exige ADR.
+SSO, Redis, fila, storage ou outro provedor por antecipação: cada decisão material exige ADR. A
+foto de perfil da conta usa o PostgreSQL, em tabela própria, pela ADR 0018; isso não vale para
+conteúdo documental, que segue a ADR 0013 e os portões de Nível 2.
 
 ## 3. Arquitetura em camadas
 

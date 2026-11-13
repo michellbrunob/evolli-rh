@@ -23,6 +23,12 @@ export const AUDIT_ACTIONS = [
   "acesso_empresa_autorizada_concedida",
   "acesso_empresa_autorizada_revogada",
 
+  // T208 — a propria pessoa salvou o proprio perfil; sem o conteudo do nome.
+  "conta_perfil_atualizado",
+  // T208 — foto de perfil da propria conta (ADR 0018), sem dado da imagem.
+  "conta_foto_enviada",
+  "conta_foto_removida",
+
   // Etapa 1 — Fatia 1: Núcleo Organizacional. O valor **persistido** segue a
   // convenção aprovada em português separada por ponto
   // (`organizacao.empresa.criada`); o identificador abaixo é o nome Prisma do

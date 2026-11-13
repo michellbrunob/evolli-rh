@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-10",
-  "lastIntegratedTask": 206,
-  "lastRecordedTask": 207,
+  "lastConvergedAt": "2026-11-12",
+  "lastIntegratedTask": 207,
+  "lastRecordedTask": 208,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T207",
-    "status": "dashboard_seletor_empresas_em_implementacao",
-    "reason": "T206 integrada em main pela PR #199 (squash 512d24914519fed335a900b18cab690832e8f121), com a CI de push 3/3 verde (run 42823908545). A T207 implementa o Dashboard funcional e a evolucao do seletor de empresa ativa conforme as decisoes V-1 a V-6, E-1 a E-4 e P-1 aprovadas em 2026-11-10 (docs/decisions/t207-dossie-dashboard-seletor-empresas.md, secao 13): cinco abas com rota e ano compartilhado; Visao Geral, Pessoas e Movimentacao so com dados reais; turnover, absenteismo e custo por pessoa como cards honestos, sem numero; Remuneracao e Clima e saude com estado de indisponibilidade; seletor com lista Empresas da conta e busca acima de 8 empresas; paleta Evolli no menu lateral, no Dashboard e no seletor. Entrega: Quadro de colaboradores com grafico e tabela, painel por mes, informacao Como calculamos, menu de acoes, CSV e impressao para salvar em PDF; Distribuicao do time e Tempo de casa com agrupamento minimo de 3 pessoas; ativos no fim e turnover como indisponiveis, sem fonte nem regra aprovada. So web e testes: sem API, banco, schema, migration, RBAC, auditoria, seed ou dependencia. Implementada e validada localmente (validacao visual aprovada em 2026-11-10); em revisao na PR #200 (Draft), com os achados das revisoes adversariais corrigidos (secoes 20 a 25 do dossie); sem Ready e sem merge."
+    "id": "T208",
+    "status": "configuracoes_meu_perfil_ampliacao_em_implementacao",
+    "reason": "T207 integrada em main pela PR #200 (squash 25903aa742d8f3f304dd7b3597eaed12ed83649a), com a CI de push 3/3 verde (run 43204739130); branch remota preservada. A T208 implementa a primeira fatia de Configuracoes, o submodulo Meu Perfil, conforme as decisoes MP-1 a MP-8 aprovadas (docs/decisions/t208-dossie-configuracoes-meu-perfil.md): rota #/configuracoes/meu-perfil, somente leitura e so web, com os dados da sessao de GET /v1/users/me (e-mail de acesso, papel, empresa ativa e data de criacao da conta), os nove papeis acessam pelo cartao no Hub e, depois da entrada no shell, pelo item proprio do menu lateral (para financeiro, colaborador, auditor, dpo e admin_tecnico e o unico cartao do Hub), rotulo Papel no Hub. Em implementacao, entrega em PR Draft #201, validada localmente (validacao visual humana aprovada em 2026-11-12); sem Ready for review e sem merge. Ampliada antes do Ready por decisao de produto: o Meu Perfil somente leitura e a base existente, nao a entrega final; o levantamento da ampliacao (nome de exibicao, foto, cargo, telefone, e-mail, senha, Google, segundo fator e sessoes) e as decisoes MPA-1 a MPA-11 estao na secao 21 do dossie, aprovadas em 2026-11-12 com a MPA-5 corrigida (secao 22); a ampliacao (nome de exibicao editavel: migration aditiva, PATCH /v1/users/me com own_account/manage, concorrencia otimista e auditoria sem conteudo) esta implementada e validada localmente (secoes 23 a 26). A foto de perfil (decisoes FP-1 a FP-8 aprovadas em 2026-11-13; ADR 0018: PostgreSQL em tabela propria, regravacao no servidor com sharp, entrega privada) esta implementada e validada localmente (secoes 27 e 28). Validacao visual do nome de exibicao e da foto aprovada em 2026-11-13 (secao 29); a ampliacao vai a PR #201, em Draft, por ordem de 2026-11-13; sem Ready e sem merge. A referencia visual foi usada so como inspiracao local e nao e registrada. A base somente leitura nao alterou API nem schema; a ampliacao aprovada acrescenta migration aditiva, rota PATCH /v1/users/me e auditoria, sem seed, Docker ou workflow; a foto acrescenta a dependencia sharp (lockfile)."
   },
   "openDeliveries": [
     {
-      "id": "T207",
+      "id": "T208",
       "pullRequest": null,
-      "status": "dashboard_seletor_empresas_em_implementacao"
+      "status": "configuracoes_meu_perfil_ampliacao_em_implementacao"
     }
   ],
   "requiredArtifacts": [

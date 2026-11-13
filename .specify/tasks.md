@@ -3300,9 +3300,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         entrega.
 
 104.  **T207 - Dashboard funcional e seletor de empresas**
-      - **Estado:** **implementada e validada localmente**, em revisão na PR #200 (Draft), sem
-        Ready e sem merge.
-        Branch `codex/t207-dashboard-seletor-empresas`, a partir do squash
+      - **Estado:** **integrada** em `main` pela PR #200, squash
+        `25903aa742d8f3f304dd7b3597eaed12ed83649a`, com a CI de push 3/3 verde (run
+        43204739130); branch remota preservada. Implementada na branch
+        `codex/t207-dashboard-seletor-empresas`, a partir do squash
         `512d24914519fed335a900b18cab690832e8f121` (T206 integrada, PR #199). A preparação
         (dossiê e decisões) foi feita antes, sem código de produto. Validação visual aprovada
         pela proprietária em 2026-11-10.
@@ -3323,7 +3324,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         menu lateral, no Dashboard e no seletor.
       - **Fora de escopo:** API, schema, migration, RBAC, auditoria, seed, Docker,
         dependências, lockfile, workflow; turnover, absenteísmo, custo, salário, clima e ativos
-        históricos calculados; tela de empresas; mudança global de cor; promoção e merge.
+        históricos calculados; tela de empresas; mudança global de cor.
+      - **Observação de relatório:** a integração funcional da T207 está concluída; promoção a
+        Ready e merge por squash foram feitos por ordem explícita em 2026-11-12,
+        e a única pendência administrativa era a sua convergência no Spec Kit, resolvida no
+        primeiro commit da T208.
       - **Entrega (seções 16 a 19 do dossiê):** Visão Geral com "Dashboard" na barra superior,
         momento da leitura uma vez por aba, Quadro de colaboradores (botão de informação,
         gráfico e tabela com os mesmos números, painel por mês, menu de ações, CSV e impressão
@@ -3355,6 +3360,64 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Validação local:** web 129 arquivos, 3653 testes; API unitária 60 suítes, 1472 testes; E2E serial com PostgreSQL real
         20 suítes, 1017 testes; scripts 182 testes; 68 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia
         do squash e `git diff --check` verdes.
+
+105.  **T208 - Configurações: Meu Perfil**
+      - **Estado:** **em implementação, ampliada antes do Ready por decisão de produto**; a
+        entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
+        leitura abaixo (validado localmente, validação visual aprovada em 2026-11-12) é a base
+        existente, não a entrega final.
+      - **Ampliação (seção 21 do dossiê, em levantamento):** mapa de nome de exibição, foto,
+        cargo, telefone, e-mail e confirmação, data de alteração, senha, Google, segundo fator e
+        sessões por domínio (conta, colaborador, empresa e autenticação), com privacidade, LGPD,
+        auditoria, RBAC, isolamento por empresa e sessões; primeira fatia proposta (nome de
+        exibição editável, com API, migration e auditoria). Decisões MPA-1 a MPA-11 aprovadas em
+        2026-11-12, com a MPA-5 corrigida (e-mail só leitura e indisponível para alteração até
+        existir fluxo próprio com verificação); escopo aprovado na seção 22. A referência visual
+        foi usada só como inspiração local e não é registrada.
+      - **Ampliação implementada e validada localmente (seções 23 a 26), validação visual
+        aprovada em 2026-11-13:** migration
+        aditiva (`nome_exibicao`, `perfil_atualizado_em`, auditoria `conta.perfil.atualizado`);
+        `PATCH /v1/users/me` com `own_account`/`manage`, só o nome de exibição e concorrência
+        otimista (409 sem sobrescrever); Meu perfil em identificação, contato e formas de entrada,
+        com o nome como único campo editável, rodapé de edição só com alteração e guarda de
+        saída. Achados do navegador corrigidos: linhas pela largura do painel, reenvio no token
+        CSRF renovado por outra aba e aviso de sessão encerrada.
+      - **Validação local da ampliação:** web 133 arquivos, 3760 testes; API unitária 61 suítes,
+        1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046 testes; scripts 182 testes;
+        58 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do
+        squash e `git diff --check` verdes.
+      - **Foto de perfil (seções 27 e 28 do dossiê; ADR 0018):** decisões FP-1 a FP-8 aprovadas
+        em 2026-11-13; implementada e validada localmente, com a validação visual aprovada em
+        2026-11-13 (seção 29); envio à PR #201 (Draft) autorizado. PostgreSQL em tabela própria
+        (`access_user_foto`), `GET`/`PUT`/`DELETE /v1/users/me/foto` só da titular, validação pelo
+        conteúdo, 5 MB, 128 px e 25 milhões de pixels, regravação no servidor em JPEG 256 × 256
+        sem metadados (dependência `sharp` 0.35.5), entrega privada sem cache persistente, remoção
+        e desativação apagando os bytes, auditoria sem dado da imagem; na web, prévia local,
+        envio, troca, remoção, avisos acessíveis e guarda de saída. Validação local: web 133
+        arquivos, 3797 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL
+        real 22 suítes, 1081 testes; scripts 182 testes; 89 mutações, todas detectadas; lint,
+        typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
+        Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
+        `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
+      - **Preparação:** levantamento e decisões MP-1 a MP-8 no
+        [dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md), aprovadas em
+        2026-11-12 como recomendadas (seção 15) e conferidas sem alteração (seção 20).
+      - **Entrega:** rota `#/configuracoes/meu-perfil` (e o atalho `#/configuracoes`) com Meu
+        perfil somente leitura, só web, com os dados da sessão de `GET /v1/users/me`, sem chamada
+        nova: e-mail de acesso, papel, empresa ativa e data de criação da conta, e um aviso de que
+        a edição ainda não está disponível. Os nove papéis acessam Configurações pelo cartão no
+        Hub e, depois da entrada no shell, pelo item próprio do menu lateral; para financeiro,
+        colaborador, auditor, DPO e administração técnica, é o único cartão do Hub. Navegação interna só com Meu perfil; o
+        rótulo "Perfil" do Hub passou a "Papel"; Segurança e Sessões ativas seguem na barra
+        superior (seção 16).
+      - **Achados do navegador, corrigidos (seção 17):** foco no título na recarga; item atual
+        da navegação interna visível sobre o fundo; gaveta do celular presa à altura da tela,
+        com rolagem (defeito anterior, da T206).
+      - **Validação local:** web 133 arquivos, 3725 testes; API unitária 60 suítes, 1472 testes;
+        E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
+        todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
+        `git diff --check` verdes.
+      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Regra obrigatória para as próximas tarefas
 
