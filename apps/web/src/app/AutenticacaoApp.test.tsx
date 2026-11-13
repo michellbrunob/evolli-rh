@@ -9,6 +9,7 @@ import {
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
+import { definirDuracaoMinimaDaAbertura } from "./abertura/duracaoDaAbertura";
 import { login, logout } from "../api/authClient";
 import { refreshCsrfToken } from "../api/csrfClient";
 import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
@@ -2691,5 +2692,253 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     );
     await acoesDoQuadro();
     expect(emTabela()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — tela de abertura institucional: só ao recarregar a página (sessão
+// verificada) e depois de um login aceito, até o acesso estar pronto. Nunca
+// na troca de empresa nem na navegação interna; nunca atrasa login recusado,
+// sessão expirada ou falha ao carregar o acesso.
+// ---------------------------------------------------------------------------
+describe("T209 — tela de abertura institucional", () => {
+  const abertura = () => document.querySelector<HTMLElement>(".tela-abertura");
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    definirDuracaoMinimaDaAbertura(0);
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  it("recarregar com sessão válida: abertura com a marca e 'Verificando sessão…', depois a aterrissagem", async () => {
+    const sessao = deferido<string>();
+    vi.mocked(refreshCsrfToken).mockReturnValueOnce(sessao.promise);
+    render(<AutenticacaoApp />);
+
+    expect(abertura()).not.toBeNull();
+    expect(within(abertura()!).getByRole("status")).toHaveTextContent(
+      "Verificando sessão…",
+    );
+    // Marca e nome são decorativos: o leitor de tela ouve só a mensagem.
+    expect(abertura()!.querySelector(".tela-abertura__marca")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(abertura()!.querySelector("svg")).not.toBeNull();
+    // Nada focável na abertura.
+    expect(
+      abertura()!.querySelectorAll("button, a, input, [tabindex]"),
+    ).toHaveLength(0);
+
+    await commitar(() => sessao.resolve("token"));
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("login aceito: abertura com 'Carregando seu acesso…' até o ator chegar; o foco vai ao título da aterrissagem", async () => {
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    const eu = deferido<never>();
+    vi.mocked(obterUsuarioAtual).mockReturnValueOnce(eu.promise);
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    expect(abertura()).toBeNull();
+
+    preencherEEntrar();
+    await waitFor(() => expect(abertura()).not.toBeNull());
+    expect(within(abertura()!).getByRole("status")).toHaveTextContent(
+      "Carregando seu acesso…",
+    );
+    // Nenhuma tela funcional montada por baixo.
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeNull();
+
+    await commitar(() => eu.resolve(ATOR_PADRAO as never));
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: TITULO_DO_DASHBOARD,
+    });
+    expect(abertura()).toBeNull();
+    await waitFor(() => expect(titulo).toHaveFocus());
+  });
+
+  it("duração mínima curta: o acesso pronto em seguida não faz a abertura piscar, e ela sai sozinha", async () => {
+    definirDuracaoMinimaDaAbertura(300);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await commitar(() => undefined);
+    // O acesso já chegou (sem rede), mas a abertura cumpre a duração mínima.
+    expect(abertura()).not.toBeNull();
+    expect(
+      screen.queryByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD }),
+    ).toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("com a duração mínima segurando a abertura, o pedido de foco espera: o título da aterrissagem recebe o foco", async () => {
+    definirDuracaoMinimaDaAbertura(300);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    // O gestor aterrissa em "Minha equipe", que depende do pedido de foco (o
+    // Dashboard foca o próprio título sozinho).
+    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    preencherEEntrar();
+    await waitFor(() => expect(abertura()).not.toBeNull());
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: "Minha equipe",
+    });
+    expect(abertura()).toBeNull();
+    await waitFor(() => expect(titulo).toHaveFocus());
+  });
+
+  it("sessão expirada ao recarregar: o login aparece na hora, sem esperar a duração mínima", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Entrar" }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("login recusado: o erro aparece na hora e a abertura nunca entra", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockRejectedValueOnce(new Error("rede"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    preencherEEntrar();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível entrar.",
+    );
+    expect(abertura()).toBeNull();
+    expect(obterUsuarioAtual).not.toHaveBeenCalled();
+  });
+
+  it("falha ao carregar o acesso: a tela de falha aparece na hora, sem esperar a duração mínima", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockRejectedValueOnce(new Error("rede"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByText("Não foi possível carregar seu acesso."),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("papel sem empresa ativa (acesso global): a abertura sai e a aterrissagem do papel aparece", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(
+      ator("master_tecnico", {
+        companyId: null,
+        empresaAtiva: null,
+        podeTrocarEmpresa: false,
+      }),
+    );
+    render(<AutenticacaoApp />);
+    expect(abertura()).not.toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("movimento reduzido: a abertura sabe e o CSS tira a animação", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((consulta: string) => {
+      const base = original(consulta);
+      if (!consulta.includes("prefers-reduced-motion")) return base;
+      return {
+        matches: true,
+        media: consulta,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      } as unknown as MediaQueryList;
+    }) as typeof window.matchMedia;
+    try {
+      const sessao = deferido<string>();
+      vi.mocked(refreshCsrfToken).mockReturnValueOnce(sessao.promise);
+      render(<AutenticacaoApp />);
+      expect(abertura()).toHaveAttribute("data-movimento", "reduzido");
+      await commitar(() => sessao.resolve("token"));
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      });
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("navegação interna não mostra a abertura", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD });
+    fireEvent.click(screen.getByRole("button", { name: /^Colaboradores/ }));
+    expect(abertura()).toBeNull();
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(abertura()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+    expect(abertura()).toBeNull();
+  });
+
+  it("troca de empresa não mostra a abertura: só o aviso simples enquanto o acesso é relido", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    // Mesmo com a duração mínima ligada, a troca não passa pela abertura.
+    definirDuracaoMinimaDaAbertura(60_000);
+
+    const eu = deferido<never>();
+    vi.mocked(obterUsuarioAtual).mockReturnValueOnce(eu.promise);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Empresa ativa/ }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Empresa Beta/ }),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector(".autenticacao-app__verificando"),
+      ).toHaveTextContent("Carregando seu acesso…"),
+    );
+    expect(abertura()).toBeNull();
+    await commitar(() =>
+      eu.resolve({
+        ...ATOR_PADRAO,
+        companyId: EMPRESA_BETA.id,
+        empresaAtiva: EMPRESA_BETA,
+      } as never),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Empresa ativa/ }),
+      ).toHaveTextContent("Empresa Beta"),
+    );
+    expect(abertura()).toBeNull();
   });
 });

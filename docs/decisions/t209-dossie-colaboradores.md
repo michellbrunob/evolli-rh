@@ -690,3 +690,41 @@ conversão automática; importação (Bloco C segue pausado).
   horizontal, botões de 44 px e rodapé de 131 px; validação da etapa 1 com foco no campo; guarda
   com Escape devolvendo o foco a "Voltar para Colaboradores" e os dados mantidos. DP coberto
   pelos testes de integração (não validado no navegador nesta rodada).
+
+## 27. Tela de abertura institucional (base para a animação oficial em Lottie)
+
+- **Quando aparece:** ao recarregar a página, enquanto a sessão é verificada ("Verificando
+  sessão…"), e depois de um login aceito, enquanto o acesso é carregado ("Carregando seu
+  acesso…") — até a sessão, o papel, a empresa ativa e a tela inicial estarem prontos. Não
+  aparece na navegação interna nem na troca de empresa (que continua com o aviso simples).
+- **Sem espera artificial:** some assim que o acesso chega; só uma duração mínima de 300 ms,
+  contada desde que apareceu, evita o piscar. Login recusado, sessão expirada e falha ao
+  carregar o acesso aparecem na hora, sem esperar por ela.
+- **Visual:** a marca aprovada do Evolli (`MarcaEvolli`, o mesmo desenho do menu e do login),
+  ampliada, com o nome e a mensagem, e uma transição curta em CSS (opacidade e deslocamento,
+  320 ms); com `prefers-reduced-motion`, nada se move. Só tokens; tela inteira também em 375 px.
+- **Acessibilidade:** a mensagem é `role="status"`; marca e nome são decorativos
+  (`aria-hidden`); nada na abertura recebe foco; o pedido de foco da aterrissagem espera a
+  abertura sair e vai ao título da tela inicial.
+- **Lottie:** componente `AnimacaoLottie` com o player `lottie_light` (SVG, sem execução de
+  expressões), carregado sob demanda junto com o JSON; enquanto carrega, ou se falhar, fica a
+  marca estática; com movimento reduzido, a animação fica parada no último quadro. Nenhuma
+  animação existe no repositório: nada foi inventado, baixado ou versionado.
+- **Onde conectar a animação oficial:** exportar do After Effects pelo Bodymovin (JSON, imagens
+  embutidas, sem expressões), salvar em `apps/web/src/app/abertura/animacao-oficial.json` e, em
+  `apps/web/src/app/abertura/animacaoOficial.ts`, trocar `null` por
+  `() => import("./animacao-oficial.json")`.
+- **Dependência:** `lottie-web` 5.13.0 (MIT, produção), versão exata publicada em maio de 2025;
+  fora do pacote principal enquanto não há animação (ADR 0019). Sem API, banco, permissão ou rota.
+- **Testes:** abertura ao recarregar e no login, com a marca e a mensagem; duração mínima sem
+  piscar; foco no título da aterrissagem mesmo com a duração mínima; sessão expirada, login
+  recusado e falha do acesso sem espera; papel sem empresa ativa; movimento reduzido; nenhuma
+  abertura na navegação interna nem na troca de empresa; o componente Lottie com o player
+  simulado (SVG, laço, último quadro com movimento reduzido, destruição ao sair, reserva quando
+  o JSON falha); contrato de CSS.
+- **Navegador (banco próprio da T209):** recarregar mostra a abertura com "Verificando
+  sessão…"; login de DP e de RH mostra a abertura por cerca de 320 ms e aterrissa no Dashboard
+  com o foco no título; senha errada mostra o erro em cerca de 120 ms, sem abertura; 375 px com
+  a abertura em tela inteira e a marca centralizada, sem rolagem horizontal; navegação interna
+  e troca de empresa (conta multiempresa) sem abertura, com o aviso, o anúncio e o foco de
+  sempre.

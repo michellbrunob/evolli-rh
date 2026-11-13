@@ -41,6 +41,11 @@ Versões exatas, publicadas há pelo menos duas semanas na data da decisão:
 | `lucide-react`                  | 1.64.0 | ISC     | produção        |
 | `tailwindcss`                   | 4.3.3  | MIT     | desenvolvimento |
 | `@tailwindcss/vite`             | 4.3.3  | MIT     | desenvolvimento |
+| `lottie-web`                    | 5.13.0 | MIT     | produção        |
+
+`lottie-web` entrou depois, para a tela de abertura (dossiê da T209, seção 27): só o player
+`lottie_light` (SVG, sem execução de expressões), carregado sob demanda e só quando houver a
+animação oficial aprovada.
 
 Compatíveis com React 18, Vite 5.4 e o Node 24 exigido pelo projeto. Nenhuma biblioteca visual
 completa (Bootstrap, MUI, Ant Design).

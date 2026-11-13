@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { instalarMatchMedia } from "./viewport";
+import { definirDuracaoMinimaDaAbertura } from "../app/abertura/duracaoDaAbertura";
 
 // O jsdom não tem `matchMedia`, e o shell precisa dele para saber se está no
 // modo gaveta (T159, R1). Instalado uma vez por ambiente; a largura começa no
@@ -38,3 +39,7 @@ if (!Element.prototype.hasPointerCapture) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// T209 — as suítes do shell rodam sem a duração mínima da tela de abertura
+// (ela só evita o piscar no navegador); as da abertura a religam.
+definirDuracaoMinimaDaAbertura(0);

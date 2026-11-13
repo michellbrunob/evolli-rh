@@ -3451,6 +3451,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         progresso e ações; etapas com os dados reais (Dados pessoais; Dados profissionais e
         vínculo; Endereço; Revisão e conclusão); lacunas registradas (CPF/RG, documentos, foto,
         rascunho, nome social). Só web.
+      - **Tela de abertura (seção 27):** marca aprovada com transição em CSS ao recarregar e
+        depois do login, até o acesso estar pronto (duração mínima de 300 ms contra o piscar);
+        nunca na navegação interna nem na troca de empresa; base Lottie (`lottie-web` 5.13.0,
+        sob demanda) com o ponto de conexão em `apps/web/src/app/abertura/animacaoOficial.ts`.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

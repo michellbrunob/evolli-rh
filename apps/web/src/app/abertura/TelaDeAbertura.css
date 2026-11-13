@@ -1,0 +1,80 @@
+/**
+ * Tela de abertura institucional (T209) — só tokens; sem sombra, sem
+ * gradiente. A marca entra com uma transição curta de opacidade e
+ * deslocamento; com movimento reduzido, aparece parada.
+ */
+
+.tela-abertura {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  text-align: center;
+}
+
+.tela-abertura__marca {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  color: var(--color-action);
+  animation: tela-abertura-entra 320ms ease-out both;
+}
+
+/* A marca aprovada, ampliada (o desenho é vetorial). */
+.tela-abertura__marca-estatica,
+.tela-abertura__marca-estatica svg {
+  display: block;
+  width: 4rem;
+  height: 4rem;
+}
+
+/* Área da animação oficial (Lottie): o mesmo quadro da marca. */
+.tela-abertura__animacao {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+}
+
+.tela-abertura__lottie {
+  position: absolute;
+  inset: 0;
+}
+
+.tela-abertura__nome {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  animation: tela-abertura-entra 320ms ease-out 60ms both;
+}
+
+.tela-abertura__mensagem {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+@keyframes tela-abertura-entra {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tela-abertura__marca,
+  .tela-abertura__nome {
+    animation: none;
+  }
+}
