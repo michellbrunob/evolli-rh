@@ -15,7 +15,11 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
 import { refreshCsrfToken } from "../api/csrfClient";
-import { atualizarPerfilProprio, obterUsuarioAtual } from "../api/usersClient";
+import {
+  atualizarPerfilProprio,
+  enviarFotoPropria,
+  obterUsuarioAtual,
+} from "../api/usersClient";
 import {
   listarEmpresasDoContexto,
   trocarEmpresaDoContexto,
@@ -44,6 +48,7 @@ vi.mock("../api/usersClient", async () => {
     ...actual,
     obterUsuarioAtual: vi.fn(),
     atualizarPerfilProprio: vi.fn(),
+    enviarFotoPropria: vi.fn(),
   };
 });
 vi.mock("../api/contextoEmpresarialClient", async () => {
@@ -298,5 +303,120 @@ describe("T208 — o nome de exibição na sessão", () => {
       expect(valor("Empresa ativa")).toBe("Empresa Beta (BETA)"),
     );
     expect(campo()).toHaveValue("Nome Global");
+  });
+});
+
+describe("T208 — a foto de perfil na sessão", () => {
+  const VERSAO_FOTO = "2026-11-13T12:00:00.000Z";
+  const navegacao = () => document.getElementById("navegacao-lateral")!;
+  const menu = (nome: RegExp) =>
+    within(navegacao()).getByRole("button", { name: nome });
+  const arquivo = () =>
+    document.querySelector('input[type="file"]') as HTMLInputElement;
+
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(() => "blob:previa-sintetica"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      configurable: true,
+    });
+  });
+
+  it("enviar troca o ator da sessão sem remontar: sair e voltar mostra a foto, sem ler /users/me de novo", async () => {
+    vi.mocked(enviarFotoPropria).mockResolvedValue({
+      ...ATOR,
+      fotoVersao: VERSAO_FOTO,
+      perfilAtualizadoEm: VERSAO_FOTO,
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    Object.defineProperty(arquivo(), "files", {
+      value: [new File([new Uint8Array(8)], "foto.png", { type: "image/png" })],
+      configurable: true,
+    });
+    fireEvent.change(arquivo());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Usar esta foto" }),
+    );
+    await waitFor(() =>
+      expect(within(painel()).getByRole("status")).toHaveTextContent(
+        "Foto atualizada.",
+      ),
+    );
+
+    fireEvent.click(menu(/^Jornada Visão/));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Configurações" }),
+      ).toBeNull(),
+    );
+    fireEvent.click(menu(/^Configurações/));
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    expect(
+      screen.getByRole("img", { name: "Sua foto de perfil" }),
+    ).toHaveAttribute(
+      "src",
+      `/v1/users/me/foto?v=${encodeURIComponent(VERSAO_FOTO)}`,
+    );
+    expect(obterUsuarioAtual).toHaveBeenCalledTimes(1);
+  });
+
+  it("recarga: a foto vem pela versão de /users/me", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR,
+      fotoVersao: VERSAO_FOTO,
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    expect(
+      screen.getByRole("img", { name: "Sua foto de perfil" }),
+    ).toBeInTheDocument();
+  });
+
+  it("trocar de empresa com uma foto escolhida e não enviada pede confirmação; a foto da conta segue na empresa nova", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR,
+      fotoVersao: VERSAO_FOTO,
+    } as never);
+    montar(ROTA);
+    await screen.findByRole("heading", { level: 1, name: "Configurações" });
+    Object.defineProperty(arquivo(), "files", {
+      value: [new File([new Uint8Array(8)], "foto.png", { type: "image/png" })],
+      configurable: true,
+    });
+    fireEvent.change(arquivo());
+    await screen.findByRole("group", { name: "Prévia da nova foto" });
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR,
+      companyId: BETA.id,
+      empresaAtiva: BETA,
+      fotoVersao: VERSAO_FOTO,
+    } as never);
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /Empresa ativa/ }),
+    );
+    await within(navegacao()).findByRole("list", { name: "Empresas da conta" });
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: /^Empresa Beta/ }),
+    );
+    const aviso = await within(navegacao()).findByRole("alert");
+    expect(aviso).toHaveTextContent("Há edição em andamento em: Meu perfil");
+    fireEvent.click(
+      within(navegacao()).getByRole("button", { name: "Trocar e descartar" }),
+    );
+    await waitFor(() =>
+      expect(valor("Empresa ativa")).toBe("Empresa Beta (BETA)"),
+    );
+    expect(
+      screen.queryByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("img", { name: "Sua foto de perfil" }),
+    ).toBeInTheDocument();
+    expect(enviarFotoPropria).not.toHaveBeenCalled();
   });
 });

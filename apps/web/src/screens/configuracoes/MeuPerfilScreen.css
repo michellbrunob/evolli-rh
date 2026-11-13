@@ -282,3 +282,65 @@
   font-size: var(--text-caption);
   color: var(--status-success-ink);
 }
+
+/* T208 — foto de perfil (ADR 0018). Círculo do mesmo tamanho das iniciais;
+   a imagem preenche o quadrado sem distorcer. */
+.configuracoes__foto {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+.configuracoes__foto-acoes,
+.configuracoes__previa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.configuracoes__foto-acoes > button,
+.configuracoes__previa-acoes > button {
+  min-height: 44px;
+}
+
+.configuracoes__foto-acoes > .configuracoes__ajuda {
+  flex: 1 1 100%;
+}
+
+/* Prévia local: o quadrado mostra o mesmo corte central que o servidor faz. */
+.configuracoes__previa,
+.configuracoes__confirmacao {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.configuracoes__confirmacao > p {
+  margin: 0;
+}
+
+.configuracoes__previa-titulo {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.configuracoes__previa-imagem {
+  width: 10rem;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  object-position: center;
+}

@@ -392,3 +392,56 @@ describe("T208 — guarda de saída da própria edição de Meu perfil", () => {
     expect(tituloDeConfiguracoes()).toBeNull();
   });
 });
+
+describe("T208 — guarda de saída com a foto escolhida e não enviada", () => {
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(() => "blob:previa-sintetica"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      configurable: true,
+    });
+  });
+
+  it("sair pelo menu pergunta; 'Continuar editando' mantém a prévia; 'Sair sem salvar' sai", async () => {
+    window.history.replaceState(null, "", `/${ROTA}`);
+    render(
+      <ComGuardaDeSaida>
+        <App papelDoAtor="rh" empresaAtiva={EMPRESA} contaDoAtor={CONTA} />
+      </ComGuardaDeSaida>,
+    );
+    const arquivo = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    Object.defineProperty(arquivo, "files", {
+      value: [new File([new Uint8Array(8)], "foto.png", { type: "image/png" })],
+      configurable: true,
+    });
+    await act(async () => {
+      fireEvent.change(arquivo);
+    });
+    const irParaJornada = () =>
+      fireEvent.click(
+        within(navegacao()).getByRole("button", { name: /^Jornada Visão/ }),
+      );
+    irParaJornada();
+    const dialogo = screen.getByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("Meu perfil");
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Continuar editando" }),
+    );
+    expect(
+      screen.getByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeInTheDocument();
+
+    irParaJornada();
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Sair sem salvar",
+      }),
+    );
+    expect(tituloDeConfiguracoes()).toBeNull();
+  });
+});

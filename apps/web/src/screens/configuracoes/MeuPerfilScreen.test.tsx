@@ -14,7 +14,9 @@ import {
   ApiError,
   ROTULO_PAPEL,
   atualizarPerfilProprio,
+  enviarFotoPropria,
   obterUsuarioAtual,
+  removerFotoPropria,
   type SafeAccessUserApi,
 } from "../../api/usersClient";
 import {
@@ -37,6 +39,8 @@ vi.mock("../../api/usersClient", async () => {
     ...actual,
     atualizarPerfilProprio: vi.fn(),
     obterUsuarioAtual: vi.fn(),
+    enviarFotoPropria: vi.fn(),
+    removerFotoPropria: vi.fn(),
   };
 });
 
@@ -72,9 +76,25 @@ function ator(parcial: Partial<SafeAccessUserApi> = {}): SafeAccessUserApi {
   };
 }
 
+const criarUrl = vi.fn(() => "blob:previa-sintetica");
+const revogarUrl = vi.fn();
+
 beforeEach(() => {
   vi.mocked(atualizarPerfilProprio).mockReset();
   vi.mocked(obterUsuarioAtual).mockReset();
+  vi.mocked(enviarFotoPropria).mockReset();
+  vi.mocked(removerFotoPropria).mockReset();
+  criarUrl.mockClear();
+  revogarUrl.mockClear();
+  // jsdom não tem URL de objeto; a prévia local só precisa de uma URL.
+  Object.defineProperty(URL, "createObjectURL", {
+    value: criarUrl,
+    configurable: true,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    value: revogarUrl,
+    configurable: true,
+  });
 });
 
 const painel = () => screen.getByRole("region", { name: "Meu perfil" });
@@ -252,14 +272,21 @@ describe("T208 — o que Meu perfil NÃO mostra nem oferece", () => {
     );
   });
 
-  it("o nome de exibição é o único campo; sem envio de foto; sem botões com o formulário limpo", () => {
+  it("com o formulário limpo: o nome é o único campo de texto, a foto só tem 'Enviar foto' e nada aparece desabilitado", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    // Os únicos controles: o nome e o arquivo da foto (escondido, aberto
+    // pelo botão).
     expect(document.querySelectorAll("input, select, textarea")).toHaveLength(
-      1,
+      2,
     );
-    expect(document.querySelector('input[type="file"]')).toBeNull();
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(document.querySelector('input[type="file"]')).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp",
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Enviar foto",
+    ]);
     expect(
       document.querySelectorAll("[disabled], [aria-disabled]"),
     ).toHaveLength(0);
@@ -599,5 +626,415 @@ describe("T208 — layout a 375 px (CSS)", () => {
     // Declarações de propriedade (não as consultas de mídia).
     expect(css).not.toMatch(/^\s+min-width:\s*[1-9]/m);
     expect(css).not.toMatch(/^\s+(min-)?width:\s*\d{3,}px/m);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T208 — foto de perfil (ADR 0018)
+// ---------------------------------------------------------------------------
+
+const VERSAO_FOTO = "2026-11-13T12:00:00.000Z";
+const botao = (nome: string) => screen.queryByRole("button", { name: nome });
+const arquivo = () =>
+  document.querySelector('input[type="file"]') as HTMLInputElement;
+
+function escolher(conteudo: File) {
+  Object.defineProperty(arquivo(), "files", {
+    value: [conteudo],
+    configurable: true,
+  });
+  fireEvent.change(arquivo());
+}
+
+function foto(tipo = "image/png", bytes = 64) {
+  return new File([new Uint8Array(bytes)], "qualquer-nome.jpg", { type: tipo });
+}
+
+describe("T208 — foto de perfil: o que aparece", () => {
+  it("sem foto: iniciais, 'Enviar foto', sem 'Remover foto' e sem imagem", () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    expect(iniciais()).toHaveTextContent("PT");
+    expect(painel().querySelector("img")).toBeNull();
+    expect(botao("Enviar foto")).toBeInTheDocument();
+    expect(botao("Remover foto")).toBeNull();
+    expect(painel()).toHaveTextContent(
+      "Sem foto: o Evolli RH mostra as suas iniciais.",
+    );
+  });
+
+  it("com foto: a imagem da própria conta, pela API e versionada; 'Trocar foto' e 'Remover foto'", () => {
+    render(<MeuPerfilScreen conta={{ ...CONTA, fotoVersao: VERSAO_FOTO }} />);
+    const imagem = screen.getByRole("img", { name: "Sua foto de perfil" });
+    expect(imagem).toHaveAttribute(
+      "src",
+      `/v1/users/me/foto?v=${encodeURIComponent(VERSAO_FOTO)}`,
+    );
+    expect(iniciais()).toBeNull();
+    expect(botao("Trocar foto")).toBeInTheDocument();
+    expect(botao("Remover foto")).toBeInTheDocument();
+    expect(painel()).toHaveTextContent("Só você vê a sua foto.");
+  });
+
+  it("se a imagem não carregar, voltam as iniciais", () => {
+    render(<MeuPerfilScreen conta={{ ...CONTA, fotoVersao: VERSAO_FOTO }} />);
+    fireEvent.error(screen.getByRole("img", { name: "Sua foto de perfil" }));
+    expect(iniciais()).toHaveTextContent("PT");
+  });
+});
+
+describe("T208 — foto de perfil: escolher, prévia e cancelar", () => {
+  it("escolher um arquivo mostra a prévia local, leva o foco a 'Usar esta foto' e não envia nada", async () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    const previa = screen.getByRole("group", { name: "Prévia da nova foto" });
+    expect(
+      within(previa).getByRole("img", {
+        name: "Prévia da nova foto, recortada no centro",
+      }),
+    ).toHaveAttribute("src", "blob:previa-sintetica");
+    expect(document.activeElement).toBe(botao("Usar esta foto"));
+    expect(enviarFotoPropria).not.toHaveBeenCalled();
+  });
+
+  it("Cancelar some com a prévia, libera a URL local e devolve o foco a 'Enviar foto'", async () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    fireEvent.click(botao("Cancelar")!);
+    expect(
+      screen.queryByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeNull();
+    expect(revogarUrl).toHaveBeenCalledWith("blob:previa-sintetica");
+    expect(document.activeElement).toBe(botao("Enviar foto"));
+  });
+
+  it("arquivo acima de 5 MB: alerta, sem prévia, nada enviado, foco em 'Enviar foto'", async () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto("image/png", 5 * 1024 * 1024 + 1));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "O arquivo passa de 5 MB.",
+    );
+    expect(
+      screen.queryByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(botao("Enviar foto"));
+    expect(enviarFotoPropria).not.toHaveBeenCalled();
+  });
+
+  it("tipo que não é JPEG, PNG ou WebP: alerta, sem prévia", async () => {
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto("image/gif"));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Escolha uma imagem JPEG, PNG ou WebP",
+    );
+    expect(
+      screen.queryByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeNull();
+  });
+});
+
+describe("T208 — foto de perfil: enviar", () => {
+  it("'Usar esta foto' envia o arquivo como veio e a versão lida; aplica a resposta; um anúncio só", async () => {
+    const escolhida = foto("image/webp");
+    const resposta = ator({
+      fotoVersao: VERSAO_FOTO,
+      perfilAtualizadoEm: VERSAO_FOTO,
+    });
+    vi.mocked(enviarFotoPropria).mockResolvedValue(resposta);
+    const aoAtualizar = vi.fn();
+    render(
+      <MeuPerfilScreen
+        conta={{ ...CONTA, perfilAtualizadoEm: VERSAO }}
+        onContaAtualizada={aoAtualizar}
+      />,
+    );
+    await act(async () => {
+      escolher(escolhida);
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(enviarFotoPropria).toHaveBeenCalledWith(escolhida, VERSAO);
+    expect(aoAtualizar).toHaveBeenCalledWith(resposta);
+    expect(
+      screen.getByRole("img", { name: "Sua foto de perfil" }),
+    ).toHaveAttribute(
+      "src",
+      `/v1/users/me/foto?v=${encodeURIComponent(VERSAO_FOTO)}`,
+    );
+    expect(
+      screen.queryByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeNull();
+    expect(status()).toHaveTextContent("Foto atualizada.");
+    expect(screen.queryAllByRole("alert")).toHaveLength(0);
+    expect(document.activeElement).toBe(botao("Trocar foto"));
+  });
+
+  it("enviar a foto não apaga o nome que está sendo editado", async () => {
+    vi.mocked(enviarFotoPropria).mockResolvedValue(
+      ator({ fotoVersao: VERSAO_FOTO, perfilAtualizadoEm: VERSAO_FOTO }),
+    );
+    render(<MeuPerfilScreen conta={CONTA} />);
+    digitar("Nome Em Edicao");
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(campo().value).toBe("Nome Em Edicao");
+    expect(salvar()).toBeInTheDocument();
+  });
+
+  it("enquanto envia: botões desabilitados e 'Enviando…'", async () => {
+    let concluir!: (a: SafeAccessUserApi) => void;
+    vi.mocked(enviarFotoPropria).mockReturnValue(
+      new Promise((r) => {
+        concluir = r;
+      }),
+    );
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(botao("Enviando…")).toBeDisabled();
+    expect(botao("Enviar foto")).toBeDisabled();
+    expect(botao("Cancelar")).toBeDisabled();
+    await act(async () => {
+      concluir(
+        ator({ fotoVersao: VERSAO_FOTO, perfilAtualizadoEm: VERSAO_FOTO }),
+      );
+    });
+    expect(botao("Trocar foto")).not.toBeDisabled();
+  });
+
+  it.each([
+    ["foto_formato_invalido", "não é uma imagem JPEG, PNG ou WebP"],
+    ["foto_pequena", "ao menos 128 × 128 pixels"],
+    ["foto_grande_demais", "até 25 megapixels"],
+    ["foto_invalida", "pode estar corrompido"],
+  ])(
+    "recusa do servidor (%s): alerta com o motivo, prévia descartada, foco em 'Enviar foto'",
+    async (codigo, trecho) => {
+      vi.mocked(enviarFotoPropria).mockRejectedValue(
+        new ApiError(422, "Não foi possível processar a requisição.", codigo),
+      );
+      render(<MeuPerfilScreen conta={CONTA} />);
+      await act(async () => {
+        escolher(foto());
+      });
+      await act(async () => {
+        fireEvent.click(botao("Usar esta foto")!);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(trecho);
+      expect(screen.getByRole("alert")).toHaveTextContent("Nada foi alterado.");
+      expect(
+        screen.queryByRole("group", { name: "Prévia da nova foto" }),
+      ).toBeNull();
+      expect(document.activeElement).toBe(botao("Enviar foto"));
+      expect(status()).toHaveTextContent("");
+    },
+  );
+
+  it("413 do servidor: mensagem de 5 MB", async () => {
+    vi.mocked(enviarFotoPropria).mockRejectedValue(new ApiError(413, "x"));
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "O arquivo passa de 5 MB.",
+    );
+  });
+
+  it("conflito (409, outra aba mexeu no perfil): alerta de conflito e a prévia fica para tentar de novo", async () => {
+    vi.mocked(enviarFotoPropria).mockRejectedValue(
+      new ApiError(409, "Conflito."),
+    );
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "alterado em outra sessão",
+    );
+    expect(
+      screen.getByRole("group", { name: "Prévia da nova foto" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sessão encerrada (401): diz para entrar de novo", async () => {
+    vi.mocked(enviarFotoPropria).mockRejectedValue(new ApiError(401, "x"));
+    render(<MeuPerfilScreen conta={CONTA} />);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "A sua sessão terminou.",
+    );
+  });
+});
+
+describe("T208 — foto de perfil: remover", () => {
+  it("pede confirmação com o foco no botão que confirma; Cancelar devolve o foco a 'Trocar foto'", async () => {
+    render(<MeuPerfilScreen conta={{ ...CONTA, fotoVersao: VERSAO_FOTO }} />);
+    await act(async () => {
+      fireEvent.click(botao("Remover foto")!);
+    });
+    const confirmacao = screen.getByRole("group", {
+      name: /Remover a sua foto\?/,
+    });
+    expect(document.activeElement).toBe(
+      within(confirmacao).getByRole("button", { name: "Remover a foto" }),
+    );
+    fireEvent.click(
+      within(confirmacao).getByRole("button", { name: "Cancelar" }),
+    );
+    expect(
+      screen.queryByRole("group", { name: /Remover a sua foto\?/ }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(botao("Trocar foto"));
+    expect(removerFotoPropria).not.toHaveBeenCalled();
+  });
+
+  it("confirmar remove com a versão lida; voltam as iniciais; anúncio e foco em 'Enviar foto'", async () => {
+    vi.mocked(removerFotoPropria).mockResolvedValue(
+      ator({ fotoVersao: null, perfilAtualizadoEm: VERSAO_FOTO }),
+    );
+    render(
+      <MeuPerfilScreen
+        conta={{
+          ...CONTA,
+          fotoVersao: VERSAO_FOTO,
+          perfilAtualizadoEm: VERSAO,
+        }}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(botao("Remover foto")!);
+    });
+    await act(async () => {
+      fireEvent.click(botao("Remover a foto")!);
+    });
+    expect(removerFotoPropria).toHaveBeenCalledWith(VERSAO);
+    expect(painel().querySelector("img")).toBeNull();
+    expect(iniciais()).toHaveTextContent("PT");
+    expect(status()).toHaveTextContent("Foto removida.");
+    expect(document.activeElement).toBe(botao("Enviar foto"));
+  });
+
+  it("remover com versão velha (409): alerta de conflito, a foto continua", async () => {
+    vi.mocked(removerFotoPropria).mockRejectedValue(new ApiError(409, "x"));
+    render(<MeuPerfilScreen conta={{ ...CONTA, fotoVersao: VERSAO_FOTO }} />);
+    await act(async () => {
+      fireEvent.click(botao("Remover foto")!);
+    });
+    await act(async () => {
+      fireEvent.click(botao("Remover a foto")!);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "alterado em outra sessão",
+    );
+    expect(
+      screen.getByRole("img", { name: "Sua foto de perfil" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("T208 — foto de perfil: guarda de saída", () => {
+  function montarComRegistro(conta: ContaDoMeuPerfil) {
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <MeuPerfilScreen conta={conta} />
+      </ProvedorDeEdicoes>,
+    );
+    return registro;
+  }
+
+  it("foto escolhida e não enviada é edição pendente; cancelar limpa", async () => {
+    const registro = montarComRegistro(CONTA);
+    expect(registro.obter().pendentes).toEqual([]);
+    await act(async () => {
+      escolher(foto());
+    });
+    expect(registro.obter().pendentes).toEqual([ROTULO_DA_EDICAO_DO_PERFIL]);
+    fireEvent.click(botao("Cancelar")!);
+    expect(registro.obter().pendentes).toEqual([]);
+  });
+
+  it("enviando ou removendo a foto: salvamento em curso (a saída fica bloqueada)", async () => {
+    let concluir!: (a: SafeAccessUserApi) => void;
+    vi.mocked(enviarFotoPropria).mockReturnValue(
+      new Promise((r) => {
+        concluir = r;
+      }),
+    );
+    const registro = montarComRegistro(CONTA);
+    await act(async () => {
+      escolher(foto());
+    });
+    await act(async () => {
+      fireEvent.click(botao("Usar esta foto")!);
+    });
+    expect(registro.obter().salvando).toEqual([ROTULO_DA_EDICAO_DO_PERFIL]);
+    await act(async () => {
+      concluir(
+        ator({ fotoVersao: VERSAO_FOTO, perfilAtualizadoEm: VERSAO_FOTO }),
+      );
+    });
+    expect(registro.obter().salvando).toEqual([]);
+    expect(registro.obter().pendentes).toEqual([]);
+  });
+});
+
+describe("T208 — foto de perfil: layout a 375 px (CSS)", () => {
+  const css = readFileSync(
+    "src/screens/configuracoes/MeuPerfilScreen.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const regra = (seletor: string) => {
+    const inicio = css.indexOf(`\n${seletor} {`);
+    if (inicio < 0) return "";
+    return css.slice(inicio, css.indexOf("}", inicio));
+  };
+
+  it("foto e prévia em tamanho fixo pequeno, sem distorcer (corte central, como o servidor)", () => {
+    expect(regra(".configuracoes__foto")).toMatch(/object-fit:\s*cover/);
+    expect(regra(".configuracoes__previa-imagem")).toMatch(
+      /object-fit:\s*cover/,
+    );
+    expect(regra(".configuracoes__previa-imagem")).toMatch(
+      /object-position:\s*center/,
+    );
+    expect(regra(".configuracoes__previa-imagem")).toMatch(/max-width:\s*100%/);
+  });
+
+  it("ações da foto quebram linha e têm alvo de 44 px", () => {
+    expect(css).toMatch(
+      /\.configuracoes__foto-acoes,\n\.configuracoes__previa-acoes \{[^}]*flex-wrap:\s*wrap/,
+    );
+    expect(css).toMatch(
+      /\.configuracoes__foto-acoes > button,\n\.configuracoes__previa-acoes > button \{\n\s*min-height:\s*44px/,
+    );
   });
 });

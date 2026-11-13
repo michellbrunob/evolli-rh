@@ -4,6 +4,9 @@ import {
   type SafeAccessUserApi,
   alterarPapel,
   atualizarPerfilProprio,
+  enviarFotoPropria,
+  removerFotoPropria,
+  urlDaFotoPropria,
   criarConta,
   desativarConta,
   listarUsuarios,
@@ -525,6 +528,122 @@ describe("usersClient", () => {
         ApiError,
       );
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("T208 — foto de perfil (ADR 0018)", () => {
+    const RESPOSTA = {
+      ...usuarioSintetico,
+      fotoVersao: "2026-11-13T12:00:00.000Z",
+      perfilAtualizadoEm: "2026-11-13T12:00:00.000Z",
+    };
+
+    it("URL versionada da própria foto", () => {
+      expect(urlDaFotoPropria("2026-11-13T12:00:00.000Z")).toBe(
+        "/v1/users/me/foto?v=2026-11-13T12%3A00%3A00.000Z",
+      );
+    });
+
+    it("envia o arquivo como veio, binário, com CSRF e a versão lida no cabeçalho", async () => {
+      setCsrfToken("token-sintetico");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, RESPOSTA));
+      const arquivo = new Blob([new Uint8Array([1, 2, 3])], {
+        type: "image/png",
+      });
+      const resultado = await enviarFotoPropria(
+        arquivo,
+        "2026-11-10T13:00:00.000Z",
+      );
+      const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+      expect(url).toBe("/v1/users/me/foto");
+      expect(init.method).toBe("PUT");
+      expect(init.body).toBe(arquivo);
+      expect(init.headers).toMatchObject({
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": "token-sintetico",
+        "x-evolli-perfil-versao": "2026-11-10T13:00:00.000Z",
+      });
+      expect(resultado).toEqual(RESPOSTA);
+    });
+
+    it("perfil nunca salvo: versão 'nenhuma'", async () => {
+      setCsrfToken("token-sintetico");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, RESPOSTA));
+      await enviarFotoPropria(new Blob([]), null);
+      const init = fetchMock.mock.calls[0]![1] as RequestInit;
+      expect(init.headers).toMatchObject({
+        "x-evolli-perfil-versao": "nenhuma",
+      });
+    });
+
+    it("422 traz o código da recusa em ApiError.codigo", async () => {
+      setCsrfToken("token-sintetico");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        jsonResponse(422, {
+          message: "Dados inválidos.",
+          codigo: "foto_pequena",
+        }),
+      );
+      await expect(enviarFotoPropria(new Blob([]), null)).rejects.toMatchObject(
+        {
+          status: 422,
+          codigo: "foto_pequena",
+        },
+      );
+    });
+
+    it("403 csrf_invalido (outra aba renovou o token): renova e reenvia uma vez", async () => {
+      setCsrfToken("token-velho");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          jsonResponse(403, {
+            message: "Acesso negado.",
+            codigo: "csrf_invalido",
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { csrfToken: "token-novo" }))
+        .mockResolvedValueOnce(jsonResponse(409, { message: "Conflito." }));
+      await expect(enviarFotoPropria(new Blob([]), null)).rejects.toMatchObject(
+        {
+          status: 409,
+        },
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(
+        (fetchMock.mock.calls[2]![1] as RequestInit).headers,
+      ).toMatchObject({
+        "x-csrf-token": "token-novo",
+      });
+    });
+
+    it("remover: DELETE com CSRF e a versão lida; mesmo reenvio no CSRF renovado", async () => {
+      setCsrfToken("token-velho");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          jsonResponse(403, {
+            message: "Acesso negado.",
+            codigo: "csrf_invalido",
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { csrfToken: "token-novo" }))
+        .mockResolvedValueOnce(
+          jsonResponse(200, { ...RESPOSTA, fotoVersao: null }),
+        );
+      const resultado = await removerFotoPropria("2026-11-10T13:00:00.000Z");
+      const [url, init] = fetchMock.mock.calls[2]! as [string, RequestInit];
+      expect(url).toBe("/v1/users/me/foto");
+      expect(init.method).toBe("DELETE");
+      expect(init.headers).toMatchObject({
+        "x-csrf-token": "token-novo",
+        "x-evolli-perfil-versao": "2026-11-10T13:00:00.000Z",
+      });
+      expect(resultado.fotoVersao).toBeNull();
     });
   });
 });

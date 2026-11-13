@@ -61,6 +61,12 @@ export interface SafeAccessUserApi {
    */
   nomeExibicao?: string | null;
   perfilAtualizadoEm?: string | null;
+  /**
+   * T208 — versão da própria foto de perfil (ADR 0018): o instante em que foi
+   * gravada, ou `null` sem foto. Só a versão; a imagem sai por
+   * `GET /users/me/foto`, só para a titular.
+   */
+  fotoVersao?: string | null;
 }
 
 /**
@@ -107,6 +113,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Código estável de recusa que o servidor manda no corpo, quando manda. */
+    readonly codigo?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -139,11 +147,16 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as {
       message?: string | string[];
+      codigo?: unknown;
     };
     const msg = Array.isArray(body.message)
       ? (body.message[0] ?? "Erro na requisição.")
       : (body.message ?? "Erro na requisição.");
-    throw new ApiError(res.status, msg);
+    throw new ApiError(
+      res.status,
+      msg,
+      typeof body.codigo === "string" ? body.codigo : undefined,
+    );
   }
   return res.json() as Promise<T>;
 }
@@ -188,6 +201,68 @@ export async function atualizarPerfilProprio(entrada: {
         "x-csrf-token": await getCsrf(),
       },
       body: corpo,
+    });
+  let res = await enviar();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow(res);
+}
+
+/** T208 — cabeçalho da versão do perfil nas gravações da foto (ADR 0018). */
+const CABECALHO_VERSAO_DO_PERFIL = "x-evolli-perfil-versao";
+
+/** T208 — a URL da própria foto, versionada: muda quando a foto muda. */
+export function urlDaFotoPropria(fotoVersao: string): string {
+  return `${USERS_ENDPOINT}/me/foto?v=${encodeURIComponent(fotoVersao)}`;
+}
+
+/**
+ * T208 — envia ou substitui a própria foto (`PUT /users/me/foto`). O corpo é
+ * o arquivo escolhido, como veio: o servidor reconhece o formato pelo
+ * conteúdo, limita, decodifica e regrava a imagem (ADR 0018). A versão lida
+ * do perfil vai no cabeçalho; versão velha responde 409. Recusa do arquivo
+ * responde 422 com `codigo` (`ApiError.codigo`) ou 413 acima de 5 MB.
+ * 403 `csrf_invalido` (outra aba renovou o token): renova e reenvia uma vez.
+ */
+export async function enviarFotoPropria(
+  arquivo: Blob,
+  perfilAtualizadoEmLido: string | null,
+): Promise<SafeAccessUserApi> {
+  const enviar = async () =>
+    apiFetch(`${USERS_ENDPOINT}/me/foto`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await getCsrf(),
+        [CABECALHO_VERSAO_DO_PERFIL]: perfilAtualizadoEmLido ?? "nenhuma",
+      },
+      body: arquivo,
+    });
+  let res = await enviar();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow(res);
+}
+
+/**
+ * T208 — remove a própria foto (`DELETE /users/me/foto`): os bytes são
+ * apagados e as iniciais voltam. Mesma versão e mesmo reenvio no CSRF
+ * renovado por outra aba.
+ */
+export async function removerFotoPropria(
+  perfilAtualizadoEmLido: string | null,
+): Promise<SafeAccessUserApi> {
+  const enviar = async () =>
+    apiFetch(`${USERS_ENDPOINT}/me/foto`, {
+      method: "DELETE",
+      headers: {
+        "x-csrf-token": await getCsrf(),
+        [CABECALHO_VERSAO_DO_PERFIL]: perfilAtualizadoEmLido ?? "nenhuma",
+      },
     });
   let res = await enviar();
   await descartarTokenSeDesatualizado(res);
