@@ -3218,9 +3218,7 @@ dossiê, aguardando aprovação; nada implementado.
 **Pendente:** validação visual humana da ampliação; aprovação das decisões FP-1 a FP-8; push e revisão da
 PR #201; Ready for review e merge só com ordem.
 
-**Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança, Empresas e
-Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker, dependências,
-lockfile e workflow; Ready for review e merge.
+**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto (em preparação, seção 27); Segurança, Empresas e Equipe e permissões; seed, Docker, dependências, lockfile e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; a ampliação aprovada acrescenta migration aditiva, rota, uso de `own_account`/`manage` e auditoria.
 
 ## Próxima ação autorizável
 

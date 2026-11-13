@@ -3410,9 +3410,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
         todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
         `git diff --check` verdes.
-      - **Fora de escopo:** edição de dados, nome de exibição, e-mail e senha; Segurança,
-        Empresas e Equipe e permissões; API, schema, migration, RBAC, auditoria, seed, Docker,
-        dependências, lockfile e workflow; Ready for review e merge.
+      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto (em preparação, seção 27); Segurança, Empresas e Equipe e permissões; seed, Docker, dependências, lockfile e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; a ampliação aprovada acrescenta migration aditiva, rota, uso de `own_account`/`manage` e auditoria.
 
 ## Regra obrigatória para as próximas tarefas
 
