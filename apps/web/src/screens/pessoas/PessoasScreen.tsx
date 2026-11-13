@@ -186,8 +186,11 @@ export interface PessoasScreenProps {
    * listagem fica montada por baixo, escondida, com busca, filtros e página.
    */
   ficha?: RotaDaFicha | null;
-  /** T198 — "Abrir ficha": o shell troca a rota. */
-  onAbrirFicha?: (colaboradorId: string) => void;
+  /**
+   * T198 — "Abrir ficha": o shell troca a rota. T209 — o menu "Ações" da
+   * listagem abre a ficha já numa aba; sem aba, "Dados do colaborador".
+   */
+  onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
   /** T198 — outra aba da ficha: o shell troca a rota. */
   onTrocarAbaDaFicha?: (aba: AbaDaFicha) => void;
   /** T202 — outra competência da aba de ponto: o shell troca a rota. */
@@ -308,12 +311,13 @@ export function PessoasScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fichaAberta]);
 
-  function abrirFicha(colaboradorId: string) {
+  function abrirFicha(colaboradorId: string, aba?: AbaDaFicha) {
     gatilhoDaFichaRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    onAbrirFicha?.(colaboradorId);
+    if (aba === undefined) onAbrirFicha?.(colaboradorId);
+    else onAbrirFicha?.(colaboradorId, aba);
   }
 
   /** T187 — o atalho da Vida funcional, agora a partir da ficha. */
@@ -463,6 +467,7 @@ export function PessoasScreen({
                     ? { estado: listagem, onEstadoChange: onListagemChange }
                     : {})}
                   podeOperarJornada={podeOperarJornada}
+                  podeVerSolicitacoes={podeVerSolicitacoes}
                 />
               ) : abaAtiva === "horario" ? (
                 <PessoasHorarioScreen

@@ -26,12 +26,15 @@ import {
 } from "../../api/organizacaoClient";
 import { type CargoApi, listarCargos } from "../../api/cargoClient";
 import {
+  type AbaDaFicha,
   type AbaDaListagem,
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type TipoDeVinculo,
+  ABAS_DA_FICHA,
   ABAS_DA_LISTAGEM,
   ESTADO_INICIAL_DA_LISTAGEM,
+  TAMANHOS_DE_PAGINA,
   TIPOS_DE_VINCULO,
   abaTemLotacao,
   normalizarEstadoDaListagem,
@@ -47,7 +50,11 @@ import {
   IconeAdicionarPessoa,
   PainelAdicionarColaborador,
 } from "./PainelAdicionarColaborador";
-import { iniciaisDe } from "./FichaColaboradorScreen";
+import {
+  ROTULO_DA_ABA as ROTULO_DA_ABA_DA_FICHA,
+  iniciaisDe,
+} from "./FichaColaboradorScreen";
+import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
@@ -186,27 +193,55 @@ function vinculoDaLinha(
 }
 
 /**
- * Quantas linhas por página.
+ * Quantas linhas por página: T209 — o tamanho escolhido (20, 50 ou 100; C-2),
+ * guardado na URL pelo shell.
  *
- * Explícito, e não herdado do padrão do servidor, porque a paginação só é
- * honesta se a tela souber o tamanho que pediu: é esse número que faz
- * "Página 2 de 5" significar alguma coisa. Vinte é o padrão do backend
- * (`TAMANHO_PAGINA_PADRAO`), bem abaixo do teto de 100.
- */
-const TAMANHO_PAGINA = 20;
-
-/**
- * R-1 — o tamanho de página da resposta, quando ele é utilizável. Ausente,
+ * Sempre explícito na consulta, e não herdado do padrão do servidor, porque a
+ * paginação só é honesta se a tela souber o tamanho que pediu: é esse número
+ * que faz "Página 2 de 5" significar alguma coisa.
+ *
+ * R-1 — o tamanho de página da RESPOSTA, quando ele é utilizável. Ausente,
  * não numérico, zero, negativo, fracionário ou não finito volta ao tamanho
  * pedido: uma paginação inventada é pior que nenhuma.
  */
-function tamanhoDePaginaValido(valor: unknown): number {
+function tamanhoDePaginaValido(valor: unknown, pedido: number): number {
   return typeof valor === "number" &&
     Number.isInteger(valor) &&
     valor > 0 &&
     Number.isFinite(valor)
     ? valor
-    : TAMANHO_PAGINA;
+    : pedido;
+}
+
+/**
+ * T209 — a janela de botões numerados (C-3): até cinco páginas em volta da
+ * atual, sem sair de 1..total. Primeira e última têm botões próprios.
+ */
+const JANELA_DE_PAGINAS = 5;
+
+export function paginasDaJanela(atual: number, total: number): number[] {
+  const largura = Math.min(JANELA_DE_PAGINAS, total);
+  const inicio = Math.min(
+    Math.max(1, atual - Math.floor(JANELA_DE_PAGINAS / 2)),
+    total - largura + 1,
+  );
+  return Array.from({ length: largura }, (_, i) => inicio + i);
+}
+
+/**
+ * T209 — "Mostrando X–Y de Z" (C-3): do primeiro ao último item da página
+ * que o servidor devolveu, sobre o total da consulta.
+ */
+export function textoDoIntervalo(
+  pagina: number,
+  tamanho: number,
+  quantidadeNaPagina: number,
+  total: number,
+): string {
+  const primeiro = (pagina - 1) * tamanho + 1;
+  const ultimo = primeiro + quantidadeNaPagina - 1;
+  const quantos = total === 1 ? "1 colaborador" : `${total} colaboradores`;
+  return `Mostrando ${primeiro}–${ultimo} de ${quantos}`;
 }
 
 /**
@@ -277,6 +312,7 @@ function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
   return (
     a.aba === b.aba &&
     a.pagina === b.pagina &&
+    a.tamanho === b.tamanho &&
     a.departamentoId === b.departamentoId &&
     a.cargoId === b.cargoId &&
     a.tipo === b.tipo
@@ -301,8 +337,15 @@ export interface ColaboradoresScreenProps {
   /**
    * T198 — o nome na linha leva à ficha unificada, em página própria: quem
    * decide o endereço é o shell. Sem esta prop, o nome é só texto.
+   * T209 — o menu "Ações" da linha abre a ficha já numa aba (C-4); sem esta
+   * prop, não há menu.
    */
-  readonly onAbrirFicha?: (colaboradorId: string) => void;
+  readonly onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
+  /**
+   * T209 — a aba "Solicitações" da ficha só existe para quem a lê (T203): o
+   * menu "Ações" só oferece o atalho a esses papéis.
+   */
+  readonly podeVerSolicitacoes?: boolean;
   /**
    * T198 — muda quando a pessoa volta da ficha: o dashboard (que ficou
    * montado, com busca, filtros e página) relê a página atual.
@@ -396,6 +439,7 @@ export function ColaboradoresScreen({
   estado: estadoControlado,
   onEstadoChange,
   podeOperarJornada = false,
+  podeVerSolicitacoes = false,
 }: ColaboradoresScreenProps = {}) {
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
@@ -418,7 +462,7 @@ export function ColaboradoresScreen({
     },
     [onEstadoChange],
   );
-  const { aba, tipo, departamentoId, cargoId } = estado;
+  const { aba, tipo, departamentoId, cargoId, tamanho } = estado;
   const temTabela = aba !== "jornada";
 
   const [statusCarregamento, setStatusCarregamento] = useState<
@@ -472,8 +516,9 @@ export function ColaboradoresScreen({
   // T164 — página e total da RESPOSTA: o servidor é quem sabe o conjunto.
   const [paginaRespondida, setPaginaRespondida] = useState(estado.pagina);
   const [total, setTotal] = useState(0);
-  const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] =
-    useState(TAMANHO_PAGINA);
+  const [tamanhoPaginaEfetivo, setTamanhoPaginaEfetivo] = useState<number>(
+    estado.tamanho,
+  );
   /** T194 — painel "Adicionar colaborador": só estado local. */
   const [painelAdicionarAberto, setPainelAdicionarAberto] = useState(false);
   /**
@@ -481,6 +526,14 @@ export function ColaboradoresScreen({
    * recente — um filtro trocado depressa nunca é sobrescrito pelo anterior.
    */
   const pedidoListaRef = useRef(0);
+  /**
+   * T209 — a requisição da leitura em voo: uma leitura nova (busca, filtro,
+   * aba, página ou tamanho) cancela a anterior, e desmontar a tela (troca de
+   * empresa, saída do módulo) cancela a que estiver em voo. A sequência acima
+   * continua: um cliente que ignore o cancelamento não sobrescreve nada.
+   */
+  const controleListaRef = useRef<AbortController | null>(null);
+  useEffect(() => () => controleListaRef.current?.abort(), []);
   const [acaoDoVazio, setAcaoDoVazio] = useState<AcaoDoVazio | null>(null);
   const acaoDoVazioRef = useRef(acaoDoVazio);
   acaoDoVazioRef.current = acaoDoVazio;
@@ -510,6 +563,9 @@ export function ColaboradoresScreen({
       daRepeticaoDoErro = false,
     ) => {
       const pedido = ++pedidoListaRef.current;
+      controleListaRef.current?.abort();
+      const controle = new AbortController();
+      controleListaRef.current = controle;
       // Qualquer outra carga (aba, filtro, página, busca) encerra a ação.
       if (!daAcaoDoVazio) setAcaoDoVazio(null);
       if (!daRepeticaoDoErro) setRepetindoErro(false);
@@ -518,7 +574,7 @@ export function ColaboradoresScreen({
         // A empresa nunca entra na query: é a da sessão.
         const query: ListarColaboradoresQuery = {
           pagina: consulta.pagina,
-          tamanhoPagina: TAMANHO_PAGINA,
+          tamanhoPagina: consulta.tamanho,
         };
         const grupo = GRUPO_DA_ABA[consulta.aba];
         if (grupo) query.grupo = grupo;
@@ -527,12 +583,16 @@ export function ColaboradoresScreen({
         if (consulta.departamentoId)
           query.departamentoId = consulta.departamentoId;
         if (consulta.cargoId) query.cargoId = consulta.cargoId;
-        const resp = await listarColaboradores(query);
+        const resp = await listarColaboradores(query, {
+          signal: controle.signal,
+        });
         if (pedido !== pedidoListaRef.current) return;
         setColaboradores(resp.itens);
         setPaginaRespondida(resp.pagina);
         setTotal(resp.total);
-        setTamanhoPaginaEfetivo(tamanhoDePaginaValido(resp.tamanhoPagina));
+        setTamanhoPaginaEfetivo(
+          tamanhoDePaginaValido(resp.tamanhoPagina, consulta.tamanho),
+        );
         setContadores(resp.contadores);
         setFalhaContadores(false);
         setStatusCarregamento("dados");
@@ -557,6 +617,8 @@ export function ColaboradoresScreen({
           setFocoPendente(ID_CAMPO_BUSCA);
         }
       } catch {
+        // Uma leitura cancelada já foi substituída (a sequência avançou) ou a
+        // tela foi desmontada: nunca vira erro na tela.
         if (pedido !== pedidoListaRef.current) return;
         setStatusCarregamento("erro");
         const acao = acaoDoVazioRef.current;
@@ -630,7 +692,7 @@ export function ColaboradoresScreen({
     const daAcaoDoVazio = cargaDaAcaoRef.current;
     cargaDaAcaoRef.current = false;
     void carregarDados(
-      { aba, pagina: estado.pagina, departamentoId, cargoId, tipo },
+      { aba, pagina: estado.pagina, tamanho, departamentoId, cargoId, tipo },
       buscaAplicada,
       false,
       daAcaoDoVazio,
@@ -641,6 +703,7 @@ export function ColaboradoresScreen({
     lotacaoDesconhecida,
     aba,
     estado.pagina,
+    tamanho,
     departamentoId,
     cargoId,
     tipo,
@@ -655,7 +718,12 @@ export function ColaboradoresScreen({
   useEffect(() => {
     if (temTabela || contadores !== null) return;
     let vigente = true;
-    listarColaboradores({ pagina: 1, tamanhoPagina: 1 })
+    // T209 — desmontar (ou sair da aba Jornada) cancela a leitura em voo.
+    const controle = new AbortController();
+    listarColaboradores(
+      { pagina: 1, tamanhoPagina: 1 },
+      { signal: controle.signal },
+    )
       .then((resp) => {
         if (!vigente) return;
         setContadores(resp.contadores);
@@ -677,6 +745,7 @@ export function ColaboradoresScreen({
       });
     return () => {
       vigente = false;
+      controle.abort();
     };
   }, [temTabela, contadores, tentativaContadores]);
 
@@ -833,8 +902,24 @@ export function ColaboradoresScreen({
 
   function irParaPagina(destino: number) {
     if (destino < 1 || destino > totalPaginas || carregando) return;
+    if (destino === paginaRespondida) return;
     mudarEstado({ ...estado, pagina: destino });
   }
+
+  /**
+   * T209 — trocar o tamanho da página (C-2) volta à página 1, com aba,
+   * filtros e busca mantidos. O seletor fica montado durante a leitura.
+   */
+  function trocarTamanho(valor: string) {
+    const novo = TAMANHOS_DE_PAGINA.find((n) => String(n) === valor);
+    if (novo === undefined || novo === tamanho) return;
+    mudarEstado({ ...estado, tamanho: novo, pagina: 1 });
+  }
+
+  /** T209 — as abas da ficha que o papel vê, na ordem da ficha (C-4). */
+  const abasDosAtalhos = ABAS_DA_FICHA.filter(
+    (a) => a !== "solicitacoes" || podeVerSolicitacoes,
+  );
 
   function trocarAba(nova: AbaDaListagem) {
     if (nova === aba) return;
@@ -1102,6 +1187,25 @@ export function ColaboradoresScreen({
             header: "Desligamento",
             cell: (c: ColaboradorListadoApi) =>
               formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataDesligamento),
+          },
+        ]
+      : []),
+    // T209 — só atalhos às abas da ficha (C-4); sem ficha, sem menu.
+    ...(onAbrirFicha
+      ? [
+          {
+            key: "acoes",
+            header: "Ações",
+            cell: (c: ColaboradorListadoApi) => (
+              <MenuAcoesDaPessoa
+                nome={c.nome}
+                atalhos={abasDosAtalhos.map((abaDaFicha) => ({
+                  id: abaDaFicha,
+                  rotulo: ROTULO_DA_ABA_DA_FICHA[abaDaFicha],
+                  aoEscolher: () => onAbrirFicha(c.id, abaDaFicha),
+                }))}
+              />
+            ),
           },
         ]
       : []),
@@ -1565,11 +1669,18 @@ export function ColaboradoresScreen({
                   {statusCarregamento !== "erro" ? (
                     <p className="colaboradores-screen__contexto">
                       <span className="colaboradores-screen__total">
-                        {statusCarregamento === "dados"
-                          ? total === 1
-                            ? "1 colaborador nesta consulta"
-                            : `${total} colaboradores nesta consulta`
-                          : "Contando…"}
+                        {statusCarregamento !== "dados"
+                          ? "Contando…"
+                          : colaboradores.length > 0
+                            ? textoDoIntervalo(
+                                paginaRespondida,
+                                tamanhoPaginaEfetivo,
+                                colaboradores.length,
+                                total,
+                              )
+                            : total === 1
+                              ? "1 colaborador nesta consulta"
+                              : `${total} colaboradores nesta consulta`}
                       </span>
                     </p>
                   ) : null}
@@ -1701,38 +1812,94 @@ export function ColaboradoresScreen({
                       focado enquanto a página nova chega. */}
                   {/* Página além do fim: o estado vazio já oferece a
                       primeira; nada de "Página 4 de 2". */}
-                  {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
-                    <nav
-                      className="colaboradores-screen__paginacao"
-                      aria-label="Paginação de colaboradores"
-                      aria-busy={carregando}
-                    >
-                      <Button
-                        variant="secondary"
-                        onClick={() => irParaPagina(paginaRespondida - 1)}
-                        aria-disabled={paginaRespondida <= 1 || carregando}
-                      >
-                        Página anterior
-                      </Button>
-                      <span
-                        role="status"
-                        className="colaboradores-screen__paginacao-posicao"
-                      >
-                        {carregando
-                          ? "Carregando página…"
-                          : `Página ${paginaRespondida} de ${totalPaginas}`}
-                      </span>
-                      <Button
-                        variant="secondary"
-                        onClick={() => irParaPagina(paginaRespondida + 1)}
-                        aria-disabled={
-                          paginaRespondida >= totalPaginas || carregando
+                  {/* T209 — rodapé da tabela: tamanho da página (C-2) e
+                      paginação numerada (C-3). O seletor fica fora do ramo
+                      que troca na carga: o foco não se perde. */}
+                  <div className="colaboradores-screen__rodape-tabela">
+                    <label className="colaboradores-screen__tamanho">
+                      <span>Itens por página</span>
+                      <select
+                        value={String(tamanho)}
+                        onChange={(evento) =>
+                          trocarTamanho(evento.target.value)
                         }
                       >
-                        Próxima página
-                      </Button>
-                    </nav>
-                  ) : null}
+                        {TAMANHOS_DE_PAGINA.map((n) => (
+                          <option key={n} value={String(n)}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
+                      <nav
+                        className="colaboradores-screen__paginacao"
+                        aria-label="Paginação de colaboradores"
+                        aria-busy={carregando}
+                      >
+                        <Button
+                          variant="secondary"
+                          onClick={() => irParaPagina(1)}
+                          aria-disabled={paginaRespondida <= 1 || carregando}
+                        >
+                          Primeira página
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => irParaPagina(paginaRespondida - 1)}
+                          aria-disabled={paginaRespondida <= 1 || carregando}
+                        >
+                          Página anterior
+                        </Button>
+                        <ul className="colaboradores-screen__paginas">
+                          {paginasDaJanela(paginaRespondida, totalPaginas).map(
+                            (n) => (
+                              <li key={n}>
+                                <button
+                                  type="button"
+                                  className="colaboradores-screen__pagina-numero"
+                                  aria-label={`Página ${n}`}
+                                  aria-current={
+                                    n === paginaRespondida ? "page" : undefined
+                                  }
+                                  aria-disabled={carregando}
+                                  onClick={() => irParaPagina(n)}
+                                >
+                                  {n}
+                                </button>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                        <span
+                          role="status"
+                          className="colaboradores-screen__paginacao-posicao"
+                        >
+                          {carregando
+                            ? "Carregando página…"
+                            : `Página ${paginaRespondida} de ${totalPaginas}`}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          onClick={() => irParaPagina(paginaRespondida + 1)}
+                          aria-disabled={
+                            paginaRespondida >= totalPaginas || carregando
+                          }
+                        >
+                          Próxima página
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => irParaPagina(totalPaginas)}
+                          aria-disabled={
+                            paginaRespondida >= totalPaginas || carregando
+                          }
+                        >
+                          Última página
+                        </Button>
+                      </nav>
+                    ) : null}
+                  </div>
                 </>
               )}
             </>
@@ -1752,9 +1919,9 @@ export function ColaboradoresScreen({
           className="colaboradores-screen__aviso-texto"
         >
           Admissão e correções deste cadastro são feitas pelo RH e pelo DP da
-          própria empresa; o suporte técnico apenas consulta. Consulta e
-          alteração de nome geram trilha de auditoria automática; a admissão é
-          registrada na página de Nova admissão.
+          própria empresa, na página de Nova admissão e na ficha. Admissões,
+          alterações e a leitura de contatos geram trilha de auditoria; o
+          suporte técnico apenas consulta.
         </p>
       </Surface>
 

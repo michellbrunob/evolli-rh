@@ -11,7 +11,11 @@ import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
-import { ColaboradoresScreen } from "./ColaboradoresScreen";
+import {
+  ColaboradoresScreen,
+  paginasDaJanela,
+  textoDoIntervalo,
+} from "./ColaboradoresScreen";
 import { PessoasScreen } from "./PessoasScreen";
 import { FichaColaboradorScreen } from "./FichaColaboradorScreen";
 import type {
@@ -69,6 +73,11 @@ import {
 } from "../../app/edicoesPendentes";
 
 vi.mock("../../api/colaboradoresClient");
+
+/** T209 — a listagem de Colaboradores passa o sinal de cancelamento. */
+const COM_SINAL = expect.objectContaining({
+  signal: expect.any(AbortSignal),
+});
 // T183 — a seção "Jornada de trabalho" da ficha lê os vínculos de horário.
 vi.mock("../../api/vinculoHorarioClient");
 vi.mock("../../api/horariosClient");
@@ -355,8 +364,8 @@ function ComFicha({
     <PessoasScreen
       empresaAtiva={empresaAtiva}
       ficha={ficha}
-      onAbrirFicha={(colaboradorId) =>
-        setFicha({ colaboradorId, aba: "dados" })
+      onAbrirFicha={(colaboradorId, aba = "dados") =>
+        setFicha({ colaboradorId, aba })
       }
       onTrocarAbaDaFicha={(aba) =>
         setFicha((atual) => (atual ? { ...atual, aba } : atual))
@@ -460,27 +469,36 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     render(<ComFicha />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     // N-6 — a aba inicial é Ativos.
-    expect(listarColaboradores).toHaveBeenLastCalledWith({
-      pagina: 1,
-      tamanhoPagina: 20,
-      grupo: "ativos",
-    });
+    expect(listarColaboradores).toHaveBeenLastCalledWith(
+      {
+        pagina: 1,
+        tamanhoPagina: 20,
+        grupo: "ativos",
+      },
+      COM_SINAL,
+    );
 
     abrirAba("Desligados");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        grupo: "desligados",
-        // T164 — a paginação viaja junto, na página 1.
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          grupo: "desligados",
+          // T164 — a paginação viaja junto, na página 1.
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
     abrirAba("Todos");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
   });
 
@@ -491,11 +509,14 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     abrirAba("Em admissão");
 
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        grupo: "em_admissao",
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          grupo: "em_admissao",
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
     // N-3 — sem os controles antigos.
     expect(screen.queryByLabelText("Situação do vínculo")).toBeNull();
@@ -1130,11 +1151,14 @@ describe("T164 — paginação real", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    expect(listarColaboradores).toHaveBeenCalledWith({
-      pagina: 1,
-      tamanhoPagina: 20,
-      grupo: "ativos",
-    });
+    expect(listarColaboradores).toHaveBeenCalledWith(
+      {
+        pagina: 1,
+        tamanhoPagina: 20,
+        grupo: "ativos",
+      },
+      COM_SINAL,
+    );
   });
 
   it("mostra a posição e avança para a página seguinte", async () => {
@@ -1157,11 +1181,14 @@ describe("T164 — paginação real", () => {
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
 
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 2,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 2,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     await waitFor(() => expect(navegacao()).toHaveTextContent("Página 2 de 3"));
   });
@@ -1242,6 +1269,7 @@ describe("T164 — paginação real", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
         expect.objectContaining({ pagina: 2 }),
+        COM_SINAL,
       ),
     );
 
@@ -1250,10 +1278,13 @@ describe("T164 — paginação real", () => {
     // Sem isto, a aba nova pediria a página 2 de um conjunto que talvez
     // tenha uma só — e a lista vazia pareceria "ninguém aqui".
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
   });
 });
@@ -1267,9 +1298,9 @@ describe("T164 — total, data e contexto de empresa", () => {
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     // Dois na tela, quarenta e cinco no conjunto. Exibir "2" como total faria
-    // o número mentir sobre o tamanho da empresa.
+    // o número mentir sobre o tamanho da empresa. T209 — com o intervalo.
     expect(
-      await screen.findByText("45 colaboradores nesta consulta"),
+      await screen.findByText("Mostrando 1–2 de 45 colaboradores"),
     ).toBeInTheDocument();
   });
 
@@ -1281,7 +1312,7 @@ describe("T164 — total, data e contexto de empresa", () => {
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     expect(
-      await screen.findByText("1 colaborador nesta consulta"),
+      await screen.findByText("Mostrando 1–1 de 1 colaborador"),
     ).toBeInTheDocument();
   });
 
@@ -3188,12 +3219,15 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     buscar("  bruno  ");
 
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        busca: "bruno",
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          busca: "bruno",
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     expect(campoBusca()).toHaveValue("bruno");
     await waitFor(() =>
@@ -3222,22 +3256,28 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
 
     abrirAba("Desligados");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        grupo: "desligados",
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          grupo: "desligados",
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     buscar("MAT-00");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        grupo: "desligados",
-        busca: "MAT-00",
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          grupo: "desligados",
+          busca: "MAT-00",
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
   });
 
@@ -3247,11 +3287,14 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
 
     buscar("     ");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     expect(campoBusca()).toHaveValue("");
   });
@@ -3262,12 +3305,15 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
 
     buscar("a".repeat(200));
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        busca: "a".repeat(160),
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          busca: "a".repeat(160),
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
   });
 
@@ -3277,23 +3323,29 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
 
     buscar("ana");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        busca: "ana",
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          busca: "ana",
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
 
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     expect(campoBusca()).toHaveValue("");
     expect(campoBusca()).toHaveFocus();
@@ -3423,11 +3475,14 @@ describe("T178 — estados vazios distintos", () => {
     );
 
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
@@ -4379,15 +4434,19 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
         expect.objectContaining({ busca: "Ana" }),
+        COM_SINAL,
       ),
     );
     abrirAba("Todos");
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        busca: "Ana",
-        pagina: 1,
-        tamanhoPagina: 20,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          busca: "Ana",
+          pagina: 1,
+          tamanhoPagina: 20,
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
@@ -4531,6 +4590,7 @@ describe("T199 — dashboard de Colaboradores", () => {
   const ESTADO_ATIVOS = {
     aba: "ativos" as const,
     pagina: 1,
+    tamanho: 20 as const,
     departamentoId: null,
     cargoId: null,
     tipo: null,
@@ -4693,10 +4753,13 @@ describe("T199 — dashboard de Colaboradores", () => {
       />,
     );
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenCalledWith({
-        pagina: 1,
-        tamanhoPagina: 1,
-      }),
+      expect(listarColaboradores).toHaveBeenCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 1,
+        },
+        COM_SINAL,
+      ),
     );
     // Nenhuma consulta da tabela do dashboard (grupo, página de 20).
     for (const [consulta] of vi
@@ -4801,6 +4864,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
         expect.objectContaining({ busca: "Ana" }),
+        COM_SINAL,
       ),
     );
     expect(onEstadoChange.mock.calls.length).toBe(antes);
@@ -4922,6 +4986,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
   const ESTADO = {
     aba: "ativos" as const,
     pagina: 3,
+    tamanho: 20 as const,
     departamentoId: null,
     cargoId: null,
     tipo: "clt" as const,
@@ -5026,6 +5091,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenCalledWith(
         expect.objectContaining({ departamentoId: DEP.id, pagina: 3 }),
+        COM_SINAL,
       ),
     );
     expect(onEstadoChange).not.toHaveBeenCalled();
@@ -5037,6 +5103,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenCalledWith(
         expect.objectContaining({ pagina: 3, tipoVinculo: "clt" }),
+        COM_SINAL,
       ),
     );
   });
@@ -5078,6 +5145,7 @@ function DashboardComEstado({
 const ESTADO_PADRAO: EstadoDaListagem = {
   aba: "ativos",
   pagina: 1,
+  tamanho: 20,
   departamentoId: null,
   cargoId: null,
   tipo: null,
@@ -5139,11 +5207,14 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
       pagina: 1,
     });
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        tipoVinculo: "pj",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          tipoVinculo: "pj",
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
   });
@@ -5162,6 +5233,7 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
         expect.objectContaining({ busca: "Ana", pagina: 1 }),
+        COM_SINAL,
       ),
     );
     await screen.findByText("Página 1 de 3");
@@ -5192,12 +5264,15 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
       screen.getByRole("button", { name: "Ir para a primeira página" }),
     );
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-        busca: "Ana",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+          busca: "Ana",
+        },
+        COM_SINAL,
+      ),
     );
   });
 
@@ -5276,15 +5351,18 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
     await screen.findByText("Página 1 de 3");
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 2,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-        tipoVinculo: "pj",
-        busca: "Ana",
-        departamentoId: DEP.id,
-        cargoId: CAR.id,
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 2,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+          tipoVinculo: "pj",
+          busca: "Ana",
+          departamentoId: DEP.id,
+          cargoId: CAR.id,
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByText("Página 2 de 3");
 
@@ -5321,11 +5399,14 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
     // Uma única mudança, já completa.
     expect(onMudanca.mock.calls.slice(antes)).toEqual([[ESTADO_PADRAO]]);
     await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
-      }),
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 20,
+          grupo: "ativos",
+        },
+        COM_SINAL,
+      ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(campoBusca()).toHaveValue("");
@@ -6213,6 +6294,769 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     );
     fireEvent.click(recarregar);
     expect(anuncioDaLista()?.textContent).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — Bloco A: listagem operacional (tamanho da página na URL, paginação
+// numerada com primeira e última, "Mostrando X–Y de Z", cancelamento das
+// leituras antigas e aviso de auditoria fiel).
+// ---------------------------------------------------------------------------
+function pessoasSinteticas(
+  quantidade: number,
+  inicio = 0,
+): ColaboradorListadoApi[] {
+  return Array.from({ length: quantidade }, (_, i) =>
+    listado(
+      {
+        id: `9${String(inicio + i).padStart(7, "0")}-0000-4000-8000-000000000000`,
+        nome: `Pessoa sintética ${inicio + i + 1}`,
+      },
+      [
+        vinculoListado(
+          `8${String(inicio + i).padStart(7, "0")}-0000-4000-8000-000000000000`,
+          `MAT-${inicio + i + 1}`,
+          "ativo",
+          "2025-01-10",
+        ),
+      ],
+    ),
+  );
+}
+
+function respostaDaPagina(
+  itens: ColaboradorListadoApi[],
+  paginaAtual: number,
+  total: number,
+  tamanho = 20,
+): ResultadoPaginadoTeste<ColaboradorListadoApi> {
+  return {
+    itens,
+    pagina: paginaAtual,
+    tamanhoPagina: tamanho,
+    total,
+    contadores: { ...contados([]), ativos: total, total },
+  };
+}
+
+const navegacaoDaPaginacao = () =>
+  screen.getByRole("navigation", { name: "Paginação de colaboradores" });
+
+const seletorDoTamanho = () =>
+  screen.getByRole("combobox", { name: "Itens por página" });
+
+/** O sinal de cancelamento passado à leitura de número `n` (0 = primeira). */
+function sinalDaLeitura(n: number): AbortSignal {
+  const chamada = vi.mocked(listarColaboradores).mock.calls[n];
+  const opcoes = chamada?.[1] as { signal?: AbortSignal } | undefined;
+  if (!opcoes?.signal) throw new Error(`A leitura ${n} não tem sinal.`);
+  return opcoes.signal;
+}
+
+describe("T209 — Bloco A: tamanho da página (C-2)", () => {
+  beforeEach(() => {
+    vi.mocked(listarColaboradores).mockClear();
+  });
+
+  it("oferece 20, 50 e 100, com 20 por padrão, e pede o tamanho escolhido na página 1", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 120),
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, pagina: 1 }}
+        onMudanca={onMudanca}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+
+    expect(seletorDoTamanho()).toHaveValue("20");
+    expect(
+      within(seletorDoTamanho())
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["20", "50", "100"]);
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(50), 1, 120, 50),
+    );
+    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      pagina: 1,
+      tamanho: 50,
+    });
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        { pagina: 1, tamanhoPagina: 50, grupo: "ativos" },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ),
+    );
+    // O seletor fica montado durante a leitura: o foco não se perde.
+    expect(seletorDoTamanho()).toHaveValue("50");
+  });
+
+  it("trocar o tamanho volta à página 1, mantendo aba, filtros e busca", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20, 40), 3, 120),
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", pagina: 3, tipo: "pj" }}
+        onMudanca={onMudanca}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    buscar("Pessoa");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: "Pessoa", pagina: 1 }),
+        expect.anything(),
+      ),
+    );
+
+    fireEvent.change(seletorDoTamanho(), { target: { value: "100" } });
+
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "todos",
+      pagina: 1,
+      tipo: "pj",
+      tamanho: 100,
+    });
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 1,
+          tamanhoPagina: 100,
+          tipoVinculo: "pj",
+          busca: "Pessoa",
+        },
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("o tamanho vindo do shell (URL) vale já na primeira leitura", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(100), 1, 250, 100),
+    );
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, tamanho: 100 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(listarColaboradores).toHaveBeenNthCalledWith(
+      1,
+      { pagina: 1, tamanhoPagina: 100, grupo: "ativos" },
+      expect.anything(),
+    );
+    expect(seletorDoTamanho()).toHaveValue("100");
+    expect(navegacaoDaPaginacao()).toHaveTextContent("Página 1 de 3");
+  });
+
+  it("a aba Jornada não tem seletor de tamanho (paginação própria)", async () => {
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "jornada" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    await screen.findByRole("tabpanel");
+    expect(
+      screen.queryByRole("combobox", { name: "Itens por página" }),
+    ).toBeNull();
+  });
+});
+
+describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)", () => {
+  beforeEach(() => {
+    vi.mocked(listarColaboradores).mockClear();
+  });
+
+  it("mostra o intervalo exibido e o total da consulta", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20, 20), 2, 45),
+    );
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, pagina: 2 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText("Mostrando 21–40 de 45 colaboradores"),
+    ).toBeInTheDocument();
+  });
+
+  it("na última página, o intervalo termina no total; um só item diz 'de 1 colaborador'", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(5, 40), 3, 45),
+    );
+    const { unmount } = render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, pagina: 3 }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText("Mostrando 41–45 de 45 colaboradores"),
+    ).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(1), 1, 1),
+    );
+    render(<ColaboradoresScreen />);
+    expect(
+      await screen.findByText("Mostrando 1–1 de 1 colaborador"),
+    ).toBeInTheDocument();
+  });
+
+  it("botões numerados, com a página atual marcada, e primeira e última página", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20, 100), 6, 205),
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, pagina: 6 }}
+        onMudanca={onMudanca}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const nav = navegacaoDaPaginacao();
+
+    // 205 em páginas de 20: 11 páginas; janela de cinco em volta da atual.
+    expect(
+      within(nav)
+        .getAllByRole("button", { name: /^Página \d+$/ })
+        .map((b) => b.textContent),
+    ).toEqual(["4", "5", "6", "7", "8"]);
+    expect(
+      within(nav).getByRole("button", { name: "Página 6" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(nav).getByRole("button", { name: "Página 5" }),
+    ).not.toHaveAttribute("aria-current");
+
+    fireEvent.click(within(nav).getByRole("button", { name: "Última página" }));
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      pagina: 11,
+    });
+  });
+
+  it("primeira página e números levam à página pedida, com filtros e busca preservados", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20, 60), 4, 205),
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", pagina: 4, tipo: "clt" }}
+        onMudanca={onMudanca}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    buscar("sintética");
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: "sintética" }),
+        expect.anything(),
+      ),
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20, 40), 3, 205),
+    );
+    await screen.findByRole("button", { name: "Página 3" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Página 3" }));
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        {
+          pagina: 3,
+          tamanhoPagina: 20,
+          tipoVinculo: "clt",
+          busca: "sintética",
+        },
+        expect.anything(),
+      ),
+    );
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "todos",
+      pagina: 3,
+      tipo: "clt",
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Página 3" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Primeira página" }));
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pagina: 1, busca: "sintética" }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("nos extremos, primeira e anterior (ou última e próxima) ficam inertes, mas focalizáveis", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 45),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const nav = navegacaoDaPaginacao();
+    expect(
+      within(nav).getByRole("button", { name: "Primeira página" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      within(nav).getByRole("button", { name: "Última página" }),
+    ).toHaveAttribute("aria-disabled", "false");
+    const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(
+      within(nav).getByRole("button", { name: "Primeira página" }),
+    );
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(chamadas);
+  });
+
+  it("a página atual marcada não relê nada ao ser clicada", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 100),
+    );
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={onMudanca} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const leituras = vi.mocked(listarColaboradores).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Página 1" }));
+    expect(onMudanca).not.toHaveBeenCalled();
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(leituras);
+  });
+
+  it("o botão numerado clicado conserva o foco enquanto a página nova chega", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 100),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const adiada = adiado<ResultadoPaginadoTeste<ColaboradorListadoApi>>();
+    vi.mocked(listarColaboradores).mockReturnValue(adiada.promessa as never);
+    const tres = screen.getByRole("button", { name: "Página 3" });
+    tres.focus();
+    fireEvent.click(tres);
+    expect(tres).toHaveFocus();
+    await act(async () => {
+      adiada.resolver(respostaDaPagina(pessoasSinteticas(20, 40), 3, 100));
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Página 3" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Página 3" })).toHaveFocus();
+  });
+});
+
+describe("T209 — janela de páginas e intervalo (funções puras)", () => {
+  it.each([
+    [1, 1, [1]],
+    [1, 2, [1, 2]],
+    [2, 5, [1, 2, 3, 4, 5]],
+    [1, 11, [1, 2, 3, 4, 5]],
+    [2, 11, [1, 2, 3, 4, 5]],
+    [3, 11, [1, 2, 3, 4, 5]],
+    [4, 11, [2, 3, 4, 5, 6]],
+    [6, 11, [4, 5, 6, 7, 8]],
+    [9, 11, [7, 8, 9, 10, 11]],
+    [10, 11, [7, 8, 9, 10, 11]],
+    [11, 11, [7, 8, 9, 10, 11]],
+    [6, 6, [2, 3, 4, 5, 6]],
+  ])("página %i de %i: %j", (atual, total, esperado) => {
+    expect(paginasDaJanela(atual, total)).toEqual(esperado);
+  });
+
+  it.each([
+    [1, 20, 20, 45, "Mostrando 1–20 de 45 colaboradores"],
+    [2, 20, 20, 45, "Mostrando 21–40 de 45 colaboradores"],
+    [3, 20, 5, 45, "Mostrando 41–45 de 45 colaboradores"],
+    [2, 50, 50, 120, "Mostrando 51–100 de 120 colaboradores"],
+    [1, 100, 1, 1, "Mostrando 1–1 de 1 colaborador"],
+  ])(
+    "página %i, tamanho %i, %i na página, total %i",
+    (pagina, tamanho, naPagina, total, esperado) => {
+      expect(textoDoIntervalo(pagina, tamanho, naPagina, total)).toBe(esperado);
+    },
+  );
+});
+
+describe("T209 — Bloco A: leituras antigas canceladas", () => {
+  beforeEach(() => {
+    vi.mocked(listarColaboradores).mockClear();
+  });
+
+  it("trocar página, tamanho, aba, filtro ou busca cancela a leitura anterior", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 100),
+    );
+    render(<DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(sinalDaLeitura(0).aborted).toBe(false);
+
+    // Leitura que nunca termina: cada troca precisa cancelar a anterior.
+    vi.mocked(listarColaboradores).mockReturnValue(new Promise(() => {}));
+    fireEvent.click(screen.getByRole("button", { name: "Página 2" }));
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(2),
+    );
+    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(3),
+    );
+    expect(sinalDaLeitura(1).aborted).toBe(true);
+    abrirAba("Todos");
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(4),
+    );
+    expect(sinalDaLeitura(2).aborted).toBe(true);
+    buscar("Pessoa");
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(5),
+    );
+    expect(sinalDaLeitura(3).aborted).toBe(true);
+    expect(sinalDaLeitura(4).aborted).toBe(false);
+  });
+
+  it("desmontar a tela (troca de empresa, saída do módulo) cancela a leitura em voo", async () => {
+    vi.mocked(listarColaboradores).mockReturnValue(new Promise(() => {}));
+    const { unmount } = render(<ColaboradoresScreen />);
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(1),
+    );
+    expect(sinalDaLeitura(0).aborted).toBe(false);
+    unmount();
+    expect(sinalDaLeitura(0).aborted).toBe(true);
+  });
+
+  it("a leitura cancelada não vira erro na tela", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(20), 1, 100),
+    );
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    let rejeitar: (erro: unknown) => void = () => {};
+    vi.mocked(listarColaboradores).mockReturnValueOnce(
+      new Promise((_, r) => {
+        rejeitar = r;
+      }) as never,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Página 2" }));
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(2),
+    );
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      respostaDaPagina(pessoasSinteticas(50), 1, 100, 50),
+    );
+    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    await waitFor(() =>
+      expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(3),
+    );
+    expect(sinalDaLeitura(1).aborted).toBe(true);
+    await act(async () => {
+      rejeitar(new DOMException("Cancelada.", "AbortError"));
+    });
+    expect(
+      await screen.findByText("Mostrando 1–50 de 100 colaboradores"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Não foi possível carregar os colaboradores"),
+    ).toBeNull();
+  });
+
+  it("os totais da aba Jornada também são cancelados ao desmontar", async () => {
+    vi.mocked(listarColaboradores).mockReturnValue(new Promise(() => {}));
+    const { unmount } = render(
+      <DashboardComEstado
+        inicial={{ ...ESTADO_PADRAO, aba: "jornada" }}
+        onMudanca={vi.fn()}
+      />,
+    );
+    // A visão de jornadas lê colaboradores por conta própria: o que conta
+    // aqui é a leitura mínima dos totais (uma linha).
+    const daLeituraDosTotais = () =>
+      vi
+        .mocked(listarColaboradores)
+        .mock.calls.find(
+          ([q]) => q?.tamanhoPagina === 1 && q.situacao === undefined,
+        );
+    await waitFor(() => expect(daLeituraDosTotais()).toBeDefined());
+    const sinal = (daLeituraDosTotais()![1] as { signal: AbortSignal }).signal;
+    expect(sinal.aborted).toBe(false);
+    unmount();
+    expect(sinal.aborted).toBe(true);
+  });
+});
+
+describe("T209 — Bloco A: aviso de auditoria fiel (C-6)", () => {
+  it("diz só o que é auditado: admissões, alterações e a leitura de contatos", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const aviso = document.getElementById("colaboradores-aviso-rh-titulo")!;
+    expect(aviso).toHaveTextContent(
+      "Admissões, alterações e a leitura de contatos geram trilha de auditoria; o suporte técnico apenas consulta.",
+    );
+    // A listagem não é auditada para RH e DP: o aviso não pode dizer isso.
+    expect(aviso.textContent).not.toMatch(/Consulta e altera/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — Bloco B: menu "Ações" por linha, só com atalhos às abas da ficha que
+// o papel vê (C-4). Nenhuma edição, desligamento ou ação em lote.
+// ---------------------------------------------------------------------------
+const ATALHOS_SEM_SOLICITACOES = [
+  "Dados do colaborador",
+  "Vida funcional",
+  "Dados contratuais",
+  "Jornada de trabalho",
+  "Documentos",
+  "Registros de ponto",
+];
+
+function botaoDeAcoes(nome: string): HTMLElement {
+  return screen.getByRole("button", { name: `Ações: ${nome}` });
+}
+
+function itensDoMenu(): string[] {
+  return within(screen.getByRole("menu"))
+    .getAllByRole("menuitem")
+    .map((item) => item.textContent ?? "");
+}
+
+describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
+  beforeEach(() => {
+    vi.mocked(listarColaboradores).mockClear();
+  });
+
+  it("cada linha tem um botão de menu com nome próprio; sem ficha, não há menu", async () => {
+    const { unmount } = render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const botao = botaoDeAcoes(colaborador1.nome);
+    expect(botao).toHaveAttribute("aria-haspopup", "menu");
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+    expect(botaoDeAcoes(colaborador2.nome)).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Ações" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(screen.queryByRole("button", { name: /^Ações: / })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+  });
+
+  it("só atalhos às abas da ficha; Solicitações só para quem as vê", async () => {
+    const { unmount } = render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    expect(itensDoMenu()).toEqual(ATALHOS_SEM_SOLICITACOES);
+    unmount();
+
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} podeVerSolicitacoes />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    expect(itensDoMenu()).toEqual([
+      ...ATALHOS_SEM_SOLICITACOES,
+      "Solicitações",
+    ]);
+    // Nada que edite, desligue ou aja em lote.
+    for (const proibido of [
+      /editar/i,
+      /deslig/i,
+      /exclu/i,
+      /lote/i,
+      /export/i,
+    ]) {
+      expect(itensDoMenu().some((t) => proibido.test(t))).toBe(false);
+    }
+  });
+
+  it("abrir foca o primeiro atalho; setas, Home e End percorrem; Escape devolve o foco", async () => {
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const botao = botaoDeAcoes(colaborador1.nome);
+    botao.focus();
+    fireEvent.click(botao);
+    const menu = screen.getByRole("menu", {
+      name: `Ações: ${colaborador1.nome}`,
+    });
+    const itens = within(menu).getAllByRole("menuitem");
+    expect(botao).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(itens[0]).toHaveFocus());
+
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(itens[1]).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(itens[itens.length - 1]).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(itens[0]).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(itens[itens.length - 1]).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "Home" });
+    expect(itens[0]).toHaveFocus();
+
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(botao).toHaveFocus();
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("seta para cima no botão abre no último atalho; para baixo, no primeiro", async () => {
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const botao = botaoDeAcoes(colaborador1.nome);
+    fireEvent.keyDown(botao, { key: "ArrowUp" });
+    let itens = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    await waitFor(() => expect(itens[itens.length - 1]).toHaveFocus());
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    fireEvent.keyDown(botao, { key: "ArrowDown" });
+    itens = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    await waitFor(() => expect(itens[0]).toHaveFocus());
+  });
+
+  it("clique fora e Tab fecham o menu; só um menu aberto por vez", async () => {
+    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    fireEvent.pointerDown(botaoDeAcoes(colaborador2.nome));
+    fireEvent.click(botaoDeAcoes(colaborador2.nome));
+    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    expect(screen.getByRole("menu")).toHaveAccessibleName(
+      `Ações: ${colaborador2.nome}`,
+    );
+  });
+
+  it("escolher um atalho fecha o menu, devolve o foco ao botão e abre a ficha naquela aba", async () => {
+    const onAbrirFicha = vi.fn();
+    render(
+      <ColaboradoresScreen onAbrirFicha={onAbrirFicha} podeVerSolicitacoes />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const botao = botaoDeAcoes(colaborador1.nome);
+    const esperado: [string, string][] = [
+      ["Dados do colaborador", "dados"],
+      ["Vida funcional", "vida-funcional"],
+      ["Dados contratuais", "contratuais"],
+      ["Jornada de trabalho", "jornada"],
+      ["Documentos", "documentos"],
+      ["Registros de ponto", "ponto"],
+      ["Solicitações", "solicitacoes"],
+    ];
+    for (const [rotulo, aba] of esperado) {
+      fireEvent.click(botao);
+      fireEvent.click(screen.getByRole("menuitem", { name: rotulo }));
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(botao).toHaveFocus();
+      expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador1.id, aba);
+    }
+    expect(onAbrirFicha).toHaveBeenCalledTimes(esperado.length);
+  });
+
+  it("Enter num atalho escolhe pelo teclado", async () => {
+    const onAbrirFicha = vi.fn();
+    render(<ColaboradoresScreen onAbrirFicha={onAbrirFicha} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.keyDown(botaoDeAcoes(colaborador2.nome), { key: "ArrowDown" });
+    const menu = screen.getByRole("menu");
+    fireEvent.keyDown(menu, { key: "End" });
+    const ultimo = within(menu).getByRole("menuitem", {
+      name: "Registros de ponto",
+    });
+    expect(ultimo).toHaveFocus();
+    // Botão nativo: Enter vira clique.
+    fireEvent.click(ultimo);
+    expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador2.id, "ponto");
+  });
+
+  it("no contêiner de Pessoas, o atalho abre a ficha já na aba escolhida", async () => {
+    render(<ComFicha />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
+    const ficha = await esperarFicha();
+    expect(
+      within(ficha).getByRole("tab", { name: /Documentos/ }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("o nome continua abrindo a ficha nos dados, como antes", async () => {
+    const onAbrirFicha = vi.fn();
+    render(<ColaboradoresScreen onAbrirFicha={onAbrirFicha} />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Abrir ficha de ${colaborador1.nome}`,
+      }),
+    );
+    expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador1.id);
+  });
+});
+
+describe("T209 — contrato de CSS da listagem operacional e do menu (375 px)", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/ColaboradoresScreen.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const inicio = css.indexOf("/* ---- T209 — listagem operacional");
+  const bloco = inicio > -1 ? css.slice(inicio) : "";
+
+  it("o bloco existe e usa só tokens: nenhuma cor literal", () => {
+    expect(inicio).toBeGreaterThan(-1);
+    expect(bloco).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(bloco).not.toMatch(/\brgba?\(|\bhsla?\(/);
+  });
+
+  it("rodapé e paginação quebram linha (sem rolagem lateral) e têm alvo de 44 px", () => {
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__rodape-tabela \{[^}]*flex-wrap: wrap;[^}]*min-width: 0;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__paginacao \{[^}]*flex-wrap: wrap;/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__pagina-numero \{[^}]*min-width: var\(--touch-target\);[^}]*min-height: var\(--touch-target\);/,
+    );
+  });
+
+  it("página atual não depende só de cor; menu cabe na tela e fica abaixo do cabeçalho fixo", () => {
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__pagina-numero\[aria-current="page"\] \{[^}]*font-weight: var\(--weight-strong\);[^}]*border-color: var\(--color-action\);/,
+    );
+    expect(bloco).toMatch(
+      /\.colaboradores-screen__menu \{[^}]*position: fixed;[^}]*z-index: 20;[^}]*max-width: calc\(100vw - 2 \* var\(--space-md\)\);/,
+    );
   });
 });
 

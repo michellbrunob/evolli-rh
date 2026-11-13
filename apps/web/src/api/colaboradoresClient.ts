@@ -396,8 +396,17 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * T209 — opções da leitura: `signal` cancela a requisição (busca, filtro,
+ * aba, página ou tamanho trocados, empresa trocada, tela desmontada).
+ */
+export interface OpcoesDaLeitura {
+  readonly signal?: AbortSignal;
+}
+
 export async function listarColaboradores(
   query: ListarColaboradoresQuery = {},
+  opcoes: OpcoesDaLeitura = {},
 ): Promise<ListagemColaboradoresApi> {
   const params = new URLSearchParams();
   if (query.situacao) params.set("situacao", query.situacao);
@@ -418,7 +427,10 @@ export async function listarColaboradores(
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));
   const qs = params.toString();
-  const res = await apiFetch(`/colaboradores${qs ? `?${qs}` : ""}`);
+  const res = await apiFetch(
+    `/colaboradores${qs ? `?${qs}` : ""}`,
+    opcoes.signal ? { signal: opcoes.signal } : {},
+  );
   return jsonOrThrow(res);
 }
 

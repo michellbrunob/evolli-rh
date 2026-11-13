@@ -93,6 +93,18 @@ describe("T178 — listarColaboradores", () => {
     expect(BUSCA_COLABORADORES_MAXIMO).toBe(160);
   });
 
+  it("T209 — o sinal de cancelamento chega ao fetch; sem ele, nenhum sinal", async () => {
+    const controle = new AbortController();
+    await listarColaboradores({ pagina: 1 }, { signal: controle.signal });
+    expect((fetchMock.mock.calls.at(-1)![1] as RequestInit).signal).toBe(
+      controle.signal,
+    );
+    await listarColaboradores({ pagina: 1 });
+    expect(
+      (fetchMock.mock.calls.at(-1)![1] as RequestInit).signal,
+    ).toBeUndefined();
+  });
+
   it("T199 — grupo e tipo de vínculo vão na query; ausentes, não vão", async () => {
     await listarColaboradores({
       grupo: "em_admissao",

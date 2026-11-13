@@ -424,7 +424,7 @@ function conteudoDoDestino(
   fichaDoColaborador: {
     readonly ficha: RotaDaFicha | null;
     readonly focarContatos: boolean;
-    readonly onAbrir: (colaboradorId: string) => void;
+    readonly onAbrir: (colaboradorId: string, aba?: AbaDaFicha) => void;
     readonly onTrocarAba: (aba: AbaDaFicha) => void;
     /** T202 — outra competência da aba de ponto: o shell troca a rota. */
     readonly onTrocarCompetencia: (competencia: string) => void;
@@ -1128,10 +1128,25 @@ export function App({
       },
     });
   }, []);
-  const abrirFicha = useCallback((colaboradorId: string) => {
-    setFocarContatosNaFicha(false);
-    setFicha({ colaboradorId, aba: "dados" });
-  }, []);
+  /**
+   * T198 — abre a ficha (empilha a rota). T209 — o menu "Ações" da listagem
+   * pede uma aba (C-4): a aba que o papel não lê vira "Dados do colaborador"
+   * (`fichaParaOPapel`), e a de ponto abre no mês corrente.
+   */
+  const abrirFicha = useCallback(
+    (colaboradorId: string, aba: AbaDaFicha = "dados") => {
+      setFocarContatosNaFicha(false);
+      setFicha(
+        fichaParaOPapel(
+          aba === "ponto"
+            ? { colaboradorId, aba, competencia: competenciaDoMesAtual() }
+            : { colaboradorId, aba },
+          papelDoAtor,
+        ),
+      );
+    },
+    [papelDoAtor],
+  );
   const trocarAbaDaFicha = useCallback(
     (aba: AbaDaFicha) => {
       // T203 — aba que o papel não lê não é oferecida; se pedida, é ignorada.

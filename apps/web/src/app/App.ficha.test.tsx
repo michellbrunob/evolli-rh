@@ -2794,3 +2794,129 @@ describe("T204 — Nova solicitação na ficha, no shell", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// T209 — listagem operacional no shell: o tamanho da página na URL (C-2) e o
+// menu "Ações" da linha abrindo a ficha na aba escolhida, por papel (C-4).
+// ---------------------------------------------------------------------------
+describe("T209 — tamanho da página e atalhos da linha no shell", () => {
+  const seletorDoTamanho = () =>
+    screen.getByRole("combobox", { name: "Itens por página" });
+  const ultimaConsulta = () =>
+    vi.mocked(listarColaboradores).mock.lastCall?.[0] ?? {};
+
+  it("trocar o tamanho empilha a URL canônica; recarregar mantém; 20 sai da URL", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&pagina=2`);
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    const entradas = window.history.length;
+
+    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`),
+    );
+    expect(window.history.length).toBe(entradas + 1);
+    await waitFor(() =>
+      expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 }),
+    );
+    const url = window.location.hash;
+    unmount();
+
+    vi.mocked(listarColaboradores).mockClear();
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    expect(seletorDoTamanho()).toHaveValue("50");
+    expect(ultimaConsulta()).toMatchObject({ tamanhoPagina: 50 });
+
+    fireEvent.change(seletorDoTamanho(), { target: { value: "20" } });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
+    );
+  });
+
+  it("tamanho inválido na URL cai em 20 e é corrigido no lugar; nada inválido vira consulta", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?tamanho=1000`);
+    const entradas = window.history.length;
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    await waitFor(() => expect(window.location.hash).toBe(LISTAGEM));
+    expect(window.history.length).toBe(entradas);
+    for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
+      expect([1, 20, 100]).toContain(consulta?.tamanhoPagina);
+      expect(consulta?.tamanhoPagina).not.toBe(1000);
+    }
+  });
+
+  it.each([
+    ["rh", true],
+    ["dp", false],
+    ["master_tecnico", true],
+  ] as const)(
+    "%s: atalhos às abas que o papel vê; Solicitações só para quem as lê (%s)",
+    async (papel, comSolicitacoes) => {
+      render(<App papelDoAtor={papel} />);
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      fireEvent.click(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
+      const rotulos = within(screen.getByRole("menu"))
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent);
+      expect(rotulos.includes("Solicitações")).toBe(comSolicitacoes);
+      expect(rotulos).toContain("Documentos");
+      expect(rotulos).toHaveLength(comSolicitacoes ? 7 : 6);
+    },
+  );
+
+  it("o atalho empilha a rota da ficha na aba; ponto no mês corrente; a trilha devolve o foco ao botão", async () => {
+    render(<App papelDoAtor="rh" />);
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    const entradas = window.history.length;
+    const botao = within(tabela).getByRole("button", {
+      name: `Ações: ${ana.nome}`,
+    });
+    fireEvent.click(botao);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
+    expect(window.history.length).toBe(entradas + 1);
+    expect(abaSelecionada()).toHaveTextContent("Documentos");
+
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".ficha-colaborador")!,
+      ).getByRole("button", { name: "Colaboradores" }),
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+      ).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: `Ações: ${ana.nome}` }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Registros de ponto" }),
+    );
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(
+      `${rotaDe(ana, "ponto")}/${competenciaDoMesAtual()}`,
+    );
+  });
+
+  it("perfis sem Colaboradores não veem menu nenhum (a rota é recusada)", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    render(<App papelDoAtor="gestor" />);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("table", { name: /^Colaboradores — / }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: /^Ações: / })).toBeNull();
+  });
+});
