@@ -150,6 +150,12 @@
   --estado-ativo-espessura: 3px;
   --estado-selecao-superficie: var(--status-info-surface);
   --foco-anel: var(--focus-width) solid var(--color-action);
+
+  /* T209 — movimento dos painéis laterais: curto e profissional. Quem pede
+     movimento reduzido não vê animação (`Modal.css`). */
+  --movimento-painel-entrada: 200ms;
+  --movimento-painel-saida: 160ms;
+  --movimento-curva: cubic-bezier(0.2, 0, 0, 1);
 }
 
 *,
