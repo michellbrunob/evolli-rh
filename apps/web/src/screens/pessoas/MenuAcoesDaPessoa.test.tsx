@@ -1,116 +1,63 @@
 /**
- * T209 — posição do menu "Ações" da linha (C-4). A tabela rola dentro do
- * próprio quadro e recortaria um menu absoluto: ele é posicionado em relação
- * à janela, abaixo do botão (ou acima, quando não cabe), e acompanha a
- * rolagem de qualquer ancestral e a mudança de tamanho da janela.
+ * T209 — o menu "Ações" da linha sobre o `DropdownMenu` da camada `src/ui`
+ * (Radix). Os contratos de teclado e foco do menu ficam em `src/ui`; aqui, o
+ * que é próprio da linha: o nome, os atalhos na ordem, o portal fora do
+ * quadro que rola e o foco no botão quando o atalho executa.
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
 
-interface Caixa {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-}
-
-let caixaDoBotao: Caixa;
-const ALTURA_DO_MENU = 300;
-
-beforeEach(() => {
-  caixaDoBotao = { top: 100, bottom: 144, left: 200, right: 300 };
-  vi.spyOn(window, "innerWidth", "get").mockReturnValue(375);
-  vi.spyOn(window, "innerHeight", "get").mockReturnValue(800);
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
-    function (this: HTMLElement) {
-      if (this.getAttribute("role") === "menu") {
-        return {
-          top: 0,
-          bottom: ALTURA_DO_MENU,
-          height: ALTURA_DO_MENU,
-        } as DOMRect;
-      }
-      if (this.getAttribute("aria-haspopup") === "menu") {
-        return {
-          ...caixaDoBotao,
-          height: caixaDoBotao.bottom - caixaDoBotao.top,
-        } as DOMRect;
-      }
-      return { top: 0, bottom: 0, left: 0, right: 0, height: 0 } as DOMRect;
-    },
-  );
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-function montar() {
+function montar(aoEscolher = vi.fn()) {
   render(
     <div data-testid="quadro" style={{ overflowX: "auto" }}>
       <MenuAcoesDaPessoa
         nome="Pessoa sintética"
         atalhos={[
-          { id: "dados", rotulo: "Dados do colaborador", aoEscolher: vi.fn() },
-          { id: "ponto", rotulo: "Registros de ponto", aoEscolher: vi.fn() },
+          { id: "dados", rotulo: "Dados do colaborador", aoEscolher },
+          { id: "ponto", rotulo: "Registros de ponto", aoEscolher },
         ]}
       />
     </div>,
   );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Ações: Pessoa sintética" }),
-  );
-  return screen.getByRole("menu");
+  return screen.getByRole("button", { name: "Ações: Pessoa sintética" });
 }
 
-describe("T209 — posição do menu 'Ações' da linha", () => {
-  it("abre abaixo do botão, alinhado à direita dele", () => {
-    const menu = montar();
-    expect(menu.style.top).toBe("148px");
-    expect(menu.style.right).toBe("75px");
+describe("T209 — menu 'Ações' da linha (Radix)", () => {
+  it("botão de menu nomeado pela pessoa, com o ícone decorativo", () => {
+    const botao = montar();
+    expect(botao).toHaveAttribute("aria-haspopup", "menu");
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+    expect(botao.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(botao).toHaveClass("colaboradores-screen__botao-acoes");
   });
 
-  it("sem espaço embaixo, abre acima do botão", () => {
-    caixaDoBotao = { top: 600, bottom: 644, left: 200, right: 300 };
-    const menu = montar();
-    expect(menu.style.top).toBe(`${600 - 4 - ALTURA_DO_MENU}px`);
-  });
-
-  it("sem espaço nem embaixo nem em cima, fica embaixo (a página rola)", () => {
-    caixaDoBotao = { top: 200, bottom: 244, left: 200, right: 300 };
-    vi.spyOn(window, "innerHeight", "get").mockReturnValue(400);
-    const menu = montar();
-    expect(menu.style.top).toBe("248px");
-  });
-
-  it("nunca encosta na borda direita da janela", () => {
-    caixaDoBotao = { top: 100, bottom: 144, left: 300, right: 375 };
-    const menu = montar();
-    expect(menu.style.right).toBe("8px");
-  });
-
-  it("acompanha a rolagem do quadro da tabela e a mudança de tamanho da janela", () => {
-    const menu = montar();
-    caixaDoBotao = { top: 100, bottom: 144, left: 140, right: 240 };
-    act(() => {
-      fireEvent.scroll(screen.getByTestId("quadro"));
+  it("abre num portal, fora do quadro que rola, com os atalhos na ordem", async () => {
+    const botao = montar();
+    fireEvent.keyDown(botao, { key: "Enter" });
+    const menu = await screen.findByRole("menu", {
+      name: "Ações: Pessoa sintética",
     });
-    expect(menu.style.right).toBe("135px");
-
-    caixaDoBotao = { top: 50, bottom: 94, left: 140, right: 240 };
-    act(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
-    expect(menu.style.top).toBe("98px");
+    expect(screen.getByTestId("quadro").contains(menu)).toBe(false);
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Dados do colaborador", "Registros de ponto"]);
+    expect(botao).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("fechado, para de ouvir rolagem e tamanho", () => {
-    const remover = vi.spyOn(window, "removeEventListener");
-    const menu = montar();
-    fireEvent.keyDown(menu, { key: "Escape" });
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(remover).toHaveBeenCalledWith("scroll", expect.any(Function), true);
-    expect(remover).toHaveBeenCalledWith("resize", expect.any(Function));
+  it("o atalho executa com o foco já de volta no botão", async () => {
+    let focoNaAcao: Element | null = null;
+    const botao = montar(
+      vi.fn(() => {
+        focoNaAcao = document.activeElement;
+      }),
+    );
+    fireEvent.keyDown(botao, { key: "Enter" });
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Registros de ponto" }),
+    );
+    expect(focoNaAcao).toBe(botao);
   });
 });

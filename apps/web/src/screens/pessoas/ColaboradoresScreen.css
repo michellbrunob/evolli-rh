@@ -793,8 +793,7 @@
 }
 
 .colaboradores-screen__pagina-numero:focus-visible,
-.colaboradores-screen__botao-acoes:focus-visible,
-.colaboradores-screen__menu-item:focus-visible {
+.colaboradores-screen__botao-acoes:focus-visible {
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
 }
@@ -827,36 +826,8 @@
   border-color: var(--color-action);
 }
 
-/* Preso à janela (a tabela rola e recortaria o menu), numa camada abaixo do
-   cabeçalho fixo do shell, da gaveta, de modais e da guarda. */
-.colaboradores-screen__menu {
-  position: fixed;
-  z-index: 20;
-  display: grid;
-  min-width: 13rem;
-  max-width: calc(100vw - 2 * var(--space-md));
-  padding: var(--space-xxs);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface-canvas);
-}
-
-.colaboradores-screen__menu-item {
-  min-height: var(--touch-target);
-  padding: 0 var(--space-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.colaboradores-screen__menu-item:hover,
-.colaboradores-screen__menu-item:focus {
-  background: var(--status-info-surface);
-}
+/* O menu "Ações" é o DropdownMenu da camada `src/ui` (Radix, em portal):
+   o posicionamento e a camada vivem lá. */
 
 /* ---- T209 — faixa de indicadores e barra de filtros. A faixa reúne os
    totais (com "Ativos" em destaque) e a distribuição por tipo; dois painéis

@@ -202,6 +202,30 @@ describe("T209 — DropdownMenu (Radix)", () => {
     await vi.waitFor(() => expect(gatilho).toHaveFocus());
   });
 
+  it("Tab fecha o menu e devolve o foco ao gatilho", async () => {
+    render(<Menu onEscolher={vi.fn()} />);
+    const gatilho = screen.getByRole("button", { name: "Ações: Pessoa" });
+    gatilho.focus();
+    fireEvent.keyDown(gatilho, { key: "Enter" });
+    const menu = await screen.findByRole("menu");
+    await vi.waitFor(() =>
+      expect(within(menu).getAllByRole("menuitem")[0]).toHaveFocus(),
+    );
+    fireEvent.keyDown(document.activeElement!, { key: "Tab" });
+    await vi.waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await vi.waitFor(() => expect(gatilho).toHaveFocus());
+  });
+
+  it("seta para cima no gatilho abre já no último item", async () => {
+    render(<Menu onEscolher={vi.fn()} />);
+    const gatilho = screen.getByRole("button", { name: "Ações: Pessoa" });
+    gatilho.focus();
+    fireEvent.keyDown(gatilho, { key: "ArrowUp" });
+    const menu = await screen.findByRole("menu");
+    const itens = within(menu).getAllByRole("menuitem");
+    await vi.waitFor(() => expect(itens[2]).toHaveFocus());
+  });
+
   it("o menu vai para um portal: o quadro que rola não o recorta", async () => {
     render(<Menu onEscolher={vi.fn()} />);
     const gatilho = screen.getByRole("button", { name: "Ações: Pessoa" });

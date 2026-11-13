@@ -6841,6 +6841,18 @@ function botaoDeAcoes(nome: string): HTMLElement {
   return screen.getByRole("button", { name: `Ações: ${nome}` });
 }
 
+/** O menu do Radix abre no ponteiro (botão principal), como no navegador. */
+async function abrirMenu(botao: HTMLElement): Promise<HTMLElement> {
+  fireEvent.pointerDown(botao, {
+    button: 0,
+    ctrlKey: false,
+    pointerType: "mouse",
+  });
+  return screen.findByRole("menu", {
+    name: botao.getAttribute("aria-label") ?? "",
+  });
+}
+
 function itensDoMenu(): string[] {
   return within(screen.getByRole("menu"))
     .getAllByRole("menuitem")
@@ -6873,13 +6885,13 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
   it("só atalhos às abas da ficha; Solicitações só para quem as vê", async () => {
     const { unmount } = render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    await abrirMenu(botaoDeAcoes(colaborador1.nome));
     expect(itensDoMenu()).toEqual(ATALHOS_SEM_SOLICITACOES);
     unmount();
 
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} podeVerSolicitacoes />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    await abrirMenu(botaoDeAcoes(colaborador1.nome));
     expect(itensDoMenu()).toEqual([
       ...ATALHOS_SEM_SOLICITACOES,
       "Solicitações",
@@ -6896,33 +6908,32 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     }
   });
 
-  it("abrir foca o primeiro atalho; setas, Home e End percorrem; Escape devolve o foco", async () => {
+  it("teclado abre no primeiro atalho; setas com volta, Home e End; Escape devolve o foco", async () => {
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const botao = botaoDeAcoes(colaborador1.nome);
     botao.focus();
-    fireEvent.click(botao);
-    const menu = screen.getByRole("menu", {
+    fireEvent.keyDown(botao, { key: "Enter" });
+    const menu = await screen.findByRole("menu", {
       name: `Ações: ${colaborador1.nome}`,
     });
     const itens = within(menu).getAllByRole("menuitem");
     expect(botao).toHaveAttribute("aria-expanded", "true");
     await waitFor(() => expect(itens[0]).toHaveFocus());
 
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
-    expect(itens[1]).toHaveFocus();
-    fireEvent.keyDown(menu, { key: "End" });
-    expect(itens[itens.length - 1]).toHaveFocus();
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
-    expect(itens[0]).toHaveFocus();
-    fireEvent.keyDown(menu, { key: "ArrowUp" });
-    expect(itens[itens.length - 1]).toHaveFocus();
-    fireEvent.keyDown(menu, { key: "Home" });
-    expect(itens[0]).toHaveFocus();
+    const tecla = async (key: string, alvo: HTMLElement) => {
+      fireEvent.keyDown(document.activeElement!, { key });
+      await waitFor(() => expect(alvo).toHaveFocus());
+    };
+    await tecla("ArrowDown", itens[1]!);
+    await tecla("End", itens[itens.length - 1]!);
+    await tecla("ArrowDown", itens[0]!);
+    await tecla("ArrowUp", itens[itens.length - 1]!);
+    await tecla("Home", itens[0]!);
 
-    fireEvent.keyDown(menu, { key: "Escape" });
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(botao).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(botao).toHaveFocus());
     expect(botao).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -6930,31 +6941,29 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const botao = botaoDeAcoes(colaborador1.nome);
+    botao.focus();
     fireEvent.keyDown(botao, { key: "ArrowUp" });
-    let itens = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    let itens = within(await screen.findByRole("menu")).getAllByRole(
+      "menuitem",
+    );
     await waitFor(() => expect(itens[itens.length - 1]).toHaveFocus());
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     fireEvent.keyDown(botao, { key: "ArrowDown" });
-    itens = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    itens = within(await screen.findByRole("menu")).getAllByRole("menuitem");
     await waitFor(() => expect(itens[0]).toHaveFocus());
   });
 
-  it("clique fora e Tab fecham o menu; só um menu aberto por vez", async () => {
+  it("clique fora fecha o menu; só um menu aberto por vez", async () => {
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    fireEvent.pointerDown(document.body);
-    expect(screen.queryByRole("menu")).toBeNull();
+    await abrirMenu(botaoDeAcoes(colaborador1.nome));
+    fireEvent.pointerDown(document.body, { button: 0, pointerType: "mouse" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
-    expect(screen.queryByRole("menu")).toBeNull();
-
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
-    fireEvent.pointerDown(botaoDeAcoes(colaborador2.nome));
-    fireEvent.click(botaoDeAcoes(colaborador2.nome));
-    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    await abrirMenu(botaoDeAcoes(colaborador1.nome));
+    await abrirMenu(botaoDeAcoes(colaborador2.nome));
+    await waitFor(() => expect(screen.getAllByRole("menu")).toHaveLength(1));
     expect(screen.getByRole("menu")).toHaveAccessibleName(
       `Ações: ${colaborador2.nome}`,
     );
@@ -6977,11 +6986,11 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
       ["Solicitações", "solicitacoes"],
     ];
     for (const [rotulo, aba] of esperado) {
-      fireEvent.click(botao);
+      await abrirMenu(botao);
       fireEvent.click(screen.getByRole("menuitem", { name: rotulo }));
-      expect(screen.queryByRole("menu")).toBeNull();
       expect(botao).toHaveFocus();
       expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador1.id, aba);
+      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     }
     expect(onAbrirFicha).toHaveBeenCalledTimes(esperado.length);
   });
@@ -6990,22 +6999,28 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     const onAbrirFicha = vi.fn();
     render(<ColaboradoresScreen onAbrirFicha={onAbrirFicha} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.keyDown(botaoDeAcoes(colaborador2.nome), { key: "ArrowDown" });
-    const menu = screen.getByRole("menu");
-    fireEvent.keyDown(menu, { key: "End" });
+    const botao = botaoDeAcoes(colaborador2.nome);
+    botao.focus();
+    fireEvent.keyDown(botao, { key: "ArrowDown" });
+    const menu = await screen.findByRole("menu");
     const ultimo = within(menu).getByRole("menuitem", {
       name: "Registros de ponto",
     });
-    expect(ultimo).toHaveFocus();
-    // Botão nativo: Enter vira clique.
-    fireEvent.click(ultimo);
-    expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador2.id, "ponto");
+    await waitFor(() =>
+      expect(within(menu).getAllByRole("menuitem")[0]).toHaveFocus(),
+    );
+    fireEvent.keyDown(document.activeElement!, { key: "End" });
+    await waitFor(() => expect(ultimo).toHaveFocus());
+    fireEvent.keyDown(ultimo, { key: "Enter" });
+    await waitFor(() =>
+      expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador2.id, "ponto"),
+    );
   });
 
   it("no contêiner de Pessoas, o atalho abre a ficha já na aba escolhida", async () => {
     render(<ComFicha />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(botaoDeAcoes(colaborador1.nome));
+    await abrirMenu(botaoDeAcoes(colaborador1.nome));
     fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
     const ficha = await esperarFicha();
     expect(
@@ -7056,9 +7071,12 @@ describe("T209 — contrato de CSS da listagem operacional e do menu (375 px)", 
     expect(bloco).toMatch(
       /\.colaboradores-screen__pagina-numero\[aria-current="page"\] \{[^}]*font-weight: var\(--weight-strong\);[^}]*border-color: var\(--color-action\);/,
     );
-    expect(bloco).toMatch(
-      /\.colaboradores-screen__menu \{[^}]*position: fixed;[^}]*z-index: 20;[^}]*max-width: calc\(100vw - 2 \* var\(--space-md\)\);/,
-    );
+    // O menu é o da camada `src/ui` (portal do Radix): cabe na tela e fica
+    // numa camada abaixo do cabeçalho fixo (z-index 20 < 30).
+    const menu = readFileSync("src/ui/DropdownMenu.tsx", "utf8");
+    expect(menu).toContain("ev:z-20");
+    expect(menu).toContain("ev:max-w-[calc(100vw-2*var(--space-md))]");
+    expect(menu).toContain("<RadixMenu.Portal>");
   });
 });
 

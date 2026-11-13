@@ -2802,6 +2802,15 @@ describe("T204 — Nova solicitação na ficha, no shell", () => {
 // T209 — listagem operacional no shell: o tamanho da página na URL (C-2) e o
 // menu "Ações" da linha abrindo a ficha na aba escolhida, por papel (C-4).
 // ---------------------------------------------------------------------------
+/** T209 — o menu "Ações" (Radix) abre no ponteiro, como no navegador. */
+function abrirMenuDaLinha(botao: HTMLElement) {
+  fireEvent.pointerDown(botao, {
+    button: 0,
+    ctrlKey: false,
+    pointerType: "mouse",
+  });
+}
+
 describe("T209 — tamanho da página e atalhos da linha no shell", () => {
   const seletorDoTamanho = () =>
     screen.getByRole("combobox", { name: "Itens por página" });
@@ -2871,10 +2880,10 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
-      fireEvent.click(
+      abrirMenuDaLinha(
         within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
       );
-      const rotulos = within(screen.getByRole("menu"))
+      const rotulos = within(await screen.findByRole("menu"))
         .getAllByRole("menuitem")
         .map((item) => item.textContent);
       expect(rotulos.includes("Solicitações")).toBe(comSolicitacoes);
@@ -2892,8 +2901,10 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
     const botao = within(tabela).getByRole("button", {
       name: `Ações: ${ana.nome}`,
     });
-    fireEvent.click(botao);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
+    abrirMenuDaLinha(botao);
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Documentos" }),
+    );
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
     expect(empilhar).toHaveBeenCalledWith(
@@ -2916,9 +2927,11 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       ).toHaveFocus(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: `Ações: ${ana.nome}` }));
+    abrirMenuDaLinha(
+      screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
     fireEvent.click(
-      screen.getByRole("menuitem", { name: "Registros de ponto" }),
+      await screen.findByRole("menuitem", { name: "Registros de ponto" }),
     );
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(
