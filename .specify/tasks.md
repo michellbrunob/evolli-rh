@@ -3426,7 +3426,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         C-1 a C-15 aprovadas em 2026-11-13, com a C-10 corrigida (sem data de nascimento na
         planilha); o Bloco C (importação CSV) está pausado porque a admissão exige a data de
         nascimento (seção 13 do dossiê). Blocos A (listagem operacional) e B (ações por pessoa)
-        em implementação, sem push, PR, Ready ou merge até a validação visual.
+        implementados e validados localmente (seções 14 a 16), sem push, PR, Ready ou merge até a
+        validação visual.
+      - **Entrega:** tamanho da página 20/50/100 na URL (`tamanho`), paginação numerada com
+        primeira e última, "Mostrando X–Y de Z", cancelamento das leituras antigas, aviso de
+        auditoria fiel; menu "Ações" por linha com atalhos às abas da ficha que o papel vê. Só
+        web; sem API, migration, RBAC ou dependência.
+      - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
         abas, busca, filtros, paginação, indicadores, tabela, ficha, permissões, isolamento por

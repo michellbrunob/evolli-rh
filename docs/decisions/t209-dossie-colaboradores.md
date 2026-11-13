@@ -3,8 +3,9 @@
 - **Estado:** **em implementação local**. As decisões C-1 a C-15 (seção 10) foram
   **aprovadas em 2026-11-13**, com a C-10 corrigida (seção 13). O **Bloco C (importação CSV)
   está pausado**: o contrato atual de admissão exige a data de nascimento, que a C-10 corrigida
-  exclui da planilha (seção 13.2). A T209 segue com os **Blocos A e B**, sem push, PR, Ready ou
-  merge até a validação visual.
+  exclui da planilha (seção 13.2). Os **Blocos A e B estão implementados e validados
+  localmente** (seções 14 a 16), em commits locais, sem push, PR, Ready ou merge, à espera da
+  validação visual.
 - **Base:** `main` em `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201).
 - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma **área de trabalho do RH e
   do DP**: listagem operacional, atalhos por pessoa e entrada de várias pessoas de uma vez, numa
@@ -346,3 +347,73 @@ antes, e levar à validação visual. O Bloco C só volta com decisão própria 
   obrigatoriedade nem coluna de nascimento. O Bloco C volta só com decisão própria: perfil
   opcional na admissão (mudança de API e de regra da T177/T179) ou outra solução aprovada. A
   entrada "Importar planilha" do painel continua indisponível, com o motivo de hoje.
+
+## 14. Implementação (Blocos A e B)
+
+Só web; **sem API, migration, RBAC, auditoria nova ou dependência**.
+
+- **Tamanho da página (C-2):** seletor "Itens por página" (20, 50, 100) no rodapé da tabela;
+  o estado da listagem ganhou `tamanho`, escrito na URL como `tamanho` só quando difere de 20
+  e na ordem canônica (`aba`, `pagina`, `tamanho`, `departamento`, `cargo`, `tipo`). Valor fora
+  dos três cai em 20 e a URL é corrigida no lugar. Trocar o tamanho volta à página 1 com aba,
+  filtros e busca mantidos. A aba Jornada não leva tamanho (paginação própria).
+- **Paginação (C-3):** primeira, anterior, janela de até cinco números (o atual com
+  `aria-current="page"`), próxima e última; "Mostrando X–Y de Z" com o total do servidor. Os
+  botões usam `aria-disabled` nos extremos e durante a carga (o foco não se perde); clicar na
+  página atual não relê.
+- **Cancelamento:** cada leitura da listagem cancela a anterior (`AbortController`) e
+  desmontar a tela (troca de empresa, saída do módulo) cancela a que estiver em voo; a leitura
+  mínima dos totais da aba Jornada também. A sequência de pedidos continua descartando resposta
+  antiga.
+- **Aviso de auditoria (C-6):** "Admissões, alterações e a leitura de contatos geram trilha de
+  auditoria; o suporte técnico apenas consulta."
+- **Ações por pessoa (C-4):** coluna "Ações" com um botão de menu por linha ("Ações: <nome>"),
+  só quando a ficha pode ser aberta. Os atalhos são as abas da ficha que o papel vê, na ordem
+  da ficha; "Solicitações" só para quem a lê (RH e master técnico). Teclado: setas (com
+  volta), Home, End, Enter; Escape fecha e devolve o foco ao botão; Tab, clique fora ou foco
+  fora fecham. Escolher devolve o foco ao botão e abre a ficha na aba (ponto no mês corrente);
+  na volta da ficha, o foco está no botão. O menu é preso à janela (a tabela rola e o
+  recortaria), abaixo do cabeçalho fixo, e acompanha a rolagem e o tamanho da janela.
+- **Arquivos:** `apps/web/src/app/rotasDoShell.ts`, `apps/web/src/app/App.tsx`,
+  `apps/web/src/api/colaboradoresClient.ts`, `apps/web/src/screens/pessoas/ColaboradoresScreen.tsx`
+  e `.css`, `apps/web/src/screens/pessoas/MenuAcoesDaPessoa.tsx` (novo) e
+  `apps/web/src/screens/pessoas/PessoasScreen.tsx`.
+
+## 15. Validação
+
+- **Testes que falham antes:** os 25 testes de tela dos Blocos A e B foram escritos antes da
+  implementação e falharam; depois, testes de rota, cliente, funções puras, posição do menu e
+  integração com o shell (por papel).
+- **Mutações:** 38 mutações nas regras de URL, tamanho, paginação, intervalo, cancelamento,
+  aviso, atalhos por papel, teclado e foco do menu, abertura da ficha na aba e cliente — todas
+  detectadas.
+- **Bateria:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
+- **Navegador (prévia local com dados sintéticos):**
+  - RH: 20, 50 e 100 por página com a URL canônica; páginas numeradas, primeira e última;
+    "Mostrando 101–136 de 136"; busca mantida ao paginar e fora da URL; requisição substituída
+    cancelada na rede; menu por teclado e mouse, Escape, clique fora; atalho "Documentos" abrindo
+    a ficha na aba e a volta devolvendo o foco ao botão "Ações", com busca, aba e tamanho
+    mantidos;
+  - DP: seis atalhos, sem Solicitações; 100 por página;
+  - master técnico: global ("no seu escopo"), só leitura, sete atalhos; com troca de empresa
+    pelo seletor, a listagem volta ao estado inicial seguro da empresa escolhida;
+  - gestor: sem Colaboradores (vai a Minha equipe), sem menu;
+  - RH com duas empresas: a troca mostra só a empresa nova, com o estado inicial;
+  - 375 px: sem rolagem horizontal da página; rodapé, paginação e menu dentro da tela; alvos de
+    44 px.
+- **Massa sintética:** 130 admissões sintéticas foram criadas pela API, como RH, no banco
+  isolado da prévia, para exercitar páginas de 50 e 100.
+
+## 16. Limites conhecidos
+
+- **Bloco C pausado** (seção 13.2); "Importar planilha" segue indisponível no painel.
+- **Menu e rolagem no navegador:** o acompanhamento da rolagem horizontal da tabela foi
+  comprovado por teste unitário com geometria simulada; na prévia, o painel do navegador estava
+  oculto (sem pintura nem eventos de rolagem), e as capturas de tela não foram feitas.
+- **Troca de empresa** volta a listagem ao estado inicial (tamanho 20), como já fazia com aba,
+  filtros e página (T189).
+- **Catálogos de filtro** seguem com uma página de 100 e sem cancelamento próprio (só a
+  marcação de vigência), como antes.
+- **Ambiente local (não é do produto):** com `core.autocrlf`, os arquivos da worktree saem em
+  CRLF; dois testes de contrato de CSS do shell (T206), que procuram `\n`, falham nessa
+  condição e passam com o arquivo em LF, como no repositório e na CI.
