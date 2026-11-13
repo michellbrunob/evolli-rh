@@ -6,11 +6,11 @@
   **base existente, não a entrega final**. As decisões MPA-1 a MPA-11 (seção 21.8) foram
   aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22). A ampliação — nome de exibição
   editável, com migration, `PATCH /v1/users/me` e auditoria — está **implementada e validada
-  localmente** (seções 23 a 26), em commits locais, sem push: a PR #201 ainda aponta para o código
-  anterior à ampliação. A **foto de perfil** (decisões FP-1 a FP-8, aprovadas em 2026-11-13;
-  [ADR 0018](../adr/0018-foto-de-perfil-da-conta-no-postgresql.md)) está **implementada e
-  validada localmente** (seções 27 e 28), também sem push, com a **validação visual aprovada em
-  2026-11-13** (seção 29). As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
+  localmente** (seções 23 a 26). A **foto de perfil** (decisões FP-1 a FP-8, aprovadas em
+  2026-11-13; [ADR 0018](../adr/0018-foto-de-perfil-da-conta-no-postgresql.md)) está
+  **implementada e validada localmente** (seções 27 e 28). A **validação visual do nome de
+  exibição e da foto foi aprovada em 2026-11-13** (seção 29), e o envio da ampliação à PR #201,
+  em Draft, foi autorizado na mesma data. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -1003,9 +1003,8 @@ Nenhum erro de script no console.
 ## 29. Validação visual da foto aprovada (2026-11-13)
 
 - **Aprovação:** a validação visual humana da foto de perfil foi aprovada em 2026-11-13, na
-  prévia local com dados sintéticos, sobre o código desta branch. A ampliação do nome de
-  exibição foi apresentada para validação visual em 2026-11-12; a aprovação registrada nesta
-  etapa é a da foto.
+  prévia local com dados sintéticos, sobre o código desta branch. A validação visual do nome de
+  exibição (apresentada em 2026-11-12) também foi aprovada em 2026-11-13.
 - **Perfis e cenários validados no navegador** (detalhes na seção 28.4):
   - **RH:** envio de PNG com prévia e corte central; foto regravada em 256 × 256 com os
     cabeçalhos de imagem privada; troca por JPEG; arquivo falso recusado pelo servidor; remoção
@@ -1037,5 +1036,5 @@ Nenhum erro de script no console.
   - 89 mutações, todas detectadas;
   - lint sem aviso, typecheck, build, Prettier, `spec:check`, prévia do squash e
     `git diff --check` verdes.
-- **Entrega:** a ampliação (nome de exibição e foto) está em commits locais; a PR #201 continua
-  em Draft no estado remoto anterior à ampliação. Push, Ready for review e merge só com ordem.
+- **Entrega:** o envio da ampliação (nome de exibição e foto) à PR #201, que continua em Draft,
+  foi autorizado em 2026-11-13. Ready for review e merge só com ordem.

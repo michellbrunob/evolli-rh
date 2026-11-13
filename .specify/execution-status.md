@@ -3181,8 +3181,8 @@ resolvida no primeiro commit da T208.
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
 decisões MPA-1 a MPA-11, aprovadas em 2026-11-12 com a MPA-5 corrigida (seção 22), estão na seção 21 do
-[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); a ampliação está implementada e validada localmente (seções 23 a 26), em commits locais, sem
-push. A referência visual foi usada só como inspiração local e não é registrada.
+[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); a ampliação está implementada e validada localmente (seções 23 a 26), com a validação visual
+aprovada em 2026-11-13. A referência visual foi usada só como inspiração local e não é registrada.
 
 **Ampliação:** nome de exibição editável — migration aditiva, `PATCH /v1/users/me` com
 `own_account`/`manage`, concorrência otimista e auditoria sem conteúdo; tela em identificação,
@@ -3213,13 +3213,15 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Foto de perfil:** decisões FP-1 a FP-8 aprovadas em 2026-11-13
 ([ADR 0018](../docs/adr/0018-foto-de-perfil-da-conta-no-postgresql.md)); implementada e validada
-localmente, com a validação visual aprovada em 2026-11-13, sem push (seções 27 a 29 do
-dossiê). Validação local: web 133 arquivos, 3797 testes;
+localmente, com a validação visual aprovada em 2026-11-13 (seções 27 a 29 do dossiê). Validação local: web 133 arquivos, 3797 testes;
 API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes;
 scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
 `spec:check`, prévia do squash e `git diff --check` verdes.
 
-**Pendente:** push da ampliação (nome de exibição e foto) para a PR #201 e revisão da
+**Envio:** a ampliação (nome de exibição e foto) vai à PR #201, em Draft, por ordem de
+2026-11-13.
+
+**Pendente:** revisão da
 PR #201; Ready for review e merge só com ordem.
 
 **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
