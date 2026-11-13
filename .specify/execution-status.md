@@ -3172,11 +3172,11 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
+## Configurações: Meu Perfil — T208 (integrada)
 
-| Tarefa | Estado                                                           | Resultado principal                                                                                                                         |
-| ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição e foto de perfil) validada localmente. |
+| Tarefa | Estado                                    | Resultado principal                                                                                      |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| T208   | **Integrada** (PR #201, squash `5b4c498`) | Configurações › Meu perfil para todos os papéis, com nome de exibição editável e foto de perfil privada. |
 
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
@@ -3218,13 +3218,12 @@ API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes
 scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
 `spec:check`, prévia do squash e `git diff --check` verdes.
 
-**Envio:** a ampliação (nome de exibição e foto) vai à PR #201, em Draft, por ordem de
-2026-11-13.
+**Observação de relatório:** a integração funcional da T208 está concluída (PR #201, squash
+`5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2`, CI de push 3/3 verde, run 43442498632; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T209.
 
-**Pendente:** revisão da
-PR #201; Ready for review e merge só com ordem.
-
-**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
+**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Próxima ação autorizável
 

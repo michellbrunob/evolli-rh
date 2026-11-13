@@ -3362,10 +3362,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         do squash e `git diff --check` verdes.
 
 105.  **T208 - Configurações: Meu Perfil**
-      - **Estado:** **em implementação, ampliada antes do Ready por decisão de produto**; a
-        entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
-        leitura abaixo (validado localmente, validação visual aprovada em 2026-11-12) é a base
-        existente, não a entrega final.
+      - **Estado:** **integrada** em `main` pela PR #201, squash
+        `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2`, com a CI de push 3/3 verde (run
+        43442498632); branch remota preservada. Ampliada antes do Ready por decisão de produto: o
+        Meu Perfil somente leitura (validação visual aprovada em 2026-11-12) ganhou o nome de
+        exibição e a foto de perfil (validação visual aprovada em 2026-11-13).
       - **Ampliação (seção 21 do dossiê, em levantamento):** mapa de nome de exibição, foto,
         cargo, telefone, e-mail e confirmação, data de alteração, senha, Google, segundo fator e
         sessões por domínio (conta, colaborador, empresa e autenticação), com privacidade, LGPD,
@@ -3417,7 +3418,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
         todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
         `git diff --check` verdes.
-      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
+      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Regra obrigatória para as próximas tarefas
 
