@@ -125,6 +125,7 @@ function contados(
   const ativosPorTipo = {
     clt: 0,
     estagio: 0,
+    aprendiz: 0,
     pj: 0,
     temporario: 0,
     outro_controlado: 0,
@@ -4582,6 +4583,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     ativosPorTipo: {
       clt: 5,
       estagio: 0,
+      aprendiz: 0,
       pj: 2,
       temporario: 0,
       outro_controlado: 0,
@@ -7075,6 +7077,7 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     ativosPorTipo: {
       clt: 5,
       estagio: 0,
+      aprendiz: 0,
       pj: 2,
       temporario: 0,
       outro_controlado: 0,
@@ -7265,6 +7268,105 @@ describe("T209 — contrato de CSS da faixa de indicadores e da barra de filtros
     expect(bloco).toMatch(
       /\.colaboradores-screen__filtros > \.colaboradores-screen__busca \{[^}]*flex: 2 1 18rem;/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — Aprendiz como tipo de vínculo (fatia mínima): filtro, distribuição,
+// coluna da tabela e URL, logo depois de Estágio. Nenhuma regra legal.
+// ---------------------------------------------------------------------------
+describe("T209 — Aprendiz na listagem de Colaboradores", () => {
+  const APRENDIZ = listado(
+    { id: "a1a1a1a1-0000-4000-8000-000000000001", nome: "Teste Aprendiz Um" },
+    [
+      {
+        ...vinculoListado(
+          "a1a1a1a1-0000-4000-8000-0000000000v1",
+          "APR-001",
+          "ativo",
+          "2026-02-02",
+        ),
+        tipo: "aprendiz",
+      },
+    ],
+  );
+
+  it("o filtro 'Tipo de vínculo' oferece Aprendiz depois de Estágio", async () => {
+    render(<ColaboradoresScreen />);
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    expect(
+      within(screen.getByLabelText("Tipo de vínculo"))
+        .getAllByRole("option")
+        .map((o) => [(o as HTMLOptionElement).value, o.textContent]),
+    ).toEqual([
+      ["", "Todos os tipos"],
+      ["clt", "CLT"],
+      ["estagio", "Estágio"],
+      ["aprendiz", "Aprendiz"],
+      ["pj", "PJ"],
+      ["temporario", "Temporário"],
+      ["outro_controlado", "Outro controlado"],
+    ]);
+  });
+
+  it("filtrar por Aprendiz sobe na URL e vai ao servidor como tipoVinculo", async () => {
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={onMudanca} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
+      target: { value: "aprendiz" },
+    });
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      tipo: "aprendiz",
+    });
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        expect.objectContaining({ tipoVinculo: "aprendiz" }),
+        expect.anything(),
+      ),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Remover filtro de tipo de vínculo: Aprendiz",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("a coluna Tipo e a distribuição mostram 'Aprendiz', com a cor própria", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([APRENDIZ]),
+      contadores: {
+        ...contados([APRENDIZ]),
+        ativosPorTipo: {
+          clt: 2,
+          estagio: 1,
+          aprendiz: 3,
+          pj: 0,
+          temporario: 0,
+          outro_controlado: 0,
+        },
+      },
+    });
+    render(<ColaboradoresScreen />);
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    const linha = within(tabela).getByText("Teste Aprendiz Um").closest("tr")!;
+    expect(within(linha).getByText("Aprendiz")).toBeInTheDocument();
+    const legenda = document.querySelector(
+      ".colaboradores-screen__legenda-tipos",
+    )!;
+    expect(
+      [...legenda.querySelectorAll("li")].map((li) => li.textContent),
+    ).toEqual(["CLT: 2", "Estágio: 1", "Aprendiz: 3"]);
+    expect(
+      document.querySelector(
+        ".colaboradores-screen__barra-tipos .colaboradores-screen__barra-tipo--aprendiz",
+      ),
+    ).not.toBeNull();
   });
 });
 

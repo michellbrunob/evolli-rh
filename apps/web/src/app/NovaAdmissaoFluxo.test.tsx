@@ -163,6 +163,7 @@ beforeEach(() => {
       ativosPorTipo: {
         clt: 0,
         estagio: 0,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
@@ -802,6 +803,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
         ativosPorTipo: {
           clt: 0,
           estagio: 0,
+          aprendiz: 0,
           pj: 0,
           temporario: 0,
           outro_controlado: 0,

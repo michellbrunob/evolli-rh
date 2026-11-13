@@ -986,6 +986,8 @@ enum SituacaoColaborador {
 enum TipoVinculo {
   clt
   estagio
+  /// T209 — Aprendiz (fatia mínima, AP-1 a AP-9): só o tipo, sem regra legal.
+  aprendiz
   pj
   temporario
   outro_controlado

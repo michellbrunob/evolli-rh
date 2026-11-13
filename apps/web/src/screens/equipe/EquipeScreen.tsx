@@ -115,11 +115,12 @@ const VARIANTE_SITUACAO: Record<string, StatusVariant> = {
   encerrado: "neutral",
 };
 
-// Valores do enum `TipoVinculo`: clt | estagio | pj | temporario |
-// outro_controlado.
+// Valores do enum `TipoVinculo`: clt | estagio | aprendiz (T209) | pj |
+// temporario | outro_controlado.
 const ROTULO_TIPO: Record<string, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro (controlado)",

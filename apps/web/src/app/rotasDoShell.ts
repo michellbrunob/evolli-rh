@@ -192,6 +192,8 @@ export type AbaDaListagem = (typeof ABAS_DA_LISTAGEM)[number];
 export const TIPOS_DE_VINCULO = [
   "clt",
   "estagio",
+  // T209 — Aprendiz, logo depois de Estágio (AP-8).
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",

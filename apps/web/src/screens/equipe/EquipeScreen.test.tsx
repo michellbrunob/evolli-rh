@@ -848,7 +848,8 @@ describe("acessibilidade", () => {
     // `afastado` e `desligado` — nenhum deles existe. O resultado foi a tela
     // mostrando o enum cru "clt". Enum do schema:
     //   SituacaoVinculo = previsto | ativo | encerrado
-    //   TipoVinculo     = clt | estagio | pj | temporario | outro_controlado
+    //   TipoVinculo     = clt | estagio | aprendiz | pj | temporario |
+    //                     outro_controlado (T209 — Aprendiz entrou no enum)
     const fonte = readFileSync("src/screens/equipe/EquipeScreen.tsx", "utf8");
     const bloco = (nome: string) =>
       fonte.slice(
@@ -869,13 +870,14 @@ describe("acessibilidade", () => {
     for (const v of [
       "clt",
       "estagio",
+      "aprendiz",
       "pj",
       "temporario",
       "outro_controlado",
     ]) {
       expect(tipo).toContain(`${v}:`);
     }
-    for (const v of ["efetivo", "aprendiz"]) {
+    for (const v of ["efetivo", "jovem_aprendiz"]) {
       expect(tipo).not.toContain(`${v}:`);
     }
   });

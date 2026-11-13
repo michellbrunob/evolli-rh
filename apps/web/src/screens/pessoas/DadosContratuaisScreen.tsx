@@ -77,6 +77,7 @@ type StatusCarregamento = "carregando" | "erro" | "pronto";
 const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro (controlado)",

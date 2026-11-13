@@ -57,6 +57,7 @@ function listagem(itens: ColaboradorApi[]): ListagemColaboradoresApi {
       ativosPorTipo: {
         clt: 0,
         estagio: 0,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
@@ -748,6 +749,7 @@ function servidorComCentoECinquenta() {
         ativosPorTipo: {
           clt: filtrada.length,
           estagio: 0,
+          aprendiz: 0,
           pj: 0,
           temporario: 0,
           outro_controlado: 0,

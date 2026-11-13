@@ -76,6 +76,7 @@ function contadores(
     ativosPorTipo: {
       clt: 9,
       estagio: 3,
+      aprendiz: 0,
       pj: 0,
       temporario: 0,
       outro_controlado: 0,
@@ -401,6 +402,7 @@ describe("T205 — leitura e resumo (E-2)", () => {
           ativosPorTipo: {
             clt: 0,
             estagio: 0,
+            aprendiz: 0,
             pj: 0,
             temporario: 0,
             outro_controlado: 0,
@@ -1178,6 +1180,54 @@ describe("T207 — Visão Geral: cards honestos (V-2) e Como calculamos (V-5)", 
 });
 
 describe("T207 — abas Pessoas e Movimentação", () => {
+  it("T209 — Aprendiz na distribuição (link para a listagem filtrada) e na tabela, depois de Estágio", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      listagem(
+        contadores({
+          ativos: 16,
+          ativosPorTipo: {
+            clt: 9,
+            estagio: 3,
+            aprendiz: 4,
+            pj: 0,
+            temporario: 0,
+            outro_controlado: 0,
+          },
+        }),
+      ),
+    );
+    const onAbrirListagem = vi.fn();
+    render(<Tela aba="pessoas" onAbrirListagem={onAbrirListagem} />);
+    await lido();
+    const painel = screen.getByRole("tabpanel");
+    const links = within(painel).getAllByRole("link");
+    expect(links.map((l) => l.textContent)).toEqual([
+      "CLT: 9 pessoas (56%)",
+      "Estágio: 3 pessoas (19%)",
+      "Aprendiz: 4 pessoas (25%)",
+    ]);
+    fireEvent.click(links[2]!);
+    expect(onAbrirListagem).toHaveBeenLastCalledWith({
+      ...ESTADO_INICIAL_DA_LISTAGEM,
+      aba: "ativos",
+      tipo: "aprendiz",
+    });
+    const tabela = within(painel).getByRole("table", {
+      name: "Pessoas ativas hoje por tipo de vínculo",
+    });
+    const linhas = within(tabela)
+      .getAllByRole("row")
+      .map((r) => [...r.querySelectorAll("th, td")].map((c) => c.textContent));
+    expect(linhas.slice(1, 4)).toEqual([
+      ["CLT", "9", "56%"],
+      ["Estágio", "3", "19%"],
+      ["Aprendiz", "4", "25%"],
+    ]);
+    expect(
+      painel.querySelector(".dashboard__barra-tipo--aprendiz"),
+    ).not.toBeNull();
+  });
+
   it("Pessoas: só a distribuição por tipo de vínculo, com tabela equivalente", async () => {
     render(<Tela aba="pessoas" />);
     await lido();

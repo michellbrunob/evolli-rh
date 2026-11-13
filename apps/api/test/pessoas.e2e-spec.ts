@@ -1216,7 +1216,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           nome: "Pessoa Sintetica Nove",
           empresaId: empresaA,
           matricula: "MAT-0009",
-          tipo: "aprendiz",
+          // T209 — "aprendiz" entrou no catálogo; fora dele, segue 400.
+          tipo: "jovem_aprendiz",
           dataAdmissao: ADMISSAO,
           motivoCodigo: "admissao_inicial",
           departamentoId: departamentoA,

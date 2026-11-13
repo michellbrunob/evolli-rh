@@ -508,6 +508,11 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   background: var(--evolli-verde-agua-escuro);
 }
 
+/* T209 — Aprendiz, com a cor própria do tipo. */
+.dashboard__barra-tipo--aprendiz {
+  background: var(--cor-tipo-aprendiz);
+}
+
 .dashboard__barra-tipo--pj {
   background: var(--evolli-marinho);
 }

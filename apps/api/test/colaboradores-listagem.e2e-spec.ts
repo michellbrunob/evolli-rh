@@ -1568,6 +1568,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         ativosPorTipo: {
           clt: 1,
           estagio: 1,
+          aprendiz: 0,
           pj: 1,
           temporario: 1,
           outro_controlado: 0,
@@ -1743,7 +1744,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
     it("grupo ou tipo fora do controlado: 400, sem consulta", async () => {
       await get("/v1/colaboradores?grupo=inativos", rhD).expect(400);
       await get("/v1/colaboradores?grupo=ATIVOS", rhD).expect(400);
-      await get("/v1/colaboradores?tipoVinculo=aprendiz", rhD).expect(400);
+      // T209 — "aprendiz" passou a ser controlado; variações seguem 400.
+      await get("/v1/colaboradores?tipoVinculo=aprendizes", rhD).expect(400);
       await get("/v1/colaboradores?tipoVinculo=CLT", rhD).expect(400);
     });
 

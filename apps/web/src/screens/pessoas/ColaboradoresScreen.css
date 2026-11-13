@@ -169,6 +169,11 @@
   background: var(--status-success-ink);
 }
 
+/* T209 — Aprendiz, com a cor própria do tipo. */
+.colaboradores-screen__barra-tipo--aprendiz {
+  background: var(--cor-tipo-aprendiz);
+}
+
 .colaboradores-screen__barra-tipo--pj {
   background: var(--status-warning-ink);
 }

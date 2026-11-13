@@ -77,6 +77,7 @@ beforeEach(() => {
       ativosPorTipo: {
         clt: 2,
         estagio: 1,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,

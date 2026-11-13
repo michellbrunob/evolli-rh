@@ -594,6 +594,33 @@ describe("Nova admissão — página própria", () => {
     ]);
   });
 
+  it("T209 — 'Tipo de vínculo' oferece Aprendiz logo depois de Estágio, sem campo extra", async () => {
+    montar();
+    await aguardarEmpresa();
+    // As etapas seguintes ficam montadas, ocultas: as opções são lidas no DOM.
+    expect(
+      [...tipo().querySelectorAll("option")].map((o) => [
+        o.value,
+        o.textContent,
+      ]),
+    ).toEqual([
+      ["", "Selecione…"],
+      ["clt", "CLT"],
+      ["estagio", "Estágio"],
+      ["aprendiz", "Aprendiz"],
+      ["pj", "PJ"],
+      ["temporario", "Temporário"],
+      ["outro_controlado", "Outro controlado"],
+    ]);
+    const campos = document.querySelectorAll("input, select, textarea").length;
+    fireEvent.change(tipo(), { target: { value: "aprendiz" } });
+    expect(tipo()).toHaveValue("aprendiz");
+    // Nenhum campo novo aparece para Aprendiz (sem prazo, programa ou cota).
+    expect(document.querySelectorAll("input, select, textarea").length).toBe(
+      campos,
+    );
+  });
+
   it("sem outro select inventado: estado civil, escolaridade, cidade e estado são texto", async () => {
     montar();
     await aguardarEmpresa();

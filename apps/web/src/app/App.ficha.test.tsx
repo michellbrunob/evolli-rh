@@ -214,6 +214,7 @@ beforeEach(() => {
       ativosPorTipo: {
         clt: 2,
         estagio: 0,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
@@ -780,6 +781,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
         ativosPorTipo: {
           clt: 1,
           estagio: 0,
+          aprendiz: 0,
           pj: 1,
           temporario: 0,
           outro_controlado: 0,
@@ -1298,6 +1300,7 @@ describe("T200 — guarda de saída no App", () => {
           ativosPorTipo: {
             clt: 2,
             estagio: 0,
+            aprendiz: 0,
             pj: 0,
             temporario: 0,
             outro_controlado: 0,

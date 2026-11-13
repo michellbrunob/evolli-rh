@@ -42,6 +42,8 @@ const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 export const TIPOS_VINCULO = [
   "clt",
   "estagio",
+  // T209 — Aprendiz, logo depois de Estágio; sem campo nem regra extra.
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",

@@ -7,8 +7,9 @@ import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
 
+/** T209 — Aprendiz entrou no catálogo, logo depois de Estágio. */
 export type TipoVinculo =
-  "clt" | "estagio" | "pj" | "temporario" | "outro_controlado";
+  "clt" | "estagio" | "aprendiz" | "pj" | "temporario" | "outro_controlado";
 
 export type SituacaoColaborador = "ativo" | "inativo";
 

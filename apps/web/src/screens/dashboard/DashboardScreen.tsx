@@ -96,6 +96,7 @@ export const LIMITE_DA_SERIE_TEXTO = "2.000";
 const TIPOS: readonly TipoVinculo[] = [
   "clt",
   "estagio",
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",
@@ -104,6 +105,7 @@ const TIPOS: readonly TipoVinculo[] = [
 const ROTULO_TIPO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",

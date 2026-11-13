@@ -78,6 +78,12 @@
   --evolli-ardosia: #6b7c99; /* apoio neutro de gráfico */
   --evolli-fundo: #f4f7fb; /* fundo neutro do Dashboard */
 
+  /* T209 — cor própria do tipo de vínculo Aprendiz nas distribuições
+     (Colaboradores e Dashboard). Objeto gráfico com contraste acima de 3:1
+     sobre o branco e o fundo do Dashboard (teste de contrato); a legenda em
+     texto diz sempre o mesmo número. */
+  --cor-tipo-aprendiz: #6b3fa0;
+
   /* Raios (grade fechada: sm / md / lg / pill). */
   --radius-sm: 8px;
   --radius-md: 11px;
