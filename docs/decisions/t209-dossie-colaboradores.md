@@ -614,3 +614,38 @@ conversão automática; importação (Bloco C segue pausado).
 - **Limites:** o Histórico funcional (aba de Pessoas) foi coberto por teste de contrato do
   rótulo, não visto no navegador; testes de tempo da Nova admissão (5 s) oscilam sob carga da
   máquina, sem relação com o Aprendiz.
+
+## 25. Fundação de interface incremental (ADR 0019)
+
+- **Integração:** Tailwind CSS 4 pelo plugin do Vite, **sem preflight**, em camadas de cascata e
+  com prefixo `ev` (`apps/web/src/ui/estilos.css`); o CSS atual prevalece e nenhuma variável do
+  tema colide com os tokens. Radix para menu, diálogo, painel lateral e tooltip; Lucide para
+  ícones; sem TanStack Table (a tabela não ordena, não seleciona e pagina no servidor).
+- **Componentes criados (`apps/web/src/ui`):** Button, IconButton, Card, CardSection, Input e
+  Select (nativos), Badge, Tabs (próprias, ativação manual), DropdownMenu, Dialog, Sheet,
+  Tooltip e primitivas de tabela (TableContainer, Table, TableCaption, TableHeader, TableBody,
+  TableRow, TableHead, TableCell).
+- **Colaboradores migrado:** painel "Adicionar colaborador" (Sheet), menu "Ações" por linha
+  (DropdownMenu, em portal), busca e filtros (Input e Select), "Itens por página" (Select), abas
+  (Tabs), indicadores (Card) e tabela (primitivas). Dashboard, Configurações, ficha, ponto e
+  solicitações não foram migrados.
+- **Comportamentos preservados:** permissões, isolamento por empresa, busca, filtros, tamanho de
+  página, paginação, cancelamento, atalhos por linha, guarda de alterações, animação e movimento
+  reduzido do painel, foco, Escape e 375 px. Acrescentados ao Radix: foco no título da janela,
+  foco devolvido a quem abriu, seta para cima abre o menu no último item, Tab fecha o menu.
+- **Dependências:** `@radix-ui/react-dialog` 1.3.1, `@radix-ui/react-dropdown-menu` 2.2.1,
+  `@radix-ui/react-tooltip` 1.4.1, `lucide-react` 1.64.0 (produção); `tailwindcss` 4.3.3 e
+  `@tailwindcss/vite` 4.3.3 (desenvolvimento) — MIT/ISC, versões exatas publicadas há pelo
+  menos duas semanas. `@radix-ui/react-tabs` foi avaliado e retirado.
+- **Testes:** 26 contratos dos componentes (`src/ui/ui.test.tsx`), menu da linha, painel,
+  integração da tela com a camada e as suítes existentes ajustadas para abrir o menu como no
+  navegador. Bateria: web 138 arquivos, 3960 testes (na rodada completa, 3 testes de tempo, 2 da guarda T200 e 1 da Nova admissão, falharam sob carga e passaram isolados); lint, typecheck e build da web verdes; CSS final 26,5 kB comprimido.
+- **Navegador (banco próprio da T209):** controles com 44 px e as bordas dos tokens; menu em
+  portal (fora da tabela, camada 20), Escape devolve o foco ao botão; painel com foco no título,
+  animação de entrada e saída, rolagem travada e a árvore da aplicação oculta ao leitor de tela
+  (só regiões `aria-live` ficam, por desenho da biblioteca); 375 px com o painel em tela inteira
+  e sem rolagem horizontal; Dashboard e Configurações sem nenhuma classe `ev:` e com os tokens
+  inalterados.
+- **Limites:** com o painel do navegador oculto (sem pintura), animações e o foco de entrada do
+  menu pelo teclado ficam parados; nos testes (jsdom) o foco vai ao primeiro item. No menu do
+  Radix, a busca por letra é nova; o resto do teclado segue o que já existia.

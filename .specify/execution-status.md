@@ -3264,6 +3264,10 @@ fundo do painel lateral, com a guarda de alterações, aprovado. **Aprendiz (se�
 aprovadas e implementadas na fatia mínima (migration aditiva, API e superfícies web, sem regra
 legal). Bateria: web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
 
+**Fundação de interface (seção 25; ADR 0019):** Tailwind 4 sem preflight, com prefixo `ev`,
+Radix e Lucide; camada `apps/web/src/ui`; Colaboradores migrado (painel, menu, filtros, abas,
+indicadores e tabela). Bateria: web 138 arquivos, 3960 testes (na rodada completa, 3 testes de tempo, 2 da guarda T200 e 1 da Nova admissão, falharam sob carga e passaram isolados); lint, typecheck e build da web verdes; CSS final 26,5 kB comprimido.
+
 **Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
 registrado.
 
