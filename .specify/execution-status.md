@@ -3174,15 +3174,14 @@ resolvida no primeiro commit da T208.
 
 ## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
 
-| Tarefa | Estado                                                           | Resultado principal                                                                                 |
-| ------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação em levantamento. |
+| Tarefa | Estado                                                           | Resultado principal                                                                                                                            |
+| ------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição) validada localmente; foto em preparação. |
 
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
 decisões MPA-1 a MPA-11, aprovadas em 2026-11-12 com a MPA-5 corrigida (seção 22), estão na seção 21 do
-[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); nada da ampliação foi
-a ampliação está implementada e validada localmente (seções 23 a 26), em commits locais, sem
+[dossiê](../docs/decisions/t208-dossie-configuracoes-meu-perfil.md); a ampliação está implementada e validada localmente (seções 23 a 26), em commits locais, sem
 push. A referência visual foi usada só como inspiração local e não é registrada.
 
 **Ampliação:** nome de exibição editável — migration aditiva, `PATCH /v1/users/me` com
