@@ -3385,11 +3385,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         1511 testes; E2E serial com PostgreSQL real 21 suítes, 1046 testes; scripts 182 testes;
         58 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do
         squash e `git diff --check` verdes.
-      - **Foto de perfil (em preparação, seção 27 do dossiê):** levantamento de armazenamento
-        (nenhum em uso; R2 aprovado só para conteúdo documental e preso aos portões de Nível 2),
-        persistência, validação, entrega, privacidade, auditoria, interface e impacto; desenho
-        mínimo com PostgreSQL em tabela própria e decisões FP-1 a FP-8 aguardando aprovação. Nada
-        implementado.
+      - **Foto de perfil (seções 27 e 28 do dossiê; ADR 0018):** decisões FP-1 a FP-8 aprovadas
+        em 2026-11-13; implementada e validada localmente, sem push. PostgreSQL em tabela própria
+        (`access_user_foto`), `GET`/`PUT`/`DELETE /v1/users/me/foto` só da titular, validação pelo
+        conteúdo, 5 MB, 128 px e 25 milhões de pixels, regravação no servidor em JPEG 256 × 256
+        sem metadados (dependência `sharp` 0.35.5), entrega privada sem cache persistente, remoção
+        e desativação apagando os bytes, auditoria sem dado da imagem; na web, prévia local,
+        envio, troca, remoção, avisos acessíveis e guarda de saída. Validação local: web 133
+        arquivos, 3797 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL
+        real 22 suítes, 1081 testes; scripts 182 testes; 89 mutações, todas detectadas; lint,
+        typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
         Branch `codex/t208-configuracoes-meu-perfil`, a partir do squash
         `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
       - **Preparação:** levantamento e decisões MP-1 a MP-8 no
@@ -3410,7 +3415,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
         todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
         `git diff --check` verdes.
-      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto (em preparação, seção 27); Segurança, Empresas e Equipe e permissões; seed, Docker, dependências, lockfile e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; a ampliação aprovada acrescenta migration aditiva, rota, uso de `own_account`/`manage` e auditoria.
+      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Regra obrigatória para as próximas tarefas
 

@@ -7,9 +7,10 @@
   aprovadas em 2026-11-12, com a MPA-5 corrigida (seção 22). A ampliação — nome de exibição
   editável, com migration, `PATCH /v1/users/me` e auditoria — está **implementada e validada
   localmente** (seções 23 a 26), em commits locais, sem push: a PR #201 ainda aponta para o código
-  anterior à ampliação. Aguarda a validação visual humana. A **foto de perfil** é uma ampliação
-  **em preparação** (seção 27): só levantamento, decisões FP-1 a FP-8 aguardando aprovação, nada
-  implementado. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
+  anterior à ampliação. A **foto de perfil** (decisões FP-1 a FP-8, aprovadas em 2026-11-13;
+  [ADR 0018](../adr/0018-foto-de-perfil-da-conta-no-postgresql.md)) está **implementada e
+  validada localmente** (seções 27 e 28), também sem push. As duas ampliações aguardam a validação
+  visual humana. As decisões MP-1 a MP-8 da seção 13 seguem sem alteração.
 - **Base:** `main` em `25903aa742d8f3f304dd7b3597eaed12ed83649a` (T207 integrada, PR #200).
 - **Objetivo:** começar o módulo **Configurações** pelo submódulo **Meu Perfil** — o que a própria
   pessoa logada vê (e, no futuro, ajusta) da sua conta de acesso —, numa entrega por vez.
@@ -861,3 +862,140 @@ sem botão de envio, sem campo inativo e sem promessa de data.
 | FP-6 | Cache e invalidação          | Só pela API, `private, no-cache` com ETag; URL versionada pela data da foto; nada público ou persistido                                                                                                | `private, max-age` curto sem revalidação                          |
 | FP-7 | Migração e compatibilidade   | Migration aditiva (tabela e auditoria); contas atuais sem foto; ator ganha só um campo opcional                                                                                                        | —                                                                 |
 | FP-8 | Escopo nesta T208            | Entra: enviar, pré-visualizar, substituir e remover a própria foto, vista só pela titular em Meu perfil. Fica fora: foto de colaborador, foto vista por outros, R2, antivírus, editor de enquadramento | Também mostrar a foto no topo do shell para a própria pessoa      |
+
+## 28. Foto de perfil — implementação (2026-11-13)
+
+### 28.1 Decisões
+
+As decisões FP-1 a FP-8 da seção 27.9 foram aprovadas em 2026-11-13, com estes ajustes da
+aprovação:
+
+- **FP-2:** inclui um teto de pixels contra imagem-bomba (25 milhões).
+- **FP-3:** o servidor é a autoridade, decodifica e regrava a imagem; o navegador faz só a prévia.
+- **FP-6:** sem cache persistente.
+
+Também ficaram autorizadas a dependência de processamento de imagem, a atualização do lockfile e
+a ADR própria: [ADR 0018](../adr/0018-foto-de-perfil-da-conta-no-postgresql.md).
+
+### 28.2 Implementação
+
+- **Dependência:** `sharp` 0.35.5, com versão exata, só na API. É a biblioteca de imagem mais
+  usada em Node, sobre a libvips. A 0.35.5 foi publicada em 2026-09-27, e a linha 0.35 é estável
+  desde junho. Não tem script de instalação, e há binários prontos para Linux x64 (CI) e Windows
+  x64 (desenvolvimento). O lockfile só ganhou o pacote e os binários, sem mudar nenhum pacote
+  existente; a instalação congelada (`pnpm install --frozen-lockfile`) aceita o resultado.
+- **Migration aditiva** `20261113120000_foto_perfil_conta`:
+  - tabela `access_user_foto` (uma linha por conta, chave = conta), separada de `access_user`,
+    para os bytes não viajarem com a sessão;
+  - CHECK de tamanho e da assinatura JPEG;
+  - cascata na exclusão da conta;
+  - eventos `conta.foto.enviada` e `conta.foto.removida`.
+- **API** (`apps/api/src/users/users.controller.ts`):
+  - `GET /v1/users/me/foto`, com `own_account`/`read`;
+  - `PUT` e `DELETE /v1/users/me/foto`, com `own_account`/`manage`, CSRF e a versão do perfil no
+    cabeçalho `x-evolli-perfil-versao` (ISO exato ou `nenhuma`);
+  - nenhuma rota com `:id`;
+  - o envio só aceita `Content-Type: application/octet-stream`; tipo declarado diferente
+    responde 415.
+- **Processamento** (`apps/api/src/users/perfil/foto-perfil.processamento.ts`), nesta ordem:
+  1. corpo limitado a 5 MB antes de qualquer processamento (o excedente é descartado e a
+     resposta é 413; acima de 10 MB a conexão cai);
+  2. formato pela assinatura do conteúdo (JPEG, PNG, WebP);
+  3. dimensões lidas do cabeçalho, sem decodificar: ao menos 128 px no menor lado e no máximo 25
+     milhões de pixels;
+  4. decodificação estrita (o mesmo teto de pixels vale no decodificador; aviso vira recusa);
+  5. orientação, corte quadrado central, 256 × 256 e regravação em JPEG sem EXIF, XMP ou ICC.
+
+  Cada recusa responde 422 com um código estável: `foto_formato_invalido`, `foto_pequena`,
+  `foto_grande_demais` ou `foto_invalida`.
+
+- **Serviço:**
+  - gravar e remover usam a versão do perfil, com 409 sem sobrescrever;
+  - remover sem foto responde 404, e a versão não muda;
+  - desativar a conta apaga a foto na mesma transação;
+  - a auditoria vai na mesma transação, sem dado da imagem.
+- **Entrega:**
+  - `Content-Type: image/jpeg`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`,
+    `Content-Disposition: inline` e CSP `default-src 'none'; sandbox`;
+  - o ator ganha `fotoVersao`, o instante da gravação, que versiona a URL;
+  - `toSafeUser`, usado pela listagem de Contas de acesso, não a carrega.
+- **Tela, em Identificação:**
+  - a própria foto, ou as iniciais quando não há foto ou a imagem não carrega;
+  - "Enviar foto" ou "Trocar foto" abre o seletor nativo de arquivo;
+  - a prévia local mostra o corte central, com "Usar esta foto" e "Cancelar";
+  - "Remover foto" pede confirmação;
+  - a foto tem fluxo próprio, fora do rodapé do nome, e enviá-la não apaga o nome em edição.
+- **Avisos e foco:**
+  - alertas para arquivo acima de 5 MB, tipo não aceito, cada recusa do servidor, conflito,
+    sessão encerrada e falha;
+  - um anúncio por desfecho;
+  - o foco vai para a ação seguinte.
+- **Guarda de saída:** foto escolhida e não enviada é edição pendente; envio ou remoção em curso
+  bloqueia a saída.
+- **Hub:** a descrição do cartão menciona a foto.
+
+### 28.3 Achados e correções
+
+Cada achado foi corrigido com teste que falha antes da correção.
+
+1. **E2E, 413 com conexão derrubada.** Acima de 5 MB, o servidor respondia antes de ler o
+   corpo, e o cliente recebia conexão derrubada em vez do 413. O excedente passou a ser
+   descartado até o fim, com um teto de descarte.
+2. **Teste de sessão, foto sumindo.** A versão da foto não era repassada à tela pela sessão,
+   então a foto sumia ao navegar ou recarregar.
+3. **Navegador, foco no `body` depois de enviar ou remover.** O foco era pedido no botão da
+   foto ainda desabilitado, e o navegador o ignorava. Os testes passaram a recusar foco em
+   elemento desabilitado e a segurar a resposta até a tela mostrar o envio em curso.
+4. **Navegador, aviso de conflito.** No conflito da foto, o aviso falava de "texto no campo".
+   Passou a dizer "o que você alterou continua na tela".
+5. **Navegador, cartão do Hub.** A descrição não mencionava a foto.
+
+### 28.4 Validação no navegador
+
+Dados sintéticos do seed local, banco local migrado e imagens geradas no próprio navegador.
+
+- **RH:**
+  - PNG 900 × 600 escolhido; a prévia mostra o corte central; envio pelo teclado;
+  - a foto aparece regravada em 256 × 256, com os cabeçalhos de imagem privada;
+  - troca por JPEG, com foco em "Trocar foto";
+  - arquivo falso (HTML com nome `.png` e tipo declarado `image/png`) recusado pelo servidor, com
+    a mensagem do formato;
+  - remoção com confirmação, as iniciais voltam e a leitura passa a responder 404;
+  - conflito entre duas abas, com "Carregar os dados atuais";
+  - a 375 px, sem rolagem horizontal e com botões de 44 px;
+  - com a prévia pendente, sair pelo Hub pergunta.
+- **Master técnico:** sem empresa, envia; ao trocar para a Alfa, a mesma foto continua.
+- **Colaborador:** pelo cartão do Hub, envia a foto.
+- **Gestor:** pelo menu, envia a foto.
+
+Nenhum erro de script no console.
+
+### 28.5 Evidências
+
+- **API unitária:** 33 testes novos da foto (`users/perfil/foto-perfil.spec.ts`).
+- **E2E com PostgreSQL real:** suíte nova `foto-perfil`, com 35 testes.
+- **Web:** testes novos de tela, cliente, sessão e shell.
+- **Mutações:** 89, todas detectadas. Inclui as da base e do nome de exibição, com alvos
+  atualizados. Uma sobreviveu na primeira rodada (tirar o corte da conexão que manda bytes
+  sem fim): o teste usava um fluxo que terminava e se autodestruía. Com um fluxo que nunca
+  termina, a mutação passou a ser detectada.
+- **Bateria local:**
+  - web 133 arquivos, 3797 testes;
+  - API unitária 62 suítes, 1544 testes;
+  - E2E serial com PostgreSQL real 22 suítes, 1081 testes;
+  - scripts 182 testes;
+  - lint sem aviso, typecheck, build, Prettier, `spec:check`, prévia do squash e
+    `git diff --check` verdes.
+
+### 28.6 Limites
+
+- **Orientação EXIF:** é aplicada antes do corte, mas sem teste próprio. Não há mutação que a
+  prenda.
+- **Teto de pixels no decodificador:** repete a conferência feita no cabeçalho (defesa em
+  profundidade). Sem um caso que o distinga, não tem teste próprio.
+- **Validação só por testes:** a desativação apagando a foto e a sessão encerrada ao enviar foram
+  comprovadas pelos testes, não no navegador.
+- **Backups:** fotos removidas continuam nos backups até a retenção deles, que segue pendente na
+  Etapa 0.
+- **Fora desta entrega:** foto vista por outras pessoas (listagens, ficha, Hub, topo do shell),
+  foto de colaborador, R2, antivírus e editor de enquadramento.

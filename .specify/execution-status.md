@@ -3174,9 +3174,9 @@ resolvida no primeiro commit da T208.
 
 ## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
 
-| Tarefa | Estado                                                           | Resultado principal                                                                                                                            |
-| ------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição) validada localmente; foto em preparação. |
+| Tarefa | Estado                                                           | Resultado principal                                                                                                                         |
+| ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição e foto de perfil) validada localmente. |
 
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
@@ -3211,13 +3211,17 @@ detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
 
 **Validação visual:** aprovada pela validação humana em 2026-11-12.
 
-**Foto de perfil (em preparação):** levantamento e decisões FP-1 a FP-8 na seção 27 do
-dossiê, aguardando aprovação; nada implementado.
+**Foto de perfil:** decisões FP-1 a FP-8 aprovadas em 2026-11-13
+([ADR 0018](../docs/adr/0018-foto-de-perfil-da-conta-no-postgresql.md)); implementada e validada
+localmente, sem push (seções 27 e 28 do dossiê). Validação local: web 133 arquivos, 3797 testes;
+API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes;
+scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
+`spec:check`, prévia do squash e `git diff --check` verdes.
 
-**Pendente:** validação visual humana da ampliação; aprovação das decisões FP-1 a FP-8; push e revisão da
+**Pendente:** validação visual humana do nome de exibição e da foto; push e revisão da
 PR #201; Ready for review e merge só com ordem.
 
-**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto (em preparação, seção 27); Segurança, Empresas e Equipe e permissões; seed, Docker, dependências, lockfile e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; a ampliação aprovada acrescenta migration aditiva, rota, uso de `own_account`/`manage` e auditoria.
+**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 ## Próxima ação autorizável
 
