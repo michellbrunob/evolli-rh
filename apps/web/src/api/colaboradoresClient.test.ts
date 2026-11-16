@@ -11,6 +11,7 @@ import {
   BUSCA_COLABORADORES_MAXIMO,
   admitirColaborador,
   enviarAdmissao,
+  enviarFotoColaborador,
   listarColaboradores,
 } from "./colaboradoresClient";
 
@@ -304,5 +305,47 @@ describe("T209 (Bloco C) — enviarAdmissao diz se foi reenvio", () => {
   it("sem o cabeçalho → admissão nova", async () => {
     fetchMock.mockResolvedValueOnce(resposta({}));
     expect((await enviarAdmissao(DTO)).reenvio).toBe(false);
+  });
+});
+
+describe("T209 — enviarFotoColaborador", () => {
+  it("PUT dos bytes do arquivo, octet-stream, com tipo, extensão e CSRF", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        versao: 1,
+        atualizadoEm: "2026-11-16T12:00:00.000Z",
+      }),
+    } as unknown as Response);
+    const arquivo = new File([new Uint8Array([1, 2, 3])], "Retrato.JPG", {
+      type: "image/jpeg",
+    });
+    const r = await enviarFotoColaborador("col-1", arquivo);
+    expect(r).toEqual({ versao: 1, atualizadoEm: "2026-11-16T12:00:00.000Z" });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe("/v1/colaboradores/col-1/foto");
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(arquivo);
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/octet-stream",
+      "x-csrf-token": "token-sintetico",
+      "x-evolli-foto-tipo": "image/jpeg",
+      "x-evolli-foto-extensao": "jpg",
+    });
+  });
+
+  it("recusa do servidor vira ApiError com o código", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: async () => ({ message: "x", codigo: "foto_pequena" }),
+    } as unknown as Response);
+    const erro = await enviarFotoColaborador(
+      "col-1",
+      new File([new Uint8Array([1])], "a.png", { type: "image/png" }),
+    ).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ApiError);
+    expect((erro as ApiError).codigo).toBe("foto_pequena");
   });
 });

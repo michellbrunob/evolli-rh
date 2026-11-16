@@ -1,6 +1,7 @@
 import {
   clearCsrfToken,
   descartarTokenSeDesatualizado,
+  getCsrfToken,
   tokenCsrfParaGravacao,
 } from "./csrfClient";
 import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
@@ -570,4 +571,48 @@ export async function descartarRascunhoAdmissao(): Promise<void> {
     headers: { "x-csrf-token": token },
   });
   if (!res.ok) await jsonOrThrow(res);
+}
+
+// ---- T209 — foto do colaborador (ADR 0020) --------------------------------
+
+/** O que o servidor devolve ao gravar a foto: só a versão e a data. */
+export interface FotoColaboradorGravadaApi {
+  readonly versao: number;
+  readonly atualizadoEm: string;
+}
+
+/** A extensão do nome do arquivo, sem o ponto, em minúsculas. */
+function extensaoDoArquivo(nome: string): string {
+  const ponto = nome.lastIndexOf(".");
+  return ponto === -1 ? "" : nome.slice(ponto + 1).toLowerCase();
+}
+
+/**
+ * T209 — envia ou substitui a foto do colaborador
+ * (`PUT /v1/colaboradores/:id/foto`). O corpo é o arquivo como veio; o tipo
+ * declarado e a extensão vão em cabeçalhos para o servidor conferir com o
+ * conteúdo. Recusa responde 422 com `codigo`, 413 acima de 5 MB; indisponível,
+ * 503. 403 `csrf_invalido` (outra aba renovou o token): renova e reenvia uma
+ * vez.
+ */
+export async function enviarFotoColaborador(
+  colaboradorId: string,
+  arquivo: File,
+): Promise<FotoColaboradorGravadaApi> {
+  const enviar = async () =>
+    apiFetch(`/colaboradores/${encodeURIComponent(colaboradorId)}/foto`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await getCsrf(),
+        "x-evolli-foto-tipo": arquivo.type,
+        "x-evolli-foto-extensao": extensaoDoArquivo(arquivo.name),
+      },
+      body: arquivo,
+    });
+  let res = await enviar();
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow<FotoColaboradorGravadaApi>(res);
 }

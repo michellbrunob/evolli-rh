@@ -660,3 +660,66 @@ button.nova-admissao__etapa-passo:focus-visible {
     grid-column: 1 / 4;
   }
 }
+
+/* ---- T209 — foto opcional do colaborador (etapa 1 e confirmação) ---------- */
+.nova-admissao__foto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.nova-admissao__foto-legenda {
+  flex: 0 0 100%;
+  padding: 0;
+  margin-bottom: var(--space-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.nova-admissao__foto-avatar {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--status-neutral-border);
+}
+
+.nova-admissao__foto-avatar--vazio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--status-neutral-surface);
+  color: var(--color-ink-subtle);
+}
+
+.nova-admissao__foto-corpo {
+  display: grid;
+  gap: var(--space-xs);
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.nova-admissao__foto-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.nova-admissao__foto-ajuda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.nova-admissao__foto-recusa {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-danger-ink);
+}

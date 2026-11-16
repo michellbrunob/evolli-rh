@@ -25,7 +25,7 @@ import {
 } from "@testing-library/react";
 import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaAdmissaoScreen } from "./NovaAdmissaoScreen";
 import { listarTabelasHorario } from "../../api/horariosClient";
 import {
@@ -33,6 +33,7 @@ import {
   type AdmissaoRegistradaApi,
   admitirColaborador,
   descartarRascunhoAdmissao,
+  enviarFotoColaborador,
   obterRascunhoAdmissao,
   salvarRascunhoAdmissao,
 } from "../../api/colaboradoresClient";
@@ -4403,7 +4404,7 @@ describe("T195 — revisão e conclusão", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("T209 — sem bloco de documentos futuros na revisão, nem campo de arquivo", async () => {
+  it("T209 — sem bloco de documentos futuros na revisão; o único arquivo é a foto", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
@@ -4411,7 +4412,9 @@ describe("T195 — revisão e conclusão", () => {
       screen.queryByRole("heading", { level: 3, name: "Documentos" }),
     ).toBeNull();
     expect(document.body).not.toHaveTextContent(/Documentos serão liberados/);
-    expect(document.querySelector('input[type="file"]')).toBeNull();
+    const arquivos = document.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
   });
 
   it("Confirmar admissão abre a mesma confirmação e envia uma vez, com a chave", async () => {
@@ -5367,16 +5370,19 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     ).toBeVisible();
   });
 
-  it("nada que o contrato não suporta: sem foto, CPF, RG ou upload (o rascunho existe, T209)", async () => {
+  it("nada que o contrato não suporta: sem CPF, RG ou upload de documento (rascunho e foto existem, T209)", async () => {
     montar();
     await aguardarEmpresa();
     const formulario = screen.getByRole("form", {
       name: "Formulário de nova admissão",
     });
-    expect(formulario.querySelector('input[type="file"]')).toBeNull();
-    // Nenhum CAMPO de CPF, RG ou foto (o aviso da página cita, em texto, o
-    // que ainda não é coletado).
-    for (const proibido of [/\bCPF\b/, /\bRG\b/, /foto/i]) {
+    // T209 — o único arquivo é a foto opcional (PNG ou JPEG).
+    const arquivos = formulario.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    // Nenhum CAMPO de CPF ou RG (o aviso da página cita, em texto, o que
+    // ainda não é coletado).
+    for (const proibido of [/\bCPF\b/, /\bRG\b/]) {
       expect(
         screen
           .queryAllByLabelText(proibido)
@@ -5386,7 +5392,6 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     expect(
       screen.getByRole("button", { name: "Salvar rascunho" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /enviar foto/i })).toBeNull();
   });
 
   it("rodapé fixo: progresso e ações; Voltar só depois da primeira etapa; Concluir na última", async () => {
@@ -5602,7 +5607,10 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     expect(corpo).not.toMatch(/Documentos serão liberados/);
     expect(corpo).not.toMatch(/T209|em desenvolvimento|branch/i);
     expect(screen.queryByRole("navigation", { name: /trilha/i })).toBeNull();
-    expect(document.querySelector('input[type="file"]')).toBeNull();
+    // T209 — o único arquivo é a foto opcional; nenhum upload de documento.
+    const arquivos = document.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
   });
 
   it("as quatro etapas, nos nomes pedidos", async () => {
@@ -5746,5 +5754,305 @@ describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => 
     await aguardarEmpresa();
     expect(nome()).toHaveValue("");
     expect(screen.queryByText(/recuperado/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — foto opcional do colaborador (ADR 0020). Escolhida na etapa 1, com
+// prévia local; enviada só DEPOIS de a admissão ser concluída; a falha da
+// foto nunca desfaz a admissão e permite nova tentativa. Nunca vai para o
+// rascunho.
+// ---------------------------------------------------------------------------
+function arquivoDeFoto(
+  nomeDoArquivo = "retrato.png",
+  tipo = "image/png",
+  tamanho = 2048,
+): File {
+  const arquivo = new File([new Uint8Array(8)], nomeDoArquivo, { type: tipo });
+  Object.defineProperty(arquivo, "size", { value: tamanho });
+  return arquivo;
+}
+
+const campoDaFoto = () =>
+  document.getElementById("nova-admissao-foto-arquivo") as HTMLInputElement;
+const escolherFoto = (arquivo: File) =>
+  fireEvent.change(campoDaFoto(), { target: { files: [arquivo] } });
+const blocoDaFoto = () =>
+  screen.getByRole("group", { name: "Foto do colaborador (opcional)" });
+
+describe("T209 — foto do colaborador na Nova admissão", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:30:00.000Z",
+    });
+    vi.mocked(descartarRascunhoAdmissao).mockResolvedValue(undefined);
+    vi.mocked(enviarFotoColaborador).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:31:00.000Z",
+    });
+    let n = 0;
+    URL.createObjectURL = vi.fn(() => `blob:previa-${++n}`);
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => {
+    vi.mocked(URL.createObjectURL).mockReset();
+    vi.mocked(URL.revokeObjectURL).mockReset();
+  });
+
+  it("etapa 1: avatar neutro, Enviar foto, regras; sem Remover antes de escolher", async () => {
+    montar();
+    await aguardarEmpresa();
+    const bloco = blocoDaFoto();
+    expect(
+      within(bloco).getByRole("button", { name: "Enviar foto" }),
+    ).toBeVisible();
+    expect(within(bloco).queryByRole("button", { name: "Remover" })).toBeNull();
+    expect(within(bloco).queryByRole("img")).toBeNull();
+    expect(bloco).toHaveTextContent("PNG ou JPEG, até 5 MB.");
+    expect(campoDaFoto()).toHaveAttribute("accept", "image/png,image/jpeg");
+  });
+
+  it("escolher PNG mostra a prévia local e o Remover; nada é enviado ainda", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    const previa = await within(blocoDaFoto()).findByRole("img", {
+      name: "Prévia da foto do colaborador",
+    });
+    expect(previa).toHaveAttribute("src", "blob:previa-1");
+    expect(
+      within(blocoDaFoto()).getByRole("button", { name: "Remover" }),
+    ).toBeVisible();
+    expect(enviarFotoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("JPEG (.jpeg) também é aceito", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto("retrato.jpeg", "image/jpeg"));
+    expect(
+      await within(blocoDaFoto()).findByRole("img", {
+        name: "Prévia da foto do colaborador",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["GIF", "anim.gif", "image/gif", 2048, "Use uma imagem PNG ou JPEG."],
+    ["WebP", "a.webp", "image/webp", 2048, "Use uma imagem PNG ou JPEG."],
+    [
+      "extensão trocada",
+      "a.txt",
+      "image/png",
+      2048,
+      "Use uma imagem PNG ou JPEG.",
+    ],
+    [
+      "tipo diferente da extensão",
+      "a.png",
+      "image/jpeg",
+      2048,
+      "Use uma imagem PNG ou JPEG.",
+    ],
+    [
+      "acima de 5 MB",
+      "grande.png",
+      "image/png",
+      5 * 1024 * 1024 + 1,
+      "A foto deve ter até 5 MB.",
+    ],
+  ])(
+    "recusa no navegador: %s",
+    async (_rotulo, nomeDoArquivo, tipo, tamanho, mensagem) => {
+      montar();
+      await aguardarEmpresa();
+      escolherFoto(arquivoDeFoto(nomeDoArquivo, tipo, tamanho));
+      expect(
+        await within(blocoDaFoto()).findByText(mensagem),
+      ).toBeInTheDocument();
+      expect(within(blocoDaFoto()).queryByRole("img")).toBeNull();
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+    },
+  );
+
+  it("Remover tira a prévia, libera a URL local e devolve o foco ao Enviar foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(
+      await within(blocoDaFoto()).findByRole("button", { name: "Remover" }),
+    );
+    expect(within(blocoDaFoto()).queryByRole("img")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:previa-1");
+    await waitFor(() =>
+      expect(
+        within(blocoDaFoto()).getByRole("button", { name: "Enviar foto" }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("trocar a foto libera a prévia anterior", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await within(blocoDaFoto()).findByRole("img");
+    escolherFoto(arquivoDeFoto("outra.jpg", "image/jpeg"));
+    await waitFor(() =>
+      expect(within(blocoDaFoto()).getByRole("img")).toHaveAttribute(
+        "src",
+        "blob:previa-2",
+      ),
+    );
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:previa-1");
+  });
+
+  it("a foto só é enviada DEPOIS da admissão, para o colaborador criado", async () => {
+    montar();
+    await aguardarEmpresa();
+    const arquivo = arquivoDeFoto();
+    escolherFoto(arquivo);
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(enviarFotoColaborador).toHaveBeenCalledTimes(1));
+    expect(enviarFotoColaborador).toHaveBeenCalledWith(resposta.id, arquivo);
+    expect(
+      vi.mocked(admitirColaborador).mock.invocationCallOrder[0]!,
+    ).toBeLessThan(
+      vi.mocked(enviarFotoColaborador).mock.invocationCallOrder[0]!,
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    // A admissão não leva a foto.
+    expect(
+      JSON.stringify(vi.mocked(admitirColaborador).mock.calls[0]),
+    ).not.toMatch(/foto|blob:/i);
+  });
+
+  it("sem foto escolhida, nada é enviado e a confirmação não fala de foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await screen.findByRole("heading", { name: /Admissão de .* registrada/ });
+    expect(enviarFotoColaborador).not.toHaveBeenCalled();
+    expect(screen.queryByText(/foto/i)).toBeNull();
+  });
+
+  it("falha da foto: a admissão fica, o aviso é claro e a nova tentativa envia de novo", async () => {
+    vi.mocked(enviarFotoColaborador)
+      .mockRejectedValueOnce(recusa(503))
+      .mockResolvedValueOnce({
+        versao: 1,
+        atualizadoEm: "2026-11-16T15:32:00.000Z",
+      });
+    montar();
+    await aguardarEmpresa();
+    const arquivo = arquivoDeFoto();
+    escolherFoto(arquivo);
+    await preencherValido();
+    await salvarEConfirmar();
+    expect(
+      await screen.findByRole("heading", { name: /Admissão de .* registrada/ }),
+    ).toBeInTheDocument();
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "O colaborador foi criado, mas a foto não foi salva.",
+    );
+    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tentar enviar foto novamente" }),
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    expect(enviarFotoColaborador).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(enviarFotoColaborador).mock.calls[1]).toEqual([
+      resposta.id,
+      arquivo,
+    ]);
+    // A nova tentativa nunca admite de novo.
+    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+  });
+
+  it("recusa da foto pelo servidor: diz o motivo e oferece escolher outra", async () => {
+    vi.mocked(enviarFotoColaborador)
+      .mockRejectedValueOnce(recusa(422, { codigo: "foto_pequena" }))
+      .mockResolvedValueOnce({
+        versao: 1,
+        atualizadoEm: "2026-11-16T15:33:00.000Z",
+      });
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await preencherValido();
+    await salvarEConfirmar();
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "O colaborador foi criado, mas a foto não foi salva.",
+    );
+    expect(alerta).toHaveTextContent(
+      "A imagem é pequena demais: use ao menos 64 × 64 pixels.",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Tentar enviar foto novamente" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Escolher outra foto" }),
+    ).toBeVisible();
+    const outra = arquivoDeFoto("maior.jpg", "image/jpeg");
+    fireEvent.change(
+      document.getElementById("nova-admissao-foto-outra") as HTMLInputElement,
+      { target: { files: [outra] } },
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    expect(vi.mocked(enviarFotoColaborador).mock.calls[1]).toEqual([
+      resposta.id,
+      outra,
+    ]);
+  });
+
+  it("só a foto escolhida já é alteração: sair pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("o rascunho nunca leva a foto; com foto escolhida, sair ainda pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await screen.findByText(/Rascunho salvo/);
+    const dados = vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0];
+    expect(JSON.stringify(dados)).not.toMatch(/foto|arquivo|blob:/i);
+    expect(blocoDaFoto()).toHaveTextContent("A foto não fica no rascunho.");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("Registrar outra admissão começa sem foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText("Foto salva.");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar outra admissão" }),
+    );
+    await waitFor(() =>
+      expect(within(blocoDaFoto()).queryByRole("img")).toBeNull(),
+    );
+    expect(
+      within(blocoDaFoto()).queryByRole("button", { name: "Remover" }),
+    ).toBeNull();
   });
 });

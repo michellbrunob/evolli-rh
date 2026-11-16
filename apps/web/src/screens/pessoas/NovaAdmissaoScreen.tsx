@@ -120,6 +120,7 @@ import {
   type TipoVinculo,
   admitirColaborador,
   descartarRascunhoAdmissao,
+  enviarFotoColaborador,
   obterRascunhoAdmissao,
   salvarRascunhoAdmissao,
   type DadosDoRascunhoApi,
@@ -767,6 +768,93 @@ export interface NovaAdmissaoScreenProps {
   readonly papelDoAtor?: string | null;
 }
 
+// ---- T209 — foto opcional do colaborador (ADR 0020) ------------------------
+
+/** Mesmo teto do servidor: 5 MB. */
+const FOTO_LIMITE_BYTES = 5 * 1024 * 1024;
+const FOTO_TIPOS_ACEITOS = "image/png,image/jpeg";
+const FOTO_TIPO_POR_EXTENSAO: Readonly<Record<string, string>> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+};
+const ID_FOTO_ARQUIVO = "nova-admissao-foto-arquivo";
+const ID_FOTO_ENVIAR = "nova-admissao-foto-enviar";
+const ID_FOTO_OUTRA = "nova-admissao-foto-outra";
+
+/** A foto escolhida: o arquivo e a URL local da prévia (só nesta aba). */
+interface FotoEscolhida {
+  readonly arquivo: File;
+  readonly url: string;
+}
+
+/** O envio da foto, que só acontece depois da admissão concluída. */
+type EnvioDaFoto =
+  | { readonly estado: "nenhum" }
+  | { readonly estado: "enviando" }
+  | { readonly estado: "enviada" }
+  | {
+      readonly estado: "falhou";
+      readonly mensagem: string;
+      /** Falha passageira: o mesmo arquivo pode ser enviado de novo. */
+      readonly podeRepetir: boolean;
+    };
+
+/**
+ * Conferência rápida no navegador (o servidor confere de novo, pelo
+ * conteúdo): PNG ou JPEG, extensão de acordo com o tipo, até 5 MB.
+ */
+function recusaDaFotoNoNavegador(arquivo: File): string | null {
+  const ponto = arquivo.name.lastIndexOf(".");
+  const extensao =
+    ponto === -1 ? "" : arquivo.name.slice(ponto + 1).toLowerCase();
+  const tipoDaExtensao = FOTO_TIPO_POR_EXTENSAO[extensao];
+  if (!tipoDaExtensao || tipoDaExtensao !== arquivo.type) {
+    return "Use uma imagem PNG ou JPEG.";
+  }
+  if (arquivo.size > FOTO_LIMITE_BYTES) return "A foto deve ter até 5 MB.";
+  return null;
+}
+
+const MENSAGEM_DA_RECUSA_DA_FOTO: Readonly<Record<string, string>> = {
+  foto_formato_invalido: "Use uma imagem PNG ou JPEG.",
+  foto_tipo_divergente:
+    "O conteúdo do arquivo não é do formato informado. Use uma imagem PNG ou JPEG.",
+  foto_grande_demais: "A imagem é grande demais.",
+  foto_pequena: "A imagem é pequena demais: use ao menos 64 × 64 pixels.",
+  foto_invalida: "Não foi possível ler a imagem. Escolha outro arquivo.",
+};
+
+/** O que dizer da falha do envio, e se repetir o mesmo arquivo adianta. */
+function falhaDoEnvioDaFoto(erro: unknown): {
+  readonly mensagem: string;
+  readonly podeRepetir: boolean;
+} {
+  const status = statusDe(erro);
+  const { codigo } = detalhesDe(erro);
+  if (status === 413) {
+    return { mensagem: "A foto deve ter até 5 MB.", podeRepetir: false };
+  }
+  if (status === 422 || status === 415) {
+    return {
+      mensagem:
+        (codigo && MENSAGEM_DA_RECUSA_DA_FOTO[codigo]) ??
+        "A imagem foi recusada. Escolha outro arquivo.",
+      podeRepetir: false,
+    };
+  }
+  if (status === 403 || status === 404) {
+    return {
+      mensagem: "Sem permissão para enviar a foto deste colaborador.",
+      podeRepetir: false,
+    };
+  }
+  return {
+    mensagem: "O envio não foi concluído. Tente de novo em instantes.",
+    podeRepetir: true,
+  };
+}
+
 export function NovaAdmissaoScreen({
   onSair,
   onAbrirAdmitido,
@@ -787,6 +875,14 @@ export function NovaAdmissaoScreen({
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
+  /** T209 — a foto escolhida (prévia local) e o seu envio, pós-admissão. */
+  const [foto, setFoto] = useState<FotoEscolhida | null>(null);
+  const [recusaDaFoto, setRecusaDaFoto] = useState<string | null>(null);
+  const [envioDaFoto, setEnvioDaFoto] = useState<EnvioDaFoto>({
+    estado: "nenhum",
+  });
+  /** Gatilho de uma vez só: devolver o foco a "Enviar foto". */
+  const focarEnviarFotoRef = useRef(false);
   /**
    * T179 — o servidor disse que a chave deste envio já registrou uma admissão
    * com OUTRO conteúdo (422 `idempotencia_conteudo_divergente`). Toda nova
@@ -982,6 +1078,19 @@ export function NovaAdmissaoScreen({
     if (admissao) sucessoTituloRef.current?.focus();
   }, [admissao]);
 
+  // T209 — a URL local da prévia vale só enquanto a foto é a escolhida:
+  // trocada, removida ou a página desmontada, ela é liberada.
+  useEffect(() => {
+    if (!foto) return undefined;
+    return () => URL.revokeObjectURL(foto.url);
+  }, [foto]);
+
+  useEffect(() => {
+    if (foto || !focarEnviarFotoRef.current) return;
+    focarEnviarFotoRef.current = false;
+    document.getElementById(ID_FOTO_ENVIAR)?.focus();
+  }, [foto]);
+
   // T180 — ao fechar o cadastro rápido por qualquer caminho, o foco vai ao
   // SELETOR, não ao "+". Este efeito roda depois da limpeza do `Modal`, que
   // devolve o foco a quem o abriu (o botão), e assim prevalece.
@@ -1072,12 +1181,14 @@ export function NovaAdmissaoScreen({
   const assinaturaAtual = JSON.stringify(dadosDoRascunho());
 
   // Com o rascunho salvo e nada mudado desde então, sair não perde nada.
+  // T209 — a foto nunca vai para o rascunho: escolhida, sair a perde.
   const pendenteSemRascunho =
-    alterado && admissao === null && assinaturaAtual !== assinaturaSalva;
+    admissao === null &&
+    ((alterado && assinaturaAtual !== assinaturaSalva) || foto !== null);
 
   useEdicaoEmAndamento("Nova admissão", {
     pendente: pendenteSemRascunho,
-    salvando,
+    salvando: salvando || envioDaFoto.estado === "enviando",
     aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
 
@@ -1516,6 +1627,9 @@ export function NovaAdmissaoScreen({
       setLimpezaDosAvisos((n) => n + 1);
       setConfirmando(false);
       setAdmissao(resposta);
+      // T209 — a foto vai só agora, para o colaborador já criado; a falha
+      // dela nunca desfaz a admissão.
+      if (foto) void enviarFoto(resposta.id, foto.arquivo);
       // T209 — concluída a admissão, o rascunho deixa de existir.
       setRascunho(null);
       setAssinaturaSalva(null);
@@ -1669,7 +1783,52 @@ export function NovaAdmissaoScreen({
     setAssinaturaSalva(null);
   }
 
+  /** T209 — o arquivo escolhido no seletor da etapa 1. */
+  function escolherFoto(arquivo: File | undefined) {
+    if (!arquivo) return;
+    const recusa = recusaDaFotoNoNavegador(arquivo);
+    setRecusaDaFoto(recusa);
+    if (recusa) return;
+    setFoto({ arquivo, url: URL.createObjectURL(arquivo) });
+  }
+
+  function removerFoto() {
+    focarEnviarFotoRef.current = true;
+    setFoto(null);
+    setRecusaDaFoto(null);
+  }
+
+  /** T209 — envia a foto do colaborador já admitido (e as novas tentativas). */
+  async function enviarFoto(colaboradorId: string, arquivo: File) {
+    setEnvioDaFoto({ estado: "enviando" });
+    try {
+      await enviarFotoColaborador(colaboradorId, arquivo);
+      setEnvioDaFoto({ estado: "enviada" });
+    } catch (erro: unknown) {
+      setEnvioDaFoto({ estado: "falhou", ...falhaDoEnvioDaFoto(erro) });
+    }
+  }
+
+  /** Depois de uma recusa: outro arquivo, conferido e enviado na hora. */
+  function enviarOutraFoto(colaboradorId: string, arquivo: File | undefined) {
+    if (!arquivo) return;
+    const recusa = recusaDaFotoNoNavegador(arquivo);
+    if (recusa) {
+      setEnvioDaFoto({
+        estado: "falhou",
+        mensagem: recusa,
+        podeRepetir: false,
+      });
+      return;
+    }
+    setFoto({ arquivo, url: URL.createObjectURL(arquivo) });
+    void enviarFoto(colaboradorId, arquivo);
+  }
+
   function recomecar() {
+    setFoto(null);
+    setRecusaDaFoto(null);
+    setEnvioDaFoto({ estado: "nenhum" });
     setCampos(CAMPOS_VAZIOS);
     setPerfil(PERFIL_VAZIO);
     setEndereco(ENDERECO_INICIAL);
@@ -1933,6 +2092,12 @@ export function NovaAdmissaoScreen({
         onAbrirAdmitido={onAbrirAdmitido}
         onRecomecar={recomecar}
         onSair={onSair}
+        foto={foto}
+        envioDaFoto={envioDaFoto}
+        onTentarFotoDeNovo={() => {
+          if (foto) void enviarFoto(admissao.id, foto.arquivo);
+        }}
+        onEscolherOutraFoto={(arquivo) => enviarOutraFoto(admissao.id, arquivo)}
       />
     );
   }
@@ -2112,6 +2277,12 @@ export function NovaAdmissaoScreen({
                   >
                     Dados pessoais
                   </h3>
+                  <BlocoDaFoto
+                    foto={foto}
+                    recusa={recusaDaFoto}
+                    onEscolher={escolherFoto}
+                    onRemover={removerFoto}
+                  />
                   {/* T178 — disposição em linhas (pedido da proprietária): nome e
               e-mail pessoal; data de nascimento, sexo e saudação; estado
               civil, nacionalidade e naturalidade; escolaridade e curso; pai e
@@ -3114,6 +3285,11 @@ interface ConfirmacaoProps {
   onAbrirAdmitido: NovaAdmissaoScreenProps["onAbrirAdmitido"];
   onRecomecar: () => void;
   onSair: () => void;
+  /** T209 — a foto escolhida e o seu envio, depois da admissão. */
+  foto: FotoEscolhida | null;
+  envioDaFoto: EnvioDaFoto;
+  onTentarFotoDeNovo: () => void;
+  onEscolherOutraFoto: (arquivo: File | undefined) => void;
 }
 
 /**
@@ -3179,6 +3355,10 @@ function ConfirmacaoDaAdmissao({
   onAbrirAdmitido,
   onRecomecar,
   onSair,
+  foto,
+  envioDaFoto,
+  onTentarFotoDeNovo,
+  onEscolherOutraFoto,
 }: ConfirmacaoProps) {
   const colaborador: ColaboradorApi = {
     id: admissao.id,
@@ -3331,6 +3511,14 @@ function ConfirmacaoDaAdmissao({
               : null
           }
         />
+        {envioDaFoto.estado !== "nenhum" ? (
+          <EstadoDaFotoEnviada
+            foto={foto}
+            envio={envioDaFoto}
+            onTentarDeNovo={onTentarFotoDeNovo}
+            onEscolherOutra={onEscolherOutraFoto}
+          />
+        ) : null}
         <FormActions>
           <Button
             type="button"
@@ -3392,5 +3580,184 @@ function ResumoGravado({
         <p className="nova-admissao__texto">{vazio}</p>
       )}
     </section>
+  );
+}
+
+/**
+ * T209 — a foto opcional na etapa 1: prévia local, "Enviar foto" (abre o
+ * seletor) e "Remover". Nada sai do navegador aqui: a foto é enviada só
+ * depois de a admissão ser concluída, e nunca vai para o rascunho.
+ */
+function BlocoDaFoto({
+  foto,
+  recusa,
+  onEscolher,
+  onRemover,
+}: {
+  readonly foto: FotoEscolhida | null;
+  readonly recusa: string | null;
+  readonly onEscolher: (arquivo: File | undefined) => void;
+  readonly onRemover: () => void;
+}) {
+  const campoRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <fieldset
+      className="nova-admissao__foto"
+      aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}
+    >
+      <legend className="nova-admissao__foto-legenda">
+        Foto do colaborador (opcional)
+      </legend>
+      {foto ? (
+        <img
+          className="nova-admissao__foto-avatar"
+          src={foto.url}
+          alt="Prévia da foto do colaborador"
+        />
+      ) : (
+        <span
+          className="nova-admissao__foto-avatar nova-admissao__foto-avatar--vazio"
+          aria-hidden="true"
+        >
+          <IconePessoaNeutra />
+        </span>
+      )}
+      <div className="nova-admissao__foto-corpo">
+        <div className="nova-admissao__foto-acoes">
+          <Button
+            id={ID_FOTO_ENVIAR}
+            type="button"
+            variant="secondary"
+            onClick={() => campoRef.current?.click()}
+          >
+            Enviar foto
+          </Button>
+          {foto ? (
+            <Button type="button" variant="subtle" onClick={onRemover}>
+              Remover
+            </Button>
+          ) : null}
+        </div>
+        <p id="nova-admissao-foto-ajuda" className="nova-admissao__foto-ajuda">
+          PNG ou JPEG, até 5 MB. Enviada ao concluir o cadastro. A foto não fica
+          no rascunho.
+        </p>
+        {recusa ? (
+          <p
+            id="nova-admissao-foto-recusa"
+            className="nova-admissao__foto-recusa"
+            role="alert"
+          >
+            {recusa}
+          </p>
+        ) : null}
+      </div>
+      <input
+        ref={campoRef}
+        id={ID_FOTO_ARQUIVO}
+        type="file"
+        accept={FOTO_TIPOS_ACEITOS}
+        hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          onEscolher(e.target.files?.[0]);
+          // Escolher o mesmo arquivo de novo também conta.
+          e.target.value = "";
+        }}
+      />
+    </fieldset>
+  );
+}
+
+/** T209 — o envio da foto na confirmação da admissão. */
+function EstadoDaFotoEnviada({
+  foto,
+  envio,
+  onTentarDeNovo,
+  onEscolherOutra,
+}: {
+  readonly foto: FotoEscolhida | null;
+  readonly envio: EnvioDaFoto;
+  readonly onTentarDeNovo: () => void;
+  readonly onEscolherOutra: (arquivo: File | undefined) => void;
+}) {
+  const campoRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <section
+      className="nova-admissao__bloco-gravado nova-admissao__foto-envio"
+      aria-labelledby="nova-admissao-sucesso-foto"
+    >
+      <h3 id="nova-admissao-sucesso-foto" className="nova-admissao__subtitulo">
+        Foto
+      </h3>
+      {foto && envio.estado === "enviada" ? (
+        <img
+          className="nova-admissao__foto-avatar"
+          src={foto.url}
+          alt="Foto do colaborador"
+        />
+      ) : null}
+      {envio.estado === "enviando" ? (
+        <p className="nova-admissao__texto" role="status">
+          Enviando a foto…
+        </p>
+      ) : null}
+      {envio.estado === "enviada" ? (
+        <p className="nova-admissao__texto" role="status">
+          Foto salva.
+        </p>
+      ) : null}
+      {envio.estado === "falhou" ? (
+        <>
+          <div className="nova-admissao__erro-geral" role="alert">
+            <p className="nova-admissao__texto">
+              O colaborador foi criado, mas a foto não foi salva.
+            </p>
+            <p className="nova-admissao__texto">{envio.mensagem}</p>
+          </div>
+          <div className="nova-admissao__foto-acoes">
+            {envio.podeRepetir && foto ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onTentarDeNovo}
+              >
+                Tentar enviar foto novamente
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => campoRef.current?.click()}
+              >
+                Escolher outra foto
+              </Button>
+            )}
+          </div>
+          <input
+            ref={campoRef}
+            id={ID_FOTO_OUTRA}
+            type="file"
+            accept={FOTO_TIPOS_ACEITOS}
+            hidden
+            tabIndex={-1}
+            onChange={(e) => {
+              onEscolherOutra(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+/** Silhueta neutra da foto vazia (decorativa). */
+function IconePessoaNeutra() {
+  return (
+    <svg viewBox="0 0 24 24" width="32" height="32" focusable="false">
+      <circle cx="12" cy="8.5" r="4" fill="currentColor" />
+      <path d="M4 20.5c0-4.1 3.6-7 8-7s8 2.9 8 7z" fill="currentColor" />
+    </svg>
   );
 }
