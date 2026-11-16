@@ -7,11 +7,11 @@
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -269,7 +269,7 @@ describe("T205 — quem abre o Dashboard (D-2, D-6)", () => {
     expect(primeiro).toHaveTextContent(/^Dashboard/);
     expect(primeiro).toHaveAttribute("aria-current", "page");
     fireEvent.click(
-      within(nav).getByRole("button", { name: /^Colaboradores/ }),
+      within(nav).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     fireEvent.click(within(nav).getAllByRole("button")[0]!);

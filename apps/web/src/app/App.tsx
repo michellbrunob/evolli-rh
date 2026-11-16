@@ -121,7 +121,11 @@ import {
 import { CentralSolicitacoesRHScreen } from "../screens/solicitacoes-rh/CentralSolicitacoesRHScreen";
 import { ModuloEmPreparacao } from "./ModuloEmPreparacao";
 import { DicaDoTrilho } from "./DicaDoTrilho";
-import { ID_NAVEGACAO_PAINEL, PainelNavigation } from "./PainelNavigation";
+import {
+  ATRIBUTO_AVISO_EM_DESENVOLVIMENTO,
+  ID_NAVEGACAO_PAINEL,
+  PainelNavigation,
+} from "./PainelNavigation";
 import {
   SeletorEmpresaAtiva,
   type EmpresaAtivaExibida,
@@ -1571,6 +1575,14 @@ export function App({
 
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key === "Escape") {
+        // T209 — com o aviso de item em desenvolvimento aberto, o `Escape`
+        // é dele: fecha só o aviso e devolve o foco ao item; a gaveta fica.
+        if (
+          evento.target instanceof Element &&
+          evento.target.closest(`[${ATRIBUTO_AVISO_EM_DESENVOLVIMENTO}]`)
+        ) {
+          return;
+        }
         evento.preventDefault();
         setGavetaAberta(false);
         return;

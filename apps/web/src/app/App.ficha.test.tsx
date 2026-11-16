@@ -11,11 +11,11 @@
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
@@ -514,7 +514,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
       name: "Navegação do painel",
     });
     fireEvent.click(
-      within(barra).getByRole("button", { name: /^Colaboradores/ }),
+      within(barra).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
@@ -902,7 +902,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     fireEvent.click(
       within(
         screen.getByRole("navigation", { name: "Navegação do painel" }),
-      ).getByRole("button", { name: /^Colaboradores/ }),
+      ).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(window.location.hash).toBe(LISTAGEM);
@@ -956,7 +956,7 @@ describe("T200 — guarda de saída no App", () => {
     await esperarFicha(ana.nome);
     const campo = editarNome();
     const item = within(barra()).getByRole("button", {
-      name: /^Colaboradores/,
+      name: /^Colaboradores Consulta/,
     });
     item.focus();
     fireEvent.click(item);
@@ -1238,7 +1238,9 @@ describe("T200 — guarda de saída no App", () => {
       await esperarFicha(ana.nome);
       editarNome();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
       unmount();
@@ -1248,7 +1250,7 @@ describe("T200 — guarda de saída no App", () => {
     await esperarFicha(ana.nome);
     expect(within(fichaNaTela()!).queryByLabelText("Nome")).toBeNull();
     fireEvent.click(
-      within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      within(barra()).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
@@ -1614,7 +1616,9 @@ describe("T200 — guarda de saída no App", () => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
       // Outro destino desmonta: pergunta.
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Jornadas de trabalho"]);
       sairSemSalvar();
@@ -1632,7 +1636,9 @@ describe("T200 — guarda de saída no App", () => {
       );
       await abrirNovoVinculo();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(formularioDeVinculo()).not.toBeNull();
@@ -1644,13 +1650,17 @@ describe("T200 — guarda de saída no App", () => {
       montarComGuarda();
       await abrirNovoVinculo();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
       continuarEditando();
       expect(formularioDeVinculo()).not.toBeNull();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       sairSemSalvar();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });

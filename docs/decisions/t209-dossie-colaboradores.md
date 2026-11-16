@@ -728,3 +728,69 @@ conversão automática; importação (Bloco C segue pausado).
   a abertura em tela inteira e a marca centralizada, sem rolagem horizontal; navegação interna
   e troca de empresa (conta multiempresa) sem abertura, com o aviso, o anúncio e o foco de
   sempre.
+
+## 28. Menu lateral completo (ordem e aprovação de 2026-11-16)
+
+- **Estrutura:** topo com a marca, o controle de recolher e o seletor de empresa; Dashboard e
+  Portal (selo "Beta"); seção **Pessoas** — Colaboradores (expansível, com os subitens
+  Colaboradores e Desenvolvimento), Recrutamento (Vagas e Banco de talentos), Pesquisas e
+  Calendário; seção **Remuneração** — Folha de Pagamento, Benefícios e Hub de Benefícios (selo
+  "Novo"); seção **Operação** com os módulos funcionais que não estavam na estrutura pedida
+  (Estrutura, Jornada, Liderança e Contas de acesso); Demonstração; rodapé preso ao pé da faixa
+  com Suporte, Roadmap e Configurações. A disposição vive em `apps/web/src/app/menuLateral.ts`;
+  os destinos, as rotas e as permissões continuam em `mapaNavegacao.ts`, sem mudança.
+- **Itens funcionais:** Dashboard, Colaboradores, Estrutura organizacional, Jornadas de
+  trabalho, Jornada, Minha equipe, Administração da liderança, Contas de acesso, as telas de
+  Demonstração e Configurações — mesmo comportamento e mesmas permissões de antes.
+- **Itens em desenvolvimento (12):** Portal, Desenvolvimento, Recrutamento (Vagas, Banco de
+  talentos), Pesquisas, Calendário, Folha de Pagamento, Benefícios, Hub de Benefícios, Suporte e
+  Roadmap. Cada um é um `<button>` com `aria-disabled`, nome, o estado "Em desenvolvimento" no
+  nome acessível e a explicação "Em desenvolvimento. Esta funcionalidade ainda não está
+  disponível." como descrição e como dica (ponteiro e foco; no trilho, com o nome). Clique,
+  Enter ou Espaço abrem um aviso pequeno e não modal ao lado do item (abaixo dele na gaveta);
+  `Escape` ou "Fechar aviso" fecham e devolvem o foco ao item. Nunca muda a URL nem a tela;
+  sem link, sem `href="#"`, sem rota nova, sem entrada em `DESTINOS`. Na gaveta do celular, o
+  primeiro `Escape` fecha só o aviso; o segundo, a gaveta.
+- **Decisões aprovadas (menu compacto):**
+  - A — uma linha por item: o sub-rótulo do destino sai de vista e vira a dica (segue no nome
+    acessível).
+  - B — o estado de um item em desenvolvimento vira uma marca compacta (relógio, decorativo)
+    ao fim da linha; o texto segue no nome acessível e a explicação na descrição, na dica e no
+    aviso.
+  - C — Recrutamento começa fechado.
+  - D — sem divisórias entre as seções no menu expandido; o divisor fica só no trilho, onde o
+    título da seção não aparece.
+  - E1 — a seção Operação (título vira botão de abrir e fechar) e o módulo Demonstração começam
+    fechados, salvo quando a tela aberta está neles; fechados com a tela atual dentro, o título
+    carrega a marca (`aria-current`). No trilho, Operação aparece sempre, em ícones.
+  - "Folha de Pagamento" com P maiúsculo.
+  - Desktop com itens de 36 px; no celular, mínimo de 44 px.
+  - Em janelas menores, a faixa lateral pode rolar por dentro.
+  - Selos Beta e Novo em 12 px.
+- **Pendências registradas (sem decisão):** ícones Lucide nos itens novos ao lado dos desenhos
+  próprios dos módulos existentes; a trilha da página continua "Gestão de Pessoas ›
+  Colaboradores"; Portal em desenvolvimento enquanto a tela de exemplo "Portal do Colaborador"
+  segue em Demonstração.
+- **Testes:** `App.menuCompleto.test.tsx` (64), escritos antes da implementação: ordem, seções
+  e rodapé; itens funcionais preservados; selos; cada item em desenvolvimento por mouse e por
+  teclado (aviso, URL e tela intactas, `Escape`, foco devolvido, um aviso por vez, foco só no
+  aviso já visível); item e subitem ativos; Recrutamento, Operação e Demonstração fechados e
+  abertos; tela ativa nunca escondida; trilho; gaveta do celular; papel gestor; contrato (sem
+  link, sem `href="#"`, sem destino ou rota para item em desenvolvimento, todo grupo do mapa uma
+  vez); contrato de CSS (só tokens, rodapé, divisor só no trilho, marca compacta, 44 px no
+  celular, sem animação fora de `no-preference`). Os testes antigos que navegam por Operação e
+  Demonstração abrem as duas antes (`apps/web/src/test/menuLateral.ts`), inclusive antes das
+  verificações de ausência, para não passarem por item escondido. 8 mutações, todas detectadas.
+- **Navegador (banco próprio da T209):** desktop 1440 × 1000 — o menu inteiro cabe sem rolagem,
+  itens de 36 px numa linha (inclusive "Hub de Benefícios Novo"), sem rolagem horizontal; dica
+  do sub-rótulo no Dashboard e da explicação nos itens em desenvolvimento; Enter em Folha de
+  Pagamento abre o aviso ao lado, com o foco nele, URL e título intactos, e `Escape` devolve o
+  foco; Operação abre e fecha. Trilho — sem o botão da seção, Estrutura, Jornada, Liderança e
+  Contas de acesso como ícones com dica. 375 px — gaveta de 300 px que rola por dentro, 16
+  alvos de 44 px numa linha, Recrutamento, Operação e Demonstração fechados; Espaço em Roadmap
+  abre o aviso dentro da tela; o primeiro `Escape` fecha o aviso e o segundo, a gaveta, com o
+  foco em Menu.
+- **Validação:** web 140 arquivos, 4062 testes, numa rodada limpa (sem falha nem estouro de
+  tempo, 4 workers); lint, typecheck, build, Prettier, `spec:check` e `git diff --check` verdes.
+  Só web: sem API, banco, permissão, rota ou dependência nova. Nenhuma imagem ou referência
+  externa foi salva ou versionada.

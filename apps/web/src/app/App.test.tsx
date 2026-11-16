@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { App } from "./App";
@@ -795,12 +796,24 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // (`sempreComoModulo`), Estrutura (dois itens desde a T182), Liderança e
     // Demonstração. O Dashboard é item único: módulo e destino fundidos.
     // T208 — Configurações também é item único (a própria conta): 21.
-    expect(botoes).toHaveLength(21);
+    // T209 — menu completo: + 11 itens em desenvolvimento (8 de primeiro
+    // nível e 3 subitens) e o cabeçalho expansível de Recrutamento: 33. O
+    // cabeçalho de Gestão de Pessoas se chama "Colaboradores" na barra.
+    // T209 (menu compacto) — o título da seção Operação vira um botão de
+    // abrir e fechar: 34.
+    expect(botoes).toHaveLength(34);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))
         .map((b) => b.textContent),
-    ).toEqual(["Gestão de Pessoas", "Estrutura", "Liderança", "Demonstração"]);
+    ).toEqual([
+      "Colaboradores",
+      "Recrutamento",
+      "Operação",
+      "Estrutura",
+      "Liderança",
+      "Demonstração",
+    ]);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");

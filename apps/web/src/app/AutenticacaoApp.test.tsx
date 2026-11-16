@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { abrirSecoesFechadasDoMenu } from "../test/menuLateral";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
@@ -778,6 +779,7 @@ describe("T153 — aterrissagem segura por papel", () => {
       /^Dashboard/,
     );
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
+    abrirSecoesFechadasDoMenu();
     expect(
       screen.getByRole("button", { name: /Minha equipe/ }),
     ).toBeInTheDocument();
@@ -809,6 +811,7 @@ describe("T153 — aterrissagem segura por papel", () => {
       });
 
       expect(destinosAtivos()).toEqual(["Dashboard Visão geral do ano"]);
+      abrirSecoesFechadasDoMenu();
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
     },
   );
@@ -830,6 +833,7 @@ describe("T153 — aterrissagem segura por papel", () => {
       await abrirProduto(abrir);
 
       expect(destinosAtivos()).toEqual([destino]);
+      abrirSecoesFechadasDoMenu();
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
       expect(
         within(
@@ -910,6 +914,7 @@ describe("T153 — aterrissagem segura por papel", () => {
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
+    abrirSecoesFechadasDoMenu();
     fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
     await screen.findByRole("navigation");
 
@@ -1683,7 +1688,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
     await screen.findByRole("button", { name: /Empresa ativa/ });
-    await abrirProduto(/^Colaboradores/);
+    await abrirProduto(/^Colaboradores Consulta/);
     await waitFor(() => expect(seletorDoMenu()).not.toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Hub" }));
     await screen.findByRole("button", { name: /Empresa ativa/ });
@@ -2897,7 +2902,9 @@ describe("T209 — tela de abertura institucional", () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD });
-    fireEvent.click(screen.getByRole("button", { name: /^Colaboradores/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
+    );
     expect(abertura()).toBeNull();
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(abertura()).toBeNull();

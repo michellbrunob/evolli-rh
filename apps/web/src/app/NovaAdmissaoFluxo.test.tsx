@@ -19,6 +19,7 @@ import {
   type RenderOptions,
 } from "@testing-library/react";
 import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
+import { abrirSecoesFechadasDoMenu } from "../test/menuLateral";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { NOVA_ADMISSAO_TITULO_ID } from "../screens/pessoas";
@@ -217,7 +218,7 @@ function itemNovaAdmissaoNaBarra() {
 function itemColaboradoresNaBarra() {
   return within(
     screen.getByRole("navigation", { name: "Navegação do painel" }),
-  ).getByRole("button", { name: /^Colaboradores/ });
+  ).getByRole("button", { name: /^Colaboradores Consulta/ });
 }
 
 function trilha() {
@@ -312,7 +313,7 @@ describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () =>
       render(<App papelDoAtor={papel} />);
       await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
       expect(
-        screen.getByRole("button", { name: "Gestão de Pessoas" }),
+        screen.getByRole("button", { name: "Colaboradores" }),
       ).toHaveAttribute("aria-expanded", "true");
       expect(itemColaboradoresNaBarra()).toHaveAttribute(
         "aria-current",
@@ -594,6 +595,7 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
   it("ir para um destino sem rota tira a rota da URL, e 'voltar' retorna à listagem", async () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    abrirSecoesFechadasDoMenu();
     fireEvent.click(
       screen.getByRole("button", { name: /^Estrutura organizacional/ }),
     );
@@ -743,7 +745,7 @@ describe("T209 — assistente da Nova admissão no App (permissões e voltar)", 
 describe("T176 — rota recusada para quem não admite", () => {
   /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
   const SEM_ACESSO = [
-    ["master_tecnico", /^Colaboradores/, ROTA_COLABORADORES],
+    ["master_tecnico", /^Colaboradores Consulta/, ROTA_COLABORADORES],
     ["gestor", /^Minha equipe/, ""],
     ["colaborador", /^Visão geral/, ""],
   ] as const;
@@ -984,6 +986,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     );
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(window.location.hash).toBe(ROTA_COLABORADORES);
+    abrirSecoesFechadasDoMenu();
     fireEvent.click(
       screen.getByRole("button", { name: /^Estrutura organizacional/ }),
     );

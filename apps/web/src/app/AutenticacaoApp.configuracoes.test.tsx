@@ -12,6 +12,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { abrirSecoesFechadasDoMenu } from "../test/menuLateral";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
 import { refreshCsrfToken } from "../api/csrfClient";
@@ -205,8 +206,10 @@ describe("T208 — Meu perfil a partir da sessão", () => {
 describe("T208 — o nome de exibição na sessão", () => {
   const campo = () => screen.getByRole("textbox", { name: "Nome de exibição" });
   const navegacao = () => document.getElementById("navegacao-lateral")!;
-  const menu = (nome: RegExp) =>
-    within(navegacao()).getByRole("button", { name: nome });
+  const menu = (nome: RegExp) => {
+    abrirSecoesFechadasDoMenu();
+    return within(navegacao()).getByRole("button", { name: nome });
+  };
 
   it("salvar troca o ator da sessão sem remontar: sair e voltar mostra o nome salvo, sem ler /users/me de novo", async () => {
     vi.mocked(atualizarPerfilProprio).mockResolvedValue({
@@ -309,8 +312,10 @@ describe("T208 — o nome de exibição na sessão", () => {
 describe("T208 — a foto de perfil na sessão", () => {
   const VERSAO_FOTO = "2026-11-13T12:00:00.000Z";
   const navegacao = () => document.getElementById("navegacao-lateral")!;
-  const menu = (nome: RegExp) =>
-    within(navegacao()).getByRole("button", { name: nome });
+  const menu = (nome: RegExp) => {
+    abrirSecoesFechadasDoMenu();
+    return within(navegacao()).getByRole("button", { name: nome });
+  };
   const arquivo = () =>
     document.querySelector('input[type="file"]') as HTMLInputElement;
 

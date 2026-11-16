@@ -3455,6 +3455,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         depois do login, até o acesso estar pronto (duração mínima de 300 ms contra o piscar);
         nunca na navegação interna nem na troca de empresa; base Lottie (`lottie-web` 5.13.0,
         sob demanda) com o ponto de conexão em `apps/web/src/app/abertura/animacaoOficial.ts`.
+      - **Menu lateral completo (seção 28):** seções Pessoas, Remuneração e Operação, Demonstração
+        e rodapé (Suporte, Roadmap, Configurações); 12 itens em desenvolvimento como botões com
+        `aria-disabled`, explicação e aviso não modal (sem URL, sem rota, sem `href="#"`); menu
+        compacto aprovado (A–E1: uma linha por item, relógio compacto, Recrutamento, Operação e
+        Demonstração fechados, sem divisórias no expandido; 36 px no desktop, 44 px no celular,
+        selos de 12 px, rolagem interna em janelas menores). Web 140 arquivos, 4062 testes numa
+        rodada limpa; 8 mutações detectadas. Só web.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
