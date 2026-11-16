@@ -27,6 +27,11 @@ import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais
 import { RascunhoAdmissaoController } from "./rascunho-admissao/rascunho-admissao.controller";
 import { RascunhoAdmissaoService } from "./rascunho-admissao/rascunho-admissao.service";
 
+import { FotoColaboradorController } from "./foto-colaborador/foto-colaborador.controller";
+import { FotoColaboradorService } from "./foto-colaborador/foto-colaborador.service";
+import { ARMAZENAMENTO_DE_FOTOS } from "./foto-colaborador/armazenamento-de-objetos";
+import { ArmazenamentoR2 } from "./foto-colaborador/armazenamento-r2";
+
 @Module({
   imports: [AuthModule, AuditModule],
   controllers: [
@@ -39,6 +44,8 @@ import { RascunhoAdmissaoService } from "./rascunho-admissao/rascunho-admissao.s
     DadosPessoaisColaboradorController,
     // T209 — rascunho da Nova admissão.
     RascunhoAdmissaoController,
+    // T209 — foto do colaborador (ADR 0020).
+    FotoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -48,6 +55,9 @@ import { RascunhoAdmissaoService } from "./rascunho-admissao/rascunho-admissao.s
     ContatoColaboradorService,
     DadosPessoaisColaboradorService,
     RascunhoAdmissaoService,
+    FotoColaboradorService,
+    // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
+    { provide: ARMAZENAMENTO_DE_FOTOS, useClass: ArmazenamentoR2 },
   ],
 })
 export class PessoasModule {}

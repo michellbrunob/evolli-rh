@@ -78,7 +78,11 @@ export type CodigoDeRecusa =
   | "foto_formato_invalido"
   | "foto_pequena"
   | "foto_grande_demais"
-  | "foto_invalida";
+  | "foto_invalida"
+  // T209 — foto do colaborador (ADR 0020): tipo declarado, extensão e
+  // conteúdo que não concordam, e tamanho de versão pedido fora da lista.
+  | "foto_tipo_divergente"
+  | "foto_tamanho_invalido";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência

@@ -157,9 +157,11 @@ model AccessUser {
   dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
 
   // T179 — admissões que esta conta enviou com chave de idempotência.
-  idempotenciasAdmissao IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  idempotenciasAdmissao    IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
   // T209 — rascunho da Nova admissão, por conta e empresa.
-  rascunhosAdmissao     RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
+  rascunhosAdmissao        RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
+  // T209 — fotos de colaborador enviadas por esta conta (autoria).
+  fotosColaboradorEnviadas FotoColaborador[]      @relation("FotoColaboradorAutor")
 
   @@index([companyId])
   @@map("access_user")
@@ -474,6 +476,12 @@ enum AuditAction {
   pessoas_rascunho_admissao_salvo      @map("pessoas.rascunho_admissao.salvo")
   pessoas_rascunho_admissao_descartado @map("pessoas.rascunho_admissao.descartado")
 
+  // T209 — foto do colaborador (ADR 0020): envio, substituicao e
+  // remocao. Sem conteudo, hash, tamanho, dimensoes ou chave do objeto.
+  pessoas_foto_colaborador_enviada     @map("pessoas.foto_colaborador.enviada")
+  pessoas_foto_colaborador_substituida @map("pessoas.foto_colaborador.substituida")
+  pessoas_foto_colaborador_removida    @map("pessoas.foto_colaborador.removida")
+
   pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
   pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
   pessoas_vinculo_encerrado @map("pessoas.vinculo.encerrado")
@@ -777,6 +785,9 @@ model Empresa {
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
   // T209 — rascunhos da Nova admissão desta empresa.
   rascunhosAdmissao     RascunhoAdmissao[]
+  // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
+  fotosColaborador      FotoColaborador[]
+  limpezasFotoPendentes LimpezaFotoColaboradorPendente[]
 
   @@index([status])
   @@map("empresa")
@@ -1109,6 +1120,9 @@ model Colaborador {
   // T179 — admissão idempotente que o criou e revisões de normalização.
   idempotenciasAdmissao IdempotenciaAdmissao[]
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+
+  // T209 — foto do colaborador, por empresa (ADR 0020).
+  fotos FotoColaborador[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -2543,4 +2557,56 @@ model RascunhoAdmissao {
   @@unique([atorUserId, empresaId])
   @@index([empresaId])
   @@map("rascunho_admissao")
+}
+
+/// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela
+/// empresa, nunca à conta de acesso (`AccessUserFoto` é outra coisa). Os bytes
+/// ficam no armazenamento de objetos privado (Cloudflare R2), em três versões
+/// WebP geradas pelo servidor; aqui só os metadados da versão ATUAL. A chave
+/// do objeto só tem ids internos — nunca nome, CPF, e-mail ou matrícula.
+model FotoColaborador {
+  id            String   @id @default(uuid())
+  colaboradorId String   @map("colaborador_id")
+  empresaId     String   @map("empresa_id")
+  /// Id do conjunto de versões atual (segmento da chave do objeto).
+  arquivoId     String   @map("arquivo_id")
+  /// Prefixo das três versões: v1/empresas/{e}/colaboradores/{c}/foto/{a}/
+  chaveAtual    String   @map("chave_atual")
+  /// SHA-256 da versão de 512 px (gerada pelo servidor).
+  hashSha256    String   @map("hash_sha256")
+  /// Bytes da versão de 512 px.
+  tamanhoBytes  Int      @map("tamanho_bytes")
+  tipo          String
+  /// Sobe a cada substituição.
+  versao        Int      @default(1)
+  enviadaPorId  String   @map("enviada_por_id")
+  criadoEm      DateTime @default(now()) @map("criado_em")
+  atualizadoEm  DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadaPor  AccessUser  @relation("FotoColaboradorAutor", fields: [enviadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([colaboradorId, empresaId])
+  @@index([empresaId])
+  @@map("foto_colaborador")
+}
+
+/// T209 — objeto da foto que não pôde ser apagado do armazenamento
+/// (substituição, remoção ou falha no envio). Fica para nova tentativa; só
+/// ids e a chave do objeto, nenhum dado pessoal.
+model LimpezaFotoColaboradorPendente {
+  id                String    @id @default(uuid())
+  empresaId         String    @map("empresa_id")
+  colaboradorId     String    @map("colaborador_id")
+  chave             String    @unique
+  motivo            String
+  tentativas        Int       @default(0)
+  criadoEm          DateTime  @default(now()) @map("criado_em")
+  ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId])
+  @@map("limpeza_foto_colaborador_pendente")
 }
