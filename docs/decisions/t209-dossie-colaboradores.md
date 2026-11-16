@@ -880,3 +880,66 @@ conversão automática; importação (Bloco C segue pausado).
   pessoas já cadastradas.
 - Sem origem "importação" na admissão, sem evento de lote e sem verificação no servidor (C-11).
 - DP e master técnico cobertos por teste (rota e painel), não vistos no navegador nesta rodada.
+
+## 30. Barra superior fixa e Hub desativado (ordem de 2026-11-16)
+
+### 30.1 Barra superior
+
+- **Esquerda:** botão da gaveta (só no celular), a marca do Evolli, o botão de recolher o menu
+  (só no desktop; saiu da faixa lateral, que agora abre no seletor de empresa) e a trilha da
+  tela atual, derivada das rotas (`apps/web/src/app/trilhaDoShell.ts`: seção do menu lateral,
+  módulo e tela do mapa de destinos, sem nome repetido; numa sub-página, o item do pai leva a
+  ele). Exemplos: "Pessoas / Colaboradores", "Pessoas / Colaboradores / Nova admissão",
+  "Dashboard", "Configurações / Meu perfil", "Operação / Estrutura / Estrutura organizacional".
+- **Direita:** só a conta. Não há ajuda nem notificações no produto, então não há controles
+  para eles. Avatar (a foto da própria conta pela rota autenticada da T208, ou as iniciais do
+  nome de exibição; sem nome, um avatar neutro), o nome de exibição (sem nome: "Minha conta",
+  nada derivado do e-mail) e um menu acessível (Radix) com Meu perfil, Segurança (quando o
+  servidor informa MFA), Sessões ativas e Sair — Sair passa pela guarda de saída, como antes.
+  Separadores sutis entre os grupos. O papel técnico saiu do cabeçalho; e-mail, empresa e
+  identificadores nunca aparecem nele.
+- **Comportamento:** `position: sticky` no topo (sem sair do fluxo, não cobre título nem
+  conteúdo; `scroll-padding-top` evita foco escondido); modais, guarda e gaveta ficam acima.
+  Menu da conta por mouse e teclado (Enter/Espaço), Escape e clique fora fecham, o foco volta
+  ao botão. Em 375 px: Menu, marca e conta (nome truncado com reticências, nome acessível
+  completo), sem a trilha, sem rolagem horizontal, alvos de 44 px. Movimento reduzido: a seta
+  do menu só gira com `no-preference`. Ao cruzar o breakpoint com o foco no recolher, o foco vai
+  ao botão Menu (como antes, quando ele morava na faixa).
+- **Trilhas dentro das páginas:** permanecem onde descem além da barra (abas de Pessoas, ficha
+  do colaborador, Nova admissão, importação, Meu perfil); a remoção fica para quando cada tela
+  for reorganizada.
+
+### 30.2 Hub desativado como destino de uso normal
+
+- O Hub não é mais montado: nenhum botão, cartão, redirecionamento ou boas-vindas leva a ele. O
+  código (`HubPosLogin`), os dados, as permissões e os testes dele ficam.
+- **Destino por papel** (`destinoPosLoginPara`, sem mudança de permissão): RH, DP e
+  `master_tecnico` → Dashboard (sem empresa ativa, o Dashboard mantém "Escolha uma empresa ativa
+  no menu para ver o Dashboard."); gestor → Minha equipe; colaborador, financeiro, auditor, DPO
+  e administração técnica → tela mínima neutra "Acesso em configuração" ("Seu acesso está sendo
+  configurado. Novos recursos serão liberados conforme o seu papel."), sem nome Hub, sem
+  módulos, cartões, atalhos ou requisições; o único controle é Sair. Ela não está no menu e não
+  é destino (`apps/web/src/app/AcessoTemporario.tsx`).
+- **Rotas:** a URL antiga do Hub (sem rota, ou `#/hub`) cai no mesmo comportamento por papel;
+  rotas que o papel já abria continuam abrindo (colaborador em `#/configuracoes/meu-perfil`).
+  Recarga, voltar/avançar, logout, sessão expirada e troca de empresa seguem como antes; outra
+  conta confirmada pelo servidor na mesma aba vai ao destino do papel novo, nunca ao Hub.
+
+### 30.3 Validação
+
+- **Testes escritos antes do código:** trilha (14), barra superior (20) e Hub desativado (16, no portão
+  de sessão — 9 vermelhos antes da mudança —, mais o caso de outra conta); os testes antigos que passavam pelo Hub ou pelos
+  botões do cabeçalho foram reescritos para o comportamento novo (aterrissagem, menu lateral e
+  menu da conta). 5 mutações, todas detectadas (trilha sem deduplicar, foco da tela temporária,
+  destino sem o padrão do papel, nome caindo no e-mail, foco ao cruzar o breakpoint).
+- **Navegador (banco próprio da T209):** RH em Colaboradores — barra com marca, recolher,
+  "Pessoas / Colaboradores" e "Minha conta", sem Hub, sem rolagem horizontal; menu da conta
+  pelo Enter (Meu perfil, Sessões ativas, Sair; foco no primeiro item), Escape fecha e devolve o
+  foco. DP e master técnico → Dashboard (master sem empresa: a orientação de escolher empresa);
+  gestor → Minha equipe com "Operação / Liderança / Minha equipe"; colaborador → "Acesso em
+  configuração" com o foco no título e só Sair; `#/hub` recarregado como colaborador → a mesma
+  tela. 375 px: RH com Menu e conta (44 px), nome truncado, sem trilha e sem rolagem horizontal;
+  tela temporária sem rolagem horizontal; voltar e avançar entre Dashboard e Colaboradores.
+- **Bateria:** web 145 arquivos, 4188 testes numa rodada limpa (4 workers); lint, typecheck,
+  build, Prettier, `spec:check` e `git diff --check` verdes. Sem API, migration, RBAC, seed,
+  dependência ou rota nova.

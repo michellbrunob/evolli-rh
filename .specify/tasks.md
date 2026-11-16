@@ -3470,6 +3470,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         admissão por linha com `Idempotency-Key` própria, resultado e nova tentativa só das que
         não entraram. Web 143 arquivos, 4143 testes numa rodada limpa; 7 mutações detectadas. Só
         web.
+      - **Barra superior e Hub desativado (seção 30):** barra fixa com marca, recolher, trilha
+        derivada das rotas e só a conta (nome de exibição, avatar, menu com Meu perfil e Sair; sem
+        e-mail, papel ou empresa); Hub nunca montado — RH, DP e master técnico no Dashboard,
+        gestor em Minha equipe, demais papéis numa tela neutra de acesso temporário, sem módulos.
+        Web 145 arquivos, 4188 testes numa rodada limpa; 5 mutações detectadas. Só web.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
