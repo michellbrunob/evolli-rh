@@ -158,6 +158,8 @@ model AccessUser {
 
   // T179 — admissões que esta conta enviou com chave de idempotência.
   idempotenciasAdmissao IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  // T209 — rascunho da Nova admissão, por conta e empresa.
+  rascunhosAdmissao     RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
 
   @@index([companyId])
   @@map("access_user")
@@ -411,7 +413,7 @@ enum AuditAction {
 
   // T208 — foto de perfil da propria conta (ADR 0018): envio (inclui
   // substituicao) e remocao. Sem conteudo, hash, nome, tamanho ou dimensoes.
-  conta_foto_enviada @map("conta.foto.enviada")
+  conta_foto_enviada  @map("conta.foto.enviada")
   conta_foto_removida @map("conta.foto.removida")
 
   organizacao_empresa_criada     @map("organizacao.empresa.criada")
@@ -465,6 +467,12 @@ enum AuditAction {
   //     entao "leitura fora do escopo proprio" e sempre 404, nunca leitura
   pessoas_colaborador_criado     @map("pessoas.colaborador.criado")
   pessoas_colaborador_atualizado @map("pessoas.colaborador.atualizado")
+
+  // T209 — rascunho da Nova admissao: salvo e descartado. O evento nao
+  // guarda conteudo do rascunho (nem nome, nem data): so quem, quando e
+  // em qual empresa.
+  pessoas_rascunho_admissao_salvo      @map("pessoas.rascunho_admissao.salvo")
+  pessoas_rascunho_admissao_descartado @map("pessoas.rascunho_admissao.descartado")
 
   pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
   pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
@@ -767,6 +775,8 @@ model Empresa {
   // T179 — idempotência da admissão e relação técnica de revisão.
   idempotenciasAdmissao IdempotenciaAdmissao[]
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+  // T209 — rascunhos da Nova admissão desta empresa.
+  rascunhosAdmissao     RascunhoAdmissao[]
 
   @@index([status])
   @@map("empresa")
@@ -2510,4 +2520,27 @@ model RevisaoNormalizacaoCadastro {
   @@index([empresaId])
   @@index([colaboradorId])
   @@map("revisao_normalizacao_cadastro")
+}
+
+/// T209 — rascunho da Nova admissão: o formulário salvo antes de concluir.
+/// Uma linha por conta e empresa ativa (quem salvou é quem recupera). Só os
+/// campos do contrato atual da admissão, filtrados pelo servidor; nunca cria
+/// colaborador, vínculo ou movimentação. Apagado ao concluir ou descartar.
+model RascunhoAdmissao {
+  id           String   @id @default(uuid())
+  atorUserId   String   @map("ator_user_id")
+  empresaId    String   @map("empresa_id")
+  /// Os valores do formulário (sem foto, sem arquivo).
+  dados        Json
+  /// Sobe a cada gravação.
+  versao       Int      @default(1)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  ator    AccessUser @relation("RascunhoAdmissaoAtor", fields: [atorUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  empresa Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([atorUserId, empresaId])
+  @@index([empresaId])
+  @@map("rascunho_admissao")
 }

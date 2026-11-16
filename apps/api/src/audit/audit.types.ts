@@ -75,6 +75,9 @@ export const AUDIT_ACTIONS = [
   // escopo próprio é sempre 404 — nunca leitura a auditar).
   "pessoas_colaborador_criado",
   "pessoas_colaborador_atualizado",
+  // T209 — rascunho da Nova admissao (sem conteudo no evento).
+  "pessoas_rascunho_admissao_salvo",
+  "pessoas_rascunho_admissao_descartado",
   "pessoas_vinculo_criado",
   "pessoas_vinculo_ativado",
   "pessoas_vinculo_encerrado",
@@ -270,7 +273,10 @@ export type AuditResource =
   | "contato_colaborador"
   // T177 — Dados pessoais e endereco do colaborador: rotulo tecnico. O
   // `resourceId` e o id do COLABORADOR. Nunca um valor pessoal.
-  | "dados_pessoais_colaborador";
+  | "dados_pessoais_colaborador"
+  // T209 — rascunho da Nova admissao: o `resourceId` e o id do RASCUNHO.
+  // Nunca nome, data ou qualquer valor do formulario.
+  | "rascunho_admissao";
 
 export type RecordAuditEventInput =
   | {
