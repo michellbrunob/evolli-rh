@@ -3462,6 +3462,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         Demonstração fechados, sem divisórias no expandido; 36 px no desktop, 44 px no celular,
         selos de 12 px, rolagem interna em janelas menores). Web 140 arquivos, 4062 testes numa
         rodada limpa; 8 mutações detectadas. Só web.
+      - **Aprendiz fechado (seção 24):** auditoria das listas de tipo de vínculo (API e web, todas
+        com `aprendiz`) e Histórico funcional visto no navegador com um vínculo Aprendiz.
+      - **Importação CSV (seção 29):** Bloco C retomado com data de nascimento obrigatória (ordem
+        de 2026-11-16); ficha de tratamento escrita antes do código; página `#/pessoas/importar`
+        (RH e DP) com modelo, conferência por linha sem repetir valores, confirmação, uma
+        admissão por linha com `Idempotency-Key` própria, resultado e nova tentativa só das que
+        não entraram. Web 143 arquivos, 4143 testes numa rodada limpa; 7 mutações detectadas. Só
+        web.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

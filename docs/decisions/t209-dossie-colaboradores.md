@@ -611,9 +611,13 @@ conversão automática; importação (Bloco C segue pausado).
   "Aprendiz" no cabeçalho, em Dados contratuais, Registros de ponto e Solicitações; Nova
   admissão com a opção depois de Estágio, para RH e DP; 375 px sem rolagem horizontal da
   página.
-- **Limites:** o Histórico funcional (aba de Pessoas) foi coberto por teste de contrato do
-  rótulo, não visto no navegador; testes de tempo da Nova admissão (5 s) oscilam sob carga da
-  máquina, sem relação com o Aprendiz.
+- **Limites:** testes de tempo da Nova admissão (5 s) oscilam sob carga da máquina, sem relação
+  com o Aprendiz (a rodada limpa da seção 28 passou inteira).
+- **Fechamento (2026-11-16):** auditoria das listas de tipo de vínculo na API e na web — todas
+  com `aprendiz`; ponto e solicitações não têm lista própria de tipo (repassam o valor do banco;
+  os catálogos `outro_controlado` deles são de motivo). Histórico funcional visto no navegador:
+  "Teste T209 Alfa Aprendiz 01" com o vínculo "Sem matrícula — Aprendiz" no seletor e a
+  admissão na linha do tempo como "(Aprendiz)". AP-1 a AP-9 atendidas; nada de código mudou.
 
 ## 25. Fundação de interface incremental (ADR 0019)
 
@@ -794,3 +798,85 @@ conversão automática; importação (Bloco C segue pausado).
   tempo, 4 workers); lint, typecheck, build, Prettier, `spec:check` e `git diff --check` verdes.
   Só web: sem API, banco, permissão, rota ou dependência nova. Nenhuma imagem ou referência
   externa foi salva ou versionada.
+
+## 29. Bloco C retomado: importação CSV com data de nascimento obrigatória (2026-11-16)
+
+### 29.1 Decisão
+
+- **C-10 corrigida de novo (ordem da usuária, 2026-11-16):** a planilha passa a ter **data de
+  nascimento obrigatória**. É o que a admissão exige (`perfilPessoal.dataNascimento`, seção
+  13.2); assim cada linha vira uma admissão de sempre, pelo contrato atual, sem API nova, sem
+  migration e sem mudança de RBAC. As demais decisões de C-1 a C-15 seguem como aprovadas.
+- **Colunas:** obrigatórias — `nome`, `tipo_vinculo`, `data_admissao`, `data_nascimento`,
+  `departamento_codigo`, `cargo_codigo`; opcionais — `matricula`, `unidade_codigo`. Qualquer
+  outra coluna (CPF, salário, contato, e-mail, telefone, endereço, sexo, documento, foto ou
+  desconhecida) recusa o arquivo inteiro, antes de ler qualquer linha.
+
+### 29.2 Ficha de tratamento da importação (C-12)
+
+| Item                  | Tratamento                                                                                                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finalidade            | admitir várias pessoas de uma vez na empresa ativa, com os mesmos dados mínimos do cadastro individual                                                                 |
+| Quem usa              | RH e DP da empresa ativa (C-9); master técnico e demais papéis não chegam à página (mesma regra da Nova admissão)                                                      |
+| Dados pessoais        | nome e data de nascimento (obrigatórios para a admissão); nenhum outro dado pessoal entra                                                                              |
+| Onde o arquivo vive   | só na memória da aba, lido pelo navegador; **nunca enviado como arquivo**, nunca guardado (sem `localStorage`, `sessionStorage`, IndexedDB nem servidor)               |
+| O que vai ao servidor | uma admissão por linha válida, pelo `POST /v1/colaboradores` de sempre, com `Idempotency-Key` própria da linha; a auditoria por admissão é a existente                 |
+| Quanto tempo          | até sair da página, trocar de empresa ou escolher outro arquivo; nada sobra depois                                                                                     |
+| Limites               | até 200 linhas de dados e 1 MB por arquivo; só CSV UTF-8, separador `;` ou `,` detectado pelo cabeçalho                                                                |
+| Mensagens e relatório | erros por linha com **campo e motivo, sem repetir o valor**; o relatório baixável (linha, campo, motivo) também não traz valores                                       |
+| Modelo                | gerado no navegador: cabeçalho fixo e uma linha de exemplo sintética, recusada se for importada sem ser apagada                                                        |
+| Fora                  | origem "importação" na admissão (C-11), evento de lote, verificação no servidor, `.xlsx`, criação de departamento ou cargo pela planilha (C-13), exportação de pessoas |
+
+### 29.3 Implementação
+
+- **Entrada:** o painel "Adicionar colaborador" habilita "Importar planilha" para quem admite
+  (RH e DP; a mesma regra da Nova admissão), com o botão "Iniciar importação". A admissão
+  digital segue indisponível.
+- **Página:** `#/pessoas/importar` (destino `importar-colaboradores`, sub-página de
+  Colaboradores, fora da barra lateral), em três passos — Modelo e arquivo, Conferência e
+  Resultado — com o foco no título de cada passo. Trocar de empresa volta à listagem e
+  descarta a planilha.
+- **Regras puras** (`apps/web/src/screens/pessoas/importacao/planilhaColaboradores.ts`): modelo
+  com BOM, cabeçalho fixo e linha de exemplo (recusada se importada); separador `;` ou `,`;
+  aspas, BOM e CRLF; coluna fora do modelo, repetida ou obrigatória ausente recusa o arquivo;
+  até 200 linhas e 1 MB; por linha — nome (2 a 160, sem caractere de controle), tipo pelo
+  código ou pelo rótulo (inclui Aprendiz), datas `DD/MM/AAAA` ou `AAAA-MM-DD` de dia real e a
+  partir de 1900 (nascimento até hoje), Departamento, Cargo e Unidade por código entre os
+  ativos da empresa (todas as páginas dos catálogos), matrícula no padrão do contrato e única
+  no arquivo, linha repetida recusada.
+- **Envio:** depois de uma confirmação ("Importar N colaboradores?", com a empresa), uma
+  admissão por linha válida, em sequência, pelo contrato do cadastro individual (motivo de
+  admissão inicial; no perfil, só a data de nascimento; sem endereço nem contatos), cada uma
+  com a sua `Idempotency-Key`, mantida nas novas tentativas. Recusa do servidor fica na linha
+  com o motivo dele; falha de rede ou 5xx vira "não confirmada" (reenvio seguro); 401 e 403
+  param a importação e o resto fica "não enviada". "Tentar de novo as que não entraram"
+  reenvia só elas, com as mesmas chaves. O relatório de erros (linha, campo, motivo) é gerado
+  no navegador, sem valores.
+- **Guarda (T200):** planilha conferida e não importada pergunta antes de sair; durante o envio,
+  a saída e a troca de empresa esperam.
+- Sem API, migration, RBAC, dependência ou armazenamento novo.
+
+### 29.4 Validação
+
+- **Testes que falham antes:** regras da planilha (52), página (17), painel (+3) e rota no
+  shell (8); contratos atualizados (Hub com o cartão "Importar planilha", estado declarado da
+  tela, sem formatador de data local). 7 mutações nas regras e no envio, todas detectadas
+  (nascimento no futuro, coluna desconhecida, limite de 200, chave nova a cada envio, 401 sem
+  parar, linha repetida, guarda sem pendência).
+- **Navegador (banco próprio da T209, RH):** painel com "Importar planilha" habilitado e
+  "Iniciar importação"; página na rota própria com a empresa ativa; arquivo sintético de 5
+  linhas → "5 linhas lidas: 3 prontas para importar, 2 com erro" (tipo fora da lista;
+  nascimento no futuro e departamento inexistente, sem repetir valores); confirmação com a
+  empresa; "3 admitidas, nenhuma pendente." com o foco no Resultado; na listagem, aba Em
+  admissão, as 3 pessoas (CLT, Aprendiz, Estágio). 375 px sem rolagem horizontal da página,
+  ações com 44 px.
+- **Bateria:** web 143 arquivos, 4143 testes numa rodada limpa (4 workers); lint, typecheck,
+  build, Prettier, `spec:check` e `git diff --check` verdes.
+
+### 29.5 Limites
+
+- Reimportar o mesmo arquivo depois de concluído gera novas admissões: a chave vale por
+  conferência, e a admissão não tem chave natural sem matrícula. A conferência não consulta
+  pessoas já cadastradas.
+- Sem origem "importação" na admissão, sem evento de lote e sem verificação no servidor (C-11).
+- DP e master técnico cobertos por teste (rota e painel), não vistos no navegador nesta rodada.
