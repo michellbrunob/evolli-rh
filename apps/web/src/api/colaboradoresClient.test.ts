@@ -10,6 +10,7 @@ import {
   type AdmitirColaboradorDto,
   BUSCA_COLABORADORES_MAXIMO,
   admitirColaborador,
+  enviarAdmissao,
   listarColaboradores,
 } from "./colaboradoresClient";
 
@@ -277,5 +278,31 @@ describe("T190 — listarColaboradores com filtros de lotação", () => {
     q = queryEnviada();
     expect(q.has("departamentoId")).toBe(false);
     expect(q.has("cargoId")).toBe(false);
+  });
+});
+
+describe("T209 (Bloco C) — enviarAdmissao diz se foi reenvio", () => {
+  function resposta(cabecalhos: Record<string, string>): Response {
+    return {
+      ok: true,
+      status: 201,
+      headers: new Headers(cabecalhos),
+      json: async () => ({ id: "col-1" }),
+    } as unknown as Response;
+  }
+
+  it("Idempotent-Replayed: true → reenvio (nada novo criado)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      resposta({ "Idempotent-Replayed": "true" }),
+    );
+    const enviada = await enviarAdmissao(DTO, {
+      chaveIdempotencia: "12345678-1234-5234-8234-123456789abc",
+    });
+    expect(enviada).toEqual({ admissao: { id: "col-1" }, reenvio: true });
+  });
+
+  it("sem o cabeçalho → admissão nova", async () => {
+    fetchMock.mockResolvedValueOnce(resposta({}));
+    expect((await enviarAdmissao(DTO)).reenvio).toBe(false);
   });
 });

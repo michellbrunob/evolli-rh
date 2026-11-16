@@ -18,7 +18,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ComGuardaDeSaida } from "../../../test/ComGuardaDeSaida";
 import {
   ApiError,
-  admitirColaborador,
+  enviarAdmissao,
+  type AdmissaoEnviada,
   type AdmissaoRegistradaApi,
 } from "../../../api/colaboradoresClient";
 import {
@@ -34,7 +35,7 @@ import {
 
 vi.mock("../../../api/colaboradoresClient", async (original) => ({
   ...(await original<typeof import("../../../api/colaboradoresClient")>()),
-  admitirColaborador: vi.fn(),
+  enviarAdmissao: vi.fn(),
 }));
 vi.mock("../../../api/organizacaoClient", async (original) => ({
   ...(await original<typeof import("../../../api/organizacaoClient")>()),
@@ -69,8 +70,11 @@ function dep(id: string, codigo: string) {
   };
 }
 
-function admitida(nome: string): AdmissaoRegistradaApi {
-  return { id: `col-${nome}`, nome } as unknown as AdmissaoRegistradaApi;
+function admitida(nome: string): AdmissaoEnviada {
+  return {
+    admissao: { id: `col-${nome}`, nome } as unknown as AdmissaoRegistradaApi,
+    reenvio: false,
+  };
 }
 
 function render(ui: ReactElement, opcoes?: RenderOptions) {
@@ -117,7 +121,7 @@ async function confirmarImportacao(n: number) {
 
 beforeEach(() => {
   onSair.mockReset();
-  vi.mocked(admitirColaborador).mockReset();
+  vi.mocked(enviarAdmissao).mockReset();
   vi.mocked(listarEmpresasMulti).mockReset();
   vi.mocked(listarDepartamentos).mockReset();
   vi.mocked(listarCargos).mockReset();
@@ -180,7 +184,7 @@ describe("passo 1 — modelo e arquivo", () => {
     fireEvent.click(screen.getByRole("button", { name: "Baixar modelo" }));
     expect(criar).toHaveBeenCalledTimes(1);
     expect(clicar).toHaveBeenCalledTimes(1);
-    expect(admitirColaborador).not.toHaveBeenCalled();
+    expect(enviarAdmissao).not.toHaveBeenCalled();
   });
 
   it("arquivo acima de 1 MB é recusado sem ser lido nem consultar catálogos", async () => {
@@ -282,14 +286,14 @@ describe("passo 2 — conferência", () => {
     });
     expect(janela).toHaveTextContent("Empresa Alfa");
     fireEvent.click(within(janela).getByRole("button", { name: "Voltar" }));
-    expect(admitirColaborador).not.toHaveBeenCalled();
+    expect(enviarAdmissao).not.toHaveBeenCalled();
   });
 });
 
 describe("passo 3 — envio e resultado", () => {
   it("uma admissão por linha, em sequência, cada uma com a sua chave; resultado com as admitidas", async () => {
     const ordem: string[] = [];
-    vi.mocked(admitirColaborador).mockImplementation(async (dto) => {
+    vi.mocked(enviarAdmissao).mockImplementation(async (dto) => {
       ordem.push(dto.nome);
       return admitida(dto.nome);
     });
@@ -300,10 +304,10 @@ describe("passo 3 — envio e resultado", () => {
     ).toBeInTheDocument();
     expect(ordem).toEqual(["Ana Souza", "Bia Lima"]);
     type Chamada = [
-      Parameters<typeof admitirColaborador>[0],
+      Parameters<typeof enviarAdmissao>[0],
       { chaveIdempotencia: string },
     ];
-    const chamadas = vi.mocked(admitirColaborador).mock.calls as Chamada[];
+    const chamadas = vi.mocked(enviarAdmissao).mock.calls as Chamada[];
     expect(chamadas).toHaveLength(2);
     const [corpoAna, opcoesAna] = chamadas[0]!;
     const [corpoBia, opcoesBia] = chamadas[1]!;
@@ -325,7 +329,7 @@ describe("passo 3 — envio e resultado", () => {
   });
 
   it("recusa do servidor fica na linha; 'tentar de novo' reenvia só ela, com a MESMA chave", async () => {
-    vi.mocked(admitirColaborador)
+    vi.mocked(enviarAdmissao)
       .mockResolvedValueOnce(admitida("Ana Souza"))
       .mockRejectedValueOnce(
         new ApiError(409, "Matrícula já usada nesta empresa.", {}),
@@ -341,9 +345,9 @@ describe("passo 3 — envio e resultado", () => {
     expect(pendentes).toHaveTextContent("Recusada");
     expect(pendentes).toHaveTextContent("Matrícula já usada nesta empresa.");
     const chaveDaBia =
-      vi.mocked(admitirColaborador).mock.calls[1]![1]!.chaveIdempotencia;
+      vi.mocked(enviarAdmissao).mock.calls[1]![1]!.chaveIdempotencia;
 
-    vi.mocked(admitirColaborador).mockResolvedValueOnce(admitida("Bia Lima"));
+    vi.mocked(enviarAdmissao).mockResolvedValueOnce(admitida("Bia Lima"));
     fireEvent.click(
       screen.getByRole("button", {
         name: "Tentar de novo as que não entraram (1)",
@@ -354,17 +358,15 @@ describe("passo 3 — envio e resultado", () => {
         screen.getByText("2 admitidas, nenhuma pendente."),
       ).toBeInTheDocument(),
     );
-    expect(admitirColaborador).toHaveBeenCalledTimes(3);
-    expect(vi.mocked(admitirColaborador).mock.calls[2]![0].nome).toBe(
-      "Bia Lima",
+    expect(enviarAdmissao).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(enviarAdmissao).mock.calls[2]![0].nome).toBe("Bia Lima");
+    expect(vi.mocked(enviarAdmissao).mock.calls[2]![1]!.chaveIdempotencia).toBe(
+      chaveDaBia,
     );
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[2]![1]!.chaveIdempotencia,
-    ).toBe(chaveDaBia);
   });
 
   it("falha de rede vira 'não confirmada' (reenvio seguro) e a importação segue", async () => {
-    vi.mocked(admitirColaborador)
+    vi.mocked(enviarAdmissao)
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValueOnce(admitida("Bia Lima"));
     await ateConferencia(ANA, BIA);
@@ -379,13 +381,13 @@ describe("passo 3 — envio e resultado", () => {
   });
 
   it("sessão expirada (401) para a importação: a linha e as seguintes ficam 'não enviada'", async () => {
-    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+    vi.mocked(enviarAdmissao).mockRejectedValueOnce(
       new ApiError(401, "Sessão expirada", {}),
     );
     await ateConferencia(ANA, BIA);
     await confirmarImportacao(2);
     await screen.findByRole("heading", { level: 2, name: "Resultado" });
-    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+    expect(enviarAdmissao).toHaveBeenCalledTimes(1);
     expect(
       screen.getByText("Nenhuma admitida, 2 pendentes: 2 não enviadas."),
     ).toBeInTheDocument();
@@ -395,8 +397,8 @@ describe("passo 3 — envio e resultado", () => {
   });
 
   it("o progresso é anunciado e, ao fim, o foco vai ao resultado", async () => {
-    let soltar: (v: AdmissaoRegistradaApi) => void = () => undefined;
-    vi.mocked(admitirColaborador)
+    let soltar: (v: AdmissaoEnviada) => void = () => undefined;
+    vi.mocked(enviarAdmissao)
       .mockImplementationOnce(
         () => new Promise((resolver) => (soltar = resolver)),
       )
@@ -436,7 +438,7 @@ describe("guarda de saída", () => {
   });
 
   it("durante o envio, a saída fica bloqueada até terminar", async () => {
-    vi.mocked(admitirColaborador).mockImplementation(
+    vi.mocked(enviarAdmissao).mockImplementation(
       () => new Promise(() => undefined),
     );
     await ateConferencia(ANA);
@@ -451,5 +453,141 @@ describe("guarda de saída", () => {
       }),
     ).toBeInTheDocument();
     expect(onSair).not.toHaveBeenCalled();
+  });
+});
+
+describe("reimportar não duplica (chave determinística por pessoa e empresa)", () => {
+  /**
+   * Servidor falso com a regra real (`IdempotenciaAdmissao`): a chave vale
+   * por empresa, sem prazo; mesma chave e mesmo conteúdo devolvem a admissão
+   * já gravada (reenvio); mesma chave com outro conteúdo, 422 divergente.
+   */
+  function servidorFalso() {
+    const gravadas = new Map<string, string>();
+    const criadas: string[] = [];
+    vi.mocked(enviarAdmissao).mockImplementation(async (dto, opcoes) => {
+      const lugar = `${dto.empresaId}|${opcoes?.chaveIdempotencia}`;
+      const conteudo = JSON.stringify(dto);
+      const anterior = gravadas.get(lugar);
+      if (anterior !== undefined) {
+        if (anterior !== conteudo) {
+          throw new ApiError(422, "Conteúdo divergente.", {
+            codigo: "idempotencia_conteudo_divergente",
+          });
+        }
+        return { ...admitida(dto.nome), reenvio: true };
+      }
+      gravadas.set(lugar, conteudo);
+      criadas.push(`${dto.empresaId}:${dto.nome}`);
+      return admitida(dto.nome);
+    });
+    return criadas;
+  }
+
+  async function importarArquivo(...linhas: string[]) {
+    await escolherArquivo(planilha(...linhas));
+    await screen.findByRole("heading", { level: 2, name: "Conferência" });
+    const n = linhas.length;
+    await confirmarImportacao(n);
+    await screen.findByRole("heading", { level: 2, name: "Resultado" });
+  }
+
+  it("primeira importação: cada pessoa criada uma vez", async () => {
+    const criadas = servidorFalso();
+    montar();
+    await importarArquivo(ANA, BIA);
+    expect(criadas).toEqual(["emp-1:Ana Souza", "emp-1:Bia Lima"]);
+    expect(
+      screen.getByText("2 admitidas, nenhuma pendente."),
+    ).toBeInTheDocument();
+  });
+
+  it("reimportação do mesmo arquivo concluído: nada novo, e a tela diz que já estavam importadas", async () => {
+    const criadas = servidorFalso();
+    montar();
+    await importarArquivo(ANA, BIA);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Importar outra planilha" }),
+    );
+    await importarArquivo(ANA, BIA);
+    expect(criadas).toHaveLength(2);
+    expect(
+      screen.getByText(
+        "Nenhuma admitida, 2 já importadas antes, nenhuma pendente.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("tentativa parcial: só a pendente é reenviada, com a mesma chave; reimportar depois não duplica", async () => {
+    const criadas = servidorFalso();
+    const real = vi.mocked(enviarAdmissao).getMockImplementation()!;
+    vi.mocked(enviarAdmissao)
+      .mockImplementationOnce(real)
+      .mockImplementationOnce(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+    montar();
+    await importarArquivo(ANA, BIA);
+    expect(criadas).toEqual(["emp-1:Ana Souza"]);
+    const chaveDaBia =
+      vi.mocked(enviarAdmissao).mock.calls[1]![1]!.chaveIdempotencia;
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Tentar de novo as que não entraram (1)",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("2 admitidas, nenhuma pendente."),
+      ).toBeInTheDocument(),
+    );
+    expect(vi.mocked(enviarAdmissao).mock.calls[2]![1]!.chaveIdempotencia).toBe(
+      chaveDaBia,
+    );
+    expect(criadas).toEqual(["emp-1:Ana Souza", "emp-1:Bia Lima"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Importar outra planilha" }),
+    );
+    await importarArquivo(ANA, BIA);
+    expect(criadas).toHaveLength(2);
+  });
+
+  it("a mesma pessoa com outros dados é recusada (não vira outra admissão)", async () => {
+    const criadas = servidorFalso();
+    montar();
+    await importarArquivo(ANA);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Importar outra planilha" }),
+    );
+    await importarArquivo("Ana Souza;pj;05/12/2026;15/05/1990;ADM;ANALISTA;;");
+    expect(criadas).toEqual(["emp-1:Ana Souza"]);
+    expect(
+      screen.getByRole("table", { name: "Não entraram" }),
+    ).toHaveTextContent(
+      "Esta pessoa já foi importada antes com outros dados. Confira e corrija pela ficha.",
+    );
+  });
+
+  it("troca de empresa: o mesmo arquivo em outra empresa usa outras chaves e admite lá", async () => {
+    const criadas = servidorFalso();
+    const { unmount } = montar();
+    await importarArquivo(ANA);
+    const chaveNaAlfa =
+      vi.mocked(enviarAdmissao).mock.calls[0]![1]!.chaveIdempotencia;
+    unmount();
+
+    vi.mocked(listarEmpresasMulti).mockResolvedValue(
+      paginado([
+        { id: "emp-2", codigo: "BETA", nome: "Empresa Beta", status: "ativo" },
+      ]),
+    );
+    montar();
+    await screen.findByText(/Empresa Beta/);
+    await importarArquivo(ANA);
+    expect(
+      vi.mocked(enviarAdmissao).mock.calls[1]![1]!.chaveIdempotencia,
+    ).not.toBe(chaveNaAlfa);
+    expect(criadas).toEqual(["emp-1:Ana Souza", "emp-2:Ana Souza"]);
   });
 });

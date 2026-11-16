@@ -456,6 +456,24 @@ export async function admitirColaborador(
   dto: AdmitirColaboradorDto,
   opcoes: OpcoesDaAdmissao = {},
 ): Promise<AdmissaoRegistradaApi> {
+  return (await enviarAdmissao(dto, opcoes)).admissao;
+}
+
+/** T209 (Bloco C) — a admissão e se ela já existia (reenvio da mesma chave). */
+export interface AdmissaoEnviada {
+  readonly admissao: AdmissaoRegistradaApi;
+  /**
+   * `true` quando o servidor devolveu a admissão já gravada com a mesma
+   * chave (`Idempotent-Replayed: true`): nada novo foi criado.
+   */
+  readonly reenvio: boolean;
+}
+
+/** O mesmo envio de `admitirColaborador`, dizendo se foi reenvio. */
+export async function enviarAdmissao(
+  dto: AdmitirColaboradorDto,
+  opcoes: OpcoesDaAdmissao = {},
+): Promise<AdmissaoEnviada> {
   const token = await getCsrf();
   const res = await apiFetch("/colaboradores", {
     method: "POST",
@@ -467,7 +485,11 @@ export async function admitirColaborador(
     },
     body: JSON.stringify(dto),
   });
-  return jsonOrThrow(res);
+  const admissao = await jsonOrThrow<AdmissaoRegistradaApi>(res);
+  return {
+    admissao,
+    reenvio: res.headers?.get("Idempotent-Replayed") === "true",
+  };
 }
 
 export async function retificarColaborador(

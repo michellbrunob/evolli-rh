@@ -14,6 +14,7 @@ import {
   gerarModelo,
   lerPlanilha,
   montarAdmissao,
+  chaveDaLinha,
   relatorioDeErros,
   verificarTamanho,
   type Referencias,
@@ -492,5 +493,56 @@ describe("relatório de erros", () => {
     expect(csv).not.toContain("Zuleica");
     expect(csv).not.toContain("estatutario");
     expect(csv).not.toContain("XYZ");
+  });
+});
+
+describe("chave de idempotência da linha (reimportar não duplica)", () => {
+  const UUID =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  async function chaveDe(linhaCsv: string, empresa = "emp-1") {
+    const [linha] = conferir(planilha(linhaCsv));
+    return chaveDaLinha(empresa, linha!.admissao!);
+  }
+
+  it("é um UUID v5 que o servidor aceita", async () => {
+    expect(await chaveDe(VALIDA)).toMatch(UUID);
+  });
+
+  it("o mesmo arquivo, conferido de novo, gera as mesmas chaves", async () => {
+    expect(await chaveDe(VALIDA)).toBe(await chaveDe(VALIDA));
+  });
+
+  it("depende só da identidade: nome (sem diferença de maiúsculas, acentos ou espaços), nascimento e matrícula", async () => {
+    const base = await chaveDe(
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+    );
+    // Outro cargo ou admissão: mesma pessoa, mesma chave (o servidor recusa o
+    // conteúdo diferente em vez de admitir de novo).
+    expect(
+      await chaveDe("  ANA  souza ;pj;02/12/2026;1990-05-15;ADM;ANALISTA;;"),
+    ).toBe(base);
+    expect(
+      await chaveDe("Ana Souza;clt;01/12/2026;16/05/1990;ADM;ANALISTA;;"),
+    ).not.toBe(base);
+    expect(
+      await chaveDe("Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;"),
+    ).not.toBe(base);
+    expect(
+      await chaveDe("Ana Sousa;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;"),
+    ).not.toBe(base);
+  });
+
+  it("outra empresa, outra chave (a mesma pessoa pode ser admitida em cada empresa)", async () => {
+    expect(await chaveDe(VALIDA, "emp-1")).not.toBe(
+      await chaveDe(VALIDA, "emp-2"),
+    );
+  });
+
+  it("não carrega dado pessoal: a chave não contém nome, data ou matrícula", async () => {
+    const chave = await chaveDe(
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;",
+    );
+    expect(chave).not.toMatch(/ana|souza|1990|m-9/i);
   });
 });

@@ -18,7 +18,7 @@
  */
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { ApiError, admitirColaborador } from "../../../api/colaboradoresClient";
+import { ApiError, enviarAdmissao } from "../../../api/colaboradoresClient";
 import { listarCargos } from "../../../api/cargoClient";
 import {
   listarDepartamentos,
@@ -38,6 +38,7 @@ import {
   COLUNAS_OBRIGATORIAS,
   COLUNAS_OPCIONAIS,
   LIMITE_DE_LINHAS,
+  chaveDaLinha,
   conferirPlanilha,
   gerarModelo,
   lerPlanilha,
@@ -79,7 +80,8 @@ const PASSOS: ReadonlyArray<readonly [Passo, string]> = [
   ["resultado", "Resultado"],
 ];
 
-type EstadoDoEnvio = "admitida" | "recusada" | "incerta" | "nao_enviada";
+type EstadoDoEnvio =
+  "admitida" | "ja_importada" | "recusada" | "incerta" | "nao_enviada";
 
 interface Envio {
   readonly estado: EstadoDoEnvio;
@@ -88,26 +90,31 @@ interface Envio {
 
 const ROTULO_DO_ESTADO: Readonly<Record<EstadoDoEnvio, string>> = {
   admitida: "Admitida",
+  ja_importada: "Já importada antes",
   recusada: "Recusada",
   incerta: "Não confirmada",
   nao_enviada: "Não enviada",
 };
 
-/** Linha pronta para enviar, com a chave fixada na conferência. */
+/** Estados em que a pessoa está admitida (agora ou numa importação anterior). */
+const ENTROU: ReadonlySet<EstadoDoEnvio> = new Set([
+  "admitida",
+  "ja_importada",
+]);
+
+/** A mesma pessoa (mesma chave) já admitida antes, com outros dados. */
+const MOTIVO_DIVERGENTE =
+  "Esta pessoa já foi importada antes com outros dados. Confira e corrija pela ficha.";
+
+/**
+ * Linha pronta para enviar, com a chave fixada na conferência: determinística
+ * pela identidade da pessoa na empresa (`chaveDaLinha`), então reimportar o
+ * mesmo arquivo nunca admite de novo.
+ */
 interface LinhaPronta {
   readonly numero: number;
   readonly admissao: AdmissaoDaLinha;
   readonly chave: string;
-}
-
-/** Mesma fonte da Nova admissão (T179): UUID v4 do próprio navegador. */
-function gerarChave(): string {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Hoje no calendário de quem usa (o limite da data de nascimento). */
@@ -159,6 +166,9 @@ function quantas(n: number, um: string, varios: string): string {
 
 /** O motivo da recusa como o servidor o deu (nunca o valor enviado). */
 function motivoDaRecusa(erro: ApiError): string {
+  if (erro.codigo === "idempotencia_conteudo_divergente") {
+    return MOTIVO_DIVERGENTE;
+  }
   const doCampo = erro.erros?.[0]?.motivo;
   return doCampo ?? erro.message;
 }
@@ -220,9 +230,10 @@ export function ImportarColaboradoresScreen({
     setPedidoDeFoco((n) => n + 1);
   }
 
-  const pendentes = prontas.filter(
-    (linha) => envios.get(linha.numero)?.estado !== "admitida",
-  );
+  const pendentes = prontas.filter((linha) => {
+    const estado = envios.get(linha.numero)?.estado;
+    return estado === undefined || !ENTROU.has(estado);
+  });
 
   // T200 — planilha conferida e ainda não importada é edição pendente; o
   // envio, salvamento em andamento.
@@ -278,16 +289,19 @@ export function ImportarColaboradoresScreen({
       setNomeDoArquivo(arquivo.name);
       setConferidas(linhas);
       setProntas(
-        linhas.flatMap((linha) =>
-          linha.admissao
-            ? [
-                {
-                  numero: linha.numero,
-                  admissao: linha.admissao,
-                  chave: gerarChave(),
-                },
-              ]
-            : [],
+        await Promise.all(
+          linhas.flatMap((linha) => {
+            const admissao = linha.admissao;
+            return admissao
+              ? [
+                  chaveDaLinha(empresa.id, admissao).then((chave) => ({
+                    numero: linha.numero,
+                    admissao,
+                    chave,
+                  })),
+                ]
+              : [];
+          }),
         ),
       );
       setEnvios(new Map());
@@ -317,10 +331,13 @@ export function ImportarColaboradoresScreen({
       }
       setProgresso({ feitas: indice, total: linhas.length });
       try {
-        await admitirColaborador(montarAdmissao(linha.admissao, empresa.id), {
-          chaveIdempotencia: linha.chave,
+        const { reenvio } = await enviarAdmissao(
+          montarAdmissao(linha.admissao, empresa.id),
+          { chaveIdempotencia: linha.chave },
+        );
+        resultado.set(linha.numero, {
+          estado: reenvio ? "ja_importada" : "admitida",
         });
-        resultado.set(linha.numero, { estado: "admitida" });
       } catch (erro: unknown) {
         if (
           erro instanceof ApiError &&
@@ -364,7 +381,7 @@ export function ImportarColaboradoresScreen({
       ),
       ...prontas.flatMap((linha) => {
         const envio = envios.get(linha.numero);
-        if (!envio || envio.estado === "admitida") return [];
+        if (!envio || ENTROU.has(envio.estado)) return [];
         return [
           {
             numero: linha.numero,
@@ -381,7 +398,12 @@ export function ImportarColaboradoresScreen({
   }
 
   const comErro = conferidas.filter((linha) => linha.admissao === null);
-  const admitidas = prontas.length - pendentes.length;
+  const admitidas = prontas.filter(
+    (l) => envios.get(l.numero)?.estado === "admitida",
+  ).length;
+  const jaImportadas = prontas.filter(
+    (l) => envios.get(l.numero)?.estado === "ja_importada",
+  ).length;
   const contagem = (estado: EstadoDoEnvio) =>
     pendentes.filter((l) => envios.get(l.numero)?.estado === estado).length;
   const partesPendentes = (
@@ -399,6 +421,10 @@ export function ImportarColaboradoresScreen({
       ? "Nenhuma admitida"
       : plural(admitidas, "admitida", "admitidas")
   }, ${
+    jaImportadas > 0
+      ? `${plural(jaImportadas, "já importada antes", "já importadas antes")}, `
+      : ""
+  }${
     pendentes.length === 0
       ? "nenhuma pendente"
       : `${plural(pendentes.length, "pendente", "pendentes")}: ${partesPendentes.join(", ")}`

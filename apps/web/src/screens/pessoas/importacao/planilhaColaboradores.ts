@@ -497,6 +497,41 @@ export function conferirPlanilha(
 
 // ---------------------------------------------------------------- envio
 
+/** Namespace próprio da importação (fixo): versão 1 da regra da chave. */
+const PREFIXO_DA_CHAVE = "evolli:importacao-colaboradores:v1";
+
+/**
+ * A chave de idempotência da linha: um UUID v5 (SHA-256 truncado) da
+ * IDENTIDADE da pessoa na empresa — nome normalizado (sem diferença de
+ * maiúsculas, acentos ou espaços), data de nascimento e matrícula.
+ *
+ * Determinística de propósito: o servidor guarda a chave por conta e
+ * empresa, sem prazo (`IdempotenciaAdmissao`). Reimportar o mesmo arquivo
+ * reaproveita a admissão já feita (resposta de reenvio); a mesma pessoa com
+ * outros dados (outro cargo, outra admissão) é recusada como conteúdo
+ * divergente — nunca admitida duas vezes. Outra empresa, outra chave. A
+ * chave é um resumo: não carrega nome, data nem matrícula.
+ */
+export async function chaveDaLinha(
+  empresaId: string,
+  linha: AdmissaoDaLinha,
+): Promise<string> {
+  const identidade = [
+    PREFIXO_DA_CHAVE,
+    empresaId,
+    normalizar(linha.nome).replace(/_+/g, " "),
+    linha.dataNascimento,
+    linha.matricula ?? "",
+  ].join(" ");
+  const resumo = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identidade)),
+  ).slice(0, 16);
+  resumo[6] = (resumo[6]! & 0x0f) | 0x50; // versão 5 (por nome)
+  resumo[8] = (resumo[8]! & 0x3f) | 0x80; // variante RFC 4122
+  const hex = [...resumo].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /**
  * O corpo da admissão: o mesmo contrato do cadastro individual (T179), com
  * o motivo de admissão inicial e, no perfil, só a data de nascimento (os
