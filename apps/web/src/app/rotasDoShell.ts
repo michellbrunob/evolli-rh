@@ -45,6 +45,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T178 — o id segue `pessoas` (o contêiner, aberto na aba Colaboradores).
   pessoas: "#/pessoas/colaboradores",
   "nova-admissao": "#/pessoas/nova-admissao",
+  // T209 (Bloco C) — importação por planilha, sub-página de Colaboradores.
+  "importar-colaboradores": "#/pessoas/importar",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
@@ -479,6 +481,8 @@ export function ehFragmentoDeRota(fragmento: string): boolean {
  */
 const DESTINO_SEGURO_APOS_TROCA: Readonly<Record<string, string>> = {
   "nova-admissao": "pessoas",
+  // T209 (Bloco C) — a planilha conferida é da empresa anterior: descartada.
+  "importar-colaboradores": "pessoas",
 };
 
 export function destinoAposTrocaDeEmpresa(

@@ -201,6 +201,8 @@ export interface PessoasScreenProps {
   focarContatosNaFicha?: boolean;
   /** T177 — leva "Novo colaborador" à página de Nova admissão. */
   onNovaAdmissao?: ColaboradoresScreenProps["onNovaAdmissao"];
+  /** T209 (Bloco C) — importação por planilha (só para quem admite). */
+  onImportarPlanilha?: ColaboradoresScreenProps["onImportarPlanilha"];
   /** T181 — repassado à aba Colaboradores (ver `ColaboradoresScreenProps`). */
   podeEditarFicha?: boolean;
   /**
@@ -234,6 +236,7 @@ export function PessoasScreen({
   onFecharFicha,
   focarContatosNaFicha = false,
   onNovaAdmissao,
+  onImportarPlanilha,
   podeEditarFicha = false,
   podeOperarJornada = false,
   podeVerSolicitacoes = false,
@@ -461,6 +464,7 @@ export function PessoasScreen({
                 <ColaboradoresScreen
                   empresaAtiva={empresaAtiva}
                   {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
+                  {...(onImportarPlanilha ? { onImportarPlanilha } : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
                   atualizacao={atualizacaoDaListagem}
                   {...(listagem && onListagemChange

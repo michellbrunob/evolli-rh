@@ -266,6 +266,17 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         papeis: PAPEIS_NOVA_ADMISSAO,
         agrupadoEm: "pessoas",
       },
+      {
+        // T209 (Bloco C) — importação por planilha: sub-página de
+        // Colaboradores (abre pelo painel "Adicionar colaborador"), uma
+        // admissão por linha pelo contrato de sempre; quem admite, importa.
+        id: "importar-colaboradores",
+        label: "Importar planilha",
+        subRotulo: "Várias admissões de uma vez",
+        estado: "funcional",
+        papeis: PAPEIS_NOVA_ADMISSAO,
+        agrupadoEm: "pessoas",
+      },
     ],
   },
   {
@@ -588,6 +599,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "dashboard",
     "pessoas",
     "nova-admissao",
+    "importar-colaboradores",
     "cadastros",
     "jornadas-trabalho",
     "ponto",
@@ -600,6 +612,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "dashboard",
     "pessoas",
     "nova-admissao",
+    "importar-colaboradores",
     "cadastros",
     "jornadas-trabalho",
     "ponto",

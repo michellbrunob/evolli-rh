@@ -105,6 +105,8 @@ import type {
 import {
   COLABORADORES_TITULO_ID,
   type FocoDoAdmitido,
+  IMPORTAR_COLABORADORES_TITULO_ID,
+  ImportarColaboradoresScreen,
   NOVA_ADMISSAO_TITULO_ID,
   NovaAdmissaoScreen,
   PessoasScreen,
@@ -266,6 +268,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
+  "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
   "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
 };
@@ -522,7 +525,10 @@ function conteudoDoDestino(
         listagem={fichaDoColaborador.listagem}
         onListagemChange={fichaDoColaborador.onListagemChange}
         {...(admissao.podeAdmitir
-          ? { onNovaAdmissao: () => onNavegar("nova-admissao") }
+          ? {
+              onNovaAdmissao: () => onNavegar("nova-admissao"),
+              onImportarPlanilha: () => onNavegar("importar-colaboradores"),
+            }
           : {})}
         // T181 — a edição da ficha é só de RH e DP.
         podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
@@ -532,6 +538,9 @@ function conteudoDoDestino(
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
       />
     );
+  }
+  if (destinoId === "importar-colaboradores") {
+    return <ImportarColaboradoresScreen onSair={() => onNavegar("pessoas")} />;
   }
   if (destinoId === "nova-admissao") {
     return (

@@ -122,6 +122,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Dashboard",
         "Colaboradores",
         "Nova admissão",
+        // T209 (Bloco C) — importação por planilha: a mesma capacidade.
+        "Importar planilha",
         "Estrutura organizacional",
         "Jornadas de trabalho",
         "Jornada",
@@ -139,6 +141,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Dashboard",
         "Colaboradores",
         "Nova admissão",
+        // T209 (Bloco C) — importação por planilha: a mesma capacidade.
+        "Importar planilha",
         "Estrutura organizacional",
         "Jornadas de trabalho",
         "Jornada",
@@ -502,7 +506,7 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(10));
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(11));
     for (const destino of capacidadeFuncionalDe("rh")) {
       // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(

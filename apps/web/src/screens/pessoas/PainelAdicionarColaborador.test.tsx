@@ -175,6 +175,49 @@ describe("PainelAdicionarColaborador (T194)", () => {
     expect(document.activeElement).toBe(focaveis[0]);
   });
 
+  describe("T209 (Bloco C) — importar planilha disponível", () => {
+    it("com onImportarPlanilha, a forma fica habilitada, sem motivo de indisponível", () => {
+      montar({ onImportarPlanilha: vi.fn() });
+      const r = radio("Importar planilha");
+      expect(r).toBeEnabled();
+      const cartao = r.closest("label") as HTMLElement;
+      expect(cartao).toHaveClass("painel-adicionar__forma--disponivel");
+      expect(cartao).not.toHaveTextContent("Indisponível");
+      expect(cartao).toHaveTextContent("Até 200 pessoas por arquivo CSV");
+      // A admissão digital segue indisponível.
+      expect(radio("Admissão digital")).toBeDisabled();
+    });
+
+    it("escolher a planilha troca o botão para 'Iniciar importação', que a inicia", () => {
+      const onImportarPlanilha = vi.fn();
+      const { onCadastroIndividual } = montar({ onImportarPlanilha });
+      fireEvent.click(radio("Importar planilha"));
+      expect(radio("Importar planilha")).toBeChecked();
+      expect(
+        within(painel()).queryByRole("button", {
+          name: ROTULO_INICIAR_CADASTRO,
+        }),
+      ).toBeNull();
+      fireEvent.click(
+        within(painel()).getByRole("button", { name: "Iniciar importação" }),
+      );
+      expect(onImportarPlanilha).toHaveBeenCalledTimes(1);
+      expect(onCadastroIndividual).not.toHaveBeenCalled();
+    });
+
+    it("voltar ao cadastro individual volta o botão e a ação", () => {
+      const onImportarPlanilha = vi.fn();
+      const { onCadastroIndividual } = montar({ onImportarPlanilha });
+      fireEvent.click(radio("Importar planilha"));
+      fireEvent.click(radio("Cadastro individual"));
+      fireEvent.click(
+        within(painel()).getByRole("button", { name: ROTULO_INICIAR_CADASTRO }),
+      );
+      expect(onCadastroIndividual).toHaveBeenCalledTimes(1);
+      expect(onImportarPlanilha).not.toHaveBeenCalled();
+    });
+  });
+
   it("sem empresa ativa informada, não mostra a linha da empresa", () => {
     montar({ empresaAtiva: null });
     expect(within(painel()).queryByText(/Você está adicionando em/)).toBeNull();

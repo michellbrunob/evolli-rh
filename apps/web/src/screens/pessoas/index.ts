@@ -26,6 +26,10 @@ export {
   NovaAdmissaoScreen,
 } from "./NovaAdmissaoScreen";
 export type { FocoDoAdmitido } from "./NovaAdmissaoScreen";
+export {
+  IMPORTAR_COLABORADORES_TITULO_ID,
+  ImportarColaboradoresScreen,
+} from "./importacao/ImportarColaboradoresScreen";
 export { PESSOAS_HORARIO_TITULO_ID, PessoasScreen } from "./PessoasScreen";
 export {
   SOLICITACOES_TITULO_ID,

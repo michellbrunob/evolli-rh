@@ -107,7 +107,8 @@ describe("o estado declarado bate com o código", () => {
    * fala com o servidor e é funcional. Se não, é maquete.
    */
   function usaApi(caminho: string): boolean {
-    return /from "\.\.\/\.\.\/api\//.test(readFileSync(caminho, "utf8"));
+    // T209 — telas em subpasta (`pessoas/importacao/`) sobem um nível a mais.
+    return /from "(?:\.\.\/)+api\//.test(readFileSync(caminho, "utf8"));
   }
 
   /** Tela que cada destino abre por padrão. */
@@ -120,6 +121,8 @@ describe("o estado declarado bate com o código", () => {
     configuracoes: "src/screens/configuracoes/MeuPerfilScreen.tsx",
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
+    "importar-colaboradores":
+      "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
     "jornadas-trabalho": "src/screens/horarios/JornadasTrabalhoScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
