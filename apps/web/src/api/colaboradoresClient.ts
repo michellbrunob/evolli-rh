@@ -504,3 +504,70 @@ export async function retificarColaborador(
   });
   return jsonOrThrow(res);
 }
+
+/**
+ * T209 — rascunho da Nova admissão, guardado no servidor por conta e empresa
+ * ativa (`/v1/admissoes/rascunho`). Só os valores do formulário — nunca foto
+ * ou arquivo; o servidor recusa campo fora do contrato da admissão.
+ */
+export interface ReferenciaDoRascunhoApi {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+}
+
+export interface DadosDoRascunhoApi {
+  readonly etapa?: number;
+  readonly campos?: Readonly<Record<string, string>>;
+  readonly perfil?: Readonly<Record<string, string>>;
+  readonly endereco?: Readonly<Record<string, string>>;
+  readonly contatos?: Readonly<Record<string, string>>;
+  readonly referencias?: Readonly<
+    Partial<
+      Record<
+        "departamento" | "cargo" | "unidade" | "centroCusto",
+        ReferenciaDoRascunhoApi
+      >
+    >
+  >;
+}
+
+export interface RascunhoAdmissaoApi {
+  readonly dados: DadosDoRascunhoApi;
+  readonly versao: number;
+  readonly atualizadoEm: string;
+}
+
+const ROTA_RASCUNHO = "/admissoes/rascunho";
+
+/** O rascunho da própria conta na empresa ativa, ou `null`. */
+export async function obterRascunhoAdmissao(): Promise<RascunhoAdmissaoApi | null> {
+  const res = await apiFetch(ROTA_RASCUNHO);
+  const corpo = await jsonOrThrow<{ rascunho: RascunhoAdmissaoApi | null }>(
+    res,
+  );
+  return corpo.rascunho;
+}
+
+/** Grava (ou substitui) o rascunho. Nunca admite ninguém. */
+export async function salvarRascunhoAdmissao(
+  dados: DadosDoRascunhoApi,
+): Promise<{ versao: number; atualizadoEm: string }> {
+  const token = await getCsrf();
+  const res = await apiFetch(ROTA_RASCUNHO, {
+    method: "PUT",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify({ dados }),
+  });
+  return jsonOrThrow(res);
+}
+
+/** Apaga o rascunho (sem rascunho, nada acontece). */
+export async function descartarRascunhoAdmissao(): Promise<void> {
+  const token = await getCsrf();
+  const res = await apiFetch(ROTA_RASCUNHO, {
+    method: "DELETE",
+    headers: { "x-csrf-token": token },
+  });
+  if (!res.ok) await jsonOrThrow(res);
+}

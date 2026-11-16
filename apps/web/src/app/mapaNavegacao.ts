@@ -260,7 +260,8 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         // T178 — sub-página de Colaboradores: sai da barra lateral (abre pela
         // ação "Nova admissão" da listagem) e, aberta, marca Colaboradores.
         id: "nova-admissao",
-        label: "Nova admissão",
+        // T209 — a página se chama "Novo colaborador" (título e trilha).
+        label: "Novo colaborador",
         subRotulo: "Página própria",
         estado: "funcional",
         papeis: PAPEIS_NOVA_ADMISSAO,

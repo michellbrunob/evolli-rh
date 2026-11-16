@@ -131,7 +131,7 @@ describe("T209 — barra superior: esquerda", () => {
   it("a trilha acompanha a navegação; numa sub-página, o pai leva de volta", async () => {
     montar({ destinoInicial: "nova-admissao" });
     const trilha = within(barra()).getByRole("navigation", { name: "Trilha" });
-    expect(trilha).toHaveTextContent("PessoasColaboradoresNova admissão");
+    expect(trilha).toHaveTextContent("PessoasColaboradoresNovo colaborador");
     fireEvent.click(
       within(trilha).getByRole("button", { name: "Colaboradores" }),
     );

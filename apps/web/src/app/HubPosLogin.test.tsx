@@ -121,7 +121,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Dashboard",
         "Colaboradores",
-        "Nova admissão",
+        "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
         "Estrutura organizacional",
@@ -140,7 +140,7 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Dashboard",
         "Colaboradores",
-        "Nova admissão",
+        "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
         "Estrutura organizacional",
@@ -519,13 +519,15 @@ describe("T162 — acessibilidade e estrutura", () => {
   it("T176 — o cartão Nova admissão diz o que faz, sem prometer dado novo", async () => {
     for (const papel of ["rh", "dp"]) {
       const { unmount } = montar({ papel });
-      await waitFor(() => expect(cartoesVisiveis()).toContain("Nova admissão"));
+      await waitFor(() =>
+        expect(cartoesVisiveis()).toContain("Novo colaborador"),
+      );
       const cartao = screen
         .getAllByRole("button")
         .find(
           (b) =>
             b.querySelector(".hub__cartao-titulo")?.textContent ===
-            "Nova admissão",
+            "Novo colaborador",
         )!;
       const descricao = cartao.querySelector(".hub__cartao-descricao");
       expect(descricao).not.toBeNull();

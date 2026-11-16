@@ -32,6 +32,9 @@ import {
   ApiError,
   type AdmissaoRegistradaApi,
   admitirColaborador,
+  descartarRascunhoAdmissao,
+  obterRascunhoAdmissao,
+  salvarRascunhoAdmissao,
 } from "../../api/colaboradoresClient";
 import {
   type DepartamentoApi,
@@ -379,7 +382,7 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Nova admissão" }),
+      screen.getByRole("heading", { level: 1, name: "Novo colaborador" }),
     ).toBeInTheDocument();
     const form = screen.getByRole("form", {
       name: "Formulário de nova admissão",
@@ -392,8 +395,10 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     const empresaBloco = document.getElementById("nova-admissao-empresa")!;
-    expect(empresaBloco).toHaveTextContent("Empresa Sintética (teste) (EMP1)");
-    expect(empresaBloco).toHaveTextContent(/Não é editável aqui/);
+    // T209 — só a frase, com o nome da empresa ativa.
+    expect(empresaBloco).toHaveTextContent(
+      "Você está cadastrando um novo colaborador para: Empresa Sintética (teste)",
+    );
     expect(
       screen.queryByRole("combobox", { name: /Empresa/ }),
     ).not.toBeInTheDocument();
@@ -483,9 +488,8 @@ describe("Nova admissão — página própria", () => {
   it("obrigatoriedade campo a campo: os opcionais dizem que são opcionais", async () => {
     montar();
     await aguardarEmpresa();
-    expect(
-      screen.getByText(/Campos com \* são obrigatórios/),
-    ).toBeInTheDocument();
+    // T209 — sem a legenda: cada campo diz se é opcional no próprio
+    // rótulo, e os obrigatórios são marcados para o leitor de tela.
     for (const rotulo of [
       "Sexo",
       "Saudação",
@@ -552,18 +556,14 @@ describe("Nova admissão — página própria", () => {
       // T183 — a jornada é opcional, só para o RH.
       ["Vínculo", "Lotação inicial", "Jornada de trabalho"],
       [],
-      [
-        "Dados pessoais",
-        "Dados profissionais e vínculo",
-        "Endereço",
-        "Documentos",
-      ],
+      // T209 — sem o bloco de documentos futuros.
+      ["Dados pessoais", "Dados profissionais e vínculo", "Endereço"],
     ]);
     // Montadas todas, visível só a atual: nada se perde ao trocar de etapa.
     expect(etapas.map((e) => e.hidden)).toEqual([false, true, true, true]);
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Empresa", "Etapa 1 de 4: Dados pessoais"]);
+    ).toEqual(["Etapa 1 de 4: Dados pessoais"]);
   });
 
   it("país começa sugerido como Brasil e pode ser editado", async () => {
@@ -1730,14 +1730,9 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(celular()).toHaveValue("(31) 99999-0000");
     expect(pais()).toHaveValue("Brasil");
     expect(salvar()).toBeEnabled();
-    // Resumo seguro no topo: o NOME do campo, nunca o valor.
-    const resumo = screen.getByRole("group", {
-      name: "Revise 1 campo antes de confirmar",
-    });
-    expect(
-      within(resumo).getByRole("button", { name: "Matrícula" }),
-    ).toBeInTheDocument();
-    expect(resumo).not.toHaveTextContent("MAT-0900");
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    expect(matricula()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("409 com o e-mail pessoal em uso: mensagem e foco no e-mail", async () => {
@@ -1758,7 +1753,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
   });
 
-  it("409 com os dois: os dois campos marcados, resumo com os dois nomes e foco no primeiro da tela", async () => {
+  it("409 com os dois: os dois campos marcados, cada um com a sua mensagem, e foco no primeiro da tela", async () => {
     vi.mocked(admitirColaborador).mockRejectedValue(
       recusa(409, {
         erros: [
@@ -1774,23 +1769,15 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     // O e-mail vem antes da matrícula na tela.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     expect(matricula()).toHaveAttribute("aria-invalid", "true");
-    const resumo = screen.getByRole("group", {
-      name: "Revise 2 campos antes de confirmar",
-    });
-    expect(
-      within(resumo)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["E-mail pessoal", "Matrícula"]);
-    expect(resumo).not.toHaveTextContent(/exemplo\.test|MAT-0900/i);
-    // O nome no resumo leva ao campo.
-    fireEvent.click(within(resumo).getByRole("button", { name: "Matrícula" }));
-    expect(matricula()).toHaveFocus();
-    // Corrigir um tira só ele do resumo.
+    expect(matricula()).toHaveAccessibleDescription(
+      /Esta matrícula já está em uso nesta empresa/,
+    );
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    // Corrigir um tira só a mensagem dele.
     fireEvent.change(matricula(), { target: { value: "MAT-0901" } });
-    expect(
-      screen.getByRole("group", { name: "Revise 1 campo antes de confirmar" }),
-    ).toBeInTheDocument();
+    expect(matricula()).not.toHaveAttribute("aria-invalid");
+    expect(emailPessoal()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("409 sem a lista de campos: mensagem geral, sem presumir que é a matrícula", async () => {
@@ -1812,9 +1799,8 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     await salvarEConfirmar();
     const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
     await waitFor(() => expect(aviso).toHaveFocus());
-    expect(
-      screen.getByRole("group", { name: "Revise 1 campo antes de confirmar" }),
-    ).toHaveTextContent("Lotação inicial");
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
       `${departamento.codigo} — ${departamento.nome}`,
     );
@@ -4417,18 +4403,14 @@ describe("T195 — revisão e conclusão", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("documentos: aviso acessível de entrega própria, sem campo de arquivo nem envio", async () => {
+  it("T209 — sem bloco de documentos futuros na revisão, nem campo de arquivo", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
-    const documentos = screen
-      .getByRole("heading", { level: 3, name: "Documentos" })
-      .closest("section")!;
-    expect(documentos).toHaveAccessibleName("Documentos");
-    expect(documentos).toHaveTextContent(
-      "Documentos serão liberados em uma próxima etapa do Evolli.",
-    );
-    expect(within(documentos).queryAllByRole("button")).toHaveLength(0);
+    expect(
+      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
+    ).toBeNull();
+    expect(document.body).not.toHaveTextContent(/Documentos serão liberados/);
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
@@ -4465,11 +4447,10 @@ describe("T195 — revisão e conclusão", () => {
     // O primeiro da tela é o e-mail, na etapa 1.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
-    // O resumo leva ao outro campo, na etapa dele.
-    const resumo = screen.getByRole("group", { name: /Revise 2 campos/ });
-    fireEvent.click(within(resumo).getByRole("button", { name: "Matrícula" }));
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
-    await waitFor(() => expect(matricula()).toHaveFocus());
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    // O outro campo, na etapa dele, já traz a própria mensagem.
+    expect(matricula()).toHaveAttribute("aria-invalid", "true");
     expect(matricula()).toHaveAccessibleDescription(
       /Esta matrícula já está em uso nesta empresa/,
     );
@@ -5344,11 +5325,11 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     expect(
       within(cabecalho).getByRole("heading", {
         level: 1,
-        name: "Nova admissão",
+        name: "Novo colaborador",
       }),
     ).toBeInTheDocument();
     expect(cabecalho).toHaveTextContent(
-      "Registre a admissão em quatro etapas. Nada é gravado antes da confirmação final.",
+      "Preencha os dados em quatro etapas. Você pode salvar e continuar depois.",
     );
     fireEvent.click(
       within(cabecalho).getByRole("button", {
@@ -5386,7 +5367,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     ).toBeVisible();
   });
 
-  it("nada que o contrato não suporta: sem foto, CPF, RG, upload ou rascunho", async () => {
+  it("nada que o contrato não suporta: sem foto, CPF, RG ou upload (o rascunho existe, T209)", async () => {
     montar();
     await aguardarEmpresa();
     const formulario = screen.getByRole("form", {
@@ -5402,7 +5383,9 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
           .filter((e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName)),
       ).toEqual([]);
     }
-    expect(screen.queryByRole("button", { name: /rascunho/i })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /enviar foto/i })).toBeNull();
   });
 
@@ -5584,3 +5567,184 @@ function render(
 ) {
   return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
 }
+
+describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", () => {
+  it("título, subtítulo, Salvar rascunho e só a frase da empresa ativa", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Novo colaborador" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Preencha os dados em quatro etapas. Você pode salvar e continuar depois.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Você está cadastrando um novo colaborador para:/),
+    ).toHaveTextContent(
+      "Você está cadastrando um novo colaborador para: Empresa Sintética (teste)",
+    );
+    expect(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sem aviso interno, explicação longa, documentos futuros, trilha repetida nem upload", async () => {
+    montar();
+    await aguardarEmpresa();
+    const corpo = document.body.textContent ?? "";
+    expect(corpo).not.toMatch(/Módulo 1/);
+    expect(corpo).not.toMatch(/não é editável/i);
+    expect(corpo).not.toMatch(/Documentos serão liberados/);
+    expect(corpo).not.toMatch(/T209|em desenvolvimento|branch/i);
+    expect(screen.queryByRole("navigation", { name: /trilha/i })).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it("as quatro etapas, nos nomes pedidos", async () => {
+    montar();
+    await aguardarEmpresa();
+    const etapas = screen.getByRole("navigation", { name: /Etapas/ });
+    expect(etapas).toHaveTextContent("Dados pessoais");
+    expect(etapas).toHaveTextContent("Dados profissionais e vínculo");
+    expect(etapas).toHaveTextContent("Endereço");
+    expect(etapas).toHaveTextContent("Revisão e conclusão");
+  });
+});
+
+describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:30:00.000Z",
+    });
+    vi.mocked(descartarRascunhoAdmissao).mockResolvedValue(undefined);
+  });
+
+  it("Salvar rascunho grava só o formulário — nunca admite nem envia foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() =>
+      expect(salvarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+    const dados = vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0];
+    expect(dados.etapa).toBe(0);
+    expect(dados.campos?.nome).toBe("Pessoa Rascunho");
+    expect(dados.perfil?.dataNascimento).toBe("1990-05-20");
+    expect(JSON.stringify(dados)).not.toMatch(/foto|arquivo/i);
+    expect(admitirColaborador).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Rascunho salvo/)).toBeInTheDocument();
+  });
+
+  it("depois de salvo e sem mudanças, sair não pergunta; mudou de novo, pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await screen.findByText(/Rascunho salvo/);
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(onSair).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho 2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("falha ao salvar o rascunho: avisa, mantém os dados e a guarda", async () => {
+    vi.mocked(salvarRascunhoAdmissao).mockRejectedValueOnce(
+      new ApiError(500, "erro", {}),
+    );
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(
+      await screen.findByText(
+        "Não foi possível salvar o rascunho agora. Os dados digitados continuam aqui.",
+      ),
+    ).toBeInTheDocument();
+    expect(nome()).toHaveValue("Pessoa Rascunho");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("recupera o rascunho salvo (da conta, na empresa ativa): campos, referência e etapa", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue({
+      versao: 3,
+      atualizadoEm: "2026-11-15T13:00:00.000Z",
+      dados: {
+        etapa: 1,
+        campos: {
+          nome: "Pessoa Recuperada",
+          tipo: "clt",
+          departamentoId: departamento.id,
+        },
+        perfil: { dataNascimento: "1991-02-03" },
+        referencias: {
+          departamento: {
+            id: departamento.id,
+            codigo: departamento.codigo,
+            nome: departamento.nome,
+          },
+        },
+      },
+    });
+    montar();
+    await aguardarEmpresa();
+    expect(
+      await screen.findByText(/Rascunho de 15\/11\/2026.* recuperado/),
+    ).toBeInTheDocument();
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais e vínculo");
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(departamento.nome);
+    expect(nome()).toHaveValue("Pessoa Recuperada");
+  });
+
+  it("Descartar rascunho apaga no servidor e limpa o formulário", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-15T13:00:00.000Z",
+      dados: { etapa: 0, campos: { nome: "Pessoa Recuperada" } },
+    });
+    montar();
+    await aguardarEmpresa();
+    await screen.findByText(/recuperado/);
+    fireEvent.click(screen.getByRole("button", { name: "Descartar rascunho" }));
+    await waitFor(() =>
+      expect(descartarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() => expect(nome()).toHaveValue(""));
+  });
+
+  it("concluir a admissão apaga o rascunho", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(descartarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+  });
+
+  it("com a leitura do rascunho falhando, a página começa vazia", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockRejectedValue(new Error("rede"));
+    montar();
+    await aguardarEmpresa();
+    expect(nome()).toHaveValue("");
+    expect(screen.queryByText(/recuperado/)).toBeNull();
+  });
+});

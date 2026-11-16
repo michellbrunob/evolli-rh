@@ -12,7 +12,7 @@ const rotulos = (id: string) => trilhaDoDestino(id).map((i) => i.rotulo);
 describe("trilha da barra superior", () => {
   it.each([
     ["pessoas", ["Pessoas", "Colaboradores"]],
-    ["nova-admissao", ["Pessoas", "Colaboradores", "Nova admissão"]],
+    ["nova-admissao", ["Pessoas", "Colaboradores", "Novo colaborador"]],
     [
       "importar-colaboradores",
       ["Pessoas", "Colaboradores", "Importar planilha"],
@@ -44,7 +44,7 @@ describe("trilha da barra superior", () => {
     expect(trilhaDoDestino("nova-admissao")).toEqual([
       { rotulo: "Pessoas" },
       { rotulo: "Colaboradores", destinoId: "pessoas" },
-      { rotulo: "Nova admissão" },
+      { rotulo: "Novo colaborador" },
     ]);
     expect(trilhaDoDestino("pessoas").every((i) => !i.destinoId)).toBe(true);
   });

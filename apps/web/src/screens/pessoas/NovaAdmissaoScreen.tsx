@@ -110,17 +110,20 @@ import {
   PageHeader,
   StatusBadge,
   Surface,
-  TrilhaNavegacao,
 } from "../../components";
 import { ChevronLeft } from "lucide-react";
 import { IconButton } from "../../ui";
-import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
 import {
   type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
   type ColaboradorApi,
   type TipoVinculo,
   admitirColaborador,
+  descartarRascunhoAdmissao,
+  obterRascunhoAdmissao,
+  salvarRascunhoAdmissao,
+  type DadosDoRascunhoApi,
+  type RascunhoAdmissaoApi,
 } from "../../api/colaboradoresClient";
 import {
   type AreaApi,
@@ -144,7 +147,7 @@ import {
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
-import { formatarDiaCivil } from "../../format/data";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import {
   DICA_DE_FORMATO,
   exibirCep,
@@ -376,32 +379,6 @@ const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   ...CAMPOS_DA_ETAPA.flat(),
   "geral",
 ];
-
-/**
- * T179 — nome de cada campo no resumo "Revise N campos". São os rótulos da
- * tela: o resumo diz ONDE corrigir, nunca o valor digitado.
- */
-const ROTULO_DO_CAMPO = {
-  nome: "Nome completo",
-  emailPessoal: "E-mail pessoal",
-  dataNascimento: ROTULO_DATA_NASCIMENTO,
-  sexo: CAMPO_SEXO.rotulo,
-  ...Object.fromEntries(CAMPOS_TEXTO_PERFIL.map((c) => [c.chave, c.rotulo])),
-  ...Object.fromEntries(CAMPOS_ENDERECO.map((c) => [c.chave, c.rotulo])),
-  celular: "Celular",
-  telefone: "Telefone",
-  matricula: "Matrícula",
-  tipo: "Tipo de vínculo",
-  dataAdmissao: "Data de admissão",
-  departamento: "Departamento",
-  cargo: "Cargo",
-  unidade: "Unidade",
-  area: "Área",
-  equipe: "Equipe",
-  centroCusto: "Centro de custo",
-  lotacao: "Lotação inicial",
-  jornada: "Jornada de trabalho",
-} as Record<Exclude<CampoErro, "referencias" | "geral">, string>;
 
 const ERRO_GERAL_ID = "nova-admissao-erro-geral";
 const ID_BOTAO_SALVAR = "nova-admissao-salvar";
@@ -806,7 +783,6 @@ export function NovaAdmissaoScreen({
   const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
   const [erros, setErros] = useState<Erros>({});
   /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
-  const [tentouSalvar, setTentouSalvar] = useState(false);
   /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -834,6 +810,17 @@ export function NovaAdmissaoScreen({
   /** T195 — a etapa na tela e a mais adiantada já alcançada. */
   const [etapa, setEtapa] = useState<IndiceEtapa>(0);
   const [etapaAlcancada, setEtapaAlcancada] = useState<IndiceEtapa>(0);
+  /** T209 — o rascunho salvo ou recuperado, para o aviso curto. */
+  const [rascunho, setRascunho] = useState<{
+    readonly estado: "salvo" | "recuperado";
+    readonly quando: string;
+  } | null>(null);
+  const [falhaDoRascunho, setFalhaDoRascunho] = useState<string | null>(null);
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
+  /** Os valores do último rascunho salvo ou recuperado (para a guarda). */
+  const [assinaturaSalva, setAssinaturaSalva] = useState<string | null>(null);
+  /** Depois de recuperar, a assinatura é a do formulário já preenchido. */
+  const sincronizarAssinaturaRef = useRef(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
   /**
@@ -1045,8 +1032,51 @@ export function NovaAdmissaoScreen({
   // antes de descartar, e espera o envio terminar.
   // T200 — e toda saída do shell, pelo diálogo único, com a frase da T179
   // sobre o que pode (ou não) ter sido gravado.
+  // ---- T209 — rascunho persistente (servidor, por conta e empresa) --------
+
+  /** O que o rascunho guarda: só os valores do formulário e a etapa. */
+  function dadosDoRascunho(): DadosDoRascunhoApi {
+    const preenchidos = (valores: Readonly<Record<string, string>>) =>
+      Object.fromEntries(
+        Object.entries(valores).filter(([, v]) => v !== ""),
+      ) as Record<string, string>;
+    const referencia = (lista: readonly Referencia[], id: string) => {
+      const r = id ? lista.find((x) => x.id === id) : undefined;
+      return r ? { id: r.id, codigo: r.codigo, nome: r.nome } : undefined;
+    };
+    const referencias = Object.fromEntries(
+      (
+        [
+          [
+            "departamento",
+            referencia(opcoes.departamentos, campos.departamentoId),
+          ],
+          ["cargo", referencia(opcoes.cargos, campos.cargoId)],
+          ["unidade", referencia(opcoes.unidades, campos.unidadeId)],
+          [
+            "centroCusto",
+            referencia(opcoes.centrosCusto, campos.centroCustoId),
+          ],
+        ] as const
+      ).filter(([, v]) => v !== undefined),
+    );
+    return {
+      etapa,
+      campos: preenchidos(campos as unknown as Record<string, string>),
+      perfil: preenchidos(perfil as unknown as Record<string, string>),
+      endereco: preenchidos(endereco as unknown as Record<string, string>),
+      contatos: preenchidos(contatos as unknown as Record<string, string>),
+      ...(Object.keys(referencias).length > 0 ? { referencias } : {}),
+    };
+  }
+  const assinaturaAtual = JSON.stringify(dadosDoRascunho());
+
+  // Com o rascunho salvo e nada mudado desde então, sair não perde nada.
+  const pendenteSemRascunho =
+    alterado && admissao === null && assinaturaAtual !== assinaturaSalva;
+
   useEdicaoEmAndamento("Nova admissão", {
-    pendente: alterado && admissao === null,
+    pendente: pendenteSemRascunho,
     salvando,
     aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
@@ -1396,7 +1426,6 @@ export function NovaAdmissaoScreen({
       for (let indice = etapa; indice < alvo; indice++) {
         const novos = errosDaEtapa(indice as IndiceEtapa);
         if (Object.keys(novos).length > 0) {
-          setTentouSalvar(true);
           setErros((prev) => ({ ...prev, ...novos }));
           focarPrimeiroErro(novos);
           return;
@@ -1406,16 +1435,6 @@ export function NovaAdmissaoScreen({
     setEtapa(alvo);
     setEtapaAlcancada((prev) => (alvo > prev ? alvo : prev));
     pedirFoco(idDoFoco);
-  }
-
-  /** T179 — um nome do resumo "Revise N campos"; T195 — abre a etapa dele. */
-  function irAoCampo(campo: CampoErro) {
-    const alvo = etapaDoCampo(campo);
-    if (alvo !== null && alvo !== etapa) {
-      irParaEtapa(alvo, ID_DO_CAMPO[campo]);
-      return;
-    }
-    document.getElementById(ID_DO_CAMPO[campo])?.focus();
   }
 
   /**
@@ -1464,7 +1483,6 @@ export function NovaAdmissaoScreen({
       irParaEtapa((etapa + 1) as IndiceEtapa);
       return;
     }
-    setTentouSalvar(true);
     const novos = validar();
     if (Object.keys(novos).length > 0 || !empresa) {
       setErros(novos);
@@ -1498,6 +1516,10 @@ export function NovaAdmissaoScreen({
       setLimpezaDosAvisos((n) => n + 1);
       setConfirmando(false);
       setAdmissao(resposta);
+      // T209 — concluída a admissão, o rascunho deixa de existir.
+      setRascunho(null);
+      setAssinaturaSalva(null);
+      void descartarRascunhoAdmissao().catch(() => undefined);
     } catch (erro: unknown) {
       // Os dados digitados ficam: só as mensagens e o estado de envio mudam.
       // A chave também fica — a próxima confirmação é o MESMO envio.
@@ -1527,6 +1549,126 @@ export function NovaAdmissaoScreen({
     guarda.solicitarSaida({ executar: onSair });
   }
 
+  // T209 — a assinatura do rascunho recuperado só existe depois de o
+  // formulário ser preenchido com ele.
+  useEffect(() => {
+    if (!sincronizarAssinaturaRef.current) return;
+    sincronizarAssinaturaRef.current = false;
+    setAssinaturaSalva(assinaturaAtual);
+  }, [assinaturaAtual]);
+
+  // T209 — recupera o rascunho da conta na empresa ativa, depois de as
+  // opções carregarem (para as referências escolhidas aparecerem). Falha na
+  // leitura: a página começa vazia, como antes.
+  useEffect(() => {
+    if (carregandoOpcoes) return;
+    let vigente = true;
+    void (async () => {
+      let salvo: RascunhoAdmissaoApi | null | undefined;
+      try {
+        salvo = await obterRascunhoAdmissao();
+      } catch {
+        return;
+      }
+      if (!vigente || !salvo) return;
+      aplicarRascunho(salvo);
+    })();
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregandoOpcoes]);
+
+  function aplicarRascunho(salvo: RascunhoAdmissaoApi) {
+    const d = salvo.dados;
+    const refs = d.referencias ?? {};
+    if (refs.departamento) conhecer("departamentos", refs.departamento);
+    if (refs.cargo) conhecer("cargos", refs.cargo);
+    if (refs.unidade) conhecer("unidades", refs.unidade);
+    if (refs.centroCusto) conhecer("centrosCusto", refs.centroCusto);
+    const so = <T extends object>(
+      base: T,
+      extra?: Readonly<Record<string, string>>,
+    ) =>
+      ({
+        ...base,
+        ...Object.fromEntries(
+          Object.entries(extra ?? {}).filter(([k]) => k in base),
+        ),
+      }) as T;
+    const novosCampos = so(CAMPOS_VAZIOS, d.campos);
+    setCampos(novosCampos);
+    setPerfil(so(PERFIL_VAZIO, d.perfil));
+    setEndereco(so(ENDERECO_INICIAL, d.endereco));
+    setContatos(so(CONTATOS_VAZIOS, d.contatos));
+    const etapaSalva = Math.min(
+      Math.max(d.etapa ?? 0, 0),
+      ULTIMA_ETAPA,
+    ) as IndiceEtapa;
+    setEtapa(etapaSalva);
+    setEtapaAlcancada(etapaSalva);
+    if (novosCampos.departamentoId) {
+      void carregarAreasDe(novosCampos.departamentoId);
+    }
+    setRascunho({ estado: "recuperado", quando: salvo.atualizadoEm });
+    sincronizarAssinaturaRef.current = true;
+  }
+
+  /** As áreas do departamento recuperado, sem limpar a área escolhida. */
+  async function carregarAreasDe(departamentoId: string) {
+    const pedido = ++pedidoAreasRef.current;
+    setCarregandoAreas(true);
+    try {
+      const resp = await listarAreas({
+        departamentoId,
+        status: "ativo",
+        tamanhoPagina: 100,
+      });
+      if (pedido !== pedidoAreasRef.current) return;
+      setAreas(soAtivos(resp.itens));
+    } catch {
+      if (pedido !== pedidoAreasRef.current) return;
+      setAreas([]);
+    } finally {
+      if (pedido === pedidoAreasRef.current) setCarregandoAreas(false);
+    }
+  }
+
+  /** "Salvar rascunho": grava o formulário no servidor; nunca admite. */
+  async function salvarRascunho() {
+    if (salvandoRascunho || admissao !== null) return;
+    const dados = dadosDoRascunho();
+    setSalvandoRascunho(true);
+    setFalhaDoRascunho(null);
+    try {
+      const resposta = await salvarRascunhoAdmissao(dados);
+      setAssinaturaSalva(JSON.stringify(dados));
+      setRascunho({ estado: "salvo", quando: resposta.atualizadoEm });
+    } catch {
+      setFalhaDoRascunho(
+        "Não foi possível salvar o rascunho agora. Os dados digitados continuam aqui.",
+      );
+    } finally {
+      setSalvandoRascunho(false);
+    }
+  }
+
+  /** "Descartar rascunho": apaga no servidor e recomeça a página. */
+  async function descartarRascunho() {
+    setFalhaDoRascunho(null);
+    try {
+      await descartarRascunhoAdmissao();
+    } catch {
+      setFalhaDoRascunho(
+        "Não foi possível descartar o rascunho agora. Tente de novo.",
+      );
+      return;
+    }
+    recomecar();
+    setRascunho(null);
+    setAssinaturaSalva(null);
+  }
+
   function recomecar() {
     setCampos(CAMPOS_VAZIOS);
     setPerfil(PERFIL_VAZIO);
@@ -1534,7 +1676,6 @@ export function NovaAdmissaoScreen({
     setContatos(CONTATOS_VAZIOS);
     setAreas([]);
     setErros({});
-    setTentouSalvar(false);
     setEtapa(0);
     setEtapaAlcancada(0);
     consultaCep.reiniciar();
@@ -1796,15 +1937,6 @@ export function NovaAdmissaoScreen({
     );
   }
 
-  // T179 — campos a revisar, na ordem da tela. Só depois de uma tentativa, e
-  // sem o aviso de referências (que tem bloco próprio) nem o erro geral.
-  const camposARevisar = tentouSalvar
-    ? ORDEM_DOS_ERROS.filter(
-        (c): c is Exclude<CampoErro, "referencias" | "geral"> =>
-          c !== "referencias" && c !== "geral" && Boolean(erros[c]),
-      )
-    : [];
-
   /** T195 — um painel de etapa: montado sempre, visível só na etapa atual. */
   function painelDaEtapa(indice: IndiceEtapa, conteudo: ReactNode) {
     const tituloId = idDoTituloDaEtapa(indice);
@@ -1867,12 +1999,9 @@ export function NovaAdmissaoScreen({
 
   return (
     <div className="nova-admissao">
-      {/* T178 — "Colaboradores" na trilha é o MESMO caminho do Cancelar:
-          com dados digitados, pede a confirmação de descarte antes de sair. */}
-      <TrilhaDaNovaAdmissao onColaboradores={pedirCancelamento} />
-      {/* T209 — cabeçalho próprio do assistente: "Voltar para Colaboradores"
-          é o mesmo caminho do Cancelar (com dados digitados, a guarda
-          pergunta antes de sair). */}
+      {/* T209 — cabeçalho do assistente: voltar (o mesmo caminho do
+          Cancelar, com a guarda), título, subtítulo e Salvar rascunho. A
+          trilha fica na barra superior do shell. */}
       <header className="nova-admissao__cabecalho">
         <IconButton
           label="Voltar para Colaboradores"
@@ -1883,25 +2012,46 @@ export function NovaAdmissaoScreen({
         <PageHeader
           headingLevel={1}
           titleId={NOVA_ADMISSAO_TITULO_ID}
-          title="Nova admissão"
-          description="Registre a admissão em quatro etapas. Nada é gravado antes da confirmação final."
+          title="Novo colaborador"
+          description="Preencha os dados em quatro etapas. Você pode salvar e continuar depois."
+          actions={
+            admissao === null ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void salvarRascunho()}
+                disabled={salvando || salvandoRascunho || carregandoOpcoes}
+              >
+                {salvandoRascunho ? "Salvando rascunho…" : "Salvar rascunho"}
+              </Button>
+            ) : undefined
+          }
         />
       </header>
 
-      <Surface
-        as="section"
-        padding="md"
-        className="nova-admissao__aviso"
-        aria-labelledby="nova-admissao-aviso-titulo"
-      >
-        <StatusBadge variant="info">Módulo 1 do cadastro</StatusBadge>
-        <p id="nova-admissao-aviso-titulo" className="nova-admissao__texto">
-          Dados pessoais, endereço e contatos são gravados junto com a admissão.
-          Nome social, gênero, documentos, CPF, dados bancários, dependentes e
-          dados contratuais avançados ainda não são coletados: entram nos
-          próximos módulos.
-        </p>
-      </Surface>
+      {rascunho || falhaDoRascunho ? (
+        <div className="nova-admissao__rascunho">
+          <p
+            className="nova-admissao__texto"
+            role={falhaDoRascunho ? "alert" : "status"}
+          >
+            {falhaDoRascunho ??
+              (rascunho?.estado === "recuperado"
+                ? `Rascunho de ${formatarInstante(rascunho.quando)} recuperado.`
+                : `Rascunho salvo em ${formatarInstante(rascunho?.quando)}.`)}
+          </p>
+          {rascunho?.estado === "recuperado" && admissao === null ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void descartarRascunho()}
+              disabled={salvando || salvandoRascunho}
+            >
+              Descartar rascunho
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <form
         className="nova-admissao__form"
@@ -1909,39 +2059,9 @@ export function NovaAdmissaoScreen({
         noValidate
         onSubmit={pedirConfirmacao}
       >
-        {/* T179 — resumo do que revisar: só NOMES de campos, nunca valores.
-            Cada nome é um botão que leva o foco ao campo. Não é região viva:
-            quem anuncia é o foco, que já vai ao primeiro campo. */}
-        {camposARevisar.length > 0 ? (
-          <div
-            className="nova-admissao__revisar"
-            role="group"
-            aria-labelledby="nova-admissao-revisar-titulo"
-          >
-            <p
-              id="nova-admissao-revisar-titulo"
-              className="nova-admissao__revisar-titulo"
-            >
-              Revise {camposARevisar.length}{" "}
-              {camposARevisar.length === 1 ? "campo" : "campos"} antes de
-              confirmar
-            </p>
-            <ul className="nova-admissao__revisar-lista">
-              {camposARevisar.map((campo) => (
-                <li key={campo}>
-                  <Button
-                    type="button"
-                    variant="subtle"
-                    onClick={() => irAoCampo(campo)}
-                  >
-                    {ROTULO_DO_CAMPO[campo]}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
+        {/* T209 — sem resumo no topo: cada campo recusado mostra a própria
+            mensagem logo abaixo dele, e o foco vai ao primeiro (na etapa
+            dele). */}
         {/* T195 — o indicador das etapas e os quatro painéis; só o da etapa
             atual aparece, e nenhum perde o que foi digitado. */}
         {/* T209 — assistente: as etapas à esquerda (no desktop) e o
@@ -1954,53 +2074,31 @@ export function NovaAdmissaoScreen({
             onIr={(alvo) => irParaEtapa(alvo)}
           />
           <div className="nova-admissao__conteudo">
-            {/* T209 — a legenda e a empresa ativa abrem a coluna do conteúdo,
-                para as etapas começarem logo abaixo do cabeçalho. */}
-            <p className="nova-admissao__texto nova-admissao__legenda">
-              Campos com * são obrigatórios. Os marcados como opcionais podem
-              ficar em branco.
-            </p>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-empresa"
-            >
-              <h2
-                id="nova-admissao-grupo-empresa"
-                className="nova-admissao__grupo-titulo"
+            {/* T209 — só a empresa ativa, numa frase; sem empresa ativa, o
+                bloqueio de sempre (nenhuma empresa é escolhida em silêncio). */}
+            {carregandoOpcoes ? (
+              <p className="nova-admissao__texto" role="status">
+                Carregando a empresa ativa…
+              </p>
+            ) : empresa ? (
+              <p className="nova-admissao__empresa" id="nova-admissao-empresa">
+                Você está cadastrando um novo colaborador para:{" "}
+                <strong>{empresa.nome}</strong>
+              </p>
+            ) : null}
+            {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
+                fica visível desde o carregamento e recebe o foco ao tentar
+                salvar. */}
+            {referenciasFaltando.length > 0 ? (
+              <p
+                id={ID_DO_CAMPO.referencias}
+                className="nova-admissao__sem-referencias"
+                role="alert"
+                tabIndex={-1}
               >
-                Empresa
-              </h2>
-              {carregandoOpcoes ? (
-                <p className="nova-admissao__texto" role="status">
-                  Carregando a empresa ativa…
-                </p>
-              ) : empresa ? (
-                <dl className="nova-admissao__leitura">
-                  <dt>Empresa ativa</dt>
-                  <dd id="nova-admissao-empresa">
-                    <strong>{empresa.nome}</strong> ({empresa.codigo})
-                    <span className="nova-admissao__ajuda">
-                      {" "}
-                      — a empresa em que você está trabalhando. Não é editável
-                      aqui.
-                    </span>
-                  </dd>
-                </dl>
-              ) : null}
-              {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
-              fica visível desde o carregamento e recebe o foco ao tentar
-              salvar. */}
-              {referenciasFaltando.length > 0 ? (
-                <p
-                  id={ID_DO_CAMPO.referencias}
-                  className="nova-admissao__sem-referencias"
-                  role="alert"
-                  tabIndex={-1}
-                >
-                  {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
-                </p>
-              ) : null}
-            </section>
+                {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
+              </p>
+            ) : null}
             {painelDaEtapa(
               0,
               <>
@@ -2583,26 +2681,6 @@ export function NovaAdmissaoScreen({
                 <p className="nova-admissao__texto nova-admissao__ajuda">
                   Campos opcionais em branco não aparecem neste resumo.
                 </p>
-                {/* T195 — decisão aprovada: documentos em entrega própria. Nada de
-                arquivo, upload ou armazenamento nesta página. */}
-                <section
-                  className="nova-admissao__documentos"
-                  aria-labelledby="nova-admissao-documentos-titulo"
-                >
-                  <h3
-                    id="nova-admissao-documentos-titulo"
-                    className="nova-admissao__subtitulo"
-                  >
-                    Documentos
-                  </h3>
-                  <p className="nova-admissao__texto">
-                    Documentos serão liberados em uma próxima etapa do Evolli.
-                  </p>
-                  <p className="nova-admissao__texto nova-admissao__ajuda">
-                    Por enquanto, nenhum arquivo é pedido nem enviado neste
-                    cadastro.
-                  </p>
-                </section>
               </>,
             )}
           </div>
@@ -2835,25 +2913,6 @@ export function NovaAdmissaoScreen({
  * vêm do mapa de navegação, os mesmos da barra lateral. Quem decide o que
  * acontece ao voltar é o chamador (com ou sem confirmação de descarte).
  */
-function TrilhaDaNovaAdmissao({
-  onColaboradores,
-}: {
-  readonly onColaboradores: () => void;
-}) {
-  return (
-    <TrilhaNavegacao
-      itens={[
-        { rotulo: tituloDoGrupoDe("nova-admissao") ?? "Gestão de Pessoas" },
-        {
-          rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-          onSelecionar: onColaboradores,
-        },
-        { rotulo: "Nova admissão" },
-      ]}
-    />
-  );
-}
-
 /** T195 — rótulo e valor, só os preenchidos, sem espaços nas pontas. */
 function linhasPreenchidas(
   pares: readonly (readonly [string, string | null])[],
@@ -3133,14 +3192,15 @@ function ConfirmacaoDaAdmissao({
   const cepBrasileiro = ehPaisBrasil(enderecoGravado?.pais);
   return (
     <div className="nova-admissao">
-      {/* Depois da admissão não há o que descartar: a trilha sai direto, como
-          "Voltar para Colaboradores". */}
-      <TrilhaDaNovaAdmissao onColaboradores={onSair} />
-      <PageHeader
-        headingLevel={1}
-        titleId={NOVA_ADMISSAO_TITULO_ID}
-        title="Nova admissão"
-      />
+      {/* Depois da admissão a trilha da barra superior e "Voltar para
+          Colaboradores", abaixo, saem direto (não há o que descartar). */}
+      <header className="nova-admissao__cabecalho">
+        <PageHeader
+          headingLevel={1}
+          titleId={NOVA_ADMISSAO_TITULO_ID}
+          title="Novo colaborador"
+        />
+      </header>
       <Surface
         as="section"
         padding="lg"
