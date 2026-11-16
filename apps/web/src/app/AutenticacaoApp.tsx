@@ -88,7 +88,7 @@ import {
   AvisoContextoAlterado,
   type ResultadoDaConferencia,
 } from "./AvisoContextoAlterado";
-import { HubPosLogin } from "./HubPosLogin";
+import { AcessoTemporario } from "./AcessoTemporario";
 import { TelaDeAbertura } from "./abertura/TelaDeAbertura";
 import { duracaoMinimaDaAbertura } from "./abertura/duracaoDaAbertura";
 import { LoginScreen } from "./LoginScreen";
@@ -305,7 +305,8 @@ export function AutenticacaoApp() {
             setDestinoAberto(destino);
             // A tela de aterrissagem nasce com o foco no título, como
             // depois de uma troca de empresa: nunca no body.
-            if (destino !== null) setFocarTitulo(true);
+            // T209 — também a tela de acesso temporário (sem destino).
+            setFocarTitulo(true);
           }
         }
         setAtor(eu);
@@ -701,24 +702,17 @@ export function AutenticacaoApp() {
   const vistasDaConta =
     vistasDoDashboard?.chave === chaveDaArvore ? vistasDoDashboard.vistas : {};
 
+  // T209 — o Hub está desativado como destino de uso normal (o código dele
+  // fica; nada o monta). Sem produto aberto, a sessão vai ao destino padrão
+  // do papel — Dashboard para RH, DP e `master_tecnico`, Minha equipe para o
+  // `gestor` — e os demais papéis veem só a tela neutra de acesso temporário.
+  const destinoEfetivo = destinoAberto ?? destinoPosLoginPara(ator.role);
+
   const arvore =
-    destinoAberto === null ? (
-      <HubPosLogin
+    destinoEfetivo === null ? (
+      <AcessoTemporario
         key={chaveDaArvore}
-        papelDoAtor={ator.role}
-        empresaAtiva={ator.empresaAtiva ?? null}
-        podeTrocarEmpresa={podeTrocarEmpresa}
-        emailDoAtor={ator.email}
-        onAbrirDestino={(destino) => {
-          // T206 — o cartão clicado some com o Hub; sem isto o foco ficaria
-          // no `body`. A tela que nasce leva o foco ao próprio título, pelo
-          // mesmo pedido de uma montagem só da aterrissagem e da troca de
-          // empresa (`focarTitulo`, consumido e desligado logo depois).
-          setFocarTitulo(true);
-          setDestinoAberto(destino);
-        }}
-        onEmpresaTrocada={aoTrocarEmpresa}
-        onLogout={() => void handleLogout()}
+        onSair={() => void handleLogout()}
         focarTituloAoAbrir={focarTitulo}
       />
     ) : (
@@ -757,11 +751,7 @@ export function AutenticacaoApp() {
           destinoExibidoRef.current = destinoId;
         }}
         focarTituloAoAbrir={focarTitulo}
-        destinoInicial={destinoAberto}
-        onVoltarAoHub={() => {
-          destinoExibidoRef.current = null;
-          setDestinoAberto(null);
-        }}
+        destinoInicial={destinoEfetivo}
         menuRecolhido={menuRecolhido}
         onMenuRecolhidoChange={(recolhido) =>
           setPreferenciaDoMenu({ chave: chaveDaArvore, recolhido })

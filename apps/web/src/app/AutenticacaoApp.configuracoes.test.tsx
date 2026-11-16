@@ -113,18 +113,13 @@ const valor = (rotulo: string) =>
     .parentElement!.querySelector("dd")!.textContent;
 
 describe("T208 — Meu perfil a partir da sessão", () => {
-  it("quem chega pelo Hub abre Configurações pelo cartão; o título recebe o foco", async () => {
+  it("colaborador com a rota de Meu perfil abre Configurações (T209: sem Hub nem cartão); o título recebe o foco", async () => {
     vi.mocked(obterUsuarioAtual).mockResolvedValue({
       ...ATOR,
       role: "colaborador",
       podeTrocarEmpresa: false,
     } as never);
-    montar(null);
-    const cartao = await screen.findByRole("button", {
-      name: /^Configurações/,
-    });
-    expect(cartao).toHaveClass("hub__cartao");
-    fireEvent.click(cartao);
+    montar(ROTA);
     const titulo = await screen.findByRole("heading", {
       level: 1,
       name: "Configurações",

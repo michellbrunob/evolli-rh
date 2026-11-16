@@ -1,0 +1,216 @@
+/* T209 — barra superior fixa do shell. Só tokens.
+
+   Fica presa no topo com `position: sticky` — sem sair do fluxo, ela nunca
+   cobre o título nem o conteúdo, e o `scroll-padding-top` impede que o foco
+   pare escondido debaixo dela. Modais, a guarda e a gaveta ficam acima (a
+   barra fica no nível 30). */
+
+:root {
+  --altura-barra-superior: 60px;
+  scroll-padding-top: var(--altura-barra-superior);
+}
+
+.barra-superior {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--altura-barra-superior);
+  padding: var(--space-xs) clamp(var(--space-md), 3vw, var(--space-lg));
+  background: var(--surface-canvas);
+  border-bottom: var(--divisor);
+}
+
+.barra-superior__grupo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.barra-superior__grupo--inicio {
+  flex: 1 1 auto;
+}
+
+.barra-superior__grupo--fim {
+  flex: 0 1 auto;
+  margin-left: auto;
+}
+
+.barra-superior__marca {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-action);
+}
+
+.barra-superior__marca-nome {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+/* Separador sutil entre grupos. */
+.barra-superior__separador {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 24px;
+  margin: 0 var(--space-xxs);
+  background: var(--hairline);
+}
+
+.barra-superior__trilha {
+  min-width: 0;
+}
+
+.barra-superior__trilha ol {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-ui);
+}
+
+.barra-superior__trilha li {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.barra-superior__trilha li + li::before {
+  content: "/";
+  margin: 0 var(--space-xs);
+  color: var(--color-ink-subtle);
+}
+
+.barra-superior__trilha-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink-muted);
+}
+
+.barra-superior__trilha-item[aria-current="page"] {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.barra-superior__trilha-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* O controle da conta: avatar, nome e a seta do menu. */
+.barra-superior__conta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 18rem;
+  min-height: var(--touch-target);
+  padding: var(--space-xxs) var(--space-sm) var(--space-xxs) var(--space-xxs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.barra-superior__conta:hover,
+.barra-superior__conta[aria-expanded="true"] {
+  background: var(--surface-neutral);
+  border-color: var(--hairline);
+}
+
+.barra-superior__conta:focus-visible {
+  outline: var(--foco-anel);
+  outline-offset: 2px;
+}
+
+.barra-superior__avatar {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.barra-superior__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.barra-superior__iniciais {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.barra-superior__nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barra-superior__seta {
+  flex: 0 0 auto;
+  color: var(--color-ink-subtle);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .barra-superior__seta {
+    transition: transform 140ms ease;
+  }
+
+  .barra-superior__conta[aria-expanded="true"] .barra-superior__seta {
+    transform: rotate(180deg);
+  }
+}
+
+/* Celular: botão da gaveta, marca e a conta (avatar e nome truncado). A
+   trilha sai de vista — o título da tela segue logo abaixo. */
+@media (max-width: 834px) {
+  :root {
+    --altura-barra-superior: 56px;
+  }
+
+  .barra-superior__trilha {
+    display: none;
+  }
+
+  .barra-superior__separador {
+    display: none;
+  }
+
+  .barra-superior__conta {
+    max-width: 10rem;
+    min-height: var(--touch-target);
+  }
+}
+
+@media (max-width: 400px) {
+  .barra-superior__marca-nome {
+    display: none;
+  }
+}
