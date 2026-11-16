@@ -50,13 +50,13 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 
-  it("exibe a marca textual 'Evolli RH' na barra superior (T209)", () => {
+  it("exibe a marca textual 'Evolli RH' no topo da faixa (T209)", () => {
     render(<App papelDoAtor="rh" />);
 
     expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
-    expect(document.querySelector(".barra-superior")!).toHaveTextContent(
-      "Evolli RH",
-    );
+    expect(
+      document.querySelector(".app-shell__cabecalho-lateral")!,
+    ).toHaveTextContent("Evolli RH");
   });
 
   it("tem exatamente um título de nível 1: o da tela de aterrissagem", () => {
@@ -879,11 +879,7 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
 
   it("oferece exatamente as ações que existem — e nada mais (T209: a conta reúne Segurança, Sessões ativas e Sair)", async () => {
     render(<App papelDoAtor="rh" onLogout={() => {}} mfaDisponivel />);
-    expect(acoesDoCabecalho()).toEqual([
-      "Menu",
-      "Recolher menu",
-      "Conta: Minha conta",
-    ]);
+    expect(acoesDoCabecalho()).toEqual(["Menu", "Conta: Minha conta"]);
     fireEvent.keyDown(screen.getByRole("button", { name: /^Conta: / }), {
       key: "Enter",
     });
@@ -911,9 +907,9 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
     }
   });
 
-  it("sem sessão, o cabeçalho só tem a gaveta e o recolher do menu", () => {
+  it("sem sessão, o cabeçalho só tem o botão da gaveta (o recolher fica no topo da faixa)", () => {
     render(<App papelDoAtor="rh" />);
-    expect(acoesDoCabecalho()).toEqual(["Menu", "Recolher menu"]);
+    expect(acoesDoCabecalho()).toEqual(["Menu"]);
   });
 
   it("T209 — não mostra o papel técnico no cabeçalho", () => {
@@ -1514,7 +1510,7 @@ describe("T189 — empresa ativa no topo do menu lateral", () => {
     redefinirLarguraDaJanela();
   });
 
-  it("abre a faixa lateral (a marca foi para a barra superior, T209), antes da navegação", async () => {
+  it("fica logo abaixo da marca Evolli, antes da navegação", async () => {
     render(
       <App
         papelDoAtor="rh"
@@ -1530,8 +1526,12 @@ describe("T189 — empresa ativa no topo do menu lateral", () => {
     const navegacao = [...barra.children].findIndex(
       (f) => f.querySelector("nav") !== null || f.tagName === "NAV",
     );
-    expect(barra.querySelector(".app-shell__marca")).toBeNull();
-    expect(seletor).toBe(0);
+    // T206/T209 — a marca divide o topo da faixa com o botão de recolher.
+    const marca = [...barra.children].findIndex(
+      (f) => f.querySelector(".app-shell__marca") !== null,
+    );
+    expect(marca).toBe(0);
+    expect(seletor).toBe(1);
     expect(navegacao).toBeGreaterThan(seletor);
   });
 

@@ -490,22 +490,21 @@ describe("T207 — Dashboard na barra superior do shell", () => {
   });
 });
 
-describe("T207/T209 — marca do Evolli na barra superior", () => {
-  it("o símbolo aparece na barra clara: quadrado azul com as barras brancas; a faixa marinho não repete a marca", async () => {
+describe("T207/T209 — marca do Evolli no topo da faixa marinho", () => {
+  it("o símbolo aparece no topo da faixa marinho: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
     montar("#/dashboard?ano=2026");
     await esperarLeitura(2026);
-    expect(
-      document.querySelector(".app-shell__sidebar .app-shell__marca-simbolo"),
-    ).toBeNull();
     const simbolo = document.querySelector<SVGElement>(
-      ".barra-superior .app-shell__marca-simbolo",
+      ".app-shell__sidebar .app-shell__marca-simbolo",
     )!;
     expect(simbolo).not.toBeNull();
     const fundo = simbolo.querySelector(":scope > rect")!.getAttribute("fill");
     const barras = simbolo.querySelector(":scope > g")!.getAttribute("fill");
-    // A barra é clara e pinta a marca na cor de ação: fundo azul, barras
-    // brancas — nunca branco sobre branco.
-    expect(fundo).toBe("currentColor");
-    expect(barras).not.toBe(fundo);
+    // A faixa pinta o texto de branco: o fundo não pode depender dessa cor.
+    expect(fundo).toBe("var(--surface-canvas)");
+    expect(barras).toBe("var(--color-action)");
+    expect(
+      document.querySelector(".barra-superior .app-shell__marca-simbolo"),
+    ).toBeNull();
   });
 });

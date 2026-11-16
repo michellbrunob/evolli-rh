@@ -7,6 +7,7 @@
  * só "Dashboard"). Numa sub-página (`agrupadoEm`), o item do pai leva a ele.
  * Destino desconhecido não ganha caminho inventado.
  */
+import type { IconeModuloId } from "./IconeModulo";
 import { GRUPOS, destinoPorId } from "./mapaNavegacao";
 import { MENU_LATERAL } from "./menuLateral";
 
@@ -23,6 +24,16 @@ export interface ItemDaTrilha {
 const TELA_DO_DESTINO: Readonly<Record<string, string>> = {
   configuracoes: "Meu perfil",
 };
+
+/** O ícone do módulo da tela (o mesmo do menu lateral), ou `null`. */
+export function iconeDaTrilha(destinoId: string): IconeModuloId | null {
+  const destino = destinoPorId(destinoId);
+  if (!destino) return null;
+  const baseId = destino.agrupadoEm ?? destino.id;
+  return (
+    GRUPOS.find((g) => g.destinos.some((d) => d.id === baseId))?.icone ?? null
+  );
+}
 
 export function trilhaDoDestino(destinoId: string): ItemDaTrilha[] {
   const destino = destinoPorId(destinoId);

@@ -214,3 +214,10 @@
     display: none;
   }
 }
+
+/* T209 — o ícone do módulo antes da trilha (decorativo). */
+.barra-superior__trilha-icone {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--color-ink-subtle);
+}

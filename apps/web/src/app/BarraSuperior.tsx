@@ -15,6 +15,7 @@
  */
 import { ChevronDown, CircleUserRound } from "lucide-react";
 import { useState, type MutableRefObject, type ReactNode } from "react";
+import { IconeModulo, type IconeModuloId } from "./IconeModulo";
 import { urlDaFotoPropria } from "../api/usersClient";
 import { iniciaisDe } from "../screens/configuracoes/nomeExibicao";
 import {
@@ -44,13 +45,9 @@ export interface BarraSuperiorProps {
   readonly botaoMenuRef: MutableRefObject<HTMLButtonElement | null>;
   readonly onAlternarGaveta: () => void;
   readonly iconeMenu: ReactNode;
-  /** Recolher/expandir o menu (desktop). */
-  readonly trilhoRecolhido: boolean;
-  readonly botaoRecolherRef: MutableRefObject<HTMLButtonElement | null>;
-  readonly controlaId: string;
-  readonly onAlternarRecolhido: () => void;
-  readonly iconeRecolher: ReactNode;
   readonly trilha: readonly ItemDaTrilha[];
+  /** O ícone do módulo, antes da trilha (decorativo). */
+  readonly iconeDaTrilha?: IconeModuloId | null;
   readonly onNavegar: (destinoId: string) => void;
   /** Sem conta (sem sessão), não há controle de conta. */
   readonly conta: ContaDaBarra | null;
@@ -97,12 +94,8 @@ export function BarraSuperior({
   botaoMenuRef,
   onAlternarGaveta,
   iconeMenu,
-  trilhoRecolhido,
-  botaoRecolherRef,
-  controlaId,
-  onAlternarRecolhido,
-  iconeRecolher,
   trilha,
+  iconeDaTrilha = null,
   onNavegar,
   conta,
   mfaDisponivel,
@@ -112,7 +105,6 @@ export function BarraSuperior({
   onSair,
 }: BarraSuperiorProps) {
   const nome = conta?.nomeExibicao ?? NOME_SEM_EXIBICAO;
-  const rotuloRecolher = trilhoRecolhido ? "Expandir menu" : "Recolher menu";
   return (
     <header className="barra-superior app-shell__topbar" {...inerte}>
       <div className="barra-superior__grupo barra-superior__grupo--inicio">
@@ -128,30 +120,22 @@ export function BarraSuperior({
           Menu
         </button>
 
-        <span className="barra-superior__marca">
-          <MarcaEvolli />
-          <span className="barra-superior__marca-nome">Evolli RH</span>
-        </span>
-
-        {/* T206 — um nó só nos dois estados: o foco fica nele ao alternar. No
-            modo gaveta ele sai da tabulação com `hidden`. */}
-        <button
-          type="button"
-          ref={botaoRecolherRef}
-          className="app-shell__recolher"
-          aria-expanded={!trilhoRecolhido}
-          aria-controls={controlaId}
-          data-dica={rotuloRecolher}
-          hidden={modoGaveta}
-          onClick={onAlternarRecolhido}
-        >
-          {iconeRecolher}
-          <span className="app-shell__oculto">{rotuloRecolher}</span>
-        </button>
+        {/* No desktop a marca mora no topo da faixa, na mesma linha; no
+            celular (faixa em gaveta) ela vem para a barra. */}
+        {modoGaveta ? (
+          <span className="barra-superior__marca">
+            <MarcaEvolli />
+            <span className="barra-superior__marca-nome">Evolli RH</span>
+          </span>
+        ) : null}
 
         {trilha.length > 0 ? (
           <>
-            <span className="barra-superior__separador" aria-hidden="true" />
+            {iconeDaTrilha ? (
+              <span className="barra-superior__trilha-icone" aria-hidden="true">
+                <IconeModulo nome={iconeDaTrilha} />
+              </span>
+            ) : null}
             <nav className="barra-superior__trilha" aria-label="Trilha">
               <ol>
                 {trilha.map((item, i) => {

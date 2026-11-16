@@ -69,7 +69,8 @@ import "./tokens.css";
 import "./app-shell.css";
 import type { SafeAccessUserApi } from "../api/usersClient";
 import { BarraSuperior } from "./BarraSuperior";
-import { trilhaDoDestino } from "./trilhaDoShell";
+import { MarcaEvolli } from "./IconeModulo";
+import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
@@ -1006,7 +1007,6 @@ export function App({
   const botaoRecolherRef = useRef<HTMLButtonElement | null>(null);
 
   const sidebarRef = useRef<HTMLDivElement | null>(null);
-  const shellRef = useRef<HTMLDivElement | null>(null);
 
   // T206 — atravessar o breakpoint esconde parte do menu: no modo gaveta a
   // faixa inteira some pelo CSS (e o "Recolher menu" ganha `hidden`); no
@@ -1035,11 +1035,7 @@ export function App({
       regiao !== null &&
       (regiao.contains(ativo) ||
         (perdido && ultimo !== null && regiao.contains(ultimo)));
-    // T209 — o botão de recolher mora na barra superior (fora da faixa).
-    if (
-      modoGaveta &&
-      (estavaEm(sidebarRef.current) || estavaEm(botaoRecolherRef.current))
-    ) {
+    if (modoGaveta && estavaEm(sidebarRef.current)) {
       botaoMenuRef.current?.focus();
     } else if (!modoGaveta && estavaEm(botaoMenuRef.current)) {
       botaoRecolherRef.current?.focus();
@@ -1673,7 +1669,6 @@ export function App({
 
   return (
     <div
-      ref={shellRef}
       className={[
         "app-shell",
         gavetaModal ? "app-shell--gaveta-aberta" : "",
@@ -1721,6 +1716,34 @@ export function App({
               }
             : {})}
         >
+          {/* T209 — topo da faixa na mesma linha da barra superior: a marca e
+              o botão de recolher, com a altura da barra. Na gaveta do
+              celular o recolher sai da tabulação (`hidden`): a gaveta é
+              sempre o menu inteiro. */}
+          <div className="app-shell__cabecalho-lateral">
+            <span className="app-shell__marca">
+              <MarcaEvolli tom="clara" />
+              <span className="app-shell__marca-texto">
+                <span className="app-shell__marca-nome">Evolli RH</span>
+              </span>
+            </span>
+            <button
+              type="button"
+              ref={botaoRecolherRef}
+              className="app-shell__recolher"
+              aria-expanded={!trilho}
+              aria-controls={ID_NAVEGACAO_PAINEL}
+              data-dica={trilho ? "Expandir menu" : "Recolher menu"}
+              hidden={modoGaveta}
+              onClick={() => definirRecolhido(!recolhido)}
+            >
+              <IconeRecolherMenu />
+              <span className="app-shell__oculto">
+                {trilho ? "Expandir menu" : "Recolher menu"}
+              </span>
+            </button>
+          </div>
+
           {/* T189 — a empresa ativa, logo abaixo da marca. Só na sessão
               autenticada (mesmo critério de "Sair"): sem sessão não há
               empresa a mostrar. */}
@@ -1749,18 +1772,17 @@ export function App({
             onExpandir={expandirMenu}
           />
 
-          {/* T209 — a raiz é o shell inteiro: o botão de recolher mora na
-              barra superior. */}
-          <DicaDoTrilho raizRef={shellRef} ativa={!modoGaveta} />
+          <DicaDoTrilho raizRef={sidebarRef} ativa={!modoGaveta} />
         </div>
 
         {/* T206 — cabeçalho, painéis, conteúdo e rodapé formam a coluna à
             direita do menu: nada fica entre a navegação e o conteúdo. */}
         <div className="app-shell__coluna">
-          {/* T209 — barra superior fixa: marca, recolher o menu e a trilha da
-              tela; à direita, só a conta (nome de exibição e o menu com Meu
-              perfil, Segurança, Sessões ativas e Sair). Sem papel técnico,
-              e-mail, empresa nem Hub. */}
+          {/* T209 — barra superior fixa: a trilha da tela (a marca e o
+              recolher ficam no topo da faixa, na mesma linha; no celular a
+              marca vem para a barra); à direita, só a conta (nome de
+              exibição e o menu com Meu perfil, Segurança, Sessões ativas e
+              Sair). Sem papel técnico, e-mail, empresa nem Hub. */}
           <BarraSuperior
             {...(gavetaModal ? { inerte: FUNDO_INERTE } : {})}
             modoGaveta={modoGaveta}
@@ -1768,12 +1790,8 @@ export function App({
             botaoMenuRef={botaoMenuRef}
             onAlternarGaveta={alternarGaveta}
             iconeMenu={<IconeMenu />}
-            trilhoRecolhido={trilho}
-            botaoRecolherRef={botaoRecolherRef}
-            controlaId={ID_NAVEGACAO_PAINEL}
-            onAlternarRecolhido={() => definirRecolhido(!recolhido)}
-            iconeRecolher={<IconeRecolherMenu />}
             trilha={trilhaDoDestino(destinoAtivoId)}
+            iconeDaTrilha={iconeDaTrilha(destinoAtivoId)}
             onNavegar={irPara}
             conta={
               onLogout

@@ -542,3 +542,29 @@
 .app-shell__sidebar .seletor-empresa__botao:focus-visible {
   outline-color: var(--evolli-sobre-marinho);
 }
+
+/* T209 — o topo da faixa (marca e recolher) fica na mesma linha da barra
+   superior: a mesma altura e a mesma linha divisória embaixo. */
+.app-shell__sidebar {
+  padding-top: 0;
+}
+
+.app-shell__cabecalho-lateral {
+  /* A barra soma a linha divisória (1 px) à altura. */
+  min-height: calc(var(--altura-barra-superior) + 1px);
+  margin: 0 calc(-1 * var(--space-sm));
+  padding: 0 var(--space-sm);
+  border-bottom: var(--divisor);
+  border-bottom-color: var(--divisor-cor-sobre-marinho);
+}
+
+@media (min-width: 835px) {
+  .app-shell--menu-recolhido .app-shell__sidebar {
+    padding-top: 0;
+  }
+
+  .app-shell--menu-recolhido .app-shell__cabecalho-lateral {
+    margin: 0 calc(-1 * var(--space-xs));
+    padding: var(--space-xs);
+  }
+}

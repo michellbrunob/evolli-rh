@@ -91,13 +91,9 @@ afterEach(() => {
 });
 
 describe("T209 — barra superior: esquerda", () => {
-  it("marca do Evolli, botão de recolher o menu e a trilha da tela", () => {
+  it("a barra começa pela trilha da tela, com o ícone do módulo (decorativo)", () => {
     montar();
     const topo = barra();
-    expect(within(topo).getByText("Evolli RH")).toBeInTheDocument();
-    expect(
-      within(topo).getByRole("button", { name: "Recolher menu" }),
-    ).toHaveAttribute("aria-expanded", "true");
     const trilha = within(topo).getByRole("navigation", { name: "Trilha" });
     expect(
       within(trilha)
@@ -108,13 +104,28 @@ describe("T209 — barra superior: esquerda", () => {
       "aria-current",
       "page",
     );
+    const icone = topo.querySelector(".barra-superior__trilha-icone");
+    expect(icone).toHaveAttribute("aria-hidden", "true");
+    expect(icone?.querySelector("svg")).not.toBeNull();
   });
 
-  it("a marca e o recolher saem da faixa lateral (não ficam duplicados)", () => {
+  it("marca e recolher no topo da faixa lateral, na linha da barra — e não duplicados na barra", () => {
     montar();
     const lateral = document.getElementById("navegacao-lateral")!;
-    expect(within(lateral).queryByText("Evolli RH")).toBeNull();
-    expect(within(lateral).queryByRole("button", { name: /menu$/ })).toBeNull();
+    const topoDaFaixa = lateral.querySelector(".app-shell__cabecalho-lateral")!;
+    expect(lateral.firstElementChild).toBe(topoDaFaixa);
+    expect(
+      within(topoDaFaixa as HTMLElement).getByText("Evolli RH"),
+    ).toBeInTheDocument();
+    expect(
+      within(topoDaFaixa as HTMLElement).getByRole("button", {
+        name: "Recolher menu",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(within(barra()).queryByText("Evolli RH")).toBeNull();
+    expect(
+      within(barra()).queryByRole("button", { name: "Recolher menu" }),
+    ).toBeNull();
   });
 
   it("a trilha acompanha a navegação; numa sub-página, o pai leva de volta", async () => {
@@ -131,13 +142,11 @@ describe("T209 — barra superior: esquerda", () => {
     );
   });
 
-  it("o recolher continua funcionando a partir da barra", () => {
+  it("o recolher, no topo da faixa, continua funcionando", () => {
     montar();
-    fireEvent.click(
-      within(barra()).getByRole("button", { name: "Recolher menu" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
     expect(
-      within(barra()).getByRole("button", { name: "Expandir menu" }),
+      screen.getByRole("button", { name: "Expandir menu" }),
     ).toHaveAttribute("aria-expanded", "false");
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
@@ -271,6 +280,8 @@ describe("T209 — barra superior no celular (375 px)", () => {
       within(topo).getByRole("button", { name: "Menu" }),
     ).toBeInTheDocument();
     expect(botaoConta()).toHaveAccessibleName("Conta: Ana Paula Sintética");
+    // No celular a faixa é gaveta: a marca vem para a barra.
+    expect(within(topo).getByText("Evolli RH")).toBeInTheDocument();
     expect(
       within(topo).queryByRole("button", { name: "Recolher menu" }),
     ).toBeNull();
