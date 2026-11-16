@@ -3481,6 +3481,14 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         conteúdo); tela "Novo colaborador" enxuta, com erro embaixo de cada campo. Web 145
         arquivos, 4210 testes numa rodada limpa; API unitária 63 suítes, 1561 testes; E2E do
         rascunho 14. Foto em R2 pendente (`R2_BUCKET`).
+      - **Foto do colaborador no R2 privado (seção 32, ADR 0020):** tabela e migration próprias
+        (`20261116180000_foto_colaborador`, com limpeza pendente),
+        `PUT/GET/DELETE /v1/colaboradores/:id/foto`, só PNG/JPEG até 5 MB conferidos pelo conteúdo, três WebP sem
+        metadados (96, 256, 512), escrita por RH e DP na empresa ativa, leitura autenticada
+        `private, no-store`, auditoria sem conteúdo; na Nova admissão, prévia, Enviar foto e
+        Remover, envio só depois da admissão, falha sem desfazer a admissão e nova tentativa.
+        API unitária 66 suítes, 1581 testes; E2E da foto 17; web 145 arquivos, 4229 testes numa rodada limpa; 3 mutações
+        detectadas; envio real ao bucket validado no navegador (desktop e 375 px).
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

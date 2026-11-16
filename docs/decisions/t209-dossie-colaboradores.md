@@ -1006,8 +1006,8 @@ conversão automática; importação (Bloco C segue pausado).
 
 ### 31.5 Pendências registradas (sem decisão nem implementação)
 
-- **Foto do colaborador (Cloudflare R2):** configuradas localmente, fora do repositório, as
-  credenciais e o endpoint; **falta `R2_BUCKET`**. Padrão obrigatório já definido para quando
+- **Foto do colaborador (Cloudflare R2):** implementada na seção 32. Na época desta seção,
+  configuradas localmente, fora do repositório, as credenciais e o endpoint; faltava `R2_BUCKET`. Padrão obrigatório já definido para quando
   for implementada: objetos `v1/empresas/{empresa-id}/colaboradores/{colaborador-id}/foto/{arquivo-id}/foto-{tamanho}.webp`,
   só versões processadas de 96, 256 e 512 px em WebP, sem o arquivo bruto, sem dado pessoal na
   chave; banco com chave da versão atual, hash, tamanho, tipo, versão e datas; substituição grava
@@ -1018,3 +1018,81 @@ conversão automática; importação (Bloco C segue pausado).
   calculado, conselho e registro, dependentes para IRRF, pensão, documentos com envio de
   arquivos, CEP com busca automática): exigem contrato, migration, ficha de tratamento e, no
   salário líquido, regra de cálculo aprovada; aguardam os valores que a usuária vai enviar.
+
+## 32. Foto opcional do colaborador no R2 privado (2026-11-16)
+
+Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.md).
+
+### 32.1 Servidor
+
+- **Dono:** o colaborador, na empresa (`foto_colaborador`, uma linha por colaborador e empresa,
+  com chave da versão atual, hash, tamanho, tipo, versão e datas). Nunca a foto da conta.
+- **Migration aditiva** `20261116180000_foto_colaborador`: as duas tabelas (`foto_colaborador` e
+  `limpeza_foto_colaborador_pendente`), três valores de auditoria e CHECKs da forma da chave (só
+  ids internos), do tipo (`image/webp`), do tamanho e do motivo da limpeza. Aplicada no banco
+  isolado da prévia.
+- **Rotas** `PUT/GET/DELETE /v1/colaboradores/:colaboradorId/foto`:
+  - entrada só PNG e JPEG até 5 MB, corpo `application/octet-stream`; extensão, tipo declarado
+    e conteúdo conferidos;
+  - o Sharp decodifica (falha em qualquer erro), corrige a orientação, corta quadrado e gera só
+    três WebP sem metadados (96, 256 e 512 px); o arquivo enviado nunca é guardado;
+  - chaves `v1/empresas/{empresa-id}/colaboradores/{colaborador-id}/foto/{arquivo-id}/foto-{96|256|512}.webp`.
+- **Ordem:** versões novas gravadas antes de o banco apontar para elas; as antigas apagadas
+  depois. Falha ao gravar apaga o que já foi gravado. O que não puder ser apagado vira limpeza
+  pendente (ids, chave e motivo), tentada de novo a cada operação de foto da empresa.
+- **Acesso:**
+  - escrita por RH e DP só na empresa ativa, para colaborador com vínculo nela; master técnico,
+    gestor e colaborador não escrevem;
+  - leitura só pela rota autenticada, depois de conferir empresa, papel e vínculo, com
+    `private, no-store`;
+  - colaborador de outra empresa responde 404.
+- **Auditoria:** envio, substituição e remoção, sem conteúdo, hash, tamanho ou chave.
+- **Cliente do R2:** assinatura SigV4 própria com o `crypto` do Node, conferida contra o exemplo
+  oficial da AWS, sem dependência nova. Configuração só no arquivo de ambiente local ignorado.
+
+### 32.2 Tela Novo colaborador
+
+- **Etapa 1:** bloco "Foto do colaborador (opcional)" com avatar neutro, Enviar foto, prévia
+  local e Remover. A regra fica escrita: "PNG ou JPEG, até 5 MB. Enviada ao concluir o cadastro.
+  A foto não fica no rascunho."
+- **Conferência no navegador:** formato pela extensão e pelo tipo, e o tamanho. A recusa aparece
+  embaixo do bloco.
+- **Rascunho e guarda:** a foto nunca vai para o rascunho. Foto escolhida conta como alteração
+  pendente: sair pergunta, mesmo com o rascunho salvo.
+- **Envio:** só depois de a admissão ser concluída, para o colaborador criado; a admissão nunca
+  leva a foto.
+- **Confirmação:**
+  - sucesso: "Foto salva.";
+  - falha: "O colaborador foi criado, mas a foto não foi salva.", com o motivo;
+  - falha passageira: "Tentar enviar foto novamente" (nunca admite de novo);
+  - recusa do arquivo: "Escolher outra foto".
+- **Recomeço:** "Registrar outra admissão" começa sem foto.
+
+### 32.3 Provas
+
+- **API:**
+  - unidade: 20 testes novos (assinatura 2, processamento 12, adaptador do R2 com `fetch`
+    simulado 6); suíte unitária 66 suítes, 1581 testes;
+  - E2E com PostgreSQL real e armazenamento falso: 17 testes. Cobrem a migration, o envio por
+    RH, a leitura autenticada, a substituição por DP e a negação a master técnico, gestor e
+    colaborador. Cobrem também o isolamento entre empresas e os arquivos falso, de tipo
+    enganoso e GIF. Por fim: 413 e 415, falha do R2 no envio, limpeza pendente refeita, remoção,
+    remoção com o R2 fora e falha de leitura sem detalhe do provedor.
+  - Nenhum teste fala com o bucket.
+- **Web:**
+  - 19 testes novos da tela (incluindo 5 recusas no navegador) e 2 do cliente;
+  - 3 mutações detectadas: guarda sem a foto, tipo diferente da extensão e prévia não
+    liberada;
+  - suíte web completa 145 arquivos, 4229 testes numa rodada limpa.
+- **Navegador** (banco isolado da T209, RH, imagem sintética de 300 × 300 px, envio real ao
+  bucket privado):
+  - desktop: prévia na etapa 1, admissão concluída e "Foto salva.";
+  - a rota autenticada devolveu as três versões em WebP de 96, 256 e 512 px, sem EXIF, com
+    `private, no-store`; tamanho 300 → 422;
+  - 375 px: GIF recusado no navegador ("Use uma imagem PNG ou JPEG."), prévia sem rolagem
+    horizontal;
+  - com 503 simulado no envio da foto: admissão registrada, aviso claro, e "Tentar enviar foto
+    novamente" → "Foto salva.".
+- **Observação:** imagem menor que 512 px é ampliada no corte (o lado mínimo aceito é 64 px).
+- **Fora desta fatia:** trocar ou remover a foto pela ficha (a rota de remoção existe e está
+  testada; falta tela), mostrar a foto na listagem e na ficha, e a retenção (`DP-2E-15`).
