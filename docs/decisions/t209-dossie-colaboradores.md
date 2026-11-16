@@ -943,3 +943,78 @@ conversão automática; importação (Bloco C segue pausado).
 - **Bateria:** web 145 arquivos, 4188 testes numa rodada limpa (4 workers); lint, typecheck,
   build, Prettier, `spec:check` e `git diff --check` verdes. Sem API, migration, RBAC, seed,
   dependência ou rota nova.
+
+## 31. Reimportação sem duplicar, rascunho persistente e Novo colaborador (2026-11-16)
+
+### 31.1 Importação: reimportar não duplica
+
+- A chave de idempotência de cada linha deixa de ser aleatória: UUID v5 (SHA-256) da
+  identidade da pessoa na empresa — nome normalizado, data de nascimento e matrícula. O
+  servidor guarda a chave por conta e empresa, sem prazo (`IdempotenciaAdmissao`), então
+  reimportar o mesmo arquivo reaproveita a admissão já feita ("já importada antes"); a mesma
+  pessoa com outros dados é recusada como conteúdo divergente, com orientação para corrigir
+  pela ficha; outra empresa, outra chave. "Tentar de novo" segue reenviando só as pendentes,
+  com as mesmas chaves. O cliente informa o reenvio (`enviarAdmissao`, cabeçalho
+  `Idempotent-Replayed`).
+- **Limite:** a chave vale por conta (escopo do servidor): outra pessoa de RH ou DP
+  reimportando o mesmo arquivo admite de novo quem não tem matrícula.
+- **Testes:** chave (5), tela com servidor falso que reproduz a regra real (5: primeira
+  importação, reimportação concluída, tentativa parcial, mesma pessoa com outros dados, troca de
+  empresa), cliente (2); 3 mutações detectadas.
+- **Navegador (banco da T209, RH):** arquivo de 2 linhas → "2 admitidas"; o mesmo arquivo de
+  novo → "Nenhuma admitida, 2 já importadas antes, nenhuma pendente."; na listagem, as 2
+  pessoas, uma vez cada.
+
+### 31.2 Rascunho persistente da Nova admissão
+
+- Tabela própria `rascunho_admissao` (migration aditiva `20261116120000_rascunho_admissao`):
+  uma linha por conta e empresa ativa, `dados` em JSON com CHECK de tamanho e de tipo, versão
+  que sobe a cada gravação, cascata com a conta e a empresa; dois valores de auditoria
+  (`pessoas.rascunho_admissao.salvo`/`descartado`), sem conteúdo.
+- `GET/PUT/DELETE /v1/admissoes/rascunho`, com a capacidade da admissão
+  (`colaborador:create`) reavaliada na empresa ativa da sessão: RH e DP, cada conta só o
+  próprio; master técnico, gestor e colaborador negados. O servidor guarda só os campos do
+  contrato atual da admissão (lista fechada); CPF, foto, campo desconhecido ou valor que não é
+  texto recusam o rascunho inteiro, sem repetir o valor. Salvar nunca cria colaborador.
+- Sem armazenamento no navegador.
+- **Testes:** filtro (16) e E2E com PostgreSQL real (14: migration do zero, papéis, isolamento
+  por conta e por empresa ativa, CSRF, CHECK, trilha sem conteúdo). Migration aplicada no banco
+  isolado da prévia.
+
+### 31.3 Novo colaborador
+
+- Cabeçalho: voltar para Colaboradores, "Novo colaborador", "Preencha os dados em quatro
+  etapas. Você pode salvar e continuar depois." e Salvar rascunho. Abaixo, só "Você está
+  cadastrando um novo colaborador para: {empresa ativa}" (sem empresa ativa, o bloqueio de
+  sempre). Saíram o aviso do Módulo 1, a explicação da empresa, o bloco de documentos futuros,
+  a trilha dentro da página (fica a da barra: "Pessoas / Colaboradores / Novo colaborador") e o
+  resumo "Revise N campos" do topo — cada campo recusado mostra a mensagem embaixo dele, com o
+  foco no primeiro (na etapa dele).
+- Rascunho na tela: Salvar rascunho grava formulário, etapa e referências escolhidas (nunca
+  admite nem envia foto); ao abrir, o rascunho da conta na empresa ativa é recuperado com
+  Descartar rascunho; concluir a admissão o apaga; salvo e sem mudanças, sair não pergunta.
+- **Navegador (RH):** salvar → "Rascunho salvo em 16/11/2026 às 17:15."; recarregar →
+  "Rascunho … recuperado." com nome e nascimento de volta; Próxima etapa sem o nome → mensagem
+  embaixo do campo, foco nele, sem resumo no topo; 375 px sem rolagem horizontal, ações de 44
+  px e o último campo acima do rodapé fixo; Descartar rascunho → formulário vazio.
+
+### 31.4 Barra e faixa
+
+- Marca e recolher voltaram ao topo da faixa lateral, na mesma linha e altura da barra
+  superior; a barra começa pela trilha, com o ícone do módulo. No celular, a marca fica na
+  barra.
+
+### 31.5 Pendências registradas (sem decisão nem implementação)
+
+- **Foto do colaborador (Cloudflare R2):** configuradas localmente, fora do repositório, as
+  credenciais e o endpoint; **falta `R2_BUCKET`**. Padrão obrigatório já definido para quando
+  for implementada: objetos `v1/empresas/{empresa-id}/colaboradores/{colaborador-id}/foto/{arquivo-id}/foto-{tamanho}.webp`,
+  só versões processadas de 96, 256 e 512 px em WebP, sem o arquivo bruto, sem dado pessoal na
+  chave; banco com chave da versão atual, hash, tamanho, tipo, versão e datas; substituição grava
+  a nova versão antes de apontá-la; remoção apaga as três e registra limpeza pendente se falhar;
+  toda leitura valida autenticação, empresa ativa, papel e vínculo antes de buscar o objeto.
+- **Campos e etapas como nos prints da usuária** (CPF e RG, gênero, contato de emergência,
+  nível, gestor direto, tipo de contratação, jornada semanal, escala, salário bruto e líquido
+  calculado, conselho e registro, dependentes para IRRF, pensão, documentos com envio de
+  arquivos, CEP com busca automática): exigem contrato, migration, ficha de tratamento e, no
+  salário líquido, regra de cálculo aprovada; aguardam os valores que a usuária vai enviar.

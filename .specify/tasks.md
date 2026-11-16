@@ -3475,6 +3475,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         e-mail, papel ou empresa); Hub nunca montado — RH, DP e master técnico no Dashboard,
         gestor em Minha equipe, demais papéis numa tela neutra de acesso temporário, sem módulos.
         Web 145 arquivos, 4188 testes numa rodada limpa; 5 mutações detectadas. Só web.
+      - **Reimportação, rascunho e Novo colaborador (seção 31):** chave determinística por
+        pessoa e empresa (reimportar não duplica); rascunho persistente no servidor (tabela e
+        migration próprias, `/v1/admissoes/rascunho`, RH e DP, por conta e empresa, auditoria sem
+        conteúdo); tela "Novo colaborador" enxuta, com erro embaixo de cada campo. Web 145
+        arquivos, 4210 testes numa rodada limpa; API unitária 63 suítes, 1561 testes; E2E do
+        rascunho 14. Foto em R2 pendente (`R2_BUCKET`).
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
