@@ -23,7 +23,6 @@ describe("T208 — rota de Configurações", () => {
   it.each([
     "#/configuracoes/",
     "#/configuracoes/seguranca",
-    "#/configuracoes/empresas",
     "#/configuracoes/equipe-e-permissoes",
     "#/configuracoes/meu-perfil/editar",
     "#/configuracoesx",

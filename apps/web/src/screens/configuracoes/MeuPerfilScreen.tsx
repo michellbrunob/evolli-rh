@@ -48,11 +48,11 @@ import {
   normalizarNomeExibicao,
 } from "./nomeExibicao";
 import "./MeuPerfilScreen.css";
+import { NavegacaoConfiguracoes } from "./NavegacaoConfiguracoes";
 
 /** `id` do `h1` da tela — o título que recebe o foco ao abrir. */
 export const CONFIGURACOES_TITULO_ID = "configuracoes-titulo";
 const MEU_PERFIL_TITULO_ID = "configuracoes-meu-perfil-titulo";
-const GRUPO_SUA_CONTA_ID = "configuracoes-grupo-sua-conta";
 const SECAO_IDENTIFICACAO_ID = "configuracoes-secao-identificacao";
 const SECAO_CONTATO_ID = "configuracoes-secao-contato";
 const SECAO_ENTRADA_ID = "configuracoes-secao-entrada";
@@ -105,6 +105,8 @@ export interface MeuPerfilScreenProps {
    * um conflito) — para a sessão seguir com o nome novo sem remontar nada.
    */
   readonly onContaAtualizada?: ((ator: SafeAccessUserApi) => void) | undefined;
+  /** T209 — a conta alcança Configurações › Empresas (item na navegação). */
+  readonly mostrarEmpresas?: boolean;
 }
 
 /** A data (sem a hora) do instante de criação, no fuso de negócio. */
@@ -143,6 +145,7 @@ type Falha = "conflito" | "sessao" | "geral" | null;
 export function MeuPerfilScreen({
   conta,
   onContaAtualizada,
+  mostrarEmpresas = false,
 }: MeuPerfilScreenProps) {
   const papel =
     conta === null ? AUSENTE : (ROTULO_PAPEL[conta.role] ?? conta.role);
@@ -467,25 +470,10 @@ export function MeuPerfilScreen({
       />
 
       <div className="configuracoes__corpo">
-        <nav className="configuracoes__navegacao" aria-label="Configurações">
-          <p className="configuracoes__grupo" id={GRUPO_SUA_CONTA_ID}>
-            Sua conta
-          </p>
-          <ul
-            className="configuracoes__itens"
-            aria-labelledby={GRUPO_SUA_CONTA_ID}
-          >
-            <li>
-              <a
-                className="configuracoes__item configuracoes__item--atual"
-                href="#/configuracoes/meu-perfil"
-                aria-current="page"
-              >
-                Meu perfil
-              </a>
-            </li>
-          </ul>
-        </nav>
+        <NavegacaoConfiguracoes
+          atual="meu-perfil"
+          mostrarEmpresas={mostrarEmpresas}
+        />
 
         <section
           className="configuracoes__painel"

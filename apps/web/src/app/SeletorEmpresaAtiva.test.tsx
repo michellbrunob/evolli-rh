@@ -482,10 +482,11 @@ describe("T189 — o navegador não é autoridade, e o visual é do Evolli", () 
     expect(fonte).not.toMatch(/\bURLSearchParams\b/);
   });
 
-  it("nenhum nome de empresa nem identificador fiscal escrito no componente", () => {
+  it("nenhum nome de empresa nem dado de pessoa escrito no componente", () => {
     const fonte = semComentarios("src/app/SeletorEmpresaAtiva.tsx");
     expect(fonte).not.toMatch(/Empresa\s+[A-Z]\b/);
-    expect(fonte).not.toMatch(/CNPJ|CPF/);
+    // T209 — o CNPJ da empresa passou a ser exibido (decisão de 2026-11-17).
+    expect(fonte).not.toMatch(/CPF/);
   });
 
   it("CSS: só tokens, alvo de 44 px, nomes quebram linha, nada empurra a página", () => {
@@ -611,7 +612,7 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
     expect(screen.getByRole("searchbox")).toHaveValue("");
   });
 
-  it("nenhuma ação de adicionar ou gerenciar empresas existe (sem tela, rota nem permissão)", async () => {
+  it("sem as ações do shell, nenhum 'Adicionar' nem 'Gerenciar' aparece (T209: só com tela e permissão)", async () => {
     vi.mocked(listarEmpresasDoContexto).mockResolvedValue(empresas(10));
     montar({ papelDoAtor: "master_tecnico" });
     await abrirLista();
@@ -740,5 +741,45 @@ describe("T209 — cartão e lista como no novo desenho", () => {
     expect(selo.querySelector(".seletor-empresa__oculto")).toHaveTextContent(
       "Atual",
     );
+  });
+});
+
+describe("T209 — CNPJ e as ações de empresa no seletor", () => {
+  it("com CNPJ, ele aparece com máscara abaixo do nome (no cartão e na lista); sem CNPJ, o código", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([
+      { ...ALFA, cnpj: "11222333000181" },
+      BETA,
+    ]);
+    montar({ empresaAtiva: { ...ALFA, cnpj: "11222333000181" } });
+    const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
+    expect(botao).toHaveTextContent("11.222.333/0001-81");
+    expect(botao).not.toHaveTextContent("Código ALFA");
+    await abrirLista();
+    expect(opcao("Empresa Alfa")).toHaveTextContent("11.222.333/0001-81");
+    expect(opcao("Empresa Beta")).toHaveTextContent("Código BETA");
+  });
+
+  it("'Adicionar empresa' e 'Gerenciar empresas' depois da lista; cada um fecha o painel e chama o shell", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([ALFA, BETA]);
+    const onAdicionarEmpresa = vi.fn();
+    const onGerenciarEmpresas = vi.fn();
+    montar({ onAdicionarEmpresa, onGerenciarEmpresas });
+    await abrirLista();
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar empresa" }));
+    expect(onAdicionarEmpresa).toHaveBeenCalledTimes(1);
+    expect(botaoDaEmpresa()).toHaveAttribute("aria-expanded", "false");
+    await abrirLista();
+    fireEvent.click(screen.getByRole("button", { name: "Gerenciar empresas" }));
+    expect(onGerenciarEmpresas).toHaveBeenCalledTimes(1);
+  });
+
+  it("empresa única com as ações: o cartão abre (para adicionar ou gerenciar)", async () => {
+    vi.mocked(listarEmpresasDoContexto).mockResolvedValue([ALFA]);
+    const onAdicionarEmpresa = vi.fn();
+    montar({ onAdicionarEmpresa });
+    await abrirLista();
+    expect(
+      screen.getByRole("button", { name: "Adicionar empresa" }),
+    ).toBeInTheDocument();
   });
 });

@@ -52,7 +52,13 @@ export interface SafeAccessUserApi {
    * `GET /v1/empresas` a cada montagem so para descobrir o nome — a ressalva
    * R-2 da T162.
    */
-  empresaAtiva?: { id: string; codigo: string; nome: string } | null;
+  // T209 — com o CNPJ, quando cadastrado.
+  empresaAtiva?: {
+    id: string;
+    codigo: string;
+    nome: string;
+    cnpj?: string | null;
+  } | null;
   /**
    * T208 — Configurações › Meu perfil: o nome de exibição da própria conta
    * (`null` sem nome: a tela usa o e-mail) e a data da última vez que o

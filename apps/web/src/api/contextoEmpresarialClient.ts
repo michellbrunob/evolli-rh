@@ -41,6 +41,8 @@ export interface EmpresaDoContextoApi {
   id: string;
   codigo: string;
   nome: string;
+  /** T209 — o CNPJ, quando cadastrado (empresas antigas não têm). */
+  cnpj?: string | null;
 }
 
 async function getCsrf(): Promise<string> {

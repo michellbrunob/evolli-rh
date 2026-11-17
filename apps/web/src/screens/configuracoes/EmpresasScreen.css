@@ -1,0 +1,151 @@
+/* T209 — Configurações › Empresas. Só tokens; nada alarga a página. */
+
+.configuracoes__grupo--seguinte {
+  margin-top: var(--space-md);
+}
+
+.empresas__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.empresas__aviso {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 8px;
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.empresas__subtitulo {
+  margin: var(--space-lg) 0 0;
+  font-size: 1rem;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.empresas__falha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.empresas__falha p {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+.empresas__tabela-moldura {
+  margin-top: var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: 12px;
+  background: var(--surface-canvas);
+  overflow-x: auto;
+}
+
+.empresas__tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.empresas__tabela th {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--divisor-cor);
+  background: var(--surface-pearl);
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  font-weight: var(--weight-strong);
+  text-align: left;
+}
+
+.empresas__tabela td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--divisor-cor);
+  color: var(--color-ink);
+  vertical-align: middle;
+}
+
+.empresas__tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.empresas__empresa {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.empresas__monograma {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--evolli-azul-suave);
+  color: var(--color-action);
+  font-size: 0.75rem;
+  font-weight: var(--weight-strong);
+}
+
+.empresas__textos {
+  display: grid;
+  min-width: 0;
+}
+
+.empresas__nome {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: var(--weight-strong);
+  overflow-wrap: break-word;
+}
+
+.empresas__selo {
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--evolli-azul-suave);
+  color: var(--color-action);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-strong);
+}
+
+.empresas__cnpj {
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+}
+
+.empresas__acoes {
+  width: 3rem;
+  text-align: right;
+}
+
+.empresas__editar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+}
+
+.empresas__editar:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.empresas__editar:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: 1px;
+}

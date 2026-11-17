@@ -63,13 +63,35 @@ describe("estrutura dos grupos", () => {
     ]);
   });
 
-  it("T208 — só Configurações é grupo da conta, com um único destino funcional", () => {
+  it("T208 — só Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas", () => {
     const daConta = GRUPOS.filter((g) => g.daConta);
     expect(daConta.map((g) => g.titulo)).toEqual(["Configurações"]);
     expect(daConta[0]!.secundario).toBeFalsy();
     expect(
-      daConta[0]!.destinos.map((d) => [d.id, d.label, d.estado, d.papeis]),
-    ).toEqual([["configuracoes", "Configurações", "funcional", undefined]]);
+      daConta[0]!.destinos.map((d) => [
+        d.id,
+        d.label,
+        d.estado,
+        d.papeis,
+        d.agrupadoEm,
+      ]),
+    ).toEqual([
+      ["configuracoes", "Configurações", "funcional", undefined, undefined],
+      [
+        "configuracoes-empresas",
+        "Empresas",
+        "funcional",
+        ["rh", "dp", "master_tecnico"],
+        "configuracoes",
+      ],
+      [
+        "nova-empresa",
+        "Nova empresa",
+        "funcional",
+        ["rh", "master_tecnico"],
+        "configuracoes-empresas",
+      ],
+    ]);
   });
 
   it("só Demonstração tem descrição, e ela diz que nada ali grava", () => {
@@ -119,6 +141,9 @@ describe("o estado declarado bate com o código", () => {
     // depende do contrato e dos rótulos de `usersClient`, sem requisição
     // própria. Funcional: dado real do servidor, não fixture.
     configuracoes: "src/screens/configuracoes/MeuPerfilScreen.tsx",
+    // T209 — Configurações › Empresas e Nova empresa.
+    "configuracoes-empresas": "src/screens/configuracoes/EmpresasScreen.tsx",
+    "nova-empresa": "src/screens/configuracoes/NovaEmpresaScreen.tsx",
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     "importar-colaboradores":

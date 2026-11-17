@@ -95,6 +95,15 @@ import {
   MeuPerfilScreen,
   type ContaDoMeuPerfil,
 } from "../screens/configuracoes/MeuPerfilScreen";
+import {
+  EMPRESAS_TITULO_ID,
+  EmpresasScreen,
+} from "../screens/configuracoes/EmpresasScreen";
+import {
+  NOVA_EMPRESA_TITULO_ID,
+  NovaEmpresaScreen,
+  type DestinoDepoisDaEmpresa,
+} from "../screens/configuracoes/NovaEmpresaScreen";
 import { InicioVisaoGeralScreen } from "../screens/inicio";
 import {
   DASHBOARD_TITULO_ID,
@@ -273,6 +282,8 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
   "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
+  "configuracoes-empresas": EMPRESAS_TITULO_ID,
+  "nova-empresa": NOVA_EMPRESA_TITULO_ID,
 };
 
 /**
@@ -461,13 +472,44 @@ function conteudoDoDestino(
   // T208 — a conta da sessão, para Configurações › Meu perfil, e quem
   // recebe o ator depois que a própria pessoa salva o perfil.
   contaDoAtor: ContaDoMeuPerfil | null,
-  onContaAtualizada?: (ator: SafeAccessUserApi) => void,
+  onContaAtualizada: ((ator: SafeAccessUserApi) => void) | undefined,
+  // T209 — Configurações › Empresas e a Nova empresa.
+  empresas: {
+    readonly podeVer: boolean;
+    readonly podeAdicionar: boolean;
+    readonly aviso: string | undefined;
+    readonly onCriadaSemAbrir: (nome: string) => void;
+    readonly onEmpresaAberta: (
+      empresa: EmpresaDoContextoApi,
+      destino: DestinoDepoisDaEmpresa,
+    ) => void;
+  },
 ) {
   if (destinoId === "configuracoes") {
     return (
       <MeuPerfilScreen
         conta={contaDoAtor}
         onContaAtualizada={onContaAtualizada}
+        mostrarEmpresas={empresas.podeVer}
+      />
+    );
+  }
+  if (destinoId === "configuracoes-empresas") {
+    return (
+      <EmpresasScreen
+        podeAdicionar={empresas.podeAdicionar}
+        podeEditar={empresas.podeAdicionar}
+        onAdicionar={() => onNavegar("nova-empresa")}
+        aviso={empresas.aviso}
+      />
+    );
+  }
+  if (destinoId === "nova-empresa") {
+    return (
+      <NovaEmpresaScreen
+        onSair={() => onNavegar("configuracoes-empresas")}
+        onCriadaSemAbrir={(empresa) => empresas.onCriadaSemAbrir(empresa.nome)}
+        onEmpresaAberta={empresas.onEmpresaAberta}
       />
     );
   }
@@ -731,7 +773,11 @@ export interface AppProps {
    * T189 — o servidor confirmou a troca feita no menu lateral. Quem monta o
    * shell reresolve o ator e o remonta no mesmo módulo (ver `AutenticacaoApp`).
    */
-  onEmpresaTrocada?: (empresa: EmpresaDoContextoApi) => void;
+  onEmpresaTrocada?: (
+    empresa: EmpresaDoContextoApi,
+    /** T209 — a tela pedida na empresa nova (Nova empresa). */
+    destinoPedido?: string,
+  ) => void;
   /**
    * T189 — o destino exibido agora, para que uma troca de empresa (aqui ou em
    * outra aba) devolva a pessoa ao mesmo módulo.
@@ -1201,6 +1247,21 @@ export function App({
   // Perfil que só consulta não ganha um botão que o levaria a um 403.
   const podeAdmitir =
     resolverEntrada("nova-admissao", papelDoAtor) === "nova-admissao";
+  // T209 — Configurações › Empresas e Nova empresa, pela mesma regra.
+  const podeVerEmpresas =
+    resolverEntrada("configuracoes-empresas", papelDoAtor) ===
+    "configuracoes-empresas";
+  const podeAdicionarEmpresa =
+    resolverEntrada("nova-empresa", papelDoAtor) === "nova-empresa";
+  /** T209 — "Empresa X criada." ao voltar da Nova empresa sem abri-la. */
+  const [avisoDeEmpresas, setAvisoDeEmpresas] = useState<string | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    if (destinoAtivoId !== "configuracoes-empresas") {
+      setAvisoDeEmpresas(undefined);
+    }
+  }, [destinoAtivoId]);
 
   /** O destino exibido agora — lido pelo manipulador de URL, fora do React. */
   const destinoAtivoRef = useRef(destinoAtivoId);
@@ -1755,6 +1816,14 @@ export function App({
               podeTrocarEmpresa={podeTrocarEmpresa}
               papelDoAtor={papelDoAtor}
               onEmpresaTrocada={(empresa) => onEmpresaTrocada?.(empresa)}
+              {...(podeAdicionarEmpresa
+                ? { onAdicionarEmpresa: () => irPara("nova-empresa") }
+                : {})}
+              {...(podeVerEmpresas
+                ? {
+                    onGerenciarEmpresas: () => irPara("configuracoes-empresas"),
+                  }
+                : {})}
               compacto={trilho}
               onExpandirMenu={expandirMenu}
             />
@@ -1889,6 +1958,17 @@ export function App({
               },
               contaDoAtor,
               onContaAtualizada,
+              {
+                podeVer: podeVerEmpresas,
+                podeAdicionar: podeAdicionarEmpresa,
+                aviso: avisoDeEmpresas,
+                onCriadaSemAbrir: (nome) => {
+                  irPara("configuracoes-empresas");
+                  setAvisoDeEmpresas(`Empresa ${nome} criada.`);
+                },
+                onEmpresaAberta: (empresa, destino) =>
+                  onEmpresaTrocada?.(empresa, destino),
+              },
             )}
           </main>
 

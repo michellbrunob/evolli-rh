@@ -117,6 +117,17 @@ export const PAPEIS_ADMINISTRACAO_LIDERANCA: readonly string[] = ["rh"];
 export const PAPEIS_NOVA_ADMISSAO: readonly string[] = ["rh", "dp"];
 
 /**
+ * T209 — Configurações › Empresas: quem alcança empresas (o DP vê a própria);
+ * Nova empresa: só quem cria (RH e master técnico, decisão de 2026-11-17).
+ */
+export const PAPEIS_EMPRESAS_DA_CONTA: readonly string[] = [
+  "rh",
+  "dp",
+  "master_tecnico",
+];
+export const PAPEIS_NOVA_EMPRESA: readonly string[] = ["rh", "master_tecnico"];
+
+/**
  * T181 — papéis que EDITAM, na ficha do colaborador, dados pessoais, endereço
  * e contatos: só `rh` e `dp`, na empresa ativa (decisão da proprietária de
  * 2026-10-23). Espelha `evaluateDadosPessoais` e `evaluateContatos` em
@@ -363,6 +374,25 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         subRotulo: "Meu perfil",
         estado: "funcional",
       },
+      {
+        // T209 — Configurações › Empresas: abre pela navegação interna de
+        // Configurações e pelo "Gerenciar empresas" do seletor.
+        id: "configuracoes-empresas",
+        label: "Empresas",
+        subRotulo: "Empresas da conta",
+        estado: "funcional",
+        papeis: PAPEIS_EMPRESAS_DA_CONTA,
+        agrupadoEm: "configuracoes",
+      },
+      {
+        // T209 — Nova empresa (CNPJ) em duas etapas.
+        id: "nova-empresa",
+        label: "Nova empresa",
+        subRotulo: "Cadastro do CNPJ",
+        estado: "funcional",
+        papeis: PAPEIS_NOVA_EMPRESA,
+        agrupadoEm: "configuracoes-empresas",
+      },
     ],
   },
   {
@@ -608,6 +638,8 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "administracao-lideranca",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-empresas",
+    "nova-empresa",
   ],
   dp: [
     "dashboard",
@@ -619,6 +651,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "ponto",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-empresas",
   ],
   master_tecnico: [
     "dashboard",
@@ -628,6 +661,8 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "ponto",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-empresas",
+    "nova-empresa",
   ],
   gestor: ["equipe", "configuracoes"],
   financeiro: ["configuracoes"],

@@ -131,6 +131,9 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Administração da liderança",
         "Contas de acesso",
         "Configurações",
+        // T209 — Empresas e Nova empresa.
+        "Empresas",
+        "Nova empresa",
       ],
     ],
     // T182 — o DP consulta as jornadas e, sem a aba Horários, a aba padrão
@@ -148,6 +151,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Jornada",
         "Contas de acesso",
         "Configurações",
+        // T209 — Configurações › Empresas (o DP vê a própria).
+        "Empresas",
       ],
     ],
     [
@@ -160,6 +165,9 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Jornada",
         "Contas de acesso",
         "Configurações",
+        // T209 — Empresas e Nova empresa (quem cria).
+        "Empresas",
+        "Nova empresa",
       ],
     ],
     // T208 — Configurações (Meu perfil) é de toda conta: `own_account` vale
@@ -506,7 +514,8 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(11));
+    // T209 — 13 com Empresas e Nova empresa.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(13));
     for (const destino of capacidadeFuncionalDe("rh")) {
       // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(

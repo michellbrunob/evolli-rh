@@ -71,6 +71,8 @@ import {
   type EmpresaDoContextoApi,
 } from "../api/contextoEmpresarialClient";
 import { useResumoDasEdicoes } from "./edicoesPendentes";
+import { formatarCnpj } from "../format/cnpj";
+import { Plus, Settings } from "lucide-react";
 import "./SeletorEmpresaAtiva.css";
 
 /** Empresa ativa como o ator a traz. `id` falta só em montagens de teste. */
@@ -78,6 +80,16 @@ export interface EmpresaAtivaExibida {
   readonly id?: string;
   readonly codigo: string;
   readonly nome: string;
+  /** T209 — o CNPJ, quando cadastrado. */
+  readonly cnpj?: string | null;
+}
+
+/** T209 — a linha de baixo: o CNPJ com máscara, ou o código. */
+function identificacao(empresa: {
+  readonly codigo: string;
+  readonly cnpj?: string | null;
+}): string {
+  return empresa.cnpj ? formatarCnpj(empresa.cnpj) : `Código ${empresa.codigo}`;
 }
 
 export type EstadoOpcoesDeEmpresa =
@@ -185,6 +197,10 @@ export interface SeletorEmpresaAtivaProps {
   readonly compacto?: boolean;
   /** T206 — pedido ao shell para sair do trilho antes de abrir a lista. */
   readonly onExpandirMenu?: () => void;
+  /** T209 — "Adicionar empresa": só quando o shell oferece (quem cria). */
+  readonly onAdicionarEmpresa?: () => void;
+  /** T209 — "Gerenciar empresas": Configurações › Empresas. */
+  readonly onGerenciarEmpresas?: () => void;
 }
 
 /** T206 — símbolo próprio da empresa no trilho, quando não há monograma. */
@@ -241,6 +257,8 @@ export function SeletorEmpresaAtiva({
   onEmpresaTrocada,
   compacto = false,
   onExpandirMenu,
+  onAdicionarEmpresa,
+  onGerenciarEmpresas,
 }: SeletorEmpresaAtivaProps) {
   const { estado: opcoes, recarregar } = useOpcoesDeEmpresa(podeTrocarEmpresa);
   const resumo = useResumoDasEdicoes();
@@ -295,7 +313,12 @@ export function SeletorEmpresaAtiva({
       ? empresa.id === empresaAtiva.id
       : empresa.codigo === empresaAtiva?.codigo;
   const haOutraOpcao = (itensConhecidos ?? []).some((e) => !ehAtual(e));
-  const expansivel = podeTrocarEmpresa && haOutraOpcao;
+  // T209 — com as ações de empresa, o painel abre mesmo com uma só.
+  const temAcoes =
+    onAdicionarEmpresa !== undefined || onGerenciarEmpresas !== undefined;
+  const expansivel =
+    podeTrocarEmpresa &&
+    (haOutraOpcao || (temAcoes && itensConhecidos !== null));
 
   const trocando = troca.tipo === "trocando";
   const salvandoAgora = resumo.salvando.length > 0;
@@ -390,10 +413,10 @@ export function SeletorEmpresaAtiva({
   // Se a lista deixa de ter para onde ir (recarregada depois de uma empresa
   // indisponível), o painel fecha — não fica um painel sem escolha.
   useEffect(() => {
-    if (aberto && opcoes.tipo === "carregadas" && !haOutraOpcao) {
+    if (aberto && opcoes.tipo === "carregadas" && !haOutraOpcao && !temAcoes) {
       setAberto(false);
     }
-  }, [aberto, opcoes.tipo, haOutraOpcao]);
+  }, [aberto, opcoes.tipo, haOutraOpcao, temAcoes]);
 
   function alternar() {
     if (aberto) {
@@ -510,7 +533,7 @@ export function SeletorEmpresaAtiva({
         <span className="seletor-empresa__nome">{nomeExibido}</span>
         {empresaAtiva ? (
           <span className="seletor-empresa__codigo">
-            Código {empresaAtiva.codigo}
+            {identificacao(empresaAtiva)}
           </span>
         ) : null}
       </span>
@@ -701,7 +724,7 @@ export function SeletorEmpresaAtiva({
                           {empresa.nome}
                         </span>
                         <span className="seletor-empresa__opcao-codigo">
-                          Código {empresa.codigo}
+                          {identificacao(empresa)}
                         </span>
                       </span>
                       {atual ? (
@@ -731,6 +754,37 @@ export function SeletorEmpresaAtiva({
               })}
             </ul>
           )}
+
+          {temAcoes ? (
+            <div className="seletor-empresa__acoes-da-conta">
+              {onAdicionarEmpresa ? (
+                <button
+                  type="button"
+                  className="seletor-empresa__acao"
+                  onClick={() => {
+                    fechar(false);
+                    onAdicionarEmpresa();
+                  }}
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  Adicionar empresa
+                </button>
+              ) : null}
+              {onGerenciarEmpresas ? (
+                <button
+                  type="button"
+                  className="seletor-empresa__acao"
+                  onClick={() => {
+                    fechar(false);
+                    onGerenciarEmpresas();
+                  }}
+                >
+                  <Settings size={16} aria-hidden="true" />
+                  Gerenciar empresas
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {papelDoAtor === "master_tecnico" && empresaAtiva !== null ? (
             <p className="seletor-empresa__nota">

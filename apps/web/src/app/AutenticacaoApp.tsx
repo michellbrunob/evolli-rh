@@ -385,9 +385,13 @@ export function AutenticacaoApp() {
    * abas são avisadas para reconferir o próprio contexto.
    */
   const aoTrocarEmpresa = useCallback(
-    (empresa: EmpresaDoContextoApi) => {
+    (empresa: EmpresaDoContextoApi, destinoPedido?: string) => {
       canalRef.current?.avisar();
-      setDestinoAberto(destinoAposTrocaDeEmpresa(destinoAtual()));
+      // T209 — a Nova empresa pede a tela seguinte na empresa nova
+      // (importação ou Novo colaborador); sem pedido, a regra da T189.
+      setDestinoAberto(
+        destinoPedido ?? destinoAposTrocaDeEmpresa(destinoAtual()),
+      );
       setAnuncio(`Empresa ativa alterada para ${descreverEmpresa(empresa)}.`);
       setFocarTitulo(true);
       setEstado("resolvendo-ator");

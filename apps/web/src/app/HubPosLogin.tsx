@@ -130,6 +130,11 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   // T208 — Meu perfil: a foto, o nome de exibição e os dados da conta.
   configuracoes:
     "Meu perfil: a sua foto, o seu nome de exibição e os dados da sua conta de acesso.",
+  // T209 — Configurações › Empresas e a Nova empresa.
+  "configuracoes-empresas":
+    "Empresas que a sua conta alcança, com CNPJ, cidade e colaboradores ativos.",
+  "nova-empresa":
+    "Cadastro de uma empresa (CNPJ) em duas etapas: dados da empresa e colaboradores.",
 };
 
 /** Ícone do grupo a que o destino pertence — mesma identidade da barra lateral. */
