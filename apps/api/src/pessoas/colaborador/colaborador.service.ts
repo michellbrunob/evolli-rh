@@ -210,7 +210,26 @@ export interface ColaboradorListado {
   atualizadoEm: Date;
   /** Ordenados: ativo, previsto, encerrado; depois admissão mais recente. */
   vinculos: VinculoListado[];
+  /** T209 — se há foto do colaborador NA EMPRESA ATIVA (ver `FotoAnunciada`). */
+  foto: FotoAnunciada | null;
 }
+
+/**
+ * T209 — a foto do colaborador, anunciada na listagem e na ficha: SÓ a
+ * versão (para a tela montar a rota autenticada `GET
+ * /v1/colaboradores/:id/foto?tamanho=…&v=…`). Nunca chave do objeto, hash,
+ * tamanho, autor nem endereço do armazenamento (ADR 0020). `null` sem foto,
+ * sem empresa ativa (a rota não a entregaria) ou sem leitura de dados
+ * pessoais na empresa.
+ */
+export interface FotoAnunciada {
+  versao: number;
+}
+
+/** T209 — o detalhe da ficha: o cadastro e a foto anunciada. */
+export type ColaboradorDetalhado = Colaborador & {
+  foto: FotoAnunciada | null;
+};
 
 export interface ListagemColaboradores extends ResultadoPaginado<ColaboradorListado> {
   contadores: ContadoresColaboradores;
@@ -1330,6 +1349,13 @@ export class ColaboradorService {
       ),
     );
 
+    // T209 — a foto da página, numa consulta só (sem ler o armazenamento).
+    const fotos = await this.fotosAnunciadas(
+      ctx,
+      empresaId,
+      linhas.map((c) => c.id),
+    );
+
     const itens: ColaboradorListado[] = linhas.map((c) => ({
       id: c.id,
       nome: c.nome,
@@ -1356,6 +1382,7 @@ export class ColaboradorService {
               : [],
         })),
       ),
+      foto: fotos.get(c.id) ?? null,
     }));
 
     return {
@@ -1377,9 +1404,50 @@ export class ColaboradorService {
   async detalhar(
     colaboradorId: string,
     ctx: PessoasAuditContext,
-  ): Promise<Colaborador> {
+  ): Promise<ColaboradorDetalhado> {
     const escopo = resolverEscopoLeituraPessoas(ctx.actor);
-    return this.carregarNoEscopo(colaboradorId, ctx, escopo, "read");
+    const colaborador = await this.carregarNoEscopo(
+      colaboradorId,
+      ctx,
+      escopo,
+      "read",
+    );
+    const fotos = await this.fotosAnunciadas(
+      ctx,
+      escopo.global ? undefined : escopo.empresaId,
+      [colaborador.id],
+    );
+    return { ...colaborador, foto: fotos.get(colaborador.id) ?? null };
+  }
+
+  /**
+   * T209 — a versão da foto de cada colaborador, SÓ na empresa ativa e só
+   * para quem lê dados pessoais nela (a mesma regra da rota da foto, ADR
+   * 0020). Global (sem empresa ativa): nada — a rota não entregaria. Lê só o
+   * banco: o armazenamento de objetos nunca é tocado aqui.
+   */
+  private async fotosAnunciadas(
+    ctx: PessoasAuditContext,
+    empresaId: string | undefined,
+    colaboradorIds: readonly string[],
+  ): Promise<Map<string, FotoAnunciada>> {
+    if (
+      empresaId === undefined ||
+      colaboradorIds.length === 0 ||
+      !podeAcessarPessoas(
+        ctx.actor,
+        "dados_pessoais_colaborador",
+        "read",
+        empresaId,
+      )
+    ) {
+      return new Map();
+    }
+    const fotos = await this.prisma.fotoColaborador.findMany({
+      where: { empresaId, colaboradorId: { in: [...colaboradorIds] } },
+      select: { colaboradorId: true, versao: true },
+    });
+    return new Map(fotos.map((f) => [f.colaboradorId, { versao: f.versao }]));
   }
 
   /**

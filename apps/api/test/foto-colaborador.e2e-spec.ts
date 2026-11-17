@@ -570,4 +570,200 @@ describe("T209 — foto do colaborador (e2e)", () => {
     const r = await ler(rhA, colaboradorA).expect(503);
     expect(r.body.toString()).not.toMatch(/r2|cloudflare|bucket|v1\/empresas/i);
   });
+
+  // -------------------------------------------------------------------------
+  // T209 — exibição: a listagem e a ficha dizem SÓ se há foto e a versão. Os
+  // bytes saem apenas pela rota autenticada, que confere empresa, papel e
+  // vínculo. Nada de chave, hash, endereço ou metadado na resposta.
+  // -------------------------------------------------------------------------
+  describe("exibição na listagem e na ficha", () => {
+    let semFotoA: string;
+    let depA2: string;
+
+    /** O que nunca pode aparecer em JSON de listagem ou ficha. */
+    const PRIVADO =
+      /v1\/empresas|foto-(96|256|512)\.webp|chaveAtual|arquivoId|hashSha256|tamanhoBytes|enviadaPor|r2|cloudflare|bucket|https?:\/\//i;
+
+    const listar = (cred: Credencial, query = "tamanhoPagina=100") =>
+      agent()
+        .get(`/v1/colaboradores?${query}`)
+        .set("Cookie", cred.cookie)
+        .expect(200);
+    const itemDe = (corpo: { itens: { id: string }[] }, id: string) =>
+      corpo.itens.find((i) => i.id === id) as
+        { id: string; foto?: unknown } | undefined;
+
+    beforeAll(async () => {
+      armazenamento.falhar = () => false;
+      depA2 = (
+        await post("/v1/departamentos", master)
+          .send({ empresaId: empresaA, codigo: "DFA2", nome: "Depto DFA2" })
+          .expect(201)
+      ).body.id as string;
+      semFotoA = await admitir(rhA, "Pessoa Sem Foto Alfa", empresaA, depA2);
+      await enviar(rhA, colaboradorA, await png()).expect(200);
+    });
+
+    it("listagem: `foto` com só a versão para quem tem; `null` para quem não tem; nada privado no JSON", async () => {
+      const r = await listar(rhA);
+      const comFoto = itemDe(r.body, colaboradorA);
+      const semFoto = itemDe(r.body, semFotoA);
+      const versao = (
+        await prisma.fotoColaborador.findFirstOrThrow({
+          where: { colaboradorId: colaboradorA, empresaId: empresaA },
+        })
+      ).versao;
+      expect(comFoto?.foto).toEqual({ versao });
+      expect(semFoto?.foto).toBeNull();
+      expect(JSON.stringify(r.body)).not.toMatch(PRIVADO);
+    });
+
+    it("listagem: a versão acompanha a substituição (DP)", async () => {
+      const antes = (
+        itemDe((await listar(dpA)).body, colaboradorA)?.foto as {
+          versao: number;
+        }
+      ).versao;
+      await enviar(dpA, colaboradorA, await png(500, 500)).expect(200);
+      const depois = itemDe((await listar(dpA)).body, colaboradorA)?.foto;
+      expect(depois).toEqual({ versao: antes + 1 });
+    });
+
+    it("listagem: busca e filtro continuam, e a foto vem junto", async () => {
+      const r = await listar(rhA, "busca=Sem%20Foto&tamanhoPagina=20");
+      expect(r.body.itens.map((i: { id: string }) => i.id)).toEqual([semFotoA]);
+      expect(r.body.itens[0].foto).toBeNull();
+      // Aba "Em admissão" (filtro no banco, antes da paginação).
+      const emAdmissao = await listar(
+        rhA,
+        "grupo=em_admissao&tamanhoPagina=20",
+      );
+      expect(itemDe(emAdmissao.body, semFotoA)?.foto).toBeNull();
+      expect(itemDe(emAdmissao.body, colaboradorA)?.foto).toEqual({
+        versao: expect.any(Number),
+      });
+    });
+
+    it("ficha (detalhe): `foto` com só a versão; sem foto, `null`; nada privado", async () => {
+      const com = await agent()
+        .get(`/v1/colaboradores/${colaboradorA}`)
+        .set("Cookie", rhA.cookie)
+        .expect(200);
+      expect(com.body.foto).toEqual({ versao: expect.any(Number) });
+      expect(Object.keys(com.body.foto)).toEqual(["versao"]);
+      expect(JSON.stringify(com.body)).not.toMatch(PRIVADO);
+      const sem = await agent()
+        .get(`/v1/colaboradores/${semFotoA}`)
+        .set("Cookie", dpA.cookie)
+        .expect(200);
+      expect(sem.body.foto).toBeNull();
+    });
+
+    it("isolamento: a foto anunciada é só a da empresa ativa", async () => {
+      // Uma linha de foto do colaborador da empresa B registrada na empresa
+      // A (cenário forçado): a empresa B nunca a anuncia nem a entrega.
+      const prefixo = `v1/empresas/${empresaA}/colaboradores/${colaboradorB}/foto/44444444-4444-4444-8444-444444444444/`;
+      const conta = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "rh.fota@example.test" },
+      });
+      await prisma.fotoColaborador.create({
+        data: {
+          colaboradorId: colaboradorB,
+          empresaId: empresaA,
+          arquivoId: "44444444-4444-4444-8444-444444444444",
+          chaveAtual: prefixo,
+          hashSha256: "a".repeat(64),
+          tamanhoBytes: 10,
+          tipo: "image/webp",
+          enviadaPorId: conta.id,
+        },
+      });
+      armazenamento.objetos.set(`${prefixo}foto-96.webp`, {
+        corpo: Buffer.from("x"),
+        tipo: "image/webp",
+      });
+      try {
+        const listaB = await listar(rhB);
+        expect(itemDe(listaB.body, colaboradorB)?.foto).toBeNull();
+        expect(itemDe(listaB.body, colaboradorA)).toBeUndefined();
+        await agent()
+          .get(`/v1/colaboradores/${colaboradorB}`)
+          .set("Cookie", rhB.cookie)
+          .expect(200)
+          .expect((res) => expect(res.body.foto).toBeNull());
+        // A rota da foto, na empresa B, não entrega a versão da empresa A.
+        await ler(rhB, colaboradorB, 96).expect(404);
+        // Na empresa A, sem vínculo, nem a listagem nem a rota a entregam.
+        expect(itemDe((await listar(rhA)).body, colaboradorB)).toBeUndefined();
+        await ler(rhA, colaboradorB, 96).expect(404);
+        // URL direta com o id de outra empresa: 404, sem tocar no objeto.
+        await ler(rhB, colaboradorA, 96).expect(404);
+      } finally {
+        await prisma.fotoColaborador.deleteMany({
+          where: { colaboradorId: colaboradorB, empresaId: empresaA },
+        });
+        armazenamento.objetos.delete(`${prefixo}foto-96.webp`);
+      }
+    });
+
+    it("master sem empresa ativa: a listagem global não anuncia foto (a rota não a entregaria)", async () => {
+      const r = await listar(master);
+      expect(itemDe(r.body, colaboradorA)?.foto).toBeNull();
+      expect(JSON.stringify(r.body)).not.toMatch(PRIVADO);
+      await ler(master, colaboradorA, 96).expect(404);
+    });
+
+    it("gestor e colaborador seguem sem listagem nem foto", async () => {
+      for (const cred of [gestorA, colaboradorConta]) {
+        await agent()
+          .get("/v1/colaboradores?tamanhoPagina=20")
+          .set("Cookie", cred.cookie)
+          .expect(403);
+        const r = await ler(cred, colaboradorA, 96);
+        expect([403, 404]).toContain(r.status);
+      }
+    });
+
+    it("listar e abrir a ficha não lê o armazenamento nem grava trilha de foto", async () => {
+      const lidas: string[] = [];
+      const lerOriginal = armazenamento.ler.bind(armazenamento);
+      armazenamento.ler = async (chave: string) => {
+        lidas.push(chave);
+        return lerOriginal(chave);
+      };
+      const desde = new Date();
+      try {
+        await listar(rhA);
+        await agent()
+          .get(`/v1/colaboradores/${colaboradorA}`)
+          .set("Cookie", rhA.cookie)
+          .expect(200);
+      } finally {
+        armazenamento.ler = lerOriginal;
+      }
+      expect(lidas).toEqual([]);
+      const novas = await prisma.auditEvent.findMany({
+        where: { occurredAt: { gte: desde } },
+      });
+      expect(novas.filter((t) => String(t.action).includes("foto"))).toEqual(
+        [],
+      );
+    });
+
+    it("a rota entrega 96 e 256 a RH e DP da empresa; a falha de leitura é 503 sem detalhe", async () => {
+      for (const cred of [rhA, dpA]) {
+        for (const tamanho of [96, 256]) {
+          const r = await ler(cred, colaboradorA, tamanho).expect(200);
+          const meta = await sharp(r.body).metadata();
+          expect(meta.format).toBe("webp");
+          expect(meta.width).toBe(tamanho);
+          expect(r.headers["cache-control"]).toBe("private, no-store");
+        }
+      }
+      armazenamento.falhar = (op) => op === "ler";
+      const falha = await ler(rhA, colaboradorA, 96).expect(503);
+      expect(falha.body.toString()).not.toMatch(PRIVADO);
+      armazenamento.falhar = () => false;
+    });
+  });
 });
