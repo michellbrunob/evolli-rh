@@ -105,15 +105,19 @@
   --font-sans:
     "Parkinsans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
-  --text-caption: 0.875rem; /* 14px */
-  --text-ui: 0.9375rem; /* 15px — item de navegação e ação de cabeçalho */
-  --text-body: 1.0625rem; /* 17px — o "passo de leitura" da referência */
-  --text-lead: 1.3125rem; /* 21px */
-  --text-title: 1.75rem; /* 28px */
-  --text-display: clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem); /* 28→40px */
-  --leading-body: 1.47;
-  --leading-tight: 1.1;
-  --tracking-body: -0.011em;
+  /* T209 — escala do ecossistema (decisão da proprietária de 2026-11-17),
+     compacta: texto de 14px; ajuda e apoio de 13px; título de seção de
+     16px; título de página de 26px. Entrelinha 1,45; o texto corrido com
+     -0,005em e os títulos com -0,02em. */
+  --text-caption: 0.8125rem; /* 13px — ajuda, apoio, legenda */
+  --text-ui: 0.875rem; /* 14px — item de navegação, botão, campo */
+  --text-body: 0.875rem; /* 14px — texto corrido */
+  --text-lead: 1rem; /* 16px — título de seção */
+  --text-title: 1.625rem; /* 26px — título de página */
+  --text-display: clamp(1.625rem, 1.4rem + 1vw, 2rem); /* 26→32px */
+  --leading-body: 1.45;
+  --leading-tight: 1.2;
+  --tracking-body: -0.005em;
   --tracking-tight: -0.02em;
   --weight-regular: 400;
   --weight-strong: 600;
