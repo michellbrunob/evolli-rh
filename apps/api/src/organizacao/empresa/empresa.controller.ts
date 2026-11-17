@@ -120,6 +120,22 @@ export class EmpresaController {
     });
   }
 
+  /** T209 — editar a empresa (painel lateral de Configurações › Empresas). */
+  @Patch(":empresaId/cadastro")
+  @UseGuards(CsrfGuard)
+  @ApiOperation({ summary: "Edita nome, CNPJ, porte e endereço da empresa" })
+  async atualizarCadastro(
+    @Param("empresaId", ParseUUIDPipe) empresaId: string,
+    @Body() dto: CadastrarEmpresaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.empresaService.atualizarCadastro(empresaId, dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
   @Patch(":empresaId")
   @UseGuards(CsrfGuard, AuthorizationGuard)
   @RequirePermission("empresa", "alter")

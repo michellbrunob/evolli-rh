@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   AccessUser,
@@ -36,6 +37,7 @@ import {
   ConflitoDeCamposException,
 } from "../../common/erros/recusa-por-campo";
 import {
+  empresaEstaAutorizada,
   listarEmpresasAutorizadas,
   papelSelecionaEmpresa,
   papelTemPoliticaGlobal,
@@ -66,6 +68,12 @@ export interface EmpresaDaConta {
   readonly codigo: string;
   readonly nome: string;
   readonly cnpj: string | null;
+  readonly porte: string | null;
+  readonly cep: string | null;
+  readonly logradouro: string | null;
+  readonly numero: string | null;
+  readonly complemento: string | null;
+  readonly bairro: string | null;
   readonly cidade: string | null;
   readonly uf: string | null;
   /** A empresa da conta: a primeira, que não pode ser removida. */
@@ -244,6 +252,79 @@ export class EmpresaService {
   }
 
   /**
+   * T209 — editar a empresa pelo painel lateral de Configurações › Empresas.
+   * Mesmo contrato do cadastro (nome, CNPJ, porte e endereço, substituídos
+   * por inteiro); só RH e master técnico; só empresa que a conta alcança —
+   * fora dela, 404, igual à inexistente (anti-enumeração). O código não muda.
+   */
+  async atualizarCadastro(
+    empresaId: string,
+    dto: CadastrarEmpresaDto,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<EmpresaCadastrada> {
+    const ator = ctx.actor as AccessUser & {
+      readonly contaEmpresaId?: string | null;
+    };
+    if (!papelSelecionaEmpresa(ator.role)) throw new ForbiddenException();
+    const conta =
+      ator.contaEmpresaId !== undefined ? ator.contaEmpresaId : ator.companyId;
+    const autorizada = await empresaEstaAutorizada(
+      this.prisma,
+      { id: ator.id, role: ator.role, companyId: conta },
+      empresaId,
+    );
+    if (!autorizada) throw new NotFoundException();
+
+    const cnpj = normalizarCnpj(dto.cnpj);
+    if (cnpj === null || !cnpjValido(cnpj)) {
+      throw new CamposRecusadosException([
+        { campo: "cnpj", motivo: "invalido" },
+      ]);
+    }
+    const conflito = () =>
+      new ConflitoDeCamposException([{ campo: "cnpj", motivo: "em_uso" }]);
+    const dono = await this.prisma.empresa.findUnique({
+      where: { cnpj },
+      select: { id: true },
+    });
+    if (dono && dono.id !== empresaId) throw conflito();
+
+    const endereco = dto.endereco ?? {};
+    try {
+      const atualizada = await this.prisma.$transaction(async (tx) => {
+        const empresa = await tx.empresa.update({
+          where: { id: empresaId },
+          data: {
+            nome: dto.nome,
+            cnpj,
+            porte: dto.porte ?? null,
+            cep: endereco.cep ?? null,
+            logradouro: endereco.logradouro ?? null,
+            numero: endereco.numero ?? null,
+            complemento: endereco.complemento ?? null,
+            bairro: endereco.bairro ?? null,
+            cidade: endereco.cidade ?? null,
+            uf: endereco.uf ?? null,
+          },
+        });
+        await this.auditoria.registrarMutacao(
+          tx,
+          ctx,
+          "organizacao_empresa_atualizada",
+          "empresa",
+          empresa.id,
+          empresa.id,
+        );
+        return empresa;
+      });
+      return comoCadastrada(atualizada);
+    } catch (erro) {
+      if (violouUnico(erro, "cnpj")) throw conflito();
+      throw erro;
+    }
+  }
+
+  /**
    * T209 — Configurações › Empresas: as empresas que esta conta alcança, a
    * principal (a da conta) primeiro. Papel que não troca de empresa vê só a
    * própria. Nenhuma consulta sai do que `listarEmpresasAutorizadas` já
@@ -274,6 +355,12 @@ export class EmpresaService {
       codigo: e.codigo,
       nome: e.nome,
       cnpj: e.cnpj,
+      porte: e.porte,
+      cep: e.cep,
+      logradouro: e.logradouro,
+      numero: e.numero,
+      complemento: e.complemento,
+      bairro: e.bairro,
       cidade: e.cidade,
       uf: e.uf,
       principal: e.id === conta,

@@ -134,6 +134,13 @@ describe("T209 — cadastro de empresa (e2e)", () => {
       .set("x-csrf-token", cred.csrfToken);
   }
 
+  function patch(rota: string, cred: Credencial) {
+    return agent()
+      .patch(rota)
+      .set("Cookie", cred.cookie)
+      .set("x-csrf-token", cred.csrfToken);
+  }
+
   function get(rota: string, cred: Credencial) {
     return agent().get(rota).set("Cookie", cred.cookie);
   }
@@ -472,5 +479,104 @@ describe("T209 — cadastro de empresa (e2e)", () => {
     expect(doDp.body.itens.map((e: { id: string }) => e.id)).toEqual([
       empresaA,
     ]);
+  });
+
+  describe("editar (painel lateral de Empresas)", () => {
+    let editavel: string;
+    beforeAll(async () => {
+      editavel = (
+        await post("/v1/empresas/cadastro", rhA)
+          .send({ cnpj: novoCnpj(), nome: "Empresa Para Editar" })
+          .expect(201)
+      ).body.id as string;
+    });
+
+    it("RH edita nome, CNPJ, porte e endereço de empresa que alcança; a lista reflete", async () => {
+      const cnpj = novoCnpj();
+      const r = await patch(`/v1/empresas/${editavel}/cadastro`, rhA)
+        .send({
+          cnpj,
+          nome: "Empresa Editada",
+          porte: "51_200",
+          endereco: { cep: "01310100", cidade: "Cidade Editada", uf: "SP" },
+        })
+        .expect(200);
+      expect(r.body).toMatchObject({
+        id: editavel,
+        nome: "Empresa Editada",
+        cnpj,
+        porte: "51_200",
+        endereco: {
+          cep: "01310100",
+          cidade: "Cidade Editada",
+          uf: "SP",
+          logradouro: null,
+        },
+      });
+      const lista = await get("/v1/empresas/da-conta", rhA).expect(200);
+      expect(lista.body.itens).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: editavel,
+            nome: "Empresa Editada",
+            porte: "51_200",
+            cep: "01310100",
+            cidade: "Cidade Editada",
+            uf: "SP",
+          }),
+        ]),
+      );
+    });
+
+    it("a principal sem CNPJ ganha o CNPJ pela edição", async () => {
+      const cnpj = novoCnpj();
+      await patch(`/v1/empresas/${empresaA}/cadastro`, rhA)
+        .send({ cnpj, nome: "Empresa NEA" })
+        .expect(200);
+      const eu = await get("/v1/users/me", rhA).expect(200);
+      expect(eu.body.empresaAtiva.cnpj).toBe(cnpj);
+    });
+
+    it("outra conta: 404 (sem revelar a empresa); DP: 403", async () => {
+      await patch(`/v1/empresas/${editavel}/cadastro`, rhB)
+        .send({ cnpj: novoCnpj(), nome: "Invasora" })
+        .expect(404);
+      await patch(`/v1/empresas/${empresaA}/cadastro`, dpA)
+        .send({ cnpj: novoCnpj(), nome: "Pelo DP" })
+        .expect(403);
+    });
+
+    it("CNPJ de outra empresa: 409; verificador errado: 422; o próprio CNPJ de novo: 200", async () => {
+      const outra = novoCnpj();
+      await post("/v1/empresas/cadastro", rhA)
+        .send({ cnpj: outra, nome: "Dona do CNPJ" })
+        .expect(201);
+      const r409 = await patch(`/v1/empresas/${editavel}/cadastro`, rhA)
+        .send({ cnpj: outra, nome: "Empresa Editada" })
+        .expect(409);
+      expect(r409.body.erros).toEqual([{ campo: "cnpj", motivo: "em_uso" }]);
+      const r422 = await patch(`/v1/empresas/${editavel}/cadastro`, rhA)
+        .send({ cnpj: "11222333000182", nome: "Empresa Editada" })
+        .expect(422);
+      expect(r422.body.erros).toEqual([{ campo: "cnpj", motivo: "invalido" }]);
+      const atual = await prisma.empresa.findUniqueOrThrow({
+        where: { id: editavel },
+      });
+      await patch(`/v1/empresas/${editavel}/cadastro`, rhA)
+        .send({ cnpj: atual.cnpj, nome: "Empresa Editada" })
+        .expect(200);
+    });
+
+    it("edição auditada", async () => {
+      expect(
+        await prisma.auditEvent.count({
+          where: {
+            action: "organizacao_empresa_atualizada",
+            resourceId: editavel,
+            actorUserId: rhAId,
+          },
+        }),
+      ).toBeGreaterThan(0);
+    });
   });
 });
