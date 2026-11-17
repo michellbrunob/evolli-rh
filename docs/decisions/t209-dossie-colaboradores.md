@@ -1325,3 +1325,84 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
     automático, e o contrato foi gravado e mostrado na confirmação;
   - barra do rodapé alinhada à coluna dos campos.
 - Migration aplicada no banco isolado da prévia.
+
+## 36. Fonte, etapa 3, empresas com CNPJ, padrão de cadastro em etapas e ícones (2026-11-17)
+
+### 36.1 Decisões da proprietária (2026-11-17)
+
+- **Fonte:** Parkinsans no ecossistema inteiro, servida pela aplicação (sem Google Fonts).
+- **Etapa 3 do Novo colaborador:** endereço só do Brasil, CEP que preenche o resto sozinho.
+- **Empresas:** criar o campo CNPJ (resolve, por decisão da proprietária, o DP-4 que mantinha a
+  empresa sem CNPJ) e o cadastro "Nova empresa"; **RH e master técnico criam empresa**, e quem
+  cria pelo RH ganha acesso a ela na hora; a empresa da conta é a principal.
+- **Padrão de cadastro em etapas** em todo formulário de cadastro: cabeçalho com voltar, etapas
+  à esquerda, seções e linhas, rodapé fixo com progresso.
+- **Editar empresa** num painel lateral, como o "Adicionar colaborador".
+- **Ícones:** Iconsax (MIT) no ecossistema inteiro, variante Bulk; sai o lucide-react.
+
+### 36.2 Servidor
+
+- **Migration aditiva** `20261117200000_empresa_cnpj_cadastro`: CNPJ (único; 12 posições
+  alfanuméricas e 2 dígitos verificadores, o formato de 2026), porte (6 faixas) e endereço na
+  empresa, com CHECKs; colunas anuláveis para as empresas antigas. Aplicada no banco isolado da
+  prévia.
+- **`POST /v1/empresas/cadastro`:** RH e master técnico; código gerado do nome; verificadores
+  conferidos no servidor (422 `cnpj/invalido`, sem eco); CNPJ repetido 409 `cnpj/em_uso`;
+  concessão do RH na mesma transação; criação auditada.
+- **`PATCH /v1/empresas/:empresaId/cadastro`:** mesmo contrato; só empresa que a conta alcança
+  (fora dela, 404, igual à inexistente); auditada.
+- **`GET /v1/empresas/da-conta`:** as empresas que a conta alcança, a principal primeiro, com
+  CNPJ, porte, endereço e colaboradores ativos.
+- **CNPJ no contexto:** na lista do seletor e na empresa ativa de `/users/me`.
+- **Risco aceito:** o 409 de CNPJ vale entre todas as empresas, então confirma que um CNPJ já
+  está cadastrado no produto.
+
+### 36.3 Tela
+
+- **Fonte:** `@fontsource/parkinsans` 5.3.0, latin 400/500/600; `--font-sans` começa por ela.
+- **Etapa 3:** seção "Endereço residencial"; CEP com consulta automática ao completar os 8
+  dígitos e "Endereço encontrado"; logradouro e número, complemento, bairro, cidade e UF (27
+  siglas); "Consultar de novo" só em falha que pode mudar; sem campo País.
+- **Seletor de empresa:** cartão compacto (monograma de 32 px, nome, CNPJ ou código), painel
+  flutuante no desktop, visto na atual, "Adicionar empresa" e "Gerenciar empresas".
+- **`CadastroEmEtapas`** (components/cadastro): o padrão compartilhado, extraído da moldura do
+  Novo colaborador, com as mesmas medidas.
+- **Nova empresa (2 etapas):** Dados da empresa (CNPJ com máscara e selo "Válido", razão
+  social, porte, endereço pelo CEP) e Colaboradores (importar planilha com o modelo CSV,
+  cadastro individual ou depois). Ao criar, abre a empresa nova na importação ou no Novo
+  colaborador, ou volta a Empresas.
+- **Configurações › Empresas:** navegação interna com ícones (Sua conta / Empresa), tabela com
+  a principal, CNPJ, colaboradores ativos e cidade, "Adicionar empresa" e o lápis que abre o
+  painel lateral de edição.
+- **Ícones:** `ui/icones.tsx` como ponto único (Bulk para módulos, itens e ações; Linear para
+  setas, mais e fechar); o menu lateral, que tinha desenho próprio, passou ao Iconsax.
+
+### 36.4 Diferenças em relação à referência
+
+- **Textos:** os que prometiam recursos que o Evolli não tem (folhas, vagas) foram trocados por
+  "cadastros".
+- **Importar planilha (etapa 2 da Nova empresa):** o arquivo é escolhido na tela de importação,
+  logo depois de criar a empresa. Escolhê-lo antes se perderia na troca de empresa.
+- **Nome longo no seletor:** quebra em duas linhas em vez de ser cortado.
+- **Cinza do texto secundário:** mais escuro que o da referência, para manter o contraste
+  mínimo de leitura.
+
+### 36.5 Provas
+
+- **E2E:** cadastro-empresa 22; bateria serial 28 suítes / 1184 antes da edição.
+- **API unitária:** 68 / 1604.
+- **Web:** 152 / 4294; lint, typecheck e build.
+- **Mutações:**
+  - etapa 3: 4/4;
+  - cadastro de empresa: 4/4;
+  - edição: a da autorização foi detectada; a do conflito de CNPJ é equivalente (o índice
+    único devolve o mesmo 409).
+- **Navegador (RH, banco isolado):**
+  - Parkinsans carregada, sem rolagem horizontal a 375 px;
+  - CEP automático na etapa 3 e no painel de edição;
+  - painel do seletor com duas empresas (Beta concedida ao RH no banco isolado, com aprovação);
+  - Nova empresa criada com "Fazer isso depois" (volta a Empresas) e com "Cadastro individual"
+    (troca para a nova e abre o Novo colaborador, com o CNPJ no seletor);
+  - edição da principal gravando o CNPJ.
+- **Defeito achado na validação e corrigido com teste:** a criação chamava a navegação ainda
+  "salvando", e a guarda de saída a barrava.

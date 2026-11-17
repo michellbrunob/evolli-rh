@@ -3505,6 +3505,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         departamento e cargo opcionais com lotação mínima (Baseline V1), cargo digitado que vira
         cargo do cadastro, líquido calculado na tela; linhas, divisórias, rodapé e fade no novo
         desenho. E2E 27 suítes / 1167; API 67 / 1587; web 147 / 4239.
+      - **Fonte, etapa 3, empresas com CNPJ, cadastro em etapas e ícones (seção 36):** Parkinsans;
+        endereço com CEP automático; migration `20261117200000_empresa_cnpj_cadastro`, cadastro,
+        edição e lista de empresas (RH e master criam, concessão na hora); Nova empresa em 2
+        etapas sobre `CadastroEmEtapas`; Configurações › Empresas com painel lateral; Iconsax no
+        lugar do lucide. E2E cadastro-empresa 22; API 68 / 1604; web 152 / 4294.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
