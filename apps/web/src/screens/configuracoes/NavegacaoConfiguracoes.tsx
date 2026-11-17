@@ -3,6 +3,10 @@
  * para quem alcança empresas, "Empresa" (Empresas). Só itens com tela; links
  * pela rota, como o resto do shell.
  */
+import type { ReactNode } from "react";
+import { IconeEmpresa, IconePerfil } from "../../ui/icones";
+import "./NavegacaoConfiguracoes.css";
+
 export type ItemDeConfiguracoes = "meu-perfil" | "empresas";
 
 const GRUPO_SUA_CONTA_ID = "configuracoes-grupo-sua-conta";
@@ -11,10 +15,12 @@ const GRUPO_EMPRESA_ID = "configuracoes-grupo-empresa";
 function Item({
   href,
   atual,
+  icone,
   children,
 }: {
   readonly href: string;
   readonly atual: boolean;
+  readonly icone: ReactNode;
   readonly children: string;
 }) {
   return (
@@ -28,6 +34,7 @@ function Item({
         href={href}
         {...(atual ? { "aria-current": "page" as const } : {})}
       >
+        <span className="configuracoes__item-icone">{icone}</span>
         {children}
       </a>
     </li>
@@ -47,7 +54,11 @@ export function NavegacaoConfiguracoes({
         Sua conta
       </p>
       <ul className="configuracoes__itens" aria-labelledby={GRUPO_SUA_CONTA_ID}>
-        <Item href="#/configuracoes/meu-perfil" atual={atual === "meu-perfil"}>
+        <Item
+          href="#/configuracoes/meu-perfil"
+          atual={atual === "meu-perfil"}
+          icone={<IconePerfil />}
+        >
           Meu perfil
         </Item>
       </ul>
@@ -63,7 +74,11 @@ export function NavegacaoConfiguracoes({
             className="configuracoes__itens"
             aria-labelledby={GRUPO_EMPRESA_ID}
           >
-            <Item href="#/configuracoes/empresas" atual={atual === "empresas"}>
+            <Item
+              href="#/configuracoes/empresas"
+              atual={atual === "empresas"}
+              icone={<IconeEmpresa />}
+            >
               Empresas
             </Item>
           </ul>

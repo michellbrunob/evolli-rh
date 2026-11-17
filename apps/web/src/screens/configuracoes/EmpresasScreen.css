@@ -1,9 +1,5 @@
 /* T209 — Configurações › Empresas. Só tokens; nada alarga a página. */
 
-.configuracoes__grupo--seguinte {
-  margin-top: var(--space-md);
-}
-
 .empresas__cabecalho {
   display: flex;
   flex-wrap: wrap;
