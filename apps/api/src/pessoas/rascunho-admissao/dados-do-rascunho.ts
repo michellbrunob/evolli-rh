@@ -9,7 +9,9 @@ import { BadRequestException } from "@nestjs/common";
  *
  * Fechado por lista: grupo ou campo fora dela, valor que não é texto, texto
  * longo ou com caractere de controle recusam o rascunho inteiro (400). Nada
- * de CPF, documento, foto ou arquivo. A recusa não repete o valor.
+ * de documento, foto ou arquivo. T209 — CPF, RG, gênero e contato de
+ * emergência entraram com a etapa 1 do Novo colaborador. A recusa não repete
+ * o valor.
  */
 const CAMPOS_POR_GRUPO = {
   campos: [
@@ -27,6 +29,11 @@ const CAMPOS_POR_GRUPO = {
   ],
   perfil: [
     "dataNascimento",
+    "cpf",
+    "rg",
+    "genero",
+    "contatoEmergenciaNome",
+    "contatoEmergenciaTelefone",
     "sexo",
     "saudacao",
     "estadoCivil",

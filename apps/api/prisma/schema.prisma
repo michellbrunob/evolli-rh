@@ -2326,6 +2326,11 @@ enum ResultadoEventoDadosPessoais {
 /// Campo alcancado por um evento. E o NOME do campo, nunca o valor.
 enum CampoDadosPessoais {
   data_nascimento
+  cpf
+  rg
+  genero
+  contato_emergencia_nome
+  contato_emergencia_telefone
   sexo
   saudacao
   estado_civil
@@ -2352,17 +2357,27 @@ model PerfilPessoalColaborador {
   empresaId     String @map("empresa_id")
   colaboradorId String @map("colaborador_id")
 
-  /// Obrigatoria: todo perfil a tem (T177).
-  dataNascimento DateTime @map("data_nascimento") @db.Date
-  sexo           String?
-  saudacao       String?
-  estadoCivil    String?  @map("estado_civil")
-  nacionalidade  String?
-  naturalidade   String?
-  escolaridade   String?
-  curso          String?
-  nomePai        String?  @map("nome_pai")
-  nomeMae        String?  @map("nome_mae")
+  /// T209 — opcional desde a etapa 1 do Novo colaborador (decisão de
+  /// 2026-11-17); antes, obrigatória (T177).
+  dataNascimento            DateTime? @map("data_nascimento") @db.Date
+  /// T209 — só os 11 dígitos, com dígitos verificadores conferidos no
+  /// servidor; único na empresa (CHECK de forma e índice único).
+  cpf                       String?
+  rg                        String?
+  /// T209 — lista fechada (`GENEROS`).
+  genero                    String?
+  sexo                      String?
+  saudacao                  String?
+  estadoCivil               String?   @map("estado_civil")
+  nacionalidade             String?
+  naturalidade              String?
+  escolaridade              String?
+  curso                     String?
+  nomePai                   String?   @map("nome_pai")
+  nomeMae                   String?   @map("nome_mae")
+  /// T209 — contato de emergência (nome e telefone em +55 + DDD + número).
+  contatoEmergenciaNome     String?   @map("contato_emergencia_nome")
+  contatoEmergenciaTelefone String?   @map("contato_emergencia_telefone")
 
   criadoPorUserId     String @map("criado_por_user_id")
   atualizadoPorUserId String @map("atualizado_por_user_id")
@@ -2379,6 +2394,7 @@ model PerfilPessoalColaborador {
 
   @@unique([colaboradorId, empresaId])
   @@unique([id, empresaId, colaboradorId])
+  @@unique([empresaId, cpf])
   @@index([empresaId])
   @@index([criadoPorUserId])
   @@index([atualizadoPorUserId])

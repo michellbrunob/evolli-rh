@@ -3805,9 +3805,12 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
 
       // Asserção sobre o corpo INTEIRO, não sobre campos esperados: assim um
       // campo novo introduzido por engano falha o teste.
+      // T209 — `foto` (só a versão, ou `null`) entrou com a exibição da
+      // foto do colaborador na ficha.
       expect(Object.keys(resposta.body).sort()).toEqual([
         "atualizadoEm",
         "criadoEm",
+        "foto",
         "id",
         "nome",
         "situacao",

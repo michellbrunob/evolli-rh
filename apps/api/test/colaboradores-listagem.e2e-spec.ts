@@ -509,6 +509,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         [
           "atualizadoEm",
           "criadoEm",
+          // T209 — a foto anunciada (só a versão, ou `null`).
+          "foto",
           "id",
           "nome",
           "situacao",

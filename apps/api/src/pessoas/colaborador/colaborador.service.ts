@@ -110,10 +110,10 @@ export interface AdmissaoRegistrada extends Pick<
     };
   };
   /**
-   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
-   * obrigatórios na admissão; endereço é `null` quando nenhum campo veio.
+   * T177 — o que o servidor gravou do Módulo 1. T209 — perfil e endereço são
+   * `null` quando nenhum campo deles veio.
    */
-  perfilPessoal: ValoresPerfil;
+  perfilPessoal: ValoresPerfil | null;
   endereco: ValoresEndereco | null;
   /** T179 — `null` quando nenhum contato foi informado na admissão. */
   contatos: ValoresContatos | null;
@@ -389,7 +389,9 @@ export function ordenarVinculosListados(
 export async function conflitosDaAdmissao(
   tx: Prisma.TransactionClient,
   empresaId: string,
-  dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos">,
+  dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos"> & {
+    readonly perfilPessoal?: { readonly cpf?: string | null } | undefined;
+  },
 ): Promise<ErroDeCampo[]> {
   // T179 — matrícula e e-mail são opcionais: só o que veio é conferido.
   const emailPessoal = contatosInformados(dto.contatos).emailPessoal;
@@ -407,9 +409,19 @@ export async function conflitosDaAdmissao(
           where: { empresaId, emailPessoal },
           select: { id: true },
         });
+  // T209 — CPF único na empresa (só a empresa ativa é consultada).
+  const cpfInformado = dto.perfilPessoal?.cpf ?? null;
+  const cpf =
+    cpfInformado === null
+      ? null
+      : await tx.perfilPessoalColaborador.findFirst({
+          where: { empresaId, cpf: cpfInformado },
+          select: { id: true },
+        });
   const erros: ErroDeCampo[] = [];
   if (matricula) erros.push({ campo: "matricula", motivo: "em_uso" });
   if (email) erros.push({ campo: "contatos.emailPessoal", motivo: "em_uso" });
+  if (cpf) erros.push({ campo: "perfilPessoal.cpf", motivo: "em_uso" });
   return erros;
 }
 
@@ -433,6 +445,9 @@ export function camposDaUnicidadeViolada(erro: unknown): ErroDeCampo[] | null {
   }
   if (/email_pessoal|emailPessoal/.test(texto)) {
     return [{ campo: "contatos.emailPessoal", motivo: "em_uso" }];
+  }
+  if (/cpf/.test(texto)) {
+    return [{ campo: "perfilPessoal.cpf", motivo: "em_uso" }];
   }
   return null;
 }
@@ -529,16 +544,22 @@ export function admissaoConfere(
     return false;
   }
 
-  if (!perfil) return false;
   const perfilEnviado = perfilCompleto(dto.perfilPessoal);
-  if (
-    perfil.dataNascimento.toISOString().slice(0, 10) !==
-    perfilEnviado.dataNascimento
-  ) {
-    return false;
-  }
-  for (const chave of CHAVES_PERFIL_SEM_DATA) {
-    if (!iguais(perfil[chave], perfilEnviado[chave])) return false;
+  const perfilTemValor = Object.values(perfilEnviado).some((v) => v !== null);
+  // T209 — perfil sem nenhum valor não nasce: os dois lados precisam bater.
+  if (!perfilTemValor) {
+    if (perfil !== null) return false;
+  } else {
+    if (!perfil) return false;
+    if (
+      (perfil.dataNascimento?.toISOString().slice(0, 10) ?? null) !==
+      perfilEnviado.dataNascimento
+    ) {
+      return false;
+    }
+    for (const chave of CHAVES_PERFIL_SEM_DATA) {
+      if (!iguais(perfil[chave], perfilEnviado[chave])) return false;
+    }
   }
 
   const enderecoEnviado = dto.endereco ? enderecoCompleto(dto.endereco) : null;
@@ -569,6 +590,11 @@ export function admissaoConfere(
 }
 
 const CHAVES_PERFIL_SEM_DATA = [
+  "cpf",
+  "rg",
+  "genero",
+  "contatoEmergenciaNome",
+  "contatoEmergenciaTelefone",
   "sexo",
   "saudacao",
   "estadoCivil",
@@ -1122,11 +1148,7 @@ export class ColaboradorService {
       ctx,
     );
     const contatos = await this.contatos.consultar(registro.colaboradorId, ctx);
-    if (
-      !dados.perfilPessoal ||
-      dados.situacao === "bloqueado" ||
-      contatos.situacao === "bloqueado"
-    ) {
+    if (dados.situacao === "bloqueado" || contatos.situacao === "bloqueado") {
       // A admissão confere, mas o uso operacional foi bloqueado depois dela
       // (desligamento): não há o que devolver como admissão registrada.
       throw new ConflictException();

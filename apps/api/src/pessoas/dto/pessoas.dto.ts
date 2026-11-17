@@ -18,7 +18,6 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
   ValidateNested,
   ValidateIf,
 } from "class-validator";
@@ -38,6 +37,13 @@ import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
  * é, nem deriva de, documento pessoal (RI-C1).
  */
 const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
+
+/**
+ * T209 — nome completo: até 150 caracteres e pelo menos 3 letras (qualquer
+ * alfabeto), decisão de 2026-11-17 para a etapa 1 do Novo colaborador.
+ */
+export const NOME_COMPLETO_MAXIMO = 150;
+export const NOME_COMPLETO_TRES_LETRAS = /^(?:[^\p{L}]*\p{L}){3}/u;
 
 export const TIPOS_VINCULO = [
   "clt",
@@ -191,10 +197,11 @@ export class AdmitirColaboradorDto {
   @IsUUID()
   centroCustoId?: string;
 
+  /** T209 — pelo menos 3 letras e até 150 caracteres (`NOME_COMPLETO`). */
   @IsString()
   @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(160)
+  @MaxLength(NOME_COMPLETO_MAXIMO)
+  @Matches(NOME_COMPLETO_TRES_LETRAS)
   nome!: string;
 
   @IsUUID()
@@ -297,10 +304,11 @@ export class CriarVinculoDto extends DestinoOrganizacionalDto {
  * fatia. Alterar a vida funcional é movimentação, nunca `PATCH`.
  */
 export class RetificarColaboradorDto {
+  /** T209 — a mesma regra da admissão. */
   @IsString()
   @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(160)
+  @MaxLength(NOME_COMPLETO_MAXIMO)
+  @Matches(NOME_COMPLETO_TRES_LETRAS)
   nome!: string;
 }
 

@@ -40,6 +40,8 @@ export type CampoPublico =
   | "matricula"
   | "contatos.emailPessoal"
   | "emailPessoal"
+  // T209 — CPF já usado na empresa.
+  | "perfilPessoal.cpf"
   // T182 — código de jornada repetido na empresa.
   | "codigo"
   // T183 — jornada do colaborador e a sua vigência.

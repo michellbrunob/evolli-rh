@@ -3,7 +3,7 @@ import { LIMITE_DO_VALOR, filtrarDadosDoRascunho } from "./dados-do-rascunho";
 
 /**
  * T209 — o servidor só guarda, no rascunho da Nova admissão, os campos do
- * contrato atual da admissão. Qualquer outra coisa (CPF, foto, campo
+ * contrato atual da admissão. Qualquer outra coisa (PIS, foto, campo
  * desconhecido, valor que não é texto) recusa o rascunho inteiro.
  */
 describe("filtrarDadosDoRascunho", () => {
@@ -47,8 +47,8 @@ describe("filtrarDadosDoRascunho", () => {
   });
 
   it.each([
-    ["grupo desconhecido", { documentos: { cpf: "000" } }],
-    ["campo desconhecido num grupo", { perfil: { cpf: "000" } }],
+    ["grupo desconhecido", { documentos: { pis: "000" } }],
+    ["campo desconhecido num grupo", { perfil: { pis: "000" } }],
     ["foto no rascunho", { campos: { foto: "data:image/png;base64,AAAA" } }],
     ["valor que não é texto", { campos: { nome: 42 } }],
     ["objeto aninhado como valor", { campos: { nome: { a: 1 } } }],
@@ -83,7 +83,7 @@ describe("filtrarDadosDoRascunho", () => {
 
   it("a mensagem de recusa nunca repete o valor", () => {
     try {
-      filtrarDadosDoRascunho({ perfil: { cpf: "123.456.789-00" } });
+      filtrarDadosDoRascunho({ perfil: { pis: "123.45678.90-1" } });
       throw new Error("deveria recusar");
     } catch (erro) {
       expect(

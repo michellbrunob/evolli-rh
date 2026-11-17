@@ -557,6 +557,11 @@ describe("T179 — admissaoConfere", () => {
         curso: null,
         nomePai: null,
         nomeMae: null,
+        cpf: null,
+        rg: null,
+        genero: null,
+        contatoEmergenciaNome: null,
+        contatoEmergenciaTelefone: null,
       },
       endereco: {
         pais: "Brasil",
@@ -946,6 +951,11 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
         curso: null,
         nomePai: null,
         nomeMae: null,
+        cpf: null,
+        rg: null,
+        genero: null,
+        contatoEmergenciaNome: null,
+        contatoEmergenciaTelefone: null,
       },
       contato: {
         emailPessoal: "pessoa.t179@example.test",

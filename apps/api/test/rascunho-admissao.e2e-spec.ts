@@ -21,7 +21,7 @@ import { requestIdMiddleware } from "../src/common/request-id";
  * Prova: a migration cria a tabela própria e os dois valores de auditoria;
  * RH e DP salvam, recuperam e descartam o PRÓPRIO rascunho na empresa ativa;
  * cada conta e cada empresa têm o seu; master técnico, gestor e colaborador
- * são negados; só campos do contrato atual entram (CPF recusa tudo); salvar
+ * são negados; só campos do contrato atual entram (PIS recusa tudo); salvar
  * não cria colaborador; a trilha não guarda conteúdo.
  *
  * **Todos os dados são sintéticos.** Domínio reservado `example.test`.
@@ -355,9 +355,9 @@ describe("T209 — rascunho da Nova admissão (e2e)", () => {
     expect([403, 404]).toContain(gravar.status);
   });
 
-  it("campo fora do contrato (CPF) recusa o rascunho inteiro, sem repetir o valor", async () => {
+  it("campo fora do contrato (PIS) recusa o rascunho inteiro, sem repetir o valor", async () => {
     const r = await put(rhA, {
-      dados: { ...DADOS, perfil: { cpf: "123.456.789-00" } },
+      dados: { ...DADOS, perfil: { pis: "123.45678.90-1" } },
     }).expect(400);
     expect(JSON.stringify(r.body)).not.toContain("123.456");
     expect((await get(rhA).expect(200)).body.rascunho.dados.perfil).toEqual(

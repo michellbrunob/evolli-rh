@@ -761,7 +761,6 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
         { perfilPessoal: { dataNascimento: "2999-01-01" } },
       ],
       ["CEP fora do padrão", { endereco: { cep: "30140/071" } }],
-      ["sem data de nascimento", { perfilPessoal: { sexo: "feminino" } }],
       ["data de nascimento vazia", { perfilPessoal: { dataNascimento: "" } }],
       ["sem o bloco do perfil", { perfilPessoal: undefined }],
       // T179 — contatos (inteiros ou em parte) são opcionais desde a decisão
@@ -1482,14 +1481,14 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
   });
 
   describe("o banco é a rede de segurança", () => {
-    it("recusa perfil sem data de nascimento e evento sem empresa fora da ambiguidade", async () => {
+    it("T209: aceita perfil sem data de nascimento; recusa evento sem empresa fora da ambiguidade", async () => {
       const qualquer = await prisma.perfilPessoalColaborador.findFirstOrThrow();
-      await expect(
-        prisma.$executeRawUnsafe(
-          "UPDATE app.perfil_pessoal_colaborador SET data_nascimento = NULL WHERE id = $1",
-          qualquer.id,
-        ),
-      ).rejects.toThrow();
+      // T209 — a data de nascimento passou a opcional (etapa 1 do Novo
+      // colaborador, 2026-11-17).
+      await prisma.$executeRawUnsafe(
+        "UPDATE app.perfil_pessoal_colaborador SET data_nascimento = NULL WHERE id = $1",
+        qualquer.id,
+      );
       const ator = await prisma.accessUser.findFirstOrThrow({
         where: { email: "rh.m1a@example.test" },
       });
