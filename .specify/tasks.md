@@ -3510,6 +3510,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         edição e lista de empresas (RH e master criam, concessão na hora); Nova empresa em 2
         etapas sobre `CadastroEmEtapas`; Configurações › Empresas com painel lateral; Iconsax no
         lugar do lucide. E2E cadastro-empresa 22; API 68 / 1604; web 152 / 4294.
+      - **Escopo de fechamento (seção 37):** Documentos (upload, categorias, R2 de documentos,
+        OCR, assinatura e retenção) sai da T209 e fica reservado para a T211, não iniciada; o
+        Novo colaborador fecha em quatro etapas com Revisão e conclusão.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

@@ -1406,3 +1406,21 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
   - edição da principal gravando o CNPJ.
 - **Defeito achado na validação e corrigido com teste:** a criação chamava a navegação ainda
   "salvando", e a guarda de saída a barrava.
+
+## 37. Escopo de fechamento da T209: Documentos fica para a T211 (2026-11-17)
+
+- **Decisão da proprietária (2026-11-17):** a T209 termina **sem a etapa documental**. Upload de
+  documentos, categorias documentais, armazenamento de documentos no R2, OCR, assinatura e
+  retenção documental pertencem exclusivamente à futura **T211**, que **não foi iniciada**.
+- **O que fica na T209:**
+  - **Novo colaborador em quatro etapas:** Dados pessoais, Dados profissionais e vínculo,
+    Endereço e Revisão e conclusão. A quarta etapa continua sendo a revisão; não há
+    "Documentos" no assistente;
+  - **foto opcional** (ADR 0020), que é do perfil e não do acervo documental;
+  - **rascunho real** por conta e empresa, descarte e guarda de saída.
+- **Fechamento:**
+  - Novo colaborador sobre o componente compartilhado de etapas;
+  - revisão de listagem e ficha;
+  - preparação para a validação visual final.
+- **Sem mudança na aba Documentos da ficha:** continua a da T201, só metadados (ADR 0011). Ela
+  não é a etapa documental do cadastro.
