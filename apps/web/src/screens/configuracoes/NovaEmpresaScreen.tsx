@@ -21,7 +21,12 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Check, FileSpreadsheet, Clock, UserRoundPlus } from "lucide-react";
+import {
+  IconeAdicionarPessoa,
+  IconePlanilha,
+  IconeRelogio,
+  IconeSucesso,
+} from "../../ui/icones";
 import { Button, CampoMascarado } from "../../components";
 import {
   CadastroEmEtapas,
@@ -477,7 +482,7 @@ export function NovaEmpresaScreen({
                   "Buscando endereço…"
                 ) : cep.tipo === "sugerido" && cep.encontrado ? (
                   <>
-                    <Check size={14} aria-hidden="true" />
+                    <IconeSucesso tamanho={14} />
                     Endereço encontrado
                   </>
                 ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
@@ -588,7 +593,7 @@ const OPCOES: readonly {
     descricao:
       "Cadastre várias pessoas de uma vez usando o nosso modelo de planilha.",
     selo: "Ideal para 5 ou mais pessoas",
-    icone: <FileSpreadsheet size={18} aria-hidden="true" />,
+    icone: <IconePlanilha tamanho={20} />,
   },
   {
     valor: "individual",
@@ -596,14 +601,14 @@ const OPCOES: readonly {
     descricao:
       "Cadastre uma pessoa por vez em 4 etapas, logo depois de criar a empresa.",
     selo: "Leva cerca de 3 minutos",
-    icone: <UserRoundPlus size={18} aria-hidden="true" />,
+    icone: <IconeAdicionarPessoa tamanho={20} />,
   },
   {
     valor: "depois",
     titulo: "Fazer isso depois",
     descricao:
       "A empresa é criada vazia. Você importa ou cadastra quando quiser, em Colaboradores.",
-    icone: <Clock size={18} aria-hidden="true" />,
+    icone: <IconeRelogio tamanho={20} />,
   },
 ];
 

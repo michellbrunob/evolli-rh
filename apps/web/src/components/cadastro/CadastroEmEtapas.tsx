@@ -15,7 +15,7 @@
  * formulário (Enter num campo ou o botão principal).
  */
 import { useId, type FormEvent, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IconeAvancar, IconeVoltar } from "../../ui/icones";
 import { Button } from "../Button";
 import { PageHeader } from "../PageHeader";
 import { IconButton } from "../../ui";
@@ -93,7 +93,7 @@ export function CadastroEmEtapas({
       <header className="cadastro-etapas__cabecalho">
         <IconButton
           label={rotuloVoltar}
-          icon={<ChevronLeft size={18} />}
+          icon={<IconeVoltar tamanho={18} />}
           className="cadastro-etapas__voltar"
           onClick={onVoltarDaPagina}
         />
@@ -259,10 +259,9 @@ export function CadastroEmEtapas({
               ) : (
                 <>
                   Próxima etapa
-                  <ChevronRight
+                  <IconeAvancar
                     className="cadastro-etapas__seta"
-                    aria-hidden="true"
-                    focusable="false"
+                    tamanho={16}
                   />
                 </>
               )}

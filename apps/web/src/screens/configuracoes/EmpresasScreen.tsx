@@ -5,7 +5,7 @@
  * só aparece para quem cria (RH e master técnico); o servidor decide de novo.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Pencil, Plus } from "lucide-react";
+import { IconeEditar, IconeEmpresa, IconeMais } from "../../ui/icones";
 import { Button, PageHeader, TrilhaNavegacao } from "../../components";
 import {
   listarEmpresasDaConta,
@@ -105,7 +105,7 @@ export function EmpresasScreen({
             </div>
             {podeAdicionar ? (
               <Button type="button" variant="primary" onClick={onAdicionar}>
-                <Plus size={16} aria-hidden="true" />
+                <IconeMais tamanho={16} />
                 Adicionar empresa
               </Button>
             ) : null}
@@ -164,9 +164,7 @@ export function EmpresasScreen({
                             className="empresas__monograma"
                             aria-hidden="true"
                           >
-                            {iniciais(e.nome) || (
-                              <Building2 size={16} aria-hidden="true" />
-                            )}
+                            {iniciais(e.nome) || <IconeEmpresa tamanho={16} />}
                           </span>
                           <span className="empresas__textos">
                             <span className="empresas__nome">
@@ -206,7 +204,7 @@ export function EmpresasScreen({
                               setEditando(e);
                             }}
                           >
-                            <Pencil size={15} aria-hidden="true" />
+                            <IconeEditar tamanho={16} />
                           </button>
                         </td>
                       ) : null}

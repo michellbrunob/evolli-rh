@@ -61,7 +61,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Clock, type LucideIcon } from "lucide-react";
+import { IconeRelogio, type IconeDoEcossistema } from "../ui/icones";
 import "./PainelNavigation.css";
 
 import { IconeModulo } from "./IconeModulo";
@@ -149,17 +149,9 @@ function SetaExpansao() {
   );
 }
 
-/** T209 — ícone de um item novo (Lucide), com a mesma moldura dos demais. */
-function IconeDoMenu({ icone: Icone }: { readonly icone: LucideIcon }) {
-  return (
-    <Icone
-      className="painel-nav__icone"
-      size={20}
-      strokeWidth={1.6}
-      aria-hidden="true"
-      focusable="false"
-    />
-  );
+/** T209 — ícone de um item do menu (Iconsax Bulk), na moldura dos demais. */
+function IconeDoMenu({ icone: Icone }: { readonly icone: IconeDoEcossistema }) {
+  return <Icone className="painel-nav__icone" tamanho={20} />;
 }
 
 function Selo({ texto }: { readonly texto: SeloDoMenu }) {
@@ -191,12 +183,9 @@ function EstadoEmDesenvolvimento() {
  */
 function MarcaEmDesenvolvimento() {
   return (
-    <Clock
+    <IconeRelogio
       className="painel-nav__marca-em-desenvolvimento"
-      size={14}
-      strokeWidth={1.8}
-      aria-hidden="true"
-      focusable="false"
+      tamanho={14}
     />
   );
 }
@@ -257,7 +246,7 @@ type PedirAviso = (alvo: HTMLElement, rotulo: string) => void;
 interface BotaoEmDesenvolvimentoProps {
   readonly rotulo: string;
   readonly nivel: "modulo" | "sub";
-  readonly icone?: LucideIcon;
+  readonly icone?: IconeDoEcossistema;
   readonly selo?: SeloDoMenu;
   readonly recolhido: boolean;
   readonly onAvisar: PedirAviso;

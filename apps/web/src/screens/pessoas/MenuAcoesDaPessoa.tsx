@@ -11,7 +11,7 @@
  * na volta da ficha, é ele que tem o foco. O menu vai para um portal: o
  * quadro da tabela, que rola, não o recorta.
  */
-import { ChevronDown } from "lucide-react";
+import { IconeAbrir } from "../../ui/icones";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +41,7 @@ export function MenuAcoesDaPessoa({
           aria-label={`Ações: ${nome}`}
         >
           Ações
-          <ChevronDown aria-hidden="true" focusable="false" size={14} />
+          <IconeAbrir tamanho={14} />
         </DropdownMenuTrigger>
         <DropdownMenuContent aria-label={`Ações: ${nome}`}>
           {atalhos.map((atalho) => (

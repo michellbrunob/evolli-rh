@@ -29,18 +29,18 @@
  * nenhuma ampliação. Os itens em desenvolvimento aparecem para todos porque
  * não abrem nada.
  */
-import type { LucideIcon } from "lucide-react";
 import {
-  BriefcaseBusiness,
-  CalendarDays,
-  ClipboardList,
-  Gift,
-  HeartHandshake,
-  LayoutGrid,
-  LifeBuoy,
-  Milestone,
-  Wallet,
-} from "lucide-react";
+  IconeBeneficios,
+  IconeCalendario,
+  IconeFolha,
+  IconeHubBeneficios,
+  IconePesquisas,
+  IconePortal,
+  IconeRecrutamento,
+  IconeRoadmap,
+  IconeSuporte,
+  type IconeDoEcossistema,
+} from "../ui/icones";
 
 /** O texto da dica e do aviso de todo item em desenvolvimento. */
 export const MENSAGEM_EM_DESENVOLVIMENTO =
@@ -59,7 +59,7 @@ export interface EntradaEmDesenvolvimento {
   readonly tipo: "em-desenvolvimento";
   readonly id: string;
   readonly rotulo: string;
-  readonly icone: LucideIcon;
+  readonly icone: IconeDoEcossistema;
   readonly selo?: SeloDoMenu;
   /**
    * Conteúdo futuro: o item vira um cabeçalho expansível, e cada subitem
@@ -114,7 +114,7 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "em-desenvolvimento",
         id: "portal",
         rotulo: "Portal",
-        icone: LayoutGrid,
+        icone: IconePortal,
         selo: "Beta",
       },
     ],
@@ -138,7 +138,7 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "em-desenvolvimento",
         id: "recrutamento",
         rotulo: "Recrutamento",
-        icone: BriefcaseBusiness,
+        icone: IconeRecrutamento,
         subitens: [
           { id: "vagas", rotulo: "Vagas" },
           { id: "banco-de-talentos", rotulo: "Banco de talentos" },
@@ -148,13 +148,13 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "em-desenvolvimento",
         id: "pesquisas",
         rotulo: "Pesquisas",
-        icone: ClipboardList,
+        icone: IconePesquisas,
       },
       {
         tipo: "em-desenvolvimento",
         id: "calendario",
         rotulo: "Calendário",
-        icone: CalendarDays,
+        icone: IconeCalendario,
       },
     ],
   },
@@ -167,19 +167,19 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "em-desenvolvimento",
         id: "folha-de-pagamento",
         rotulo: "Folha de Pagamento",
-        icone: Wallet,
+        icone: IconeFolha,
       },
       {
         tipo: "em-desenvolvimento",
         id: "beneficios",
         rotulo: "Benefícios",
-        icone: Gift,
+        icone: IconeBeneficios,
       },
       {
         tipo: "em-desenvolvimento",
         id: "hub-de-beneficios",
         rotulo: "Hub de Benefícios",
-        icone: HeartHandshake,
+        icone: IconeHubBeneficios,
         selo: "Novo",
       },
     ],
@@ -214,13 +214,13 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "em-desenvolvimento",
         id: "suporte",
         rotulo: "Suporte",
-        icone: LifeBuoy,
+        icone: IconeSuporte,
       },
       {
         tipo: "em-desenvolvimento",
         id: "roadmap",
         rotulo: "Roadmap",
-        icone: Milestone,
+        icone: IconeRoadmap,
       },
       { tipo: "modulo", grupo: "Configurações" },
     ],

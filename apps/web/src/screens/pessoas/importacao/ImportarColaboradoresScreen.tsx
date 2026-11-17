@@ -16,7 +16,7 @@
  * enviada". Com planilha conferida e não importada, sair pergunta (T200);
  * durante o envio, a saída e a troca de empresa esperam.
  */
-import { ChevronLeft } from "lucide-react";
+import { IconeVoltar } from "../../../ui/icones";
 import { useEffect, useId, useRef, useState } from "react";
 import { ApiError, enviarAdmissao } from "../../../api/colaboradoresClient";
 import { listarCargos } from "../../../api/cargoClient";
@@ -450,7 +450,7 @@ export function ImportarColaboradoresScreen({
       <header className="importar-colaboradores__cabecalho">
         <IconButton
           label="Voltar para Colaboradores"
-          icon={<ChevronLeft size={18} />}
+          icon={<IconeVoltar tamanho={18} />}
           onClick={sair}
         />
         <PageHeader

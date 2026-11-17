@@ -13,7 +13,7 @@
  *
  * Não há Hub: a barra não oferece volta a ele.
  */
-import { ChevronDown, CircleUserRound } from "lucide-react";
+import { IconeAbrir, IconeConta } from "../ui/icones";
 import { useState, type MutableRefObject, type ReactNode } from "react";
 import { IconeModulo, type IconeModuloId } from "./IconeModulo";
 import { urlDaFotoPropria } from "../api/usersClient";
@@ -81,7 +81,7 @@ function AvatarDaConta({ conta }: { readonly conta: ContaDaBarra }) {
           {iniciaisDe(conta.nomeExibicao, "")}
         </span>
       ) : (
-        <CircleUserRound size={22} strokeWidth={1.6} aria-hidden="true" />
+        <IconeConta tamanho={22} />
       )}
     </span>
   );
@@ -179,11 +179,7 @@ export function BarraSuperior({
             >
               <AvatarDaConta conta={conta} />
               <span className="barra-superior__nome">{nome}</span>
-              <ChevronDown
-                className="barra-superior__seta"
-                size={16}
-                aria-hidden="true"
-              />
+              <IconeAbrir className="barra-superior__seta" tamanho={16} />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onSelect={onMeuPerfil}>

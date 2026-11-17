@@ -111,7 +111,7 @@ import {
   StatusBadge,
   Surface,
 } from "../../components";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { IconeAvancar, IconeSucesso, IconeVoltar } from "../../ui/icones";
 import { IconButton } from "../../ui";
 import {
   type AdmissaoRegistradaApi,
@@ -2781,7 +2781,7 @@ export function NovaAdmissaoScreen({
       <header className="nova-admissao__cabecalho">
         <IconButton
           label="Voltar para Colaboradores"
-          icon={<ChevronLeft size={18} />}
+          icon={<IconeVoltar tamanho={18} />}
           className="nova-admissao__voltar"
           onClick={pedirCancelamento}
         />
@@ -3638,7 +3638,7 @@ export function NovaAdmissaoScreen({
                         "Buscando endereço…"
                       ) : cep.tipo === "sugerido" && cep.encontrado ? (
                         <>
-                          <Check size={14} aria-hidden="true" />
+                          <IconeSucesso tamanho={14} />
                           Endereço encontrado
                         </>
                       ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
@@ -3894,11 +3894,7 @@ export function NovaAdmissaoScreen({
               ) : (
                 <>
                   Próxima etapa
-                  <ChevronRight
-                    className="nova-admissao__seta"
-                    aria-hidden="true"
-                    focusable="false"
-                  />
+                  <IconeAvancar className="nova-admissao__seta" tamanho={16} />
                 </>
               )}
             </Button>

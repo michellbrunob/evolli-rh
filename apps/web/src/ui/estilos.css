@@ -96,3 +96,8 @@
     width: 100%;
   }
 }
+
+/* T209 — o X de fechar é o "mais" do Iconsax girado 45°, no mesmo traço. */
+.ev-icone--fechar {
+  transform: rotate(45deg);
+}

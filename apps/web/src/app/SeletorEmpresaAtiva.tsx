@@ -72,7 +72,7 @@ import {
 } from "../api/contextoEmpresarialClient";
 import { useResumoDasEdicoes } from "./edicoesPendentes";
 import { formatarCnpj } from "../format/cnpj";
-import { Plus, Settings } from "lucide-react";
+import { IconeConfiguracoes, IconeMais } from "../ui/icones";
 import "./SeletorEmpresaAtiva.css";
 
 /** Empresa ativa como o ator a traz. `id` falta só em montagens de teste. */
@@ -766,7 +766,7 @@ export function SeletorEmpresaAtiva({
                     onAdicionarEmpresa();
                   }}
                 >
-                  <Plus size={16} aria-hidden="true" />
+                  <IconeMais tamanho={16} />
                   Adicionar empresa
                 </button>
               ) : null}
@@ -779,7 +779,7 @@ export function SeletorEmpresaAtiva({
                     onGerenciarEmpresas();
                   }}
                 >
-                  <Settings size={16} aria-hidden="true" />
+                  <IconeConfiguracoes tamanho={16} />
                   Gerenciar empresas
                 </button>
               ) : null}

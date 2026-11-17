@@ -17,7 +17,7 @@
  *    animação perceptível.
  */
 import * as RadixDialog from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { IconeFechar } from "./icones";
 import {
   createContext,
   useCallback,
@@ -180,7 +180,7 @@ function Janela({
             </div>
             <IconButton
               label="Fechar"
-              icon={<X size={18} />}
+              icon={<IconeFechar tamanho={20} />}
               onClick={pedirFechamento}
               disabled={bloqueado}
             />

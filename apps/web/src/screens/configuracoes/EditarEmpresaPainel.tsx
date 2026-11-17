@@ -6,7 +6,7 @@
  * e Salvar. Fechar com alteração pede confirmação (o próprio `Sheet`).
  */
 import { useEffect, useRef, useState } from "react";
-import { Building2, Check } from "lucide-react";
+import { IconeEmpresa, IconeSucesso } from "../../ui/icones";
 import { CampoMascarado } from "../../components";
 import { Button, Sheet } from "../../ui";
 import {
@@ -209,7 +209,7 @@ export function EditarEmpresaPainel({
       aberto
       titulo={empresa.nome}
       descricao={subtitulo}
-      icone={<Building2 size={18} />}
+      icone={<IconeEmpresa tamanho={20} />}
       onFechar={onFechar}
       alterado={alterado}
       bloqueado={salvando}
@@ -329,7 +329,7 @@ export function EditarEmpresaPainel({
               "Buscando endereço…"
             ) : cep.tipo === "sugerido" && cep.encontrado ? (
               <>
-                <Check size={14} aria-hidden="true" />
+                <IconeSucesso tamanho={14} />
                 Endereço encontrado
               </>
             ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
