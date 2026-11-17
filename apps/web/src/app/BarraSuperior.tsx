@@ -26,6 +26,7 @@ import {
 } from "../ui";
 import { MarcaEvolli } from "./IconeModulo";
 import type { ItemDaTrilha } from "./trilhaDoShell";
+import { useComplementoDaTrilha } from "./trilhaComplementar";
 import "./BarraSuperior.css";
 
 /** O nome mostrado quando a conta não tem nome de exibição. */
@@ -94,7 +95,7 @@ export function BarraSuperior({
   botaoMenuRef,
   onAlternarGaveta,
   iconeMenu,
-  trilha,
+  trilha: trilhaDaRota,
   iconeDaTrilha = null,
   onNavegar,
   conta,
@@ -104,6 +105,19 @@ export function BarraSuperior({
   onSessoesAtivas,
   onSair,
 }: BarraSuperiorProps) {
+  // T209 — o nível que a página declarou (o nome na ficha): entra no fim, e
+  // o último nível da rota vira a volta para ele.
+  const complemento = useComplementoDaTrilha();
+  const trilha: readonly ItemDaTrilha[] = complemento
+    ? [
+        ...trilhaDaRota.slice(0, -1),
+        ...trilhaDaRota.slice(-1).map((item) => ({
+          ...item,
+          onSelecionar: complemento.onVoltar,
+        })),
+        { rotulo: complemento.rotulo },
+      ]
+    : trilhaDaRota;
   const nome = conta?.nomeExibicao ?? NOME_SEM_EXIBICAO;
   return (
     <header className="barra-superior app-shell__topbar" {...inerte}>
@@ -142,11 +156,15 @@ export function BarraSuperior({
                   const ultimo = i === trilha.length - 1;
                   return (
                     <li key={`${i}-${item.rotulo}`}>
-                      {item.destinoId && !ultimo ? (
+                      {(item.destinoId || item.onSelecionar) && !ultimo ? (
                         <button
                           type="button"
                           className="barra-superior__trilha-link"
-                          onClick={() => onNavegar(item.destinoId!)}
+                          onClick={() =>
+                            item.onSelecionar
+                              ? item.onSelecionar()
+                              : onNavegar(item.destinoId!)
+                          }
                         >
                           {item.rotulo}
                         </button>

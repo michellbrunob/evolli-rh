@@ -981,9 +981,13 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
         name: "Abrir ficha de Pessoa Sintética Fluxo",
       }),
     );
-    const ficha = await esperarFicha();
+    await esperarFicha();
     fireEvent.click(
-      within(ficha).getByRole("button", { name: "Colaboradores" }),
+      // T209 — a volta é pela trilha da barra superior.
+      within(screen.getByRole("navigation", { name: "Trilha" })).getByRole(
+        "button",
+        { name: "Colaboradores" },
+      ),
     );
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(window.location.hash).toBe(ROTA_COLABORADORES);

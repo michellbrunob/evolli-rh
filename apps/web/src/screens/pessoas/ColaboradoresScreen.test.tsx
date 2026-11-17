@@ -7,6 +7,8 @@ import {
   within,
   type RenderOptions,
 } from "@testing-library/react";
+import { comTrilha, voltarPelaTrilha } from "../../test/trilhaDeTeste";
+
 import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -397,9 +399,7 @@ async function esperarFicha(): Promise<HTMLElement> {
 
 /** T198 — volta da ficha à listagem pela trilha. */
 function voltarDaFicha() {
-  fireEvent.click(
-    within(fichaAberta()).getByRole("button", { name: "Colaboradores" }),
-  );
+  fireEvent.click(voltarPelaTrilha());
 }
 
 describe("ColaboradoresScreen (T111 — funcional)", () => {
@@ -693,9 +693,7 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
 
     const campo = within(fichaAberta()).getByLabelText("Nome");
     fireEvent.change(campo, { target: { value: "Ana Corrigida (teste)" } });
-    const trilha = within(fichaAberta()).getByRole("button", {
-      name: "Colaboradores",
-    });
+    const trilha = voltarPelaTrilha();
     trilha.focus();
     fireEvent.click(trilha);
     expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
@@ -4499,11 +4497,13 @@ describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
     );
 
     rerender(
-      <ColaboradoresScreen
-        key="empresa-b"
-        onNovaAdmissao={vi.fn()}
-        empresaAtiva={{ nome: "Empresa Beta Sintética", codigo: "BETA" }}
-      />,
+      comTrilha(
+        <ColaboradoresScreen
+          key="empresa-b"
+          onNovaAdmissao={vi.fn()}
+          empresaAtiva={{ nome: "Empresa Beta Sintética", codigo: "BETA" }}
+        />,
+      ),
     );
     expect(screen.queryByRole("dialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
@@ -5068,10 +5068,12 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     await waitFor(() => expect(onEstadoChange).toHaveBeenCalledTimes(1));
     // O shell ignorou a correção e reaplicou a URL: objeto novo, mesmos valores.
     rerender(
-      <ColaboradoresScreen
-        estado={{ ...invalido }}
-        onEstadoChange={onEstadoChange}
-      />,
+      comTrilha(
+        <ColaboradoresScreen
+          estado={{ ...invalido }}
+          onEstadoChange={onEstadoChange}
+        />,
+      ),
     );
     await waitFor(() => expect(onEstadoChange).toHaveBeenCalledTimes(2));
     expect(onEstadoChange).toHaveBeenLastCalledWith(
@@ -5386,11 +5388,13 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
       contadores: CONTADORES_CHEIOS,
     }));
     rerender(
-      <DashboardComEstado
-        inicial={inicial}
-        onMudanca={onMudanca}
-        atualizacao={1}
-      />,
+      comTrilha(
+        <DashboardComEstado
+          inicial={inicial}
+          onMudanca={onMudanca}
+          atualizacao={1}
+        />,
+      ),
     );
     const limpar = await screen.findByRole("button", {
       name: "Limpar busca e filtros",
@@ -7471,7 +7475,11 @@ function render(
   ui: Parameters<typeof renderSemGuarda>[0],
   opcoes?: Omit<RenderOptions, "wrapper">,
 ) {
-  return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
+  // T209 — com a barra em miniatura: a ficha declara o último nível da trilha.
+  return renderSemGuarda(comTrilha(ui), {
+    wrapper: ComGuardaDeSaida,
+    ...opcoes,
+  });
 }
 
 // ---------------------------------------------------------------------------

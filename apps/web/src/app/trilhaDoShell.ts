@@ -15,6 +15,8 @@ export interface ItemDaTrilha {
   readonly rotulo: string;
   /** Presente quando o item leva a uma tela (o pai de uma sub-página). */
   readonly destinoId?: string;
+  /** T209 — volta declarada pela página (o pai de um nível complementar). */
+  readonly onSelecionar?: () => void;
 }
 
 /**

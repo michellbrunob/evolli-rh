@@ -71,6 +71,7 @@ import type { SafeAccessUserApi } from "../api/usersClient";
 import { BarraSuperior } from "./BarraSuperior";
 import { MarcaEvolli } from "./IconeModulo";
 import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
+import { ProvedorDeTrilhaComplementar } from "./trilhaComplementar";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
@@ -1729,260 +1730,263 @@ export function App({
   }, []);
 
   return (
-    <div
-      className={[
-        "app-shell",
-        gavetaModal ? "app-shell--gaveta-aberta" : "",
-        trilho ? "app-shell--menu-recolhido" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      {/* T200 — o salto só move o foco: seguir a âncora criaria uma entrada
-          no histórico (e tiraria a rota da URL). */}
-      <a
-        className="app-shell__skip-link"
-        href="#conteudo-principal"
-        onClick={(evento) => {
-          evento.preventDefault();
-          mainRef.current?.focus();
-        }}
+    <ProvedorDeTrilhaComplementar>
+      <div
+        className={[
+          "app-shell",
+          gavetaModal ? "app-shell--gaveta-aberta" : "",
+          trilho ? "app-shell--menu-recolhido" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
-        Pular para o conteúdo
-      </a>
-
-      <div className="app-shell__body">
-        {gavetaModal ? (
-          <button
-            type="button"
-            className="app-shell__fundo-gaveta"
-            aria-label="Fechar menu"
-            onClick={() => setGavetaAberta(false)}
-          />
-        ) : null}
-
-        {/* R3 — a semântica de diálogo existe SÓ enquanto a gaveta é modal.
-            No desktop este mesmo nó é a barra lateral permanente, e anunciar
-            uma barra permanente como janela modal seria mentir para quem usa
-            leitor de tela. */}
-        <div
-          className="app-shell__sidebar"
-          id="navegacao-lateral"
-          ref={sidebarRef}
-          {...(gavetaModal
-            ? {
-                role: "dialog",
-                "aria-modal": true,
-                "aria-label": "Menu de navegação",
-              }
-            : {})}
+        {/* T200 — o salto só move o foco: seguir a âncora criaria uma entrada
+          no histórico (e tiraria a rota da URL). */}
+        <a
+          className="app-shell__skip-link"
+          href="#conteudo-principal"
+          onClick={(evento) => {
+            evento.preventDefault();
+            mainRef.current?.focus();
+          }}
         >
-          {/* T209 — topo da faixa na mesma linha da barra superior: a marca e
-              o botão de recolher, com a altura da barra. Na gaveta do
-              celular o recolher sai da tabulação (`hidden`): a gaveta é
-              sempre o menu inteiro. */}
-          <div className="app-shell__cabecalho-lateral">
-            <span className="app-shell__marca">
-              <MarcaEvolli tom="clara" />
-              <span className="app-shell__marca-texto">
-                <span className="app-shell__marca-nome">Evolli RH</span>
-              </span>
-            </span>
+          Pular para o conteúdo
+        </a>
+
+        <div className="app-shell__body">
+          {gavetaModal ? (
             <button
               type="button"
-              ref={botaoRecolherRef}
-              className="app-shell__recolher"
-              aria-expanded={!trilho}
-              aria-controls={ID_NAVEGACAO_PAINEL}
-              data-dica={trilho ? "Expandir menu" : "Recolher menu"}
-              hidden={modoGaveta}
-              onClick={() => definirRecolhido(!recolhido)}
-            >
-              <IconeRecolherMenu />
-              <span className="app-shell__oculto">
-                {trilho ? "Expandir menu" : "Recolher menu"}
-              </span>
-            </button>
-          </div>
-
-          {/* T189 — a empresa ativa, logo abaixo da marca. Só na sessão
-              autenticada (mesmo critério de "Sair"): sem sessão não há
-              empresa a mostrar. */}
-          {onLogout ? (
-            <SeletorEmpresaAtiva
-              id="menu-empresa-ativa"
-              variante="menu"
-              empresaAtiva={empresaAtiva}
-              podeTrocarEmpresa={podeTrocarEmpresa}
-              papelDoAtor={papelDoAtor}
-              onEmpresaTrocada={(empresa) => onEmpresaTrocada?.(empresa)}
-              {...(podeAdicionarEmpresa
-                ? { onAdicionarEmpresa: () => irPara("nova-empresa") }
-                : {})}
-              {...(podeVerEmpresas
-                ? {
-                    onGerenciarEmpresas: () => irPara("configuracoes-empresas"),
-                  }
-                : {})}
-              compacto={trilho}
-              onExpandirMenu={expandirMenu}
+              className="app-shell__fundo-gaveta"
+              aria-label="Fechar menu"
+              onClick={() => setGavetaAberta(false)}
             />
           ) : null}
 
-          {/* T159 — o shell passa o papel e a navegação decide sozinha quais
+          {/* R3 — a semântica de diálogo existe SÓ enquanto a gaveta é modal.
+            No desktop este mesmo nó é a barra lateral permanente, e anunciar
+            uma barra permanente como janela modal seria mentir para quem usa
+            leitor de tela. */}
+          <div
+            className="app-shell__sidebar"
+            id="navegacao-lateral"
+            ref={sidebarRef}
+            {...(gavetaModal
+              ? {
+                  role: "dialog",
+                  "aria-modal": true,
+                  "aria-label": "Menu de navegação",
+                }
+              : {})}
+          >
+            {/* T209 — topo da faixa na mesma linha da barra superior: a marca e
+              o botão de recolher, com a altura da barra. Na gaveta do
+              celular o recolher sai da tabulação (`hidden`): a gaveta é
+              sempre o menu inteiro. */}
+            <div className="app-shell__cabecalho-lateral">
+              <span className="app-shell__marca">
+                <MarcaEvolli tom="clara" />
+                <span className="app-shell__marca-texto">
+                  <span className="app-shell__marca-nome">Evolli RH</span>
+                </span>
+              </span>
+              <button
+                type="button"
+                ref={botaoRecolherRef}
+                className="app-shell__recolher"
+                aria-expanded={!trilho}
+                aria-controls={ID_NAVEGACAO_PAINEL}
+                data-dica={trilho ? "Expandir menu" : "Recolher menu"}
+                hidden={modoGaveta}
+                onClick={() => definirRecolhido(!recolhido)}
+              >
+                <IconeRecolherMenu />
+                <span className="app-shell__oculto">
+                  {trilho ? "Expandir menu" : "Recolher menu"}
+                </span>
+              </button>
+            </div>
+
+            {/* T189 — a empresa ativa, logo abaixo da marca. Só na sessão
+              autenticada (mesmo critério de "Sair"): sem sessão não há
+              empresa a mostrar. */}
+            {onLogout ? (
+              <SeletorEmpresaAtiva
+                id="menu-empresa-ativa"
+                variante="menu"
+                empresaAtiva={empresaAtiva}
+                podeTrocarEmpresa={podeTrocarEmpresa}
+                papelDoAtor={papelDoAtor}
+                onEmpresaTrocada={(empresa) => onEmpresaTrocada?.(empresa)}
+                {...(podeAdicionarEmpresa
+                  ? { onAdicionarEmpresa: () => irPara("nova-empresa") }
+                  : {})}
+                {...(podeVerEmpresas
+                  ? {
+                      onGerenciarEmpresas: () =>
+                        irPara("configuracoes-empresas"),
+                    }
+                  : {})}
+                compacto={trilho}
+                onExpandirMenu={expandirMenu}
+              />
+            ) : null}
+
+            {/* T159 — o shell passa o papel e a navegação decide sozinha quais
               destinos condicionados oferecer, lendo os papéis declarados no
               mapa. Antes a lista de capacidades era remontada aqui, longe dos
               destinos, e já havia divergido deles. */}
-          <PainelNavigation
-            destinoAtivoId={destinoAtivoId}
-            onSelecionar={irPara}
-            papel={papelDoAtor}
-            recolhido={trilho}
-            onExpandir={expandirMenu}
-          />
+            <PainelNavigation
+              destinoAtivoId={destinoAtivoId}
+              onSelecionar={irPara}
+              papel={papelDoAtor}
+              recolhido={trilho}
+              onExpandir={expandirMenu}
+            />
 
-          <DicaDoTrilho raizRef={sidebarRef} ativa={!modoGaveta} />
-        </div>
+            <DicaDoTrilho raizRef={sidebarRef} ativa={!modoGaveta} />
+          </div>
 
-        {/* T206 — cabeçalho, painéis, conteúdo e rodapé formam a coluna à
+          {/* T206 — cabeçalho, painéis, conteúdo e rodapé formam a coluna à
             direita do menu: nada fica entre a navegação e o conteúdo. */}
-        <div className="app-shell__coluna">
-          {/* T209 — barra superior fixa: a trilha da tela (a marca e o
+          <div className="app-shell__coluna">
+            {/* T209 — barra superior fixa: a trilha da tela (a marca e o
               recolher ficam no topo da faixa, na mesma linha; no celular a
               marca vem para a barra); à direita, só a conta (nome de
               exibição e o menu com Meu perfil, Segurança, Sessões ativas e
               Sair). Sem papel técnico, e-mail, empresa nem Hub. */}
-          <BarraSuperior
-            {...(gavetaModal ? { inerte: FUNDO_INERTE } : {})}
-            modoGaveta={modoGaveta}
-            gavetaAberta={gavetaModal}
-            botaoMenuRef={botaoMenuRef}
-            onAlternarGaveta={alternarGaveta}
-            iconeMenu={<IconeMenu />}
-            trilha={trilhaDoDestino(destinoAtivoId)}
-            iconeDaTrilha={iconeDaTrilha(destinoAtivoId)}
-            onNavegar={irPara}
-            conta={
-              onLogout
-                ? {
-                    nomeExibicao: contaDoAtor?.nomeExibicao ?? null,
-                    fotoVersao: contaDoAtor?.fotoVersao ?? null,
-                  }
-                : null
-            }
-            mfaDisponivel={mfaDisponivel === true}
-            onMeuPerfil={() => irPara("configuracoes")}
-            onSeguranca={() => {
-              setSegurancaAberto(true);
-              setSessoesAtivasAberto(false);
-            }}
-            onSessoesAtivas={() => {
-              setSessoesAtivasAberto(true);
-              setSegurancaAberto(false);
-            }}
-            onSair={() => {
-              if (onLogout) {
-                guardaRef.current.solicitarSaida({ executar: onLogout });
+            <BarraSuperior
+              {...(gavetaModal ? { inerte: FUNDO_INERTE } : {})}
+              modoGaveta={modoGaveta}
+              gavetaAberta={gavetaModal}
+              botaoMenuRef={botaoMenuRef}
+              onAlternarGaveta={alternarGaveta}
+              iconeMenu={<IconeMenu />}
+              trilha={trilhaDoDestino(destinoAtivoId)}
+              iconeDaTrilha={iconeDaTrilha(destinoAtivoId)}
+              onNavegar={irPara}
+              conta={
+                onLogout
+                  ? {
+                      nomeExibicao: contaDoAtor?.nomeExibicao ?? null,
+                      fotoVersao: contaDoAtor?.fotoVersao ?? null,
+                    }
+                  : null
               }
-            }}
-          />
+              mfaDisponivel={mfaDisponivel === true}
+              onMeuPerfil={() => irPara("configuracoes")}
+              onSeguranca={() => {
+                setSegurancaAberto(true);
+                setSessoesAtivasAberto(false);
+              }}
+              onSessoesAtivas={() => {
+                setSessoesAtivasAberto(true);
+                setSegurancaAberto(false);
+              }}
+              onSair={() => {
+                if (onLogout) {
+                  guardaRef.current.solicitarSaida({ executar: onLogout });
+                }
+              }}
+            />
 
-          {onLogout && mfaDisponivel && segurancaAberto ? (
-            <div
-              className="app-shell__sessoes-ativas-wrapper"
+            {onLogout && mfaDisponivel && segurancaAberto ? (
+              <div
+                className="app-shell__sessoes-ativas-wrapper"
+                {...(gavetaModal ? FUNDO_INERTE : {})}
+              >
+                <SegurancaMfaPanel
+                  aberto={segurancaAberto}
+                  onFechar={() => setSegurancaAberto(false)}
+                  onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
+                />
+              </div>
+            ) : null}
+
+            {onLogout && sessoesAtivasAberto ? (
+              <div
+                className="app-shell__sessoes-ativas-wrapper"
+                {...(gavetaModal ? FUNDO_INERTE : {})}
+              >
+                <SessoesAtivasPanel
+                  aberto={sessoesAtivasAberto}
+                  onFechar={() => setSessoesAtivasAberto(false)}
+                  onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
+                />
+              </div>
+            ) : null}
+
+            <main
+              id="conteudo-principal"
+              className="app-shell__main"
+              tabIndex={-1}
               {...(gavetaModal ? FUNDO_INERTE : {})}
+              ref={mainRef}
+              aria-labelledby={tituloDoDestinoId}
             >
-              <SegurancaMfaPanel
-                aberto={segurancaAberto}
-                onFechar={() => setSegurancaAberto(false)}
-                onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
-              />
-            </div>
-          ) : null}
-
-          {onLogout && sessoesAtivasAberto ? (
-            <div
-              className="app-shell__sessoes-ativas-wrapper"
-              {...(gavetaModal ? FUNDO_INERTE : {})}
-            >
-              <SessoesAtivasPanel
-                aberto={sessoesAtivasAberto}
-                onFechar={() => setSessoesAtivasAberto(false)}
-                onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
-              />
-            </div>
-          ) : null}
-
-          <main
-            id="conteudo-principal"
-            className="app-shell__main"
-            tabIndex={-1}
-            {...(gavetaModal ? FUNDO_INERTE : {})}
-            ref={mainRef}
-            aria-labelledby={tituloDoDestinoId}
-          >
-            {conteudoDoDestino(
-              destinoAtivoId,
-              irPara,
-              setCadastrosTituloId,
-              setPessoasTituloId,
-              setPontoTituloId,
-              setDocumentosTituloId,
-              setPortalTituloId,
-              setRelatoriosTituloId,
-              () => onSessaoAtualEncerrada?.(),
-              empresaAtiva,
-              {
-                onAbrirAdmitido: abrirAdmitido,
-                podeAdmitir,
-                papelDoAtor,
-              },
-              {
-                ficha,
-                focarContatos: focarContatosNaFicha,
-                onAbrir: abrirFicha,
-                onTrocarAba: trocarAbaDaFicha,
-                onTrocarCompetencia: trocarCompetenciaDaFicha,
-                onFechar: fecharFicha,
-                listagem,
-                onListagemChange: mudarListagem,
-              },
-              {
-                ano: anoDoDashboard,
-                aba: abaDoDashboard,
-                onTrocarAno: trocarAnoDoDashboard,
-                onTrocarAba: trocarAbaDoDashboard,
-                onAbrirListagem: abrirListagemDoDashboard,
-                vistas: vistasDoDashboard,
-                onTrocarVista: onVistaDoDashboardChange,
-              },
-              contaDoAtor,
-              onContaAtualizada,
-              {
-                podeVer: podeVerEmpresas,
-                podeAdicionar: podeAdicionarEmpresa,
-                aviso: avisoDeEmpresas,
-                onCriadaSemAbrir: (nome) => {
-                  irPara("configuracoes-empresas");
-                  setAvisoDeEmpresas(`Empresa ${nome} criada.`);
+              {conteudoDoDestino(
+                destinoAtivoId,
+                irPara,
+                setCadastrosTituloId,
+                setPessoasTituloId,
+                setPontoTituloId,
+                setDocumentosTituloId,
+                setPortalTituloId,
+                setRelatoriosTituloId,
+                () => onSessaoAtualEncerrada?.(),
+                empresaAtiva,
+                {
+                  onAbrirAdmitido: abrirAdmitido,
+                  podeAdmitir,
+                  papelDoAtor,
                 },
-                onEmpresaAberta: (empresa, destino) =>
-                  onEmpresaTrocada?.(empresa, destino),
-              },
-            )}
-          </main>
+                {
+                  ficha,
+                  focarContatos: focarContatosNaFicha,
+                  onAbrir: abrirFicha,
+                  onTrocarAba: trocarAbaDaFicha,
+                  onTrocarCompetencia: trocarCompetenciaDaFicha,
+                  onFechar: fecharFicha,
+                  listagem,
+                  onListagemChange: mudarListagem,
+                },
+                {
+                  ano: anoDoDashboard,
+                  aba: abaDoDashboard,
+                  onTrocarAno: trocarAnoDoDashboard,
+                  onTrocarAba: trocarAbaDoDashboard,
+                  onAbrirListagem: abrirListagemDoDashboard,
+                  vistas: vistasDoDashboard,
+                  onTrocarVista: onVistaDoDashboardChange,
+                },
+                contaDoAtor,
+                onContaAtualizada,
+                {
+                  podeVer: podeVerEmpresas,
+                  podeAdicionar: podeAdicionarEmpresa,
+                  aviso: avisoDeEmpresas,
+                  onCriadaSemAbrir: (nome) => {
+                    irPara("configuracoes-empresas");
+                    setAvisoDeEmpresas(`Empresa ${nome} criada.`);
+                  },
+                  onEmpresaAberta: (empresa, destino) =>
+                    onEmpresaTrocada?.(empresa, destino),
+                },
+              )}
+            </main>
 
-          <footer
-            className="app-shell__footer"
-            {...(gavetaModal ? FUNDO_INERTE : {})}
-          >
-            <div className="app-shell__footer-inner">
-              <span className="app-shell__footer-brand">Evolli RH</span>
-              <span>Ambiente interno · sem dados reais</span>
-            </div>
-          </footer>
+            <footer
+              className="app-shell__footer"
+              {...(gavetaModal ? FUNDO_INERTE : {})}
+            >
+              <div className="app-shell__footer-inner">
+                <span className="app-shell__footer-brand">Evolli RH</span>
+                <span>Ambiente interno · sem dados reais</span>
+              </div>
+            </footer>
+          </div>
         </div>
       </div>
-    </div>
+    </ProvedorDeTrilhaComplementar>
   );
 }

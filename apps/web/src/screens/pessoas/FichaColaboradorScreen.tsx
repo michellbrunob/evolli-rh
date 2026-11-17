@@ -39,13 +39,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import {
-  Button,
-  DataTable,
-  FormField,
-  StatusBadge,
-  TrilhaNavegacao,
-} from "../../components";
+import { Button, DataTable, FormField, StatusBadge } from "../../components";
 import type { DataTableColumn, StatusVariant } from "../../components";
 import {
   type ColaboradorApi,
@@ -64,7 +58,8 @@ import {
   type VinculoHorarioApi,
   listarVinculosHorario,
 } from "../../api/vinculoHorarioClient";
-import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
+import { destinoPorId } from "../../app/mapaNavegacao";
+import { useTrilhaComplementar } from "../../app/trilhaComplementar";
 import {
   type AbaDaFicha,
   ABAS_DA_FICHA,
@@ -622,24 +617,21 @@ function FichaColaboradorConteudo({
 
   // ---- Trilha ---------------------------------------------------------------
   const rotuloColaboradores = destinoPorId("pessoas")?.label ?? "Colaboradores";
-  const trilha = [
-    { rotulo: tituloDoGrupoDe("pessoas") ?? "Gestão de Pessoas" },
-    { rotulo: rotuloColaboradores, onSelecionar: pedirVoltar },
-    {
-      rotulo:
-        colaborador?.nome ??
-        (estado.tipo === "nao-encontrado"
-          ? "Colaborador não encontrado"
-          : "Ficha do colaborador"),
-    },
-  ];
+  // T209 — a trilha é a da barra superior; a ficha declara o último nível
+  // (o nome) e o "Colaboradores" de antes vira a volta à listagem.
+  useTrilhaComplementar(
+    colaborador?.nome ??
+      (estado.tipo === "nao-encontrado"
+        ? "Colaborador não encontrado"
+        : "Ficha do colaborador"),
+    pedirVoltar,
+  );
 
   if (estado.tipo !== "dados") {
     // Mesmo painel de perfil do estado com dados, na mesma ordem de nós: o
     // h1 é reaproveitado quando os dados chegam, e o foco fica nele.
     return (
       <div className="ficha-colaborador">
-        <TrilhaNavegacao itens={trilha} />
         <div className="ficha-colaborador__perfil">
           <header className="ficha-colaborador__cabecalho">
             <div className="ficha-colaborador__faixa" aria-hidden="true" />
@@ -855,8 +847,6 @@ function FichaColaboradorConteudo({
 
   return (
     <div className="ficha-colaborador">
-      <TrilhaNavegacao itens={trilha} />
-
       <div className="ficha-colaborador__perfil">
         <header className="ficha-colaborador__cabecalho">
           {/* Faixa institucional: só decoração, sem conteúdo. */}
