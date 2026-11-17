@@ -39,7 +39,7 @@ import {
   type SafeAccessUserApi,
 } from "../../api/usersClient";
 import { falhaPorSessaoExpirada } from "../../api/csrfClient";
-import { Button, PageHeader, TrilhaNavegacao } from "../../components";
+import { Button, PageHeader } from "../../components";
 import { AUSENTE, formatarInstante } from "../../format/data";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import {
@@ -459,9 +459,7 @@ export function MeuPerfilScreen({
 
   return (
     <div className="configuracoes">
-      <TrilhaNavegacao
-        itens={[{ rotulo: "Configurações" }, { rotulo: "Meu perfil" }]}
-      />
+      {/* T209 — a trilha fica só na barra superior (sem repetição). */}
       <PageHeader
         headingLevel={1}
         titleId={CONFIGURACOES_TITULO_ID}

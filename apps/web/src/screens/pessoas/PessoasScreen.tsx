@@ -22,12 +22,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useRef, useState } from "react";
-import {
-  type EstadoDestino,
-  destinoPorId,
-  tituloDoGrupoDe,
-} from "../../app/mapaNavegacao";
-import { TrilhaNavegacao } from "../../components";
+import { type EstadoDestino } from "../../app/mapaNavegacao";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import type {
@@ -377,26 +372,6 @@ export function PessoasScreen({
     document.getElementById("pessoas-tab-colaboradores")?.focus();
   }, [abaAtiva]);
 
-  // T178 — trilha só no modo funcional, que é o destino "Colaboradores" da
-  // barra. Os nomes saem do mapa de navegação: barra e trilha não divergem.
-  // A aba ativa, quando não é Colaboradores, entra como terceiro nível.
-  const trilha =
-    modo === "funcional"
-      ? [
-          { rotulo: tituloDoGrupoDe("pessoas") ?? "Gestão de Pessoas" },
-          {
-            rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-            onSelecionar: () =>
-              trocarAbaDePessoas("colaboradores", () => {
-                focarAbaColaboradoresRef.current = true;
-              }),
-          },
-          ...(definicaoAtiva.id === "colaboradores"
-            ? []
-            : [{ rotulo: definicaoAtiva.rotulo }]),
-        ]
-      : null;
-
   return (
     <div className="pessoas-screen">
       {fichaAberta && ficha ? (
@@ -422,7 +397,7 @@ export function PessoasScreen({
       ) : null}
       {listagemMontada || !fichaAberta ? (
         <div className="pessoas-screen__conteudo" hidden={fichaAberta}>
-          {trilha ? <TrilhaNavegacao itens={trilha} /> : null}
+          {/* T209 — a trilha fica só na barra superior (sem repetição). */}
           <div
             role="tablist"
             aria-label="Seções de Pessoas"

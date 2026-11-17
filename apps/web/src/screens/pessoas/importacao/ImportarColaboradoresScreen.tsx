@@ -28,9 +28,8 @@ import {
 } from "../../../api/organizacaoClient";
 import { useEdicaoEmAndamento } from "../../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../../app/guardaDeSaida";
-import { destinoPorId, tituloDoGrupoDe } from "../../../app/mapaNavegacao";
 import { formatarDiaCivil } from "../../../format/data";
-import { PageHeader, Surface, TrilhaNavegacao } from "../../../components";
+import { PageHeader, Surface } from "../../../components";
 import { baixarArquivo } from "../../dashboard/exportacao";
 import { Button, Dialog, IconButton } from "../../../ui";
 import { ROTULO_TIPO_DE_VINCULO } from "../ColaboradoresScreen";
@@ -434,19 +433,7 @@ export function ImportarColaboradoresScreen({
 
   return (
     <div className="importar-colaboradores">
-      <TrilhaNavegacao
-        itens={[
-          {
-            rotulo:
-              tituloDoGrupoDe("importar-colaboradores") ?? "Gestão de Pessoas",
-          },
-          {
-            rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-            onSelecionar: sair,
-          },
-          { rotulo: "Importar planilha" },
-        ]}
-      />
+      {/* T209 — a trilha fica só na barra superior (sem repetição). */}
       <header className="importar-colaboradores__cabecalho">
         <IconButton
           label="Voltar para Colaboradores"

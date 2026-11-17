@@ -224,10 +224,6 @@ function itemColaboradoresNaBarra() {
   ).getByRole("button", { name: /^Colaboradores Consulta/ });
 }
 
-function trilha() {
-  return screen.getByRole("navigation", { name: "Trilha de navegação" });
-}
-
 /** T209 — a trilha da barra superior do shell (a página não repete a sua). */
 function trilhaDaBarra() {
   return screen.getByRole("navigation", { name: "Trilha" });
@@ -387,43 +383,16 @@ describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () =>
 });
 
 describe("T178 — trilha de navegação", () => {
-  it("na listagem: Gestão de Pessoas › Colaboradores, com Colaboradores como atual", async () => {
+  it("T209 — na listagem e nas abas internas, a página não repete a trilha (ela fica na barra superior)", async () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-
-    const itens = within(trilha()).getAllByRole("listitem");
-    expect(itens.map((i) => i.textContent?.replace("›", "").trim())).toEqual([
-      "Gestão de Pessoas",
-      "Colaboradores",
-    ]);
-    expect(within(trilha()).getByText("Colaboradores")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    // O separador é desenho: fica fora da árvore de acessibilidade.
-    for (const separador of trilha().querySelectorAll(
-      ".evolli-trilha__separador",
-    )) {
-      expect(separador).toHaveAttribute("aria-hidden", "true");
-    }
-  });
-
-  it("numa aba interna, a trilha ganha o terceiro nível e 'Colaboradores' volta à aba", async () => {
-    render(<App papelDoAtor="rh" />);
-    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-
-    expect(within(trilha()).getByText("Horário de trabalho")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    fireEvent.click(
-      within(trilha()).getByRole("button", { name: "Colaboradores" }),
-    );
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Colaboradores" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveFocus();
+      screen.queryByRole("navigation", { name: "Trilha de navegação" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    expect(
+      screen.queryByRole("navigation", { name: "Trilha de navegação" }),
+    ).toBeNull();
   });
 
   it("no Novo colaborador: a trilha da barra é Pessoas / Colaboradores / Novo colaborador (T209: a página não repete a sua)", async () => {

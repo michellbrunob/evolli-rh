@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { IconeEditar, IconeEmpresa, IconeMais } from "../../ui/icones";
-import { Button, PageHeader, TrilhaNavegacao } from "../../components";
+import { Button, PageHeader } from "../../components";
 import {
   listarEmpresasDaConta,
   type EmpresaDaContaApi,
@@ -76,9 +76,7 @@ export function EmpresasScreen({
 
   return (
     <div className="configuracoes">
-      <TrilhaNavegacao
-        itens={[{ rotulo: "Configurações" }, { rotulo: "Empresas" }]}
-      />
+      {/* T209 — a trilha fica só na barra superior (sem repetição). */}
       <PageHeader
         headingLevel={1}
         titleId={EMPRESAS_TITULO_ID}
