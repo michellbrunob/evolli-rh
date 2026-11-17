@@ -1970,13 +1970,15 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
    */
   function esperarEtapa2Ativa() {
     const visiveis = [
-      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
+      ...document.querySelectorAll<HTMLElement>(
+        "section.cadastro-etapas__etapa",
+      ),
     ]
       .filter((painel) => !painel.hasAttribute("hidden"))
       .map((painel) => painel.querySelector("h2")?.textContent);
     expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais"]);
     expect(
-      document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
+      document.querySelector('.cadastro-etapas__etapas [aria-current="step"]'),
     ).toHaveTextContent("Etapa 2: Dados profissionais, etapa atual");
   }
 

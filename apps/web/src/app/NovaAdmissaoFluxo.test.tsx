@@ -704,7 +704,7 @@ describe("T209 — assistente da Nova admissão no App (permissões e voltar)", 
         screen.getByRole("navigation", { name: "Etapas do cadastro" }),
       ).toBeInTheDocument();
       const rodape = document.querySelector<HTMLElement>(
-        ".nova-admissao__rodape",
+        ".cadastro-etapas__rodape",
       )!;
       expect(rodape).toHaveTextContent("25% concluído");
       expect(
@@ -733,7 +733,7 @@ describe("T209 — assistente da Nova admissão no App (permissões e voltar)", 
     expect(
       screen.queryByRole("button", { name: "Voltar para Colaboradores" }),
     ).not.toBeInTheDocument();
-    expect(document.querySelector(".nova-admissao__rodape")).toBeNull();
+    expect(document.querySelector(".cadastro-etapas__rodape")).toBeNull();
   });
 });
 

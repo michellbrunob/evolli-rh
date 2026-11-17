@@ -100,7 +100,12 @@
  * aposentado na T177: não coletava os campos obrigatórios. "Novo colaborador"
  * traz para esta página.
  */
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  CadastroEmEtapas,
+  LinhaDoCadastro,
+  SecaoDoCadastro,
+} from "../../components/cadastro/CadastroEmEtapas";
 import {
   Button,
   CampoMascarado,
@@ -111,8 +116,7 @@ import {
   StatusBadge,
   Surface,
 } from "../../components";
-import { IconeAvancar, IconeSucesso, IconeVoltar } from "../../ui/icones";
-import { IconButton } from "../../ui";
+import { IconeSucesso } from "../../ui/icones";
 import {
   type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
@@ -2652,42 +2656,6 @@ export function NovaAdmissaoScreen({
     ) : null;
   }
 
-  /** T195 — um painel de etapa: montado sempre, visível só na etapa atual. */
-  function painelDaEtapa(indice: IndiceEtapa, conteudo: ReactNode) {
-    const tituloId = idDoTituloDaEtapa(indice);
-    return (
-      <section
-        className="nova-admissao__etapa"
-        aria-labelledby={tituloId}
-        hidden={indice !== etapa}
-      >
-        {/* T209 — cabeçalho da etapa: título e descrição; o selo "Etapa N
-            de 4" à direita (lido junto do título). */}
-        <header className="nova-admissao__etapa-cabecalho">
-          <div className="nova-admissao__etapa-textos">
-            <h2
-              id={tituloId}
-              className="nova-admissao__etapa-titulo"
-              tabIndex={-1}
-            >
-              <span className="nova-admissao__so-leitor">
-                Etapa {indice + 1} de {ETAPAS.length}:{" "}
-              </span>
-              {ETAPAS[indice]}
-            </h2>
-            <p className="nova-admissao__etapa-descricao">
-              {DESCRICOES_DAS_ETAPAS[indice]}
-            </p>
-          </div>
-          <span className="nova-admissao__etapa-selo" aria-hidden="true">
-            Etapa {indice + 1} de {ETAPAS.length}
-          </span>
-        </header>
-        {conteudo}
-      </section>
-    );
-  }
-
   // T195 — o resumo da revisão: o que foi digitado, sem opcional em branco.
   const linhasBasicas = linhasPreenchidas([
     ["Nome completo", campos.nome],
@@ -2774,84 +2742,78 @@ export function NovaAdmissaoScreen({
   );
 
   return (
-    <div className="nova-admissao">
-      {/* T209 — cabeçalho do assistente: voltar (o mesmo caminho do
-          Cancelar, com a guarda), título, subtítulo e Salvar rascunho. A
-          trilha fica na barra superior do shell. */}
-      <header className="nova-admissao__cabecalho">
-        <IconButton
-          label="Voltar para Colaboradores"
-          icon={<IconeVoltar tamanho={18} />}
-          className="nova-admissao__voltar"
-          onClick={pedirCancelamento}
-        />
-        <PageHeader
-          headingLevel={1}
-          titleId={NOVA_ADMISSAO_TITULO_ID}
-          title="Novo colaborador"
-          description="Preencha os dados em 4 etapas. Você pode salvar e continuar depois."
-          actions={
-            admissao === null ? (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void salvarRascunho()}
-                disabled={salvando || salvandoRascunho || carregandoOpcoes}
-              >
-                {salvandoRascunho ? "Salvando rascunho…" : "Salvar rascunho"}
-              </Button>
-            ) : undefined
-          }
-        />
-      </header>
-
-      {rascunho || falhaDoRascunho ? (
-        <div className="nova-admissao__rascunho">
-          <p
-            className="nova-admissao__texto"
-            role={falhaDoRascunho ? "alert" : "status"}
-          >
-            {falhaDoRascunho ??
-              (rascunho?.estado === "recuperado"
-                ? `Rascunho de ${formatarInstante(rascunho.quando)} recuperado.`
-                : `Rascunho salvo em ${formatarInstante(rascunho?.quando)}.`)}
-          </p>
-          {rascunho?.estado === "recuperado" && admissao === null ? (
+    <>
+      {/* T209 — o padrão compartilhado de cadastro em etapas: cabeçalho com
+          voltar (o mesmo caminho do Cancelar, com a guarda), título e Salvar
+          rascunho; etapas à esquerda; os quatro painéis sempre montados (só
+          o atual visível, nada do que foi digitado sai do documento); rodapé
+          fixo com o progresso e as ações. Enter num campo faz o mesmo que
+          "Próxima etapa" (envio implícito); duplo clique não salta etapa. */}
+      <CadastroEmEtapas
+        className="nova-admissao"
+        tituloId={NOVA_ADMISSAO_TITULO_ID}
+        titulo="Novo colaborador"
+        descricao="Preencha os dados em 4 etapas. Você pode salvar e continuar depois."
+        rotuloVoltar="Voltar para Colaboradores"
+        onVoltarDaPagina={pedirCancelamento}
+        acaoDoCabecalho={
+          admissao === null ? (
             <Button
               type="button"
               variant="secondary"
-              onClick={() => void descartarRascunho()}
-              disabled={salvando || salvandoRascunho}
+              onClick={() => void salvarRascunho()}
+              disabled={salvando || salvandoRascunho || carregandoOpcoes}
             >
-              Descartar rascunho
+              {salvandoRascunho ? "Salvando rascunho…" : "Salvar rascunho"}
             </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <form
-        className="nova-admissao__form"
-        aria-label="Formulário de nova admissão"
-        noValidate
+          ) : undefined
+        }
+        aposCabecalho={
+          rascunho || falhaDoRascunho ? (
+            <div className="nova-admissao__rascunho">
+              <p
+                className="nova-admissao__texto"
+                role={falhaDoRascunho ? "alert" : "status"}
+              >
+                {falhaDoRascunho ??
+                  (rascunho?.estado === "recuperado"
+                    ? `Rascunho de ${formatarInstante(rascunho.quando)} recuperado.`
+                    : `Rascunho salvo em ${formatarInstante(rascunho?.quando)}.`)}
+              </p>
+              {rascunho?.estado === "recuperado" && admissao === null ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void descartarRascunho()}
+                  disabled={salvando || salvandoRascunho}
+                >
+                  Descartar rascunho
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
+        etapas={ETAPAS.map((titulo, i) => ({
+          titulo,
+          subtitulo: SUBTITULOS_DAS_ETAPAS[i]!,
+          descricao: DESCRICOES_DAS_ETAPAS[i]!,
+        }))}
+        atual={etapa}
+        alcancada={etapaAlcancada}
+        onIrParaEtapa={(alvo) => irParaEtapa(alvo as IndiceEtapa)}
+        idDoTituloDaEtapa={(i) => idDoTituloDaEtapa(i as IndiceEtapa)}
+        rotuloDoFormulario="Formulário de nova admissão"
         onSubmit={pedirConfirmacao}
-      >
-        {/* T209 — sem resumo no topo: cada campo recusado mostra a própria
-            mensagem logo abaixo dele, e o foco vai ao primeiro (na etapa
-            dele). */}
-        {/* T195 — o indicador das etapas e os quatro painéis; só o da etapa
-            atual aparece, e nenhum perde o que foi digitado. */}
-        {/* T209 — assistente: as etapas à esquerda (no desktop) e o
-            conteúdo da etapa atual em uma coluna, organizado por seções. */}
-        <div className="nova-admissao__corpo">
-          <IndicadorDeEtapas
-            atual={etapa}
-            alcancada={etapaAlcancada}
-            desabilitado={salvando}
-            onIr={(alvo) => irParaEtapa(alvo)}
-          />
-          <div className="nova-admissao__conteudo">
+        rotuloConcluir="Cadastrar colaborador"
+        idBotaoPrincipal={
+          etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR
+        }
+        principalDesabilitado={carregandoOpcoes && etapa > 0}
+        ocupado={salvando}
+        antesDoConteudo={
+          <>
             {/* T209 — só a empresa ativa, numa frase; sem empresa ativa, o
-                bloqueio de sempre (nenhuma empresa é escolhida em silêncio). */}
+              bloqueio de sempre (nenhuma empresa é escolhida em silêncio). */}
             {carregandoOpcoes ? (
               <p className="nova-admissao__texto" role="status">
                 Carregando a empresa ativa…
@@ -2863,8 +2825,8 @@ export function NovaAdmissaoScreen({
               </p>
             ) : null}
             {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
-                fica visível desde o carregamento e recebe o foco ao tentar
-                salvar. */}
+              fica visível desde o carregamento e recebe o foco ao tentar
+              salvar. */}
             {referenciasFaltando.length > 0 ? (
               <p
                 id={ID_DO_CAMPO.referencias}
@@ -2875,1032 +2837,944 @@ export function NovaAdmissaoScreen({
                 {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
               </p>
             ) : null}
-            {painelDaEtapa(
-              0,
-              <>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-identificacao"
-                  titulo="Identificação"
-                  descricao="Aparecem no perfil, nos documentos e no eSocial."
-                >
-                  <BlocoDaFoto
-                    foto={foto}
-                    recusa={recusaDaFoto}
-                    onEscolher={escolherFoto}
-                    onRemover={removerFoto}
-                  />
-                  <LinhaDoCadastro
-                    rotulo="Nome completo"
-                    ajuda="Como está nos documentos oficiais."
-                    paraId={ID_DO_CAMPO.nome}
-                  >
-                    <input
-                      type="text"
-                      maxLength={NOME_MAXIMO}
-                      autoComplete="off"
-                      placeholder="Nome completo"
-                      aria-required="true"
-                      value={campos.nome}
-                      onChange={(e) =>
-                        atualizar("nome", e.target.value, "nome")
-                      }
-                      {...propsDoCampo("nome")}
-                    />
-                    {erroDoCampo("nome")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="CPF e RG"
-                    ajuda="Usados na folha e no eSocial."
-                  >
-                    <div className="nova-admissao__linha-par">
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="off"
-                          maxLength={14}
-                          placeholder="000.000.000-00"
-                          aria-label="CPF"
-                          aria-required="true"
-                          value={identificacao.cpf}
-                          onChange={(e) =>
-                            atualizarIdentificacao(
-                              "cpf",
-                              mascararCpf(e.target.value),
-                            )
-                          }
-                          {...propsDoCampo("cpf")}
-                        />
-                        {erroDoCampo("cpf")}
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          autoComplete="off"
-                          maxLength={20}
-                          placeholder="00.000.000-0"
-                          aria-label="RG"
-                          value={identificacao.rg}
-                          onChange={(e) =>
-                            atualizarIdentificacao("rg", e.target.value)
-                          }
-                          {...propsDoCampo("rg")}
-                        />
-                        {erroDoCampo("rg")}
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo={ROTULO_DATA_NASCIMENTO}
-                    paraId={ID_DO_CAMPO.dataNascimento}
-                  >
-                    <input
-                      type="date"
-                      value={perfil.dataNascimento}
-                      onChange={(e) =>
-                        atualizarPerfil("dataNascimento", e.target.value)
-                      }
-                      {...propsDoCampo("dataNascimento")}
-                    />
-                    {erroDoCampo("dataNascimento")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Gênero e estado civil">
-                    <div className="nova-admissao__linha-par">
-                      <div className="nova-admissao__linha-celula">
-                        <select
-                          aria-label="Gênero"
-                          value={identificacao.genero}
-                          onChange={(e) =>
-                            atualizarIdentificacao("genero", e.target.value)
-                          }
-                          {...propsDoCampo("genero")}
-                        >
-                          <option value="">Selecione</option>
-                          {OPCOES_GENERO.map((o) => (
-                            <option key={o.codigo} value={o.codigo}>
-                              {o.rotulo}
-                            </option>
-                          ))}
-                        </select>
-                        {erroDoCampo("genero")}
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <select
-                          aria-label="Estado civil"
-                          value={perfil.estadoCivil}
-                          onChange={(e) =>
-                            atualizarPerfil("estadoCivil", e.target.value)
-                          }
-                          {...propsDoCampo("estadoCivil")}
-                        >
-                          <option value="">Selecione</option>
-                          {/* Valor gravado antes da lista (rascunho antigo):
-                              continua visível como opção. */}
-                          {perfil.estadoCivil !== "" &&
-                          !(OPCOES_ESTADO_CIVIL as readonly string[]).includes(
-                            perfil.estadoCivil,
-                          ) ? (
-                            <option value={perfil.estadoCivil}>
-                              {perfil.estadoCivil}
-                            </option>
-                          ) : null}
-                          {OPCOES_ESTADO_CIVIL.map((opcao) => (
-                            <option key={opcao} value={opcao}>
-                              {opcao}
-                            </option>
-                          ))}
-                        </select>
-                        {erroDoCampo("estadoCivil")}
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-contato"
-                  titulo="Contato"
-                  descricao="Canais pessoais para falar com o colaborador."
-                >
-                  <LinhaDoCadastro
-                    rotulo="E-mail pessoal"
-                    ajuda="Diferente do e-mail corporativo."
-                    paraId={ID_DO_CAMPO.emailPessoal}
-                  >
-                    <input
-                      type="email"
-                      maxLength={254}
-                      autoComplete="off"
-                      placeholder="email@exemplo.com"
-                      value={contatos.emailPessoal}
-                      onChange={(e) =>
-                        atualizarContato("emailPessoal", e.target.value)
-                      }
-                      {...propsDoCampo("emailPessoal")}
-                    />
-                    {erroDoCampo("emailPessoal")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Telefone pessoal"
-                    ajuda="Com DDD."
-                    paraId={ID_DO_CAMPO.celular}
-                  >
-                    <CampoMascarado
-                      mascara="telefone"
-                      placeholder="(00) 00000-0000"
-                      value={contatos.celular}
-                      onValorChange={(valor) =>
-                        atualizarContato("celular", valor)
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...propsDoCampo("celular")}
-                    />
-                    {erroDoCampo("celular")}
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-emergencia"
-                  titulo="Contato de emergência"
-                  descricao="Acionado apenas em situações de urgência."
-                >
-                  <LinhaDoCadastro
-                    rotulo="Nome do contato"
-                    paraId={ID_DO_CAMPO.contatoEmergenciaNome}
-                  >
-                    <input
-                      type="text"
-                      maxLength={150}
-                      autoComplete="off"
-                      placeholder="Nome do contato"
-                      value={identificacao.contatoEmergenciaNome}
-                      onChange={(e) =>
-                        atualizarIdentificacao(
-                          "contatoEmergenciaNome",
-                          e.target.value,
-                        )
-                      }
-                      {...propsDoCampo("contatoEmergenciaNome")}
-                    />
-                    {erroDoCampo("contatoEmergenciaNome")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Telefone do contato"
-                    paraId={ID_DO_CAMPO.contatoEmergenciaTelefone}
-                  >
-                    <CampoMascarado
-                      mascara="telefone"
-                      placeholder="(00) 00000-0000"
-                      value={identificacao.contatoEmergenciaTelefone}
-                      onValorChange={(valor) =>
-                        atualizarIdentificacao(
-                          "contatoEmergenciaTelefone",
-                          valor,
-                        )
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...propsDoCampo("contatoEmergenciaTelefone")}
-                    />
-                    {erroDoCampo("contatoEmergenciaTelefone")}
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-              </>,
-            )}
-
-            {painelDaEtapa(
-              1,
-              <>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-cargo"
-                  titulo="Cargo e estrutura"
-                  descricao="Onde o colaborador está na organização."
-                >
-                  <LinhaDoCadastro rotulo="Cargo e nível">
-                    <div className="nova-admissao__linha-par">
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          maxLength={120}
-                          autoComplete="off"
-                          placeholder="Ex.: Analista de RH"
-                          aria-label="Cargo"
-                          value={campos.cargoNome}
-                          onChange={(e) =>
-                            atualizar(
-                              "cargoNome",
-                              e.target.value,
-                              "cargo",
-                              "lotacao",
-                            )
-                          }
-                          {...propsDoCampo("cargo")}
-                        />
-                        {erroDoCampo("cargo")}
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <select
-                          aria-label="Nível"
-                          value={campos.nivel}
-                          onChange={(e) =>
-                            atualizar("nivel", e.target.value, "nivel")
-                          }
-                          {...propsDoCampo("nivel")}
-                        >
-                          <option value="">Nível</option>
-                          {OPCOES_NIVEL.map((o) => (
-                            <option key={o.codigo} value={o.codigo}>
-                              {o.rotulo}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Departamento e área">
-                    <div className="nova-admissao__linha-par nova-admissao__linha-par--seletores">
-                      <SeletorDeReferencia
-                        id={ID_DO_CAMPO.departamento}
-                        rotulo="Departamento"
-                        rotuloVisivel="Departamento"
-                        plural="departamentos"
-                        nenhum="Nenhum"
-                        ativo="ativo"
-                        obrigatorio={false}
-                        placeholder="Departamento"
-                        {...(erros.departamento
-                          ? { erro: erros.departamento }
-                          : {})}
-                        escolhida={referenciaPorId(
-                          opcoes.departamentos,
-                          campos.departamentoId,
-                        )}
-                        onEscolher={(r) => {
-                          if (r) conhecer("departamentos", r);
-                          void selecionarDepartamento(r?.id ?? "");
-                        }}
-                        listar={consultaDe(listarDepartamentos)}
-                        desabilitado={carregandoOpcoes}
-                        versao={versaoDaBusca.departamento}
-                        acao={botaoNovaReferencia("departamento")}
-                        criacao={criacaoDe("departamento")}
-                        aviso={avisoDaCriacao.departamento}
-                      />
-                      {seletorDeLotacao({
-                        campo: "area",
-                        rotulo: "Área",
-                        obrigatorio: false,
-                        valor: campos.areaId,
-                        lista: areas,
-                        aoMudar: (id) =>
-                          atualizar("areaId", id, "area", "lotacao"),
-                        vazio: campos.departamentoId
-                          ? carregandoAreas
-                            ? "Carregando áreas…"
-                            : "Área"
-                          : "Área",
-                        desabilitado: !campos.departamentoId || carregandoAreas,
-                      })}
-                    </div>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Centro de custo" grupo={false}>
-                    <SeletorDeReferencia
-                      id={ID_DO_CAMPO.centroCusto}
-                      rotulo="Centro de custo"
-                      rotuloVisivel="Centro de custo"
-                      plural="centros de custo"
-                      nenhum="Nenhum"
-                      ativo="ativo"
-                      obrigatorio={false}
-                      placeholder="Selecione"
-                      {...(erros.centroCusto
-                        ? { erro: erros.centroCusto }
-                        : {})}
-                      escolhida={referenciaPorId(
-                        opcoes.centrosCusto,
-                        campos.centroCustoId,
-                      )}
-                      onEscolher={(r) => {
-                        if (r) conhecer("centrosCusto", r);
-                        atualizar(
-                          "centroCustoId",
-                          r?.id ?? "",
-                          "centroCusto",
-                          "cargo",
-                          "lotacao",
-                        );
-                      }}
-                      listar={consultaDe(listarCentrosCusto)}
-                      desabilitado={carregandoOpcoes}
-                      versao={versaoDaBusca.centroCusto}
-                      criacao={criacaoDe("centroCusto")}
-                      aviso={avisoDaCriacao.centroCusto}
-                    />
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Unidade"
-                    ajuda="Filial, loja ou local de trabalho."
-                    grupo={false}
-                  >
-                    <SeletorDeReferencia
-                      id={ID_DO_CAMPO.unidade}
-                      rotulo="Unidade"
-                      rotuloVisivel="Unidade"
-                      plural="unidades"
-                      nenhum="Nenhuma"
-                      ativo="ativa"
-                      obrigatorio={false}
-                      placeholder="Selecione"
-                      {...(erros.unidade ? { erro: erros.unidade } : {})}
-                      escolhida={referenciaPorId(
-                        opcoes.unidades,
-                        campos.unidadeId,
-                      )}
-                      onEscolher={(r) => {
-                        if (r) conhecer("unidades", r);
-                        atualizar(
-                          "unidadeId",
-                          r?.id ?? "",
-                          "unidade",
-                          "cargo",
-                          "lotacao",
-                        );
-                      }}
-                      listar={consultaDe(listarUnidades)}
-                      desabilitado={carregandoOpcoes}
-                      versao={versaoDaBusca.unidade}
-                      acao={botaoNovaReferencia("unidade")}
-                      criacao={criacaoDe("unidade")}
-                      aviso={avisoDaCriacao.unidade}
-                    />
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Gestor direto"
-                    ajuda="Recebe as solicitações do colaborador."
-                    paraId={ID_DO_CAMPO.gestorDireto}
-                  >
-                    <select
-                      value={campos.gestorDiretoId}
-                      onChange={(e) =>
-                        atualizar(
-                          "gestorDiretoId",
-                          e.target.value,
-                          "gestorDireto",
-                        )
-                      }
-                      {...propsDoCampo("gestorDireto")}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="sem_gestor">Sem gestor</option>
-                      {gestores.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.cargo ? `${g.nome} — ${g.cargo}` : g.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {erroDoCampo("gestorDireto")}
-                  </LinhaDoCadastro>
-                  {erros.lotacao ? (
-                    <p
-                      className="nova-admissao__erro-geral"
-                      role="alert"
-                      id={ID_DO_CAMPO.lotacao}
-                      tabIndex={-1}
-                    >
-                      {erros.lotacao}
-                    </p>
-                  ) : null}
-                </SecaoDoCadastro>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-contrato"
-                  titulo="Contrato"
-                  descricao="Tipo de vínculo, admissão, jornada, escala e matrícula."
-                >
-                  <LinhaDoCadastro
-                    rotulo="Tipo de contratação"
-                    paraId={ID_DO_CAMPO.tipo}
-                  >
-                    <select
-                      aria-required="true"
-                      value={campos.tipo}
-                      onChange={(e) =>
-                        atualizar("tipo", e.target.value as TipoVinculo, "tipo")
-                      }
-                      {...propsDoCampo("tipo")}
-                    >
-                      <option value="">Selecione</option>
-                      {TIPOS_DE_CONTRATACAO.map((tipo) => (
-                        <option key={tipo} value={tipo}>
-                          {ROTULO_TIPO_VINCULO[tipo]}
-                        </option>
-                      ))}
-                    </select>
-                    {erroDoCampo("tipo")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Data de admissão"
-                    paraId={ID_DO_CAMPO.dataAdmissao}
-                  >
-                    <input
-                      type="date"
-                      aria-required="true"
-                      value={campos.dataAdmissao}
-                      onChange={(e) =>
-                        atualizar(
-                          "dataAdmissao",
-                          e.target.value,
-                          "dataAdmissao",
-                        )
-                      }
-                      {...propsDoCampo("dataAdmissao")}
-                    />
-                    {erroDoCampo("dataAdmissao")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Jornada de trabalho"
-                    paraId={ID_DO_CAMPO.jornadaSemanalHoras}
-                  >
-                    <div className="nova-admissao__com-sufixo">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={2}
-                        placeholder="44"
-                        value={campos.jornadaSemanalHoras}
-                        onChange={(e) =>
-                          atualizar(
-                            "jornadaSemanalHoras",
-                            e.target.value.replace(/\D/g, ""),
-                            "jornadaSemanalHoras",
-                          )
-                        }
-                        {...propsDoCampo("jornadaSemanalHoras")}
-                      />
-                      <span aria-hidden="true">horas por semana</span>
-                    </div>
-                    {erroDoCampo("jornadaSemanalHoras")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Escala de trabalho"
-                    ajuda="Sem escala, os benefícios usam os dias úteis do mês."
-                    paraId={ID_DO_CAMPO.escala}
-                  >
-                    <select
-                      value={campos.escala}
-                      onChange={(e) =>
-                        atualizar("escala", e.target.value, "escala")
-                      }
-                      {...propsDoCampo("escala")}
-                    >
-                      <option value="">Selecione a escala</option>
-                      {OPCOES_ESCALA.map((o) => (
-                        <option key={o.codigo} value={o.codigo}>
-                          {o.descricao ? `${o.nome} — ${o.descricao}` : o.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Matrícula"
-                    paraId={ID_DO_CAMPO.matricula}
-                    dica={
-                      <>
-                        <button
-                          type="button"
-                          className="nova-admissao__dica"
-                          aria-label="Sobre Matrícula"
-                          aria-expanded={dicaDaMatricula}
-                          aria-controls="nova-admissao-dica-matricula"
-                          onClick={() => setDicaDaMatricula((v) => !v)}
-                        >
-                          ?
-                        </button>
-                        {dicaDaMatricula ? (
-                          <span
-                            id="nova-admissao-dica-matricula"
-                            role="tooltip"
-                            className="nova-admissao__dica-texto"
-                          >
-                            {DICA_DA_MATRICULA}
-                          </span>
-                        ) : null}
-                      </>
-                    }
-                  >
-                    <input
-                      type="text"
-                      maxLength={30}
-                      autoComplete="off"
-                      placeholder="Ex.: 000123"
-                      value={campos.matricula}
-                      onChange={(e) =>
-                        atualizar(
-                          "matricula",
-                          e.target.value.toUpperCase(),
-                          "matricula",
-                        )
-                      }
-                      {...propsDoCampo("matricula")}
-                    />
-                    {erroDoCampo("matricula")}
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-remuneracao"
-                  titulo="Remuneração"
-                  descricao="Valores mensais usados na folha."
-                >
-                  <LinhaDoCadastro
-                    rotulo="Salário bruto"
-                    paraId={ID_DO_CAMPO.salarioBruto}
-                  >
-                    <div className="nova-admissao__com-prefixo">
-                      <span aria-hidden="true">R$</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0,00"
-                        aria-required="true"
-                        value={campos.salarioBruto}
-                        onChange={(e) =>
-                          atualizar(
-                            "salarioBruto",
-                            mascararReais(e.target.value),
-                            "salarioBruto",
-                          )
-                        }
-                        {...propsDoCampo("salarioBruto")}
-                      />
-                    </div>
-                    {erroDoCampo("salarioBruto")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Salário líquido"
-                    ajuda="Calculado a partir do bruto."
-                    paraId="nova-admissao-salario-liquido"
-                  >
-                    <div className="nova-admissao__com-prefixo">
-                      <span aria-hidden="true">R$</span>
-                      <input
-                        id="nova-admissao-salario-liquido"
-                        type="text"
-                        readOnly
-                        placeholder="—"
-                        value={salarioLiquidoExibido}
-                      />
-                    </div>
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-adicionais"
-                  titulo="Informações adicionais"
-                  descricao="Registro profissional e deduções."
-                >
-                  <LinhaDoCadastro
-                    rotulo="Conselho e registro"
-                    ajuda="Obrigatório para algumas profissões."
-                  >
-                    <div className="nova-admissao__linha-par">
-                      <div className="nova-admissao__linha-celula">
-                        <select
-                          aria-label="Conselho"
-                          value={campos.conselhoProfissional}
-                          onChange={(e) => {
-                            const valor = e.target.value;
-                            atualizar(
-                              "conselhoProfissional",
-                              valor,
-                              "conselhoProfissional",
-                              "registroProfissional",
-                            );
-                            if (!valor || valor === "nenhum") {
-                              atualizar("registroProfissional", "");
-                            }
-                          }}
-                          {...propsDoCampo("conselhoProfissional")}
-                        >
-                          <option value="">Selecione</option>
-                          {OPCOES_CONSELHO.map((o) => (
-                            <option key={o.codigo} value={o.codigo}>
-                              {o.rotulo}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          maxLength={40}
-                          autoComplete="off"
-                          placeholder="Ex.: 123456/SP"
-                          aria-label="Número do registro"
-                          disabled={
-                            !campos.conselhoProfissional ||
-                            campos.conselhoProfissional === "nenhum"
-                          }
-                          value={campos.registroProfissional}
-                          onChange={(e) =>
-                            atualizar(
-                              "registroProfissional",
-                              e.target.value,
-                              "registroProfissional",
-                            )
-                          }
-                          {...propsDoCampo("registroProfissional")}
-                        />
-                        {erroDoCampo("registroProfissional")}
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Dependentes (IRRF)"
-                    paraId={ID_DO_CAMPO.dependentesIrrf}
-                  >
+          </>
+        }
+        paineis={[
+          <>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-identificacao"
+              titulo="Identificação"
+              descricao="Aparecem no perfil, nos documentos e no eSocial."
+            >
+              <BlocoDaFoto
+                foto={foto}
+                recusa={recusaDaFoto}
+                onEscolher={escolherFoto}
+                onRemover={removerFoto}
+              />
+              <LinhaDoCadastro
+                rotulo="Nome completo"
+                ajuda="Como está nos documentos oficiais."
+                paraId={ID_DO_CAMPO.nome}
+              >
+                <input
+                  type="text"
+                  maxLength={NOME_MAXIMO}
+                  autoComplete="off"
+                  placeholder="Nome completo"
+                  aria-required="true"
+                  value={campos.nome}
+                  onChange={(e) => atualizar("nome", e.target.value, "nome")}
+                  {...propsDoCampo("nome")}
+                />
+                {erroDoCampo("nome")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="CPF e RG"
+                ajuda="Usados na folha e no eSocial."
+              >
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
                     <input
                       type="text"
                       inputMode="numeric"
-                      maxLength={2}
-                      value={campos.dependentesIrrf}
+                      autoComplete="off"
+                      maxLength={14}
+                      placeholder="000.000.000-00"
+                      aria-label="CPF"
+                      aria-required="true"
+                      value={identificacao.cpf}
                       onChange={(e) =>
-                        atualizar(
-                          "dependentesIrrf",
-                          e.target.value.replace(/\D/g, ""),
-                          "dependentesIrrf",
+                        atualizarIdentificacao(
+                          "cpf",
+                          mascararCpf(e.target.value),
                         )
                       }
-                      {...propsDoCampo("dependentesIrrf")}
+                      {...propsDoCampo("cpf")}
                     />
-                    {erroDoCampo("dependentesIrrf")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Pensão alimentícia"
-                    paraId={ID_DO_CAMPO.pensaoAlimenticiaPercentual}
-                  >
-                    <div className="nova-admissao__com-sufixo">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        maxLength={6}
-                        value={campos.pensaoAlimenticiaPercentual}
-                        onChange={(e) =>
-                          atualizar(
-                            "pensaoAlimenticiaPercentual",
-                            e.target.value.replace(/[^\d,.]/g, ""),
-                            "pensaoAlimenticiaPercentual",
-                          )
-                        }
-                        {...propsDoCampo("pensaoAlimenticiaPercentual")}
-                      />
-                      <span aria-hidden="true">%</span>
-                    </div>
-                    {erroDoCampo("pensaoAlimenticiaPercentual")}
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-              </>,
-            )}
-
-            {painelDaEtapa(
-              2,
-              <>
-                {/* T209 — etapa 3 do Novo colaborador: endereço residencial,
-                    tudo opcional; o CEP preenche o resto sozinho. */}
-                <SecaoDoCadastro
-                  id="nova-admissao-secao-endereco"
-                  titulo="Endereço residencial"
-                  descricao="Preenchemos o restante automaticamente a partir do CEP."
-                >
-                  <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
-                    <div className="nova-admissao__campo-cep">
-                      <CampoMascarado
-                        mascara="cep"
-                        placeholder="00000-000"
-                        value={endereco.cep}
-                        onValorChange={(valor) => {
-                          atualizarEndereco("cep", valor);
-                          if (/^\d{8}$/.test(valor.replace(/\D/g, ""))) {
-                            consultarCepAoCompletarRef.current = true;
-                          }
-                        }}
-                        limparAvisos={limpezaDosAvisos}
-                        onBlur={() => void buscarCep("saida")}
-                        {...propsDoCampo("cep")}
-                      />
-                    </div>
-                    {erroDoCampo("cep")}
-                    {/* A única região viva do bloco: anuncia o resultado sem
-                        mover o foco. Sempre montada, para que o anúncio saia. */}
-                    <p
-                      id="nova-admissao-cep-status"
-                      className={
-                        cep.tipo === "sugerido" && cep.encontrado
-                          ? "nova-admissao__cep-status nova-admissao__cep-status--encontrado"
-                          : "nova-admissao__cep-status"
+                    {erroDoCampo("cpf")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      maxLength={20}
+                      placeholder="00.000.000-0"
+                      aria-label="RG"
+                      value={identificacao.rg}
+                      onChange={(e) =>
+                        atualizarIdentificacao("rg", e.target.value)
                       }
-                      role="status"
+                      {...propsDoCampo("rg")}
+                    />
+                    {erroDoCampo("rg")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo={ROTULO_DATA_NASCIMENTO}
+                paraId={ID_DO_CAMPO.dataNascimento}
+              >
+                <input
+                  type="date"
+                  value={perfil.dataNascimento}
+                  onChange={(e) =>
+                    atualizarPerfil("dataNascimento", e.target.value)
+                  }
+                  {...propsDoCampo("dataNascimento")}
+                />
+                {erroDoCampo("dataNascimento")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Gênero e estado civil">
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Gênero"
+                      value={identificacao.genero}
+                      onChange={(e) =>
+                        atualizarIdentificacao("genero", e.target.value)
+                      }
+                      {...propsDoCampo("genero")}
                     >
-                      {cep.tipo === "buscando" ? (
-                        "Buscando endereço…"
-                      ) : cep.tipo === "sugerido" && cep.encontrado ? (
-                        <>
-                          <IconeSucesso tamanho={14} />
-                          Endereço encontrado
-                        </>
-                      ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
-                        cep.mensagem
-                      ) : (
-                        ""
-                      )}
-                    </p>
-                    {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
-                      <div className="nova-admissao__cep-acoes">
-                        <Button
-                          type="button"
-                          variant="subtle"
-                          onClick={usarEnderecoDoCep}
-                        >
-                          Usar endereço do CEP
-                        </Button>
-                      </div>
-                    ) : null}
-                    {cep.tipo === "aviso" && cep.repetivel ? (
-                      <div className="nova-admissao__cep-acoes">
-                        <Button
-                          type="button"
-                          variant="subtle"
-                          onClick={() => void buscarCep("botao")}
-                        >
-                          Consultar de novo
-                        </Button>
-                      </div>
-                    ) : null}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Logradouro e número">
-                    <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          maxLength={200}
-                          autoComplete="off"
-                          placeholder="Rua, avenida…"
-                          aria-label="Logradouro"
-                          value={endereco.logradouro}
-                          onChange={(e) =>
-                            atualizarEndereco("logradouro", e.target.value)
-                          }
-                          {...propsDoCampo("logradouro")}
-                        />
-                        {erroDoCampo("logradouro")}
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          maxLength={20}
-                          autoComplete="off"
-                          placeholder="Nº"
-                          aria-label="Número"
-                          value={endereco.numero}
-                          onChange={(e) =>
-                            atualizarEndereco("numero", e.target.value)
-                          }
-                          {...propsDoCampo("numero")}
-                        />
-                        {erroDoCampo("numero")}
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro
-                    rotulo="Complemento"
-                    paraId={ID_DO_CAMPO.complemento}
-                  >
-                    <input
-                      type="text"
-                      maxLength={120}
-                      autoComplete="off"
-                      placeholder="Apto, bloco, sala…"
-                      value={endereco.complemento}
+                      <option value="">Selecione</option>
+                      {OPCOES_GENERO.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("genero")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Estado civil"
+                      value={perfil.estadoCivil}
                       onChange={(e) =>
-                        atualizarEndereco("complemento", e.target.value)
+                        atualizarPerfil("estadoCivil", e.target.value)
                       }
-                      {...propsDoCampo("complemento")}
-                    />
-                    {erroDoCampo("complemento")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Bairro" paraId={ID_DO_CAMPO.bairro}>
-                    <input
-                      type="text"
-                      maxLength={120}
-                      autoComplete="off"
-                      value={endereco.bairro}
-                      onChange={(e) =>
-                        atualizarEndereco("bairro", e.target.value)
-                      }
-                      {...propsDoCampo("bairro")}
-                    />
-                    {erroDoCampo("bairro")}
-                  </LinhaDoCadastro>
-                  <LinhaDoCadastro rotulo="Cidade e estado">
-                    <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
-                      <div className="nova-admissao__linha-celula">
-                        <input
-                          type="text"
-                          maxLength={120}
-                          autoComplete="off"
-                          placeholder="Cidade"
-                          aria-label="Cidade"
-                          value={endereco.cidade}
-                          onChange={(e) =>
-                            atualizarEndereco("cidade", e.target.value)
-                          }
-                          {...propsDoCampo("cidade")}
-                        />
-                        {erroDoCampo("cidade")}
-                      </div>
-                      <div className="nova-admissao__linha-celula">
-                        <select
-                          aria-label="Estado"
-                          value={siglaDaUf(endereco.estado)}
-                          onChange={(e) =>
-                            atualizarEndereco("estado", e.target.value)
-                          }
-                          {...propsDoCampo("estado")}
-                        >
-                          <option value="">UF</option>
-                          {UFS.map((uf) => (
-                            <option key={uf.sigla} value={uf.sigla}>
-                              {uf.sigla}
-                            </option>
-                          ))}
-                        </select>
-                        {erroDoCampo("estado")}
-                      </div>
-                    </div>
-                  </LinhaDoCadastro>
-                </SecaoDoCadastro>
-              </>,
-            )}
-
-            {painelDaEtapa(
-              3,
-              <>
-                <p className="nova-admissao__texto">
-                  Confira os dados antes de concluir. Para corrigir algo, use
-                  Editar: o que você já digitou continua aqui.
-                </p>
-                <BlocoDaRevisao
-                  titulo={ETAPAS[0]}
-                  id="nova-admissao-revisao-basicos"
-                  linhas={linhasBasicas}
-                  onEditar={() => irParaEtapa(0)}
-                />
-                <BlocoDaRevisao
-                  titulo={ETAPAS[1]}
-                  id="nova-admissao-revisao-profissionais"
-                  linhas={linhasProfissionais}
-                  onEditar={() => irParaEtapa(1)}
-                />
-                <BlocoDaRevisao
-                  titulo={ETAPAS[2]}
-                  id="nova-admissao-revisao-endereco"
-                  linhas={linhasDoEndereco}
-                  onEditar={() => irParaEtapa(2)}
-                />
-                <p className="nova-admissao__texto nova-admissao__ajuda">
-                  Campos opcionais em branco não aparecem neste resumo.
-                </p>
-              </>,
-            )}
-          </div>
-        </div>
-
-        {erros.geral ? (
-          <p
-            className="nova-admissao__erro-geral"
-            role="alert"
-            id={ERRO_GERAL_ID}
-            tabIndex={-1}
-          >
-            {erros.geral}
-          </p>
-        ) : null}
-        {erros.geral && envioDivergente ? (
-          // T179 — saída clara do 422 divergente: recomeçar gera uma chave
-          // nova (o formulário volta vazio, porque a admissão anterior pode
-          // já existir), e conferir leva à listagem pelo caminho de sempre,
-          // com a confirmação de descarte se houver dados digitados.
-          <div className="nova-admissao__acoes-recusa">
-            <p className="nova-admissao__texto">
-              Recomeçar limpa o formulário e prepara um envio novo.
-            </p>
-            <FormActions>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={pedirCancelamento}
-              >
-                Conferir em Colaboradores
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={recomecarComNovaChave}
-              >
-                Recomeçar a admissão
-              </Button>
-            </FormActions>
-          </div>
-        ) : null}
-
-        {/* T209 — rodapé fixo do assistente: o progresso e as ações. */}
-        <div className="nova-admissao__rodape">
-          <ProgressoDaAdmissao atual={etapa} />
-          <div className="nova-admissao__rodape-acoes">
-            {/* T209 — "Cancelar" na primeira etapa; "Voltar" nas demais. */}
-            {etapa === 0 ? (
-              <Button
-                type="button"
-                variant="subtle"
-                onClick={pedirCancelamento}
-                disabled={salvando}
-              >
-                Cancelar
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="subtle"
-                onClick={() => irParaEtapa((etapa - 1) as IndiceEtapa)}
-                disabled={salvando}
-              >
-                Voltar
-              </Button>
-            )}
-            {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
-              botão (envio implícito do navegador). Num seletor, Enter é do
-              próprio seletor: avança-se com Tab até aqui e Enter.
-
-              Revisão final — o botão é o mesmo nas quatro etapas e fica no
-              mesmo lugar: o 2º clique de um duplo clique em "Próxima etapa" na
-              etapa 3 caía em "Concluir" e abria a confirmação sem a
-              revisão ter sido lida. Clique repetido (`detail` > 1, a contagem
-              do próprio navegador) é ignorado; teclado e envio implícito têm
-              `detail` 0 e seguem normais. */}
-            <Button
-              type="submit"
-              variant="primary"
-              id={etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR}
-              disabled={salvando || (carregandoOpcoes && etapa > 0)}
-              onClick={(evento) => {
-                if (evento.detail > 1) evento.preventDefault();
-              }}
+                      {...propsDoCampo("estadoCivil")}
+                    >
+                      <option value="">Selecione</option>
+                      {/* Valor gravado antes da lista (rascunho antigo):
+                          continua visível como opção. */}
+                      {perfil.estadoCivil !== "" &&
+                      !(OPCOES_ESTADO_CIVIL as readonly string[]).includes(
+                        perfil.estadoCivil,
+                      ) ? (
+                        <option value={perfil.estadoCivil}>
+                          {perfil.estadoCivil}
+                        </option>
+                      ) : null}
+                      {OPCOES_ESTADO_CIVIL.map((opcao) => (
+                        <option key={opcao} value={opcao}>
+                          {opcao}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("estadoCivil")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-contato"
+              titulo="Contato"
+              descricao="Canais pessoais para falar com o colaborador."
             >
-              {etapa === ULTIMA_ETAPA ? (
-                "Cadastrar colaborador"
-              ) : (
-                <>
-                  Próxima etapa
-                  <IconeAvancar className="nova-admissao__seta" tamanho={16} />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </form>
+              <LinhaDoCadastro
+                rotulo="E-mail pessoal"
+                ajuda="Diferente do e-mail corporativo."
+                paraId={ID_DO_CAMPO.emailPessoal}
+              >
+                <input
+                  type="email"
+                  maxLength={254}
+                  autoComplete="off"
+                  placeholder="email@exemplo.com"
+                  value={contatos.emailPessoal}
+                  onChange={(e) =>
+                    atualizarContato("emailPessoal", e.target.value)
+                  }
+                  {...propsDoCampo("emailPessoal")}
+                />
+                {erroDoCampo("emailPessoal")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Telefone pessoal"
+                ajuda="Com DDD."
+                paraId={ID_DO_CAMPO.celular}
+              >
+                <CampoMascarado
+                  mascara="telefone"
+                  placeholder="(00) 00000-0000"
+                  value={contatos.celular}
+                  onValorChange={(valor) => atualizarContato("celular", valor)}
+                  limparAvisos={limpezaDosAvisos}
+                  {...propsDoCampo("celular")}
+                />
+                {erroDoCampo("celular")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-emergencia"
+              titulo="Contato de emergência"
+              descricao="Acionado apenas em situações de urgência."
+            >
+              <LinhaDoCadastro
+                rotulo="Nome do contato"
+                paraId={ID_DO_CAMPO.contatoEmergenciaNome}
+              >
+                <input
+                  type="text"
+                  maxLength={150}
+                  autoComplete="off"
+                  placeholder="Nome do contato"
+                  value={identificacao.contatoEmergenciaNome}
+                  onChange={(e) =>
+                    atualizarIdentificacao(
+                      "contatoEmergenciaNome",
+                      e.target.value,
+                    )
+                  }
+                  {...propsDoCampo("contatoEmergenciaNome")}
+                />
+                {erroDoCampo("contatoEmergenciaNome")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Telefone do contato"
+                paraId={ID_DO_CAMPO.contatoEmergenciaTelefone}
+              >
+                <CampoMascarado
+                  mascara="telefone"
+                  placeholder="(00) 00000-0000"
+                  value={identificacao.contatoEmergenciaTelefone}
+                  onValorChange={(valor) =>
+                    atualizarIdentificacao("contatoEmergenciaTelefone", valor)
+                  }
+                  limparAvisos={limpezaDosAvisos}
+                  {...propsDoCampo("contatoEmergenciaTelefone")}
+                />
+                {erroDoCampo("contatoEmergenciaTelefone")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+          </>,
+          <>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-cargo"
+              titulo="Cargo e estrutura"
+              descricao="Onde o colaborador está na organização."
+            >
+              <LinhaDoCadastro rotulo="Cargo e nível">
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      placeholder="Ex.: Analista de RH"
+                      aria-label="Cargo"
+                      value={campos.cargoNome}
+                      onChange={(e) =>
+                        atualizar(
+                          "cargoNome",
+                          e.target.value,
+                          "cargo",
+                          "lotacao",
+                        )
+                      }
+                      {...propsDoCampo("cargo")}
+                    />
+                    {erroDoCampo("cargo")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Nível"
+                      value={campos.nivel}
+                      onChange={(e) =>
+                        atualizar("nivel", e.target.value, "nivel")
+                      }
+                      {...propsDoCampo("nivel")}
+                    >
+                      <option value="">Nível</option>
+                      {OPCOES_NIVEL.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Departamento e área">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--seletores">
+                  <SeletorDeReferencia
+                    id={ID_DO_CAMPO.departamento}
+                    rotulo="Departamento"
+                    rotuloVisivel="Departamento"
+                    plural="departamentos"
+                    nenhum="Nenhum"
+                    ativo="ativo"
+                    obrigatorio={false}
+                    placeholder="Departamento"
+                    {...(erros.departamento
+                      ? { erro: erros.departamento }
+                      : {})}
+                    escolhida={referenciaPorId(
+                      opcoes.departamentos,
+                      campos.departamentoId,
+                    )}
+                    onEscolher={(r) => {
+                      if (r) conhecer("departamentos", r);
+                      void selecionarDepartamento(r?.id ?? "");
+                    }}
+                    listar={consultaDe(listarDepartamentos)}
+                    desabilitado={carregandoOpcoes}
+                    versao={versaoDaBusca.departamento}
+                    acao={botaoNovaReferencia("departamento")}
+                    criacao={criacaoDe("departamento")}
+                    aviso={avisoDaCriacao.departamento}
+                  />
+                  {seletorDeLotacao({
+                    campo: "area",
+                    rotulo: "Área",
+                    obrigatorio: false,
+                    valor: campos.areaId,
+                    lista: areas,
+                    aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
+                    vazio: campos.departamentoId
+                      ? carregandoAreas
+                        ? "Carregando áreas…"
+                        : "Área"
+                      : "Área",
+                    desabilitado: !campos.departamentoId || carregandoAreas,
+                  })}
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Centro de custo" grupo={false}>
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.centroCusto}
+                  rotulo="Centro de custo"
+                  rotuloVisivel="Centro de custo"
+                  plural="centros de custo"
+                  nenhum="Nenhum"
+                  ativo="ativo"
+                  obrigatorio={false}
+                  placeholder="Selecione"
+                  {...(erros.centroCusto ? { erro: erros.centroCusto } : {})}
+                  escolhida={referenciaPorId(
+                    opcoes.centrosCusto,
+                    campos.centroCustoId,
+                  )}
+                  onEscolher={(r) => {
+                    if (r) conhecer("centrosCusto", r);
+                    atualizar(
+                      "centroCustoId",
+                      r?.id ?? "",
+                      "centroCusto",
+                      "cargo",
+                      "lotacao",
+                    );
+                  }}
+                  listar={consultaDe(listarCentrosCusto)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.centroCusto}
+                  criacao={criacaoDe("centroCusto")}
+                  aviso={avisoDaCriacao.centroCusto}
+                />
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Unidade"
+                ajuda="Filial, loja ou local de trabalho."
+                grupo={false}
+              >
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.unidade}
+                  rotulo="Unidade"
+                  rotuloVisivel="Unidade"
+                  plural="unidades"
+                  nenhum="Nenhuma"
+                  ativo="ativa"
+                  obrigatorio={false}
+                  placeholder="Selecione"
+                  {...(erros.unidade ? { erro: erros.unidade } : {})}
+                  escolhida={referenciaPorId(opcoes.unidades, campos.unidadeId)}
+                  onEscolher={(r) => {
+                    if (r) conhecer("unidades", r);
+                    atualizar(
+                      "unidadeId",
+                      r?.id ?? "",
+                      "unidade",
+                      "cargo",
+                      "lotacao",
+                    );
+                  }}
+                  listar={consultaDe(listarUnidades)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.unidade}
+                  acao={botaoNovaReferencia("unidade")}
+                  criacao={criacaoDe("unidade")}
+                  aviso={avisoDaCriacao.unidade}
+                />
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Gestor direto"
+                ajuda="Recebe as solicitações do colaborador."
+                paraId={ID_DO_CAMPO.gestorDireto}
+              >
+                <select
+                  value={campos.gestorDiretoId}
+                  onChange={(e) =>
+                    atualizar("gestorDiretoId", e.target.value, "gestorDireto")
+                  }
+                  {...propsDoCampo("gestorDireto")}
+                >
+                  <option value="">Selecione</option>
+                  <option value="sem_gestor">Sem gestor</option>
+                  {gestores.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.cargo ? `${g.nome} — ${g.cargo}` : g.nome}
+                    </option>
+                  ))}
+                </select>
+                {erroDoCampo("gestorDireto")}
+              </LinhaDoCadastro>
+              {erros.lotacao ? (
+                <p
+                  className="nova-admissao__erro-geral"
+                  role="alert"
+                  id={ID_DO_CAMPO.lotacao}
+                  tabIndex={-1}
+                >
+                  {erros.lotacao}
+                </p>
+              ) : null}
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-contrato"
+              titulo="Contrato"
+              descricao="Tipo de vínculo, admissão, jornada, escala e matrícula."
+            >
+              <LinhaDoCadastro
+                rotulo="Tipo de contratação"
+                paraId={ID_DO_CAMPO.tipo}
+              >
+                <select
+                  aria-required="true"
+                  value={campos.tipo}
+                  onChange={(e) =>
+                    atualizar("tipo", e.target.value as TipoVinculo, "tipo")
+                  }
+                  {...propsDoCampo("tipo")}
+                >
+                  <option value="">Selecione</option>
+                  {TIPOS_DE_CONTRATACAO.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {ROTULO_TIPO_VINCULO[tipo]}
+                    </option>
+                  ))}
+                </select>
+                {erroDoCampo("tipo")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Data de admissão"
+                paraId={ID_DO_CAMPO.dataAdmissao}
+              >
+                <input
+                  type="date"
+                  aria-required="true"
+                  value={campos.dataAdmissao}
+                  onChange={(e) =>
+                    atualizar("dataAdmissao", e.target.value, "dataAdmissao")
+                  }
+                  {...propsDoCampo("dataAdmissao")}
+                />
+                {erroDoCampo("dataAdmissao")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Jornada de trabalho"
+                paraId={ID_DO_CAMPO.jornadaSemanalHoras}
+              >
+                <div className="nova-admissao__com-sufixo">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    placeholder="44"
+                    value={campos.jornadaSemanalHoras}
+                    onChange={(e) =>
+                      atualizar(
+                        "jornadaSemanalHoras",
+                        e.target.value.replace(/\D/g, ""),
+                        "jornadaSemanalHoras",
+                      )
+                    }
+                    {...propsDoCampo("jornadaSemanalHoras")}
+                  />
+                  <span aria-hidden="true">horas por semana</span>
+                </div>
+                {erroDoCampo("jornadaSemanalHoras")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Escala de trabalho"
+                ajuda="Sem escala, os benefícios usam os dias úteis do mês."
+                paraId={ID_DO_CAMPO.escala}
+              >
+                <select
+                  value={campos.escala}
+                  onChange={(e) =>
+                    atualizar("escala", e.target.value, "escala")
+                  }
+                  {...propsDoCampo("escala")}
+                >
+                  <option value="">Selecione a escala</option>
+                  {OPCOES_ESCALA.map((o) => (
+                    <option key={o.codigo} value={o.codigo}>
+                      {o.descricao ? `${o.nome} — ${o.descricao}` : o.nome}
+                    </option>
+                  ))}
+                </select>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Matrícula"
+                paraId={ID_DO_CAMPO.matricula}
+                dica={
+                  <>
+                    <button
+                      type="button"
+                      className="nova-admissao__dica"
+                      aria-label="Sobre Matrícula"
+                      aria-expanded={dicaDaMatricula}
+                      aria-controls="nova-admissao-dica-matricula"
+                      onClick={() => setDicaDaMatricula((v) => !v)}
+                    >
+                      ?
+                    </button>
+                    {dicaDaMatricula ? (
+                      <span
+                        id="nova-admissao-dica-matricula"
+                        role="tooltip"
+                        className="nova-admissao__dica-texto"
+                      >
+                        {DICA_DA_MATRICULA}
+                      </span>
+                    ) : null}
+                  </>
+                }
+              >
+                <input
+                  type="text"
+                  maxLength={30}
+                  autoComplete="off"
+                  placeholder="Ex.: 000123"
+                  value={campos.matricula}
+                  onChange={(e) =>
+                    atualizar(
+                      "matricula",
+                      e.target.value.toUpperCase(),
+                      "matricula",
+                    )
+                  }
+                  {...propsDoCampo("matricula")}
+                />
+                {erroDoCampo("matricula")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-remuneracao"
+              titulo="Remuneração"
+              descricao="Valores mensais usados na folha."
+            >
+              <LinhaDoCadastro
+                rotulo="Salário bruto"
+                paraId={ID_DO_CAMPO.salarioBruto}
+              >
+                <div className="nova-admissao__com-prefixo">
+                  <span aria-hidden="true">R$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    aria-required="true"
+                    value={campos.salarioBruto}
+                    onChange={(e) =>
+                      atualizar(
+                        "salarioBruto",
+                        mascararReais(e.target.value),
+                        "salarioBruto",
+                      )
+                    }
+                    {...propsDoCampo("salarioBruto")}
+                  />
+                </div>
+                {erroDoCampo("salarioBruto")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Salário líquido"
+                ajuda="Calculado a partir do bruto."
+                paraId="nova-admissao-salario-liquido"
+              >
+                <div className="nova-admissao__com-prefixo">
+                  <span aria-hidden="true">R$</span>
+                  <input
+                    id="nova-admissao-salario-liquido"
+                    type="text"
+                    readOnly
+                    placeholder="—"
+                    value={salarioLiquidoExibido}
+                  />
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-adicionais"
+              titulo="Informações adicionais"
+              descricao="Registro profissional e deduções."
+            >
+              <LinhaDoCadastro
+                rotulo="Conselho e registro"
+                ajuda="Obrigatório para algumas profissões."
+              >
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Conselho"
+                      value={campos.conselhoProfissional}
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        atualizar(
+                          "conselhoProfissional",
+                          valor,
+                          "conselhoProfissional",
+                          "registroProfissional",
+                        );
+                        if (!valor || valor === "nenhum") {
+                          atualizar("registroProfissional", "");
+                        }
+                      }}
+                      {...propsDoCampo("conselhoProfissional")}
+                    >
+                      <option value="">Selecione</option>
+                      {OPCOES_CONSELHO.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={40}
+                      autoComplete="off"
+                      placeholder="Ex.: 123456/SP"
+                      aria-label="Número do registro"
+                      disabled={
+                        !campos.conselhoProfissional ||
+                        campos.conselhoProfissional === "nenhum"
+                      }
+                      value={campos.registroProfissional}
+                      onChange={(e) =>
+                        atualizar(
+                          "registroProfissional",
+                          e.target.value,
+                          "registroProfissional",
+                        )
+                      }
+                      {...propsDoCampo("registroProfissional")}
+                    />
+                    {erroDoCampo("registroProfissional")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Dependentes (IRRF)"
+                paraId={ID_DO_CAMPO.dependentesIrrf}
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={campos.dependentesIrrf}
+                  onChange={(e) =>
+                    atualizar(
+                      "dependentesIrrf",
+                      e.target.value.replace(/\D/g, ""),
+                      "dependentesIrrf",
+                    )
+                  }
+                  {...propsDoCampo("dependentesIrrf")}
+                />
+                {erroDoCampo("dependentesIrrf")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Pensão alimentícia"
+                paraId={ID_DO_CAMPO.pensaoAlimenticiaPercentual}
+              >
+                <div className="nova-admissao__com-sufixo">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    maxLength={6}
+                    value={campos.pensaoAlimenticiaPercentual}
+                    onChange={(e) =>
+                      atualizar(
+                        "pensaoAlimenticiaPercentual",
+                        e.target.value.replace(/[^\d,.]/g, ""),
+                        "pensaoAlimenticiaPercentual",
+                      )
+                    }
+                    {...propsDoCampo("pensaoAlimenticiaPercentual")}
+                  />
+                  <span aria-hidden="true">%</span>
+                </div>
+                {erroDoCampo("pensaoAlimenticiaPercentual")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+          </>,
+          <>
+            {/* T209 — etapa 3 do Novo colaborador: endereço residencial,
+                tudo opcional; o CEP preenche o resto sozinho. */}
+            <SecaoDoCadastro
+              id="nova-admissao-secao-endereco"
+              titulo="Endereço residencial"
+              descricao="Preenchemos o restante automaticamente a partir do CEP."
+            >
+              <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
+                <div className="nova-admissao__campo-cep">
+                  <CampoMascarado
+                    mascara="cep"
+                    placeholder="00000-000"
+                    value={endereco.cep}
+                    onValorChange={(valor) => {
+                      atualizarEndereco("cep", valor);
+                      if (/^\d{8}$/.test(valor.replace(/\D/g, ""))) {
+                        consultarCepAoCompletarRef.current = true;
+                      }
+                    }}
+                    limparAvisos={limpezaDosAvisos}
+                    onBlur={() => void buscarCep("saida")}
+                    {...propsDoCampo("cep")}
+                  />
+                </div>
+                {erroDoCampo("cep")}
+                {/* A única região viva do bloco: anuncia o resultado sem
+                    mover o foco. Sempre montada, para que o anúncio saia. */}
+                <p
+                  id="nova-admissao-cep-status"
+                  className={
+                    cep.tipo === "sugerido" && cep.encontrado
+                      ? "nova-admissao__cep-status nova-admissao__cep-status--encontrado"
+                      : "nova-admissao__cep-status"
+                  }
+                  role="status"
+                >
+                  {cep.tipo === "buscando" ? (
+                    "Buscando endereço…"
+                  ) : cep.tipo === "sugerido" && cep.encontrado ? (
+                    <>
+                      <IconeSucesso tamanho={14} />
+                      Endereço encontrado
+                    </>
+                  ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
+                    cep.mensagem
+                  ) : (
+                    ""
+                  )}
+                </p>
+                {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
+                  <div className="nova-admissao__cep-acoes">
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      onClick={usarEnderecoDoCep}
+                    >
+                      Usar endereço do CEP
+                    </Button>
+                  </div>
+                ) : null}
+                {cep.tipo === "aviso" && cep.repetivel ? (
+                  <div className="nova-admissao__cep-acoes">
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      onClick={() => void buscarCep("botao")}
+                    >
+                      Consultar de novo
+                    </Button>
+                  </div>
+                ) : null}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Logradouro e número">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={200}
+                      autoComplete="off"
+                      placeholder="Rua, avenida…"
+                      aria-label="Logradouro"
+                      value={endereco.logradouro}
+                      onChange={(e) =>
+                        atualizarEndereco("logradouro", e.target.value)
+                      }
+                      {...propsDoCampo("logradouro")}
+                    />
+                    {erroDoCampo("logradouro")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={20}
+                      autoComplete="off"
+                      placeholder="Nº"
+                      aria-label="Número"
+                      value={endereco.numero}
+                      onChange={(e) =>
+                        atualizarEndereco("numero", e.target.value)
+                      }
+                      {...propsDoCampo("numero")}
+                    />
+                    {erroDoCampo("numero")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Complemento"
+                paraId={ID_DO_CAMPO.complemento}
+              >
+                <input
+                  type="text"
+                  maxLength={120}
+                  autoComplete="off"
+                  placeholder="Apto, bloco, sala…"
+                  value={endereco.complemento}
+                  onChange={(e) =>
+                    atualizarEndereco("complemento", e.target.value)
+                  }
+                  {...propsDoCampo("complemento")}
+                />
+                {erroDoCampo("complemento")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Bairro" paraId={ID_DO_CAMPO.bairro}>
+                <input
+                  type="text"
+                  maxLength={120}
+                  autoComplete="off"
+                  value={endereco.bairro}
+                  onChange={(e) => atualizarEndereco("bairro", e.target.value)}
+                  {...propsDoCampo("bairro")}
+                />
+                {erroDoCampo("bairro")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Cidade e estado">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      placeholder="Cidade"
+                      aria-label="Cidade"
+                      value={endereco.cidade}
+                      onChange={(e) =>
+                        atualizarEndereco("cidade", e.target.value)
+                      }
+                      {...propsDoCampo("cidade")}
+                    />
+                    {erroDoCampo("cidade")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Estado"
+                      value={siglaDaUf(endereco.estado)}
+                      onChange={(e) =>
+                        atualizarEndereco("estado", e.target.value)
+                      }
+                      {...propsDoCampo("estado")}
+                    >
+                      <option value="">UF</option>
+                      {UFS.map((uf) => (
+                        <option key={uf.sigla} value={uf.sigla}>
+                          {uf.sigla}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("estado")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+          </>,
+          <>
+            <p className="nova-admissao__texto">
+              Confira os dados antes de concluir. Para corrigir algo, use
+              Editar: o que você já digitou continua aqui.
+            </p>
+            <BlocoDaRevisao
+              titulo={ETAPAS[0]}
+              id="nova-admissao-revisao-basicos"
+              linhas={linhasBasicas}
+              onEditar={() => irParaEtapa(0)}
+            />
+            <BlocoDaRevisao
+              titulo={ETAPAS[1]}
+              id="nova-admissao-revisao-profissionais"
+              linhas={linhasProfissionais}
+              onEditar={() => irParaEtapa(1)}
+            />
+            <BlocoDaRevisao
+              titulo={ETAPAS[2]}
+              id="nova-admissao-revisao-endereco"
+              linhas={linhasDoEndereco}
+              onEditar={() => irParaEtapa(2)}
+            />
+            <p className="nova-admissao__texto nova-admissao__ajuda">
+              Campos opcionais em branco não aparecem neste resumo.
+            </p>
+          </>,
+        ]}
+        mensagem={
+          <>
+            {erros.geral ? (
+              <p
+                className="nova-admissao__erro-geral"
+                role="alert"
+                id={ERRO_GERAL_ID}
+                tabIndex={-1}
+              >
+                {erros.geral}
+              </p>
+            ) : null}
+            {erros.geral && envioDivergente ? (
+              // T179 — saída clara do 422 divergente: recomeçar gera uma chave
+              // nova (o formulário volta vazio, porque a admissão anterior pode
+              // já existir), e conferir leva à listagem pelo caminho de sempre,
+              // com a confirmação de descarte se houver dados digitados.
+              <div className="nova-admissao__acoes-recusa">
+                <p className="nova-admissao__texto">
+                  Recomeçar limpa o formulário e prepara um envio novo.
+                </p>
+                <FormActions>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={pedirCancelamento}
+                  >
+                    Conferir em Colaboradores
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={recomecarComNovaChave}
+                  >
+                    Recomeçar a admissão
+                  </Button>
+                </FormActions>
+              </div>
+            ) : null}
+          </>
+        }
+      />
 
       {/* T179 — confirmação antes de gravar: confirmação curta, o uso de
           modal que a decisão do `DP-FLX-21` mantém. O resumo traz só o que
@@ -4035,7 +3909,7 @@ export function NovaAdmissaoScreen({
           }
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -4052,146 +3926,6 @@ function linhasPreenchidas(
     valor !== null && valor.trim() !== ""
       ? [[rotulo, valor.trim()] as const]
       : [],
-  );
-}
-
-type EstadoDaEtapa = "atual" | "concluida" | "visitada" | "pendente";
-
-const ROTULO_DO_ESTADO: Record<EstadoDaEtapa, string> = {
-  atual: "etapa atual",
-  concluida: "concluída",
-  visitada: "visitada",
-  pendente: "não iniciada",
-};
-
-/**
- * T195 — o indicador das etapas: progresso de 25% a 100% e a lista das quatro,
- * cada uma com o estado dito em texto (para quem vê, também pela forma do
- * marcador — nunca só pela cor). Só as etapas já alcançadas, fora a atual,
- * são botões; ir adiante passa pela validação de quem chama.
- */
-function IndicadorDeEtapas({
-  atual,
-  alcancada,
-  desabilitado,
-  onIr,
-}: {
-  readonly atual: IndiceEtapa;
-  readonly alcancada: IndiceEtapa;
-  readonly desabilitado: boolean;
-  readonly onIr: (alvo: IndiceEtapa) => void;
-}) {
-  return (
-    <nav className="nova-admissao__etapas" aria-label="Etapas do cadastro">
-      <p className="nova-admissao__etapas-rotulo" aria-hidden="true">
-        Etapas
-      </p>
-      <ol className="nova-admissao__etapas-lista">
-        {ETAPAS.map((titulo, i) => {
-          const indice = i as IndiceEtapa;
-          const estado: EstadoDaEtapa =
-            indice === atual
-              ? "atual"
-              : indice < alcancada
-                ? "concluida"
-                : indice === alcancada
-                  ? "visitada"
-                  : "pendente";
-          const conteudo = (
-            <>
-              <span
-                className="nova-admissao__etapa-marcador"
-                aria-hidden="true"
-              >
-                {estado === "concluida" ? <IconeEtapaConcluida /> : indice + 1}
-              </span>
-              {/* O nome visível e o lido são o mesmo título; o lido diz
-                  também o número e o estado, num texto só. */}
-              <span className="nova-admissao__etapa-nome" aria-hidden="true">
-                {titulo}
-                <span className="nova-admissao__etapa-sub">
-                  {SUBTITULOS_DAS_ETAPAS[indice]}
-                </span>
-              </span>
-              <span className="nova-admissao__so-leitor">
-                {`Etapa ${indice + 1}: ${titulo}, ${ROTULO_DO_ESTADO[estado]}`}
-              </span>
-            </>
-          );
-          return (
-            <li
-              key={titulo}
-              className={`nova-admissao__etapa-item nova-admissao__etapa-item--${estado}`}
-            >
-              {estado === "concluida" || estado === "visitada" ? (
-                <button
-                  type="button"
-                  className="nova-admissao__etapa-passo"
-                  disabled={desabilitado}
-                  onClick={() => onIr(indice)}
-                >
-                  {conteudo}
-                </button>
-              ) : (
-                <span
-                  className="nova-admissao__etapa-passo"
-                  {...(estado === "atual"
-                    ? { "aria-current": "step" as const }
-                    : {})}
-                >
-                  {conteudo}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-/**
- * T209 — o progresso do assistente, no rodapé fixo: texto e barra com os
- * mesmos números (a barra é nomeada pelo texto).
- */
-function ProgressoDaAdmissao({ atual }: { readonly atual: IndiceEtapa }) {
-  const progresso = ((atual + 1) / ETAPAS.length) * 100;
-  return (
-    // T209 — a barra (trilho e preenchimento) e, à direita, "% concluído".
-    <div className="nova-admissao__progresso">
-      <progress
-        className="nova-admissao__progresso-barra"
-        max={100}
-        value={progresso}
-        aria-labelledby="nova-admissao-progresso"
-      />
-      <p
-        id="nova-admissao-progresso"
-        className="nova-admissao__progresso-texto"
-      >
-        {progresso}% concluído
-      </p>
-    </div>
-  );
-}
-
-/** T195 — marca de etapa concluída, desenhada aqui (sem biblioteca, T159). */
-function IconeEtapaConcluida() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M3.5 8.5l3 3 6-7" />
-    </svg>
   );
 }
 
@@ -4335,10 +4069,10 @@ function ConfirmacaoDaAdmissao({
   const contatosGravados = admissao.contatos;
   const cepBrasileiro = ehPaisBrasil(enderecoGravado?.pais);
   return (
-    <div className="nova-admissao">
+    <div className="cadastro-etapas nova-admissao">
       {/* Depois da admissão a trilha da barra superior e "Voltar para
           Colaboradores", abaixo, saem direto (não há o que descartar). */}
-      <header className="nova-admissao__cabecalho">
+      <header className="cadastro-etapas__cabecalho">
         <PageHeader
           headingLevel={1}
           titleId={NOVA_ADMISSAO_TITULO_ID}
@@ -4707,93 +4441,6 @@ function BlocoDaFoto({
         />
       </div>
     </LinhaDoCadastro>
-  );
-}
-
-/**
- * T209 — uma seção da etapa: título e descrição, e as linhas dela.
- */
-function SecaoDoCadastro({
-  id,
-  titulo,
-  descricao,
-  children,
-}: {
-  readonly id: string;
-  readonly titulo: string;
-  readonly descricao: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <section className="nova-admissao__secao" aria-labelledby={id}>
-      <header className="nova-admissao__secao-cabecalho">
-        <h3 id={id} className="nova-admissao__secao-titulo">
-          {titulo}
-        </h3>
-        <p className="nova-admissao__secao-descricao">{descricao}</p>
-      </header>
-      {children}
-    </section>
-  );
-}
-
-/**
- * T209 — uma linha do cadastro: rótulo e ajuda à esquerda, campos à direita
- * (em tela estreita, um embaixo do outro). Com `paraId`, o rótulo é o
- * `<label>` do campo; sem ele (dois campos lado a lado), a linha é um grupo
- * nomeado pelo rótulo, e cada campo tem o próprio nome.
- */
-function LinhaDoCadastro({
-  rotulo,
-  ajuda,
-  paraId,
-  dica,
-  grupo = true,
-  children,
-}: {
-  readonly rotulo: string;
-  readonly ajuda?: string;
-  readonly paraId?: string;
-  /**
-   * Sem `paraId`, a linha é um grupo nomeado pelo rótulo. `false` quando o
-   * único campo dela já tem nome próprio (um seletor com rótulo): o rótulo
-   * fica só visual, sem nomear duas vezes.
-   */
-  readonly grupo?: boolean;
-  /** T209 — ajuda extra ao lado do rótulo (o "?" da matrícula). */
-  readonly dica?: ReactNode;
-  readonly children: ReactNode;
-}) {
-  const base = useId();
-  const idRotulo = `${base}-rotulo`;
-  return (
-    <div
-      className="nova-admissao__linha-cadastro"
-      {...(paraId || !grupo
-        ? {}
-        : { role: "group", "aria-labelledby": idRotulo })}
-    >
-      <div className="nova-admissao__linha-rotulo">
-        <div className="nova-admissao__linha-cabeca">
-          {paraId ? (
-            <label
-              id={idRotulo}
-              htmlFor={paraId}
-              className="nova-admissao__linha-titulo"
-            >
-              {rotulo}
-            </label>
-          ) : (
-            <p id={idRotulo} className="nova-admissao__linha-titulo">
-              {rotulo}
-            </p>
-          )}
-          {dica}
-        </div>
-        {ajuda ? <p className="nova-admissao__linha-ajuda">{ajuda}</p> : null}
-      </div>
-      <div className="nova-admissao__linha-campos">{children}</div>
-    </div>
   );
 }
 

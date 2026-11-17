@@ -33,7 +33,7 @@ const ROTULO_DO_ESTADO: Readonly<Record<EstadoDaEtapa, string>> = {
   atual: "etapa atual",
   concluida: "concluída",
   visitada: "visitada",
-  pendente: "pendente",
+  pendente: "não iniciada",
 };
 
 export interface CadastroEmEtapasProps {
@@ -60,7 +60,27 @@ export interface CadastroEmEtapasProps {
   readonly mensagem?: ReactNode;
   /** Título da etapa atual, quando ele depende do que foi digitado. */
   readonly tituloDaEtapa?: string;
-  readonly children: ReactNode;
+  /**
+   * Um painel por etapa, TODOS montados (só o atual visível): nada do que foi
+   * digitado sai do documento. Sem `paineis`, `children` é o conteúdo da
+   * etapa atual.
+   */
+  readonly paineis?: readonly ReactNode[];
+  /** Id do título de cada etapa (para quem move o foco até ele). */
+  readonly idDoTituloDaEtapa?: (indice: number) => string;
+  /** Entre o cabeçalho da página e o formulário (ex.: o aviso do rascunho). */
+  readonly aposCabecalho?: ReactNode;
+  /** No topo da coluna do conteúdo, antes da etapa (ex.: a empresa ativa). */
+  readonly antesDoConteudo?: ReactNode;
+  /** Classe a mais na raiz (estilos próprios da tela). */
+  readonly className?: string;
+  /** Nome acessível do formulário. */
+  readonly rotuloDoFormulario?: string;
+  /** Id do botão principal (quem move o foco até ele). */
+  readonly idBotaoPrincipal?: string;
+  /** Trava só o botão principal (ex.: dados ainda carregando). */
+  readonly principalDesabilitado?: boolean;
+  readonly children?: ReactNode;
 }
 
 export function CadastroEmEtapas({
@@ -79,17 +99,52 @@ export function CadastroEmEtapas({
   ocupado = false,
   mensagem,
   tituloDaEtapa,
+  paineis,
+  idDoTituloDaEtapa,
+  aposCabecalho,
+  antesDoConteudo,
+  className,
+  rotuloDoFormulario,
+  idBotaoPrincipal,
+  principalDesabilitado = false,
   children,
 }: CadastroEmEtapasProps) {
   const base = useId();
-  const idTituloDaEtapa = `${base}-etapa-${atual}`;
+  const idDoTitulo = (indice: number) =>
+    idDoTituloDaEtapa ? idDoTituloDaEtapa(indice) : `${base}-etapa-${indice}`;
   const idProgresso = `${base}-progresso`;
-  const etapa = etapas[atual]!;
   const ultima = atual === etapas.length - 1;
+
+  /** Título, descrição e o selo "Etapa N de M" de uma etapa. */
+  function cabecalhoDaEtapa(indice: number) {
+    const etapa = etapas[indice]!;
+    return (
+      <header className="cadastro-etapas__etapa-cabecalho">
+        <div className="cadastro-etapas__etapa-textos">
+          <h2
+            id={idDoTitulo(indice)}
+            className="cadastro-etapas__etapa-titulo"
+            tabIndex={-1}
+          >
+            <span className="cadastro-etapas__so-leitor">
+              Etapa {indice + 1} de {etapas.length}:{" "}
+            </span>
+            {indice === atual && tituloDaEtapa ? tituloDaEtapa : etapa.titulo}
+          </h2>
+          <p className="cadastro-etapas__etapa-descricao">{etapa.descricao}</p>
+        </div>
+        <span className="cadastro-etapas__etapa-selo" aria-hidden="true">
+          Etapa {indice + 1} de {etapas.length}
+        </span>
+      </header>
+    );
+  }
   const progresso = Math.round(((atual + 1) / etapas.length) * 100);
 
   return (
-    <div className="cadastro-etapas">
+    <div
+      className={className ? `cadastro-etapas ${className}` : "cadastro-etapas"}
+    >
       <header className="cadastro-etapas__cabecalho">
         <IconButton
           label={rotuloVoltar}
@@ -106,7 +161,14 @@ export function CadastroEmEtapas({
         />
       </header>
 
-      <form className="cadastro-etapas__form" noValidate onSubmit={onSubmit}>
+      {aposCabecalho}
+
+      <form
+        className="cadastro-etapas__form"
+        noValidate
+        onSubmit={onSubmit}
+        {...(rotuloDoFormulario ? { "aria-label": rotuloDoFormulario } : {})}
+      >
         <div className="cadastro-etapas__corpo">
           <nav
             className="cadastro-etapas__etapas"
@@ -178,37 +240,30 @@ export function CadastroEmEtapas({
           </nav>
 
           <div className="cadastro-etapas__conteudo">
-            {/* A `key` remonta a etapa na troca: é o que dispara o fade. */}
-            <section
-              key={atual}
-              className="cadastro-etapas__etapa"
-              aria-labelledby={idTituloDaEtapa}
-            >
-              <header className="cadastro-etapas__etapa-cabecalho">
-                <div className="cadastro-etapas__etapa-textos">
-                  <h2
-                    id={idTituloDaEtapa}
-                    className="cadastro-etapas__etapa-titulo"
-                    tabIndex={-1}
-                  >
-                    <span className="cadastro-etapas__so-leitor">
-                      Etapa {atual + 1} de {etapas.length}:{" "}
-                    </span>
-                    {tituloDaEtapa ?? etapa.titulo}
-                  </h2>
-                  <p className="cadastro-etapas__etapa-descricao">
-                    {etapa.descricao}
-                  </p>
-                </div>
-                <span
-                  className="cadastro-etapas__etapa-selo"
-                  aria-hidden="true"
+            {antesDoConteudo}
+            {paineis ? (
+              paineis.map((painel, indice) => (
+                <section
+                  key={indice}
+                  className="cadastro-etapas__etapa"
+                  aria-labelledby={idDoTitulo(indice)}
+                  hidden={indice !== atual}
                 >
-                  Etapa {atual + 1} de {etapas.length}
-                </span>
-              </header>
-              {children}
-            </section>
+                  {cabecalhoDaEtapa(indice)}
+                  {painel}
+                </section>
+              ))
+            ) : (
+              // A `key` remonta a etapa na troca: é o que dispara o fade.
+              <section
+                key={atual}
+                className="cadastro-etapas__etapa"
+                aria-labelledby={idDoTitulo(atual)}
+              >
+                {cabecalhoDaEtapa(atual)}
+                {children}
+              </section>
+            )}
             {mensagem}
           </div>
         </div>
@@ -248,7 +303,8 @@ export function CadastroEmEtapas({
             <Button
               type="submit"
               variant="primary"
-              disabled={ocupado}
+              disabled={ocupado || principalDesabilitado}
+              {...(idBotaoPrincipal ? { id: idBotaoPrincipal } : {})}
               onClick={(evento) => {
                 // Duplo clique em "Próxima etapa" não pode cair no "Concluir".
                 if (evento.detail > 1) evento.preventDefault();
@@ -277,13 +333,17 @@ export function CadastroEmEtapas({
 export function SecaoDoCadastro({
   titulo,
   descricao,
+  id: idPedido,
   children,
 }: {
   readonly titulo: string;
   readonly descricao: ReactNode;
+  /** Id do título (quando a tela o referencia). */
+  readonly id?: string;
   readonly children: ReactNode;
 }) {
-  const id = useId();
+  const gerado = useId();
+  const id = idPedido ?? gerado;
   return (
     <section className="cadastro-etapas__secao" aria-labelledby={id}>
       <header className="cadastro-etapas__secao-cabecalho">
@@ -306,11 +366,20 @@ export function LinhaDoCadastro({
   rotulo,
   ajuda,
   paraId,
+  dica,
+  grupo = true,
   children,
 }: {
   readonly rotulo: string;
   readonly ajuda?: string;
   readonly paraId?: string;
+  /** Ajuda extra ao lado do rótulo (ex.: o "?" de um campo). */
+  readonly dica?: ReactNode;
+  /**
+   * Sem `paraId`, a linha é um grupo nomeado pelo rótulo. `false` quando o
+   * único campo dela já tem nome próprio: o rótulo fica só visual.
+   */
+  readonly grupo?: boolean;
   readonly children: ReactNode;
 }) {
   const base = useId();
@@ -318,7 +387,9 @@ export function LinhaDoCadastro({
   return (
     <div
       className="cadastro-etapas__linha-cadastro"
-      {...(paraId ? {} : { role: "group", "aria-labelledby": idRotulo })}
+      {...(paraId || !grupo
+        ? {}
+        : { role: "group", "aria-labelledby": idRotulo })}
     >
       <div className="cadastro-etapas__linha-rotulo">
         <div className="cadastro-etapas__linha-cabeca">
@@ -335,6 +406,7 @@ export function LinhaDoCadastro({
               {rotulo}
             </p>
           )}
+          {dica}
         </div>
         {ajuda ? <p className="cadastro-etapas__linha-ajuda">{ajuda}</p> : null}
       </div>

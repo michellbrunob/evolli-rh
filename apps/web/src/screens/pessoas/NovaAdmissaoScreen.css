@@ -1,22 +1,3 @@
-/**
- * Pessoas > Nova admissão (T176) — página própria, só com tokens existentes
- * (`tokens.css`): sem hexadecimal novo, sem sombra, sem gradiente. Os grupos
- * empilham em uma coluna; dentro de cada grupo, os campos vão em linhas de
- * duas ou três colunas quando há largura (T178), e a uma só em tela estreita.
- */
-
-.nova-admissao {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  min-width: 0;
-  max-width: 56rem;
-}
-
-.nova-admissao > * {
-  min-width: 0;
-}
-
 .nova-admissao__texto {
   margin: 0;
   color: var(--color-ink);
@@ -309,172 +290,6 @@
   border: 0;
 }
 
-/* Indicador: o progresso e, abaixo, as quatro etapas lado a lado. */
-.nova-admissao__etapas {
-  display: grid;
-  gap: var(--space-sm);
-  min-width: 0;
-}
-
-.nova-admissao__progresso {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.nova-admissao__progresso-texto {
-  margin: 0;
-  color: var(--color-ink-muted);
-  font-size: var(--text-caption);
-}
-
-/* T209 — trilho visível (cinza) com o preenchimento por cima, curto, e o
-   texto à direita. */
-.nova-admissao__progresso-barra {
-  appearance: none;
-  flex: none;
-  width: 10rem;
-  height: 0.25rem;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--hairline);
-  overflow: hidden;
-}
-
-.nova-admissao__progresso-barra::-webkit-progress-bar {
-  border-radius: var(--radius-pill);
-  background: var(--hairline);
-}
-
-.nova-admissao__progresso-barra::-webkit-progress-value {
-  border-radius: var(--radius-pill);
-  background: var(--color-action);
-}
-
-.nova-admissao__progresso-barra::-moz-progress-bar {
-  border-radius: var(--radius-pill);
-  background: var(--color-action);
-}
-
-.nova-admissao__etapas-lista {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-xs);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.nova-admissao__etapa-item {
-  min-width: 0;
-}
-
-/* Botão (etapa alcançada) ou texto (atual e não iniciada), com o mesmo
-   desenho: marcador e nome. Alvo de toque mínimo de 44 px. */
-.nova-admissao__etapa-passo {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: var(--space-xxs) var(--space-xs);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--color-ink-muted);
-  font: inherit;
-  font-size: var(--text-caption);
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-button.nova-admissao__etapa-passo {
-  cursor: pointer;
-}
-
-button.nova-admissao__etapa-passo:hover:not(:disabled) {
-  border-color: var(--hairline);
-  background: var(--surface-neutral);
-}
-
-button.nova-admissao__etapa-passo:focus-visible {
-  outline: var(--focus-width) solid var(--color-action);
-  outline-offset: var(--focus-offset);
-}
-
-.nova-admissao__etapa-marcador {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
-  background: var(--surface-canvas);
-  font-weight: var(--weight-strong);
-}
-
-.nova-admissao__etapa-nome {
-  min-width: 0;
-}
-
-/* Atual: marcador cheio e nome em destaque. Concluída: marcador com ✓. O
-   estado também é dito em texto, para leitor de tela. */
-.nova-admissao__etapa-item--atual .nova-admissao__etapa-passo {
-  color: var(--color-ink);
-  font-weight: var(--weight-strong);
-}
-
-.nova-admissao__etapa-item--atual .nova-admissao__etapa-marcador {
-  border-color: var(--color-action);
-  background: var(--color-action);
-  color: var(--color-on-action);
-}
-
-.nova-admissao__etapa-item--concluida .nova-admissao__etapa-marcador {
-  border-color: var(--color-action);
-  color: var(--color-action);
-}
-
-.nova-admissao__etapa-item--concluida .nova-admissao__etapa-passo,
-.nova-admissao__etapa-item--visitada .nova-admissao__etapa-passo {
-  color: var(--color-ink);
-}
-
-/* O painel de cada etapa: montado sempre, visível só o da atual. A regra do
-   `hidden` precisa vir explícita, porque `display: grid` a sobreporia. */
-.nova-admissao__etapa {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-lg);
-  min-width: 0;
-}
-
-.nova-admissao__etapa[hidden] {
-  display: none;
-}
-
-.nova-admissao__etapa-titulo {
-  display: grid;
-  gap: var(--space-xxs);
-  margin: 0;
-  font-size: var(--text-title);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.nova-admissao__etapa-titulo:focus {
-  outline: none;
-}
-
-.nova-admissao__etapa-titulo:focus-visible {
-  outline: var(--focus-width) solid var(--color-action);
-  outline-offset: var(--focus-offset);
-}
-
 .nova-admissao__etapa-numero {
   font-size: var(--text-caption);
   font-weight: var(--weight-regular);
@@ -509,117 +324,12 @@ button.nova-admissao__etapa-passo:focus-visible {
   border-radius: var(--radius-md);
   background: var(--status-info-surface);
 }
-
 /* Em tela estreita, as quatro etapas viram só marcadores; o leitor de tela
    segue com o nome completo de cada uma, e o título da etapa atual aparece
    logo abaixo. */
-@media (max-width: 640px) {
-  .nova-admissao__etapa-passo {
-    justify-content: center;
-  }
 
-  .nova-admissao__etapa-nome {
-    display: none;
-  }
-}
-
-/* ---- T209 — assistente de etapas: cabeçalho com "Voltar para
-   Colaboradores", as etapas à esquerda (fixas ao rolar) quando a página tem
-   espaço, o conteúdo da etapa em uma coluna e o rodapé fixo com o progresso e
-   as ações. Pela largura da própria página (o menu lateral aberto estreita o
-   conteúdo). Só tokens. ---- */
-.nova-admissao {
-  container-type: inline-size;
-  max-width: 72rem;
-}
-
-.nova-admissao__cabecalho {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  min-width: 0;
-  padding-bottom: var(--secao-espaco-compacto);
-  border-bottom: var(--divisor);
-}
-
-.nova-admissao__cabecalho > .evolli-page-header {
+.cadastro-etapas__cabecalho > .evolli-page-header {
   flex: 1 1 auto;
-  min-width: 0;
-}
-
-.nova-admissao__voltar {
-  flex: 0 0 auto;
-  border-radius: var(--radius-md);
-}
-
-.nova-admissao__corpo {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--secao-espaco);
-  align-items: start;
-  min-width: 0;
-}
-
-.nova-admissao__conteudo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  min-width: 0;
-  max-width: 48rem;
-}
-
-.nova-admissao__etapas-rotulo {
-  margin: 0;
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-@container (min-width: 52rem) {
-  .nova-admissao__corpo {
-    grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
-  }
-
-  .nova-admissao__etapas {
-    position: sticky;
-    top: var(--space-lg);
-    padding-right: var(--secao-espaco-compacto);
-    border-right: var(--divisor);
-  }
-
-  .nova-admissao__etapas-lista {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.nova-admissao__rodape {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm) var(--space-lg);
-  min-width: 0;
-  padding: var(--space-md) 0;
-  border-top: var(--divisor);
-  background: var(--surface-neutral);
-}
-
-.nova-admissao__rodape > .nova-admissao__progresso {
-  flex: 1 1 12rem;
-  min-width: 0;
-  max-width: 20rem;
-}
-
-.nova-admissao__rodape-acoes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-xs);
   min-width: 0;
 }
 
@@ -627,55 +337,6 @@ button.nova-admissao__etapa-passo:focus-visible {
    Voltar no tamanho do texto e a ação principal (envio) com o resto. A
    ordem de tabulação continua a visual (progresso, Cancelar, Voltar,
    principal); nada alarga a tela. */
-@media (max-width: 640px) {
-  .nova-admissao__rodape {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--space-xs);
-    align-items: center;
-  }
-
-  .nova-admissao__rodape > .nova-admissao__progresso {
-    grid-column: 1 / 3;
-    grid-row: 1;
-    max-width: none;
-  }
-
-  /* T209 — no celular a barra encolhe para o "% concluído" caber em uma
-     linha, sem encostar em Cancelar. */
-  .nova-admissao__rodape .nova-admissao__progresso-barra {
-    flex: 1 1 auto;
-    width: auto;
-    min-width: 0;
-  }
-
-  .nova-admissao__rodape .nova-admissao__progresso-texto {
-    white-space: nowrap;
-  }
-
-  .nova-admissao__rodape-acoes {
-    display: contents;
-  }
-
-  .nova-admissao__rodape-acoes > :first-child {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .nova-admissao__rodape-acoes > :nth-child(2):not([type="submit"]) {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .nova-admissao__rodape-acoes > [type="submit"] {
-    grid-column: 2 / 4;
-    grid-row: 2;
-  }
-
-  .nova-admissao__rodape-acoes > [type="submit"]:nth-child(2) {
-    grid-column: 1 / 4;
-  }
-}
 
 /* ---- T209 — foto opcional do colaborador (etapa 1 e confirmação) ---------- */
 .nova-admissao__foto {
@@ -740,95 +401,7 @@ button.nova-admissao__etapa-passo:focus-visible {
   color: var(--status-danger-ink);
 }
 
-/* ---- T209 — etapa 1 do Novo colaborador: cabeçalho, seções e linhas ------ */
-.nova-admissao__etapa-cabecalho {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-sm) var(--space-md);
-  padding-bottom: var(--space-md);
-  border-bottom: 1px solid var(--hairline);
-}
-
-.nova-admissao__etapa-textos {
-  display: grid;
-  gap: var(--space-xxs);
-  min-width: 0;
-}
-
-.nova-admissao__etapa-descricao {
-  margin: 0;
-  color: var(--color-ink-muted);
-}
-
-.nova-admissao__etapa-selo {
-  flex: none;
-  padding: 2px var(--space-sm);
-  border: 1px solid var(--status-neutral-border);
-  border-radius: var(--radius-pill);
-  background: var(--status-neutral-surface);
-  color: var(--color-ink-muted);
-  font-size: var(--text-caption);
-  white-space: nowrap;
-}
-
-.nova-admissao__etapa-sub {
-  display: block;
-  font-size: var(--text-caption);
-  font-weight: normal;
-  color: var(--color-ink-muted);
-}
-
-.nova-admissao__secao {
-  display: grid;
-  padding-top: var(--space-lg);
-  min-width: 0;
-}
-
-.nova-admissao__secao-cabecalho {
-  display: grid;
-  gap: var(--space-xxs);
-  padding-bottom: var(--space-sm);
-}
-
-.nova-admissao__secao-titulo {
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.nova-admissao__secao-descricao,
-.nova-admissao__linha-ajuda {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-muted);
-}
-
-.nova-admissao__linha-cadastro {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-xs);
-  padding: var(--space-md) 0;
-  border-bottom: 1px solid var(--hairline);
-  min-width: 0;
-}
-
-.nova-admissao__linha-rotulo {
-  display: grid;
-  gap: var(--space-xxs);
-  align-content: start;
-}
-
-.nova-admissao__linha-titulo {
-  margin: 0;
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  color: var(--color-ink);
-}
-
-.nova-admissao__linha-campos,
+.cadastro-etapas__linha-campos,
 .nova-admissao__linha-celula {
   display: grid;
   gap: var(--space-xxs);
@@ -839,21 +412,6 @@ button.nova-admissao__etapa-passo:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-sm);
-}
-
-.nova-admissao__linha-campos :where(input:not([type="file"]), select) {
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: var(--space-xs) var(--space-sm);
-  font: inherit;
-  color: var(--color-ink);
-  background: var(--surface-canvas);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-}
-
-.nova-admissao__linha-campos :where([aria-invalid="true"]) {
-  border-color: var(--status-danger-ink);
 }
 
 .nova-admissao__linha-erro {
@@ -871,11 +429,6 @@ button.nova-admissao__etapa-passo:focus-visible {
 
 /* Desktop: rótulo e ajuda à esquerda; campos à direita; pares lado a lado. */
 @media (min-width: 641px) {
-  .nova-admissao__linha-cadastro {
-    grid-template-columns: minmax(0, 17rem) minmax(0, 30rem);
-    column-gap: 2.5rem;
-  }
-
   .nova-admissao__linha-par {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -887,12 +440,12 @@ button.nova-admissao__etapa-passo:focus-visible {
   max-width: 12.5rem;
 }
 
-.nova-admissao__linha-campos > .nova-admissao__cep-status {
+.cadastro-etapas__linha-campos > .nova-admissao__cep-status {
   margin: 0;
   font-size: 0.8125rem;
 }
 
-.nova-admissao__linha-campos > .nova-admissao__cep-status:empty {
+.cadastro-etapas__linha-campos > .nova-admissao__cep-status:empty {
   display: block;
   height: 0;
 }
@@ -932,11 +485,7 @@ button.nova-admissao__etapa-passo:focus-visible {
   max-width: 8rem;
 }
 
-.nova-admissao__linha-campos input[readonly] {
-  background: var(--status-neutral-surface);
-}
-
-.nova-admissao__linha-cabeca .nova-admissao__dica-texto,
+.cadastro-etapas__linha-cabeca .nova-admissao__dica-texto,
 .nova-admissao__linha-dica {
   display: flex;
   flex-wrap: wrap;
@@ -970,7 +519,7 @@ button.nova-admissao__etapa-passo:focus-visible {
 }
 
 /* Dentro da linha, o rótulo já está à esquerda: o do seletor só é lido. */
-.nova-admissao__linha-cadastro .evolli-field__label {
+.cadastro-etapas__linha-cadastro .evolli-field__label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -984,7 +533,7 @@ button.nova-admissao__etapa-passo:focus-visible {
 
 /* T209 — na linha do cadastro, o seletor sem escolha não repete "Nenhuma
    escolha." (o campo vazio já mostra o que pedir). A escolha feita aparece. */
-.nova-admissao__linha-cadastro .seletor-referencia__escolha--vazia {
+.cadastro-etapas__linha-cadastro .seletor-referencia__escolha--vazia {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -993,85 +542,8 @@ button.nova-admissao__etapa-passo:focus-visible {
   white-space: nowrap;
 }
 
-/* T209 — o rótulo e, ao lado, a dica ("?") quando houver. */
-.nova-admissao__linha-cabeca {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-/* ==========================================================================
-   T209 — medidas do novo desenho do cadastro (2026-11-17): linhas com
-   divisor fino, 20 px de respiro, rótulo em 260 px e 40 px até o campo;
-   campos de 42 px com raio de 8 px; título da etapa 22 px, da seção 16 px,
-   rótulo 14 px, ajuda 13 px. Fade de entrada ao trocar de etapa.
-   ========================================================================== */
-.nova-admissao {
-  --cadastro-divisor: var(--hairline);
-  --cadastro-borda-campo: #e2e2e7;
-  --cadastro-texto: #17171c;
-  --cadastro-texto-suave: #8e8e98;
-}
-
-.nova-admissao__etapa-cabecalho {
-  border-bottom-color: var(--cadastro-divisor);
-}
-
-.nova-admissao__etapa-titulo {
-  font-size: 1.375rem;
-  font-weight: 600;
-  color: var(--cadastro-texto);
-}
-
-.nova-admissao__etapa-descricao {
-  font-size: 0.84375rem;
-  color: var(--cadastro-texto-suave);
-}
-
-.nova-admissao__secao {
-  padding-top: 2rem;
-}
-
-.nova-admissao__secao-cabecalho {
-  gap: 2px;
-  padding-bottom: 0.25rem;
-}
-
-.nova-admissao__secao-titulo {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--cadastro-texto);
-}
-
-.nova-admissao__secao-descricao {
-  font-size: 0.84375rem;
-  color: var(--cadastro-texto-suave);
-}
-
-.nova-admissao__linha-cadastro {
-  padding: 1.25rem 0;
-  border-bottom: 0.8px solid var(--cadastro-divisor);
-}
-
-.nova-admissao__linha-rotulo {
-  gap: 3px;
-}
-
-.nova-admissao__linha-titulo {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--cadastro-texto);
-}
-
-.nova-admissao__linha-ajuda {
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--cadastro-texto-suave);
-}
-
-.nova-admissao__linha-campos :where(input:not([type="file"]), select),
-.nova-admissao__linha-cadastro .seletor-referencia__linha input {
+.cadastro-etapas__linha-campos :where(input:not([type="file"]), select),
+.cadastro-etapas__linha-cadastro .seletor-referencia__linha input {
   min-height: 42px;
   padding: 0 0.75rem;
   font-size: 0.875rem;
@@ -1080,112 +552,6 @@ button.nova-admissao__etapa-passo:focus-visible {
   border-radius: 8px;
 }
 
-.nova-admissao__linha-campos :where(input, select)::placeholder {
-  color: var(--cadastro-texto-suave);
-}
-
 .nova-admissao__linha-erro {
   font-size: 0.8125rem;
-}
-
-@container (min-width: 52rem) {
-  .nova-admissao__linha-cadastro {
-    grid-template-columns: 260px minmax(0, 1fr);
-    column-gap: 2.5rem;
-  }
-
-  .nova-admissao__conteudo {
-    max-width: 808px;
-  }
-
-  /* A divisória entre as etapas e o conteúdo vai até o fim do conteúdo. */
-  .nova-admissao__etapas {
-    border-right: 0;
-  }
-
-  .nova-admissao__conteudo {
-    padding-left: var(--secao-espaco);
-    border-left: 0.8px solid var(--cadastro-divisor);
-  }
-}
-
-/* Fade de entrada da etapa: sobe alguns pixels enquanto aparece. */
-@keyframes nova-admissao-etapa-entra {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.nova-admissao__etapa:not([hidden]) {
-  animation: nova-admissao-etapa-entra 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nova-admissao__etapa:not([hidden]) {
-    animation: none;
-  }
-}
-
-/* ---- T209 — divisórias e espaços como no novo desenho -------------------- */
-/* O cabeçalho da etapa encosta nas seções: o respiro é o da seção (32 px). */
-.nova-admissao__etapa {
-  gap: 0;
-}
-
-.nova-admissao__conteudo {
-  gap: var(--space-md);
-}
-
-@container (min-width: 52rem) {
-  /* Etapas ligadas por uma linha vertical: colorida até a etapa atual. */
-  .nova-admissao__etapa-item {
-    position: relative;
-  }
-
-  .nova-admissao__etapa-item:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    left: calc(var(--space-xs) + 1px + 0.875rem - 0.5px);
-    top: calc(50% + 0.875rem);
-    width: 1px;
-    height: calc(100% + var(--space-xs) - 1.75rem);
-    background: var(--cadastro-divisor);
-  }
-
-  .nova-admissao__etapa-item--concluida:not(:last-child)::after {
-    background: var(--color-action);
-  }
-
-  /* O rodapé continua a divisória vertical e tem a linha só sobre o
-     conteúdo; a barra fica alinhada aos campos. */
-  .nova-admissao__rodape {
-    position: sticky;
-    border-top: 0;
-    padding-left: calc(15rem + var(--secao-espaco) * 2);
-  }
-
-  .nova-admissao__rodape::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: calc(15rem + var(--secao-espaco));
-    right: 0;
-    height: 0.8px;
-    background: var(--cadastro-divisor);
-  }
-
-  .nova-admissao__rodape::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(15rem + var(--secao-espaco));
-    width: 0.8px;
-    background: var(--cadastro-divisor);
-  }
 }

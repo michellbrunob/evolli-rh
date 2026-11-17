@@ -3443,7 +3443,7 @@ const indicador = () =>
   screen.getByRole("navigation", { name: "Etapas do cadastro" });
 // T209 — o progresso fica no rodapé fixo do assistente.
 const rodapeDoAssistente = () =>
-  document.querySelector<HTMLElement>(".nova-admissao__rodape")!;
+  document.querySelector<HTMLElement>(".cadastro-etapas__rodape")!;
 const progresso = () => within(rodapeDoAssistente()).getByRole("progressbar");
 const passoDoIndicador = (n: number) =>
   within(indicador()).getAllByRole("listitem")[n - 1]!;
@@ -4739,7 +4739,7 @@ const ETAPAS_REAIS = [
 ];
 
 const rodape = () =>
-  document.querySelector<HTMLElement>(".nova-admissao__rodape")!;
+  document.querySelector<HTMLElement>(".cadastro-etapas__rodape")!;
 
 function botoesDoRodape(): string[] {
   return within(rodape())
@@ -4752,7 +4752,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     const cabecalho = document.querySelector<HTMLElement>(
-      ".nova-admissao__cabecalho",
+      ".cadastro-etapas__cabecalho",
     )!;
     expect(
       within(cabecalho).getByRole("heading", {
@@ -4790,13 +4790,13 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     await aguardarEmpresa();
     const nav = screen.getByRole("navigation", { name: "Etapas do cadastro" });
     expect(
-      [...nav.querySelectorAll(".nova-admissao__etapa-nome")].map(
+      [...nav.querySelectorAll(".cadastro-etapas__etapa-nome")].map(
         (e) => e.firstChild?.textContent,
       ),
     ).toEqual(ETAPAS_REAIS);
     // T209 — o subtítulo de cada etapa, embaixo do nome.
     expect(
-      [...nav.querySelectorAll(".nova-admissao__etapa-sub")].map(
+      [...nav.querySelectorAll(".cadastro-etapas__etapa-sub")].map(
         (e) => e.textContent,
       ),
     ).toEqual([
@@ -4944,8 +4944,15 @@ describe("T209 — contrato de CSS do assistente (desktop e 375 px)", () => {
     "src/screens/pessoas/NovaAdmissaoScreen.css",
     "utf8",
   ).replace(/\r\n/g, "\n");
-  const inicio = css.indexOf("/* ---- T209 — assistente de etapas");
+  // T209 — a moldura saiu para o padrão compartilhado; o bloco da tela
+  // começa no que é só dela (foto, endereço, linhas da etapa 2).
+  const inicio = css.indexOf("/* ---- T209 — foto opcional");
   const bloco = inicio > -1 ? css.slice(inicio) : "";
+  // T209 — a moldura (etapas, corpo, rodapé) é a do padrão compartilhado.
+  const compartilhado = readFileSync(
+    "src/components/cadastro/CadastroEmEtapas.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
 
   it("o bloco existe e usa só tokens", () => {
     expect(inicio).toBeGreaterThan(-1);
@@ -4964,42 +4971,44 @@ describe("T209 — contrato de CSS do assistente (desktop e 375 px)", () => {
   });
 
   it("desktop: etapas à esquerda (fixas ao rolar) e o conteúdo em uma coluna", () => {
-    expect(bloco).toMatch(
-      /\.nova-admissao \{[^}]*container-type: inline-size;/,
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas \{[^}]*container-type: inline-size;/,
     );
-    expect(bloco).toMatch(
-      /@container \(min-width: 52rem\) \{[^@]*\.nova-admissao__corpo \{[^}]*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__corpo \{[^}]*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
     );
-    expect(bloco).toMatch(
-      /@container \(min-width: 52rem\) \{[^@]*\.nova-admissao__etapas \{[^}]*position: sticky;/,
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__etapas \{[^}]*position: sticky;/,
     );
-    expect(bloco).toMatch(
-      /@container \(min-width: 52rem\) \{[^@]*\.nova-admissao__etapas-lista \{[^}]*grid-template-columns: minmax\(0, 1fr\);/,
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__etapas-lista \{[^}]*grid-template-columns: minmax\(0, 1fr\);/,
     );
   });
 
   it("rodapé fixo ao pé da tela, com divisor, que quebra linha em vez de alargar", () => {
-    expect(bloco).toMatch(
-      /\.nova-admissao__rodape \{[^}]*position: sticky;[^}]*bottom: 0;[^}]*flex-wrap: wrap;[^}]*border-top: var\(--divisor\);/,
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas__rodape \{[^}]*position: sticky;[^}]*bottom: 0;[^}]*flex-wrap: wrap;[^}]*border-top: var\(--divisor\);/,
     );
-    expect(bloco).toMatch(
-      /\.nova-admissao__rodape-acoes \{[^}]*flex-wrap: wrap;/,
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas__rodape-acoes \{[^}]*flex-wrap: wrap;/,
     );
   });
 
   it("375 px: rodapé em grade de duas linhas — progresso e Cancelar; Voltar e a ação principal larga", () => {
-    const celular = bloco.slice(bloco.indexOf("@media (max-width: 640px)"));
-    expect(celular).toMatch(
-      /\.nova-admissao__rodape \{[^}]*display: grid;[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto;/,
+    const celular = compartilhado.slice(
+      compartilhado.lastIndexOf("@media (max-width: 640px)"),
     );
     expect(celular).toMatch(
-      /\.nova-admissao__rodape-acoes \{\s*display: contents;/,
+      /\.cadastro-etapas__rodape \{[^}]*display: grid;[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto;/,
     );
     expect(celular).toMatch(
-      /\.nova-admissao__rodape-acoes > \[type="submit"\] \{[^}]*grid-column: 2 \/ 4;/,
+      /\.cadastro-etapas__rodape-acoes \{\s*display: contents;/,
     );
     expect(celular).toMatch(
-      /\.nova-admissao__rodape-acoes > \[type="submit"\]:nth-child\(2\) \{[^}]*grid-column: 1 \/ 4;/,
+      /\.cadastro-etapas__rodape-acoes > \[type="submit"\] \{[^}]*grid-column: 2 \/ 4;/,
+    );
+    expect(celular).toMatch(
+      /\.cadastro-etapas__rodape-acoes > \[type="submit"\]:nth-child\(2\) \{[^}]*grid-column: 1 \/ 4;/,
     );
   });
 });
@@ -5520,7 +5529,7 @@ describe("T209 — etapa 1: dados básicos", () => {
       "Informações pessoais e de contato do novo colaborador.",
     );
     expect(
-      painel.querySelector(".nova-admissao__etapa-selo"),
+      painel.querySelector(".cadastro-etapas__etapa-selo"),
     ).toHaveTextContent("Etapa 1 de 4");
   });
 
@@ -5542,7 +5551,7 @@ describe("T209 — etapa 1: dados básicos", () => {
     montar();
     await aguardarEmpresa();
     const linhas = [
-      ...etapa1().querySelectorAll(".nova-admissao__linha-rotulo"),
+      ...etapa1().querySelectorAll(".cadastro-etapas__linha-rotulo"),
     ].map((l) => [...l.children].map((c) => c.textContent));
     expect(linhas).toEqual([
       ["Foto", "Aparece na lista de colaboradores e no perfil."],
