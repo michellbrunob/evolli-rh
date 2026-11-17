@@ -218,6 +218,9 @@ beforeEach(() => {
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     },
   });
@@ -785,6 +788,9 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
           pj: 1,
           temporario: 0,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       },
     }));
@@ -1306,6 +1312,9 @@ describe("T200 — guarda de saída no App", () => {
             pj: 0,
             temporario: 0,
             outro_controlado: 0,
+            part_time: 0,
+            freelancer: 0,
+            trainee: 0,
           },
         },
       } as never);

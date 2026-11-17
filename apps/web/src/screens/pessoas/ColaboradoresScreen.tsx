@@ -159,6 +159,9 @@ export const ROTULO_TIPO_DE_VINCULO: Readonly<Record<TipoDeVinculo, string>> = {
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 /** A situação da pessoa no escopo, pela mesma regra dos grupos (N-1). */

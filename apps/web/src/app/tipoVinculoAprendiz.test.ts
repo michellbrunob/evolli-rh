@@ -28,6 +28,10 @@ describe("T209 — Aprendiz na URL e na ordem dos tipos", () => {
       "pj",
       "temporario",
       "outro_controlado",
+      // T209 — etapa 2 do Novo colaborador.
+      "part_time",
+      "freelancer",
+      "trainee",
     ]);
   });
 

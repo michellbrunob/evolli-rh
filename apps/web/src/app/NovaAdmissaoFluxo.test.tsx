@@ -168,6 +168,9 @@ beforeEach(() => {
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     },
   });
@@ -272,7 +275,7 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
       target: { value: "3133330001" },
     });
   }
-  fireEvent.change(screen.getByLabelText(/Tipo de vínculo/), {
+  fireEvent.change(screen.getByLabelText(/Tipo de contratação/), {
     target: { value: "clt" },
   });
   fireEvent.change(screen.getByLabelText(/Data de admissão/), {
@@ -280,10 +283,17 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
   });
   // T196 — as referências são escolhidas pela busca no servidor: seta para
   // baixo abre a lista e a opção é clicada.
+  // T209 — etapa 2: o cargo é digitado (vira o cargo do cadastro ao
+  // concluir) e o salário bruto é obrigatório.
+  fireEvent.change(screen.getByLabelText(/^Cargo$/), {
+    target: { value: cargo.nome },
+  });
+  fireEvent.change(screen.getByLabelText(/^Salário bruto/), {
+    target: { value: "500000" },
+  });
   for (const [rotulo, referencia] of [
-    [/^Departamento/, departamento],
-    [/^Cargo/, cargo],
-    [/^Unidade/, unidade],
+    [/^Departamento$/, departamento],
+    [/^Unidade$/, unidade],
   ] as const) {
     const campo = screen.getByLabelText(rotulo);
     fireEvent.keyDown(campo, { key: "ArrowDown" });
@@ -874,6 +884,9 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
           pj: 0,
           temporario: 0,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       },
     });
@@ -1013,48 +1026,6 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
   });
-});
-
-// ---------------------------------------------------------------------------
-// T179 — o shell repassa o papel à página: a ORIENTAÇÃO do aviso de empresa
-// sem referências muda (T180 — o RH usa o "+" sem sair da página; o DP pede
-// ao RH), e só o RH vê o "+" do cadastro rápido.
-// ---------------------------------------------------------------------------
-describe("T179 — empresa sem referências, pelo papel que o shell conhece", () => {
-  it.each([
-    ["rh", /Use o botão "\+" ao lado de Cargo/, true],
-    // T179 — só o que falta, e só Departamento e Cargo contam.
-    ["dp", /O RH precisa cadastrar Cargo nesta empresa/, false],
-  ])(
-    "%s vê a orientação certa e não consegue enviar",
-    async (papel, texto, comMais) => {
-      vi.mocked(listarCargos).mockResolvedValue(paginado([]));
-      render(<App papelDoAtor={papel} />);
-      await abrirNovaAdmissaoPelaListagem();
-      const aviso = await screen.findByText(texto);
-      expect(aviso).toHaveTextContent(/cadastro ativo de Cargo/);
-      // T195 — a lotação é a etapa 2: a 1 é preenchida para chegar a ela.
-      fireEvent.change(screen.getByLabelText(/Nome completo/), {
-        target: { value: "Pessoa Sintética Fluxo" },
-      });
-      fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
-        target: { value: "1990-05-20" },
-      });
-      // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
-      fireEvent.change(screen.getByLabelText(/^CPF$/), {
-        target: { value: "529.982.247-25" },
-      });
-      fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-      // T180 — o "+" do cadastro rápido é só do RH.
-      expect(
-        screen.queryByRole("button", { name: "Cadastrar novo cargo" }) !== null,
-      ).toBe(comMais);
-      fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-      await waitFor(() => expect(aviso).toHaveFocus());
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(admitirColaborador).not.toHaveBeenCalled();
-    },
-  );
 });
 
 /**

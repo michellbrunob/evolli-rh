@@ -10,7 +10,16 @@ const BASE = "/v1";
 
 /** T209 — Aprendiz entrou no catálogo, logo depois de Estágio. */
 export type TipoVinculo =
-  "clt" | "estagio" | "aprendiz" | "pj" | "temporario" | "outro_controlado";
+  | "clt"
+  | "estagio"
+  | "aprendiz"
+  | "pj"
+  | "temporario"
+  | "outro_controlado"
+  // T209 — etapa 2 do Novo colaborador.
+  | "part_time"
+  | "freelancer"
+  | "trainee";
 
 export type SituacaoColaborador = "ativo" | "inativo";
 
@@ -214,8 +223,9 @@ export interface DestinoOrganizacionalDto {
  * muda.
  */
 export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
-  departamentoId: string;
-  cargoId: string;
+  /** T209 — etapa 2: opcionais (ao menos uma referência da lotação). */
+  departamentoId?: string;
+  cargoId?: string;
   nome: string;
   empresaId: string;
   /** T179 — opcional; omitida quando vazia. */
@@ -243,7 +253,32 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * na data de admissão. Ausente é "sem jornada".
    */
   tabelaHorarioId?: string;
+  /** T209 — o contrato da admissão (etapa 2); ausente sem nenhum valor. */
+  contrato?: ContratoAdmissaoApi;
 }
+
+/**
+ * T209 — o contrato da admissão (etapa 2): nível, gestor direto, jornada
+ * semanal, escala, salário bruto (reais, com ponto: "5000.00"), conselho e
+ * registro profissional, dependentes para IRRF e pensão (percentual, com
+ * ponto). Cada campo vazio é omitido.
+ */
+export interface ContratoAdmissaoApi {
+  nivel?: string;
+  gestorDiretoId?: string;
+  jornadaSemanalHoras?: number;
+  escala?: string;
+  salarioBruto?: string;
+  conselhoProfissional?: string;
+  registroProfissional?: string;
+  dependentesIrrf?: number;
+  pensaoAlimenticiaPercentual?: string;
+}
+
+/** T209 — o contrato como o servidor o gravou (decimais em 2 casas). */
+export type ContratoGravadoApi = {
+  [K in keyof ContratoAdmissaoApi]-?: ContratoAdmissaoApi[K] | null;
+};
 
 /**
  * Resposta da admissão (T167): o colaborador no topo, como antes, mais a
@@ -274,7 +309,7 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
    * endereço é `null` quando nenhum campo veio. T179 — contatos também são
    * `null` quando nenhum veio, e cada um pode ser `null` sozinho.
    */
-  perfilPessoal: PerfilPessoalApi;
+  perfilPessoal: PerfilPessoalApi | null;
   endereco: EnderecoApi | null;
   contatos: {
     emailPessoal: string | null;
@@ -291,6 +326,8 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
     tabelaHorarioId: string;
     vigenciaInicio: string;
   } | null;
+  /** T209 — o contrato da admissão, ou `null` sem nenhum valor. */
+  contrato?: ContratoGravadoApi | null;
 }
 
 export interface RetificarColaboradorDto {

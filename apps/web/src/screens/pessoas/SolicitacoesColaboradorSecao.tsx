@@ -90,6 +90,9 @@ const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 const ROTULO_SITUACAO_VINCULO: Record<SituacaoVinculo, string> = {

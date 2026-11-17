@@ -129,6 +129,9 @@ function contados(
     pj: 0,
     temporario: 0,
     outro_controlado: 0,
+    part_time: 0,
+    freelancer: 0,
+    trainee: 0,
   };
   for (const c of itens) {
     if (grupo(c) !== "ativo") continue;
@@ -4590,6 +4593,9 @@ describe("T199 — dashboard de Colaboradores", () => {
       pj: 2,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     },
   };
   const ESTADO_ATIVOS = {
@@ -7102,6 +7108,9 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
       pj: 2,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     },
   };
 
@@ -7327,6 +7336,10 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
       ["pj", "PJ"],
       ["temporario", "Temporário"],
       ["outro_controlado", "Outro controlado"],
+      // T209 — etapa 2 do Novo colaborador.
+      ["part_time", "Part-time"],
+      ["freelancer", "Freelancer"],
+      ["trainee", "Trainee"],
     ]);
   });
 
@@ -7368,6 +7381,9 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
           pj: 0,
           temporario: 0,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       },
     });

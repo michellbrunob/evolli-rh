@@ -199,6 +199,10 @@ export const TIPOS_DE_VINCULO = [
   "pj",
   "temporario",
   "outro_controlado",
+  // T209 — etapa 2 do Novo colaborador.
+  "part_time",
+  "freelancer",
+  "trainee",
 ] as const;
 export type TipoDeVinculo = (typeof TIPOS_DE_VINCULO)[number];
 

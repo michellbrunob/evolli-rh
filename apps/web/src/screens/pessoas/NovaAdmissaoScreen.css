@@ -317,8 +317,9 @@
 }
 
 .nova-admissao__progresso {
-  display: grid;
-  gap: var(--space-xxs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .nova-admissao__progresso-texto {
@@ -327,19 +328,22 @@
   font-size: var(--text-caption);
 }
 
+/* T209 — trilho visível (cinza) com o preenchimento por cima, curto, e o
+   texto à direita. */
 .nova-admissao__progresso-barra {
   appearance: none;
-  width: 100%;
-  height: 0.5rem;
+  flex: none;
+  width: 10rem;
+  height: 0.25rem;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--surface-neutral);
+  background: var(--hairline);
   overflow: hidden;
 }
 
 .nova-admissao__progresso-barra::-webkit-progress-bar {
   border-radius: var(--radius-pill);
-  background: var(--surface-neutral);
+  background: var(--hairline);
 }
 
 .nova-admissao__progresso-barra::-webkit-progress-value {
@@ -862,5 +866,283 @@ button.nova-admissao__etapa-passo:focus-visible {
 
   .nova-admissao__linha-par {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- T209 — etapa 2: prefixo, sufixo, dica e seletores dentro da linha ---- */
+.nova-admissao__com-prefixo,
+.nova-admissao__com-sufixo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.nova-admissao__com-prefixo > span,
+.nova-admissao__com-sufixo > span {
+  flex: none;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.nova-admissao__com-sufixo > input {
+  max-width: 8rem;
+}
+
+.nova-admissao__linha-campos input[readonly] {
+  background: var(--status-neutral-surface);
+}
+
+.nova-admissao__linha-cabeca .nova-admissao__dica-texto,
+.nova-admissao__linha-dica {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.nova-admissao__dica {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+
+.nova-admissao__dica-texto {
+  flex: 1 1 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-info-surface);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+/* Dentro da linha, o rótulo já está à esquerda: o do seletor só é lido. */
+.nova-admissao__linha-cadastro .evolli-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* T209 — na linha do cadastro, o seletor sem escolha não repete "Nenhuma
+   escolha." (o campo vazio já mostra o que pedir). A escolha feita aparece. */
+.nova-admissao__linha-cadastro .seletor-referencia__escolha--vazia {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* T209 — o rótulo e, ao lado, a dica ("?") quando houver. */
+.nova-admissao__linha-cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ==========================================================================
+   T209 — medidas do novo desenho do cadastro (2026-11-17): linhas com
+   divisor fino, 20 px de respiro, rótulo em 260 px e 40 px até o campo;
+   campos de 42 px com raio de 8 px; título da etapa 22 px, da seção 16 px,
+   rótulo 14 px, ajuda 13 px. Fade de entrada ao trocar de etapa.
+   ========================================================================== */
+.nova-admissao {
+  --cadastro-divisor: var(--hairline);
+  --cadastro-borda-campo: #e2e2e7;
+  --cadastro-texto: #17171c;
+  --cadastro-texto-suave: #8e8e98;
+}
+
+.nova-admissao__etapa-cabecalho {
+  border-bottom-color: var(--cadastro-divisor);
+}
+
+.nova-admissao__etapa-titulo {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--cadastro-texto);
+}
+
+.nova-admissao__etapa-descricao {
+  font-size: 0.84375rem;
+  color: var(--cadastro-texto-suave);
+}
+
+.nova-admissao__secao {
+  padding-top: 2rem;
+}
+
+.nova-admissao__secao-cabecalho {
+  gap: 2px;
+  padding-bottom: 0.25rem;
+}
+
+.nova-admissao__secao-titulo {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cadastro-texto);
+}
+
+.nova-admissao__secao-descricao {
+  font-size: 0.84375rem;
+  color: var(--cadastro-texto-suave);
+}
+
+.nova-admissao__linha-cadastro {
+  padding: 1.25rem 0;
+  border-bottom: 0.8px solid var(--cadastro-divisor);
+}
+
+.nova-admissao__linha-rotulo {
+  gap: 3px;
+}
+
+.nova-admissao__linha-titulo {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--cadastro-texto);
+}
+
+.nova-admissao__linha-ajuda {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--cadastro-texto-suave);
+}
+
+.nova-admissao__linha-campos :where(input:not([type="file"]), select),
+.nova-admissao__linha-cadastro .seletor-referencia__linha input {
+  min-height: 42px;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--cadastro-texto);
+  border: 0.8px solid var(--cadastro-borda-campo);
+  border-radius: 8px;
+}
+
+.nova-admissao__linha-campos :where(input, select)::placeholder {
+  color: var(--cadastro-texto-suave);
+}
+
+.nova-admissao__linha-erro {
+  font-size: 0.8125rem;
+}
+
+@container (min-width: 52rem) {
+  .nova-admissao__linha-cadastro {
+    grid-template-columns: 260px minmax(0, 1fr);
+    column-gap: 2.5rem;
+  }
+
+  .nova-admissao__conteudo {
+    max-width: 808px;
+  }
+
+  /* A divisória entre as etapas e o conteúdo vai até o fim do conteúdo. */
+  .nova-admissao__etapas {
+    border-right: 0;
+  }
+
+  .nova-admissao__conteudo {
+    padding-left: var(--secao-espaco);
+    border-left: 0.8px solid var(--cadastro-divisor);
+  }
+}
+
+/* Fade de entrada da etapa: sobe alguns pixels enquanto aparece. */
+@keyframes nova-admissao-etapa-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.nova-admissao__etapa:not([hidden]) {
+  animation: nova-admissao-etapa-entra 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nova-admissao__etapa:not([hidden]) {
+    animation: none;
+  }
+}
+
+/* ---- T209 — divisórias e espaços como no novo desenho -------------------- */
+/* O cabeçalho da etapa encosta nas seções: o respiro é o da seção (32 px). */
+.nova-admissao__etapa {
+  gap: 0;
+}
+
+.nova-admissao__conteudo {
+  gap: var(--space-md);
+}
+
+@container (min-width: 52rem) {
+  /* Etapas ligadas por uma linha vertical: colorida até a etapa atual. */
+  .nova-admissao__etapa-item {
+    position: relative;
+  }
+
+  .nova-admissao__etapa-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: calc(var(--space-xs) + 1px + 0.875rem - 0.5px);
+    top: calc(50% + 0.875rem);
+    width: 1px;
+    height: calc(100% + var(--space-xs) - 1.75rem);
+    background: var(--cadastro-divisor);
+  }
+
+  .nova-admissao__etapa-item--concluida:not(:last-child)::after {
+    background: var(--color-action);
+  }
+
+  /* O rodapé continua a divisória vertical e tem a linha só sobre o
+     conteúdo; a barra fica alinhada aos campos. */
+  .nova-admissao__rodape {
+    position: sticky;
+    border-top: 0;
+    padding-left: calc(15rem + var(--secao-espaco) * 2);
+  }
+
+  .nova-admissao__rodape::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: calc(15rem + var(--secao-espaco));
+    right: 0;
+    height: 0.8px;
+    background: var(--cadastro-divisor);
+  }
+
+  .nova-admissao__rodape::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(15rem + var(--secao-espaco));
+    width: 0.8px;
+    background: var(--cadastro-divisor);
   }
 }

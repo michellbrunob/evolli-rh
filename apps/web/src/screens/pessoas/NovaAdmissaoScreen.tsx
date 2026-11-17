@@ -116,6 +116,8 @@ import { IconButton } from "../../ui";
 import {
   type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
+  type ContratoAdmissaoApi,
+  listarColaboradores,
   type ColaboradorApi,
   type TipoVinculo,
   admitirColaborador,
@@ -137,7 +139,12 @@ import {
   listarEquipes,
   listarUnidades,
 } from "../../api/organizacaoClient";
-import { listarCargos } from "../../api/cargoClient";
+import { criarCargo, listarCargos } from "../../api/cargoClient";
+import {
+  calcularSalarioLiquido,
+  formatarReais,
+  lerValorEmReais,
+} from "./salarioLiquido";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
@@ -209,6 +216,9 @@ const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
@@ -295,6 +305,16 @@ type CampoErro =
   | "dataAdmissao"
   | CampoLotacao
   | "lotacao"
+  // T209 — etapa 2: contrato da admissão.
+  | "nivel"
+  | "gestorDireto"
+  | "jornadaSemanalHoras"
+  | "escala"
+  | "salarioBruto"
+  | "conselhoProfissional"
+  | "registroProfissional"
+  | "dependentesIrrf"
+  | "pensaoAlimenticiaPercentual"
   // T183 — jornada de trabalho opcional (só o RH a vê).
   | "jornada"
   | "geral";
@@ -366,16 +386,27 @@ const CAMPOS_DA_ETAPA: readonly (readonly CampoErro[])[] = [
     "contatoEmergenciaTelefone",
   ],
   [
+    // T209 — a ordem da etapa 2: cargo e estrutura, contrato, remuneração e
+    // informações adicionais.
     "referencias",
-    "matricula",
+    "cargo",
+    "nivel",
+    "departamento",
+    "area",
+    "centroCusto",
+    "unidade",
+    "gestorDireto",
     "tipo",
     "dataAdmissao",
-    "departamento",
-    "cargo",
-    "area",
-    "unidade",
+    "jornadaSemanalHoras",
+    "escala",
+    "matricula",
+    "salarioBruto",
+    "conselhoProfissional",
+    "registroProfissional",
+    "dependentesIrrf",
+    "pensaoAlimenticiaPercentual",
     "equipe",
-    "centroCusto",
     "lotacao",
     "jornada",
   ],
@@ -559,6 +590,11 @@ const CAMPO_DO_CONFLITO: Readonly<
   "perfilPessoal.cpf": {
     campo: "cpf",
     mensagem: "Este CPF já está cadastrado nesta empresa.",
+  },
+  // T209 — gestor direto sem vínculo na empresa.
+  "contrato.gestorDiretoId": {
+    campo: "gestorDireto",
+    mensagem: "Este gestor não está disponível nesta empresa.",
   },
 };
 
@@ -745,6 +781,18 @@ interface Campos {
   centroCustoId: string;
   /** T183 — jornada de trabalho opcional; vazio é "sem jornada". */
   tabelaHorarioId: string;
+  /** T209 — etapa 2: cargo digitado (vira cargo do cadastro ao concluir). */
+  cargoNome: string;
+  nivel: string;
+  gestorDiretoId: string;
+  jornadaSemanalHoras: string;
+  escala: string;
+  /** Em reais, como digitado: "5.000,00". */
+  salarioBruto: string;
+  conselhoProfissional: string;
+  registroProfissional: string;
+  dependentesIrrf: string;
+  pensaoAlimenticiaPercentual: string;
 }
 
 const CONTATOS_VAZIOS: ValoresContatos = {
@@ -754,6 +802,16 @@ const CONTATOS_VAZIOS: ValoresContatos = {
 };
 
 const CAMPOS_VAZIOS: Campos = {
+  cargoNome: "",
+  nivel: "",
+  gestorDiretoId: "",
+  jornadaSemanalHoras: "",
+  escala: "",
+  salarioBruto: "",
+  conselhoProfissional: "",
+  registroProfissional: "",
+  dependentesIrrf: "",
+  pensaoAlimenticiaPercentual: "",
   nome: "",
   matricula: "",
   tipo: "",
@@ -877,6 +935,232 @@ function falhaDoEnvioDaFoto(erro: unknown): {
   };
 }
 
+// ---- T209 — etapa 2 do Novo colaborador ------------------------------------
+
+/** Tipo de contratação, na ordem da etapa 2 (sete opções). */
+const TIPOS_DE_CONTRATACAO: readonly TipoVinculo[] = [
+  "clt",
+  "pj",
+  "estagio",
+  "aprendiz",
+  "part_time",
+  "freelancer",
+  "trainee",
+];
+
+const OPCOES_NIVEL = [
+  { codigo: "sem_nivel", rotulo: "Sem nível" },
+  { codigo: "primeiro_emprego", rotulo: "Primeiro emprego" },
+  { codigo: "junior", rotulo: "Júnior" },
+  { codigo: "pleno", rotulo: "Pleno" },
+  { codigo: "senior", rotulo: "Sênior" },
+  { codigo: "lider_tecnico", rotulo: "Líder técnico" },
+  { codigo: "coordenador", rotulo: "Coordenador" },
+  { codigo: "gerente", rotulo: "Gerente" },
+  { codigo: "head", rotulo: "Head" },
+  { codigo: "diretor", rotulo: "Diretor" },
+  { codigo: "vp", rotulo: "VP" },
+  { codigo: "c_level", rotulo: "C-Level" },
+] as const;
+
+/** Escalas: nome e descrição (dias de trabalho no mês). */
+const OPCOES_ESCALA = [
+  { codigo: "nao_informada", nome: "Não informada", descricao: "" },
+  {
+    codigo: "5x2",
+    nome: "5x2",
+    descricao: "Dias fixos na semana · Segunda a sexta, folga sábado e domingo",
+  },
+  {
+    codigo: "6x1",
+    nome: "6x1",
+    descricao:
+      "Dias fixos na semana · Seis dias de trabalho e uma folga · 26 dias no mês",
+  },
+  {
+    codigo: "semana_espanhola",
+    nome: "Semana espanhola",
+    descricao:
+      "Dias fixos na semana · Semanas de 5 e 6 dias alternadas (sábado sim, sábado não) · 24 dias no mês",
+  },
+  {
+    codigo: "4x3",
+    nome: "4x3",
+    descricao:
+      "Dias fixos na semana · Quatro dias de trabalho e três de folga · 17 dias no mês",
+  },
+  {
+    codigo: "fim_de_semana",
+    nome: "Fim de semana",
+    descricao: "Dias fixos na semana · Só sábado e domingo · 9 dias no mês",
+  },
+  {
+    codigo: "5x1",
+    nome: "5x1",
+    descricao:
+      "Revezamento em dias · Cinco dias de trabalho e uma folga, em rodízio · 25 dias no mês",
+  },
+  {
+    codigo: "6x2",
+    nome: "6x2",
+    descricao:
+      "Revezamento em dias · Seis dias de trabalho e duas folgas · 23 dias no mês",
+  },
+  {
+    codigo: "4x2",
+    nome: "4x2",
+    descricao:
+      "Revezamento em dias · Quatro dias de trabalho e duas folgas · 20 dias no mês",
+  },
+  {
+    codigo: "2x2",
+    nome: "2x2",
+    descricao:
+      "Revezamento em dias · Dois dias de trabalho e dois de folga · 15 dias no mês",
+  },
+  {
+    codigo: "3x3",
+    nome: "3x3",
+    descricao:
+      "Revezamento em dias · Três dias de trabalho e três de folga · 15 dias no mês",
+  },
+  {
+    codigo: "4x4",
+    nome: "4x4",
+    descricao:
+      "Revezamento em dias · Quatro dias de trabalho e quatro de folga · 15 dias no mês",
+  },
+  {
+    codigo: "12x36",
+    nome: "12x36",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 36 de descanso · 15 dias no mês",
+  },
+  {
+    codigo: "12x60",
+    nome: "12x60",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 60 de descanso · 10 dias no mês",
+  },
+  {
+    codigo: "12x72",
+    nome: "12x72",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 72 de descanso · 9 dias no mês",
+  },
+  {
+    codigo: "18x36",
+    nome: "18x36",
+    descricao:
+      "Plantão em horas · 18 horas de trabalho e 36 de descanso · 13 dias no mês",
+  },
+  {
+    codigo: "24x48",
+    nome: "24x48",
+    descricao:
+      "Plantão em horas · 24 horas de trabalho e 48 de descanso · 10 dias no mês",
+  },
+  {
+    codigo: "24x72",
+    nome: "24x72",
+    descricao:
+      "Plantão em horas · 24 horas de trabalho e 72 de descanso · 8 dias no mês",
+  },
+  {
+    codigo: "7x7",
+    nome: "7x7",
+    descricao:
+      "Embarque e alojamento · Sete dias embarcado e sete de folga · 15 dias no mês",
+  },
+  {
+    codigo: "14x14",
+    nome: "14x14",
+    descricao:
+      "Embarque e alojamento · 14 dias embarcado e 14 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "14x21",
+    nome: "14x21",
+    descricao:
+      "Embarque e alojamento · 14 dias embarcado e 21 de folga · 12 dias no mês",
+  },
+  {
+    codigo: "15x15",
+    nome: "15x15",
+    descricao:
+      "Embarque e alojamento · 15 dias de trabalho e 15 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "20x10",
+    nome: "20x10",
+    descricao:
+      "Embarque e alojamento · 20 dias de trabalho e 10 de folga · 20 dias no mês",
+  },
+  {
+    codigo: "21x21",
+    nome: "21x21",
+    descricao:
+      "Embarque e alojamento · 21 dias de trabalho e 21 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "28x28",
+    nome: "28x28",
+    descricao:
+      "Embarque e alojamento · 28 dias de trabalho e 28 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "outra",
+    nome: "Outra",
+    descricao: "Outra · Escala diferente: benefícios usam os dias úteis do mês",
+  },
+] as const;
+
+const OPCOES_CONSELHO = [
+  { codigo: "nenhum", rotulo: "Nenhum" },
+  ...(
+    [
+      "oab",
+      "crm",
+      "coren",
+      "cro",
+      "crp",
+      "crea",
+      "cau",
+      "cra",
+      "crc",
+      "crf",
+      "crn",
+      "cref",
+      "crefito",
+      "crbm",
+      "crtr",
+    ] as const
+  ).map((codigo) => ({ codigo, rotulo: codigo.toUpperCase() })),
+];
+
+/** Dica da matrícula (ícone de ajuda ao lado do rótulo). */
+const DICA_DA_MATRICULA =
+  "Número do colaborador no sistema da folha ou da contabilidade (matrícula, código, registro ou chapa). Usado nos holerites: quando o PDF não traz o CPF, o sistema acha a pessoa pela matrícula.";
+
+/** "500000" → "5.000,00", conforme se digita (centavos à direita). */
+function mascararReais(texto: string): string {
+  const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, 12);
+  if (digitos === "") return "";
+  const completo = digitos.padStart(3, "0");
+  const inteiros = completo.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${inteiros},${completo.slice(-2)}`;
+}
+
+/** T209 — o cargo digitado não pôde virar cargo do cadastro. */
+class CargoIndisponivel extends Error {}
+
+/** Gestor direto: as pessoas da empresa ativa, com o cargo vigente. */
+interface OpcaoDeGestor {
+  readonly id: string;
+  readonly nome: string;
+  readonly cargo: string | null;
+}
+
 // ---- T209 — etapa 1 do Novo colaborador ------------------------------------
 
 /** Campos novos da etapa 1, fora do perfil compartilhado com a ficha. */
@@ -988,6 +1272,9 @@ export function NovaAdmissaoScreen({
   const [perfil, setPerfil] = useState<ValoresPerfil>(PERFIL_VAZIO);
   const [endereco, setEndereco] = useState<ValoresEndereco>(ENDERECO_INICIAL);
   const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
+  /** T209 — etapa 2: as pessoas da empresa para "Gestor direto". */
+  const [gestores, setGestores] = useState<OpcaoDeGestor[]>([]);
+  const [dicaDaMatricula, setDicaDaMatricula] = useState(false);
   /** T209 — CPF, RG, gênero e contato de emergência (etapa 1). */
   const [identificacao, setIdentificacao] =
     useState<ValoresIdentificacao>(IDENTIFICACAO_VAZIA);
@@ -1111,6 +1398,10 @@ export function NovaAdmissaoScreen({
     papelDoAtor === "rh",
   );
   const [jornadasIndisponiveis, setJornadasIndisponiveis] = useState(false);
+  // T209 — etapa 2: a jornada da tabela de horário saiu da admissão
+  // (decisão de 2026-11-17); a leitura fica para a revisão e o rascunho antigo.
+  void carregandoJornadas;
+  void jornadasIndisponiveis;
   useEffect(() => {
     if (papelDoAtor !== "rh") return;
     let vigente = true;
@@ -1200,6 +1491,30 @@ export function NovaAdmissaoScreen({
     if (admissao) sucessoTituloRef.current?.focus();
   }, [admissao]);
 
+  // T209 — etapa 2: as pessoas da empresa ativa, para "Gestor direto".
+  // Falha na leitura deixa a lista só com "Sem gestor".
+  useEffect(() => {
+    if (!empresa) return undefined;
+    let vivo = true;
+    void Promise.resolve(listarColaboradores({ tamanhoPagina: 100 }))
+      .then((pagina) => {
+        if (!vivo) return;
+        setGestores(
+          (pagina?.itens ?? []).map((c) => ({
+            id: c.id,
+            nome: c.nome,
+            cargo: c.vinculos?.[0]?.lotacaoVigente?.cargo?.nome ?? null,
+          })),
+        );
+      })
+      .catch(() => {
+        if (vivo) setGestores([]);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [empresa]);
+
   // T209 — a URL local da prévia vale só enquanto a foto é a escolhida:
   // trocada, removida ou a página desmontada, ela é liberada.
   useEffect(() => {
@@ -1238,13 +1553,10 @@ export function NovaAdmissaoScreen({
    * sem unidade ativa admite sem ela. Só se calcula com a empresa resolvida:
    * sem ela, o aviso de empresa indefinida já basta.
    */
-  const referenciasFaltando: string[] =
-    carregandoOpcoes || !empresa
-      ? []
-      : [
-          ...(existemAtivos.departamento ? [] : ["Departamento"]),
-          ...(existemAtivos.cargo ? [] : ["Cargo"]),
-        ];
+  // T209 — etapa 2: Departamento e Cargo passaram a opcionais; empresa sem
+  // eles admite do mesmo jeito (o cargo digitado vira cargo do cadastro).
+  const referenciasFaltando: string[] = [];
+  void existemAtivos;
 
   const alterado =
     (Object.keys(campos) as (keyof Campos)[]).some(
@@ -1617,19 +1929,53 @@ export function NovaAdmissaoScreen({
       novos.matricula =
         "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).";
     }
-    if (!campos.tipo) novos.tipo = "Selecione o tipo de vínculo.";
+    // T209 — etapa 2: tipo e data de admissão obrigatórios; da lotação, ao
+    // menos uma referência (Baseline V1, item 10); salário bruto obrigatório.
+    if (!campos.tipo) novos.tipo = "Selecione o tipo de contratação.";
     if (!campos.dataAdmissao) {
       novos.dataAdmissao = "Informe a data de admissão.";
     }
-    if (!campos.departamentoId) {
-      novos.departamento = existemAtivos.departamento
-        ? "Selecione o departamento."
-        : "Não há departamento ativo nesta empresa.";
+    if (
+      !campos.cargoNome.trim() &&
+      !campos.cargoId &&
+      !campos.departamentoId &&
+      !campos.unidadeId &&
+      !campos.centroCustoId
+    ) {
+      novos.cargo =
+        "Informe ao menos o cargo, o departamento, a unidade ou o centro de custo.";
+    } else if (campos.cargoNome.trim().length > 120) {
+      novos.cargo = "O cargo deve ter no máximo 120 caracteres.";
     }
-    if (!campos.cargoId) {
-      novos.cargo = existemAtivos.cargo
-        ? "Selecione o cargo."
-        : "Não há cargo ativo nesta empresa.";
+    const jornada = campos.jornadaSemanalHoras.trim();
+    if (
+      jornada !== "" &&
+      (!/^\d+$/.test(jornada) || Number(jornada) < 1 || Number(jornada) > 80)
+    ) {
+      novos.jornadaSemanalHoras = "Informe de 1 a 80 horas por semana.";
+    }
+    const bruto = lerValorEmReais(campos.salarioBruto);
+    if (bruto === null || bruto <= 0) {
+      novos.salarioBruto =
+        "Informe o salário bruto. Ele é usado na folha de pagamento.";
+    }
+    if (campos.registroProfissional.trim().length > 40) {
+      novos.registroProfissional =
+        "O número do registro deve ter no máximo 40 caracteres.";
+    }
+    const dependentes = campos.dependentesIrrf.trim();
+    if (
+      dependentes !== "" &&
+      (!/^\d+$/.test(dependentes) || Number(dependentes) > 99)
+    ) {
+      novos.dependentesIrrf = "Informe de 0 a 99 dependentes.";
+    }
+    const pensao = campos.pensaoAlimenticiaPercentual.trim().replace(",", ".");
+    if (
+      pensao !== "" &&
+      (!/^\d{1,3}(\.\d{1,2})?$/.test(pensao) || Number(pensao) > 100)
+    ) {
+      novos.pensaoAlimenticiaPercentual = "Informe um percentual de 0 a 100.";
     }
     Object.assign(
       novos,
@@ -1708,8 +2054,12 @@ export function NovaAdmissaoScreen({
    * inteiro some quando os três estão vazios). Perfil e endereço seguem com
    * o vazio como `null` — inclusive o sexo sem seleção.
    */
-  function montarDto(empresaId: string): AdmitirColaboradorDto {
+  function montarDto(
+    empresaId: string,
+    cargoResolvido: string | null = campos.cargoId || null,
+  ): AdmitirColaboradorDto {
     const { unidadeId, areaId, equipeId, centroCustoId } = campos;
+    const contrato = blocoDoContrato();
     const matricula = campos.matricula.trim().toUpperCase();
     const blocoContatos = contatosDaAdmissao(contatos);
     return {
@@ -1719,8 +2069,10 @@ export function NovaAdmissaoScreen({
       tipo: campos.tipo as TipoVinculo,
       dataAdmissao: campos.dataAdmissao,
       motivoCodigo: "admissao_inicial",
-      departamentoId: campos.departamentoId,
-      cargoId: campos.cargoId,
+      ...(campos.departamentoId
+        ? { departamentoId: campos.departamentoId }
+        : {}),
+      ...(cargoResolvido ? { cargoId: cargoResolvido } : {}),
       ...(unidadeId ? { unidadeOrganizacionalId: unidadeId } : {}),
       ...(areaId ? { areaId } : {}),
       ...(equipeId ? { equipeId } : {}),
@@ -1735,7 +2087,81 @@ export function NovaAdmissaoScreen({
       ...(campos.tabelaHorarioId
         ? { tabelaHorarioId: campos.tabelaHorarioId }
         : {}),
+      ...(contrato ? { contrato } : {}),
     };
+  }
+
+  /** T209 — o bloco `contrato` da etapa 2; sem nenhum valor, nada vai. */
+  function blocoDoContrato(): ContratoAdmissaoApi | null {
+    const bruto = lerValorEmReais(campos.salarioBruto);
+    const pensao = campos.pensaoAlimenticiaPercentual.trim().replace(",", ".");
+    const conselho =
+      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
+        ? campos.conselhoProfissional
+        : null;
+    const registro = campos.registroProfissional.trim();
+    const bloco: ContratoAdmissaoApi = {
+      ...(campos.nivel && campos.nivel !== "sem_nivel"
+        ? { nivel: campos.nivel }
+        : {}),
+      ...(campos.gestorDiretoId && campos.gestorDiretoId !== "sem_gestor"
+        ? { gestorDiretoId: campos.gestorDiretoId }
+        : {}),
+      ...(campos.jornadaSemanalHoras.trim()
+        ? { jornadaSemanalHoras: Number(campos.jornadaSemanalHoras.trim()) }
+        : {}),
+      ...(campos.escala && campos.escala !== "nao_informada"
+        ? { escala: campos.escala }
+        : {}),
+      ...(bruto !== null && bruto > 0
+        ? { salarioBruto: bruto.toFixed(2) }
+        : {}),
+      ...(conselho ? { conselhoProfissional: conselho } : {}),
+      ...(conselho && registro ? { registroProfissional: registro } : {}),
+      ...(campos.dependentesIrrf.trim()
+        ? { dependentesIrrf: Number(campos.dependentesIrrf.trim()) }
+        : {}),
+      ...(pensao ? { pensaoAlimenticiaPercentual: pensao } : {}),
+    };
+    return Object.keys(bloco).length > 0 ? bloco : null;
+  }
+
+  /**
+   * T209 — o cargo digitado vira cargo do cadastro: o que já existe com esse
+   * nome (ativo) é usado; senão, o RH o cria (código automático, T197). O DP
+   * não cria cargo: sem ele no cadastro, a recusa fica no campo. Vazio, sem
+   * cargo (ou o escolhido antes, de um rascunho antigo).
+   */
+  async function resolverCargo(): Promise<string | null> {
+    const nomeDigitado = campos.cargoNome.trim().replace(/\s+/g, " ");
+    if (!nomeDigitado) return campos.cargoId || null;
+    const chave = nomeDigitado.toLocaleLowerCase("pt-BR");
+    const achados = await listarCargos({
+      busca: nomeDigitado,
+      status: "ativo",
+      pagina: 1,
+      tamanhoPagina: TAMANHO_DA_PAGINA_DE_REFERENCIAS,
+    });
+    const existente = (achados?.itens ?? []).find(
+      (c) => c.nome.trim().toLocaleLowerCase("pt-BR") === chave,
+    );
+    if (existente) return existente.id;
+    if (papelDoAtor !== "rh") {
+      throw new CargoIndisponivel(
+        "Este cargo não está no cadastro. Peça ao RH para cadastrá-lo, ou deixe o campo em branco.",
+      );
+    }
+    try {
+      return (await criarCargo({ nome: nomeDigitado, empresaId: empresa!.id }))
+        .id;
+    } catch (erro: unknown) {
+      const existenteNoConflito = (erro as { referencia?: { id?: string } })
+        ?.referencia?.id;
+      if (existenteNoConflito) return existenteNoConflito;
+      throw new CargoIndisponivel(
+        "Não foi possível usar este cargo. Confira o nome e tente de novo.",
+      );
+    }
   }
 
   /**
@@ -1775,9 +2201,24 @@ export function NovaAdmissaoScreen({
     const chave = (chaveIdempotenciaRef.current ??= gerarChaveIdempotencia());
     setSalvando(true);
     try {
-      const resposta = await admitirColaborador(montarDto(empresa.id), {
-        chaveIdempotencia: chave,
-      });
+      // T209 — o cargo digitado vira cargo do cadastro antes de admitir.
+      let cargoResolvido: string | null;
+      try {
+        cargoResolvido = await resolverCargo();
+      } catch (erro: unknown) {
+        if (erro instanceof CargoIndisponivel) {
+          setConfirmando(false);
+          const recusa: Erros = { cargo: erro.message };
+          setErros(recusa);
+          focarPrimeiroErro(recusa);
+          return;
+        }
+        throw erro;
+      }
+      const resposta = await admitirColaborador(
+        montarDto(empresa.id, cargoResolvido),
+        { chaveIdempotencia: chave },
+      );
       // Sucesso: a próxima admissão desta página será OUTRO envio.
       chaveIdempotenciaRef.current = null;
       setEnvioIncerto(false);
@@ -2208,6 +2649,17 @@ export function NovaAdmissaoScreen({
     );
   }
 
+  // T209 — o líquido estimado, recalculado a cada mudança da remuneração.
+  const salarioLiquido = calcularSalarioLiquido({
+    bruto: lerValorEmReais(campos.salarioBruto) ?? 0,
+    dependentes: Number(campos.dependentesIrrf || 0),
+    pensaoPercentual: Number(
+      campos.pensaoAlimenticiaPercentual.replace(",", ".") || 0,
+    ),
+  });
+  const salarioLiquidoExibido =
+    salarioLiquido === null ? "" : formatarReais(salarioLiquido);
+
   /** T209 — id, estado inválido e descrição do erro de um campo da linha. */
   function propsDoCampo(campo: CampoErro) {
     const id = ID_DO_CAMPO[campo];
@@ -2283,24 +2735,64 @@ export function NovaAdmissaoScreen({
     ["Telefone do contato", identificacao.contatoEmergenciaTelefone],
   ]);
   const linhasProfissionais = linhasPreenchidas([
-    ["Matrícula", campos.matricula.toUpperCase()],
-    ["Tipo de vínculo", campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null],
+    [
+      "Cargo",
+      campos.cargoNome.trim() || escolhida(opcoes.cargos, campos.cargoId),
+    ],
+    [
+      "Nível",
+      OPCOES_NIVEL.find((o) => o.codigo === campos.nivel)?.rotulo ?? null,
+    ],
+    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
+    ["Área", escolhida(areas, campos.areaId)],
+    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
+    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
+    [
+      "Gestor direto",
+      campos.gestorDiretoId === "sem_gestor"
+        ? "Sem gestor"
+        : (gestores.find((g) => g.id === campos.gestorDiretoId)?.nome ?? null),
+    ],
+    [
+      "Tipo de contratação",
+      campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null,
+    ],
     [
       "Data de admissão",
       campos.dataAdmissao ? formatarDiaCivil(campos.dataAdmissao) : null,
     ],
-    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
-    ["Cargo", escolhida(opcoes.cargos, campos.cargoId)],
-    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
-    ["Área", escolhida(areas, campos.areaId)],
-    ["Equipe", escolhida(opcoes.equipes, campos.equipeId)],
-    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
     [
       "Jornada de trabalho",
-      papelDoAtor === "rh" && campos.tabelaHorarioId
-        ? jornadaEscolhida
-          ? rotuloDaJornada(jornadaEscolhida)
-          : "Jornada escolhida"
+      campos.jornadaSemanalHoras
+        ? `${campos.jornadaSemanalHoras} horas por semana`
+        : null,
+    ],
+    [
+      "Escala de trabalho",
+      OPCOES_ESCALA.find((o) => o.codigo === campos.escala)?.nome ?? null,
+    ],
+    ["Matrícula", campos.matricula.toUpperCase()],
+    ["Salário bruto", campos.salarioBruto ? `R$ ${campos.salarioBruto}` : null],
+    [
+      "Salário líquido",
+      salarioLiquidoExibido ? `R$ ${salarioLiquidoExibido}` : null,
+    ],
+    [
+      "Conselho e registro",
+      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
+        ? [
+            campos.conselhoProfissional.toUpperCase(),
+            campos.registroProfissional.trim(),
+          ]
+            .filter(Boolean)
+            .join(" ")
+        : null,
+    ],
+    ["Dependentes (IRRF)", campos.dependentesIrrf || null],
+    [
+      "Pensão alimentícia",
+      campos.pensaoAlimenticiaPercentual
+        ? `${campos.pensaoAlimenticiaPercentual}%`
         : null,
     ],
   ]);
@@ -2642,227 +3134,108 @@ export function NovaAdmissaoScreen({
             {painelDaEtapa(
               1,
               <>
-                <section
-                  className="nova-admissao__grupo"
-                  aria-labelledby="nova-admissao-grupo-vinculo"
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-cargo"
+                  titulo="Cargo e estrutura"
+                  descricao="Onde o colaborador está na organização."
                 >
-                  <h3
-                    id="nova-admissao-grupo-vinculo"
-                    className="nova-admissao__grupo-titulo"
-                  >
-                    Vínculo
-                  </h3>
-                  <div className="nova-admissao__linha nova-admissao__linha--3">
-                    <FormField
-                      id={ID_DO_CAMPO.matricula}
-                      label={rotuloOpcional("Matrícula")}
-                      help="Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco."
-                      {...(erros.matricula ? { error: erros.matricula } : {})}
-                    >
-                      {(control) => (
+                  <LinhaDoCadastro rotulo="Cargo e nível">
+                    <div className="nova-admissao__linha-par">
+                      <div className="nova-admissao__linha-celula">
                         <input
                           type="text"
-                          maxLength={32}
+                          maxLength={120}
                           autoComplete="off"
-                          value={campos.matricula}
+                          placeholder="Ex.: Analista de RH"
+                          aria-label="Cargo"
+                          value={campos.cargoNome}
                           onChange={(e) =>
                             atualizar(
-                              "matricula",
-                              e.target.value.toUpperCase(),
-                              "matricula",
+                              "cargoNome",
+                              e.target.value,
+                              "cargo",
+                              "lotacao",
                             )
                           }
-                          {...control}
+                          {...propsDoCampo("cargo")}
                         />
-                      )}
-                    </FormField>
-                    <FormField
-                      id={ID_DO_CAMPO.tipo}
-                      label="Tipo de vínculo"
-                      required
-                      {...(erros.tipo ? { error: erros.tipo } : {})}
-                    >
-                      {(control) => (
+                        {erroDoCampo("cargo")}
+                      </div>
+                      <div className="nova-admissao__linha-celula">
                         <select
-                          value={campos.tipo}
+                          aria-label="Nível"
+                          value={campos.nivel}
                           onChange={(e) =>
-                            atualizar(
-                              "tipo",
-                              e.target.value as TipoVinculo,
-                              "tipo",
-                            )
+                            atualizar("nivel", e.target.value, "nivel")
                           }
-                          {...control}
+                          {...propsDoCampo("nivel")}
                         >
-                          <option value="">Selecione…</option>
-                          {(
-                            Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]
-                          ).map((tipo) => (
-                            <option key={tipo} value={tipo}>
-                              {ROTULO_TIPO_VINCULO[tipo]}
+                          <option value="">Nível</option>
+                          {OPCOES_NIVEL.map((o) => (
+                            <option key={o.codigo} value={o.codigo}>
+                              {o.rotulo}
                             </option>
                           ))}
                         </select>
-                      )}
-                    </FormField>
-                    <FormField
-                      id={ID_DO_CAMPO.dataAdmissao}
-                      label="Data de admissão"
-                      required
-                      help="Data futura deixa o ato de admissão programado para ela."
-                      {...(erros.dataAdmissao
-                        ? { error: erros.dataAdmissao }
-                        : {})}
-                    >
-                      {(control) => (
-                        <input
-                          type="date"
-                          value={campos.dataAdmissao}
-                          onChange={(e) =>
-                            atualizar(
-                              "dataAdmissao",
-                              e.target.value,
-                              "dataAdmissao",
-                            )
-                          }
-                          {...control}
-                        />
-                      )}
-                    </FormField>
-                  </div>
-                </section>
-                <section
-                  className="nova-admissao__grupo"
-                  aria-labelledby="nova-admissao-grupo-lotacao"
-                >
-                  <h3
-                    id="nova-admissao-grupo-lotacao"
-                    className="nova-admissao__grupo-titulo"
-                  >
-                    Lotação inicial
-                  </h3>
-                  {/* T179 — um seletor por referência. T196 — Departamento,
-                  Cargo, Unidade e Centro de custo são escolhidos pela busca
-                  no servidor, de 20 em 20; em duas colunas, para o campo de
-                  busca caber ao lado dos botões de 44 px. Departamento e
-                  Cargo (obrigatórios) primeiro; a Área logo abaixo do
-                  Departamento que a filtra; os demais opcionais depois. */}
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    <SeletorDeReferencia
-                      id={ID_DO_CAMPO.departamento}
-                      rotulo="Departamento"
-                      rotuloVisivel="Departamento"
-                      plural="departamentos"
-                      nenhum="Nenhum"
-                      ativo="ativo"
-                      obrigatorio
-                      {...(erros.departamento
-                        ? { erro: erros.departamento }
-                        : {})}
-                      escolhida={referenciaPorId(
-                        opcoes.departamentos,
-                        campos.departamentoId,
-                      )}
-                      onEscolher={(r) => {
-                        if (r) conhecer("departamentos", r);
-                        void selecionarDepartamento(r?.id ?? "");
-                      }}
-                      listar={consultaDe(listarDepartamentos)}
-                      desabilitado={carregandoOpcoes}
-                      versao={versaoDaBusca.departamento}
-                      acao={botaoNovaReferencia("departamento")}
-                      criacao={criacaoDe("departamento")}
-                      aviso={avisoDaCriacao.departamento}
-                    />
-                    <SeletorDeReferencia
-                      id={ID_DO_CAMPO.cargo}
-                      rotulo="Cargo"
-                      rotuloVisivel="Cargo"
-                      plural="cargos"
-                      nenhum="Nenhum"
-                      ativo="ativo"
-                      obrigatorio
-                      {...(erros.cargo ? { erro: erros.cargo } : {})}
-                      escolhida={referenciaPorId(opcoes.cargos, campos.cargoId)}
-                      onEscolher={(r) => {
-                        if (r) conhecer("cargos", r);
-                        atualizar("cargoId", r?.id ?? "", "cargo", "lotacao");
-                      }}
-                      listar={consultaDe(listarCargos)}
-                      desabilitado={carregandoOpcoes}
-                      versao={versaoDaBusca.cargo}
-                      acao={botaoNovaReferencia("cargo")}
-                      criacao={criacaoDe("cargo")}
-                      aviso={avisoDaCriacao.cargo}
-                    />
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {seletorDeLotacao({
-                      campo: "area",
-                      rotulo: "Área",
-                      obrigatorio: false,
-                      valor: campos.areaId,
-                      lista: areas,
-                      aoMudar: (id) =>
-                        atualizar("areaId", id, "area", "lotacao"),
-                      ajuda:
-                        "Escolha antes o departamento: a lista mostra só as áreas dele.",
-                      vazio: campos.departamentoId
-                        ? carregandoAreas
-                          ? "Carregando áreas…"
-                          : "Nenhuma área ativa neste departamento"
-                        : "Escolha antes o departamento",
-                      desabilitado: !campos.departamentoId || carregandoAreas,
-                    })}
-                    <SeletorDeReferencia
-                      id={ID_DO_CAMPO.unidade}
-                      rotulo="Unidade"
-                      rotuloVisivel={rotuloOpcional("Unidade")}
-                      plural="unidades"
-                      nenhum="Nenhuma"
-                      ativo="ativa"
-                      obrigatorio={false}
-                      {...(erros.unidade ? { erro: erros.unidade } : {})}
-                      escolhida={referenciaPorId(
-                        opcoes.unidades,
-                        campos.unidadeId,
-                      )}
-                      onEscolher={(r) => {
-                        if (r) conhecer("unidades", r);
-                        atualizar(
-                          "unidadeId",
-                          r?.id ?? "",
-                          "unidade",
-                          "lotacao",
-                        );
-                      }}
-                      listar={consultaDe(listarUnidades)}
-                      desabilitado={carregandoOpcoes}
-                      versao={versaoDaBusca.unidade}
-                      acao={botaoNovaReferencia("unidade")}
-                      criacao={criacaoDe("unidade")}
-                      aviso={avisoDaCriacao.unidade}
-                    />
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {seletorDeLotacao({
-                      campo: "equipe",
-                      rotulo: "Equipe",
-                      obrigatorio: false,
-                      valor: campos.equipeId,
-                      lista: opcoes.equipes,
-                      aoMudar: (id) =>
-                        atualizar("equipeId", id, "equipe", "lotacao"),
-                      vazio: "Nenhuma equipe ativa",
-                    })}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Departamento e área">
+                    <div className="nova-admissao__linha-par nova-admissao__linha-par--seletores">
+                      <SeletorDeReferencia
+                        id={ID_DO_CAMPO.departamento}
+                        rotulo="Departamento"
+                        rotuloVisivel="Departamento"
+                        plural="departamentos"
+                        nenhum="Nenhum"
+                        ativo="ativo"
+                        obrigatorio={false}
+                        placeholder="Departamento"
+                        {...(erros.departamento
+                          ? { erro: erros.departamento }
+                          : {})}
+                        escolhida={referenciaPorId(
+                          opcoes.departamentos,
+                          campos.departamentoId,
+                        )}
+                        onEscolher={(r) => {
+                          if (r) conhecer("departamentos", r);
+                          void selecionarDepartamento(r?.id ?? "");
+                        }}
+                        listar={consultaDe(listarDepartamentos)}
+                        desabilitado={carregandoOpcoes}
+                        versao={versaoDaBusca.departamento}
+                        acao={botaoNovaReferencia("departamento")}
+                        criacao={criacaoDe("departamento")}
+                        aviso={avisoDaCriacao.departamento}
+                      />
+                      {seletorDeLotacao({
+                        campo: "area",
+                        rotulo: "Área",
+                        obrigatorio: false,
+                        valor: campos.areaId,
+                        lista: areas,
+                        aoMudar: (id) =>
+                          atualizar("areaId", id, "area", "lotacao"),
+                        vazio: campos.departamentoId
+                          ? carregandoAreas
+                            ? "Carregando áreas…"
+                            : "Área"
+                          : "Área",
+                        desabilitado: !campos.departamentoId || carregandoAreas,
+                      })}
+                    </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Centro de custo" grupo={false}>
                     <SeletorDeReferencia
                       id={ID_DO_CAMPO.centroCusto}
                       rotulo="Centro de custo"
-                      rotuloVisivel={rotuloOpcional("Centro de custo")}
+                      rotuloVisivel="Centro de custo"
                       plural="centros de custo"
                       nenhum="Nenhum"
                       ativo="ativo"
                       obrigatorio={false}
+                      placeholder="Selecione"
                       {...(erros.centroCusto
                         ? { erro: erros.centroCusto }
                         : {})}
@@ -2876,6 +3249,7 @@ export function NovaAdmissaoScreen({
                           "centroCustoId",
                           r?.id ?? "",
                           "centroCusto",
+                          "cargo",
                           "lotacao",
                         );
                       }}
@@ -2885,7 +3259,70 @@ export function NovaAdmissaoScreen({
                       criacao={criacaoDe("centroCusto")}
                       aviso={avisoDaCriacao.centroCusto}
                     />
-                  </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Unidade"
+                    ajuda="Filial, loja ou local de trabalho."
+                    grupo={false}
+                  >
+                    <SeletorDeReferencia
+                      id={ID_DO_CAMPO.unidade}
+                      rotulo="Unidade"
+                      rotuloVisivel="Unidade"
+                      plural="unidades"
+                      nenhum="Nenhuma"
+                      ativo="ativa"
+                      obrigatorio={false}
+                      placeholder="Selecione"
+                      {...(erros.unidade ? { erro: erros.unidade } : {})}
+                      escolhida={referenciaPorId(
+                        opcoes.unidades,
+                        campos.unidadeId,
+                      )}
+                      onEscolher={(r) => {
+                        if (r) conhecer("unidades", r);
+                        atualizar(
+                          "unidadeId",
+                          r?.id ?? "",
+                          "unidade",
+                          "cargo",
+                          "lotacao",
+                        );
+                      }}
+                      listar={consultaDe(listarUnidades)}
+                      desabilitado={carregandoOpcoes}
+                      versao={versaoDaBusca.unidade}
+                      acao={botaoNovaReferencia("unidade")}
+                      criacao={criacaoDe("unidade")}
+                      aviso={avisoDaCriacao.unidade}
+                    />
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Gestor direto"
+                    ajuda="Recebe as solicitações do colaborador."
+                    paraId={ID_DO_CAMPO.gestorDireto}
+                  >
+                    <select
+                      value={campos.gestorDiretoId}
+                      onChange={(e) =>
+                        atualizar(
+                          "gestorDiretoId",
+                          e.target.value,
+                          "gestorDireto",
+                        )
+                      }
+                      {...propsDoCampo("gestorDireto")}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="sem_gestor">Sem gestor</option>
+                      {gestores.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.cargo ? `${g.nome} — ${g.cargo}` : g.nome}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("gestorDireto")}
+                  </LinhaDoCadastro>
                   {erros.lotacao ? (
                     <p
                       className="nova-admissao__erro-geral"
@@ -2896,64 +3333,292 @@ export function NovaAdmissaoScreen({
                       {erros.lotacao}
                     </p>
                   ) : null}
-                </section>
-                {/* T183 — jornada de trabalho OPCIONAL, só para o RH: o DP admite,
-            mas não atribui jornada. A vigência começa na data de admissão. */}
-                {papelDoAtor === "rh" ? (
-                  <section
-                    className="nova-admissao__grupo"
-                    aria-labelledby="nova-admissao-grupo-jornada"
+                </SecaoDoCadastro>
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-contrato"
+                  titulo="Contrato"
+                  descricao="Tipo de vínculo, admissão, jornada, escala e matrícula."
+                >
+                  <LinhaDoCadastro
+                    rotulo="Tipo de contratação"
+                    paraId={ID_DO_CAMPO.tipo}
                   >
-                    <h3
-                      id="nova-admissao-grupo-jornada"
-                      className="nova-admissao__grupo-titulo"
+                    <select
+                      aria-required="true"
+                      value={campos.tipo}
+                      onChange={(e) =>
+                        atualizar("tipo", e.target.value as TipoVinculo, "tipo")
+                      }
+                      {...propsDoCampo("tipo")}
                     >
-                      Jornada de trabalho
-                    </h3>
-                    <div className="nova-admissao__linha nova-admissao__linha--3">
-                      <FormField
-                        id={ID_DO_CAMPO.jornada}
-                        label={rotuloOpcional("Jornada de trabalho")}
-                        help="Só jornadas ativas. A vigência começa na data de admissão."
-                        {...(erros.jornada ? { error: erros.jornada } : {})}
-                      >
-                        {(control) => (
-                          <select
-                            value={campos.tabelaHorarioId}
-                            onChange={(e) =>
-                              atualizar(
-                                "tabelaHorarioId",
-                                e.target.value,
-                                "jornada",
-                              )
-                            }
-                            disabled={carregandoOpcoes}
-                            {...control}
-                          >
-                            <option value="">Sem jornada por enquanto</option>
-                            {opcoes.jornadas.map((j) => (
-                              <option key={j.id} value={j.id}>
-                                {rotuloDaJornada(j)}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </FormField>
+                      <option value="">Selecione</option>
+                      {TIPOS_DE_CONTRATACAO.map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                          {ROTULO_TIPO_VINCULO[tipo]}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("tipo")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Data de admissão"
+                    paraId={ID_DO_CAMPO.dataAdmissao}
+                  >
+                    <input
+                      type="date"
+                      aria-required="true"
+                      value={campos.dataAdmissao}
+                      onChange={(e) =>
+                        atualizar(
+                          "dataAdmissao",
+                          e.target.value,
+                          "dataAdmissao",
+                        )
+                      }
+                      {...propsDoCampo("dataAdmissao")}
+                    />
+                    {erroDoCampo("dataAdmissao")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Jornada de trabalho"
+                    paraId={ID_DO_CAMPO.jornadaSemanalHoras}
+                  >
+                    <div className="nova-admissao__com-sufixo">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        placeholder="44"
+                        value={campos.jornadaSemanalHoras}
+                        onChange={(e) =>
+                          atualizar(
+                            "jornadaSemanalHoras",
+                            e.target.value.replace(/\D/g, ""),
+                            "jornadaSemanalHoras",
+                          )
+                        }
+                        {...propsDoCampo("jornadaSemanalHoras")}
+                      />
+                      <span aria-hidden="true">horas por semana</span>
                     </div>
-                    {jornadasIndisponiveis ? (
-                      <p className="nova-admissao__texto">
-                        Não foi possível carregar as jornadas. A admissão pode
-                        seguir sem jornada; atribua depois, na ficha do
-                        colaborador.
-                      </p>
-                    ) : !carregandoJornadas && opcoes.jornadas.length === 0 ? (
-                      <p className="nova-admissao__texto">
-                        Nenhuma jornada ativa nesta empresa. A admissão segue
-                        sem jornada.
-                      </p>
-                    ) : null}
-                  </section>
-                ) : null}
+                    {erroDoCampo("jornadaSemanalHoras")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Escala de trabalho"
+                    ajuda="Sem escala, os benefícios usam os dias úteis do mês."
+                    paraId={ID_DO_CAMPO.escala}
+                  >
+                    <select
+                      value={campos.escala}
+                      onChange={(e) =>
+                        atualizar("escala", e.target.value, "escala")
+                      }
+                      {...propsDoCampo("escala")}
+                    >
+                      <option value="">Selecione a escala</option>
+                      {OPCOES_ESCALA.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.descricao ? `${o.nome} — ${o.descricao}` : o.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Matrícula"
+                    paraId={ID_DO_CAMPO.matricula}
+                    dica={
+                      <>
+                        <button
+                          type="button"
+                          className="nova-admissao__dica"
+                          aria-label="Sobre Matrícula"
+                          aria-expanded={dicaDaMatricula}
+                          aria-controls="nova-admissao-dica-matricula"
+                          onClick={() => setDicaDaMatricula((v) => !v)}
+                        >
+                          ?
+                        </button>
+                        {dicaDaMatricula ? (
+                          <span
+                            id="nova-admissao-dica-matricula"
+                            role="tooltip"
+                            className="nova-admissao__dica-texto"
+                          >
+                            {DICA_DA_MATRICULA}
+                          </span>
+                        ) : null}
+                      </>
+                    }
+                  >
+                    <input
+                      type="text"
+                      maxLength={30}
+                      autoComplete="off"
+                      placeholder="Ex.: 000123"
+                      value={campos.matricula}
+                      onChange={(e) =>
+                        atualizar(
+                          "matricula",
+                          e.target.value.toUpperCase(),
+                          "matricula",
+                        )
+                      }
+                      {...propsDoCampo("matricula")}
+                    />
+                    {erroDoCampo("matricula")}
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-remuneracao"
+                  titulo="Remuneração"
+                  descricao="Valores mensais usados na folha."
+                >
+                  <LinhaDoCadastro
+                    rotulo="Salário bruto"
+                    paraId={ID_DO_CAMPO.salarioBruto}
+                  >
+                    <div className="nova-admissao__com-prefixo">
+                      <span aria-hidden="true">R$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        aria-required="true"
+                        value={campos.salarioBruto}
+                        onChange={(e) =>
+                          atualizar(
+                            "salarioBruto",
+                            mascararReais(e.target.value),
+                            "salarioBruto",
+                          )
+                        }
+                        {...propsDoCampo("salarioBruto")}
+                      />
+                    </div>
+                    {erroDoCampo("salarioBruto")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Salário líquido"
+                    ajuda="Calculado a partir do bruto."
+                    paraId="nova-admissao-salario-liquido"
+                  >
+                    <div className="nova-admissao__com-prefixo">
+                      <span aria-hidden="true">R$</span>
+                      <input
+                        id="nova-admissao-salario-liquido"
+                        type="text"
+                        readOnly
+                        placeholder="—"
+                        value={salarioLiquidoExibido}
+                      />
+                    </div>
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-adicionais"
+                  titulo="Informações adicionais"
+                  descricao="Registro profissional e deduções."
+                >
+                  <LinhaDoCadastro
+                    rotulo="Conselho e registro"
+                    ajuda="Obrigatório para algumas profissões."
+                  >
+                    <div className="nova-admissao__linha-par">
+                      <div className="nova-admissao__linha-celula">
+                        <select
+                          aria-label="Conselho"
+                          value={campos.conselhoProfissional}
+                          onChange={(e) => {
+                            const valor = e.target.value;
+                            atualizar(
+                              "conselhoProfissional",
+                              valor,
+                              "conselhoProfissional",
+                              "registroProfissional",
+                            );
+                            if (!valor || valor === "nenhum") {
+                              atualizar("registroProfissional", "");
+                            }
+                          }}
+                          {...propsDoCampo("conselhoProfissional")}
+                        >
+                          <option value="">Selecione</option>
+                          {OPCOES_CONSELHO.map((o) => (
+                            <option key={o.codigo} value={o.codigo}>
+                              {o.rotulo}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="nova-admissao__linha-celula">
+                        <input
+                          type="text"
+                          maxLength={40}
+                          autoComplete="off"
+                          placeholder="Ex.: 123456/SP"
+                          aria-label="Número do registro"
+                          disabled={
+                            !campos.conselhoProfissional ||
+                            campos.conselhoProfissional === "nenhum"
+                          }
+                          value={campos.registroProfissional}
+                          onChange={(e) =>
+                            atualizar(
+                              "registroProfissional",
+                              e.target.value,
+                              "registroProfissional",
+                            )
+                          }
+                          {...propsDoCampo("registroProfissional")}
+                        />
+                        {erroDoCampo("registroProfissional")}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Dependentes (IRRF)"
+                    paraId={ID_DO_CAMPO.dependentesIrrf}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={2}
+                      value={campos.dependentesIrrf}
+                      onChange={(e) =>
+                        atualizar(
+                          "dependentesIrrf",
+                          e.target.value.replace(/\D/g, ""),
+                          "dependentesIrrf",
+                        )
+                      }
+                      {...propsDoCampo("dependentesIrrf")}
+                    />
+                    {erroDoCampo("dependentesIrrf")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Pensão alimentícia"
+                    paraId={ID_DO_CAMPO.pensaoAlimenticiaPercentual}
+                  >
+                    <div className="nova-admissao__com-sufixo">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        maxLength={6}
+                        value={campos.pensaoAlimenticiaPercentual}
+                        onChange={(e) =>
+                          atualizar(
+                            "pensaoAlimenticiaPercentual",
+                            e.target.value.replace(/[^\d,.]/g, ""),
+                            "pensaoAlimenticiaPercentual",
+                          )
+                        }
+                        {...propsDoCampo("pensaoAlimenticiaPercentual")}
+                      />
+                      <span aria-hidden="true">%</span>
+                    </div>
+                    {erroDoCampo("pensaoAlimenticiaPercentual")}
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
               </>,
             )}
 
@@ -3425,19 +4090,20 @@ function IndicadorDeEtapas({
 function ProgressoDaAdmissao({ atual }: { readonly atual: IndiceEtapa }) {
   const progresso = ((atual + 1) / ETAPAS.length) * 100;
   return (
+    // T209 — a barra (trilho e preenchimento) e, à direita, "% concluído".
     <div className="nova-admissao__progresso">
-      <p
-        id="nova-admissao-progresso"
-        className="nova-admissao__progresso-texto"
-      >
-        {progresso}% concluído
-      </p>
       <progress
         className="nova-admissao__progresso-barra"
         max={100}
         value={progresso}
         aria-labelledby="nova-admissao-progresso"
       />
+      <p
+        id="nova-admissao-progresso"
+        className="nova-admissao__progresso-texto"
+      >
+        {progresso}% concluído
+      </p>
     </div>
   );
 }
@@ -3710,6 +4376,62 @@ function ConfirmacaoDaAdmissao({
               : null
           }
         />
+        {/* T209 — o contrato que o servidor gravou (etapa 2). */}
+        {admissao.contrato ? (
+          <ResumoGravado
+            titulo="Contrato"
+            id="nova-admissao-sucesso-contrato"
+            linhas={[
+              [
+                "Nível",
+                OPCOES_NIVEL.find((o) => o.codigo === admissao.contrato?.nivel)
+                  ?.rotulo ?? null,
+              ],
+              [
+                "Jornada de trabalho",
+                admissao.contrato.jornadaSemanalHoras
+                  ? `${admissao.contrato.jornadaSemanalHoras} horas por semana`
+                  : null,
+              ],
+              [
+                "Escala de trabalho",
+                OPCOES_ESCALA.find(
+                  (o) => o.codigo === admissao.contrato?.escala,
+                )?.nome ?? null,
+              ],
+              [
+                "Salário bruto",
+                admissao.contrato.salarioBruto
+                  ? `R$ ${formatarReais(Number(admissao.contrato.salarioBruto))}`
+                  : null,
+              ],
+              [
+                "Conselho e registro",
+                admissao.contrato.conselhoProfissional
+                  ? [
+                      admissao.contrato.conselhoProfissional.toUpperCase(),
+                      admissao.contrato.registroProfissional ?? "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  : null,
+              ],
+              [
+                "Dependentes (IRRF)",
+                admissao.contrato.dependentesIrrf === null ||
+                admissao.contrato.dependentesIrrf === undefined
+                  ? null
+                  : String(admissao.contrato.dependentesIrrf),
+              ],
+              [
+                "Pensão alimentícia",
+                admissao.contrato.pensaoAlimenticiaPercentual
+                  ? `${admissao.contrato.pensaoAlimenticiaPercentual.replace(".", ",")}%`
+                  : null,
+              ],
+            ]}
+          />
+        ) : null}
         <ResumoGravado
           titulo="Endereço"
           id="nova-admissao-sucesso-endereco"
@@ -3958,11 +4680,21 @@ function LinhaDoCadastro({
   rotulo,
   ajuda,
   paraId,
+  dica,
+  grupo = true,
   children,
 }: {
   readonly rotulo: string;
   readonly ajuda?: string;
   readonly paraId?: string;
+  /**
+   * Sem `paraId`, a linha é um grupo nomeado pelo rótulo. `false` quando o
+   * único campo dela já tem nome próprio (um seletor com rótulo): o rótulo
+   * fica só visual, sem nomear duas vezes.
+   */
+  readonly grupo?: boolean;
+  /** T209 — ajuda extra ao lado do rótulo (o "?" da matrícula). */
+  readonly dica?: ReactNode;
   readonly children: ReactNode;
 }) {
   const base = useId();
@@ -3970,22 +4702,27 @@ function LinhaDoCadastro({
   return (
     <div
       className="nova-admissao__linha-cadastro"
-      {...(paraId ? {} : { role: "group", "aria-labelledby": idRotulo })}
+      {...(paraId || !grupo
+        ? {}
+        : { role: "group", "aria-labelledby": idRotulo })}
     >
       <div className="nova-admissao__linha-rotulo">
-        {paraId ? (
-          <label
-            id={idRotulo}
-            htmlFor={paraId}
-            className="nova-admissao__linha-titulo"
-          >
-            {rotulo}
-          </label>
-        ) : (
-          <p id={idRotulo} className="nova-admissao__linha-titulo">
-            {rotulo}
-          </p>
-        )}
+        <div className="nova-admissao__linha-cabeca">
+          {paraId ? (
+            <label
+              id={idRotulo}
+              htmlFor={paraId}
+              className="nova-admissao__linha-titulo"
+            >
+              {rotulo}
+            </label>
+          ) : (
+            <p id={idRotulo} className="nova-admissao__linha-titulo">
+              {rotulo}
+            </p>
+          )}
+          {dica}
+        </div>
         {ajuda ? <p className="nova-admissao__linha-ajuda">{ajuda}</p> : null}
       </div>
       <div className="nova-admissao__linha-campos">{children}</div>

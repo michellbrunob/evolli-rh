@@ -109,6 +109,9 @@ const ROTULO_TIPO: Record<TipoVinculo, string> = {
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 /** T207 — o nome de cada aba, na ordem da rota. */
