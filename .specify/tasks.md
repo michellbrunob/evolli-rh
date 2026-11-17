@@ -3496,6 +3496,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         26 testes (9 novos); API unitária 67 suítes, 1585 testes; web 146 arquivos, 4242 testes numa rodada limpa; 4 mutações detectadas; validado no navegador
         com armazenamento em memória (desktop e 375 px) e uma validação real no R2 com imagem
         sintética (credenciais mantidas por decisão da usuária).
+      - **Novo colaborador, etapa 1 e moldura (seção 34):** CPF (dígitos verificadores, único na
+        empresa), RG, gênero, estado civil e contato de emergência; nascimento opcional; nome com
+        3+ letras; linhas com rótulo e ajuda à esquerda; rodapé com "% concluído". Migration
+        `20261117120000_cadastro_etapa_1`. E2E 26 suítes / 1142; API 67 / 1587; web 146 / 4240.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

@@ -1165,3 +1165,80 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
   Sintetica Foto" deixaram de ser referenciadas quando a foto foi trocada na prévia em memória.
   Lá a remoção foi feita na memória, não no bucket, e por isso nenhuma limpeza pendente foi
   registrada. Seguem no bucket até uma remoção manual.
+
+## 34. Novo colaborador: etapa 1 (dados básicos) e moldura (2026-11-17)
+
+### 34.1 Decisões da proprietária (2026-11-17)
+
+- As quatro etapas do Novo colaborador ganham um desenho novo, com campos, posições, listas e
+  textos definidos pela proprietária. A entrega vai etapa por etapa.
+- **Obrigatórios do cadastro manual:** só o nome (pelo menos 3 letras), o CPF e o salário bruto
+  (este na etapa 2). Isso revoga, nesses pontos, a decisão de 2026-10-21: a data de nascimento,
+  o tipo, a admissão, o departamento e o cargo passam a opcionais.
+  - Nesta fatia, só a data de nascimento mudou.
+  - As demais mudanças entram com a etapa 2.
+- **Etapa 2:** cargo em texto livre, mais Nível; tipo de contratação com CLT, PJ, Estágio,
+  Aprendiz, Part-time, Freelancer e Trainee; jornada em horas por semana, mais escala, sem
+  ligar à tabela de horário na admissão.
+
+### 34.2 Servidor
+
+- **Migration aditiva** `20261117120000_cadastro_etapa_1`:
+  - `data_nascimento` deixa de ser obrigatória;
+  - o perfil pessoal ganha CPF (só os 11 dígitos), RG, gênero (lista fechada: feminino,
+    masculino, outro, prefiro não informar) e o contato de emergência (nome e telefone em +55);
+  - CHECKs de forma e índice único (empresa, CPF);
+  - cinco nomes de campo novos na trilha, nunca valores.
+- **CPF:**
+  - a máscara é aceita na entrada;
+  - os dígitos verificadores são conferidos;
+  - repetido na empresa, responde 409 em `perfilPessoal.cpf`, sem ecoar o valor;
+  - em outra empresa, é aceito.
+- **Nome:** pelo menos 3 letras e até 150 caracteres, na admissão e na retificação.
+- **Perfil vazio:** sem nenhum valor, não é criado.
+- **Edição da ficha:** CPF, RG, gênero e emergência ausentes do corpo mantêm o que está
+  gravado.
+- **Rascunho:** aceita os campos novos.
+- **Admissão sem CPF:** a API aceita, porque a importação por planilha não traz CPF; a tela
+  o exige.
+
+### 34.3 Tela
+
+- **Moldura:**
+  - etapas com subtítulo (Dados básicos / Informações pessoais; Dados profissionais / Cargo e
+    contrato; Endereço / Residência; a 4ª segue como revisão até a fatia dos documentos);
+  - cabeçalho da etapa com descrição e o selo "Etapa N de 4";
+  - rodapé com "% concluído", "Cancelar" só na etapa 1 e "Voltar" nas demais;
+  - "Próxima etapa" com seta e "Cadastrar colaborador" no fim.
+- **Etapa 1:** três seções (Identificação, Contato, Contato de emergência). Em cada linha, o
+  rótulo e a ajuda ficam à esquerda e os campos à direita; em tela estreita, um embaixo do
+  outro. As linhas:
+  - Foto;
+  - Nome completo;
+  - CPF e RG (CPF com máscara);
+  - Data de nascimento;
+  - Gênero e estado civil (lista de cinco opções, gravada como texto);
+  - E-mail pessoal;
+  - Telefone pessoal (o celular dos contatos);
+  - Nome e telefone do contato de emergência.
+- **Saíram da etapa 1:** sexo, saudação, nacionalidade, naturalidade, escolaridade, curso, pai,
+  mãe e o telefone fixo. Continuam na ficha.
+- **Ficha:** a data de nascimento ficou opcional também na edição.
+
+### 34.4 Provas
+
+- **Testes:**
+  - E2E da etapa 1 com PostgreSQL real: 10 (migration, admissão completa sem nascimento,
+    dígito verificador, CPF repetido na empresa e aceito em outra, gênero fora da lista,
+    emergência inválida, regra do nome, retificação, admissão sem CPF, ficha que mantém os
+    campos ausentes);
+  - bateria E2E serial: 26 suítes, 1142 testes, com 4 ajustes de regra;
+  - API unitária: 67 suítes, 1587 testes;
+  - web: 146 arquivos, 4240 testes;
+  - mutações detectadas: 4.
+- **Navegador (RH):**
+  - etapa vazia → "Informe o nome completo (pelo menos 3 letras)." e "Informe o CPF."
+    embaixo dos campos, com foco no nome;
+  - desktop largo com as etapas à esquerda;
+  - 375 px sem rolagem horizontal.
+- Migration aplicada no banco isolado da prévia.
