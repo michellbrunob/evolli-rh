@@ -7541,3 +7541,91 @@ describe("T209 — contrato de CSS das divisões em Colaboradores", () => {
     expect(dataTable).not.toMatch(/tr:hover/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T209 — a foto do colaborador na listagem: a versão de 96 px pela rota
+// autenticada, preguiçosa, só nas linhas que têm foto; sem foto, iniciais.
+// ---------------------------------------------------------------------------
+describe("T209 — foto na listagem de Colaboradores", () => {
+  const celula = (nome: string) =>
+    screen
+      .getByRole("button", { name: `Abrir ficha de ${nome}` })
+      .closest(".colaboradores-screen__pessoa") as HTMLElement;
+
+  it("linha com foto: avatar de 96 px pela rota autenticada; sem foto, iniciais", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        { ...colaborador1, foto: { versao: 4 } },
+        { ...colaborador2, foto: null },
+      ]),
+    );
+    render(<ComFicha />);
+    await screen.findByRole("button", {
+      name: "Abrir ficha de Ana Colaboradora (teste)",
+    });
+    const img = celula("Ana Colaboradora (teste)").querySelector("img");
+    expect(img).toHaveAttribute(
+      "src",
+      `/v1/colaboradores/${colaborador1.id}/foto?tamanho=96&v=4`,
+    );
+    expect(img).toHaveAttribute("loading", "lazy");
+    expect(img).toHaveAttribute("alt", "");
+    const semFoto = celula("Bruno Colaborador (teste)");
+    expect(semFoto.querySelector("img")).toBeNull();
+    expect(semFoto).toHaveTextContent("BT");
+  });
+
+  it("só as linhas com foto pedem imagem; nada do armazenamento no HTML", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([{ ...colaborador1, foto: { versao: 1 } }, colaborador2]),
+    );
+    const { container } = render(<ComFicha />);
+    await screen.findByRole("button", {
+      name: "Abrir ficha de Ana Colaboradora (teste)",
+    });
+    const imagens = container.querySelectorAll(
+      ".colaboradores-screen__avatar img",
+    );
+    expect(imagens).toHaveLength(1);
+    // A única origem de imagem é a rota autenticada do Evolli.
+    for (const img of imagens) {
+      expect(img.getAttribute("src")).toMatch(
+        /^\/v1\/colaboradores\/[0-9a-f-]+\/foto\?tamanho=96&v=\d+$/,
+      );
+    }
+    expect(container.innerHTML).not.toMatch(
+      /v1\/empresas|foto-(96|256|512)\.webp|cloudflare|bucket/i,
+    );
+  });
+
+  it("falha ao ler a foto da linha: volta às iniciais, a listagem segue", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([{ ...colaborador1, foto: { versao: 1 } }, colaborador2]),
+    );
+    render(<ComFicha />);
+    await screen.findByRole("button", {
+      name: "Abrir ficha de Ana Colaboradora (teste)",
+    });
+    fireEvent.error(celula("Ana Colaboradora (teste)").querySelector("img")!);
+    expect(celula("Ana Colaboradora (teste)").querySelector("img")).toBeNull();
+    expect(celula("Ana Colaboradora (teste)")).toHaveTextContent("AT");
+    expect(
+      screen.getByRole("button", {
+        name: "Abrir ficha de Bruno Colaborador (teste)",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("contrato de CSS: a foto preenche o avatar redondo sem deformar", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/ColaboradoresScreen.css",
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+    expect(css).toMatch(
+      /\.colaboradores-screen__avatar img \{[^}]*object-fit: cover;[^}]*\}/,
+    );
+    expect(css).toMatch(
+      /\.colaboradores-screen__avatar \{[^}]*overflow: hidden;/,
+    );
+  });
+});

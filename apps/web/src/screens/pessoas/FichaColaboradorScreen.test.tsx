@@ -1608,3 +1608,65 @@ function render(
 ) {
   return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
 }
+
+// ---------------------------------------------------------------------------
+// T209 — a foto na área de identificação da ficha: a versão de 256 px pela
+// rota autenticada; sem foto ou com falha de leitura, as iniciais.
+// ---------------------------------------------------------------------------
+describe("T209 — foto na ficha do colaborador", () => {
+  const avatar = () =>
+    cabecalho().querySelector(".ficha-colaborador__avatar") as HTMLElement;
+
+  it("com foto: 256 px pela rota autenticada, no lugar das iniciais", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({
+      ...ana,
+      foto: { versao: 7 },
+    });
+    render(<Ficha />);
+    await esperarFicha();
+    const img = avatar().querySelector("img");
+    expect(img).toHaveAttribute(
+      "src",
+      `/v1/colaboradores/${ana.id}/foto?tamanho=256&v=7`,
+    );
+    expect(img).toHaveAttribute("alt", "");
+    expect(avatar()).not.toHaveTextContent("AT");
+    expect(cabecalho().innerHTML).not.toMatch(
+      /v1\/empresas|foto-(96|256|512)\.webp|cloudflare|bucket/i,
+    );
+  });
+
+  it("sem foto: iniciais, nenhuma imagem", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({ ...ana, foto: null });
+    render(<Ficha />);
+    await esperarFicha();
+    expect(avatar().querySelector("img")).toBeNull();
+    expect(avatar()).toHaveTextContent("AT");
+  });
+
+  it("falha ao ler a foto: volta às iniciais e a ficha segue", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({
+      ...ana,
+      foto: { versao: 1 },
+    });
+    render(<Ficha />);
+    await esperarFicha();
+    fireEvent.error(avatar().querySelector("img")!);
+    expect(avatar().querySelector("img")).toBeNull();
+    expect(avatar()).toHaveTextContent("AT");
+    expect(
+      screen.getByRole("heading", { level: 1, name: ana.nome }),
+    ).toBeInTheDocument();
+  });
+
+  it("contrato de CSS: a foto preenche o avatar da ficha sem deformar", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/FichaColaboradorScreen.css",
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+    expect(css).toMatch(
+      /\.ficha-colaborador__avatar img \{[^}]*object-fit: cover;[^}]*\}/,
+    );
+    expect(css).toMatch(/\.ficha-colaborador__avatar \{[^}]*overflow: hidden;/);
+  });
+});

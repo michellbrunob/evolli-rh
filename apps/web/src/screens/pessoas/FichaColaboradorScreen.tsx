@@ -93,6 +93,7 @@ import { type IconeFichaId, IconeFicha } from "./IconeFicha";
 import { jornadaDeHoje, rotuloDaJornada } from "./jornadaColaborador";
 import { vinculoPrincipal } from "./vinculoPrincipal";
 import "./FichaColaboradorScreen.css";
+import { FotoDoColaborador } from "./FotoDoColaborador";
 
 /** `id` do `h1` da ficha: o shell rotula o `<main>` por ele. */
 export const FICHA_COLABORADOR_TITULO_ID = "ficha-colaborador-titulo";
@@ -858,10 +859,16 @@ function FichaColaboradorConteudo({
           {/* Faixa institucional: só decoração, sem conteúdo. */}
           <div className="ficha-colaborador__faixa" aria-hidden="true" />
           <div className="ficha-colaborador__topo">
-            {/* Avatar neutro por iniciais: o nome já está no h1 ao lado. */}
-            <span className="ficha-colaborador__avatar" aria-hidden="true">
+            {/* T209 — a foto de 256 px quando o servidor a anuncia; senão (ou
+                na falha), as iniciais. O nome já está no h1 ao lado. */}
+            <FotoDoColaborador
+              colaboradorId={estado.colaborador.id}
+              foto={estado.colaborador.foto}
+              tamanho={256}
+              className="ficha-colaborador__avatar"
+            >
               {iniciaisDe(nome)}
-            </span>
+            </FotoDoColaborador>
             <div className="ficha-colaborador__identidade">
               <h1
                 id={FICHA_COLABORADOR_TITULO_ID}

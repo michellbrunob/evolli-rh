@@ -74,6 +74,7 @@ import {
   TabsTrigger,
 } from "../../ui";
 import "./ColaboradoresScreen.css";
+import { FotoDoColaborador } from "./FotoDoColaborador";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
@@ -1085,10 +1086,16 @@ export function ColaboradoresScreen({
       header: "Colaborador",
       cell: (c) => (
         <span className="colaboradores-screen__pessoa">
-          {/* Avatar neutro por iniciais: o nome está ao lado. */}
-          <span className="colaboradores-screen__avatar" aria-hidden="true">
+          {/* T209 — a foto de 96 px, preguiçosa, quando o servidor a anuncia;
+              senão (ou na falha), as iniciais. O nome está ao lado. */}
+          <FotoDoColaborador
+            colaboradorId={c.id}
+            foto={c.foto}
+            tamanho={96}
+            className="colaboradores-screen__avatar"
+          >
             {iniciaisDe(c.nome)}
-          </span>
+          </FotoDoColaborador>
           {onAbrirFicha ? (
             <button
               type="button"

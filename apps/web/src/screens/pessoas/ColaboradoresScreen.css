@@ -304,6 +304,7 @@
   color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
+  overflow: hidden;
 }
 
 .colaboradores-screen__nome {
@@ -962,4 +963,12 @@
 .colaboradores-screen__rodape-tabela {
   padding-top: var(--secao-espaco-compacto);
   border-top: var(--divisor);
+}
+
+/* T209 — a foto do colaborador preenche o avatar redondo, sem deformar. */
+.colaboradores-screen__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

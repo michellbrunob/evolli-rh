@@ -30,7 +30,7 @@ import { RascunhoAdmissaoService } from "./rascunho-admissao/rascunho-admissao.s
 import { FotoColaboradorController } from "./foto-colaborador/foto-colaborador.controller";
 import { FotoColaboradorService } from "./foto-colaborador/foto-colaborador.service";
 import { ARMAZENAMENTO_DE_FOTOS } from "./foto-colaborador/armazenamento-de-objetos";
-import { ArmazenamentoR2 } from "./foto-colaborador/armazenamento-r2";
+import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armazenamento";
 
 @Module({
   imports: [AuthModule, AuditModule],
@@ -57,7 +57,10 @@ import { ArmazenamentoR2 } from "./foto-colaborador/armazenamento-r2";
     RascunhoAdmissaoService,
     FotoColaboradorService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
-    { provide: ARMAZENAMENTO_DE_FOTOS, useClass: ArmazenamentoR2 },
+    {
+      provide: ARMAZENAMENTO_DE_FOTOS,
+      useFactory: () => escolherArmazenamentoDeFotos(),
+    },
   ],
 })
 export class PessoasModule {}

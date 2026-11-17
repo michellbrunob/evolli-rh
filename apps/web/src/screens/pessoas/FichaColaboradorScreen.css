@@ -69,6 +69,7 @@
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   line-height: 1;
+  overflow: hidden;
 }
 
 /* Estados sem dados (carregando, erro, não encontrado): avatar só com o
@@ -426,4 +427,12 @@
 .ficha-colaborador__item:focus-visible {
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
+}
+
+/* T209 — a foto do colaborador preenche o avatar da ficha, sem deformar. */
+.ficha-colaborador__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

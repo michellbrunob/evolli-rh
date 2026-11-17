@@ -22,6 +22,20 @@ export interface ColaboradorApi {
   situacao: SituacaoColaborador;
   criadoEm: string;
   atualizadoEm: string;
+  /**
+   * T209 — a foto do colaborador na empresa ativa, como a listagem e a ficha
+   * a anunciam: só a versão, ou `null` sem foto. Ausente nas respostas que
+   * não a trazem (admissão, retificação).
+   */
+  foto?: FotoAnunciadaApi | null;
+}
+
+/**
+ * T209 — só a versão da foto: a tela monta a rota autenticada
+ * (`/v1/colaboradores/:id/foto`). Nunca chave nem endereço do armazenamento.
+ */
+export interface FotoAnunciadaApi {
+  readonly versao: number;
 }
 
 export interface VinculoApi {
