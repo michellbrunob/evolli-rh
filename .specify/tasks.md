@@ -3500,6 +3500,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         empresa), RG, gênero, estado civil e contato de emergência; nascimento opcional; nome com
         3+ letras; linhas com rótulo e ajuda à esquerda; rodapé com "% concluído". Migration
         `20261117120000_cadastro_etapa_1`. E2E 26 suítes / 1142; API 67 / 1587; web 146 / 4240.
+      - **Novo colaborador, etapa 2 e acabamento (seção 35):** contrato da admissão em tabela própria
+        (migration `20261117160000_cadastro_etapa_2`, tipos part_time/freelancer/trainee),
+        departamento e cargo opcionais com lotação mínima (Baseline V1), cargo digitado que vira
+        cargo do cadastro, líquido calculado na tela; linhas, divisórias, rodapé e fade no novo
+        desenho. E2E 27 suítes / 1167; API 67 / 1587; web 147 / 4239.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

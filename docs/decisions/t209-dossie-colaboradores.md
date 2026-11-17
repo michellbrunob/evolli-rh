@@ -1242,3 +1242,86 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
   - desktop largo com as etapas à esquerda;
   - 375 px sem rolagem horizontal.
 - Migration aplicada no banco isolado da prévia.
+
+## 35. Novo colaborador: etapa 2 (dados profissionais) e acabamento visual (2026-11-17)
+
+### 35.1 Decisões (2026-11-17)
+
+- **Obrigatórios:** tipo de contratação e data de admissão continuam obrigatórios, porque sem
+  eles não há vínculo, nem situação, ponto, dashboard ou efetivação. Departamento e cargo
+  passam a opcionais.
+- **Lotação mínima:** a Baseline V1, item 10, continua valendo: ao menos uma referência
+  (cargo, departamento, unidade ou centro de custo), porque a alocação exige uma por CHECK no
+  banco.
+- **Cargo:** texto livre que vira cargo do cadastro. Ao concluir, a tela usa o cargo ativo de
+  mesmo nome; se não houver, o RH o cria, com código automático (T197). O DP não cria cargo:
+  sem o cargo no cadastro, a recusa fica no campo.
+- **Jornada:** horas por semana e escala; a tabela de horário saiu da admissão. Equipe também
+  saiu do formulário.
+
+### 35.2 Servidor
+
+- **Migration aditiva** `20261117160000_cadastro_etapa_2`:
+  - tipos de contratação `part_time`, `freelancer` e `trainee`;
+  - tabela `contrato_vinculo`, uma linha por vínculo, fora do vínculo para o salário não sair
+    pelas rotas que já devolvem o vínculo. Guarda nível (11 códigos), gestor direto, jornada
+    semanal (1–80), escala (25 códigos), salário bruto (> 0, 2 casas), conselho (15 códigos) e
+    registro (só com conselho, até 40), dependentes para IRRF (0–99) e pensão (0–100 %);
+  - CHECKs para cada lista e faixa.
+- **Admissão:**
+  - aceita o bloco `contrato` e o grava na mesma transação;
+  - o gestor direto precisa ter vínculo na empresa ativa; se não tiver, responde 422 em
+    `contrato.gestorDiretoId`, sem ecoar o id;
+  - sem nenhuma referência de lotação, responde 422;
+  - o reenvio idempotente compara também o contrato;
+  - a resposta traz `contrato`, ou `null`;
+  - a trilha não tem salário nem registro.
+- **Rascunho:** guarda o cargo digitado e o contrato.
+- **Cálculo do líquido:** só na tela, a partir das tabelas de 2026:
+  - INSS progressivo com teto;
+  - pensão sobre (bruto − INSS);
+  - R$ 189,59 de dedução por dependente;
+  - IRRF mensal com o redutor de 2026, que zera até R$ 5.000 e vai até R$ 7.350.
+
+### 35.3 Tela
+
+- **Etapa 2, em quatro seções:**
+  - Cargo e estrutura: cargo e nível; departamento e área; centro de custo; unidade; gestor
+    direto;
+  - Contrato: tipo de contratação (sete opções); data de admissão; jornada em horas por
+    semana; escala com descrição; matrícula com dica;
+  - Remuneração: salário bruto em R$ com máscara; líquido calculado;
+  - Informações adicionais: conselho e número do registro; dependentes (IRRF); pensão em %.
+- **Medidas:**
+  - linhas com divisor fino, 20 px de respiro, rótulo em 260 px e 40 px até o campo;
+  - campos de 42 px com raio de 8 px;
+  - títulos de 22 e 16 px, rótulo de 14 px e ajuda de 13 px;
+  - conteúdo até 808 px.
+- **Divisórias:**
+  - divisória vertical entre etapas e conteúdo, atravessando o rodapé;
+  - etapas ligadas por linha vertical, colorida até a etapa concluída;
+  - o rodapé tem a linha só sobre o conteúdo, a barra com trilho alinhada aos campos e
+    "% concluído" à direita.
+- **Animação:** a etapa entra com fade e um deslocamento curto (220 ms); sem animação para
+  quem pede menos movimento.
+
+### 35.4 Provas
+
+- **Testes:**
+  - E2E da etapa 2 com PostgreSQL real: 26;
+  - bateria E2E serial: 27 suítes / 1167;
+  - API unitária: 67 / 1587;
+  - web: 147 / 4239;
+  - cálculo do líquido: 16 casos (12 contra as tabelas).
+- **Mutações detectadas:**
+  - API: contrato fora da idempotência; gestor sem conferência de empresa;
+  - tela: salário bruto opcional; cargo existente ignorado; DP criando cargo; conflito 409
+    sem reaproveitar a referência (sobreviveu na 1ª rodada; ganhou teste e passou a ser
+    detectada).
+- **Navegador (RH, banco isolado):**
+  - líquido de R$ 5.000,00 → R$ 4.498,49;
+  - R$ 8.000,00 com 1 dependente e 10 % de pensão → R$ 5.579,58;
+  - admissão completa com cargo novo digitado: o cargo foi criado no cadastro com código
+    automático, e o contrato foi gravado e mostrado na confirmação;
+  - barra do rodapé alinhada à coluna dos campos.
+- Migration aplicada no banco isolado da prévia.
