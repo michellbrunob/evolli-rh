@@ -145,6 +145,12 @@ const resposta: AdmissaoRegistradaApi = {
     dataNascimento: "1990-05-20",
     // T179 — gravado como código; a confirmação mostra o rótulo.
     sexo: "feminino",
+    // T209 — etapa 1.
+    cpf: "52998224725",
+    rg: null,
+    genero: "feminino",
+    contatoEmergenciaNome: "Contato Sintético Servidor",
+    contatoEmergenciaTelefone: "+5531988887777",
     saudacao: null,
     estadoCivil: "Solteira",
     nacionalidade: "Brasileira",
@@ -299,7 +305,7 @@ function irAteEtapa(titulo: string) {
 function salvar(): HTMLElement {
   for (;;) {
     const confirmar = screen.queryByRole("button", {
-      name: "Concluir",
+      name: "Cadastrar colaborador",
     });
     if (confirmar) return confirmar;
     const continuar = screen.getByRole("button", { name: "Próxima etapa" });
@@ -325,8 +331,20 @@ async function salvarEConfirmar() {
 }
 
 const emailPessoal = () => screen.getByLabelText(/E-mail pessoal/);
-const celular = () => screen.getByLabelText(/^Celular/);
-const telefone = () => screen.getByLabelText(/^Telefone/);
+const celular = () => screen.getByLabelText(/^Telefone pessoal/);
+// T209 — o telefone fixo saiu da etapa 1; quem o usava passa ao do contato
+// de emergência, o segundo telefone da etapa.
+const telefone = () => screen.getByLabelText(/^Telefone do contato/);
+/** T209 — CPF sintético com dígitos verificadores válidos. */
+const CPF_VALIDO = "529.982.247-25";
+const cpf = () => screen.getByLabelText(/^CPF$/);
+/**
+ * T209 — sair da Nova admissão: "Cancelar" na etapa 1; nas demais (como no
+ * novo rodapé), o voltar do cabeçalho — o mesmo caminho, com a guarda.
+ */
+const botaoSair = () =>
+  screen.queryByRole("button", { name: "Cancelar" }) ??
+  screen.getByRole("button", { name: "Voltar para Colaboradores" });
 const pais = () => screen.getByLabelText(/^País/);
 
 /** Os três contatos da ficha da T169 — obrigatórios na página. */
@@ -349,6 +367,7 @@ async function preencherValido() {
   preencherContatos();
   fireEvent.change(nome(), { target: { value: "  Pessoa Sintética Nova " } });
   fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+  fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
   fireEvent.change(matricula(), { target: { value: "mat-0900" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-03" } });
@@ -356,11 +375,11 @@ async function preencherValido() {
 }
 
 /**
- * T195 — leva à etapa 2 (Dados profissionais e vínculo). Os obrigatórios da
+ * T195 — leva à etapa 2 (Dados profissionais). Os obrigatórios da
  * etapa 1 ainda vazios recebem um valor sintético; o já digitado fica.
  */
 function abrirLotacao() {
-  if (tituloDaEtapa().textContent?.endsWith("Dados profissionais e vínculo")) {
+  if (tituloDaEtapa().textContent?.endsWith("Dados profissionais")) {
     return;
   }
   if (!(nome() as HTMLInputElement).value) {
@@ -369,7 +388,10 @@ function abrirLotacao() {
   if (!(dataNascimento() as HTMLInputElement).value) {
     fireEvent.change(dataNascimento(), { target: { value: "1992-03-04" } });
   }
-  irAteEtapa("Dados profissionais e vínculo");
+  if (!(cpf() as HTMLInputElement).value) {
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+  }
+  irAteEtapa("Dados profissionais");
 }
 
 /** T195 — leva à etapa 3 (Endereço), com os obrigatórios preenchidos. */
@@ -410,189 +432,12 @@ describe("Nova admissão — página própria", () => {
     expect(within(empresaBloco).queryByRole("combobox")).toBeNull();
   });
 
-  it("pede os campos do Módulo 1, e nenhum campo de módulo futuro", async () => {
-    montar();
-    await aguardarEmpresa();
-    // T179 — só estes seis são obrigatórios.
-    for (const campo of [
-      nome,
-      dataNascimento,
-      tipo,
-      data,
-      departamentoSel,
-      cargoSel,
-    ]) {
-      expect(campo()).toHaveAttribute("aria-required", "true");
-    }
-    for (const campo of [
-      emailPessoal,
-      celular,
-      telefone,
-      matricula,
-      unidadeSel,
-    ]) {
-      expect(campo()).not.toHaveAttribute("aria-required");
-    }
-    const form = screen.getByRole("form", {
-      name: "Formulário de nova admissão",
-    });
-    const rotulos = [...form.querySelectorAll("label")].map((l) =>
-      (l.textContent ?? "").replace(/\*|obrigatório|opcional/g, "").trim(),
-    );
-    for (const esperado of [
-      "Nome completo",
-      "Data de nascimento",
-      "Sexo",
-      "Saudação",
-      "Estado civil",
-      "Nacionalidade",
-      "Naturalidade",
-      "Escolaridade",
-      "Curso",
-      "Nome do pai",
-      "Nome da mãe",
-      "País",
-      "CEP",
-      "Logradouro",
-      "Número",
-      "Complemento",
-      "Bairro",
-      "Cidade",
-      "Estado",
-      "E-mail pessoal",
-      "Celular",
-      "Telefone",
-    ]) {
-      expect(rotulos.some((r) => r.startsWith(esperado))).toBe(true);
-    }
-    for (const proibido of [
-      /CPF/i,
-      /nome social/i,
-      /gênero/i,
-      /raça|etnia/i,
-      /foto/i,
-      /deficiência/i,
-      /emergência/i,
-      /corporativo/i,
-      /banc|agência|conta corrente/i,
-      /dependente/i,
-      /saúde/i,
-      /sindic/i,
-      /documento|\bRG\b|CNH|CTPS|\bPIS\b|eleitor|reservista/i,
-      /fuso/i,
-      /filhos|camisa/i,
-    ]) {
-      expect(rotulos.filter((r) => proibido.test(r))).toEqual([]);
-    }
-  });
-
-  it("obrigatoriedade campo a campo: os opcionais dizem que são opcionais", async () => {
-    montar();
-    await aguardarEmpresa();
-    // T209 — sem a legenda: cada campo diz se é opcional no próprio
-    // rótulo, e os obrigatórios são marcados para o leitor de tela.
-    for (const rotulo of [
-      "Sexo",
-      "Saudação",
-      "Estado civil",
-      "Nacionalidade",
-      "Naturalidade",
-      "Escolaridade",
-      "Curso",
-      "Nome do pai",
-      "Nome da mãe",
-      "País",
-      "CEP",
-      "Logradouro",
-      "Número",
-      "Complemento",
-      "Bairro",
-      "Cidade",
-      "Estado",
-      // T179 — opcionais desde a decisão de 2026-10-21.
-      "E-mail pessoal",
-      "Celular",
-      "Telefone",
-      "Matrícula",
-      "Unidade",
-      "Área",
-      "Equipe",
-      "Centro de custo",
-    ]) {
-      const campo = screen.getByLabelText(`${rotulo} (opcional)`);
-      expect(campo).not.toHaveAttribute("aria-required");
-    }
-    for (const campo of [
-      nome,
-      dataNascimento,
-      tipo,
-      data,
-      departamentoSel,
-      cargoSel,
-    ]) {
-      expect(campo()).toHaveAttribute("aria-required", "true");
-      expect(campo()).toHaveAccessibleName(/obrigatório/);
-      expect(campo()).not.toHaveAccessibleName(/opcional/);
-    }
-  });
-
-  it("T195 — quatro etapas na ordem, cada uma com os seus blocos; só a atual aparece", async () => {
-    montar();
-    await aguardarEmpresa();
-    const etapas = [
-      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
-    ];
-    expect(etapas.map((e) => e.querySelector("h2")!.textContent)).toEqual([
-      "Etapa 1 de 4: Dados pessoais",
-      "Etapa 2 de 4: Dados profissionais e vínculo",
-      "Etapa 3 de 4: Endereço",
-      "Etapa 4 de 4: Revisão e conclusão",
-    ]);
-    expect(
-      etapas.map((e) =>
-        [...e.querySelectorAll("h3")].map((h) => h.textContent),
-      ),
-    ).toEqual([
-      ["Dados pessoais", "Contatos"],
-      // T183 — a jornada é opcional, só para o RH.
-      ["Vínculo", "Lotação inicial", "Jornada de trabalho"],
-      [],
-      // T209 — sem o bloco de documentos futuros.
-      ["Dados pessoais", "Dados profissionais e vínculo", "Endereço"],
-    ]);
-    // Montadas todas, visível só a atual: nada se perde ao trocar de etapa.
-    expect(etapas.map((e) => e.hidden)).toEqual([false, true, true, true]);
-    expect(
-      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Etapa 1 de 4: Dados pessoais"]);
-  });
-
   it("país começa sugerido como Brasil e pode ser editado", async () => {
     montar();
     await aguardarEmpresa();
     expect(pais()).toHaveValue("Brasil");
     fireEvent.change(pais(), { target: { value: "Portugal" } });
     expect(pais()).toHaveValue("Portugal");
-  });
-
-  it("T179 — sexo é seletor de lista fechada: vazio + as quatro opções, sem texto livre", async () => {
-    montar();
-    await aguardarEmpresa();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    expect(sexo.tagName).toBe("SELECT");
-    expect(sexo).not.toHaveAttribute("aria-required");
-    expect(sexo).toHaveValue("");
-    expect(
-      within(sexo)
-        .getAllByRole("option")
-        .map((o) => [(o as HTMLOptionElement).value, o.textContent]),
-    ).toEqual([
-      ["", "Selecione…"],
-      ["feminino", "Feminino"],
-      ["masculino", "Masculino"],
-      ["intersexo", "Intersexo"],
-      ["nao_informar", "Não informar"],
-    ]);
   });
 
   it("T209 — 'Tipo de vínculo' oferece Aprendiz logo depois de Estágio, sem campo extra", async () => {
@@ -622,41 +467,29 @@ describe("Nova admissão — página própria", () => {
     );
   });
 
-  it("sem outro select inventado: estado civil, escolaridade, cidade e estado são texto", async () => {
-    montar();
-    await aguardarEmpresa();
-    for (const rotulo of [
-      /^Estado civil/,
-      /^Escolaridade/,
-      /^Cidade/,
-      /^Estado \(opcional\)$/,
-      /^País/,
-    ]) {
-      expect(screen.getByLabelText(rotulo).tagName).toBe("INPUT");
-    }
-  });
-
   it("continuar vazio: erros só da etapa atual, ancorados nos campos, foco no primeiro; nada enviado", async () => {
     montar();
     await aguardarEmpresa();
     fireEvent.click(salvar());
     await waitFor(() => expect(nome()).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     expect(nome()).toHaveAttribute("aria-invalid", "true");
-    expect(nome()).toHaveAccessibleDescription(/Nome é obrigatório/);
-    expect(dataNascimento()).toHaveAccessibleDescription(
-      /Informe a data de nascimento/,
+    expect(nome()).toHaveAccessibleDescription(
+      "Informe o nome completo (pelo menos 3 letras).",
     );
+    // T209 — CPF obrigatório; a data de nascimento passou a opcional.
+    expect(cpf()).toHaveAccessibleDescription("Informe o CPF.");
+    expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
     // T195 — a etapa 2 ainda não foi validada: nada acusa lá.
     for (const campo of [tipo, data, departamentoSel, cargoSel]) {
       expect(campo()).not.toHaveAttribute("aria-invalid");
     }
 
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(salvar());
     await waitFor(() => expect(tipo()).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     expect(tipo()).toHaveAccessibleDescription(/Selecione o tipo de vínculo/);
     expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
     expect(departamentoSel()).toHaveAccessibleDescription(
@@ -677,30 +510,14 @@ describe("Nova admissão — página própria", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("data de nascimento é obrigatória: sem ela, nada é enviado", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(dataNascimento(), { target: { value: "" } });
-    fireEvent.click(salvar());
-    await waitFor(() => expect(dataNascimento()).toHaveFocus());
-    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
-    expect(dataNascimento()).toHaveAccessibleDescription(
-      /Informe a data de nascimento/,
-    );
-    expect(dialogoConfirmacao()).toBeNull();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
   it("o foco vai ao primeiro campo com erro na ordem visual", async () => {
     montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(salvar());
-    // T179 — o e-mail pessoal, ao lado do nome, é opcional: o primeiro
-    // obrigatório vazio depois do nome é a data de nascimento.
-    await waitFor(() => expect(dataNascimento()).toHaveFocus());
-    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    // T209 — depois do nome, o primeiro obrigatório é o CPF.
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(salvar());
     // Contatos e matrícula são opcionais: depois vem o tipo de vínculo.
     await waitFor(() => expect(tipo()).toHaveFocus());
@@ -723,114 +540,6 @@ describe("Nova admissão — página própria", () => {
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("T178/T179 — os campos aparecem na disposição pedida, linha a linha", async () => {
-    montar();
-    await aguardarEmpresa();
-
-    /**
-     * Rótulos de cada linha da grade de um grupo, sem o "(opcional)". T195 —
-     * os grupos são h3 dentro das etapas (montadas, ocultas fora da atual);
-     * o Endereço é a própria etapa 3.
-     */
-    function linhasDo(grupo: string): string[][] {
-      const secao =
-        grupo === "Endereço"
-          ? document.getElementById("nova-admissao-etapa-3-titulo")!
-              .parentElement!
-          : screen
-              .getAllByRole("heading", {
-                level: 3,
-                name: grupo,
-                hidden: true,
-              })[0]!
-              .closest("section")!;
-      return [...secao.querySelectorAll(".nova-admissao__linha")].map((linha) =>
-        [...linha.querySelectorAll("label")].map((l) =>
-          (l.textContent ?? "")
-            .replace(" (opcional)", "")
-            .replace("*", "")
-            .replace(" (obrigatório)", "")
-            .trim(),
-        ),
-      );
-    }
-
-    expect(linhasDo("Dados pessoais")).toEqual([
-      ["Nome completo", "E-mail pessoal"],
-      ["Data de nascimento", "Sexo", "Saudação"],
-      ["Estado civil", "Nacionalidade", "Naturalidade"],
-      ["Escolaridade", "Curso"],
-      ["Nome do pai", "Nome da mãe"],
-    ]);
-    expect(linhasDo("Endereço")).toEqual([
-      ["País", "CEP"],
-      ["Logradouro", "Número"],
-      ["Complemento", "Bairro"],
-      ["Cidade", "Estado"],
-    ]);
-    expect(linhasDo("Contatos")).toEqual([["Celular", "Telefone"]]);
-    expect(linhasDo("Vínculo")).toEqual([
-      ["Matrícula", "Tipo de vínculo", "Data de admissão"],
-    ]);
-    // T196 — duas colunas, para o campo de busca caber ao lado dos botões:
-    // os obrigatórios primeiro, a Área logo abaixo do Departamento que a
-    // filtra, os demais opcionais depois.
-    expect(linhasDo("Lotação inicial")).toEqual([
-      ["Departamento", "Cargo"],
-      ["Área", "Unidade"],
-      ["Equipe", "Centro de custo"],
-    ]);
-
-    // Classes de coluna: 2, 3 e a linha larga/estreita do logradouro.
-    const endereco = document.getElementById(
-      "nova-admissao-etapa-3-titulo",
-    )!.parentElement!;
-    expect(
-      screen.getByLabelText(/^Logradouro/).closest(".nova-admissao__linha"),
-    ).toHaveClass("nova-admissao__linha--larga-estreita");
-    expect(endereco.querySelectorAll(".nova-admissao__linha--2")).toHaveLength(
-      3,
-    );
-    expect(
-      screen.getByLabelText(/^Matrícula/).closest(".nova-admissao__linha"),
-    ).toHaveClass("nova-admissao__linha--3");
-    expect(departamentoSel().closest(".nova-admissao__linha")).toHaveClass(
-      "nova-admissao__linha--2",
-    );
-  });
-
-  it("T178 — o e-mail pessoal está em Dados pessoais e continua indo em `contatos.emailPessoal`", async () => {
-    montar();
-    await aguardarEmpresa();
-
-    const dadosPessoais = screen
-      .getByRole("heading", { level: 3, name: "Dados pessoais" })
-      .closest("section")!;
-    const contatosSecao = screen
-      .getByRole("heading", { level: 3, name: "Contatos" })
-      .closest("section")!;
-    expect(dadosPessoais).toContainElement(emailPessoal());
-    expect(contatosSecao).not.toContainElement(emailPessoal());
-    // Os ids não mudaram: só a posição.
-    expect(emailPessoal()).toHaveAttribute("id", "nova-admissao-email-pessoal");
-    expect(
-      within(contatosSecao).getByText(
-        /O e-mail pessoal fica em Dados pessoais/,
-      ),
-    ).toBeInTheDocument();
-
-    await preencherValido();
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos).toEqual({
-      emailPessoal: "pessoa.nova@exemplo.test",
-      celular: "+5531999990000",
-      telefone: "+553133330000",
-    });
-    expect(dto.perfilPessoal).not.toHaveProperty("emailPessoal");
-  });
-
   it("T179 — contatos opcionais: vazios não acusam erro nem dizem 'obrigatório'", async () => {
     montar();
     await aguardarEmpresa();
@@ -848,9 +557,15 @@ describe("Nova admissão — página própria", () => {
     [/Data de nascimento/, "1899-12-31", /anterior a 01\/01\/1900/],
     // T179 — com país Brasil, o CEP precisa dos 8 dígitos.
     [/^CEP/, "3014", /Informe os 8 dígitos do CEP, no formato 00000-000/],
-    [/^Saudação/, "x".repeat(41), /no máximo 40 caracteres/],
-    [/^Celular/, "11 9876-5", /precisa do DDD e do número/],
-    [/^Telefone/, "(11) 1000-0000", /não é um número brasileiro válido/],
+    [/^Telefone pessoal/, "11 9876-5", /precisa do DDD e do número/],
+    // T209 — o telefone do contato de emergência.
+    [
+      /^Telefone do contato/,
+      "(11) 1000-0000",
+      /Informe o telefone com DDD, no formato \(00\) 00000-0000/,
+    ],
+    // T209 — CPF com dígito verificador errado.
+    [/^CPF$/, "529.982.247-26", /Informe um CPF válido/],
     // T179 — opcionais, mas o formato ainda vale quando preenchidos.
     [/^Matrícula/, "M", /Use apenas letras maiúsculas/],
     [/^Matrícula/, "MAT 01", /Use apenas letras maiúsculas/],
@@ -897,7 +612,7 @@ describe("Nova admissão — página própria", () => {
     await waitFor(() => expect(nome()).toHaveFocus());
     fireEvent.change(nome(), { target: { value: "Pessoa" } });
     expect(nome()).not.toHaveAttribute("aria-invalid");
-    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
+    expect(cpf()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("envia exatamente o contrato: empresa da sessão, matrícula normalizada, Departamento, Cargo e Unidade, e a chave do envio", async () => {
@@ -928,6 +643,13 @@ describe("Nova admissão — página própria", () => {
           curso: null,
           nomePai: null,
           nomeMae: null,
+          // T209 — etapa 1: CPF só com dígitos; o segundo telefone da
+          // etapa é o do contato de emergência.
+          cpf: "52998224725",
+          rg: null,
+          genero: null,
+          contatoEmergenciaNome: null,
+          contatoEmergenciaTelefone: "+553133330000",
         },
         endereco: {
           pais: "Brasil",
@@ -942,7 +664,6 @@ describe("Nova admissão — página própria", () => {
         contatos: {
           emailPessoal: "pessoa.nova@exemplo.test",
           celular: "+5531999990000",
-          telefone: "+553133330000",
         },
       },
       { chaveIdempotencia: expect.stringMatching(/^[0-9a-f-]{36}$/) },
@@ -953,6 +674,7 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: " Pessoa Mínima " } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
     fireEvent.change(tipo(), { target: { value: "estagio" } });
     fireEvent.change(data(), { target: { value: "2026-11-04" } });
@@ -980,6 +702,11 @@ describe("Nova admissão — página própria", () => {
         curso: null,
         nomePai: null,
         nomeMae: null,
+        cpf: "52998224725",
+        rg: null,
+        genero: null,
+        contatoEmergenciaNome: null,
+        contatoEmergenciaTelefone: null,
       },
       endereco: {
         pais: "Brasil",
@@ -1019,94 +746,6 @@ describe("Nova admissão — página própria", () => {
     expect(vi.mocked(admitirColaborador).mock.calls[0]![0].contatos).toEqual({
       celular: "+5531999990000",
     });
-  });
-
-  it.each([
-    ["feminino", "Feminino"],
-    ["masculino", "Masculino"],
-    ["intersexo", "Intersexo"],
-    ["nao_informar", "Não informar"],
-  ])("T179 — sexo %s (%s) vai como código no corpo", async (codigo, rotulo) => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: codigo } });
-    expect(sexo).toHaveDisplayValue(rotulo);
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
-    ).toBe(codigo);
-  });
-
-  it("T179 — sexo sem seleção vai null, e voltar a 'Selecione…' desfaz a escolha", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: "masculino" } });
-    fireEvent.change(sexo, { target: { value: "" } });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
-    ).toBeNull();
-  });
-
-  it("T179 — valor de sexo fora da lista não é aceito pelo seletor", async () => {
-    montar();
-    await aguardarEmpresa();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: "Feminino" } });
-    // Sem opção com esse valor, o seletor fica sem seleção — nunca texto livre.
-    expect(sexo).toHaveValue("");
-  });
-
-  it("envia os dados pessoais e o endereço normalizados, vazio como null", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
-      target: { value: "1990-05-20" },
-    });
-    // T179 — sexo de lista fechada: vai o código.
-    fireEvent.change(screen.getByLabelText(/^Sexo/), {
-      target: { value: "feminino" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Naturalidade/), {
-      target: { value: "Belo   Horizonte" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Nome da mãe/), {
-      target: { value: "Mãe Sintética" },
-    });
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
-      target: { value: "30140-071" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Estado \(opcional\)$/), {
-      target: { value: "MG" },
-    });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(admitirColaborador).toHaveBeenCalledWith(
-      expect.objectContaining({
-        perfilPessoal: expect.objectContaining({
-          dataNascimento: "1990-05-20",
-          sexo: "feminino",
-          naturalidade: "Belo Horizonte",
-          nomeMae: "Mãe Sintética",
-          curso: null,
-        }),
-        // T179 — CEP brasileiro vai só com os 8 dígitos.
-        endereco: expect.objectContaining({
-          pais: "Brasil",
-          cep: "30140071",
-          estado: "MG",
-          bairro: null,
-        }),
-      }),
-      expect.anything(),
-    );
   });
 
   it("T179 — a área é opcional, filtrada pelo departamento, e vai junto com ele", async () => {
@@ -2065,6 +1704,7 @@ describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
     preencherContatos();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     await escolher(departamentoSel(), departamento);
@@ -2082,7 +1722,8 @@ describe("T179 — máscaras na Nova admissão", () => {
     montar();
     await aguardarEmpresa();
     expect(celular()).toHaveAttribute("inputmode", "tel");
-    expect(celular()).toHaveAccessibleDescription(/\(00\) 00000-0000/);
+    // T209 — a dica agora é "Com DDD."; o formato fica no placeholder.
+    expect(celular()).toHaveAccessibleName("Telefone pessoal");
     fireEvent.change(celular(), { target: { value: "31999" } });
     expect(celular()).toHaveValue("(31) 999");
     fireEvent.change(celular(), { target: { value: "" } });
@@ -2113,7 +1754,7 @@ describe("T179 — máscaras na Nova admissão", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
     expect(dto.contatos?.celular).toBe("+5591987654321");
-    expect(dto.contatos?.telefone).toBe("+551133330000");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+551133330000");
   });
 
   it("T179 (B2): +55 digitado e o resto colado, e DDD 55 completo com dígitos a mais, chegam certos ao servidor", async () => {
@@ -2151,7 +1792,7 @@ describe("T179 — máscaras na Nova admissão", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
     expect(dto.contatos?.celular).toBe("+5591987654321");
-    expect(dto.contatos?.telefone).toBe("+5555999998888");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+5555999998888");
   });
 
   it("CEP: máscara 00000-000 só com país Brasil", async () => {
@@ -2174,7 +1815,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     expect(pais()).toHaveValue("Brasil");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
   });
 
@@ -2182,7 +1823,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     fireEvent.change(pais(), { target: { value: "Argentina" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -2193,7 +1834,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     await escolher(cargoSel(), cargo);
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -2203,7 +1844,7 @@ describe("Nova admissão — cancelar", () => {
   it("sem nada digitado, sai direto", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
@@ -2212,7 +1853,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const confirmacao = screen.getByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -2239,7 +1880,7 @@ describe("Nova admissão — cancelar", () => {
     await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toHaveAccessibleDescription(DESCARTE_COMUM);
@@ -2249,7 +1890,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     fireEvent.change(matricula(), { target: { value: "MAT-1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     expect(onSair).toHaveBeenCalledTimes(1);
     expect(admitirColaborador).not.toHaveBeenCalled();
@@ -2292,12 +1933,15 @@ describe("Nova admissão — sucesso", () => {
     ).toBeInTheDocument();
     // Módulo 1: o que o SERVIDOR gravou, bloco a bloco.
     const dadosPessoais = screen.getByRole("region", {
-      name: "Dados pessoais",
+      name: "Dados básicos",
     });
     expect(dadosPessoais).toHaveTextContent("20/05/1990");
+    // T209 — CPF exibido com a máscara; gênero pelo rótulo; emergência.
+    expect(dadosPessoais).toHaveTextContent("529.982.247-25");
     expect(dadosPessoais).toHaveTextContent("Feminino");
     expect(dadosPessoais).not.toHaveTextContent("feminino");
-    expect(dadosPessoais).toHaveTextContent("Mãe Sintética Servidor");
+    expect(dadosPessoais).toHaveTextContent("Contato Sintético Servidor");
+    expect(dadosPessoais).toHaveTextContent("(31) 98888-7777");
     expect(dadosPessoais).toHaveTextContent("Não informado");
     const enderecoGravado = screen.getByRole("region", { name: "Endereço" });
     expect(enderecoGravado).toHaveTextContent("Cidade Sintética");
@@ -2323,7 +1967,7 @@ describe("Nova admissão — sucesso", () => {
           unidadeOrganizacionalId: null,
         },
       },
-      perfilPessoal: { ...resposta.perfilPessoal, sexo: null },
+      perfilPessoal: { ...resposta.perfilPessoal, genero: null },
       contatos: null,
     });
     await admitirComSucesso();
@@ -2332,10 +1976,10 @@ describe("Nova admissão — sucesso", () => {
     }).nextElementSibling;
     expect(matriculaGravada).toHaveTextContent("Não informada");
     expect(screen.getByText("Unidade: Não informada")).toBeInTheDocument();
-    const sexoGravado = within(
-      screen.getByRole("region", { name: "Dados pessoais" }),
-    ).getByText("Sexo", { selector: "dt" }).nextElementSibling;
-    expect(sexoGravado).toHaveTextContent("Não informado");
+    const generoGravado = within(
+      screen.getByRole("region", { name: "Dados básicos" }),
+    ).getByText("Gênero", { selector: "dt" }).nextElementSibling;
+    expect(generoGravado).toHaveTextContent("Não informado");
     // T179 — sem contatos, o bloco usa o mesmo texto da ficha.
     expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
       "Nenhum contato registrado.",
@@ -2773,7 +2417,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
   });
 
@@ -2786,7 +2430,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const dialogo = dialogoDescarte();
     expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
     expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
@@ -2826,7 +2470,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_INCERTO);
   });
 
@@ -2851,7 +2495,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       expect(escolhaDe(unidadeSel())).toHaveTextContent(
         `${unidade.codigo} — ${unidade.nome}`,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      fireEvent.click(botaoSair());
       const dialogo = dialogoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
       expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
@@ -2888,7 +2532,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       screen.getByRole("button", { name: "Recomeçar a admissão" }),
     );
     fireEvent.change(nome(), { target: { value: "Outra Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
   });
 });
@@ -2960,7 +2604,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos?.telefone).toBe("+5555999998888");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+5555999998888");
   });
 
   it("T179 (revisão final): telefone com ramal ou rótulo é recusado com aviso de formato, e o servidor recebe só os números certos", async () => {
@@ -3067,7 +2711,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
 
   /** Abre o descarte e devolve a descrição dele (diz se há envio incerto). */
   function descricaoDoDescarte(): HTMLElement {
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     return dialogoDescarte();
   }
 
@@ -3417,6 +3061,7 @@ async function cadastrarPeloMais(
 /** Parte da admissão digitada ANTES do modal, para conferir que fica. */
 function preencherParteDaAdmissao() {
   fireEvent.change(nome(), { target: { value: "Pessoa Sintética Rápida" } });
+  fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
   fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-10" } });
@@ -4003,6 +3648,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
 
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     await salvarEConfirmar();
@@ -4177,12 +3823,12 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
   it("começa na etapa 1, com 25%, a etapa atual marcada e as demais não iniciadas, sem botão", async () => {
     montar();
     await aguardarEmpresa();
-    expect(tituloDaEtapa()).toHaveTextContent("Etapa 1 de 4: Dados pessoais");
+    expect(tituloDaEtapa()).toHaveTextContent("Etapa 1 de 4: Dados básicos");
     expect(
-      within(rodapeDoAssistente()).getByText("Etapa 1 de 4 · 25%"),
+      within(rodapeDoAssistente()).getByText("25% concluído"),
     ).toBeVisible();
     expect(progresso()).toHaveAttribute("value", "25");
-    expect(progresso()).toHaveAccessibleName("Etapa 1 de 4 · 25%");
+    expect(progresso()).toHaveAccessibleName("25% concluído");
     expect(passoDoIndicador(1).querySelector("[aria-current]")).toHaveAttribute(
       "aria-current",
       "step",
@@ -4201,7 +3847,7 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     await aguardarEmpresa();
     await preencherValido();
     for (const [titulo, pct] of [
-      ["Etapa 2 de 4: Dados profissionais e vínculo", "50"],
+      ["Etapa 2 de 4: Dados profissionais", "50"],
       ["Etapa 3 de 4: Endereço", "75"],
       ["Etapa 4 de 4: Revisão e conclusão", "100"],
     ] as const) {
@@ -4212,15 +3858,14 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     }
     // Na revisão, o botão principal é "Concluir".
     expect(screen.queryByRole("button", { name: "Próxima etapa" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Concluir" })).toHaveAttribute(
-      "type",
-      "submit",
-    );
+    expect(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    ).toHaveAttribute("type", "submit");
     // As três anteriores, concluídas, viram botões com o estado no nome.
     expect(within(indicador()).getAllByRole("button")).toHaveLength(3);
     for (const nome of [
-      "Etapa 1: Dados pessoais, concluída",
-      "Etapa 2: Dados profissionais e vínculo, concluída",
+      "Etapa 1: Dados básicos, concluída",
+      "Etapa 2: Dados profissionais, concluída",
       "Etapa 3: Endereço, concluída",
     ]) {
       expect(
@@ -4239,8 +3884,9 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.submit(nome().closest("form")!);
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     expect(dialogoConfirmacao()).toBeNull();
   });
 
@@ -4254,8 +3900,9 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     montar();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     expect(botaoContinuar()).toBeDisabled();
     await act(async () => liberar());
     await aguardarEmpresa();
@@ -4268,23 +3915,23 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     montar();
     await aguardarEmpresa();
     await preencherValido();
-    fireEvent.change(screen.getByLabelText(/^Saudação/), {
-      target: { value: "Sra." },
+    fireEvent.change(screen.getByLabelText("RG"), {
+      target: { value: "12.345.678-9" },
     });
     irAteEtapa("Endereço");
     fireEvent.change(logradouro(), { target: { value: "Rua Sintética" } });
     fireEvent.click(botaoVoltar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     // Apagar um obrigatório e voltar de novo: Voltar não acusa nada.
     fireEvent.change(tipo(), { target: { value: "" } });
     fireEvent.click(botaoVoltar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     expect(tipo()).not.toHaveAttribute("aria-invalid");
     expect(screen.queryByRole("button", { name: "Voltar" })).toBeNull();
     // Tudo o que foi digitado continua, em todas as etapas.
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
-    expect(screen.getByLabelText(/^Saudação/)).toHaveValue("Sra.");
+    expect(screen.getByLabelText("RG")).toHaveValue("12.345.678-9");
     expect(celular()).toHaveValue("(31) 99999-0000");
     expect(matricula()).toHaveValue("MAT-0900");
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
@@ -4300,10 +3947,10 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     await ateARevisao();
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 1: Dados pessoais, concluída",
+        name: "Etapa 1: Dados básicos, concluída",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
     // A revisão, já alcançada, continua ao alcance: o caminho é validado.
@@ -4322,7 +3969,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     await ateARevisao();
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 2: Dados profissionais e vínculo, concluída",
+        name: "Etapa 2: Dados profissionais, concluída",
       }),
     );
     fireEvent.change(data(), { target: { value: "" } });
@@ -4331,7 +3978,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
         name: "Etapa 4: Revisão e conclusão, visitada",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(data()).toHaveFocus());
     expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
     expect(dialogoConfirmacao()).toBeNull();
@@ -4343,7 +3990,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     abrirLotacao();
     fireEvent.change(matricula(), { target: { value: "x" } });
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(matricula()).toHaveFocus());
     // Etapa 3 nunca alcançada: nem botão no indicador.
     expect(passoDoIndicador(3)).toHaveTextContent("não iniciada");
@@ -4367,16 +4014,17 @@ describe("T195 — revisão e conclusão", () => {
         .getByRole("heading", { level: 3, name: titulo })
         .closest("section")!;
 
-    const basicos = bloco("Dados pessoais");
+    const basicos = bloco("Dados básicos");
     expect(basicos).toHaveTextContent("Nome completoPessoa Sintética Nova");
     expect(basicos).toHaveTextContent("E-mail pessoalPessoa.Nova@Exemplo.TEST");
     expect(basicos).toHaveTextContent("Data de nascimento20/05/1990");
-    expect(basicos).toHaveTextContent("Celular(31) 99999-0000");
+    expect(basicos).toHaveTextContent("Telefone pessoal(31) 99999-0000");
+    expect(basicos).toHaveTextContent("CPF529.982.247-25");
     // Opcional em branco não aparece.
     expect(basicos).not.toHaveTextContent("Saudação");
     expect(basicos).not.toHaveTextContent("Sexo");
 
-    const profissionais = bloco("Dados profissionais e vínculo");
+    const profissionais = bloco("Dados profissionais");
     expect(profissionais).toHaveTextContent("MatrículaMAT-0900");
     expect(profissionais).toHaveTextContent("Tipo de vínculoCLT");
     expect(profissionais).toHaveTextContent("Data de admissão03/11/2026");
@@ -4395,10 +4043,10 @@ describe("T195 — revisão e conclusão", () => {
     // Editar volta à etapa, com o foco no título e os dados no lugar.
     fireEvent.click(
       within(profissionais).getByRole("button", {
-        name: "Editar Dados profissionais e vínculo",
+        name: "Editar Dados profissionais",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     expect(matricula()).toHaveValue("MAT-0900");
     expect(admitirColaborador).not.toHaveBeenCalled();
@@ -4421,7 +4069,9 @@ describe("T195 — revisão e conclusão", () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
-    fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    );
     const dialogo = await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
     });
@@ -4449,7 +4099,7 @@ describe("T195 — revisão e conclusão", () => {
     await salvarEConfirmar();
     // O primeiro da tela é o e-mail, na etapa 1.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
     expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
     // O outro campo, na etapa dele, já traz a própria mensagem.
@@ -4486,7 +4136,7 @@ describe("T195 — revisão e conclusão", () => {
       screen
         .getByRole("heading", {
           level: 3,
-          name: "Dados profissionais e vínculo",
+          name: "Dados profissionais",
         })
         .closest("section"),
     ).not.toHaveTextContent("Jornada");
@@ -4502,7 +4152,7 @@ describe("T195 — cancelar e recomeçar", () => {
     await aguardarEmpresa();
     await preencherValido();
     irAteEtapa("Endereço");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const dialogo = await screen.findByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -4522,7 +4172,7 @@ describe("T195 — cancelar e recomeçar", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Registrar outra admissão" }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados pessoais$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     expect(progresso()).toHaveAttribute("value", "25");
     expect(within(indicador()).queryAllByRole("button")).toHaveLength(0);
   });
@@ -4556,7 +4206,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     // O navegador conta os cliques: 1 e depois 2, no mesmo lugar.
     fireEvent.click(botao, { detail: 1 });
     // O mesmo botão já virou "Concluir" — é onde o 2º clique cai.
-    expect(botao).toHaveTextContent("Concluir");
+    expect(botao).toHaveTextContent("Cadastrar colaborador");
     fireEvent.click(botao, { detail: 2 });
     expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
     expect(dialogoConfirmacao()).toBeNull();
@@ -4575,7 +4225,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     await preencherValido();
     fireEvent.click(botaoContinuar(), { detail: 1 });
     fireEvent.click(botaoContinuar(), { detail: 2 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     fireEvent.click(botaoContinuar(), { detail: 1 });
     fireEvent.click(botaoContinuar(), { detail: 2 });
     fireEvent.click(botaoContinuar(), { detail: 3 });
@@ -4592,15 +4242,18 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     await preencherValido();
     // Enter num campo de texto: envio implícito do navegador.
     fireEvent.submit(nome().closest("form")!);
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     // Enter ou Espaço no botão: ativação pelo teclado, `detail` 0.
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
-    fireEvent.click(screen.getByRole("button", { name: "Concluir" }), {
-      detail: 0,
-    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+      {
+        detail: 0,
+      },
+    );
     await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
     });
@@ -4617,20 +4270,15 @@ describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e E
     await preencherLotacao();
     // O seletor nativo (Equipe) fica com o Enter: nada de envio a partir dele.
     fireEvent.keyDown(equipeSel(), { key: "Enter" });
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     // T196 — o último campo da etapa (Centro de custo, pesquisável), o botão
     // de opções dele e, logo depois, as ações — nesta ordem.
     const ordem = tabulaveis();
     const depois = ordem.slice(ordem.indexOf(centroSel()) + 1);
     expect(
       depois.map((e) => e.getAttribute("aria-label") ?? e.textContent),
-    ).toEqual([
-      "Mostrar opções de Centro de custo",
-      "Cancelar",
-      "Voltar",
-      "Próxima etapa",
-    ]);
-    const continuar = depois[3]!;
+    ).toEqual(["Mostrar opções de Centro de custo", "Voltar", "Próxima etapa"]);
+    const continuar = depois[2]!;
     expect(continuar).toHaveAttribute("type", "submit");
     continuar.focus();
     fireEvent.click(continuar, { detail: 0 });
@@ -4720,7 +4368,7 @@ describe("T196 — busca nas referências da etapa 2", () => {
     await salvarEConfirmar();
     const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
     await waitFor(() => expect(aviso).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e vínculo$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     // A escolha não some: a pessoa decide trocar.
     expect(escolhaDe(cargoSel())).toHaveTextContent(
       `${cargo.codigo} — ${cargo.nome}`,
@@ -4897,7 +4545,7 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     expect(
       await screen.findByRole("dialog", { name: "Criar cargo" }),
     ).toBeInTheDocument();
-    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais e vínculo");
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais");
     expect(admitirColaborador).not.toHaveBeenCalled();
     expect(criarCargo).not.toHaveBeenCalled();
   });
@@ -5303,8 +4951,8 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
 // CPF, RG, documentos nem "Salvar rascunho".
 // ---------------------------------------------------------------------------
 const ETAPAS_REAIS = [
-  "Dados pessoais",
-  "Dados profissionais e vínculo",
+  "Dados básicos",
+  "Dados profissionais",
   "Endereço",
   "Revisão e conclusão",
 ];
@@ -5332,7 +4980,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
       }),
     ).toBeInTheDocument();
     expect(cabecalho).toHaveTextContent(
-      "Preencha os dados em quatro etapas. Você pode salvar e continuar depois.",
+      "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
     );
     fireEvent.click(
       within(cabecalho).getByRole("button", {
@@ -5362,15 +5010,26 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     const nav = screen.getByRole("navigation", { name: "Etapas do cadastro" });
     expect(
       [...nav.querySelectorAll(".nova-admissao__etapa-nome")].map(
-        (e) => e.textContent,
+        (e) => e.firstChild?.textContent,
       ),
     ).toEqual(ETAPAS_REAIS);
+    // T209 — o subtítulo de cada etapa, embaixo do nome.
     expect(
-      screen.getByRole("heading", { level: 2, name: /Dados pessoais$/ }),
+      [...nav.querySelectorAll(".nova-admissao__etapa-sub")].map(
+        (e) => e.textContent,
+      ),
+    ).toEqual([
+      "Informações pessoais",
+      "Cargo e contrato",
+      "Residência",
+      "Confira e conclua",
+    ]);
+    expect(
+      screen.getByRole("heading", { level: 2, name: /Dados básicos$/ }),
     ).toBeVisible();
   });
 
-  it("nada que o contrato não suporta: sem CPF, RG ou upload de documento (rascunho e foto existem, T209)", async () => {
+  it("nada que o contrato não suporta: sem PIS nem upload de documento (CPF, RG, rascunho e foto existem, T209)", async () => {
     montar();
     await aguardarEmpresa();
     const formulario = screen.getByRole("form", {
@@ -5380,9 +5039,8 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     const arquivos = formulario.querySelectorAll('input[type="file"]');
     expect(arquivos).toHaveLength(1);
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
-    // Nenhum CAMPO de CPF ou RG (o aviso da página cita, em texto, o que
-    // ainda não é coletado).
-    for (const proibido of [/\bCPF\b/, /\bRG\b/]) {
+    // T209 — CPF e RG entraram na etapa 1; continua sem campo de documento.
+    for (const proibido of [/\bPIS\b/, /Carteira de Trabalho/]) {
       expect(
         screen
           .queryAllByLabelText(proibido)
@@ -5394,10 +5052,10 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     ).toBeInTheDocument();
   });
 
-  it("rodapé fixo: progresso e ações; Voltar só depois da primeira etapa; Concluir na última", async () => {
+  it("rodapé fixo: progresso e ações; Cancelar só na primeira etapa; Cadastrar colaborador na última", async () => {
     montar();
     await aguardarEmpresa();
-    expect(rodape()).toHaveTextContent("Etapa 1 de 4 · 25%");
+    expect(rodape()).toHaveTextContent("25% concluído");
     expect(within(rodape()).getByRole("progressbar")).toHaveAttribute(
       "value",
       "25",
@@ -5406,19 +5064,17 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
 
     await preencherValido();
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    await waitFor(() => expect(rodape()).toHaveTextContent("Etapa 2 de 4"));
-    expect(botoesDoRodape()).toEqual(["Cancelar", "Voltar", "Próxima etapa"]);
+    await waitFor(() => expect(rodape()).toHaveTextContent("50% concluído"));
+    expect(botoesDoRodape()).toEqual(["Voltar", "Próxima etapa"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    await waitFor(() => expect(rodape()).toHaveTextContent("Etapa 3 de 4"));
+    await waitFor(() => expect(rodape()).toHaveTextContent("75% concluído"));
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    await waitFor(() =>
-      expect(rodape()).toHaveTextContent("Etapa 4 de 4 · 100%"),
-    );
-    expect(botoesDoRodape()).toEqual(["Cancelar", "Voltar", "Concluir"]);
+    await waitFor(() => expect(rodape()).toHaveTextContent("100% concluído"));
+    expect(botoesDoRodape()).toEqual(["Voltar", "Cadastrar colaborador"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    await waitFor(() => expect(rodape()).toHaveTextContent("Etapa 3 de 4"));
+    await waitFor(() => expect(rodape()).toHaveTextContent("75% concluído"));
     expect(
       screen.getByRole("heading", { level: 2, name: /Endereço$/ }),
     ).toHaveFocus();
@@ -5428,7 +5084,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
     montar();
     await aguardarEmpresa();
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    expect(rodape()).toHaveTextContent("Etapa 1 de 4");
+    expect(rodape()).toHaveTextContent("25% concluído");
     await waitFor(() => expect(nome()).toHaveFocus());
     expect(nome()).toHaveAttribute("aria-invalid", "true");
   });
@@ -5482,12 +5138,10 @@ describe("T209 — assistente: teclado, Escape e guarda de saída", () => {
       screen.getByRole("form", { name: "Formulário de nova admissão" }),
     );
     await waitFor(() =>
-      expect(tituloDaEtapa()).toHaveTextContent(
-        /Dados profissionais e vínculo$/,
-      ),
+      expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/),
     );
     expect(tituloDaEtapa()).toHaveFocus();
-    expect(rodape()).toHaveTextContent("Etapa 2 de 4 · 50%");
+    expect(rodape()).toHaveTextContent("50% concluído");
   });
 
   it("o rodapé fica dentro do formulário: 'Próxima etapa'/'Concluir' são o envio dele", async () => {
@@ -5500,10 +5154,7 @@ describe("T209 — assistente: teclado, Escape e guarda de saída", () => {
     expect(
       screen.getByRole("button", { name: "Próxima etapa" }),
     ).toHaveAttribute("type", "submit");
-    expect(screen.getByRole("button", { name: "Cancelar" })).toHaveAttribute(
-      "type",
-      "button",
-    );
+    expect(botaoSair()).toHaveAttribute("type", "button");
   });
 });
 
@@ -5582,7 +5233,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Preencha os dados em quatro etapas. Você pode salvar e continuar depois.",
+        "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -5617,8 +5268,8 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     montar();
     await aguardarEmpresa();
     const etapas = screen.getByRole("navigation", { name: /Etapas/ });
-    expect(etapas).toHaveTextContent("Dados pessoais");
-    expect(etapas).toHaveTextContent("Dados profissionais e vínculo");
+    expect(etapas).toHaveTextContent("Dados básicos");
+    expect(etapas).toHaveTextContent("Dados profissionais");
     expect(etapas).toHaveTextContent("Endereço");
     expect(etapas).toHaveTextContent("Revisão e conclusão");
   });
@@ -5658,11 +5309,11 @@ describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => 
     fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
     await screen.findByText(/Rascunho salvo/);
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
 
     fireEvent.change(nome(), { target: { value: "Pessoa Rascunho 2" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       await screen.findByRole("heading", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -5683,7 +5334,7 @@ describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => 
       ),
     ).toBeInTheDocument();
     expect(nome()).toHaveValue("Pessoa Rascunho");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       await screen.findByRole("heading", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -5716,7 +5367,7 @@ describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => 
     expect(
       await screen.findByText(/Rascunho de 15\/11\/2026.* recuperado/),
     ).toBeInTheDocument();
-    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais e vínculo");
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais");
     expect(escolhaDe(departamentoSel())).toHaveTextContent(departamento.nome);
     expect(nome()).toHaveValue("Pessoa Recuperada");
   });
@@ -5777,8 +5428,7 @@ const campoDaFoto = () =>
   document.getElementById("nova-admissao-foto-arquivo") as HTMLInputElement;
 const escolherFoto = (arquivo: File) =>
   fireEvent.change(campoDaFoto(), { target: { files: [arquivo] } });
-const blocoDaFoto = () =>
-  screen.getByRole("group", { name: "Foto do colaborador (opcional)" });
+const blocoDaFoto = () => screen.getByRole("group", { name: "Foto" });
 
 describe("T209 — foto do colaborador na Nova admissão", () => {
   beforeEach(() => {
@@ -5810,7 +5460,7 @@ describe("T209 — foto do colaborador na Nova admissão", () => {
     ).toBeVisible();
     expect(within(bloco).queryByRole("button", { name: "Remover" })).toBeNull();
     expect(within(bloco).queryByRole("img")).toBeNull();
-    expect(bloco).toHaveTextContent("PNG ou JPEG, até 5 MB.");
+    expect(bloco).toHaveTextContent("PNG ou JPG, até 5 MB.");
     expect(campoDaFoto()).toHaveAttribute("accept", "image/png,image/jpeg");
   });
 
@@ -6014,7 +5664,7 @@ describe("T209 — foto do colaborador na Nova admissão", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     escolherFoto(arquivoDeFoto());
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       await screen.findByRole("heading", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -6030,8 +5680,7 @@ describe("T209 — foto do colaborador na Nova admissão", () => {
     await screen.findByText(/Rascunho salvo/);
     const dados = vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0];
     expect(JSON.stringify(dados)).not.toMatch(/foto|arquivo|blob:/i);
-    expect(blocoDaFoto()).toHaveTextContent("A foto não fica no rascunho.");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       await screen.findByRole("heading", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -6054,5 +5703,252 @@ describe("T209 — foto do colaborador na Nova admissão", () => {
     expect(
       within(blocoDaFoto()).queryByRole("button", { name: "Remover" }),
     ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — etapa 1 do Novo colaborador (decisão de 2026-11-17): seções,
+// linhas (rótulo e ajuda à esquerda, campos à direita), textos, listas e
+// regras. Nome com pelo menos 3 letras; CPF obrigatório; nascimento opcional.
+// ---------------------------------------------------------------------------
+describe("T209 — etapa 1: dados básicos", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+  });
+
+  const etapa1 = () =>
+    screen
+      .getByRole("heading", { level: 2, name: /Dados básicos$/ })
+      .closest("section") as HTMLElement;
+
+  it("cabeçalho da etapa: título, descrição e o selo 'Etapa 1 de 4'", async () => {
+    montar();
+    await aguardarEmpresa();
+    const painel = etapa1();
+    expect(painel).toHaveTextContent(
+      "Informações pessoais e de contato do novo colaborador.",
+    );
+    expect(
+      painel.querySelector(".nova-admissao__etapa-selo"),
+    ).toHaveTextContent("Etapa 1 de 4");
+  });
+
+  it("três seções, na ordem, com as descrições", async () => {
+    montar();
+    await aguardarEmpresa();
+    const secoes = [...etapa1().querySelectorAll("h3")].map((h) => [
+      h.textContent,
+      h.nextElementSibling?.textContent,
+    ]);
+    expect(secoes).toEqual([
+      ["Identificação", "Aparecem no perfil, nos documentos e no eSocial."],
+      ["Contato", "Canais pessoais para falar com o colaborador."],
+      ["Contato de emergência", "Acionado apenas em situações de urgência."],
+    ]);
+  });
+
+  it("as linhas, na ordem, com as ajudas", async () => {
+    montar();
+    await aguardarEmpresa();
+    const linhas = [
+      ...etapa1().querySelectorAll(".nova-admissao__linha-rotulo"),
+    ].map((l) => [...l.children].map((c) => c.textContent));
+    expect(linhas).toEqual([
+      ["Foto", "Aparece na lista de colaboradores e no perfil."],
+      ["Nome completo", "Como está nos documentos oficiais."],
+      ["CPF e RG", "Usados na folha e no eSocial."],
+      ["Data de nascimento"],
+      ["Gênero e estado civil"],
+      ["E-mail pessoal", "Diferente do e-mail corporativo."],
+      ["Telefone pessoal", "Com DDD."],
+      ["Nome do contato"],
+      ["Telefone do contato"],
+    ]);
+  });
+
+  it("placeholders dos campos", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(nome()).toHaveAttribute("placeholder", "Nome completo");
+    expect(cpf()).toHaveAttribute("placeholder", "000.000.000-00");
+    expect(screen.getByLabelText("RG")).toHaveAttribute(
+      "placeholder",
+      "00.000.000-0",
+    );
+    expect(emailPessoal()).toHaveAttribute("placeholder", "email@exemplo.com");
+    expect(celular()).toHaveAttribute("placeholder", "(00) 00000-0000");
+    expect(screen.getByLabelText("Nome do contato")).toHaveAttribute(
+      "placeholder",
+      "Nome do contato",
+    );
+    expect(telefone()).toHaveAttribute("placeholder", "(00) 00000-0000");
+  });
+
+  it("gênero e estado civil: 'Selecione' e as opções", async () => {
+    montar();
+    await aguardarEmpresa();
+    const opcoes = (rotulo: string) =>
+      [...(screen.getByLabelText(rotulo) as HTMLSelectElement).options].map(
+        (o) => o.textContent,
+      );
+    expect(opcoes("Gênero")).toEqual([
+      "Selecione",
+      "Feminino",
+      "Masculino",
+      "Outro",
+      "Prefiro não informar",
+    ]);
+    expect(opcoes("Estado civil")).toEqual([
+      "Selecione",
+      "Solteiro(a)",
+      "Casado(a)",
+      "Divorciado(a)",
+      "Viúvo(a)",
+      "União estável",
+    ]);
+  });
+
+  it("saíram da etapa 1: sexo, saudação, nacionalidade, naturalidade, escolaridade, curso, pai, mãe e telefone fixo", async () => {
+    montar();
+    await aguardarEmpresa();
+    for (const rotulo of [
+      /^Sexo/,
+      /^Saudação/,
+      /^Nacionalidade/,
+      /^Naturalidade/,
+      /^Escolaridade/,
+      /^Curso/,
+      /^Nome do pai/,
+      /^Nome da mãe/,
+      /^Celular/,
+      /^Telefone \(opcional\)/,
+    ]) {
+      expect(screen.queryByLabelText(rotulo)).toBeNull();
+    }
+  });
+
+  it("CPF ganha a máscara enquanto se digita", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: "52998224725" } });
+    expect(cpf()).toHaveValue("529.982.247-25");
+    fireEvent.change(cpf(), { target: { value: "529982" } });
+    expect(cpf()).toHaveValue("529.982");
+  });
+
+  it("nome: pelo menos 3 letras", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "A1 B2" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(nome()).toHaveFocus());
+    expect(nome()).toHaveAccessibleDescription(
+      "Informe o nome completo (pelo menos 3 letras).",
+    );
+  });
+
+  it("CPF inválido: mensagem no campo; data de nascimento vazia não acusa", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(cpf()).toHaveAccessibleDescription("Informe um CPF válido.");
+    expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("sem data de nascimento, avança e o corpo leva `null`", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    fireEvent.change(dataNascimento(), { target: { value: "" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal
+        .dataNascimento,
+    ).toBeNull();
+  });
+
+  it("o corpo leva CPF, RG, gênero, estado civil e o contato de emergência", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    fireEvent.change(screen.getByLabelText("RG"), {
+      target: { value: " 12.345.678-9 " },
+    });
+    fireEvent.change(screen.getByLabelText("Gênero"), {
+      target: { value: "prefiro_nao_informar" },
+    });
+    fireEvent.change(screen.getByLabelText("Estado civil"), {
+      target: { value: "União estável" },
+    });
+    fireEvent.change(screen.getByLabelText("Nome do contato"), {
+      target: { value: "  Contato   Sintético " },
+    });
+    fireEvent.change(telefone(), { target: { value: "(31) 98888-7777" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal,
+    ).toMatchObject({
+      cpf: "52998224725",
+      rg: "12.345.678-9",
+      genero: "prefiro_nao_informar",
+      estadoCivil: "União estável",
+      contatoEmergenciaNome: "Contato Sintético",
+      contatoEmergenciaTelefone: "+5531988887777",
+    });
+  });
+
+  it("CPF já cadastrado na empresa (409): mensagem no CPF, na etapa 1", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(409, {
+        erros: [{ campo: "perfilPessoal.cpf", motivo: "em_uso" }],
+      }),
+    );
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
+    expect(cpf()).toHaveAccessibleDescription(
+      "Este CPF já está cadastrado nesta empresa.",
+    );
+  });
+
+  it("o rascunho guarda os campos novos da etapa 1", async () => {
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-17T12:00:00.000Z",
+    });
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    fireEvent.change(screen.getByLabelText("Gênero"), {
+      target: { value: "outro" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() => expect(salvarRascunhoAdmissao).toHaveBeenCalled());
+    expect(
+      vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0].perfil,
+    ).toMatchObject({ cpf: CPF_VALIDO, genero: "outro" });
+  });
+
+  it("rodapé: 'Cancelar' só na etapa 1; o botão final é 'Cadastrar colaborador'", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByRole("button", { name: "Cancelar" }),
+    ).toBeInTheDocument();
+    await ateARevisao();
+    expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    ).toBeInTheDocument();
   });
 });

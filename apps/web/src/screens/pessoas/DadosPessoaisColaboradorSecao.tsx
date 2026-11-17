@@ -453,8 +453,8 @@ function BlocoPerfilPessoal(
         >
           <FormField
             id={ID_PERFIL.dataNascimento}
-            label={ROTULO_DATA_NASCIMENTO}
-            required
+            // T209 — a data de nascimento passou a opcional (2026-11-17).
+            label={rotuloOpcional(ROTULO_DATA_NASCIMENTO)}
             disabled={salvando}
             {...(erros.dataNascimento ? { error: erros.dataNascimento } : {})}
           >

@@ -215,9 +215,9 @@ export type ErrosEndereco = Partial<Record<ChaveEndereco, string>>;
 export function validarPerfil(valores: ValoresPerfil): ErrosPerfil {
   const erros: ErrosPerfil = {};
   const data = valores.dataNascimento;
-  if (data === "") {
-    erros.dataNascimento = "Informe a data de nascimento.";
-  } else {
+  // T209 — a data de nascimento passou a opcional (etapa 1 do Novo
+  // colaborador); informada, precisa ser válida.
+  if (data !== "") {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(Date.parse(data))) {
       erros.dataNascimento = "Informe uma data de nascimento válida.";
     } else if (data < DATA_MINIMA) {
@@ -276,19 +276,21 @@ export function validarEndereco(valores: ValoresEndereco): ErrosEndereco {
 /**
  * Corpo do bloco: texto normalizado, vazio como `null`. A data de nascimento
  * vai como digitada — só se monta o bloco depois de `validarPerfil` aceitá-la.
+ * T209 — sem data, vai `null`.
  */
-export function blocoPerfil(valores: ValoresPerfil): Record<
-  Exclude<ChavePerfil, "dataNascimento">,
-  string | null
-> & {
-  dataNascimento: string;
-} {
+export function blocoPerfil(
+  valores: ValoresPerfil,
+): Record<ChavePerfil, string | null> {
   const bloco = {} as Record<ChavePerfil, string | null>;
   for (const chave of Object.keys(valores) as ChavePerfil[]) {
     const limpo = normalizarTexto(valores[chave]);
     bloco[chave] = limpo === "" ? null : limpo;
   }
-  return { ...bloco, dataNascimento: valores.dataNascimento };
+  return {
+    ...bloco,
+    dataNascimento:
+      valores.dataNascimento === "" ? null : valores.dataNascimento,
+  };
 }
 
 export function blocoEndereco(

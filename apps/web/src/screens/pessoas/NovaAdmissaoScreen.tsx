@@ -100,7 +100,7 @@
  * aposentado na T177: não coletava os campos obrigatórios. "Novo colaborador"
  * traz para esta página.
  */
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import {
   Button,
   CampoMascarado,
@@ -111,7 +111,7 @@ import {
   StatusBadge,
   Surface,
 } from "../../components";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { IconButton } from "../../ui";
 import {
   type AdmissaoRegistradaApi,
@@ -156,9 +156,6 @@ import {
 } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
-  CAMPOS_TEXTO_PERFIL,
-  CAMPO_SEXO,
-  OPCOES_SEXO,
   type ChaveEndereco,
   type ChavePerfil,
   ENDERECO_INICIAL,
@@ -169,7 +166,6 @@ import {
   blocoEndereco,
   blocoPerfil,
   ehPaisBrasil,
-  rotuloDoSexo,
   validarEndereco,
   validarPerfil,
 } from "./dadosPessoais";
@@ -177,6 +173,7 @@ import {
   type CampoContato,
   type ValoresContatos,
   contatosDaAdmissao,
+  normalizarTelefone,
   validarContatos,
 } from "./contatosColaborador";
 import {
@@ -289,6 +286,7 @@ type CampoLotacao =
 type CampoErro =
   | "referencias"
   | "nome"
+  | ChaveIdentificacao
   | ChavePerfil
   | ChaveEndereco
   | CampoContato
@@ -307,13 +305,29 @@ type Erros = Partial<Record<CampoErro, string>>;
  * T195 — as quatro etapas do cadastro individual, na ordem da tela.
  */
 const ETAPAS = [
-  // T209 — títulos fiéis aos dados reais de cada etapa: dados pessoais e
-  // contatos; vínculo, lotação e jornada; endereço; revisão. Não há etapa de
-  // documentos (não há upload nem armazenamento nesta página).
-  "Dados pessoais",
-  "Dados profissionais e vínculo",
+  // T209 — etapa 1 do Novo colaborador (2026-11-17): títulos, subtítulos e
+  // descrições do novo cadastro. A etapa 4 segue como revisão até a fatia
+  // dos documentos.
+  "Dados básicos",
+  "Dados profissionais",
   "Endereço",
   "Revisão e conclusão",
+] as const;
+
+/** T209 — o subtítulo de cada etapa, na coluna das etapas. */
+const SUBTITULOS_DAS_ETAPAS = [
+  "Informações pessoais",
+  "Cargo e contrato",
+  "Residência",
+  "Confira e conclua",
+] as const;
+
+/** T209 — a descrição de cada etapa, no cabeçalho dela. */
+const DESCRICOES_DAS_ETAPAS = [
+  "Informações pessoais e de contato do novo colaborador.",
+  "Cargo e contrato do novo colaborador.",
+  "Residência usada em correspondências e no eSocial.",
+  "Confira os dados antes de cadastrar.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;
@@ -339,14 +353,17 @@ function idDoTituloDaEtapa(indice: IndiceEtapa): string {
  */
 const CAMPOS_DA_ETAPA: readonly (readonly CampoErro[])[] = [
   [
+    // T209 — a ordem da etapa 1: identificação, contato e emergência.
     "nome",
-    "emailPessoal",
+    "cpf",
+    "rg",
     "dataNascimento",
-    // T179 — o sexo é seletor, logo depois da data de nascimento na tela.
-    CAMPO_SEXO.chave,
-    ...CAMPOS_TEXTO_PERFIL.map((c) => c.chave),
+    "genero",
+    "estadoCivil",
+    "emailPessoal",
     "celular",
-    "telefone",
+    "contatoEmergenciaNome",
+    "contatoEmergenciaTelefone",
   ],
   [
     "referencias",
@@ -537,6 +554,11 @@ const CAMPO_DO_CONFLITO: Readonly<
   "contatos.emailPessoal": {
     campo: "emailPessoal",
     mensagem: "Este e-mail pessoal já está em uso nesta empresa.",
+  },
+  // T209 — CPF único na empresa.
+  "perfilPessoal.cpf": {
+    campo: "cpf",
+    mensagem: "Este CPF já está cadastrado nesta empresa.",
   },
 };
 
@@ -855,6 +877,103 @@ function falhaDoEnvioDaFoto(erro: unknown): {
   };
 }
 
+// ---- T209 — etapa 1 do Novo colaborador ------------------------------------
+
+/** Campos novos da etapa 1, fora do perfil compartilhado com a ficha. */
+type ChaveIdentificacao =
+  | "cpf"
+  | "rg"
+  | "genero"
+  | "contatoEmergenciaNome"
+  | "contatoEmergenciaTelefone";
+type ValoresIdentificacao = Record<ChaveIdentificacao, string>;
+
+const IDENTIFICACAO_VAZIA: ValoresIdentificacao = {
+  cpf: "",
+  rg: "",
+  genero: "",
+  contatoEmergenciaNome: "",
+  contatoEmergenciaTelefone: "",
+};
+
+const CHAVES_IDENTIFICACAO = Object.keys(
+  IDENTIFICACAO_VAZIA,
+) as ChaveIdentificacao[];
+
+/** Gênero em lista fechada (o código vai ao servidor). */
+const OPCOES_GENERO = [
+  { codigo: "feminino", rotulo: "Feminino" },
+  { codigo: "masculino", rotulo: "Masculino" },
+  { codigo: "outro", rotulo: "Outro" },
+  { codigo: "prefiro_nao_informar", rotulo: "Prefiro não informar" },
+] as const;
+
+/** Estado civil: o texto da opção é o que fica gravado. */
+const OPCOES_ESTADO_CIVIL = [
+  "Solteiro(a)",
+  "Casado(a)",
+  "Divorciado(a)",
+  "Viúvo(a)",
+  "União estável",
+] as const;
+
+function rotuloDoGenero(codigo: string | null | undefined): string | null {
+  if (!codigo) return null;
+  return OPCOES_GENERO.find((o) => o.codigo === codigo)?.rotulo ?? codigo;
+}
+
+/** `00000000000` → `000.000.000-00`, conforme se digita. */
+function mascararCpf(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+/** CPF gravado (11 dígitos) como a tela mostra. */
+function exibirCpf(cpf: string | null | undefined): string | null {
+  return cpf ? mascararCpf(cpf) : null;
+}
+
+/** Dígitos verificadores do CPF (a mesma regra do servidor). */
+function cpfValido(digitos: string): boolean {
+  if (!/^\d{11}$/.test(digitos) || /^(\d)\1{10}$/.test(digitos)) return false;
+  const n = [...digitos].map(Number);
+  const dv = (quantos: number) => {
+    let soma = 0;
+    for (let i = 0; i < quantos; i++) soma += n[i]! * (quantos + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return dv(9) === n[9] && dv(10) === n[10];
+}
+
+/** Nome completo: pelo menos 3 letras e até 150 caracteres. */
+const NOME_TRES_LETRAS = /^(?:[^\p{L}]*\p{L}){3}/u;
+const NOME_MAXIMO = 150;
+
+/** Telefone brasileiro como o servidor grava (`+55` + DDD + número). */
+const TELEFONE_GRAVADO = /^\+55[1-9]{2}(?:9[0-9]{8}|[2-5][0-9]{7})$/;
+
+function blocoIdentificacao(
+  valores: ValoresIdentificacao,
+): Record<ChaveIdentificacao, string | null> {
+  const limpo = (v: string) => {
+    const t = v.trim().replace(/ {2,}/g, " ");
+    return t === "" ? null : t;
+  };
+  const telefone = limpo(valores.contatoEmergenciaTelefone);
+  return {
+    cpf: limpo(valores.cpf.replace(/\D/g, "")),
+    rg: limpo(valores.rg),
+    genero: limpo(valores.genero),
+    contatoEmergenciaNome: limpo(valores.contatoEmergenciaNome),
+    contatoEmergenciaTelefone:
+      telefone === null ? null : normalizarTelefone(telefone),
+  };
+}
+
 export function NovaAdmissaoScreen({
   onSair,
   onAbrirAdmitido,
@@ -869,6 +988,9 @@ export function NovaAdmissaoScreen({
   const [perfil, setPerfil] = useState<ValoresPerfil>(PERFIL_VAZIO);
   const [endereco, setEndereco] = useState<ValoresEndereco>(ENDERECO_INICIAL);
   const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
+  /** T209 — CPF, RG, gênero e contato de emergência (etapa 1). */
+  const [identificacao, setIdentificacao] =
+    useState<ValoresIdentificacao>(IDENTIFICACAO_VAZIA);
   const [erros, setErros] = useState<Erros>({});
   /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
   /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
@@ -1128,6 +1250,7 @@ export function NovaAdmissaoScreen({
     (Object.keys(campos) as (keyof Campos)[]).some(
       (c) => campos[c] !== CAMPOS_VAZIOS[c],
     ) ||
+    CHAVES_IDENTIFICACAO.some((c) => identificacao[c] !== "") ||
     (Object.keys(perfil) as ChavePerfil[]).some(
       (c) => perfil[c] !== PERFIL_VAZIO[c],
     ) ||
@@ -1172,7 +1295,10 @@ export function NovaAdmissaoScreen({
     return {
       etapa,
       campos: preenchidos(campos as unknown as Record<string, string>),
-      perfil: preenchidos(perfil as unknown as Record<string, string>),
+      perfil: preenchidos({
+        ...(perfil as unknown as Record<string, string>),
+        ...identificacao,
+      }),
       endereco: preenchidos(endereco as unknown as Record<string, string>),
       contatos: preenchidos(contatos as unknown as Record<string, string>),
       ...(Object.keys(referencias).length > 0 ? { referencias } : {}),
@@ -1225,6 +1351,11 @@ export function NovaAdmissaoScreen({
   const cepAssistido = consultaCep.assistido;
   const buscarCep = consultaCep.buscar;
   const usarEnderecoDoCep = consultaCep.usarEnderecoDoCep;
+
+  function atualizarIdentificacao(campo: ChaveIdentificacao, valor: string) {
+    setIdentificacao((prev) => ({ ...prev, [campo]: valor }));
+    setErros((prev) => semErroDe(prev, campo));
+  }
 
   function atualizarContato(campo: CampoContato, valor: string) {
     setContatos((prev) => ({ ...prev, [campo]: valor }));
@@ -1451,11 +1582,34 @@ export function NovaAdmissaoScreen({
         papelDoAtor,
       );
     }
+    // T209 — nome com pelo menos 3 letras e até 150 caracteres; CPF
+    // obrigatório e válido; os demais da etapa 1 são opcionais.
     const nome = campos.nome.trim();
-    if (!nome) {
-      novos.nome = "Nome é obrigatório.";
-    } else if (nome.length < 2 || nome.length > 160) {
-      novos.nome = "Nome deve ter entre 2 e 160 caracteres.";
+    if (!NOME_TRES_LETRAS.test(nome)) {
+      novos.nome = "Informe o nome completo (pelo menos 3 letras).";
+    } else if (nome.length > NOME_MAXIMO) {
+      novos.nome = `O nome completo deve ter no máximo ${NOME_MAXIMO} caracteres.`;
+    }
+    const cpf = identificacao.cpf.replace(/\D/g, "");
+    if (cpf === "") {
+      novos.cpf = "Informe o CPF.";
+    } else if (!cpfValido(cpf)) {
+      novos.cpf = "Informe um CPF válido.";
+    }
+    if (identificacao.rg.trim().length > 20) {
+      novos.rg = "O RG deve ter no máximo 20 caracteres.";
+    }
+    if (identificacao.contatoEmergenciaNome.trim().length > 150) {
+      novos.contatoEmergenciaNome =
+        "O nome do contato deve ter no máximo 150 caracteres.";
+    }
+    const telefoneEmergencia = identificacao.contatoEmergenciaTelefone.trim();
+    if (
+      telefoneEmergencia !== "" &&
+      !TELEFONE_GRAVADO.test(normalizarTelefone(telefoneEmergencia))
+    ) {
+      novos.contatoEmergenciaTelefone =
+        "Informe o telefone com DDD, no formato (00) 00000-0000.";
     }
     // T179 — matrícula opcional: o formato só é conferido quando preenchida.
     const matricula = campos.matricula.trim().toUpperCase();
@@ -1571,7 +1725,10 @@ export function NovaAdmissaoScreen({
       ...(areaId ? { areaId } : {}),
       ...(equipeId ? { equipeId } : {}),
       ...(centroCustoId ? { centroCustoId } : {}),
-      perfilPessoal: blocoPerfil(perfil),
+      perfilPessoal: {
+        ...blocoPerfil(perfil),
+        ...blocoIdentificacao(identificacao),
+      },
       endereco: blocoEndereco(endereco),
       ...(blocoContatos ? { contatos: blocoContatos } : {}),
       // T183 — jornada opcional: só vai quando escolhida (e só o RH a vê).
@@ -1713,6 +1870,7 @@ export function NovaAdmissaoScreen({
     const novosCampos = so(CAMPOS_VAZIOS, d.campos);
     setCampos(novosCampos);
     setPerfil(so(PERFIL_VAZIO, d.perfil));
+    setIdentificacao(so(IDENTIFICACAO_VAZIA, d.perfil));
     setEndereco(so(ENDERECO_INICIAL, d.endereco));
     setContatos(so(CONTATOS_VAZIOS, d.contatos));
     const etapaSalva = Math.min(
@@ -1833,6 +1991,7 @@ export function NovaAdmissaoScreen({
     setPerfil(PERFIL_VAZIO);
     setEndereco(ENDERECO_INICIAL);
     setContatos(CONTATOS_VAZIOS);
+    setIdentificacao(IDENTIFICACAO_VAZIA);
     setAreas([]);
     setErros({});
     setEtapa(0);
@@ -1924,59 +2083,6 @@ export function NovaAdmissaoScreen({
    * ajuda e validação continuam vindo de `CAMPOS_TEXTO_PERFIL`; o JSX só
    * decide em que linha da grade ele aparece.
    */
-  function campoPerfil(chave: Exclude<ChavePerfil, "dataNascimento" | "sexo">) {
-    const campo = CAMPOS_TEXTO_PERFIL.find((c) => c.chave === chave)!;
-    return (
-      <FormField
-        id={ID_DO_CAMPO[campo.chave]}
-        label={rotuloOpcional(campo.rotulo)}
-        {...(campo.ajuda ? { help: campo.ajuda } : {})}
-        {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
-      >
-        {(control) => (
-          <input
-            type="text"
-            maxLength={campo.limite}
-            autoComplete="off"
-            value={perfil[campo.chave]}
-            onChange={(e) => atualizarPerfil(campo.chave, e.target.value)}
-            {...control}
-          />
-        )}
-      </FormField>
-    );
-  }
-
-  /**
-   * T179 — o sexo: seletor de lista FECHADA (`OPCOES_SEXO`), opcional. A
-   * opção vazia "Selecione…" é o "não informado" — vai `null`. O valor é o
-   * código; o que se lê é o rótulo.
-   */
-  function campoSexo() {
-    return (
-      <FormField
-        id={ID_DO_CAMPO.sexo}
-        label={rotuloOpcional(CAMPO_SEXO.rotulo)}
-        {...(erros.sexo ? { error: erros.sexo } : {})}
-      >
-        {(control) => (
-          <select
-            value={perfil.sexo}
-            onChange={(e) => atualizarPerfil("sexo", e.target.value)}
-            {...control}
-          >
-            <option value="">Selecione…</option>
-            {OPCOES_SEXO.map((opcao) => (
-              <option key={opcao.codigo} value={opcao.codigo}>
-                {opcao.rotulo}
-              </option>
-            ))}
-          </select>
-        )}
-      </FormField>
-    );
-  }
-
   /** T178 — idem para o endereço (`CAMPOS_ENDERECO`). */
   function campoEndereco(chave: ChaveEndereco, aoSair?: () => void) {
     const campo = CAMPOS_ENDERECO.find((c) => c.chave === chave)!;
@@ -2102,6 +2208,28 @@ export function NovaAdmissaoScreen({
     );
   }
 
+  /** T209 — id, estado inválido e descrição do erro de um campo da linha. */
+  function propsDoCampo(campo: CampoErro) {
+    const id = ID_DO_CAMPO[campo];
+    return {
+      id,
+      "aria-invalid": erros[campo] ? ("true" as const) : undefined,
+      "aria-describedby": erros[campo] ? `${id}-erro` : undefined,
+    };
+  }
+
+  /** T209 — a mensagem do erro, embaixo do campo. */
+  function erroDoCampo(campo: CampoErro) {
+    return erros[campo] ? (
+      <p
+        id={`${ID_DO_CAMPO[campo]}-erro`}
+        className="nova-admissao__linha-erro"
+      >
+        {erros[campo]}
+      </p>
+    ) : null;
+  }
+
   /** T195 — um painel de etapa: montado sempre, visível só na etapa atual. */
   function painelDaEtapa(indice: IndiceEtapa, conteudo: ReactNode) {
     const tituloId = idDoTituloDaEtapa(indice);
@@ -2111,13 +2239,28 @@ export function NovaAdmissaoScreen({
         aria-labelledby={tituloId}
         hidden={indice !== etapa}
       >
-        <h2 id={tituloId} className="nova-admissao__etapa-titulo" tabIndex={-1}>
-          <span className="nova-admissao__etapa-numero">
+        {/* T209 — cabeçalho da etapa: título e descrição; o selo "Etapa N
+            de 4" à direita (lido junto do título). */}
+        <header className="nova-admissao__etapa-cabecalho">
+          <div className="nova-admissao__etapa-textos">
+            <h2
+              id={tituloId}
+              className="nova-admissao__etapa-titulo"
+              tabIndex={-1}
+            >
+              <span className="nova-admissao__so-leitor">
+                Etapa {indice + 1} de {ETAPAS.length}:{" "}
+              </span>
+              {ETAPAS[indice]}
+            </h2>
+            <p className="nova-admissao__etapa-descricao">
+              {DESCRICOES_DAS_ETAPAS[indice]}
+            </p>
+          </div>
+          <span className="nova-admissao__etapa-selo" aria-hidden="true">
             Etapa {indice + 1} de {ETAPAS.length}
-            <span className="nova-admissao__so-leitor">:</span>
-          </span>{" "}
-          {ETAPAS[indice]}
-        </h2>
+          </span>
+        </header>
         {conteudo}
       </section>
     );
@@ -2126,15 +2269,18 @@ export function NovaAdmissaoScreen({
   // T195 — o resumo da revisão: o que foi digitado, sem opcional em branco.
   const linhasBasicas = linhasPreenchidas([
     ["Nome completo", campos.nome],
-    ["E-mail pessoal", contatos.emailPessoal],
+    ["CPF", identificacao.cpf],
+    ["RG", identificacao.rg],
     [
       ROTULO_DATA_NASCIMENTO,
       perfil.dataNascimento ? formatarDiaCivil(perfil.dataNascimento) : null,
     ],
-    [CAMPO_SEXO.rotulo, rotuloDoSexo(perfil.sexo)],
-    ...CAMPOS_TEXTO_PERFIL.map((c) => [c.rotulo, perfil[c.chave]] as const),
-    ["Celular", contatos.celular],
-    ["Telefone", contatos.telefone],
+    ["Gênero", rotuloDoGenero(identificacao.genero)],
+    ["Estado civil", perfil.estadoCivil],
+    ["E-mail pessoal", contatos.emailPessoal],
+    ["Telefone pessoal", contatos.celular],
+    ["Nome do contato", identificacao.contatoEmergenciaNome],
+    ["Telefone do contato", identificacao.contatoEmergenciaTelefone],
   ]);
   const linhasProfissionais = linhasPreenchidas([
     ["Matrícula", campos.matricula.toUpperCase()],
@@ -2178,7 +2324,7 @@ export function NovaAdmissaoScreen({
           headingLevel={1}
           titleId={NOVA_ADMISSAO_TITULO_ID}
           title="Novo colaborador"
-          description="Preencha os dados em quatro etapas. Você pode salvar e continuar depois."
+          description="Preencha os dados em 4 etapas. Você pode salvar e continuar depois."
           actions={
             admissao === null ? (
               <Button
@@ -2267,160 +2413,229 @@ export function NovaAdmissaoScreen({
             {painelDaEtapa(
               0,
               <>
-                <section
-                  className="nova-admissao__grupo"
-                  aria-labelledby="nova-admissao-grupo-dados-pessoais"
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-identificacao"
+                  titulo="Identificação"
+                  descricao="Aparecem no perfil, nos documentos e no eSocial."
                 >
-                  <h3
-                    id="nova-admissao-grupo-dados-pessoais"
-                    className="nova-admissao__grupo-titulo"
-                  >
-                    Dados pessoais
-                  </h3>
                   <BlocoDaFoto
                     foto={foto}
                     recusa={recusaDaFoto}
                     onEscolher={escolherFoto}
                     onRemover={removerFoto}
                   />
-                  {/* T178 — disposição em linhas (pedido da proprietária): nome e
-              e-mail pessoal; data de nascimento, sexo e saudação; estado
-              civil, nacionalidade e naturalidade; escolaridade e curso; pai e
-              mãe. Em tela estreita cada linha vira uma coluna só. */}
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    <FormField
-                      id={ID_DO_CAMPO.nome}
-                      label="Nome completo"
-                      required
-                      help="2 a 160 caracteres."
-                      {...(erros.nome ? { error: erros.nome } : {})}
-                    >
-                      {(control) => (
+                  <LinhaDoCadastro
+                    rotulo="Nome completo"
+                    ajuda="Como está nos documentos oficiais."
+                    paraId={ID_DO_CAMPO.nome}
+                  >
+                    <input
+                      type="text"
+                      maxLength={NOME_MAXIMO}
+                      autoComplete="off"
+                      placeholder="Nome completo"
+                      aria-required="true"
+                      value={campos.nome}
+                      onChange={(e) =>
+                        atualizar("nome", e.target.value, "nome")
+                      }
+                      {...propsDoCampo("nome")}
+                    />
+                    {erroDoCampo("nome")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="CPF e RG"
+                    ajuda="Usados na folha e no eSocial."
+                  >
+                    <div className="nova-admissao__linha-par">
+                      <div className="nova-admissao__linha-celula">
                         <input
                           type="text"
-                          maxLength={160}
+                          inputMode="numeric"
                           autoComplete="off"
-                          value={campos.nome}
+                          maxLength={14}
+                          placeholder="000.000.000-00"
+                          aria-label="CPF"
+                          aria-required="true"
+                          value={identificacao.cpf}
                           onChange={(e) =>
-                            atualizar("nome", e.target.value, "nome")
+                            atualizarIdentificacao(
+                              "cpf",
+                              mascararCpf(e.target.value),
+                            )
                           }
-                          {...control}
+                          {...propsDoCampo("cpf")}
                         />
-                      )}
-                    </FormField>
-                    {/* O e-mail pessoal é o MESMO campo dos contatos (T169): mesmo
-                estado e validação, e segue em `contatos.emailPessoal`. Só a
-                posição na tela é de Dados pessoais. T179 — opcional. */}
-                    <FormField
-                      id={ID_DO_CAMPO.emailPessoal}
-                      label={rotuloOpcional("E-mail pessoal")}
-                      {...(erros.emailPessoal
-                        ? { error: erros.emailPessoal }
-                        : {})}
-                    >
-                      {(control) => (
+                        {erroDoCampo("cpf")}
+                      </div>
+                      <div className="nova-admissao__linha-celula">
                         <input
-                          type="email"
-                          maxLength={254}
+                          type="text"
                           autoComplete="off"
-                          value={contatos.emailPessoal}
+                          maxLength={20}
+                          placeholder="00.000.000-0"
+                          aria-label="RG"
+                          value={identificacao.rg}
                           onChange={(e) =>
-                            atualizarContato("emailPessoal", e.target.value)
+                            atualizarIdentificacao("rg", e.target.value)
                           }
-                          {...control}
+                          {...propsDoCampo("rg")}
                         />
-                      )}
-                    </FormField>
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--3">
-                    <FormField
-                      id={ID_DO_CAMPO.dataNascimento}
-                      label={ROTULO_DATA_NASCIMENTO}
-                      required
-                      {...(erros.dataNascimento
-                        ? { error: erros.dataNascimento }
-                        : {})}
-                    >
-                      {(control) => (
-                        <input
-                          type="date"
-                          value={perfil.dataNascimento}
-                          onChange={(e) =>
-                            atualizarPerfil("dataNascimento", e.target.value)
-                          }
-                          {...control}
-                        />
-                      )}
-                    </FormField>
-                    {campoSexo()}
-                    {campoPerfil("saudacao")}
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--3">
-                    {campoPerfil("estadoCivil")}
-                    {campoPerfil("nacionalidade")}
-                    {campoPerfil("naturalidade")}
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {campoPerfil("escolaridade")}
-                    {campoPerfil("curso")}
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {campoPerfil("nomePai")}
-                    {campoPerfil("nomeMae")}
-                  </div>
-                </section>
-                <section
-                  className="nova-admissao__grupo"
-                  aria-labelledby="nova-admissao-grupo-contatos"
-                >
-                  <h3
-                    id="nova-admissao-grupo-contatos"
-                    className="nova-admissao__grupo-titulo"
+                        {erroDoCampo("rg")}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo={ROTULO_DATA_NASCIMENTO}
+                    paraId={ID_DO_CAMPO.dataNascimento}
                   >
-                    Contatos
-                  </h3>
-                  <p className="nova-admissao__texto nova-admissao__ajuda">
-                    O e-mail pessoal fica em Dados pessoais, ao lado do nome.
-                  </p>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    <FormField
-                      id={ID_DO_CAMPO.celular}
-                      label={rotuloOpcional("Celular")}
-                      help={DICA_DE_FORMATO.telefone}
-                      {...(erros.celular ? { error: erros.celular } : {})}
-                    >
-                      {(control) => (
-                        <CampoMascarado
-                          mascara="telefone"
-                          value={contatos.celular}
-                          onValorChange={(valor) =>
-                            atualizarContato("celular", valor)
+                    <input
+                      type="date"
+                      value={perfil.dataNascimento}
+                      onChange={(e) =>
+                        atualizarPerfil("dataNascimento", e.target.value)
+                      }
+                      {...propsDoCampo("dataNascimento")}
+                    />
+                    {erroDoCampo("dataNascimento")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Gênero e estado civil">
+                    <div className="nova-admissao__linha-par">
+                      <div className="nova-admissao__linha-celula">
+                        <select
+                          aria-label="Gênero"
+                          value={identificacao.genero}
+                          onChange={(e) =>
+                            atualizarIdentificacao("genero", e.target.value)
                           }
-                          limparAvisos={limpezaDosAvisos}
-                          {...control}
-                        />
-                      )}
-                    </FormField>
-                    <FormField
-                      id={ID_DO_CAMPO.telefone}
-                      label={rotuloOpcional("Telefone")}
-                      help={DICA_DE_FORMATO.telefone}
-                      {...(erros.telefone ? { error: erros.telefone } : {})}
-                    >
-                      {(control) => (
-                        <CampoMascarado
-                          mascara="telefone"
-                          value={contatos.telefone}
-                          onValorChange={(valor) =>
-                            atualizarContato("telefone", valor)
+                          {...propsDoCampo("genero")}
+                        >
+                          <option value="">Selecione</option>
+                          {OPCOES_GENERO.map((o) => (
+                            <option key={o.codigo} value={o.codigo}>
+                              {o.rotulo}
+                            </option>
+                          ))}
+                        </select>
+                        {erroDoCampo("genero")}
+                      </div>
+                      <div className="nova-admissao__linha-celula">
+                        <select
+                          aria-label="Estado civil"
+                          value={perfil.estadoCivil}
+                          onChange={(e) =>
+                            atualizarPerfil("estadoCivil", e.target.value)
                           }
-                          limparAvisos={limpezaDosAvisos}
-                          {...control}
-                        />
-                      )}
-                    </FormField>
-                  </div>
-                </section>
+                          {...propsDoCampo("estadoCivil")}
+                        >
+                          <option value="">Selecione</option>
+                          {/* Valor gravado antes da lista (rascunho antigo):
+                              continua visível como opção. */}
+                          {perfil.estadoCivil !== "" &&
+                          !(OPCOES_ESTADO_CIVIL as readonly string[]).includes(
+                            perfil.estadoCivil,
+                          ) ? (
+                            <option value={perfil.estadoCivil}>
+                              {perfil.estadoCivil}
+                            </option>
+                          ) : null}
+                          {OPCOES_ESTADO_CIVIL.map((opcao) => (
+                            <option key={opcao} value={opcao}>
+                              {opcao}
+                            </option>
+                          ))}
+                        </select>
+                        {erroDoCampo("estadoCivil")}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-contato"
+                  titulo="Contato"
+                  descricao="Canais pessoais para falar com o colaborador."
+                >
+                  <LinhaDoCadastro
+                    rotulo="E-mail pessoal"
+                    ajuda="Diferente do e-mail corporativo."
+                    paraId={ID_DO_CAMPO.emailPessoal}
+                  >
+                    <input
+                      type="email"
+                      maxLength={254}
+                      autoComplete="off"
+                      placeholder="email@exemplo.com"
+                      value={contatos.emailPessoal}
+                      onChange={(e) =>
+                        atualizarContato("emailPessoal", e.target.value)
+                      }
+                      {...propsDoCampo("emailPessoal")}
+                    />
+                    {erroDoCampo("emailPessoal")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Telefone pessoal"
+                    ajuda="Com DDD."
+                    paraId={ID_DO_CAMPO.celular}
+                  >
+                    <CampoMascarado
+                      mascara="telefone"
+                      placeholder="(00) 00000-0000"
+                      value={contatos.celular}
+                      onValorChange={(valor) =>
+                        atualizarContato("celular", valor)
+                      }
+                      limparAvisos={limpezaDosAvisos}
+                      {...propsDoCampo("celular")}
+                    />
+                    {erroDoCampo("celular")}
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-emergencia"
+                  titulo="Contato de emergência"
+                  descricao="Acionado apenas em situações de urgência."
+                >
+                  <LinhaDoCadastro
+                    rotulo="Nome do contato"
+                    paraId={ID_DO_CAMPO.contatoEmergenciaNome}
+                  >
+                    <input
+                      type="text"
+                      maxLength={150}
+                      autoComplete="off"
+                      placeholder="Nome do contato"
+                      value={identificacao.contatoEmergenciaNome}
+                      onChange={(e) =>
+                        atualizarIdentificacao(
+                          "contatoEmergenciaNome",
+                          e.target.value,
+                        )
+                      }
+                      {...propsDoCampo("contatoEmergenciaNome")}
+                    />
+                    {erroDoCampo("contatoEmergenciaNome")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Telefone do contato"
+                    paraId={ID_DO_CAMPO.contatoEmergenciaTelefone}
+                  >
+                    <CampoMascarado
+                      mascara="telefone"
+                      placeholder="(00) 00000-0000"
+                      value={identificacao.contatoEmergenciaTelefone}
+                      onValorChange={(valor) =>
+                        atualizarIdentificacao(
+                          "contatoEmergenciaTelefone",
+                          valor,
+                        )
+                      }
+                      limparAvisos={limpezaDosAvisos}
+                      {...propsDoCampo("contatoEmergenciaTelefone")}
+                    />
+                    {erroDoCampo("contatoEmergenciaTelefone")}
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
               </>,
             )}
 
@@ -2899,24 +3114,26 @@ export function NovaAdmissaoScreen({
         <div className="nova-admissao__rodape">
           <ProgressoDaAdmissao atual={etapa} />
           <div className="nova-admissao__rodape-acoes">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={pedirCancelamento}
-              disabled={salvando}
-            >
-              Cancelar
-            </Button>
-            {etapa > 0 ? (
+            {/* T209 — "Cancelar" na primeira etapa; "Voltar" nas demais. */}
+            {etapa === 0 ? (
               <Button
                 type="button"
-                variant="secondary"
+                variant="subtle"
+                onClick={pedirCancelamento}
+                disabled={salvando}
+              >
+                Cancelar
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="subtle"
                 onClick={() => irParaEtapa((etapa - 1) as IndiceEtapa)}
                 disabled={salvando}
               >
                 Voltar
               </Button>
-            ) : null}
+            )}
             {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
               botão (envio implícito do navegador). Num seletor, Enter é do
               próprio seletor: avança-se com Tab até aqui e Enter.
@@ -2936,7 +3153,18 @@ export function NovaAdmissaoScreen({
                 if (evento.detail > 1) evento.preventDefault();
               }}
             >
-              {etapa === ULTIMA_ETAPA ? "Concluir" : "Próxima etapa"}
+              {etapa === ULTIMA_ETAPA ? (
+                "Cadastrar colaborador"
+              ) : (
+                <>
+                  Próxima etapa
+                  <ChevronRight
+                    className="nova-admissao__seta"
+                    aria-hidden="true"
+                    focusable="false"
+                  />
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -3149,6 +3377,9 @@ function IndicadorDeEtapas({
                   também o número e o estado, num texto só. */}
               <span className="nova-admissao__etapa-nome" aria-hidden="true">
                 {titulo}
+                <span className="nova-admissao__etapa-sub">
+                  {SUBTITULOS_DAS_ETAPAS[indice]}
+                </span>
               </span>
               <span className="nova-admissao__so-leitor">
                 {`Etapa ${indice + 1}: ${titulo}, ${ROTULO_DO_ESTADO[estado]}`}
@@ -3199,7 +3430,7 @@ function ProgressoDaAdmissao({ atual }: { readonly atual: IndiceEtapa }) {
         id="nova-admissao-progresso"
         className="nova-admissao__progresso-texto"
       >
-        Etapa {atual + 1} de {ETAPAS.length} · {progresso}%
+        {progresso}% concluído
       </p>
       <progress
         className="nova-admissao__progresso-barra"
@@ -3448,19 +3679,36 @@ function ConfirmacaoDaAdmissao({
           ) : null}
         </dl>
         <ResumoGravado
-          titulo="Dados pessoais"
+          titulo="Dados básicos"
           id="nova-admissao-sucesso-dados-pessoais"
-          linhas={[
-            [
-              ROTULO_DATA_NASCIMENTO,
-              formatarDiaCivil(admissao.perfilPessoal.dataNascimento),
-            ],
-            // T179 — o sexo gravado é código: aparece pelo rótulo.
-            [CAMPO_SEXO.rotulo, rotuloDoSexo(admissao.perfilPessoal.sexo)],
-            ...CAMPOS_TEXTO_PERFIL.map(
-              (c) => [c.rotulo, admissao.perfilPessoal[c.chave]] as const,
-            ),
-          ]}
+          linhas={
+            admissao.perfilPessoal
+              ? [
+                  ["CPF", exibirCpf(admissao.perfilPessoal.cpf)],
+                  ["RG", admissao.perfilPessoal.rg ?? null],
+                  [
+                    ROTULO_DATA_NASCIMENTO,
+                    admissao.perfilPessoal.dataNascimento
+                      ? formatarDiaCivil(admissao.perfilPessoal.dataNascimento)
+                      : null,
+                  ],
+                  ["Gênero", rotuloDoGenero(admissao.perfilPessoal.genero)],
+                  ["Estado civil", admissao.perfilPessoal.estadoCivil],
+                  [
+                    "Contato de emergência",
+                    admissao.perfilPessoal.contatoEmergenciaNome ?? null,
+                  ],
+                  [
+                    "Telefone do contato",
+                    admissao.perfilPessoal.contatoEmergenciaTelefone
+                      ? exibirTelefone(
+                          admissao.perfilPessoal.contatoEmergenciaTelefone,
+                        )
+                      : null,
+                  ],
+                ]
+              : null
+          }
         />
         <ResumoGravado
           titulo="Endereço"
@@ -3601,71 +3849,147 @@ function BlocoDaFoto({
 }) {
   const campoRef = useRef<HTMLInputElement | null>(null);
   return (
-    <fieldset
-      className="nova-admissao__foto"
-      aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}
+    <LinhaDoCadastro
+      rotulo="Foto"
+      ajuda="Aparece na lista de colaboradores e no perfil."
     >
-      <legend className="nova-admissao__foto-legenda">
-        Foto do colaborador (opcional)
-      </legend>
-      {foto ? (
-        <img
-          className="nova-admissao__foto-avatar"
-          src={foto.url}
-          alt="Prévia da foto do colaborador"
-        />
-      ) : (
-        <span
-          className="nova-admissao__foto-avatar nova-admissao__foto-avatar--vazio"
-          aria-hidden="true"
-        >
-          <IconePessoaNeutra />
-        </span>
-      )}
-      <div className="nova-admissao__foto-corpo">
-        <div className="nova-admissao__foto-acoes">
-          <Button
-            id={ID_FOTO_ENVIAR}
-            type="button"
-            variant="secondary"
-            onClick={() => campoRef.current?.click()}
+      <div
+        className="nova-admissao__foto"
+        aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}
+      >
+        {foto ? (
+          <img
+            className="nova-admissao__foto-avatar"
+            src={foto.url}
+            alt="Prévia da foto do colaborador"
+          />
+        ) : (
+          <span
+            className="nova-admissao__foto-avatar nova-admissao__foto-avatar--vazio"
+            aria-hidden="true"
           >
-            Enviar foto
-          </Button>
-          {foto ? (
-            <Button type="button" variant="subtle" onClick={onRemover}>
-              Remover
+            <IconePessoaNeutra />
+          </span>
+        )}
+        <div className="nova-admissao__foto-corpo">
+          <div className="nova-admissao__foto-acoes">
+            <Button
+              id={ID_FOTO_ENVIAR}
+              type="button"
+              variant="secondary"
+              onClick={() => campoRef.current?.click()}
+            >
+              Enviar foto
             </Button>
+            {foto ? (
+              <Button type="button" variant="subtle" onClick={onRemover}>
+                Remover
+              </Button>
+            ) : null}
+          </div>
+          <p
+            id="nova-admissao-foto-ajuda"
+            className="nova-admissao__foto-ajuda"
+          >
+            PNG ou JPG, até 5 MB.
+          </p>
+          {recusa ? (
+            <p
+              id="nova-admissao-foto-recusa"
+              className="nova-admissao__foto-recusa"
+              role="alert"
+            >
+              {recusa}
+            </p>
           ) : null}
         </div>
-        <p id="nova-admissao-foto-ajuda" className="nova-admissao__foto-ajuda">
-          PNG ou JPEG, até 5 MB. Enviada ao concluir o cadastro. A foto não fica
-          no rascunho.
-        </p>
-        {recusa ? (
-          <p
-            id="nova-admissao-foto-recusa"
-            className="nova-admissao__foto-recusa"
-            role="alert"
-          >
-            {recusa}
-          </p>
-        ) : null}
+        <input
+          ref={campoRef}
+          id={ID_FOTO_ARQUIVO}
+          type="file"
+          accept={FOTO_TIPOS_ACEITOS}
+          hidden
+          tabIndex={-1}
+          onChange={(e) => {
+            onEscolher(e.target.files?.[0]);
+            // Escolher o mesmo arquivo de novo também conta.
+            e.target.value = "";
+          }}
+        />
       </div>
-      <input
-        ref={campoRef}
-        id={ID_FOTO_ARQUIVO}
-        type="file"
-        accept={FOTO_TIPOS_ACEITOS}
-        hidden
-        tabIndex={-1}
-        onChange={(e) => {
-          onEscolher(e.target.files?.[0]);
-          // Escolher o mesmo arquivo de novo também conta.
-          e.target.value = "";
-        }}
-      />
-    </fieldset>
+    </LinhaDoCadastro>
+  );
+}
+
+/**
+ * T209 — uma seção da etapa: título e descrição, e as linhas dela.
+ */
+function SecaoDoCadastro({
+  id,
+  titulo,
+  descricao,
+  children,
+}: {
+  readonly id: string;
+  readonly titulo: string;
+  readonly descricao: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <section className="nova-admissao__secao" aria-labelledby={id}>
+      <header className="nova-admissao__secao-cabecalho">
+        <h3 id={id} className="nova-admissao__secao-titulo">
+          {titulo}
+        </h3>
+        <p className="nova-admissao__secao-descricao">{descricao}</p>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * T209 — uma linha do cadastro: rótulo e ajuda à esquerda, campos à direita
+ * (em tela estreita, um embaixo do outro). Com `paraId`, o rótulo é o
+ * `<label>` do campo; sem ele (dois campos lado a lado), a linha é um grupo
+ * nomeado pelo rótulo, e cada campo tem o próprio nome.
+ */
+function LinhaDoCadastro({
+  rotulo,
+  ajuda,
+  paraId,
+  children,
+}: {
+  readonly rotulo: string;
+  readonly ajuda?: string;
+  readonly paraId?: string;
+  readonly children: ReactNode;
+}) {
+  const base = useId();
+  const idRotulo = `${base}-rotulo`;
+  return (
+    <div
+      className="nova-admissao__linha-cadastro"
+      {...(paraId ? {} : { role: "group", "aria-labelledby": idRotulo })}
+    >
+      <div className="nova-admissao__linha-rotulo">
+        {paraId ? (
+          <label
+            id={idRotulo}
+            htmlFor={paraId}
+            className="nova-admissao__linha-titulo"
+          >
+            {rotulo}
+          </label>
+        ) : (
+          <p id={idRotulo} className="nova-admissao__linha-titulo">
+            {rotulo}
+          </p>
+        )}
+        {ajuda ? <p className="nova-admissao__linha-ajuda">{ajuda}</p> : null}
+      </div>
+      <div className="nova-admissao__linha-campos">{children}</div>
+    </div>
   );
 }
 

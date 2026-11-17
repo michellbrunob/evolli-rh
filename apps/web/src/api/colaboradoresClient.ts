@@ -227,15 +227,15 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
    * `null`.
    *
-   * OBRIGATÓRIO: `perfilPessoal` com `dataNascimento`. OPCIONAIS: os demais
-   * campos do perfil (`sexo` só com um código de `OPCOES_SEXO`), o `endereco`
-   * inteiro e os `contatos` — T179: cada contato vazio é omitido, e o bloco
-   * inteiro some quando os três estão vazios.
+   * OBRIGATÓRIO: o bloco `perfilPessoal` (T209 — a data de nascimento passou
+   * a opcional). OPCIONAIS: os campos do perfil (`sexo` só com um código de
+   * `OPCOES_SEXO`; T209 — CPF, RG, gênero e contato de emergência), o
+   * `endereco` inteiro e os `contatos` — T179: cada contato vazio é omitido, e
+   * o bloco inteiro some quando os três estão vazios.
    */
-  perfilPessoal: Record<
-    Exclude<keyof PerfilPessoalApi, "atualizadoEm" | "dataNascimento">,
-    string | null
-  > & { dataNascimento: string };
+  perfilPessoal: Partial<
+    Record<Exclude<keyof PerfilPessoalApi, "atualizadoEm">, string | null>
+  >;
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
   contatos?: { emailPessoal?: string; celular?: string; telefone?: string };
   /**

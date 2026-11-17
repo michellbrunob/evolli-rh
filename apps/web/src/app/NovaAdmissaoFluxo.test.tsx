@@ -257,14 +257,18 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
   fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
     target: { value: "1990-05-20" },
   });
+  // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+  fireEvent.change(screen.getByLabelText(/^CPF$/), {
+    target: { value: "529.982.247-25" },
+  });
   if (!semContatos) {
     fireEvent.change(screen.getByLabelText(/E-mail pessoal/), {
       target: { value: "pessoa.fluxo@exemplo.test" },
     });
-    fireEvent.change(screen.getByLabelText(/^Celular/), {
+    fireEvent.change(screen.getByLabelText(/^Telefone pessoal/), {
       target: { value: "+5531999990001" },
     });
-    fireEvent.change(screen.getByLabelText(/^Telefone/), {
+    fireEvent.change(screen.getByLabelText(/^Telefone do contato/), {
       target: { value: "3133330001" },
     });
   }
@@ -295,13 +299,15 @@ async function admitirPelaPagina({ semContatos = false } = {}) {
   // T195 — quatro etapas: "Próxima etapa" até a revisão. Nela, "Confirmar
   // admissão" só valida e abre a confirmação (T179); quem grava é
   // "Confirmar cadastro".
-  for (const etapa of ["Dados pessoais", "Dados profissionais", "Endereço"]) {
+  for (const etapa of ["Dados básicos", "Dados profissionais", "Endereço"]) {
     expect(
       screen.getByRole("heading", { level: 2, name: new RegExp(etapa) }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
   }
-  fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Cadastrar colaborador" }),
+  );
   const confirmacao = await screen.findByRole("dialog", {
     name: "Confirmar cadastro de colaborador?",
   });
@@ -721,7 +727,7 @@ describe("T209 — assistente da Nova admissão no App (permissões e voltar)", 
       const rodape = document.querySelector<HTMLElement>(
         ".nova-admissao__rodape",
       )!;
-      expect(rodape).toHaveTextContent("Etapa 1 de 4 · 25%");
+      expect(rodape).toHaveTextContent("25% concluído");
       expect(
         within(rodape).getByRole("button", { name: "Próxima etapa" }),
       ).toBeInTheDocument();
@@ -1033,6 +1039,10 @@ describe("T179 — empresa sem referências, pelo papel que o shell conhece", ()
       });
       fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
         target: { value: "1990-05-20" },
+      });
+      // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+      fireEvent.change(screen.getByLabelText(/^CPF$/), {
+        target: { value: "529.982.247-25" },
       });
       fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
       // T180 — o "+" do cadastro rápido é só do RH.

@@ -1591,10 +1591,14 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
+    // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+      target: { value: "529.982.247-25" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     const titulo = await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e vínculo$/,
+      name: /Dados profissionais$/,
     });
 
     await trocarPeloMenuPara("Empresa Beta");
@@ -1925,10 +1929,14 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
+    // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+      target: { value: "529.982.247-25" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e vínculo$/,
+      name: /Dados profissionais$/,
     });
     const mais = await screen.findByRole("button", {
       name: "Cadastrar novo departamento",
@@ -1966,10 +1974,10 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     ]
       .filter((painel) => !painel.hasAttribute("hidden"))
       .map((painel) => painel.querySelector("h2")?.textContent);
-    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e vínculo"]);
+    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais"]);
     expect(
       document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
-    ).toHaveTextContent("Etapa 2: Dados profissionais e vínculo, etapa atual");
+    ).toHaveTextContent("Etapa 2: Dados profissionais, etapa atual");
   }
 
   it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
