@@ -3,7 +3,12 @@ import {
   ForbiddenException,
   Injectable,
 } from "@nestjs/common";
-import { Empresa, Prisma, StatusOrganizacional } from "@prisma/client";
+import {
+  AccessUser,
+  Empresa,
+  Prisma,
+  StatusOrganizacional,
+} from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { OrganizacaoAuditoriaService } from "../organizacao-auditoria.service";
 import {
@@ -20,9 +25,83 @@ import {
 } from "../validacao.util";
 import {
   AtualizarNoOrganizacionalDto,
+  CadastrarEmpresaDto,
   CriarEmpresaDto,
   ListarNosOrganizacionaisQueryDto,
 } from "../dto/organizacao.dto";
+import { codigosCandidatos } from "../criacao-automatica";
+import { cnpjValido, normalizarCnpj } from "./cnpj";
+import {
+  CamposRecusadosException,
+  ConflitoDeCamposException,
+} from "../../common/erros/recusa-por-campo";
+import {
+  listarEmpresasAutorizadas,
+  papelSelecionaEmpresa,
+  papelTemPoliticaGlobal,
+} from "../../auth/session/contexto-empresarial";
+
+/** T209 — a empresa como o cadastro a devolve (sem campos internos). */
+export interface EmpresaCadastrada {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+  readonly status: StatusOrganizacional;
+  readonly cnpj: string | null;
+  readonly porte: string | null;
+  readonly endereco: {
+    readonly cep: string | null;
+    readonly logradouro: string | null;
+    readonly numero: string | null;
+    readonly complemento: string | null;
+    readonly bairro: string | null;
+    readonly cidade: string | null;
+    readonly uf: string | null;
+  };
+}
+
+/** T209 — uma linha de Configurações › Empresas. */
+export interface EmpresaDaConta {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+  readonly cnpj: string | null;
+  readonly cidade: string | null;
+  readonly uf: string | null;
+  /** A empresa da conta: a primeira, que não pode ser removida. */
+  readonly principal: boolean;
+  /** Vínculos ativos (colaboradores ativos) na empresa. */
+  readonly colaboradoresAtivos: number;
+}
+
+function comoCadastrada(e: Empresa): EmpresaCadastrada {
+  return {
+    id: e.id,
+    codigo: e.codigo,
+    nome: e.nome,
+    status: e.status,
+    cnpj: e.cnpj,
+    porte: e.porte,
+    endereco: {
+      cep: e.cep,
+      logradouro: e.logradouro,
+      numero: e.numero,
+      complemento: e.complemento,
+      bairro: e.bairro,
+      cidade: e.cidade,
+      uf: e.uf,
+    },
+  };
+}
+
+/** Conflito de unicidade do Prisma no campo dado. */
+function violouUnico(erro: unknown, campo: string): boolean {
+  return (
+    erro instanceof Prisma.PrismaClientKnownRequestError &&
+    erro.code === "P2002" &&
+    JSON.stringify(erro.meta?.target ?? "").includes(campo)
+  );
+}
 
 /**
  * Empresa — raiz do escopo organizacional (spec §3.1). Não existe entidade
@@ -69,6 +148,141 @@ export class EmpresaService {
     } catch (error) {
       traduzirErroPrisma(error);
     }
+  }
+
+  /**
+   * T209 — Nova empresa (Configurações › Empresas), por decisão da
+   * proprietária (2026-11-17): RH e master técnico criam. O código sai do
+   * nome; o CNPJ é conferido aqui (verificadores) e é único entre todas as
+   * empresas. Quem cria pelo RH recebe a concessão da empresa nova na MESMA
+   * transação (autor e data na própria concessão), e passa a poder trocar
+   * para ela; o master já tem política global e não precisa de concessão.
+   */
+  async cadastrar(
+    dto: CadastrarEmpresaDto,
+    ctx: OrganizacaoAuditContext,
+  ): Promise<EmpresaCadastrada> {
+    const ator = ctx.actor;
+    if (!papelSelecionaEmpresa(ator.role)) throw new ForbiddenException();
+
+    const cnpj = normalizarCnpj(dto.cnpj);
+    if (cnpj === null || !cnpjValido(cnpj)) {
+      throw new CamposRecusadosException([
+        { campo: "cnpj", motivo: "invalido" },
+      ]);
+    }
+    const conflito = () =>
+      new ConflitoDeCamposException([{ campo: "cnpj", motivo: "em_uso" }]);
+    if (
+      await this.prisma.empresa.findUnique({
+        where: { cnpj },
+        select: { id: true },
+      })
+    ) {
+      throw conflito();
+    }
+
+    const candidatos = codigosCandidatos(dto.nome, "EMP");
+    const usados = new Set(
+      (
+        await this.prisma.empresa.findMany({
+          where: { codigo: { in: candidatos } },
+          select: { codigo: true },
+        })
+      ).map((e) => e.codigo),
+    );
+    const livres = candidatos.filter((c) => !usados.has(c));
+    if (livres.length === 0) throw new ConflictException();
+
+    const endereco = dto.endereco ?? {};
+    for (const codigo of livres) {
+      try {
+        const criada = await this.prisma.$transaction(async (tx) => {
+          const empresa = await tx.empresa.create({
+            data: {
+              codigo,
+              nome: dto.nome,
+              cnpj,
+              porte: dto.porte ?? null,
+              cep: endereco.cep ?? null,
+              logradouro: endereco.logradouro ?? null,
+              numero: endereco.numero ?? null,
+              complemento: endereco.complemento ?? null,
+              bairro: endereco.bairro ?? null,
+              cidade: endereco.cidade ?? null,
+              uf: endereco.uf ?? null,
+            },
+          });
+          if (!papelTemPoliticaGlobal(ator.role)) {
+            await tx.accessUserEmpresa.create({
+              data: {
+                userId: ator.id,
+                empresaId: empresa.id,
+                concedidoPorUserId: ator.id,
+              },
+            });
+          }
+          await this.auditoria.registrarMutacao(
+            tx,
+            ctx,
+            "organizacao_empresa_criada",
+            "empresa",
+            empresa.id,
+            empresa.id,
+          );
+          return empresa;
+        });
+        return comoCadastrada(criada);
+      } catch (erro) {
+        if (violouUnico(erro, "cnpj")) throw conflito();
+        // Código tomado por outra criação ao mesmo tempo: tenta o próximo.
+        if (violouUnico(erro, "codigo")) continue;
+        throw erro;
+      }
+    }
+    throw new ConflictException();
+  }
+
+  /**
+   * T209 — Configurações › Empresas: as empresas que esta conta alcança, a
+   * principal (a da conta) primeiro. Papel que não troca de empresa vê só a
+   * própria. Nenhuma consulta sai do que `listarEmpresasAutorizadas` já
+   * autoriza.
+   */
+  async listarDaConta(
+    ator: AccessUser & { readonly contaEmpresaId?: string | null },
+  ): Promise<EmpresaDaConta[]> {
+    const conta =
+      ator.contaEmpresaId !== undefined ? ator.contaEmpresaId : ator.companyId;
+    const usuario = { id: ator.id, role: ator.role, companyId: conta };
+    const ids = papelSelecionaEmpresa(ator.role)
+      ? (await listarEmpresasAutorizadas(this.prisma, usuario)).map((e) => e.id)
+      : conta !== null
+        ? [conta]
+        : [];
+    if (ids.length === 0) return [];
+
+    const empresas = await this.prisma.empresa.findMany({
+      where: { id: { in: ids }, status: StatusOrganizacional.ativo },
+      orderBy: { codigo: "asc" },
+    });
+    const contagens = await Promise.all(
+      empresas.map((e) => contarVinculosAtivosNaEmpresa(this.prisma, e.id)),
+    );
+    const itens = empresas.map((e, i) => ({
+      id: e.id,
+      codigo: e.codigo,
+      nome: e.nome,
+      cnpj: e.cnpj,
+      cidade: e.cidade,
+      uf: e.uf,
+      principal: e.id === conta,
+      colaboradoresAtivos: contagens[i]!,
+    }));
+    return [
+      ...itens.filter((e) => e.principal),
+      ...itens.filter((e) => !e.principal),
+    ];
   }
 
   async listar(

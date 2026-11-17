@@ -722,6 +722,19 @@ model Empresa {
   nome   String
   status StatusOrganizacional @default(ativo)
 
+  // T209 — cadastro de empresa: CNPJ (único; numérico ou alfanumérico, com
+  // verificadores conferidos no servidor), porte e endereço. Anuláveis: as
+  // empresas antigas ficam sem eles até serem completadas.
+  cnpj        String? @unique
+  porte       String?
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  uf          String?
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 

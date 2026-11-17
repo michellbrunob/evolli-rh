@@ -26,6 +26,9 @@ import {
  */
 export type MotivoDoCampo =
   | "em_uso"
+  // T209 — valor com formato certo e conteúdo recusado (CNPJ com verificador
+  // errado).
+  | "invalido"
   | "indisponivel"
   | "igual_a_vigente"
   | "fora_de_ordem"
@@ -42,6 +45,8 @@ export type CampoPublico =
   | "emailPessoal"
   // T209 — CPF já usado na empresa.
   | "perfilPessoal.cpf"
+  // T209 — CNPJ da Nova empresa (inválido ou já cadastrado).
+  | "cnpj"
   // T209 — gestor direto sem vínculo na empresa.
   | "contrato.gestorDiretoId"
   // T182 — código de jornada repetido na empresa.

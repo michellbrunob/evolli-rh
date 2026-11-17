@@ -764,7 +764,7 @@ describe("Contexto empresarial ativo (e2e)", () => {
   // compartilhada entre abas e o isolamento depois da troca.
   // -------------------------------------------------------------------------
   describe("T189 — contratos do seletor de empresa ativa", () => {
-    const CAMPOS_DA_EMPRESA = ["codigo", "id", "nome"];
+    const CAMPOS_DA_EMPRESA = ["cnpj", "codigo", "id", "nome"];
     let rhMulti: Credencial;
     let rhUnica: Credencial;
     let empresaE: string;
@@ -807,17 +807,20 @@ describe("Contexto empresarial ativo (e2e)", () => {
       rhUnica = await criar("rh.unica.t189@example.test", "rh", empresaD);
     });
 
-    it("rh: /users/me diz que troca, e a empresa ativa traz só id, código e nome", async () => {
+    it("rh: /users/me diz que troca, e a empresa ativa traz só id, código, nome e CNPJ", async () => {
       const eu = await get("/v1/users/me", rhMulti).expect(200);
       expect(eu.body.podeTrocarEmpresa).toBe(true);
       expect(Object.keys(eu.body.empresaAtiva).sort()).toEqual(
         CAMPOS_DA_EMPRESA,
       );
       expect(eu.body.empresaAtiva.id).toBe(empresaB);
-      expect(JSON.stringify(eu.body)).not.toMatch(/cnpj|cpf/i);
+      expect(JSON.stringify(eu.body)).not.toMatch(/cpf/i);
     });
 
-    it("rh com várias empresas: a lista traz as autorizadas, só com id, código e nome", async () => {
+    // T209 — o CNPJ da empresa entra na lista (decisão da proprietária de
+    // 2026-11-17): o seletor o mostra abaixo do nome. Dado de pessoa (CPF)
+    // continua fora.
+    it("rh com várias empresas: a lista traz as autorizadas, só com id, código, nome e CNPJ", async () => {
       const r = await get("/v1/auth/contexto/empresas", rhMulti).expect(200);
       expect(r.body.itens.map((e: { id: string }) => e.id)).toEqual([
         empresaB,
@@ -826,7 +829,7 @@ describe("Contexto empresarial ativo (e2e)", () => {
       for (const item of r.body.itens) {
         expect(Object.keys(item).sort()).toEqual(CAMPOS_DA_EMPRESA);
       }
-      expect(JSON.stringify(r.body)).not.toMatch(/cnpj|cpf/i);
+      expect(JSON.stringify(r.body)).not.toMatch(/cpf/i);
     });
 
     it("empresa única: a lista tem só a ativa — a interface mostra só leitura", async () => {
@@ -899,6 +902,8 @@ describe("Contexto empresarial ativo (e2e)", () => {
         id: empresaD,
         codigo: "EMPD",
         nome: "Empresa D",
+        // T209 — empresa criada sem CNPJ (rota administrativa).
+        cnpj: null,
       });
       const r = await get(
         "/v1/colaboradores?tamanhoPagina=100",

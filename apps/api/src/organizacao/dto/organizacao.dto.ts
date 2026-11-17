@@ -11,7 +11,9 @@ import {
   MaxLength,
   Min,
   MinLength,
+  IsObject,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
 import { StatusOrganizacional } from "@prisma/client";
 import {
@@ -61,6 +63,129 @@ export class AtualizarNoOrganizacionalDto {
 }
 
 export class CriarEmpresaDto extends CodigoNomeDto {}
+
+/** T209 — faixas de pessoas no CNPJ (o "Porte" da Nova empresa). */
+export const PORTES_DE_EMPRESA = [
+  "1_10",
+  "11_50",
+  "51_200",
+  "201_500",
+  "501_1000",
+  "mais_de_1000",
+] as const;
+export type PorteDeEmpresa = (typeof PORTES_DE_EMPRESA)[number];
+
+/** T209 — as 27 unidades da federação. */
+export const UFS = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+] as const;
+
+/** Texto opcional: aparado; vazio vira ausente. */
+const textoOpcional = ({ value }: { value: unknown }) =>
+  typeof value === "string" ? value.trim() || undefined : value;
+
+/** T209 — endereço da empresa: tudo opcional (preenchido pelo CEP na tela). */
+export class EnderecoDaEmpresaDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.replace(/\D/g, "") || undefined : value,
+  )
+  @Matches(/^[0-9]{8}$/)
+  cep?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(200)
+  logradouro?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(20)
+  numero?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(120)
+  complemento?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(120)
+  bairro?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(120)
+  cidade?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().toUpperCase() || undefined : value,
+  )
+  @IsIn(UFS)
+  uf?: string;
+}
+
+/**
+ * T209 — Nova empresa (Configurações › Empresas). O código é gerado pelo
+ * servidor a partir do nome; o CNPJ chega com ou sem máscara e os
+ * verificadores são conferidos no serviço (422 no campo, sem eco).
+ */
+export class CadastrarEmpresaDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(18)
+  cnpj!: string;
+
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value,
+  )
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
+  nome!: string;
+
+  @IsOptional()
+  @IsIn(PORTES_DE_EMPRESA)
+  porte?: PorteDeEmpresa;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => EnderecoDaEmpresaDto)
+  endereco?: EnderecoDaEmpresaDto;
+}
 
 /**
  * T197 — criação de Departamento, Unidade, Cargo ou Centro de custo. Com
