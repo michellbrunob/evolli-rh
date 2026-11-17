@@ -26,6 +26,8 @@ const CAMPOS_POR_GRUPO = {
     "equipeId",
     "centroCustoId",
     "tabelaHorarioId",
+    // T209 — etapa 2: o cargo digitado (vira cargo do cadastro ao concluir).
+    "cargoNome",
   ],
   perfil: [
     "dataNascimento",
@@ -55,6 +57,18 @@ const CAMPOS_POR_GRUPO = {
     "estado",
   ],
   contatos: ["emailPessoal", "celular", "telefone"],
+  // T209 — etapa 2: o contrato da admissão, em texto como a tela o guarda.
+  contrato: [
+    "nivel",
+    "gestorDiretoId",
+    "jornadaSemanalHoras",
+    "escala",
+    "salarioBruto",
+    "conselhoProfissional",
+    "registroProfissional",
+    "dependentesIrrf",
+    "pensaoAlimenticiaPercentual",
+  ],
 } as const;
 
 type Grupo = keyof typeof CAMPOS_POR_GRUPO;
@@ -86,6 +100,7 @@ export interface DadosDoRascunho {
   perfil?: Record<string, string>;
   endereco?: Record<string, string>;
   contatos?: Record<string, string>;
+  contrato?: Record<string, string>;
   referencias?: Partial<Record<ChaveDeReferencia, ReferenciaDoRascunho>>;
 }
 

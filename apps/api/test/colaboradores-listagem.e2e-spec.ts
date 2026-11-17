@@ -1574,6 +1574,9 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
           pj: 1,
           temporario: 1,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       });
     });

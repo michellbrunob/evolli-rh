@@ -326,12 +326,12 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
 
   describe("lotação obrigatória: Departamento e Cargo (Unidade opcional)", () => {
     it.each(["departamentoId", "cargoId"])(
-      "sem %s: 400 e nada é gravado",
+      "T209 — sem %s: aceito (opcional desde a etapa 2), com as outras referências",
       async (campo) => {
         const corpo: Record<string, unknown> = admissao();
         delete corpo[campo];
-        await admitir(rhA).send(corpo).expect(400);
-        expect(await vinculosCom(String(corpo["matricula"]))).toBe(0);
+        await admitir(rhA).send(corpo).expect(201);
+        expect(await vinculosCom(String(corpo["matricula"]))).toBe(1);
       },
     );
 
@@ -1203,12 +1203,15 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
       },
     );
 
-    it("Departamento, Cargo e data de admissão continuam obrigatórios", async () => {
-      for (const campo of ["departamentoId", "cargoId", "dataAdmissao"]) {
+    it("T209 — tipo e data de admissão continuam obrigatórios; Departamento e Cargo, não", async () => {
+      for (const campo of ["tipo", "dataAdmissao"]) {
         const corpo = soObrigatorios();
         delete corpo[campo];
         await admitir(rhA).send(corpo).expect(400);
       }
+      const semCargo = soObrigatorios();
+      delete semCargo["cargoId"];
+      await admitir(rhA).send(semCargo).expect(201);
     });
 
     it("PUT de contatos: todos opcionais — nada informado não cria registro; um só cria com os outros nulos", async () => {

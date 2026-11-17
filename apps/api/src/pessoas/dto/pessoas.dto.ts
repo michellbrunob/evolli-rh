@@ -30,6 +30,7 @@ import {
   TipoVinculo,
 } from "@prisma/client";
 import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
+import { ContratoAdmissaoDto } from "../colaborador/contrato-admissao";
 
 /**
  * Matrícula: identificador **funcional**, único dentro da empresa
@@ -53,6 +54,10 @@ export const TIPOS_VINCULO = [
   "pj",
   "temporario",
   "outro_controlado",
+  // T209 — etapa 2 do Novo colaborador (2026-11-17).
+  "part_time",
+  "freelancer",
+  "trainee",
 ] as const satisfies readonly TipoVinculo[];
 
 const TIPOS_MOVIMENTACAO = [
@@ -175,11 +180,17 @@ export class DestinoOrganizacionalDto {
  * (`CriarVinculoDto`) continua com o destino todo opcional.
  */
 export class AdmitirColaboradorDto {
+  /**
+   * T209 — etapa 2 (decisão de 2026-11-17): Departamento e Cargo passaram a
+   * opcionais; tipo e data de admissão continuam obrigatórios.
+   */
+  @IsOptional()
   @IsUUID()
-  departamentoId!: string;
+  departamentoId?: string;
 
+  @IsOptional()
   @IsUUID()
-  cargoId!: string;
+  cargoId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -268,6 +279,17 @@ export class AdmitirColaboradorDto {
   @ValidateIf((_, valor) => valor !== undefined)
   @IsUUID()
   tabelaHorarioId?: string;
+
+  /**
+   * T209 — contrato da admissão (etapa 2): nível, gestor direto, jornada
+   * semanal, escala, salário bruto, conselho, dependentes e pensão. Opcional
+   * na API (a importação por planilha não o traz); a tela exige o salário.
+   */
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ContratoAdmissaoDto)
+  contrato?: ContratoAdmissaoDto;
 }
 
 /**

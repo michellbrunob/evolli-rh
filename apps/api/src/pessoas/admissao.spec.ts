@@ -266,6 +266,8 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
       [
         "atualizadoEm",
         "contatos",
+        // T209 — o contrato da admissão (etapa 2), `null` sem valores.
+        "contrato",
         "criadoEm",
         "endereco",
         "id",

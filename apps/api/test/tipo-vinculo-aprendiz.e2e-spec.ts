@@ -364,6 +364,9 @@ describe("T209 — Aprendiz como tipo de vínculo (e2e)", () => {
         "pj",
         "temporario",
         "outro_controlado",
+        "part_time",
+        "freelancer",
+        "trainee",
       ]);
     });
 
@@ -513,6 +516,9 @@ describe("T209 — Aprendiz como tipo de vínculo (e2e)", () => {
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       });
       expect(Object.keys(a.contadores.ativosPorTipo)).toEqual([
         "clt",
@@ -521,6 +527,9 @@ describe("T209 — Aprendiz como tipo de vínculo (e2e)", () => {
         "pj",
         "temporario",
         "outro_controlado",
+        "part_time",
+        "freelancer",
+        "trainee",
       ]);
       const b = await listar(rhB);
       expect(b.contadores.ativosPorTipo.aprendiz).toBe(1);

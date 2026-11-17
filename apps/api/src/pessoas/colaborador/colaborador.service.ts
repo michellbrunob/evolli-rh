@@ -64,6 +64,12 @@ import {
   contatosInformados,
 } from "../contatos/contato-colaborador.service";
 import { escaparCuringas } from "../../common/busca.util";
+import {
+  type ContratoDaAdmissao,
+  contratoConfere,
+  contratoGravado,
+  gravarContratoNaAdmissao,
+} from "./contrato-admissao";
 
 /**
  * Resposta da admissão (T167).
@@ -122,6 +128,8 @@ export interface AdmissaoRegistrada extends Pick<
    * nenhuma jornada foi escolhida (é opcional).
    */
   jornada: JornadaDaAdmissao | null;
+  /** T209 — o contrato da admissão (etapa 2), ou `null` sem nenhum valor. */
+  contrato: ContratoDaAdmissao | null;
 }
 
 /** T183 — a jornada da admissão: só ids e a data de início. */
@@ -351,6 +359,9 @@ export function distribuirAtivosPorTipo(
     pj: 0,
     temporario: 0,
     outro_controlado: 0,
+    part_time: 0,
+    freelancer: 0,
+    trainee: 0,
   };
   for (const v of principal.values()) contagem[v.tipo] += 1;
   return contagem;
@@ -495,6 +506,8 @@ export interface AdmissaoGravada {
   > | null;
   /** T183 — a jornada criada com a admissão; ausente ou `null` é nenhuma. */
   jornada?: Pick<VinculoHorario, "tabelaHorarioId"> | null;
+  /** T209 — o contrato gravado com a admissão; ausente ou `null` é nenhum. */
+  contrato?: Prisma.ContratoVinculoGetPayload<object> | null;
 }
 
 /**
@@ -512,6 +525,9 @@ export function admissaoConfere(
     gravada;
   const destino = extrairDestino(dto);
   const iguais = (a: unknown, b: unknown) => a === b;
+
+  // T209 — o contrato (etapa 2) também precisa ser o mesmo do envio.
+  if (!contratoConfere(dto.contrato, gravada.contrato ?? null)) return false;
 
   // T183 — a jornada opcional também precisa ser a mesma do envio.
   if (
@@ -871,6 +887,13 @@ export class ColaboradorService {
                 dataAdmissao,
               });
 
+        // T209 — contrato da admissão (etapa 2), na MESMA transação.
+        const contrato = await gravarContratoNaAdmissao(
+          tx,
+          { vinculoId: vinculo.id, empresaId: escopo.empresaId },
+          dto.contrato,
+        );
+
         // T179 — registro de idempotência na MESMA transação: existe se, e só
         // se, a admissão existe. Só chave, ator, empresa e ids — nenhum dado
         // pessoal.
@@ -920,6 +943,7 @@ export class ColaboradorService {
           endereco: modulo1.endereco,
           contatos: contatosGravados,
           jornada,
+          contrato,
         };
       });
       return { admissao, reenvio: false };
@@ -1128,6 +1152,10 @@ export class ColaboradorService {
         orderBy: { criadoEm: "asc" },
         select: { id: true, tabelaHorarioId: true, vigenciaInicio: true },
       });
+      // T209 — o contrato gravado com a admissão (etapa 2).
+      const contrato = await tx.contratoVinculo.findUnique({
+        where: { vinculoId: registro.vinculoId },
+      });
       return {
         colaborador,
         vinculo,
@@ -1136,6 +1164,7 @@ export class ColaboradorService {
         endereco,
         contato,
         jornada,
+        contrato,
       };
     });
 
@@ -1190,6 +1219,7 @@ export class ColaboradorService {
         endereco: dados.endereco,
         contatos: contatos.contatos,
         jornada: gravada.jornada,
+        contrato: contratoGravado(gravada.contrato),
       },
     };
   }

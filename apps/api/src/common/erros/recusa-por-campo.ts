@@ -42,6 +42,8 @@ export type CampoPublico =
   | "emailPessoal"
   // T209 — CPF já usado na empresa.
   | "perfilPessoal.cpf"
+  // T209 — gestor direto sem vínculo na empresa.
+  | "contrato.gestorDiretoId"
   // T182 — código de jornada repetido na empresa.
   | "codigo"
   // T183 — jornada do colaborador e a sua vigência.

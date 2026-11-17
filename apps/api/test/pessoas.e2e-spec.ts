@@ -1166,9 +1166,9 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
     });
 
     it("recusa alocação sem nenhuma referência organizacional", async () => {
-      // T179 — a Nova admissão exige Departamento, Cargo e Unidade: sem
-      // nenhuma referência, a recusa chega já na validação do corpo (400),
-      // antes de qualquer gravação.
+      // T209 — Departamento e Cargo passaram a opcionais, mas a Baseline V1
+      // (item 10) exige ao menos uma referência: sem nenhuma, 422 antes de
+      // qualquer gravação.
       await post("/v1/colaboradores", rhA)
         .send({
           ...camposObrigatoriosAdmissao(),
@@ -1179,7 +1179,7 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           dataAdmissao: ADMISSAO,
           motivoCodigo: "admissao_inicial",
         })
-        .expect(400);
+        .expect(422);
       const prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
       try {
         expect(
@@ -2188,6 +2188,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
         [
           "atualizadoEm",
           "contatos",
+          // T209 — o contrato da admissão (etapa 2).
+          "contrato",
           "criadoEm",
           "endereco",
           "id",

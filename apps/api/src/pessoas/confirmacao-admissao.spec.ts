@@ -764,11 +764,12 @@ describe("T179 — AdmitirColaboradorDto: obrigatoriedade da Nova admissão", ()
     expect(await campos(CORPO)).toEqual([]);
   });
 
+  // T209 — etapa 2 (decisão de 2026-11-17): Departamento e Cargo passaram a
+  // opcionais; informados, continuam sendo UUID.
   it.each(["departamentoId", "cargoId"])(
-    "sem %s: recusado só nesse campo",
+    "sem %s: aceito; informado, precisa ser UUID",
     async (campo) => {
-      expect(await campos({ ...CORPO, [campo]: undefined })).toEqual([campo]);
-      expect(await campos({ ...CORPO, [campo]: null })).toEqual([campo]);
+      expect(await campos({ ...CORPO, [campo]: undefined })).toEqual([]);
       expect(await campos({ ...CORPO, [campo]: "" })).toEqual([campo]);
       expect(await campos({ ...CORPO, [campo]: "nao-e-uuid" })).toEqual([
         campo,
@@ -776,14 +777,14 @@ describe("T179 — AdmitirColaboradorDto: obrigatoriedade da Nova admissão", ()
     },
   );
 
-  it("sem nenhum da lotação: Departamento e Cargo recusados; Unidade é opcional", async () => {
+  it("T209 — sem nenhum da lotação, o DTO aceita (a regra de ao menos uma referência é do serviço, Baseline V1 item 10)", async () => {
     const semLotacao = {
       ...CORPO,
       departamentoId: undefined,
       cargoId: undefined,
       unidadeOrganizacionalId: undefined,
     };
-    expect(await campos(semLotacao)).toEqual(["cargoId", "departamentoId"]);
+    expect(await campos(semLotacao)).toEqual([]);
   });
 
   it("Unidade é opcional, mas, quando vem, é UUID", async () => {
@@ -992,6 +993,8 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
       contatoColaborador: { findUnique: jest.fn(async () => gravada.contato) },
       // T183 — admissão sem jornada: nenhuma vigência nasceu com ela.
       vinculoHorario: { findFirst: jest.fn(async () => null) },
+      // T209 — sem contrato gravado (etapa 2).
+      contratoVinculo: { findUnique: jest.fn(async () => null) },
     };
     const gravacao = jest.fn(async () => {
       throw opcoes.falhaNaGravacao ?? new Error("não devia gravar");

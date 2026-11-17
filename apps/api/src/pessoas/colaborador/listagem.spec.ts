@@ -304,6 +304,9 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
       pj: 1,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     });
     expect(distribuirAtivosPorTipo([])).toEqual({
       clt: 0,
@@ -312,6 +315,9 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
       pj: 0,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     });
   });
 
@@ -341,6 +347,9 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
       "pj",
       "temporario",
       "outro_controlado",
+      "part_time",
+      "freelancer",
+      "trainee",
     ]);
   });
 
@@ -373,6 +382,9 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     });
   });
