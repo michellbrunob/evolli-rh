@@ -641,6 +641,18 @@ button.nova-admissao__etapa-passo:focus-visible {
     max-width: none;
   }
 
+  /* T209 — no celular a barra encolhe para o "% concluído" caber em uma
+     linha, sem encostar em Cancelar. */
+  .nova-admissao__rodape .nova-admissao__progresso-barra {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .nova-admissao__rodape .nova-admissao__progresso-texto {
+    white-space: nowrap;
+  }
+
   .nova-admissao__rodape-acoes {
     display: contents;
   }

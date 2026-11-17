@@ -100,9 +100,11 @@
   --space-2xl: 48px;
   --space-3xl: 80px;
 
-  /* Tipografia — apenas fontes do sistema, com fallback seguro. */
+  /* Tipografia — T209: Parkinsans, servida pela aplicação (main.tsx), com
+     as fontes do sistema como reserva. */
   --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    "Parkinsans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --text-caption: 0.875rem; /* 14px */
   --text-ui: 0.9375rem; /* 15px — item de navegação e ação de cabeçalho */
   --text-body: 1.0625rem; /* 17px — o "passo de leitura" da referência */

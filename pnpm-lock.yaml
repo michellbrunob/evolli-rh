@@ -132,6 +132,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource/parkinsans':
+        specifier: 5.3.0
+        version: 5.3.0
       '@radix-ui/react-dialog':
         specifier: 1.3.1
         version: 1.3.1(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -626,6 +629,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource/parkinsans@5.3.0':
+    resolution: {integrity: sha512-6mzn/Y/sZVmea1vYD7qUxnMuK3DxyP7nQc//unMBWq+CBwlTDFyIfvU9/Xcc4Uka0NGNoD6TUwX6A+pxRbNBmw==}
 
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
@@ -5339,6 +5345,8 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource/parkinsans@5.3.0': {}
 
   '@grpc/grpc-js@1.14.4':
     dependencies:
