@@ -3513,6 +3513,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Escopo de fechamento (seção 37):** Documentos (upload, categorias, R2 de documentos,
         OCR, assinatura e retenção) sai da T209 e fica reservado para a T211, não iniciada; o
         Novo colaborador fecha em quatro etapas com Revisão e conclusão.
+      - **Fechamento (seção 38):** Novo colaborador sobre o `CadastroEmEtapas` compartilhado; trilha
+        única na barra superior (também na ficha); `GET /v1/empresas/da-conta` só para RH, DP e
+        master técnico. Web 153 / 4298; API 68 / 1604; E2E 28 suítes / 1189; lint, typecheck,
+        build, `spec:check` e `git diff --check` limpos; papéis validados no navegador.
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

@@ -1424,3 +1424,55 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
   - preparação para a validação visual final.
 - **Sem mudança na aba Documentos da ficha:** continua a da T201, só metadados (ADR 0011). Ela
   não é a etapa documental do cadastro.
+
+## 38. Fechamento da T209: Novo colaborador no padrão compartilhado e revisão final (2026-11-17)
+
+### 38.1 Finalizado
+
+- **Novo colaborador sobre o `CadastroEmEtapas`:**
+  - cabeçalho, etapas, painéis, rodapé e progresso vêm do componente compartilhado, com as seções
+    e linhas compartilhadas;
+  - o componente ganhou painéis sempre montados (o que foi digitado não sai do documento),
+    conteúdo antes das etapas, id e travamento do botão principal, nome do formulário, seção com
+    id e linha com dica;
+  - 94 regras de CSS da moldura antiga saíram da tela;
+  - as quatro etapas: Dados básicos, Dados profissionais, Endereço e Revisão e conclusão.
+- **Trilha única:** fica só na barra superior, também na ficha (Pessoas / Colaboradores / nome).
+  A ficha declara o último nível; "Colaboradores" volta à listagem pela guarda da ficha.
+- **Limpeza:**
+  - sem trilha repetida dentro das páginas;
+  - sem a frase de contexto do Dashboard;
+  - tipografia compacta nos tokens (14 / 13 / 16 / 26 px).
+
+### 38.2 Corrigido na revisão
+
+- **`GET /v1/empresas/da-conta`** respondia a qualquer papel autenticado com a própria empresa, a
+  contagem de ativos e o endereço. Agora só RH, DP e master técnico a leem; os demais recebem
+  403. O E2E cobre o gestor.
+
+### 38.3 Validação
+
+- **Web:** 153 / 4298; lint, typecheck e build.
+- **API unitária:** 68 / 1604.
+- **E2E serial com PostgreSQL real:** 28 suítes / 1189. Cada suíte aplica as migrations do zero
+  (smoke de migration).
+- **Outros:** `spec:check` e `git diff --check` limpos; Prettier nos arquivos alterados.
+- **Navegador (banco isolado):**
+  - **RH:** lista, ficha com a trilha única, Novo colaborador e Empresas com edição;
+  - **DP:** lista, Novo colaborador, e Empresas só leitura, com a própria empresa;
+  - **master técnico sem empresa ativa:** lista em acesso global; Novo colaborador redireciona
+    para Colaboradores; Empresas com todas e "Adicionar";
+  - **master técnico com empresa ativa:** lista e ficha só leitura, sem "Adicionar
+    colaborador";
+  - **gestor:** cai em Minha equipe; as rotas de Colaboradores, Novo colaborador e Empresas
+    devolvem Minha equipe; `/v1/colaboradores` responde 403;
+  - **375 px:** sem rolagem lateral; ao fim da rolagem, o rodapé não cobre o último campo.
+
+### 38.4 Limites conhecidos
+
+- **Documentos:** fora da T209, reservado à T211 (seção 37).
+- **Teste instável:** um teste de tempo do `AutenticacaoApp` (T189) às vezes estoura na suíte
+  cheia; passa sozinho.
+- **Seletor de empresa:** depois de editar o CNPJ da empresa ativa, o seletor só o mostra na
+  próxima leitura do ator.
+- **Bundle:** cresce com o Iconsax (+16 kB gzip).
