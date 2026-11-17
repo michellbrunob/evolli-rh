@@ -43,6 +43,13 @@ import {
   papelTemPoliticaGlobal,
 } from "../../auth/session/contexto-empresarial";
 
+/** T209 — quem lê Configurações › Empresas. */
+const PAPEIS_DA_LISTA_DE_EMPRESAS: readonly AccessUser["role"][] = [
+  "rh",
+  "dp",
+  "master_tecnico",
+];
+
 /** T209 — a empresa como o cadastro a devolve (sem campos internos). */
 export interface EmpresaCadastrada {
   readonly id: string;
@@ -333,6 +340,12 @@ export class EmpresaService {
   async listarDaConta(
     ator: AccessUser & { readonly contaEmpresaId?: string | null },
   ): Promise<EmpresaDaConta[]> {
+    // Só os papéis que têm Configurações › Empresas (RH, DP e master
+    // técnico): os demais não precisam da contagem de ativos nem do
+    // endereço da empresa.
+    if (!PAPEIS_DA_LISTA_DE_EMPRESAS.includes(ator.role)) {
+      throw new ForbiddenException();
+    }
     const conta =
       ator.contaEmpresaId !== undefined ? ator.contaEmpresaId : ator.companyId;
     const usuario = { id: ator.id, role: ator.role, companyId: conta };

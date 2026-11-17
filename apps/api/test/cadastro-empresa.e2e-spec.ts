@@ -474,6 +474,13 @@ describe("T209 — cadastro de empresa (e2e)", () => {
     expect(deB.body.itens.map((e: { nome: string }) => e.nome)).not.toContain(
       "Comercio Sintetico Alfa",
     );
+    // Gestor (e quem não tem a tela) não lê a lista: 403.
+    const gestor = await criarUsuario(
+      "gestor.a.empresa@example.test",
+      "gestor",
+      empresaA,
+    );
+    await get("/v1/empresas/da-conta", gestor.cred).expect(403);
     // DP vê só a própria empresa.
     const doDp = await get("/v1/empresas/da-conta", dpA).expect(200);
     expect(doDp.body.itens.map((e: { id: string }) => e.id)).toEqual([
