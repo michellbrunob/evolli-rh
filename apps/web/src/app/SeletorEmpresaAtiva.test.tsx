@@ -509,10 +509,27 @@ describe("T189 — o navegador não é autoridade, e o visual é do Evolli", () 
     expect(bloco(".seletor-empresa__opcao-nome")).toMatch(
       /overflow-wrap: anywhere/,
     );
-    // O painel abre no fluxo (dentro da gaveta), nunca flutuando por cima.
+    // T209 — o painel base abre no fluxo (Hub e gaveta do celular); só no
+    // menu do desktop ele flutua (ver o teste da T209 abaixo).
     expect(bloco(".seletor-empresa__painel")).not.toMatch(
       /position: (absolute|fixed)/,
     );
+  });
+
+  it("T209 — no menu do desktop o painel flutua junto ao cartão, fora do recorte da lateral", () => {
+    const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+    const desktop = /@media \(min-width: 641px\) \{([\s\S]*?)\n\}/.exec(
+      css,
+    )?.[1];
+    expect(desktop).toBeDefined();
+    const regra =
+      /\.seletor-empresa--menu \.seletor-empresa__painel \{([^}]*)\}/.exec(
+        desktop!,
+      )?.[1];
+    expect(regra).toMatch(/position: fixed/);
+    expect(regra).toMatch(/top: var\(--seletor-empresa-topo\)/);
+    expect(regra).toMatch(/left: var\(--seletor-empresa-esquerda\)/);
+    expect(regra).toMatch(/width: min\(20\.75rem, calc\(100vw - 2rem\)\)/);
   });
 });
 
@@ -628,15 +645,16 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
     expect(regra(".seletor-empresa__opcao")).toContain(
       "min-height: var(--touch-target)",
     );
+    // T209 — monograma em superfície azul suave com letras azuis.
     expect(regra(".seletor-empresa__monograma")).toContain(
-      "background: var(--evolli-azul)",
+      "background: var(--evolli-azul-suave)",
     );
     expect(css).toMatch(
       /\.seletor-empresa__opcao:focus-visible[\s\S]*?outline: var\(--focus-width\) solid var\(--evolli-azul\)/,
     );
   });
 
-  it("selo 'Atual' abaixo do nome, na coluna do texto; o nome só quebra entre palavras (faixa estreita)", () => {
+  it("T209 — a atual tem o círculo com visto à direita (texto 'Atual' só para leitor de tela); o nome só quebra entre palavras", () => {
     const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
     const regra = (seletor: string) => {
       const blocos: string[] = [];
@@ -648,11 +666,12 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
       expect(blocos.length, seletor).toBeGreaterThan(0);
       return blocos.join("\n");
     };
-    // Duas colunas (monograma e textos): o selo desce para a coluna 2.
+    // Três colunas: monograma, textos e o visto à direita.
     expect(regra(".seletor-empresa__opcao")).toMatch(
-      /grid-template-columns:\s*auto minmax\(0,\s*1fr\)/,
+      /grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto/,
     );
-    expect(regra(".seletor-empresa__atual")).toMatch(/grid-column:\s*2;/);
+    expect(regra(".seletor-empresa__atual")).toMatch(/grid-column:\s*3;/);
+    expect(regra(".seletor-empresa__atual")).toMatch(/border-radius: 50%/);
     // A regra que vale é a última do arquivo para o nome: só entre palavras.
     const ultima = [
       ...css.matchAll(/\n\.seletor-empresa__opcao-nome \{([^}]*)\}/g),
@@ -673,5 +692,53 @@ describe("T207 — lista Empresas da conta e busca (E-1, E-3)", () => {
     expect(
       textos.compareDocumentPosition(selo) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe("T209 — cartão e lista como no novo desenho", () => {
+  it("o rótulo 'Empresa ativa' fica só no nome acessível; à vista, nome e código", async () => {
+    montar();
+    const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
+    expect(botao.querySelector(".seletor-empresa__rotulo")).toHaveClass(
+      "seletor-empresa__oculto",
+    );
+  });
+
+  it("a seta é a dupla (abre para cima e para baixo) e não gira", async () => {
+    montar();
+    const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
+    expect(botao.querySelector(".seletor-empresa__seta path")).toHaveAttribute(
+      "d",
+      "M5 6.5l3-3 3 3M5 9.5l3 3 3-3",
+    );
+    const css = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+    expect(css).not.toMatch(/rotate\(180deg\)/);
+  });
+
+  it("aberto no menu, o painel recebe a posição do cartão", async () => {
+    montar();
+    await abrirLista();
+    const painel = document.querySelector<HTMLElement>(
+      ".seletor-empresa__painel",
+    )!;
+    expect(painel.style.getPropertyValue("--seletor-empresa-topo")).toMatch(
+      /^\d+(\.\d+)?px$/,
+    );
+    expect(painel.style.getPropertyValue("--seletor-empresa-esquerda")).toMatch(
+      /^\d+(\.\d+)?px$/,
+    );
+  });
+
+  it("o selo da atual: visto num círculo, com 'Atual' oculto", async () => {
+    montar();
+    await abrirLista();
+    const marcada = screen
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("aria-current") === "true")!;
+    const selo = marcada.querySelector(".seletor-empresa__atual")!;
+    expect(selo.querySelector("svg")).not.toBeNull();
+    expect(selo.querySelector(".seletor-empresa__oculto")).toHaveTextContent(
+      "Atual",
+    );
   });
 });
