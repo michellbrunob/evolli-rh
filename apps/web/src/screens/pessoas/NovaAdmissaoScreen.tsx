@@ -111,7 +111,7 @@ import {
   StatusBadge,
   Surface,
 } from "../../components";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconButton } from "../../ui";
 import {
   type AdmissaoRegistradaApi,
@@ -150,17 +150,14 @@ import {
   listarTabelasHorario,
 } from "../../api/horariosClient";
 import { rotuloDaJornada } from "./jornadaColaborador";
+import { UFS, siglaDaUf } from "./ufs";
 import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
-import {
-  DICA_DE_FORMATO,
-  exibirCep,
-  exibirTelefone,
-} from "../../format/mascaras";
+import { exibirCep, exibirTelefone } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
   type ChaveEndereco,
@@ -280,7 +277,6 @@ const ROTULO_DO_BOTAO_REFERENCIA: Record<TipoReferenciaRapida, string> = {
 // T178 — preenchimento ASSISTIDO do endereço pelo CEP: a consulta e o que
 // fazer com a resposta ficam em `cepAssistido.ts` (T181), compartilhados com
 // a edição do endereço na ficha do colaborador.
-const ID_BOTAO_BUSCAR_CEP = "nova-admissao-buscar-cep";
 
 // ---------------------------------------------------------------------------
 // Erros, campo a campo.
@@ -1653,16 +1649,35 @@ export function NovaAdmissaoScreen({
   // ---- T178 — consulta assistida de CEP (T181: `useCepAssistido`) ---------
   const consultaCep = useCepAssistido({
     endereco,
-    setEndereco,
+    // T209 — o Estado é um seletor de siglas: o que o CEP sugerir por
+    // extenso entra como sigla.
+    setEndereco: (acao) =>
+      setEndereco((prev) => {
+        const proximo = typeof acao === "function" ? acao(prev) : acao;
+        return { ...proximo, estado: siglaDaUf(proximo.estado) };
+      }),
     onErroNoCep: (mensagem) => setErros((prev) => ({ ...prev, cep: mensagem })),
     onCamposAjustados: (campos) =>
       setErros((prev) => semErroDe(prev, ...campos)),
-    idBotaoBuscar: ID_BOTAO_BUSCAR_CEP,
+    // T209 — sem "Buscar CEP" (a consulta sai ao completar o CEP): o foco
+    // volta ao próprio CEP.
+    idBotaoBuscar: ID_DO_CAMPO.cep,
   });
   const cep = consultaCep.estado;
-  const cepAssistido = consultaCep.assistido;
   const buscarCep = consultaCep.buscar;
   const usarEnderecoDoCep = consultaCep.usarEnderecoDoCep;
+  /**
+   * T209 — completar os 8 dígitos do CEP consulta sozinho ("Preenchemos o
+   * restante automaticamente a partir do CEP"). A consulta sai depois que o
+   * CEP novo chega ao estado (o hook lê o endereço atual), e só por digitação:
+   * abrir um rascunho com CEP não consulta.
+   */
+  const consultarCepAoCompletarRef = useRef(false);
+  useEffect(() => {
+    if (!consultarCepAoCompletarRef.current) return;
+    consultarCepAoCompletarRef.current = false;
+    void buscarCep("botao");
+  }, [endereco.cep, buscarCep]);
 
   function atualizarIdentificacao(campo: ChaveIdentificacao, valor: string) {
     setIdentificacao((prev) => ({ ...prev, [campo]: valor }));
@@ -2524,51 +2539,6 @@ export function NovaAdmissaoScreen({
    * ajuda e validação continuam vindo de `CAMPOS_TEXTO_PERFIL`; o JSX só
    * decide em que linha da grade ele aparece.
    */
-  /** T178 — idem para o endereço (`CAMPOS_ENDERECO`). */
-  function campoEndereco(chave: ChaveEndereco, aoSair?: () => void) {
-    const campo = CAMPOS_ENDERECO.find((c) => c.chave === chave)!;
-    // T179 — CEP brasileiro tem máscara `00000-000`; com outro país, texto
-    // livre como antes.
-    const cepComMascara = chave === "cep" && cepAssistido;
-    const ajuda =
-      campo.chave === "pais"
-        ? "Sugerido como Brasil; pode ser alterado."
-        : cepComMascara
-          ? DICA_DE_FORMATO.cep
-          : campo.ajuda;
-    return (
-      <FormField
-        id={ID_DO_CAMPO[campo.chave]}
-        label={rotuloOpcional(campo.rotulo)}
-        {...(ajuda ? { help: ajuda } : {})}
-        {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
-      >
-        {(control) =>
-          cepComMascara ? (
-            <CampoMascarado
-              mascara="cep"
-              value={endereco.cep}
-              onValorChange={(valor) => atualizarEndereco("cep", valor)}
-              limparAvisos={limpezaDosAvisos}
-              onBlur={aoSair}
-              {...control}
-            />
-          ) : (
-            <input
-              type="text"
-              maxLength={campo.limite}
-              autoComplete="off"
-              value={endereco[campo.chave]}
-              onChange={(e) => atualizarEndereco(campo.chave, e.target.value)}
-              onBlur={aoSair}
-              {...control}
-            />
-          )
-        }
-      </FormField>
-    );
-  }
-
   /**
    * T179 — um seletor da lotação. Obrigatório (Departamento, Cargo) ou
    * opcional (Unidade, Área, Equipe, Centro de custo); opções `CÓDIGO — Nome`, só
@@ -2796,8 +2766,11 @@ export function NovaAdmissaoScreen({
         : null,
     ],
   ]);
+  // T209 — sem campo País na etapa 3: o país não entra no resumo.
   const linhasDoEndereco = linhasPreenchidas(
-    CAMPOS_ENDERECO.map((c) => [c.rotulo, endereco[c.chave]] as const),
+    CAMPOS_ENDERECO.filter((c) => c.chave !== "pais").map(
+      (c) => [c.rotulo, endereco[c.chave]] as const,
+    ),
   );
 
   return (
@@ -3625,82 +3598,180 @@ export function NovaAdmissaoScreen({
             {painelDaEtapa(
               2,
               <>
-                <div className="nova-admissao__grupo">
-                  <p className="nova-admissao__texto nova-admissao__ajuda">
-                    Todo o endereço é opcional. Com país Brasil, o CEP pode
-                    sugerir logradouro, bairro, cidade e estado; tudo continua
-                    editável.
-                  </p>
-                  {/* T178 — país e CEP; logradouro (largo) e número (estreito);
-              complemento e bairro; cidade e estado. */}
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {campoEndereco("pais")}
-                    {/* T178 — CEP com consulta assistida, só para o Brasil. Com outro
-                país não há botão nem consulta: o CEP é só texto. */}
-                    <div className="nova-admissao__cep">
-                      {campoEndereco(
-                        "cep",
-                        cepAssistido
-                          ? () => void buscarCep("saida")
-                          : undefined,
-                      )}
-                      {cepAssistido ? (
-                        <div className="nova-admissao__cep-acoes">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            id={ID_BOTAO_BUSCAR_CEP}
-                            aria-disabled={cep.tipo === "buscando"}
-                            aria-describedby="nova-admissao-cep-status"
-                            onClick={() => {
-                              if (cep.tipo === "buscando") return;
-                              void buscarCep("botao");
-                            }}
-                          >
-                            {cep.tipo === "buscando"
-                              ? "Buscando CEP…"
-                              : "Buscar CEP"}
-                          </Button>
-                          {/* A única região viva do bloco: anuncia o resultado sem
-                      mover o foco. Sempre montada, para que o anúncio saia. */}
-                          <p
-                            id="nova-admissao-cep-status"
-                            className="nova-admissao__texto nova-admissao__cep-status"
-                            role="status"
-                          >
-                            {cep.tipo === "buscando"
-                              ? "Buscando CEP…"
-                              : cep.tipo === "aviso" || cep.tipo === "sugerido"
-                                ? cep.mensagem
-                                : ""}
-                          </p>
-                          {cep.tipo === "sugerido" &&
-                          cep.mantidos.length > 0 ? (
-                            <Button
-                              type="button"
-                              variant="subtle"
-                              onClick={usarEnderecoDoCep}
-                            >
-                              Usar endereço do CEP
-                            </Button>
-                          ) : null}
-                        </div>
-                      ) : null}
+                {/* T209 — etapa 3 do Novo colaborador: endereço residencial,
+                    tudo opcional; o CEP preenche o resto sozinho. */}
+                <SecaoDoCadastro
+                  id="nova-admissao-secao-endereco"
+                  titulo="Endereço residencial"
+                  descricao="Preenchemos o restante automaticamente a partir do CEP."
+                >
+                  <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
+                    <div className="nova-admissao__campo-cep">
+                      <CampoMascarado
+                        mascara="cep"
+                        placeholder="00000-000"
+                        value={endereco.cep}
+                        onValorChange={(valor) => {
+                          atualizarEndereco("cep", valor);
+                          if (/^\d{8}$/.test(valor.replace(/\D/g, ""))) {
+                            consultarCepAoCompletarRef.current = true;
+                          }
+                        }}
+                        limparAvisos={limpezaDosAvisos}
+                        onBlur={() => void buscarCep("saida")}
+                        {...propsDoCampo("cep")}
+                      />
                     </div>
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--larga-estreita">
-                    {campoEndereco("logradouro")}
-                    {campoEndereco("numero")}
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {campoEndereco("complemento")}
-                    {campoEndereco("bairro")}
-                  </div>
-                  <div className="nova-admissao__linha nova-admissao__linha--2">
-                    {campoEndereco("cidade")}
-                    {campoEndereco("estado")}
-                  </div>
-                </div>
+                    {erroDoCampo("cep")}
+                    {/* A única região viva do bloco: anuncia o resultado sem
+                        mover o foco. Sempre montada, para que o anúncio saia. */}
+                    <p
+                      id="nova-admissao-cep-status"
+                      className={
+                        cep.tipo === "sugerido" && cep.encontrado
+                          ? "nova-admissao__cep-status nova-admissao__cep-status--encontrado"
+                          : "nova-admissao__cep-status"
+                      }
+                      role="status"
+                    >
+                      {cep.tipo === "buscando" ? (
+                        "Buscando endereço…"
+                      ) : cep.tipo === "sugerido" && cep.encontrado ? (
+                        <>
+                          <Check size={14} aria-hidden="true" />
+                          Endereço encontrado
+                        </>
+                      ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
+                        cep.mensagem
+                      ) : (
+                        ""
+                      )}
+                    </p>
+                    {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
+                      <div className="nova-admissao__cep-acoes">
+                        <Button
+                          type="button"
+                          variant="subtle"
+                          onClick={usarEnderecoDoCep}
+                        >
+                          Usar endereço do CEP
+                        </Button>
+                      </div>
+                    ) : null}
+                    {cep.tipo === "aviso" && cep.repetivel ? (
+                      <div className="nova-admissao__cep-acoes">
+                        <Button
+                          type="button"
+                          variant="subtle"
+                          onClick={() => void buscarCep("botao")}
+                        >
+                          Consultar de novo
+                        </Button>
+                      </div>
+                    ) : null}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Logradouro e número">
+                    <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                      <div className="nova-admissao__linha-celula">
+                        <input
+                          type="text"
+                          maxLength={200}
+                          autoComplete="off"
+                          placeholder="Rua, avenida…"
+                          aria-label="Logradouro"
+                          value={endereco.logradouro}
+                          onChange={(e) =>
+                            atualizarEndereco("logradouro", e.target.value)
+                          }
+                          {...propsDoCampo("logradouro")}
+                        />
+                        {erroDoCampo("logradouro")}
+                      </div>
+                      <div className="nova-admissao__linha-celula">
+                        <input
+                          type="text"
+                          maxLength={20}
+                          autoComplete="off"
+                          placeholder="Nº"
+                          aria-label="Número"
+                          value={endereco.numero}
+                          onChange={(e) =>
+                            atualizarEndereco("numero", e.target.value)
+                          }
+                          {...propsDoCampo("numero")}
+                        />
+                        {erroDoCampo("numero")}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro
+                    rotulo="Complemento"
+                    paraId={ID_DO_CAMPO.complemento}
+                  >
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      placeholder="Apto, bloco, sala…"
+                      value={endereco.complemento}
+                      onChange={(e) =>
+                        atualizarEndereco("complemento", e.target.value)
+                      }
+                      {...propsDoCampo("complemento")}
+                    />
+                    {erroDoCampo("complemento")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Bairro" paraId={ID_DO_CAMPO.bairro}>
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      value={endereco.bairro}
+                      onChange={(e) =>
+                        atualizarEndereco("bairro", e.target.value)
+                      }
+                      {...propsDoCampo("bairro")}
+                    />
+                    {erroDoCampo("bairro")}
+                  </LinhaDoCadastro>
+                  <LinhaDoCadastro rotulo="Cidade e estado">
+                    <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                      <div className="nova-admissao__linha-celula">
+                        <input
+                          type="text"
+                          maxLength={120}
+                          autoComplete="off"
+                          placeholder="Cidade"
+                          aria-label="Cidade"
+                          value={endereco.cidade}
+                          onChange={(e) =>
+                            atualizarEndereco("cidade", e.target.value)
+                          }
+                          {...propsDoCampo("cidade")}
+                        />
+                        {erroDoCampo("cidade")}
+                      </div>
+                      <div className="nova-admissao__linha-celula">
+                        <select
+                          aria-label="Estado"
+                          value={siglaDaUf(endereco.estado)}
+                          onChange={(e) =>
+                            atualizarEndereco("estado", e.target.value)
+                          }
+                          {...propsDoCampo("estado")}
+                        >
+                          <option value="">UF</option>
+                          {UFS.map((uf) => (
+                            <option key={uf.sigla} value={uf.sigla}>
+                              {uf.sigla}
+                            </option>
+                          ))}
+                        </select>
+                        {erroDoCampo("estado")}
+                      </div>
+                    </div>
+                  </LinhaDoCadastro>
+                </SecaoDoCadastro>
               </>,
             )}
 

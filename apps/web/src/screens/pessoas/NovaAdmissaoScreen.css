@@ -881,6 +881,37 @@ button.nova-admissao__etapa-passo:focus-visible {
   }
 }
 
+/* ---- T209 — etapa 3: endereço residencial ---- */
+/* O CEP é curto (≈200 px); o resultado da consulta fica logo abaixo. */
+.nova-admissao__campo-cep {
+  max-width: 12.5rem;
+}
+
+.nova-admissao__linha-campos > .nova-admissao__cep-status {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.nova-admissao__linha-campos > .nova-admissao__cep-status:empty {
+  display: block;
+  height: 0;
+}
+
+.nova-admissao__cep-status--encontrado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Logradouro + Nº e Cidade + UF: o primeiro largo, o segundo estreito. */
+@media (min-width: 641px) {
+  .nova-admissao__linha-par--larga-estreita {
+    grid-template-columns: minmax(0, 1fr) 7.5rem;
+  }
+}
+
 /* ---- T209 — etapa 2: prefixo, sufixo, dica e seletores dentro da linha ---- */
 .nova-admissao__com-prefixo,
 .nova-admissao__com-sufixo {

@@ -356,7 +356,6 @@ const cpf = () => screen.getByLabelText(/^CPF$/);
 const botaoSair = () =>
   screen.queryByRole("button", { name: "Cancelar" }) ??
   screen.getByRole("button", { name: "Voltar para Colaboradores" });
-const pais = () => screen.getByLabelText(/^País/);
 
 /** Os três contatos da ficha da T169 — obrigatórios na página. */
 function preencherContatos() {
@@ -444,14 +443,6 @@ describe("Nova admissão — página própria", () => {
     ).not.toBeInTheDocument();
     expect(within(empresaBloco).queryByRole("textbox")).toBeNull();
     expect(within(empresaBloco).queryByRole("combobox")).toBeNull();
-  });
-
-  it("país começa sugerido como Brasil e pode ser editado", async () => {
-    montar();
-    await aguardarEmpresa();
-    expect(pais()).toHaveValue("Brasil");
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(pais()).toHaveValue("Portugal");
   });
 
   it("continuar vazio: erros só da etapa atual, ancorados nos campos, foco no primeiro; nada enviado", async () => {
@@ -581,25 +572,6 @@ describe("Nova admissão — página própria", () => {
       expect(admitirColaborador).not.toHaveBeenCalled();
     },
   );
-
-  it("com outro país, o CEP é texto livre e segue a forma de antes", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    const cep = screen.getByLabelText(/^CEP/);
-    fireEvent.change(cep, { target: { value: "30140/071" } });
-    expect(cep).toHaveValue("30140/071");
-    fireEvent.click(salvar());
-    await waitFor(() => expect(cep).toHaveFocus());
-    expect(cep).toHaveAccessibleDescription(/letras, números, espaço e hífen/);
-    fireEvent.change(cep, { target: { value: "1000-001" } });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].endereco,
-    ).toMatchObject({ pais: "Portugal", cep: "1000-001" });
-  });
 
   it("corrigir um campo limpa só o erro dele", async () => {
     montar();
@@ -1079,10 +1051,10 @@ describe("T179 — confirmação antes de gravar", () => {
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.change(screen.getByLabelText(/^Cidade/), {
+    fireEvent.change(screen.getByLabelText(/^Cidade$/), {
       target: { value: "Cidade Resumo Sintética" },
     });
-    fireEvent.change(screen.getByLabelText(/^Logradouro/), {
+    fireEvent.change(screen.getByLabelText(/^Logradouro$/), {
       target: { value: "Rua Resumo Sintética" },
     });
     fireEvent.click(salvar());
@@ -1160,9 +1132,9 @@ describe("T179 — confirmação antes de gravar", () => {
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar CEP" }));
+    // T209 — completar o CEP consulta sozinho.
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Logradouro/)).toHaveValue(
+      expect(screen.getByLabelText(/^Logradouro$/)).toHaveValue(
         "Avenida Sintética",
       ),
     );
@@ -1190,7 +1162,7 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
-    ).toHaveTextContent(/Endereço sugerido pelo CEP/);
+    ).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
@@ -1295,7 +1267,6 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     // `type="email"` apara as pontas no próprio campo; o resto fica como digitado.
     expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
     expect(celular()).toHaveValue("(31) 99999-0000");
-    expect(pais()).toHaveValue("Brasil");
     expect(salvar()).toBeEnabled();
     // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
     expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
@@ -1616,18 +1587,14 @@ describe("T179 — máscaras na Nova admissão", () => {
     expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+5555999998888");
   });
 
-  it("CEP: máscara 00000-000 só com país Brasil", async () => {
+  it("CEP: máscara 00000-000 (T209: o endereço é sempre do Brasil)", async () => {
     montar();
     await aguardarEmpresa();
     const cep = () => screen.getByLabelText(/^CEP/);
     expect(cep()).toHaveAttribute("inputmode", "numeric");
-    expect(cep()).toHaveAccessibleDescription(/Formato 00000-000/);
+    expect(cep()).toHaveAttribute("placeholder", "00000-000");
     fireEvent.change(cep(), { target: { value: "301400" } });
     expect(cep()).toHaveValue("30140-0");
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(cep()).not.toHaveAttribute("inputmode");
-    fireEvent.change(cep(), { target: { value: "1000-001 A" } });
-    expect(cep()).toHaveValue("1000-001 A");
   });
 });
 
@@ -1635,20 +1602,8 @@ describe("Nova admissão — cancelar", () => {
   it("o país sugerido, sozinho, não conta como dado digitado", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    expect(pais()).toHaveValue("Brasil");
     fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
-  });
-
-  it("editar só o país já conta como alteração e pede confirmação", async () => {
-    const { onSair } = montar();
-    await aguardarEmpresa();
-    fireEvent.change(pais(), { target: { value: "Argentina" } });
-    fireEvent.click(botaoSair());
-    expect(
-      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
-    ).toBeInTheDocument();
-    expect(onSair).not.toHaveBeenCalled();
   });
 
   it("escolher só uma referência da lotação já conta como alteração", async () => {
@@ -1862,7 +1817,6 @@ describe("Nova admissão — sucesso", () => {
     expect(emailPessoal()).toHaveValue("");
     expect(celular()).toHaveValue("");
     expect(escolhaDe(departamentoSel())).toHaveTextContent("Nenhuma escolha.");
-    expect(pais()).toHaveValue("Brasil");
   });
 });
 
@@ -1921,14 +1875,17 @@ describe("Nova admissão — contrato de CSS da confirmação", () => {
 // ---------------------------------------------------------------------------
 
 const campoCep = () => screen.getByLabelText(/^CEP/);
-const logradouro = () => screen.getByLabelText(/^Logradouro/);
+// T209 — etapa 3: "Logradouro e número" e "Cidade e estado" são grupos;
+// cada campo tem o próprio nome.
+const logradouro = () => screen.getByLabelText(/^Logradouro$/);
 // T209 — "Número do registro" (etapa 2) também começa por "Número".
 const numero = () => screen.getByLabelText(/^Número(?! do registro)/);
 const complemento = () => screen.getByLabelText(/^Complemento/);
 const bairro = () => screen.getByLabelText(/^Bairro/);
-const cidade = () => screen.getByLabelText(/^Cidade/);
-const estado = () => screen.getByLabelText(/^Estado \(opcional\)$/);
-const botaoBuscarCep = () => screen.queryByRole("button", { name: /CEP…?$/ });
+const cidade = () => screen.getByLabelText(/^Cidade$/);
+const estado = () => screen.getByLabelText(/^Estado$/);
+const botaoConsultarDeNovo = () =>
+  screen.queryByRole("button", { name: "Consultar de novo" });
 const statusCep = () => document.getElementById("nova-admissao-cep-status");
 
 const RESPOSTA_CEP: EnderecoDoCepApi = {
@@ -1949,39 +1906,111 @@ function digitarCep(valor: string) {
   fireEvent.change(campoCep(), { target: { value: valor } });
 }
 
-describe("T178 — CEP: quando consulta", () => {
+describe("T209 — etapa 3: endereço residencial", () => {
   beforeEach(() => {
     vi.mocked(consultarCep).mockReset();
     vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
   });
 
-  it("'Buscar CEP' consulta com os 8 dígitos; o campo fica na máscara 00000-000", async () => {
+  it("uma seção 'Endereço residencial', sem País nem 'Buscar CEP'; tudo opcional", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    digitarCep(" 30.140-071 ");
-    // T179 — a máscara limpa pontos e espaços já na digitação.
-    expect(campoCep()).toHaveValue("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
-
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("30140071"));
-    expect(consultarCep).toHaveBeenCalledTimes(1);
-    expect(campoCep()).toHaveValue("30140-071");
+    const secao = screen.getByRole("region", { name: "Endereço residencial" });
+    expect(secao).toHaveTextContent(
+      "Preenchemos o restante automaticamente a partir do CEP.",
+    );
+    expect(screen.queryByLabelText(/^País/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Buscar CEP/ })).toBeNull();
+    expect(
+      screen.getByRole("group", { name: "Logradouro e número" }),
+    ).toContainElement(numero());
+    expect(
+      screen.getByRole("group", { name: "Cidade e estado" }),
+    ).toContainElement(estado());
+    expect(campoCep()).toHaveAttribute("placeholder", "00000-000");
+    expect(campoCep()).toHaveAttribute("inputmode", "numeric");
+    expect(logradouro()).toHaveAttribute("placeholder", "Rua, avenida…");
+    expect(logradouro()).toHaveAttribute("maxlength", "200");
+    expect(numero()).toHaveAttribute("placeholder", "Nº");
+    expect(numero()).toHaveAttribute("maxlength", "20");
+    expect(complemento()).toHaveAttribute("placeholder", "Apto, bloco, sala…");
+    expect(complemento()).toHaveAttribute("maxlength", "120");
+    expect(bairro()).toHaveAttribute("maxlength", "120");
+    expect(cidade()).toHaveAttribute("placeholder", "Cidade");
+    expect(cidade()).toHaveAttribute("maxlength", "120");
+    for (const campo of [campoCep(), logradouro(), cidade(), estado()]) {
+      expect(campo).not.toBeRequired();
+    }
+    // Sem nada preenchido, a etapa avança.
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
   });
 
-  it("digitar não consulta; sair do campo com CEP completo consulta UMA vez", async () => {
+  it("o estado é uma das 27 siglas, em ordem alfabética do nome", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
+    const opcoes = [...(estado() as HTMLSelectElement).options].map(
+      (o) => o.value,
+    );
+    expect(opcoes).toEqual([
+      "",
+      "AC",
+      "AL",
+      "AP",
+      "AM",
+      "BA",
+      "CE",
+      "DF",
+      "ES",
+      "GO",
+      "MA",
+      "MT",
+      "MS",
+      "MG",
+      "PA",
+      "PB",
+      "PR",
+      "PE",
+      "PI",
+      "RJ",
+      "RN",
+      "RS",
+      "RO",
+      "RR",
+      "SC",
+      "SP",
+      "SE",
+      "TO",
+    ]);
+    expect((estado() as HTMLSelectElement).options[0]).toHaveTextContent("UF");
+  });
+
+  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço encontrado'", async () => {
+    montar();
+    await aguardarEmpresa();
+    await abrirEndereco();
+    fireEvent.change(numero(), { target: { value: "100" } });
+    fireEvent.change(complemento(), { target: { value: "Sala 2" } });
     digitarCep("3014");
-    digitarCep("30140-071");
     expect(consultarCep).not.toHaveBeenCalled();
-
-    fireEvent.blur(campoCep());
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
+    digitarCep(" 30.140-071 ");
+    // A máscara limpa pontos e espaços já na digitação.
+    expect(campoCep()).toHaveValue("30140-071");
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("30140071"));
     await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
+    expect(bairro()).toHaveValue("Bairro Sintético");
+    expect(cidade()).toHaveValue("Cidade Sintética");
+    expect(estado()).toHaveValue("MG");
+    // Número e complemento nunca são tocados.
+    expect(numero()).toHaveValue("100");
+    expect(complemento()).toHaveValue("Sala 2");
+    expect(statusCep()).toHaveAttribute("role", "status");
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
+    expect(statusCep()).toHaveClass("nova-admissao__cep-status--encontrado");
 
-    // O mesmo CEP de novo: sair do campo não repergunta.
+    // Sair do campo com o mesmo CEP não repergunta.
     fireEvent.focus(campoCep());
     fireEvent.blur(campoCep());
     expect(consultarCep).toHaveBeenCalledTimes(1);
@@ -1993,48 +2022,12 @@ describe("T178 — CEP: quando consulta", () => {
     await abrirEndereco();
     digitarCep("30140-07");
     fireEvent.blur(campoCep());
+    await act(async () => {});
     expect(consultarCep).not.toHaveBeenCalled();
     expect(campoCep()).not.toHaveAttribute("aria-invalid");
   });
 
-  it("'Buscar CEP' com CEP incompleto: mensagem no campo, sem consultar", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    digitarCep("3014");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() =>
-      expect(campoCep()).toHaveAccessibleDescription(
-        /Informe os 8 dígitos do CEP/,
-      ),
-    );
-    expect(consultarCep).not.toHaveBeenCalled();
-  });
-
-  it("com outro país não há botão e nada é consultado", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(botaoBuscarCep()).toBeNull();
-    expect(statusCep()).toBeNull();
-    digitarCep("30140071");
-    fireEvent.blur(campoCep());
-    expect(consultarCep).not.toHaveBeenCalled();
-  });
-
-  it("'Brasil' é reconhecido sem diferenciar caixa, acento e espaços", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(pais(), { target: { value: "  BRASÍL " } });
-    expect(botaoBuscarCep()).not.toBeNull();
-    digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
-  });
-
-  it("durante a busca o botão fica travado: duplo clique é UMA consulta", async () => {
+  it("durante a busca, 'Buscando endereço…'; sair do campo não pergunta de novo", async () => {
     let concluir: (v: EnderecoDoCepApi) => void = () => {};
     vi.mocked(consultarCep).mockImplementation(
       () =>
@@ -2046,18 +2039,13 @@ describe("T178 — CEP: quando consulta", () => {
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    const botao = await screen.findByRole("button", { name: "Buscando CEP…" });
-    expect(botao).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(botao);
-    fireEvent.click(botao);
-    expect(consultarCep).toHaveBeenCalledTimes(1);
-
-    await act(async () => concluir(RESPOSTA_CEP));
-    expect(screen.getByRole("button", { name: "Buscar CEP" })).toHaveAttribute(
-      "aria-disabled",
-      "false",
+    await waitFor(() =>
+      expect(statusCep()).toHaveTextContent("Buscando endereço…"),
     );
+    fireEvent.blur(campoCep());
+    expect(consultarCep).toHaveBeenCalledTimes(1);
+    await act(async () => concluir(RESPOSTA_CEP));
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("resposta obsoleta (o CEP mudou durante a busca) é descartada", async () => {
@@ -2068,62 +2056,38 @@ describe("T178 — CEP: quando consulta", () => {
           concluir = resolve;
         }),
     );
+    vi.mocked(consultarCep).mockImplementationOnce(
+      () => new Promise<EnderecoDoCepApi>(() => {}),
+    );
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await screen.findByRole("button", { name: "Buscando CEP…" });
-
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
     digitarCep("01310100");
     await act(async () => concluir(RESPOSTA_CEP));
-
     expect(logradouro()).toHaveValue("");
     expect(cidade()).toHaveValue("");
-    expect(statusCep()).toHaveTextContent("");
-  });
-});
-
-describe("T178 — CEP: o que faz com a resposta", () => {
-  beforeEach(() => {
-    vi.mocked(consultarCep).mockReset();
-    vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+    expect(statusCep()).not.toHaveTextContent("Endereço encontrado");
   });
 
-  it("preenche os vazios (estado pela sigla) e nunca toca número nem complemento", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(numero(), { target: { value: "100" } });
-    fireEvent.change(complemento(), { target: { value: "Sala 2" } });
-    digitarCep("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
-
-    await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
-    expect(bairro()).toHaveValue("Bairro Sintético");
-    expect(cidade()).toHaveValue("Cidade Sintética");
-    expect(estado()).toHaveValue("MG");
-    expect(numero()).toHaveValue("100");
-    expect(complemento()).toHaveValue("Sala 2");
-    expect(pais()).toHaveValue("Brasil");
-    expect(statusCep()).toHaveAttribute("role", "status");
-    expect(statusCep()).toHaveTextContent(/Endereço sugerido pelo CEP/);
-    expect(
-      screen.queryByRole("button", { name: "Usar endereço do CEP" }),
-    ).toBeNull();
-  });
-
-  it("sem sigla, o estado vem por extenso", async () => {
+  it("sem sigla, o estado por extenso vira a sigla do seletor", async () => {
     vi.mocked(consultarCep).mockResolvedValue({ ...RESPOSTA_CEP, uf: null });
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() => expect(estado()).toHaveValue("Minas Gerais"));
+    await waitFor(() => expect(cidade()).toHaveValue("Cidade Sintética"));
+    expect(estado()).toHaveValue("MG");
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
+    expect(
+      vi.mocked(admitirColaborador).mock.calls.at(-1)![0].endereco,
+    ).toMatchObject({ estado: "MG" });
   });
 
-  it("campo já digitado é mantido, com aviso; 'Usar endereço do CEP' substitui", async () => {
+  it("campo já digitado é mantido, com aviso; 'Usar endereço do CEP' substitui e o foco volta ao CEP", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
@@ -2131,7 +2095,6 @@ describe("T178 — CEP: o que faz com a resposta", () => {
     // Igual ao sugerido, a menos de caixa: não conta como conflito.
     fireEvent.change(bairro(), { target: { value: "bairro sintético" } });
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
 
     await waitFor(() => expect(cidade()).toHaveValue("Cidade Sintética"));
     expect(logradouro()).toHaveValue("Rua Já Digitada");
@@ -2150,18 +2113,18 @@ describe("T178 — CEP: o que faz com a resposta", () => {
     expect(
       screen.queryByRole("button", { name: "Usar endereço do CEP" }),
     ).toBeNull();
-    expect(screen.getByRole("button", { name: "Buscar CEP" })).toHaveFocus();
+    expect(campoCep()).toHaveFocus();
   });
 
-  it("os campos seguem editáveis e a admissão leva o valor editado", async () => {
+  it("os campos seguem editáveis e a admissão leva o valor editado, com país Brasil", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
     await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
 
     fireEvent.change(logradouro(), { target: { value: "Avenida Editada" } });
+    fireEvent.change(estado(), { target: { value: "SP" } });
     await preencherValido();
     await salvarEConfirmar();
 
@@ -2173,7 +2136,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
       logradouro: "Avenida Editada",
       bairro: "Bairro Sintético",
       cidade: "Cidade Sintética",
-      estado: "MG",
+      estado: "SP",
       numero: null,
       complemento: null,
     });
@@ -2182,34 +2145,45 @@ describe("T178 — CEP: o que faz com a resposta", () => {
   });
 
   it.each([
-    [404, "CEP não encontrado. Preencha o endereço manualmente."],
+    [404, "CEP não encontrado. Preencha o endereço manualmente.", false],
     [
       503,
       "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.",
+      true,
     ],
     [
       429,
       "Muitas consultas de CEP em pouco tempo. Aguarde alguns minutos ou preencha manualmente.",
+      true,
     ],
-    [400, "CEP inválido. Use os 8 dígitos."],
+    [400, "CEP inválido. Use os 8 dígitos.", false],
     [
       403,
       "A consulta de CEP está indisponível agora. Preencha o endereço manualmente.",
+      true,
     ],
   ])(
-    "recusa %s: mensagem clara, e a admissão segue sendo enviada",
-    async (status, mensagem) => {
+    "recusa %s: mensagem clara, sem bloquear; 'Consultar de novo' só quando faz sentido",
+    async (status, mensagem, repetivel) => {
       vi.mocked(consultarCep).mockRejectedValue(recusaCep(status));
       montar();
       await aguardarEmpresa();
       await abrirEndereco();
       digitarCep("30140071");
-      fireEvent.click(botaoBuscarCep()!);
       await waitFor(() => expect(statusCep()).toHaveTextContent(mensagem));
-      // Não bloqueia: o CEP não fica inválido e o cadastro manual segue.
       expect(campoCep()).not.toHaveAttribute("aria-invalid");
+      if (repetivel) {
+        vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+        fireEvent.click(botaoConsultarDeNovo()!);
+        await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(2));
+        await waitFor(() =>
+          expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/),
+        );
+        expect(botaoConsultarDeNovo()).toBeNull();
+      } else {
+        expect(botaoConsultarDeNovo()).toBeNull();
+      }
       fireEvent.change(cidade(), { target: { value: "Cidade Manual" } });
-
       await preencherValido();
       await salvarEConfirmar();
       await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
@@ -2384,12 +2358,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     expect(campoCep()).toHaveValue("0131");
     expect(campoCep()).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
     fireEvent.blur(campoCep());
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() =>
-      expect(campoCep()).toHaveAccessibleDescription(
-        /Informe os 8 dígitos do CEP/,
-      ),
-    );
+    await act(async () => {});
     expect(consultarCep).not.toHaveBeenCalled();
     expect(logradouro()).toHaveValue("");
   });
@@ -3716,7 +3685,8 @@ describe("T195 — revisão e conclusão", () => {
     expect(profissionais).not.toHaveTextContent("Jornada");
 
     const endereco = bloco("Endereço");
-    expect(endereco).toHaveTextContent("PaísBrasil");
+    // T209 — sem campo País na etapa 3, o país não aparece no resumo.
+    expect(endereco).not.toHaveTextContent("País");
     expect(endereco).toHaveTextContent("CidadeCidade Sintética");
     expect(endereco).not.toHaveTextContent("Logradouro");
     expectSemIsoVisivel(document.body);
