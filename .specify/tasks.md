@@ -3489,6 +3489,13 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         Remover, envio só depois da admissão, falha sem desfazer a admissão e nova tentativa.
         API unitária 66 suítes, 1581 testes; E2E da foto 17; web 145 arquivos, 4229 testes numa rodada limpa; 3 mutações
         detectadas; envio real ao bucket validado no navegador (desktop e 375 px).
+      - **Foto na listagem e na ficha (seção 33):** listagem e detalhe anunciam só `{ versao }`
+        da foto na empresa ativa (sem chave nem endereço); avatar de 96 px preguiçoso na
+        listagem e de 256 px na ficha pela rota autenticada, com iniciais sem foto ou na falha;
+        `EVOLLI_FOTO_ARMAZENAMENTO=memoria` para a prévia, recusado em produção. E2E da foto
+        26 testes (9 novos); API unitária 67 suítes, 1585 testes; web 146 arquivos, 4242 testes numa rodada limpa; 4 mutações detectadas; validado no navegador
+        com armazenamento em memória (desktop e 375 px) e uma validação real no R2 com imagem
+        sintética (credenciais mantidas por decisão da usuária).
       - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
       - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
         e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,

@@ -1096,3 +1096,72 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
 - **Observação:** imagem menor que 512 px é ampliada no corte (o lado mínimo aceito é 64 px).
 - **Fora desta fatia:** trocar ou remover a foto pela ficha (a rota de remoção existe e está
   testada; falta tela), mostrar a foto na listagem e na ficha, e a retenção (`DP-2E-15`).
+
+## 33. Foto do colaborador na listagem e na ficha (2026-11-17)
+
+### 33.1 Implementado
+
+- **API:** `GET /v1/colaboradores` (cada item) e `GET /v1/colaboradores/:id` trazem `foto`: só
+  `{ versao }`, ou `null`. A versão sai do banco numa consulta por página, filtrada pela
+  empresa ativa e só para quem lê dados pessoais nela (a mesma regra da rota da foto). Sem
+  empresa ativa (master técnico global), `null`. Nunca chave, hash, tamanho, autor ou endereço
+  do armazenamento. Listar e abrir a ficha não leem o armazenamento nem gravam trilha nova.
+- **Listagem:** avatar de 96 px pela rota autenticada
+  (`/v1/colaboradores/{id}/foto?tamanho=96&v={versao}`). A imagem é preguiçosa
+  (`loading="lazy"`) e decorativa, e só as linhas com foto anunciada pedem imagem. Sem foto, ou
+  se a leitura falhar, ficam as iniciais. Paginação, busca, filtros e abas não mudaram.
+- **Ficha:** avatar de 256 px na área de identificação, com o mesmo fallback. Nenhuma tela nova
+  de troca ou remoção: a foto continua entrando pela Nova admissão.
+- **Armazenamento da prévia:** a variável `EVOLLI_FOTO_ARMAZENAMENTO=memoria` troca o R2 por um
+  armazenamento em memória, perdido ao reiniciar. Em produção, ou com valor desconhecido, a API
+  não sobe. Sem a variável, segue o R2.
+
+### 33.2 Testado com armazenamento falso
+
+- **API:**
+  - E2E da foto com PostgreSQL real e armazenamento em memória: 26 testes (9 novos). A listagem anuncia só a
+    versão, e a versão acompanha a substituição; busca e aba seguem funcionando; a ficha anuncia
+    a foto.
+  - Isolamento: uma foto registrada em outra empresa não é anunciada nem entregue, e URL direta
+    com o id de outra empresa responde 404.
+  - Master global sem foto; gestor e colaborador seguem sem listagem.
+  - Listar e abrir a ficha não leem o armazenamento nem gravam trilha; 96 e 256 px entregues a
+    RH e DP; falha de leitura responde 503 sem detalhe.
+  - Seletor do armazenamento: 4 testes.
+  - Suíte unitária: 67 suítes, 1585 testes.
+- **Web:**
+  - componente (5), listagem (4) e ficha (4);
+  - a única origem de imagem é a rota autenticada, e o HTML não tem nada do armazenamento;
+  - suíte completa: 146 arquivos, 4242 testes numa rodada limpa.
+- **Mutações detectadas:** 4. Na API, tirar o filtro de empresa. Na web: sem `loading="lazy"`,
+  sem volta às iniciais na falha e sem a versão na URL.
+
+### 33.3 Validado no navegador
+
+- Prévia com armazenamento em memória, RH, imagem sintética. Nada foi lido, gravado ou apagado
+  no bucket real.
+- **Listagem (desktop):**
+  - "Pessoa Sintetica Foto": avatar de 96 px carregado, `loading="lazy"`;
+  - "Pessoa Sintetica Falha": a foto aponta para um objeto que não está no armazenamento em
+    memória, e o avatar caiu nas iniciais;
+  - o JSON da listagem não tem chave nem endereço.
+- **Ficha:** imagem de 256 px exibida em 72 px; o HTML da página não tem nada do armazenamento.
+- **375 px:** ficha e listagem sem rolagem horizontal; nenhum pedido de foto antes de a linha
+  ficar visível.
+
+### 33.4 Validação real no R2 (credenciais mantidas)
+
+- Em 2026-11-17 a usuária decidiu manter as credenciais do bucket como estão, sem renovar
+  agora. Com isso foi feita a única validação real prevista, com imagem sintética.
+- **Envio:** a prévia voltou ao R2 e recebeu um envio de foto sintética ("Pessoa Sintetica
+  Foto", versão 3).
+- **Leitura pela rota autenticada:** 96 e 256 px das duas pessoas com foto, lidos do bucket,
+  com `private, no-store`.
+- **Listagem:** página de 20 linhas com imagem só nas 2 que têm foto; o JSON sem nada do
+  armazenamento.
+- **Ficha:** 256 px carregada do bucket.
+- **Limpeza:** nenhuma pendente depois da troca.
+- **Objetos sem referência no bucket:** as três versões enviadas em 2026-11-16 para "Pessoa
+  Sintetica Foto" deixaram de ser referenciadas quando a foto foi trocada na prévia em memória.
+  Lá a remoção foi feita na memória, não no bucket, e por isso nenhuma limpeza pendente foi
+  registrada. Seguem no bucket até uma remoção manual.

@@ -42,5 +42,9 @@
 
 - Os testes automatizados usam armazenamento em memória com falhas injetáveis; nenhum teste
   fala com o bucket.
+- **Exibição (2026-11-17):** listagem e ficha recebem só a versão da foto, na empresa ativa e
+  para quem lê dados pessoais nela; a imagem vem sempre da rota autenticada.
+- **Prévia local:** `EVOLLI_FOTO_ARMAZENAMENTO=memoria` usa armazenamento em memória fora de
+  produção; em produção, ou com valor desconhecido, a API não sobe.
 - Retenção e descarte da foto acompanham a regra geral de dados do colaborador, ainda aberta
   (`DP-2E-15`); a remoção pela ficha fica para quando houver tela para isso.
