@@ -3534,9 +3534,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         contatos na listagem e exportação de pessoas.
 
 107.  **T210 - Configurações › Aparência e marca oficial**
-      - **Estado:** **fechada localmente** (2026-11-18), sem publicação. Branch
-        `codex/t210-marca-aparencia`, a partir do squash da T209 em `main` (`b7d2d03`, PR
-        #202). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #203, squash
+        `053aa3df015723e09cd64399ce4205e7e00f8901`, com a CI de push 3/3 verde (run
+        44335080581); branch remota `codex/t210-marca-aparencia` preservada.
       - **Entregue:** `PATCH /v1/users/me/aparencia` e `temaAparencia` em `/users/me`
         (migration `20261118120000_tema_aparencia`, coluna anulável com CHECK; nula = Azul
         Institucional, inclusive em toda conta nova); `data-theme` aplicado depois da identidade;

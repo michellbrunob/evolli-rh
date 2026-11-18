@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-18",
-  "lastIntegratedTask": 209,
+  "lastIntegratedTask": 210,
   "lastRecordedTask": 210,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
@@ -12,16 +12,10 @@
   },
   "nextTask": {
     "id": "T210",
-    "status": "aparencia_fechada_localmente",
-    "reason": "T210 fechada localmente em 2026-11-18, sem publicacao: Configuracoes > Aparencia (quatro temas por conta, persistidos no servidor), menu lateral claro com tom do tema e a marca oficial do Evolli pelos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Sem push, PR, Ready ou merge."
+    "status": "integrada",
+    "reason": "T210 integrada em main pela PR #203 (squash 053aa3df015723e09cd64399ce4205e7e00f8901), com a CI de push 3/3 verde (run 44335080581); branch remota preservada. Configuracoes > Aparencia com quatro temas por conta gravados no servidor, menu lateral claro no tema e a marca oficial do Evolli pelos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Nenhuma entrega aberta ate a abertura da proxima tarefa."
   },
-  "openDeliveries": [
-    {
-      "id": "T210",
-      "pullRequest": null,
-      "status": "aparencia_fechada_localmente"
-    }
-  ],
+  "openDeliveries": [],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",

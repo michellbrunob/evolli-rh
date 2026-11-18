@@ -3334,11 +3334,16 @@ dependências, lockfile, workflow, push, PR, promoção e merge.
 - `/speckit.converge` registrado antes de Ready for review.
 - Autorizações separadas para Ready, merge e qualquer ação operacional externa.
 
-## Aparência e marca — T210 (fechada localmente)
+## Aparência e marca — T210 (integrada)
 
-| Tarefa | Estado                 | Resultado principal                                                             |
-| ------ | ---------------------- | ------------------------------------------------------------------------------- |
-| T210   | **Fechada localmente** | Configurações › Aparência (quatro temas por conta) e a marca oficial do Evolli. |
+| Tarefa | Estado                                    | Resultado principal                                                             |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| T210   | **Integrada** (PR #203, squash `053aa3d`) | Configurações › Aparência (quatro temas por conta) e a marca oficial do Evolli. |
+
+**Observação de relatório:** a integração funcional da T210 está concluída (PR #203, squash
+`053aa3df015723e09cd64399ce4205e7e00f8901`, CI de push 3/3 verde, run 44335080581; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da tarefa seguinte.
 
 **Escopo:** tema individual por conta, gravado no servidor (migration e rota própria), aplicado
 por `data-theme`; quatro paletas fechadas com contraste WCAG AA calculado; marca a partir dos SVGs
