@@ -530,9 +530,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     window.history.replaceState(null, "", `/${rotaDe(ana)}`);
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Organograma/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     const barra = screen.getByRole("navigation", {
       name: "Navegação do painel",
     });
@@ -914,9 +912,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     );
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Organograma/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     fireEvent.click(
       within(
         screen.getByRole("navigation", { name: "Navegação do painel" }),
