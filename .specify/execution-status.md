@@ -3349,5 +3349,5 @@ da ação do tema ([documento de decisão](../docs/decisions/t210-temas-de-apare
 e `git diff --check` limpos; quatro temas e 375 px validados no navegador.
 
 **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema escuro e
-Documentos (entrega própria, não iniciada). A T209 segue aberta, fechada
-localmente e aprovada, sem publicação.
+Documentos (entrega própria, não iniciada). A T209 está integrada
+(PR #202, squash `b7d2d03`).

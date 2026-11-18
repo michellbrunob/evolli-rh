@@ -1,7 +1,7 @@
 # T210 — Configurações › Aparência e marca oficial do Evolli
 
-- **Estado:** fechada localmente em 2026-11-18. Branch `codex/t210-aparencia`, a partir do HEAD
-  local da T209 (`b81c312`), que segue aberta, aguardando publicação. Sem push, PR, Ready ou merge.
+- **Estado:** fechada localmente em 2026-11-18. Branch `codex/t210-marca-aparencia`, a partir do
+  squash da T209 em `main` (`b7d2d03`, PR #202). Sem push, PR, Ready ou merge.
 - **Pedido da proprietária:** um tema visual por pessoa, gravado na própria conta, e a marca
   oficial do Evolli na interface.
 

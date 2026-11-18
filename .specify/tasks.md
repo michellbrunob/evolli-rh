@@ -3535,8 +3535,8 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
 
 107.  **T210 - Configurações › Aparência e marca oficial**
       - **Estado:** **fechada localmente** (2026-11-18), sem publicação. Branch
-        `codex/t210-aparencia`, a partir do HEAD local da T209 (`b81c312`), que segue aberta sem
-        publicação. Sem push, PR, Ready ou merge.
+        `codex/t210-marca-aparencia`, a partir do squash da T209 em `main` (`b7d2d03`, PR
+        #202). Sem push, PR, Ready ou merge.
       - **Entregue:** `PATCH /v1/users/me/aparencia` e `temaAparencia` em `/users/me`
         (migration `20261118120000_tema_aparencia`, coluna anulável com CHECK; nula = Azul
         Institucional, inclusive em toda conta nova); `data-theme` aplicado depois da identidade;
