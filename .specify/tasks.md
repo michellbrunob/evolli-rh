@@ -3534,14 +3534,30 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         contatos na listagem e exportação de pessoas.
 
 107.  **T210 - Configurações › Aparência e marca oficial**
-      - **Estado:** **em preparação**. Branch `codex/t210-aparencia`, a partir do HEAD local da T209
-        (`b81c312`), que segue aberta sem publicação. T211 (Documentos) reservada, não iniciada.
+      - **Estado:** **fechada localmente** (2026-11-18), sem publicação. Branch
+        `codex/t210-aparencia`, a partir do HEAD local da T209 (`b81c312`), que segue aberta sem
+        publicação. Sem push, PR, Ready ou merge.
+      - **Entregue:** `PATCH /v1/users/me/aparencia` e `temaAparencia` em `/users/me`
+        (migration `20261118120000_tema_aparencia`, coluna anulável com CHECK; nula = Azul
+        Institucional, inclusive em toda conta nova); `data-theme` aplicado depois da identidade;
+        Configurações › Aparência (quatro cartões, aplicação imediata, falha volta ao anterior,
+        fora do Hub); menu lateral claro com 4% da ação do tema (decisão da proprietária pela
+        prancha da marca); contorno de campo `--borda-controle` ≥ 3:1; marca oficial pelos SVGs
+        locais (horizontal, símbolo, vertical e versões brancas de mesma geometria), símbolo na
+        barra até 400 px.
+      - **Validação:** E2E serial 29 suítes / 1207 (aparência 18); API 68 / 1604; lint,
+        typecheck, build, `spec:check` e `git diff --check` limpos; quatro temas e 375 px
+        validados no navegador.
+      - **Próximas (decisão da proprietária, 2026-11-18):** **T211** = menu lateral com a mesma
+        árvore da referência, realocando as telas funcionais (Jornadas → aba Escala de trabalho,
+        Estrutura → aba Organograma, Contas de acesso → Configurações › Equipe e permissões);
+        **T212** = Documentos (antes reservada como T211), não iniciada.
       - **Objetivo:** quatro temas fechados por conta (Azul Institucional, Evolli Claro, Verde
         Petróleo e Alto Contraste), gravados no servidor e aplicados por `data-theme`, e a marca
         oficial do Evolli a partir dos SVGs locais, conforme o
         [documento de decisão](../docs/decisions/t210-temas-de-aparencia.md).
       - **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema
-        escuro, versão branca da marca e Documentos.
+        escuro e Documentos.
 
 ## Regra obrigatória para as próximas tarefas
 

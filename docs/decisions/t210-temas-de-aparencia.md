@@ -1,8 +1,7 @@
 # T210 — Configurações › Aparência e marca oficial do Evolli
 
-- **Estado:** aberta em 2026-11-18, em preparação/implementação local. Branch
-  `codex/t210-aparencia`, a partir do HEAD local da T209 (`b81c312`), que segue aberta, aguardando
-  publicação. Sem push, PR, Ready ou merge.
+- **Estado:** fechada localmente em 2026-11-18. Branch `codex/t210-aparencia`, a partir do HEAD
+  local da T209 (`b81c312`), que segue aberta, aguardando publicação. Sem push, PR, Ready ou merge.
 - **Pedido da proprietária:** um tema visual por pessoa, gravado na própria conta, e a marca
   oficial do Evolli na interface.
 
@@ -12,16 +11,18 @@
   em cartões. Aplicação imediata e gravação na conta (servidor), valendo em qualquer dispositivo.
 - **Preferência individual por conta**, não por empresa. Ausente ou inválida, vale **Azul
   Institucional**.
-- **Marca oficial** a partir dos três SVGs locais aprovados, sem recriar, redesenhar nem
-  recolorir:
+- **Marca oficial** a partir dos três SVGs locais aprovados, sem recriar nem redesenhar:
   - `apps/web/src/assets/brand/evolli-horizontal.svg`;
   - `evolli-symbol.svg`;
-  - `evolli-vertical.svg`.
+  - `evolli-vertical.svg`;
+  - e as versões brancas (negativas) `*-branco.svg`, geradas dos oficiais com a mesma geometria
+    e só o preenchimento branco, como a prancha da marca define (decisão da proprietária,
+    2026-11-18).
 - **Fora desta entrega:**
   - tema por empresa, logotipo por empresa e personalização livre (seletor de cor);
   - tema escuro;
-  - versão branca da marca (não existe arquivo oficial);
-  - Documentos (T211, não iniciada).
+  - Documentos (T212, não iniciada; a T211 passou a ser o menu lateral pela árvore da
+    referência, decisão da proprietária de 2026-11-18).
 - **O tema não altera** dados, permissões, relatórios, PDFs, CSVs, impressão ou e-mails: muda só
   as cores da tela.
 
@@ -30,7 +31,8 @@
 - **D1 — Persistência:**
   - coluna `tema_aparencia` em `access_user` (migration aditiva, anulável), com CHECK nos quatro
     códigos;
-  - nula = Azul Institucional;
+  - nula = Azul Institucional. **Toda conta ou acesso novo nasce com o Azul Institucional**
+    (regra da proprietária, 2026-11-18): a coluna nasce nula e nada a preenche na criação;
   - sem auditoria, como pedido;
   - nada em `localStorage` nem `sessionStorage`.
 - **D2 — Contrato:**
@@ -58,17 +60,29 @@
     divisores e cartões, não a contorno de campo;
   - os campos de formulário usam o token derivado `--borda-controle`, com pelo menos 3:1
     (seção 3).
-- **D7 — Menu lateral:**
-  - continua marinho em todos os temas (as paletas não definem a cor do menu);
-  - o item ativo e os textos sobre o marinho já têm contraste próprio.
-- **D8 — Marca:**
-  - azul institucional `#0066CC` em todos os temas, sem acompanhar a cor de ação;
-  - só sobre superfície clara: a assinatura horizontal na barra superior e na tela de entrada;
-    o símbolo no menu, no trilho recolhido e na carga, dentro de uma placa clara;
-  - a vertical só na tela de entrada e na carga, onde há espaço;
-  - sem filtro, sombra, gradiente, distorção nem cor arbitrária;
-  - nome acessível "Evolli"; onde hoje está "Evolli RH", fica a marca "Evolli" (e "RH" só como
-    texto, quando necessário, sem repetir a leitura).
+- **D7 — Menu lateral (revista em 2026-11-18, decisão da proprietária pela prancha da marca):**
+  - o menu deixa o marinho fixo da T207 e fica **claro, no tema da conta**;
+  - fundo com um tom bem leve da ação do tema (`--menu-fundo`: 4% da ação sobre o canvas);
+  - item ativo na cor de ação sobre 12% da ação, com peso e barra indicadora, além do
+    `aria-current`;
+  - hover: 6% da tinta sobre o fundo do menu (existe também no Alto Contraste, onde neutro =
+    canvas);
+  - textos na tinta e no secundário do tema; foco no token de foco do tema;
+  - nenhuma cor nova: tudo derivado da paleta (tokens `--menu-*`).
+- **D8 — Marca (componente `MarcaEvolli`):**
+  - azul institucional `#0066CC` em todos os temas, sem acompanhar a cor de ação; cada tom é um
+    arquivo (azul ou branco), nada é recolorido em CSS;
+  - horizontal azul: topo do menu, barra superior (celular), Hub e acesso temporário;
+  - símbolo azul: menu recolhido (trilho) e ícone da página (favicon);
+  - vertical azul: tela de abertura (carregamento);
+  - horizontal branca: painel institucional do login, que fica na cor de ação;
+  - largura pela proporção do próprio arquivo; mínimos da prancha: símbolo 24 px, horizontal
+    156 px de largura;
+  - sem filtro, sombra, gradiente, distorção nem cor arbitrária (`object-fit: contain`);
+  - nome acessível "Evolli" (`alt`), ou decorativa onde o nome já está ao lado; "Evolli RH" saiu
+    dos pontos de marca e dos textos.
+- **D10 — Aparência fora do Hub:** é preferência da conta, não produto; abre pela navegação
+  interna de Configurações (o cartão Configurações já leva lá).
 - **D9 — Movimento:** nenhuma transição decorativa de cor na troca de tema; `prefers-reduced-motion`
   continua respeitado.
 
@@ -115,10 +129,11 @@ Faixas: menor e maior valor sobre canvas, fundo neutro e superfície clara.
 
 ## 5. Limites
 
-- **Sem tema escuro:** a marca não tem versão branca oficial; o tema escuro fica para quando
-  houver.
-- **Superfícies próprias:** o menu marinho e o Dashboard (paleta de gráficos) mantêm as cores
-  delas. Os gráficos continuam com a paleta própria em todos os temas.
+- **Sem tema escuro:** fora do pedido; a versão branca da marca já existe para quando houver.
+- **Superfícies próprias:** o Dashboard (paleta de gráficos e títulos em marinho) mantém as cores
+  dele em todos os temas.
+- **Respiro da marca** (x = ¼ da altura do símbolo, prancha): seguido pelo espaçamento dos
+  contêineres, sem regra automática.
 - **Tema da empresa:** fica para entrega futura, com o logotipo por empresa e a personalização
   livre.
 
@@ -150,3 +165,21 @@ Faixas: menor e maior valor sobre canvas, fundo neutro e superfície clara.
   - lint, typecheck, build, smoke de migration e testes focados;
   - validação no navegador dos quatro temas em Configurações, Dashboard, Colaboradores,
     formulário e tabela.
+
+## 7. Resultados (2026-11-18)
+
+- **API:** E2E `aparencia` 18/18 (padrão nulo, gravação e nova sessão, inválidos 400, sem CSRF 403,
+  sem sessão 401, isolamento, todos os papéis, CHECK no banco, sem auditoria); bateria E2E serial
+  29 suítes / 1207 testes, com as migrations do zero (smoke da migration); unitária 68 / 1604.
+- **Web:** 158 arquivos / 4359 testes; um teste de temporização da T189 estourou 5 s na suíte
+  completa e passou isolado (instabilidade conhecida). Inclui temas (paletas, contrastes dos
+  quatro temas, menu, contorno de campo, nenhuma cor fixa), `MarcaEvolli`, Aparência (tela, rota,
+  sessão, falha, sessão expirada, teclado, descrições acessíveis) e Hub sem o cartão.
+- **Gerais:** lint, typecheck e build limpos; `spec:check` e `git diff --check` limpos.
+- **Navegador:** quatro temas em Configurações, Dashboard, Colaboradores (tabela e filtros) e
+  Novo colaborador (formulário): ação, menu, item ativo, contorno de campo e texto seguem o tema;
+  marca carregada; troca gravada e restaurada na conta de demonstração. 375 px sem rolagem
+  horizontal em cinco telas; na barra, o símbolo de 28 px até 400 px.
+- **Limites para o tema da empresa (futuro):** a preferência é da conta; um tema por empresa
+  precisaria de coluna e regra de precedência próprias (empresa × conta), logotipo por empresa
+  com armazenamento e validação de arquivo, e a mesma checagem de contraste para cores livres.

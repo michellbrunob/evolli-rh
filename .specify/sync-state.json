@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T210",
-    "status": "aparencia_em_preparacao",
-    "reason": "T209 fechada localmente e aprovada pela proprietaria em 2026-11-18 (sem Documentos, reservados a T211, nao iniciada), ainda sem publicacao. T210 aberta como unica entrega nova: Configuracoes > Aparencia (quatro temas por conta, persistidos no servidor) e a marca oficial do Evolli a partir dos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Sem push, PR, Ready ou merge."
+    "status": "aparencia_fechada_localmente",
+    "reason": "T210 fechada localmente em 2026-11-18, sem publicacao: Configuracoes > Aparencia (quatro temas por conta, persistidos no servidor), menu lateral claro com tom do tema e a marca oficial do Evolli pelos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Proximas por decisao da proprietaria: T211 = menu lateral pela arvore da referencia; T212 = Documentos. Sem push, PR, Ready ou merge."
   },
   "openDeliveries": [
     {
       "id": "T210",
       "pullRequest": null,
-      "status": "aparencia_em_preparacao"
+      "status": "aparencia_fechada_localmente"
     }
   ],
   "requiredArtifacts": [

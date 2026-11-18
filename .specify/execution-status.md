@@ -3334,17 +3334,23 @@ dependências, lockfile, workflow, push, PR, promoção e merge.
 - `/speckit.converge` registrado antes de Ready for review.
 - Autorizações separadas para Ready, merge e qualquer ação operacional externa.
 
-## Aparência e marca — T210 (em preparação)
+## Aparência e marca — T210 (fechada localmente)
 
-| Tarefa | Estado            | Resultado principal                                                             |
-| ------ | ----------------- | ------------------------------------------------------------------------------- |
-| T210   | **Em preparação** | Configurações › Aparência (quatro temas por conta) e a marca oficial do Evolli. |
+| Tarefa | Estado                 | Resultado principal                                                             |
+| ------ | ---------------------- | ------------------------------------------------------------------------------- |
+| T210   | **Fechada localmente** | Configurações › Aparência (quatro temas por conta) e a marca oficial do Evolli. |
 
 **Escopo:** tema individual por conta, gravado no servidor (migration e rota própria), aplicado
 por `data-theme`; quatro paletas fechadas com contraste WCAG AA calculado; marca a partir dos SVGs
-locais aprovados, só sobre superfície clara
-([documento de decisão](../docs/decisions/t210-temas-de-aparencia.md)).
+locais aprovados, com as versões brancas de mesma geometria; menu lateral claro com um tom leve
+da ação do tema ([documento de decisão](../docs/decisions/t210-temas-de-aparencia.md)).
 
-**Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema escuro,
-versão branca da marca e Documentos (T211, não iniciada). A T209 segue aberta, fechada
+**Validação:** E2E serial 29 suítes / 1207; API 68 / 1604; lint, typecheck, build, `spec:check`
+e `git diff --check` limpos; quatro temas e 375 px validados no navegador.
+
+**Próximas:** T211 = menu lateral pela árvore da referência (decisão da proprietária,
+2026-11-18); T212 = Documentos, não iniciada.
+
+**Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema escuro e
+Documentos (T212, não iniciada). A T209 segue aberta, fechada
 localmente e aprovada, sem publicação.
