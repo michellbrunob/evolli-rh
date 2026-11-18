@@ -336,18 +336,18 @@ const ETAPAS = [
 
 /** T209 — o subtítulo de cada etapa, na coluna das etapas. */
 const SUBTITULOS_DAS_ETAPAS = [
-  "Informações pessoais",
-  "Cargo e contrato",
-  "Residência",
-  "Confira e conclua",
+  "Identificação e contatos",
+  "Lotação e contrato",
+  "CEP e endereço",
+  "Resumo final",
 ] as const;
 
 /** T209 — a descrição de cada etapa, no cabeçalho dela. */
 const DESCRICOES_DAS_ETAPAS = [
-  "Informações pessoais e de contato do novo colaborador.",
-  "Cargo e contrato do novo colaborador.",
-  "Residência usada em correspondências e no eSocial.",
-  "Confira os dados antes de cadastrar.",
+  "Quem é a pessoa e como falar com ela.",
+  "Lotação, contrato e remuneração.",
+  "Onde a pessoa mora.",
+  "Revise tudo antes de concluir.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;
@@ -1140,7 +1140,7 @@ const OPCOES_CONSELHO = [
 
 /** Dica da matrícula (ícone de ajuda ao lado do rótulo). */
 const DICA_DA_MATRICULA =
-  "Número do colaborador no sistema da folha ou da contabilidade (matrícula, código, registro ou chapa). Usado nos holerites: quando o PDF não traz o CPF, o sistema acha a pessoa pela matrícula.";
+  "Código da pessoa na folha ou na contabilidade (matrícula, registro ou chapa). Serve para achar a pessoa quando um documento não traz o CPF.";
 
 /** "500000" → "5.000,00", conforme se digita (centavos à direita). */
 function mascararReais(texto: string): string {
@@ -1671,8 +1671,8 @@ export function NovaAdmissaoScreen({
   const buscarCep = consultaCep.buscar;
   const usarEnderecoDoCep = consultaCep.usarEnderecoDoCep;
   /**
-   * T209 — completar os 8 dígitos do CEP consulta sozinho ("Preenchemos o
-   * restante automaticamente a partir do CEP"). A consulta sai depois que o
+   * T209 — completar os 8 dígitos do CEP consulta sozinho (o Evolli
+   * completa o endereço). A consulta sai depois que o
    * CEP novo chega ao estado (o hook lê o endereço atual), e só por digitação:
    * abrir um rascunho com CEP não consulta.
    */
@@ -1975,8 +1975,7 @@ export function NovaAdmissaoScreen({
     }
     const bruto = lerValorEmReais(campos.salarioBruto);
     if (bruto === null || bruto <= 0) {
-      novos.salarioBruto =
-        "Informe o salário bruto. Ele é usado na folha de pagamento.";
+      novos.salarioBruto = "Informe o salário bruto.";
     }
     if (campos.registroProfissional.trim().length > 40) {
       novos.registroProfissional =
@@ -2753,7 +2752,7 @@ export function NovaAdmissaoScreen({
         className="nova-admissao"
         tituloId={NOVA_ADMISSAO_TITULO_ID}
         titulo="Novo colaborador"
-        descricao="Preencha os dados em 4 etapas. Você pode salvar e continuar depois."
+        descricao="Quatro etapas. Salve o rascunho a qualquer momento e termine depois."
         rotuloVoltar="Voltar para Colaboradores"
         onVoltarDaPagina={pedirCancelamento}
         acaoDoCabecalho={
@@ -2844,7 +2843,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-identificacao"
               titulo="Identificação"
-              descricao="Aparecem no perfil, nos documentos e no eSocial."
+              descricao="Dados que identificam a pessoa no Evolli."
             >
               <BlocoDaFoto
                 foto={foto}
@@ -2854,7 +2853,7 @@ export function NovaAdmissaoScreen({
               />
               <LinhaDoCadastro
                 rotulo="Nome completo"
-                ajuda="Como está nos documentos oficiais."
+                ajuda="Igual ao documento de identidade."
                 paraId={ID_DO_CAMPO.nome}
               >
                 <input
@@ -2871,7 +2870,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="CPF e RG"
-                ajuda="Usados na folha e no eSocial."
+                ajuda="Documentos de identificação da pessoa."
               >
                 <div className="nova-admissao__linha-par">
                   <div className="nova-admissao__linha-celula">
@@ -2979,11 +2978,11 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-contato"
               titulo="Contato"
-              descricao="Canais pessoais para falar com o colaborador."
+              descricao="Como a empresa fala com a pessoa."
             >
               <LinhaDoCadastro
                 rotulo="E-mail pessoal"
-                ajuda="Diferente do e-mail corporativo."
+                ajuda="O e-mail particular, não o da empresa."
                 paraId={ID_DO_CAMPO.emailPessoal}
               >
                 <input
@@ -3018,7 +3017,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-emergencia"
               titulo="Contato de emergência"
-              descricao="Acionado apenas em situações de urgência."
+              descricao="Quem avisar se algo acontecer."
             >
               <LinhaDoCadastro
                 rotulo="Nome do contato"
@@ -3062,7 +3061,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-cargo"
               titulo="Cargo e estrutura"
-              descricao="Onde o colaborador está na organização."
+              descricao="Posição da pessoa na estrutura da empresa."
             >
               <LinhaDoCadastro rotulo="Cargo e nível">
                 <div className="nova-admissao__linha-par">
@@ -3184,7 +3183,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Unidade"
-                ajuda="Filial, loja ou local de trabalho."
+                ajuda="Onde a pessoa trabalha."
                 grupo={false}
               >
                 <SeletorDeReferencia
@@ -3218,7 +3217,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Gestor direto"
-                ajuda="Recebe as solicitações do colaborador."
+                ajuda="Quem aprova os pedidos da pessoa."
                 paraId={ID_DO_CAMPO.gestorDireto}
               >
                 <select
@@ -3252,7 +3251,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-contrato"
               titulo="Contrato"
-              descricao="Tipo de vínculo, admissão, jornada, escala e matrícula."
+              descricao="Como e desde quando a pessoa trabalha."
             >
               <LinhaDoCadastro
                 rotulo="Tipo de contratação"
@@ -3316,7 +3315,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Escala de trabalho"
-                ajuda="Sem escala, os benefícios usam os dias úteis do mês."
+                ajuda="Sem escala, contam os dias úteis do mês."
                 paraId={ID_DO_CAMPO.escala}
               >
                 <select
@@ -3382,7 +3381,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-remuneracao"
               titulo="Remuneração"
-              descricao="Valores mensais usados na folha."
+              descricao="Salário mensal da pessoa."
             >
               <LinhaDoCadastro
                 rotulo="Salário bruto"
@@ -3410,7 +3409,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Salário líquido"
-                ajuda="Calculado a partir do bruto."
+                ajuda="Estimativa a partir do salário bruto."
                 paraId="nova-admissao-salario-liquido"
               >
                 <div className="nova-admissao__com-prefixo">
@@ -3428,11 +3427,11 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-adicionais"
               titulo="Informações adicionais"
-              descricao="Registro profissional e deduções."
+              descricao="Conselho de classe e descontos."
             >
               <LinhaDoCadastro
                 rotulo="Conselho e registro"
-                ajuda="Obrigatório para algumas profissões."
+                ajuda="Exigido em profissões regulamentadas."
               >
                 <div className="nova-admissao__linha-par">
                   <div className="nova-admissao__linha-celula">
@@ -3537,7 +3536,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-endereco"
               titulo="Endereço residencial"
-              descricao="Preenchemos o restante automaticamente a partir do CEP."
+              descricao="Digite o CEP e o Evolli completa o endereço."
             >
               <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
                 <div className="nova-admissao__campo-cep">
@@ -3573,7 +3572,7 @@ export function NovaAdmissaoScreen({
                   ) : cep.tipo === "sugerido" && cep.encontrado ? (
                     <>
                       <IconeSucesso tamanho={14} />
-                      Endereço encontrado
+                      Endereço localizado pelo CEP
                     </>
                   ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
                     cep.mensagem
@@ -4372,10 +4371,7 @@ function BlocoDaFoto({
 }) {
   const campoRef = useRef<HTMLInputElement | null>(null);
   return (
-    <LinhaDoCadastro
-      rotulo="Foto"
-      ajuda="Aparece na lista de colaboradores e no perfil."
-    >
+    <LinhaDoCadastro rotulo="Foto" ajuda="Mostrada na lista e na ficha.">
       <div
         className="nova-admissao__foto"
         aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}

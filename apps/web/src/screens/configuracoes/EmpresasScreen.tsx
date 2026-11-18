@@ -97,8 +97,7 @@ export function EmpresasScreen({
                 Empresas
               </h2>
               <p className="configuracoes__texto">
-                Cada empresa (CNPJ) é um ambiente do painel, com colaboradores e
-                cadastros separados.
+                Os CNPJs que a sua conta alcança.
               </p>
             </div>
             {podeAdicionar ? (
@@ -119,7 +118,7 @@ export function EmpresasScreen({
             Empresas da conta
           </h3>
           <p className="configuracoes__texto">
-            A empresa principal é a da sua conta e não pode ser removida.
+            A principal é a empresa da sua conta.
           </p>
 
           {estado.tipo === "carregando" ? (

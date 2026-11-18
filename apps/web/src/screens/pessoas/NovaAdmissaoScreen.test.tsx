@@ -478,7 +478,7 @@ describe("Nova admissão — página própria", () => {
     );
     expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
     expect(salarioBruto()).toHaveAccessibleDescription(
-      /Informe o salário bruto\. Ele é usado na folha de pagamento\./,
+      /Informe o salário bruto\./,
     );
     // T179 — os opcionais vazios não acusam erro. T209 — Departamento
     // deixou de ser obrigatório.
@@ -1162,7 +1162,7 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
-    ).toHaveTextContent(/^Endereço encontrado$/);
+    ).toHaveTextContent(/^Endereço localizado pelo CEP$/);
   });
 
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
@@ -1918,7 +1918,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await abrirEndereco();
     const secao = screen.getByRole("region", { name: "Endereço residencial" });
     expect(secao).toHaveTextContent(
-      "Preenchemos o restante automaticamente a partir do CEP.",
+      "Digite o CEP e o Evolli completa o endereço.",
     );
     expect(screen.queryByLabelText(/^País/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Buscar CEP/ })).toBeNull();
@@ -1987,7 +1987,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect((estado() as HTMLSelectElement).options[0]).toHaveTextContent("UF");
   });
 
-  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço encontrado'", async () => {
+  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço localizado pelo CEP'", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
@@ -2007,7 +2007,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect(numero()).toHaveValue("100");
     expect(complemento()).toHaveValue("Sala 2");
     expect(statusCep()).toHaveAttribute("role", "status");
-    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
     expect(statusCep()).toHaveClass("nova-admissao__cep-status--encontrado");
 
     // Sair do campo com o mesmo CEP não repergunta.
@@ -2045,7 +2045,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     fireEvent.blur(campoCep());
     expect(consultarCep).toHaveBeenCalledTimes(1);
     await act(async () => concluir(RESPOSTA_CEP));
-    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
   });
 
   it("resposta obsoleta (o CEP mudou durante a busca) é descartada", async () => {
@@ -2068,7 +2068,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await act(async () => concluir(RESPOSTA_CEP));
     expect(logradouro()).toHaveValue("");
     expect(cidade()).toHaveValue("");
-    expect(statusCep()).not.toHaveTextContent("Endereço encontrado");
+    expect(statusCep()).not.toHaveTextContent("Endereço localizado pelo CEP");
   });
 
   it("sem sigla, o estado por extenso vira a sigla do seletor", async () => {
@@ -2177,7 +2177,9 @@ describe("T209 — etapa 3: endereço residencial", () => {
         fireEvent.click(botaoConsultarDeNovo()!);
         await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(2));
         await waitFor(() =>
-          expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/),
+          expect(statusCep()).toHaveTextContent(
+            /^Endereço localizado pelo CEP$/,
+          ),
         );
         expect(botaoConsultarDeNovo()).toBeNull();
       } else {
@@ -4148,7 +4150,7 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
     await waitFor(() => expect(salarioBruto()).toHaveFocus());
     expect(salarioBruto()).toHaveAttribute("aria-invalid", "true");
     expect(salarioBruto()).toHaveAccessibleDescription(
-      "Informe o salário bruto. Ele é usado na folha de pagamento.",
+      "Informe o salário bruto.",
     );
     expect(cargoSel()).not.toHaveAttribute("aria-invalid");
     fireEvent.change(salarioBruto(), { target: { value: "500000" } });
@@ -4761,7 +4763,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
       }),
     ).toBeInTheDocument();
     expect(cabecalho).toHaveTextContent(
-      "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
+      "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
     );
     fireEvent.click(
       within(cabecalho).getByRole("button", {
@@ -4800,10 +4802,10 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
         (e) => e.textContent,
       ),
     ).toEqual([
-      "Informações pessoais",
-      "Cargo e contrato",
-      "Residência",
-      "Confira e conclua",
+      "Identificação e contatos",
+      "Lotação e contrato",
+      "CEP e endereço",
+      "Resumo final",
     ]);
     expect(
       screen.getByRole("heading", { level: 2, name: /Dados básicos$/ }),
@@ -5033,7 +5035,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
+        "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -5525,9 +5527,7 @@ describe("T209 — etapa 1: dados básicos", () => {
     montar();
     await aguardarEmpresa();
     const painel = etapa1();
-    expect(painel).toHaveTextContent(
-      "Informações pessoais e de contato do novo colaborador.",
-    );
+    expect(painel).toHaveTextContent("Quem é a pessoa e como falar com ela.");
     expect(
       painel.querySelector(".cadastro-etapas__etapa-selo"),
     ).toHaveTextContent("Etapa 1 de 4");
@@ -5541,9 +5541,9 @@ describe("T209 — etapa 1: dados básicos", () => {
       h.nextElementSibling?.textContent,
     ]);
     expect(secoes).toEqual([
-      ["Identificação", "Aparecem no perfil, nos documentos e no eSocial."],
-      ["Contato", "Canais pessoais para falar com o colaborador."],
-      ["Contato de emergência", "Acionado apenas em situações de urgência."],
+      ["Identificação", "Dados que identificam a pessoa no Evolli."],
+      ["Contato", "Como a empresa fala com a pessoa."],
+      ["Contato de emergência", "Quem avisar se algo acontecer."],
     ]);
   });
 
@@ -5554,12 +5554,12 @@ describe("T209 — etapa 1: dados básicos", () => {
       ...etapa1().querySelectorAll(".cadastro-etapas__linha-rotulo"),
     ].map((l) => [...l.children].map((c) => c.textContent));
     expect(linhas).toEqual([
-      ["Foto", "Aparece na lista de colaboradores e no perfil."],
-      ["Nome completo", "Como está nos documentos oficiais."],
-      ["CPF e RG", "Usados na folha e no eSocial."],
+      ["Foto", "Mostrada na lista e na ficha."],
+      ["Nome completo", "Igual ao documento de identidade."],
+      ["CPF e RG", "Documentos de identificação da pessoa."],
       ["Data de nascimento"],
       ["Gênero e estado civil"],
-      ["E-mail pessoal", "Diferente do e-mail corporativo."],
+      ["E-mail pessoal", "O e-mail particular, não o da empresa."],
       ["Telefone pessoal", "Com DDD."],
       ["Nome do contato"],
       ["Telefone do contato"],

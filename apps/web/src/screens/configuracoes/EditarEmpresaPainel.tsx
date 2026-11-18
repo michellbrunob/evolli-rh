@@ -330,7 +330,7 @@ export function EditarEmpresaPainel({
             ) : cep.tipo === "sugerido" && cep.encontrado ? (
               <>
                 <IconeSucesso tamanho={14} />
-                Endereço encontrado
+                Endereço localizado pelo CEP
               </>
             ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
               cep.mensagem

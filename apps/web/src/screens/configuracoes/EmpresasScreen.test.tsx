@@ -103,9 +103,7 @@ describe("T209 — Configurações › Empresas", () => {
       screen.getByRole("heading", { level: 2, name: "Empresas" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Cada empresa (CNPJ) é um ambiente do painel, com colaboradores e cadastros separados.",
-      ),
+      screen.getByText("Os CNPJs que a sua conta alcança."),
     ).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", {
@@ -114,9 +112,7 @@ describe("T209 — Configurações › Empresas", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "A empresa principal é a da sua conta e não pode ser removida.",
-      ),
+      screen.getByText("A principal é a empresa da sua conta."),
     ).toBeInTheDocument();
   });
 

@@ -131,7 +131,7 @@ export type EstadoCep =
       readonly mensagem: string;
       /**
        * T209 — a consulta preencheu o endereço sem conflito com o que já
-       * estava digitado (a tela pode dizer só "Endereço encontrado").
+       * estava digitado (a tela pode dizer só "Endereço localizado pelo CEP").
        */
       readonly encontrado?: boolean;
       /** Campos que já tinham outro valor: mantidos até a ação explícita. */

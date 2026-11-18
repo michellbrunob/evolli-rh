@@ -104,26 +104,22 @@ describe("T209 — Nova empresa: etapa 1 (Dados da empresa)", () => {
       screen.getByRole("heading", { level: 1, name: "Nova empresa" }),
     ).toHaveAttribute("id", NOVA_EMPRESA_TITULO_ID);
     expect(
-      screen.getByText(
-        "Cadastre o CNPJ em 2 etapas. Os colaboradores podem vir depois.",
-      ),
+      screen.getByText("Duas etapas: os dados do CNPJ e, se quiser, a equipe."),
     ).toBeInTheDocument();
     const etapas = screen.getByRole("navigation", {
       name: "Etapas do cadastro",
     });
     expect(etapas).toHaveTextContent("Dados da empresa");
-    expect(etapas).toHaveTextContent("CNPJ e endereço");
+    expect(etapas).toHaveTextContent("Identificação e endereço");
     expect(etapas).toHaveTextContent("Colaboradores");
-    expect(etapas).toHaveTextContent("Planilha ou depois");
+    expect(etapas).toHaveTextContent("Como incluir a equipe");
     expect(tituloDaEtapa()).toHaveTextContent(/Dados da empresa$/);
     expect(screen.getByText("Etapa 1 de 2")).toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Identificação" }),
-    ).toHaveTextContent(
-      "Aparecem no seletor de empresas, nos cadastros e nos documentos.",
-    );
+    ).toHaveTextContent("Como a empresa aparece no seletor e nos cadastros.");
     expect(screen.getByRole("region", { name: "Endereço" })).toHaveTextContent(
-      "Preenchemos pelo CEP; confira o número e o complemento.",
+      "O CEP completa o endereço; revise número e complemento.",
     );
     expect(screen.getByText("50% concluído")).toBeInTheDocument();
     expect(
@@ -183,7 +179,7 @@ describe("T209 — Nova empresa: etapa 1 (Dados da empresa)", () => {
     );
   });
 
-  it("CEP completo preenche o endereço sozinho, com 'Endereço encontrado'", async () => {
+  it("CEP completo preenche o endereço sozinho, com 'Endereço localizado pelo CEP'", async () => {
     vi.mocked(consultarCep).mockResolvedValue({
       cep: "30140071",
       logradouro: "Avenida Sintetica",
@@ -202,7 +198,9 @@ describe("T209 — Nova empresa: etapa 1 (Dados da empresa)", () => {
     expect(screen.getByLabelText(/^Bairro$/)).toHaveValue("Bairro Sintetico");
     expect(screen.getByLabelText(/^Cidade$/)).toHaveValue("Cidade Sintetica");
     expect(screen.getByLabelText(/^UF$/)).toHaveValue("MG");
-    expect(screen.getByText("Endereço encontrado")).toBeInTheDocument();
+    expect(
+      screen.getByText("Endereço localizado pelo CEP"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -217,15 +215,13 @@ describe("T209 — Nova empresa: etapa 2 (Colaboradores) e conclusão", () => {
   it("três opções em cartões de rádio; importar vem marcada; o botão muda com a escolha", async () => {
     await irParaEtapa2();
     expect(
-      screen.getByText(
-        "Traga o time agora ou faça isso depois em Colaboradores.",
-      ),
+      screen.getByText("Escolha como incluir as pessoas desta empresa."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(`Os colaboradores ficam ligados ao CNPJ ${CNPJ}.`),
+      screen.getByText(`As pessoas ficarão no CNPJ ${CNPJ}.`),
     ).toBeInTheDocument();
     const grupo = screen.getByRole("radiogroup", {
-      name: "Como você quer cadastrar?",
+      name: "Como incluir a equipe?",
     });
     expect(within(grupo).getAllByRole("radio")).toHaveLength(3);
     expect(
@@ -242,7 +238,7 @@ describe("T209 — Nova empresa: etapa 2 (Colaboradores) e conclusão", () => {
       screen.getByRole("button", { name: "Criar empresa" }),
     ).toBeInTheDocument();
     fireEvent.click(
-      within(grupo).getByRole("radio", { name: /Fazer isso depois/ }),
+      within(grupo).getByRole("radio", { name: /Incluir depois/ }),
     );
     expect(
       screen.getByRole("button", { name: "Criar empresa" }),
@@ -303,7 +299,7 @@ describe("T209 — Nova empresa: etapa 2 (Colaboradores) e conclusão", () => {
     preencherEtapa1();
     fireEvent.click(proxima());
     await screen.findByText("Etapa 2 de 2");
-    fireEvent.click(screen.getByRole("radio", { name: /Fazer isso depois/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Incluir depois/ }));
     fireEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
     await waitFor(() => expect(onCriadaSemAbrir).toHaveBeenCalledTimes(1));
     expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
@@ -376,7 +372,7 @@ describe("T209 — Nova empresa: o padrão compartilhado", () => {
 
 describe("T209 — Nova empresa: sair depois de criar não esbarra na guarda", () => {
   it.each([
-    ["Fazer isso depois", "Criar empresa", "semAbrir"],
+    ["Incluir depois", "Criar empresa", "semAbrir"],
     ["Importar planilha", "Criar e importar", "aberta"],
   ] as const)(
     "%s: quando a tela pede a navegação, nada está salvando nem pendente",

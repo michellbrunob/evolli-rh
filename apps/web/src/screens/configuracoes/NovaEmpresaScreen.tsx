@@ -61,14 +61,13 @@ export const ROTULO_DA_EDICAO_DA_EMPRESA = "Nova empresa";
 const ETAPAS = [
   {
     titulo: "Dados da empresa",
-    subtitulo: "CNPJ e endereço",
-    descricao:
-      "O CNPJ vira um ambiente novo no painel, com colaboradores e cadastros separados.",
+    subtitulo: "Identificação e endereço",
+    descricao: "Cada CNPJ tem colaboradores e cadastros próprios no Evolli.",
   },
   {
     titulo: "Colaboradores",
-    subtitulo: "Planilha ou depois",
-    descricao: "Traga o time agora ou faça isso depois em Colaboradores.",
+    subtitulo: "Como incluir a equipe",
+    descricao: "Escolha como incluir as pessoas desta empresa.",
   },
 ] as const;
 
@@ -107,7 +106,7 @@ type CampoComErro = "cnpj" | "nome";
 export interface NovaEmpresaScreenProps {
   /** Voltar a Empresas (cancelar, ou "Ir para Empresas"). */
   readonly onSair: () => void;
-  /** "Fazer isso depois": criada, sem trocar a empresa ativa. */
+  /** "Incluir depois": criada, sem trocar a empresa ativa. */
   readonly onCriadaSemAbrir: (empresa: EmpresaCadastradaApi) => void;
   /** A empresa ativa já é a nova (o servidor confirmou): a tela seguinte. */
   readonly onEmpresaAberta: (
@@ -351,7 +350,7 @@ export function NovaEmpresaScreen({
     <CadastroEmEtapas
       tituloId={NOVA_EMPRESA_TITULO_ID}
       titulo="Nova empresa"
-      descricao="Cadastre o CNPJ em 2 etapas. Os colaboradores podem vir depois."
+      descricao="Duas etapas: os dados do CNPJ e, se quiser, a equipe."
       rotuloVoltar="Voltar para Empresas"
       onVoltarDaPagina={onSair}
       etapas={ETAPAS}
@@ -372,7 +371,7 @@ export function NovaEmpresaScreen({
         <>
           <SecaoDoCadastro
             titulo="Identificação"
-            descricao="Aparecem no seletor de empresas, nos cadastros e nos documentos."
+            descricao="Como a empresa aparece no seletor e nos cadastros."
           >
             <LinhaDoCadastro rotulo="CNPJ" paraId={ID.cnpj}>
               <div className="nova-empresa__cnpj">
@@ -411,7 +410,7 @@ export function NovaEmpresaScreen({
             </LinhaDoCadastro>
             <LinhaDoCadastro
               rotulo="Razão social ou nome"
-              ajuda="Como você quer ver no menu."
+              ajuda="O nome mostrado no seletor de empresas."
               paraId={ID.nome}
             >
               <input
@@ -430,7 +429,7 @@ export function NovaEmpresaScreen({
             </LinhaDoCadastro>
             <LinhaDoCadastro
               rotulo="Porte"
-              ajuda="Quantas pessoas trabalham neste CNPJ."
+              ajuda="Faixa de pessoas que trabalham aqui."
               paraId={ID.porte}
             >
               <select
@@ -452,7 +451,7 @@ export function NovaEmpresaScreen({
 
           <SecaoDoCadastro
             titulo="Endereço"
-            descricao="Preenchemos pelo CEP; confira o número e o complemento."
+            descricao="O CEP completa o endereço; revise número e complemento."
           >
             <LinhaDoCadastro rotulo="CEP" paraId={ID.cep}>
               <div className="cadastro-etapas__campo-cep">
@@ -483,7 +482,7 @@ export function NovaEmpresaScreen({
                 ) : cep.tipo === "sugerido" && cep.encontrado ? (
                   <>
                     <IconeSucesso tamanho={14} />
-                    Endereço encontrado
+                    Endereço localizado pelo CEP
                   </>
                 ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
                   cep.mensagem
@@ -590,24 +589,21 @@ const OPCOES: readonly {
   {
     valor: "importar",
     titulo: "Importar planilha",
-    descricao:
-      "Cadastre várias pessoas de uma vez usando o nosso modelo de planilha.",
-    selo: "Ideal para 5 ou mais pessoas",
+    descricao: "Várias pessoas de uma vez, pelo modelo CSV.",
+    selo: "Para equipes maiores",
     icone: <IconePlanilha tamanho={20} />,
   },
   {
     valor: "individual",
     titulo: "Cadastro individual",
-    descricao:
-      "Cadastre uma pessoa por vez em 4 etapas, logo depois de criar a empresa.",
-    selo: "Leva cerca de 3 minutos",
+    descricao: "Uma pessoa por vez, logo depois de criar a empresa.",
+    selo: "Para poucas pessoas",
     icone: <IconeAdicionarPessoa tamanho={20} />,
   },
   {
     valor: "depois",
-    titulo: "Fazer isso depois",
-    descricao:
-      "A empresa é criada vazia. Você importa ou cadastra quando quiser, em Colaboradores.",
+    titulo: "Incluir depois",
+    descricao: "Cria a empresa sem pessoas; inclua depois em Colaboradores.",
     icone: <IconeRelogio tamanho={20} />,
   },
 ];
@@ -623,13 +619,13 @@ function EtapaColaboradores({
 }) {
   return (
     <SecaoDoCadastro
-      titulo="Como você quer cadastrar?"
-      descricao={`Os colaboradores ficam ligados ao CNPJ ${cnpj}.`}
+      titulo="Como incluir a equipe?"
+      descricao={`As pessoas ficarão no CNPJ ${cnpj}.`}
     >
       <div
         className="nova-empresa__opcoes"
         role="radiogroup"
-        aria-label="Como você quer cadastrar?"
+        aria-label="Como incluir a equipe?"
       >
         {OPCOES.map((o) => {
           const marcada = o.valor === opcao;
@@ -666,7 +662,7 @@ function EtapaColaboradores({
                 <ol className="nova-empresa__passos">
                   <li>
                     <span className="nova-empresa__passo-titulo">
-                      Baixe o modelo de planilha
+                      Baixe o modelo
                     </span>
                     <Button
                       type="button"
@@ -683,15 +679,15 @@ function EtapaColaboradores({
                   </li>
                   <li>
                     <span className="nova-empresa__passo-titulo">
-                      Preencha no Excel ou Google Planilhas
+                      Preencha uma linha por pessoa
                     </span>
                     <span className="nova-empresa__passo-texto">
-                      Uma pessoa por linha, nas colunas do modelo.
+                      Use as colunas do modelo, sem mudar a ordem.
                     </span>
                   </li>
                   <li>
                     <span className="nova-empresa__passo-titulo">
-                      Envie a planilha preenchida
+                      Envie o arquivo na tela seguinte
                     </span>
                     <span className="nova-empresa__passo-texto">
                       Depois de criar a empresa, você escolhe o arquivo e
