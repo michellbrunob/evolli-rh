@@ -41,6 +41,10 @@ import { consultarDadosPessoaisDoColaborador } from "../../api/dadosPessoaisClie
 import { buscarLinhaDoTempo } from "../../api/movimentacaoClient";
 import type { AbaDaFicha } from "../../app/rotasDoShell";
 import { expectSemIsoVisivel } from "../../test/semIsoVisivel";
+import {
+  ProvedorDeTrilhaComplementar,
+  useComplementoDaTrilha,
+} from "../../app/trilhaComplementar";
 import { FichaColaboradorScreen, iniciaisDe } from "./FichaColaboradorScreen";
 
 /**
@@ -846,16 +850,40 @@ describe("T198 — respostas atrasadas nunca preenchem outra ficha", () => {
   });
 });
 
+/** T209 — a barra superior em miniatura: o pai clicável e o último nível. */
+function TrilhaDeTeste() {
+  const complemento = useComplementoDaTrilha();
+  if (!complemento) return null;
+  return (
+    <nav aria-label="Trilha">
+      <button type="button" onClick={complemento.onVoltar}>
+        Colaboradores
+      </button>
+      <span aria-current="page">{complemento.rotulo}</span>
+    </nav>
+  );
+}
+
 describe("T198 — voltar", () => {
-  it("a trilha volta à listagem; com edição pendente, pede confirmação", async () => {
+  it("a trilha (na barra superior) volta à listagem; com edição pendente, pede confirmação", async () => {
     const onVoltar = vi.fn();
-    render(<Ficha podeEditarFicha onVoltar={onVoltar} />);
+    render(
+      <ProvedorDeTrilhaComplementar>
+        <Ficha podeEditarFicha onVoltar={onVoltar} />
+        <TrilhaDeTeste />
+      </ProvedorDeTrilhaComplementar>,
+    );
     await esperarFicha();
-    const trilha = screen.getByRole("navigation", {
-      name: "Trilha de navegação",
-    });
-    expect(trilha).toHaveTextContent("Gestão de Pessoas");
-    expect(trilha).toHaveTextContent(ana.nome);
+    // T209 — a página não desenha trilha própria: declara o último nível.
+    expect(
+      screen.queryByRole("navigation", { name: "Trilha de navegação" }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Trilha" }),
+      ).toHaveTextContent(ana.nome),
+    );
+    const trilha = screen.getByRole("navigation", { name: "Trilha" });
 
     fireEvent.click(
       within(trilha).getByRole("button", { name: "Colaboradores" }),
@@ -1608,3 +1636,65 @@ function render(
 ) {
   return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
 }
+
+// ---------------------------------------------------------------------------
+// T209 — a foto na área de identificação da ficha: a versão de 256 px pela
+// rota autenticada; sem foto ou com falha de leitura, as iniciais.
+// ---------------------------------------------------------------------------
+describe("T209 — foto na ficha do colaborador", () => {
+  const avatar = () =>
+    cabecalho().querySelector(".ficha-colaborador__avatar") as HTMLElement;
+
+  it("com foto: 256 px pela rota autenticada, no lugar das iniciais", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({
+      ...ana,
+      foto: { versao: 7 },
+    });
+    render(<Ficha />);
+    await esperarFicha();
+    const img = avatar().querySelector("img");
+    expect(img).toHaveAttribute(
+      "src",
+      `/v1/colaboradores/${ana.id}/foto?tamanho=256&v=7`,
+    );
+    expect(img).toHaveAttribute("alt", "");
+    expect(avatar()).not.toHaveTextContent("AT");
+    expect(cabecalho().innerHTML).not.toMatch(
+      /v1\/empresas|foto-(96|256|512)\.webp|cloudflare|bucket/i,
+    );
+  });
+
+  it("sem foto: iniciais, nenhuma imagem", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({ ...ana, foto: null });
+    render(<Ficha />);
+    await esperarFicha();
+    expect(avatar().querySelector("img")).toBeNull();
+    expect(avatar()).toHaveTextContent("AT");
+  });
+
+  it("falha ao ler a foto: volta às iniciais e a ficha segue", async () => {
+    vi.mocked(buscarColaborador).mockResolvedValue({
+      ...ana,
+      foto: { versao: 1 },
+    });
+    render(<Ficha />);
+    await esperarFicha();
+    fireEvent.error(avatar().querySelector("img")!);
+    expect(avatar().querySelector("img")).toBeNull();
+    expect(avatar()).toHaveTextContent("AT");
+    expect(
+      screen.getByRole("heading", { level: 1, name: ana.nome }),
+    ).toBeInTheDocument();
+  });
+
+  it("contrato de CSS: a foto preenche o avatar da ficha sem deformar", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/FichaColaboradorScreen.css",
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+    expect(css).toMatch(
+      /\.ficha-colaborador__avatar img \{[^}]*object-fit: cover;[^}]*\}/,
+    );
+    expect(css).toMatch(/\.ficha-colaborador__avatar \{[^}]*overflow: hidden;/);
+  });
+});

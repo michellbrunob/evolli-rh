@@ -28,7 +28,7 @@ export const LIMITE_DE_CODIGOS_CANDIDATOS = 50;
 const TENTATIVAS_DA_TRANSACAO = 5;
 
 /** Prefixo do código quando o nome não rende ao menos 2 caracteres. */
-export type PrefixoDoTipo = "DEP" | "CAR" | "UNI" | "CC";
+export type PrefixoDoTipo = "DEP" | "CAR" | "UNI" | "CC" | "EMP";
 
 // eslint-disable-next-line no-control-regex
 const CARACTERE_DE_CONTROLE = /[\u0000-\u001F\u007F]/;

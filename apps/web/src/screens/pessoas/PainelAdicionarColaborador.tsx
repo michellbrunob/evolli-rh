@@ -2,9 +2,10 @@
  * T194 — painel lateral "Adicionar colaborador": o ponto de entrada das formas
  * de iniciar a entrada de uma pessoa na empresa ativa.
  *
- * Só escolhe — nunca grava nada nem chama API. Hoje há uma forma disponível,
- * o cadastro individual, que leva à página de Nova admissão de sempre (com a
- * confirmação e a idempotência da T179). As outras duas aparecem com o motivo
+ * Só escolhe — nunca grava nada nem chama API. O cadastro individual leva à
+ * página de Nova admissão de sempre (com a confirmação e a idempotência da
+ * T179); a importação por planilha (T209, Bloco C), à página de importação,
+ * quando o shell a oferece. As indisponíveis aparecem com o motivo
  * de estarem indisponíveis e **não podem ser escolhidas**: o rádio delas é
  * desabilitado de verdade (fora do teclado, anunciado como indisponível), e
  * não há botão, link nem ação por trás delas — botão sem operação seria
@@ -14,19 +15,22 @@
  * cartão-rótulo): teclado, leitor de tela e estado desabilitado vêm do
  * navegador, sem ARIA inventado. O botão do rodapé inicia a forma escolhida.
  *
- * A janela é o `Modal` (foco preso, Escape, foco devolvido a quem abriu), na
- * posição lateral. Sem formulário a salvar, nunca vira edição pendente
+ * A janela é o `Sheet` da camada `src/ui` (T209, Radix): entra pela direita,
+ * foco no título, foco preso, Escape e clique no fundo fecham, foco devolvido
+ * a quem abriu, fundo inerte e rolagem travada. Sem formulário a salvar,
+ * nunca vira edição pendente
  * (T189): abrir e fechar não pedem confirmação, e a troca de empresa segue
  * livre. Ícones: SVG desenhado aqui, com geometria simples, sempre
  * `aria-hidden` — nenhum vem de conjunto de terceiros (decisão da T159).
  */
 import { useId, useState } from "react";
 import type { ReactNode } from "react";
-import { Button, Modal } from "../../components";
+import { Button, Sheet } from "../../ui";
 import "./PainelAdicionarColaborador.css";
 
 export const TITULO_PAINEL_ADICIONAR = "Adicionar colaborador";
 export const ROTULO_INICIAR_CADASTRO = "Iniciar cadastro";
+export const ROTULO_INICIAR_IMPORTACAO = "Iniciar importação";
 
 export interface PainelAdicionarColaboradorProps {
   readonly aberto: boolean;
@@ -38,6 +42,11 @@ export interface PainelAdicionarColaboradorProps {
   readonly onFechar: () => void;
   /** Cadastro individual: leva à página de Nova admissão. */
   readonly onCadastroIndividual: () => void;
+  /**
+   * T209 (Bloco C) — importar planilha: leva à página de importação. Sem
+   * ele, a forma segue indisponível, com o motivo.
+   */
+  readonly onImportarPlanilha?: () => void;
 }
 
 /** Moldura comum dos ícones: mesmo `viewBox`, traço e cor do texto. */
@@ -104,6 +113,16 @@ interface Forma {
   readonly motivo?: string;
 }
 
+/** T209 (Bloco C) — a planilha, quando há quem a abra. */
+const PLANILHA_DISPONIVEL: Forma = {
+  id: "planilha",
+  titulo: "Importar planilha",
+  texto:
+    "Traga várias pessoas de uma vez a partir de um arquivo, conferido linha a linha antes de importar.",
+  icone: <IconePlanilha />,
+  etiqueta: "Até 200 pessoas por arquivo CSV",
+};
+
 const FORMAS: readonly Forma[] = [
   {
     id: "individual",
@@ -139,30 +158,36 @@ export function PainelAdicionarColaborador({
   empresaAtiva,
   onFechar,
   onCadastroIndividual,
+  onImportarPlanilha,
 }: PainelAdicionarColaboradorProps) {
   const prefixo = useId();
-  // Só a forma disponível pode ser escolhida; ela já vem marcada.
+  // Só as formas disponíveis podem ser escolhidas; o cadastro individual já
+  // vem marcado.
   const [escolhida, setEscolhida] = useState<FormaId>("individual");
+  const formas = FORMAS.map((forma) =>
+    forma.id === "planilha" && onImportarPlanilha ? PLANILHA_DISPONIVEL : forma,
+  );
+  const importando = escolhida === "planilha" && onImportarPlanilha;
 
   function iniciar() {
     if (escolhida === "individual") onCadastroIndividual();
+    else if (escolhida === "planilha") onImportarPlanilha?.();
   }
 
   return (
-    <Modal
+    <Sheet
       aberto={aberto}
       titulo={TITULO_PAINEL_ADICIONAR}
       descricao="Escolha o caminho mais prático para trazer alguém para a equipe."
-      posicao="lateral"
       icone={<IconeAdicionarPessoa />}
       onFechar={onFechar}
       rodape={
         <>
-          <Button type="button" variant="secondary" onClick={onFechar}>
+          <Button variant="secondary" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button type="button" onClick={iniciar}>
-            {ROTULO_INICIAR_CADASTRO}
+          <Button variant="primary" onClick={iniciar}>
+            {importando ? ROTULO_INICIAR_IMPORTACAO : ROTULO_INICIAR_CADASTRO}
           </Button>
         </>
       }
@@ -181,7 +206,7 @@ export function PainelAdicionarColaborador({
         <legend className="painel-adicionar__legenda">
           Como você quer adicionar
         </legend>
-        {FORMAS.map((forma) => {
+        {formas.map((forma) => {
           const disponivel = forma.motivo === undefined;
           const idTitulo = `${prefixo}-${forma.id}-titulo`;
           const idTexto = `${prefixo}-${forma.id}-texto`;
@@ -245,6 +270,6 @@ export function PainelAdicionarColaborador({
           );
         })}
       </fieldset>
-    </Modal>
+    </Sheet>
   );
 }

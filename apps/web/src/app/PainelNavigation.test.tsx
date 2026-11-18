@@ -14,7 +14,8 @@
  *    quem o servidor atende; sem papel conhecido, não aparece;
  *  - semântica de item ativo, grupos, teclado e `onSelecionar`.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { PainelNavigation } from "./PainelNavigation";
@@ -39,8 +40,11 @@ function navegacao() {
  * que abre e fecha o submenu em vez de navegar.
  */
 function botoesDeDestino(): HTMLElement[] {
+  // T209 — itens em desenvolvimento (`aria-disabled`) não são destinos.
   return [...navegacao().querySelectorAll<HTMLElement>("button")].filter(
-    (botao) => !botao.hasAttribute("aria-expanded"),
+    (botao) =>
+      !botao.hasAttribute("aria-expanded") &&
+      !botao.hasAttribute("aria-disabled"),
   );
 }
 
@@ -59,13 +63,35 @@ describe("estrutura dos grupos", () => {
     ]);
   });
 
-  it("T208 — só Configurações é grupo da conta, com um único destino funcional", () => {
+  it("T208 — só Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas", () => {
     const daConta = GRUPOS.filter((g) => g.daConta);
     expect(daConta.map((g) => g.titulo)).toEqual(["Configurações"]);
     expect(daConta[0]!.secundario).toBeFalsy();
     expect(
-      daConta[0]!.destinos.map((d) => [d.id, d.label, d.estado, d.papeis]),
-    ).toEqual([["configuracoes", "Configurações", "funcional", undefined]]);
+      daConta[0]!.destinos.map((d) => [
+        d.id,
+        d.label,
+        d.estado,
+        d.papeis,
+        d.agrupadoEm,
+      ]),
+    ).toEqual([
+      ["configuracoes", "Configurações", "funcional", undefined, undefined],
+      [
+        "configuracoes-empresas",
+        "Empresas",
+        "funcional",
+        ["rh", "dp", "master_tecnico"],
+        "configuracoes",
+      ],
+      [
+        "nova-empresa",
+        "Nova empresa",
+        "funcional",
+        ["rh", "master_tecnico"],
+        "configuracoes-empresas",
+      ],
+    ]);
   });
 
   it("só Demonstração tem descrição, e ela diz que nada ali grava", () => {
@@ -103,7 +129,8 @@ describe("o estado declarado bate com o código", () => {
    * fala com o servidor e é funcional. Se não, é maquete.
    */
   function usaApi(caminho: string): boolean {
-    return /from "\.\.\/\.\.\/api\//.test(readFileSync(caminho, "utf8"));
+    // T209 — telas em subpasta (`pessoas/importacao/`) sobem um nível a mais.
+    return /from "(?:\.\.\/)+api\//.test(readFileSync(caminho, "utf8"));
   }
 
   /** Tela que cada destino abre por padrão. */
@@ -114,8 +141,13 @@ describe("o estado declarado bate com o código", () => {
     // depende do contrato e dos rótulos de `usersClient`, sem requisição
     // própria. Funcional: dado real do servidor, não fixture.
     configuracoes: "src/screens/configuracoes/MeuPerfilScreen.tsx",
+    // T209 — Configurações › Empresas e Nova empresa.
+    "configuracoes-empresas": "src/screens/configuracoes/EmpresasScreen.tsx",
+    "nova-empresa": "src/screens/configuracoes/NovaEmpresaScreen.tsx",
     pessoas: "src/screens/pessoas/ColaboradoresScreen.tsx",
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
+    "importar-colaboradores":
+      "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
     "jornadas-trabalho": "src/screens/horarios/JornadasTrabalhoScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
@@ -277,7 +309,7 @@ describe("semântica de item ativo, seleção e teclado", () => {
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
     expect(
-      screen.getByRole("button", { name: /^Colaboradores/ }),
+      screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
     ).toHaveAttribute("aria-current", "page");
     expect(
       screen.getByRole("button", { name: /^Relatórios/ }),
@@ -432,7 +464,7 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
       );
       // Módulo com um só item, mas com cabeçalho (`sempreComoModulo`): o nome
       // do módulo não some, e é o mesmo da trilha de navegação.
-      const modulo = screen.getByRole("button", { name: "Gestão de Pessoas" });
+      const modulo = screen.getByRole("button", { name: "Colaboradores" });
       expect(modulo).toHaveAttribute("aria-expanded", "true");
       const regiao = document.getElementById(
         modulo.getAttribute("aria-controls")!,
@@ -446,7 +478,11 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
         within(regiao as HTMLElement)
           .getAllByRole("button")
           .map((b) => b.textContent),
-      ).toEqual(["Colaboradores Consulta, ficha e vida funcional"]);
+      ).toEqual([
+        "Colaboradores Consulta, ficha e vida funcional",
+        // T209 — subitem em desenvolvimento, ao lado do funcional.
+        "Desenvolvimento Em desenvolvimento",
+      ]);
       // Nova admissão é sub-página de Colaboradores: abre pela listagem.
       expect(
         screen.queryByRole("button", { name: /Nova admissão/ }),
@@ -573,7 +609,10 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
       />,
     );
     const icones = navegacao().querySelectorAll("svg.painel-nav__icone");
-    expect(icones.length).toBe(GRUPOS.length);
+    // T209 — um por módulo do mapa e um por item em desenvolvimento de
+    // primeiro nível (Portal, Recrutamento, Pesquisas, Calendário, Folha,
+    // Benefícios, Hub de Benefícios, Suporte e Roadmap).
+    expect(icones.length).toBe(GRUPOS.length + 9);
     for (const icone of icones) {
       expect(icone).toHaveAttribute("aria-hidden", "true");
       expect(icone).toHaveAttribute("focusable", "false");
@@ -597,13 +636,15 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
       />,
     );
     const listas = listasDeModulo();
-    // T208 — operacionais, a própria conta (Configurações) e Demonstração.
-    expect(listas).toHaveLength(3);
+    // T209 — início, Pessoas, Remuneração, Operação, Demonstração e o
+    // rodapé (utilidades e a própria conta, presos ao pé da faixa).
+    expect(listas).toHaveLength(6);
 
-    const operacionais = listas[0]!;
-    const daConta = listas[1]!;
-    const secundaria = listas[2]!;
+    const operacionais = listas[3]!;
+    const secundaria = listas[4]!;
+    const daConta = listas[5]!;
     expect(daConta).toHaveClass("painel-nav__modulos--conta");
+    expect(daConta).toHaveClass("painel-nav__modulos--rodape");
     expect(
       within(daConta).getByRole("button", { name: /^Configurações/ }),
     ).toBeInTheDocument();
@@ -614,8 +655,9 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
       operacionais.compareDocumentPosition(daConta) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    // T209 — Demonstração vem antes do rodapé.
     expect(
-      daConta.compareDocumentPosition(secundaria) &
+      secundaria.compareDocumentPosition(daConta) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(secundaria).toHaveClass("painel-nav__modulos--secundario");

@@ -26,6 +26,9 @@ import {
  */
 export type MotivoDoCampo =
   | "em_uso"
+  // T209 — valor com formato certo e conteúdo recusado (CNPJ com verificador
+  // errado).
+  | "invalido"
   | "indisponivel"
   | "igual_a_vigente"
   | "fora_de_ordem"
@@ -40,6 +43,12 @@ export type CampoPublico =
   | "matricula"
   | "contatos.emailPessoal"
   | "emailPessoal"
+  // T209 — CPF já usado na empresa.
+  | "perfilPessoal.cpf"
+  // T209 — CNPJ da Nova empresa (inválido ou já cadastrado).
+  | "cnpj"
+  // T209 — gestor direto sem vínculo na empresa.
+  | "contrato.gestorDiretoId"
   // T182 — código de jornada repetido na empresa.
   | "codigo"
   // T183 — jornada do colaborador e a sua vigência.
@@ -78,7 +87,11 @@ export type CodigoDeRecusa =
   | "foto_formato_invalido"
   | "foto_pequena"
   | "foto_grande_demais"
-  | "foto_invalida";
+  | "foto_invalida"
+  // T209 — foto do colaborador (ADR 0020): tipo declarado, extensão e
+  // conteúdo que não concordam, e tamanho de versão pedido fora da lista.
+  | "foto_tipo_divergente"
+  | "foto_tamanho_invalido";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência

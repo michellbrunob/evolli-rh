@@ -3172,11 +3172,11 @@ largura total; a 375 px, a vaga fica na altura-base em todos os meses (M1), com 
 remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
 resolvida no primeiro commit da T208.
 
-## Configurações: Meu Perfil — T208 (em implementação, ampliada; PR #201 em Draft)
+## Configurações: Meu Perfil — T208 (integrada)
 
-| Tarefa | Estado                                                           | Resultado principal                                                                                                                         |
-| ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| T208   | **Em implementação** (ampliada antes do Ready; PR #201 em Draft) | Base: Configurações › Meu perfil, somente leitura, para todos os papéis; ampliação (nome de exibição e foto de perfil) validada localmente. |
+| Tarefa | Estado                                    | Resultado principal                                                                                      |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| T208   | **Integrada** (PR #201, squash `5b4c498`) | Configurações › Meu perfil para todos os papéis, com nome de exibição editável e foto de perfil privada. |
 
 **Ampliação:** por decisão de produto, a T208 foi ampliada antes do Ready. O Meu Perfil somente
 leitura abaixo é a base existente, não a entrega final. O levantamento da ampliação e as
@@ -3218,13 +3218,61 @@ API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes
 scripts 182 testes; 89 mutações, todas detectadas; lint, typecheck, build, Prettier,
 `spec:check`, prévia do squash e `git diff --check` verdes.
 
-**Envio:** a ampliação (nome de exibição e foto) vai à PR #201, em Draft, por ordem de
-2026-11-13.
+**Observação de relatório:** a integração funcional da T208 está concluída (PR #201, squash
+`5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2`, CI de push 3/3 verde, run 43442498632; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da T209.
 
-**Pendente:** revisão da
-PR #201; Ready for review e merge só com ordem.
+**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
-**Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
+## Colaboradores — T209 (em implementação local)
+
+| Tarefa | Estado                     | Resultado principal                                                               |
+| ------ | -------------------------- | --------------------------------------------------------------------------------- |
+| T209   | **Em implementação local** | Listagem operacional e ações por pessoa em Colaboradores; importação CSV pausada. |
+
+**Escopo da preparação:** levantamento e preparação de decisão, no
+[dossiê](../docs/decisions/t209-dossie-colaboradores.md):
+
+- rotas, URL, listagem, abas, busca, filtros, paginação, indicadores, tabela, ficha, entrada de
+  colaboradores e contratos da API; isolamento por empresa e comportamento por papel;
+- exposição de campos (sem CPF, salário nem contatos na listagem), exportação, importação e
+  ações em lote;
+- acessibilidade, foco, teclado, URL, respostas atrasadas, 375 px, guarda de saída e troca de
+  empresa;
+- classificação em contratos atuais, dependências de API, migration, RBAC, auditoria ou decisão
+  e itens indisponíveis; primeira fatia proposta e decisões C-1 a C-15 para aprovação.
+
+**Aprovação (2026-11-13):** C-1 a C-15 aprovadas, com a C-10 corrigida (sem data de
+nascimento na planilha). O Bloco C (importação CSV) está pausado: a admissão exige a data de
+nascimento (seção 13 do dossiê). Os Blocos A e B estão implementados e validados
+localmente (seções 14 a 16), sem push, PR, Ready ou merge até a validação visual.
+
+**Entrega local:** tamanho da página 20/50/100 na URL (`tamanho`), paginação numerada com
+primeira e última, "Mostrando X–Y de Z", cancelamento das leituras antigas e aviso de auditoria
+fiel; menu "Ações" por linha com atalhos às abas da ficha que o papel vê. Só web.
+
+**Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
+
+**Refinamento, divisões e animação (seções 17 a 21 do dossiê):** faixa de indicadores e barra
+de filtros; padrão de divisões sutis com tokens, aplicado ao shell e a Colaboradores (rollout por
+módulo); animação reutilizável dos painéis laterais; massa sintética por tipo no banco próprio da
+prévia (Aprendiz indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
+
+**Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento pelo
+fundo do painel lateral, com a guarda de alterações, aprovado. **Aprendiz (seção 24):** AP-1 a AP-9
+aprovadas e implementadas na fatia mínima (migration aditiva, API e superfícies web, sem regra
+legal). Bateria: web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
+
+**Fundação de interface (seção 25; ADR 0019):** Tailwind 4 sem preflight, com prefixo `ev`,
+Radix e Lucide; camada `apps/web/src/ui`; Colaboradores migrado (painel, menu, filtros, abas,
+indicadores e tabela). Bateria: web 138 arquivos, 3960 testes (na rodada completa, 3 testes de tempo, 2 da guarda T200 e 1 da Nova admissão, falharam sob carga e passaram isolados); lint, typecheck e build da web verdes; CSS final 26,5 kB comprimido.
+
+**Referência visual:** usada só localmente, como lembrete de organização funcional; nada dela é
+registrado.
+
+**Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed, Docker,
+dependências, lockfile, workflow, push, PR, promoção e merge.
 
 ## Próxima ação autorizável
 

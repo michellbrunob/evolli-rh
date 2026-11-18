@@ -15,6 +15,11 @@ import {
 import {
   CEP_BRASILEIRO,
   CEP_FORMA,
+  CPF_GRAVADO,
+  GENEROS,
+  type Genero,
+  cpfValido,
+  normalizarCpf,
   DATA_NASCIMENTO_MINIMA,
   LIMITES_ENDERECO,
   LIMITES_PERFIL,
@@ -25,6 +30,22 @@ import {
   normalizarCep,
   normalizarTextoPessoal,
 } from "./normalizacao-dados-pessoais.util";
+import {
+  TELEFONE_NORMALIZADO,
+  normalizarTelefone,
+} from "../contatos/normalizacao-contatos.util";
+
+/** T209 — CPF com dígitos verificadores válidos. */
+@ValidatorConstraint({ name: "cpfValido", async: false })
+export class CpfValido implements ValidatorConstraintInterface {
+  validate(valor: unknown): boolean {
+    return typeof valor === "string" && cpfValido(valor);
+  }
+
+  defaultMessage(): string {
+    return "cpf inválido";
+  }
+}
 
 /**
  * T179 — com país Brasil, o CEP é obrigatoriamente os 8 dígitos já
@@ -73,11 +94,38 @@ export class DataNascimentoNoIntervalo implements ValidatorConstraintInterface {
  * `Colaborador`. Nome social e gênero ficaram fora do Módulo 1 (matriz da PR).
  */
 export class PerfilPessoalDto {
+  /** T209 — opcional desde a etapa 1 do Novo colaborador (2026-11-17). */
+  @IsOptional()
   @IsString()
   @IsDateString({ strict: true })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @Validate(DataNascimentoNoIntervalo)
-  dataNascimento!: string;
+  dataNascimento?: string | null;
+
+  /**
+   * T209 — CPF: máscara aceita, gravado só com os 11 dígitos, dígitos
+   * verificadores conferidos; único na empresa. Ausente na edição da ficha,
+   * mantém o gravado.
+   */
+  @Transform(({ value }) => normalizarCpf(value))
+  @IsOptional()
+  @IsString()
+  @Matches(CPF_GRAVADO)
+  @Validate(CpfValido)
+  cpf?: string | null;
+
+  @Transform(({ value }) => normalizarTextoPessoal(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITES_PERFIL.rg)
+  @Matches(SEM_CONTROLE)
+  rg?: string | null;
+
+  /** T209 — lista fechada (`GENEROS`). */
+  @Transform(({ value }) => normalizarTextoPessoal(value))
+  @IsOptional()
+  @IsIn(GENEROS)
+  genero?: Genero | null;
 
   /** T179 — opções fechadas (`SEXOS`); sem seleção, `null`. */
   @Transform(({ value }) => normalizarTextoPessoal(value))
@@ -140,6 +188,20 @@ export class PerfilPessoalDto {
   @MaxLength(LIMITES_PERFIL.nomeMae)
   @Matches(SEM_CONTROLE)
   nomeMae?: string | null;
+
+  /** T209 — contato de emergência: nome e telefone (+55, DDD e número). */
+  @Transform(({ value }) => normalizarTextoPessoal(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITES_PERFIL.contatoEmergenciaNome)
+  @Matches(SEM_CONTROLE)
+  contatoEmergenciaNome?: string | null;
+
+  @Transform(({ value }) => normalizarTelefone(value))
+  @IsOptional()
+  @IsString()
+  @Matches(TELEFONE_NORMALIZADO)
+  contatoEmergenciaTelefone?: string | null;
 }
 
 /**

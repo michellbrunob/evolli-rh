@@ -230,16 +230,14 @@ describe("T208 — o que Meu perfil mostra", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  it("título único de página, trilha Configurações › Meu perfil", () => {
+  it("título único de página; T209: sem trilha repetida (ela fica na barra superior)", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
     const titulo = screen.getByRole("heading", { level: 1 });
     expect(titulo).toHaveTextContent("Configurações");
     expect(titulo).toHaveAttribute("id", CONFIGURACOES_TITULO_ID);
-    const trilha = screen.getByRole("navigation", {
-      name: "Trilha de navegação",
-    });
-    expect(trilha).toHaveTextContent("Configurações");
-    expect(trilha).toHaveTextContent("Meu perfil");
+    expect(
+      screen.queryByRole("navigation", { name: "Trilha de navegação" }),
+    ).toBeNull();
   });
 
   it("navegação interna só com Meu perfil, no grupo Sua conta — nenhum item sem tela", () => {

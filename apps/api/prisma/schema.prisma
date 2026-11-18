@@ -157,7 +157,11 @@ model AccessUser {
   dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
 
   // T179 — admissões que esta conta enviou com chave de idempotência.
-  idempotenciasAdmissao IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  idempotenciasAdmissao    IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  // T209 — rascunho da Nova admissão, por conta e empresa.
+  rascunhosAdmissao        RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
+  // T209 — fotos de colaborador enviadas por esta conta (autoria).
+  fotosColaboradorEnviadas FotoColaborador[]      @relation("FotoColaboradorAutor")
 
   @@index([companyId])
   @@map("access_user")
@@ -411,7 +415,7 @@ enum AuditAction {
 
   // T208 — foto de perfil da propria conta (ADR 0018): envio (inclui
   // substituicao) e remocao. Sem conteudo, hash, nome, tamanho ou dimensoes.
-  conta_foto_enviada @map("conta.foto.enviada")
+  conta_foto_enviada  @map("conta.foto.enviada")
   conta_foto_removida @map("conta.foto.removida")
 
   organizacao_empresa_criada     @map("organizacao.empresa.criada")
@@ -465,6 +469,18 @@ enum AuditAction {
   //     entao "leitura fora do escopo proprio" e sempre 404, nunca leitura
   pessoas_colaborador_criado     @map("pessoas.colaborador.criado")
   pessoas_colaborador_atualizado @map("pessoas.colaborador.atualizado")
+
+  // T209 — rascunho da Nova admissao: salvo e descartado. O evento nao
+  // guarda conteudo do rascunho (nem nome, nem data): so quem, quando e
+  // em qual empresa.
+  pessoas_rascunho_admissao_salvo      @map("pessoas.rascunho_admissao.salvo")
+  pessoas_rascunho_admissao_descartado @map("pessoas.rascunho_admissao.descartado")
+
+  // T209 — foto do colaborador (ADR 0020): envio, substituicao e
+  // remocao. Sem conteudo, hash, tamanho, dimensoes ou chave do objeto.
+  pessoas_foto_colaborador_enviada     @map("pessoas.foto_colaborador.enviada")
+  pessoas_foto_colaborador_substituida @map("pessoas.foto_colaborador.substituida")
+  pessoas_foto_colaborador_removida    @map("pessoas.foto_colaborador.removida")
 
   pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
   pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
@@ -706,6 +722,19 @@ model Empresa {
   nome   String
   status StatusOrganizacional @default(ativo)
 
+  // T209 — cadastro de empresa: CNPJ (único; numérico ou alfanumérico, com
+  // verificadores conferidos no servidor), porte e endereço. Anuláveis: as
+  // empresas antigas ficam sem eles até serem completadas.
+  cnpj        String? @unique
+  porte       String?
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  uf          String?
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
@@ -767,6 +796,11 @@ model Empresa {
   // T179 — idempotência da admissão e relação técnica de revisão.
   idempotenciasAdmissao IdempotenciaAdmissao[]
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+  // T209 — rascunhos da Nova admissão desta empresa.
+  rascunhosAdmissao     RascunhoAdmissao[]
+  // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
+  fotosColaborador      FotoColaborador[]
+  limpezasFotoPendentes LimpezaFotoColaboradorPendente[]
 
   @@index([status])
   @@map("empresa")
@@ -986,9 +1020,15 @@ enum SituacaoColaborador {
 enum TipoVinculo {
   clt
   estagio
+  /// T209 — Aprendiz (fatia mínima, AP-1 a AP-9): só o tipo, sem regra legal.
+  aprendiz
   pj
   temporario
   outro_controlado
+  /// T209 — etapa 2 do Novo colaborador (2026-11-17).
+  part_time
+  freelancer
+  trainee
 }
 
 /// Sem `suspenso`: afastamento esta fora desta fatia. Reintroduzir e migration
@@ -1060,6 +1100,9 @@ model Colaborador {
 
   vinculos VinculoFuncional[]
 
+  /// T209 — vínculos de quem tem esta pessoa como gestor direto.
+  contratosComoGestor ContratoVinculo[] @relation("ContratoGestorDireto")
+
   // Etapa 2 — Documentos: o colaborador e o SUJEITO do documento (ADR 0011,
   // DP-2E-07). Relacao de leitura apenas; a coerencia empresa<->colaborador e
   // validada na aplicacao (o colaborador precisa ter vinculo na empresa do
@@ -1097,6 +1140,9 @@ model Colaborador {
   // T179 — admissão idempotente que o criou e revisões de normalização.
   idempotenciasAdmissao IdempotenciaAdmissao[]
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+
+  // T209 — foto do colaborador, por empresa (ADR 0020).
+  fotos FotoColaborador[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1143,6 +1189,10 @@ model VinculoFuncional {
 
   // T179 — admissão idempotente que o criou.
   idempotenciasAdmissao IdempotenciaAdmissao[]
+
+  /// T209 — o contrato da admissão (etapa 2): tabela própria, fora do
+  /// vínculo, para o salário não sair pelas rotas do vínculo.
+  contrato ContratoVinculo?
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -2300,6 +2350,11 @@ enum ResultadoEventoDadosPessoais {
 /// Campo alcancado por um evento. E o NOME do campo, nunca o valor.
 enum CampoDadosPessoais {
   data_nascimento
+  cpf
+  rg
+  genero
+  contato_emergencia_nome
+  contato_emergencia_telefone
   sexo
   saudacao
   estado_civil
@@ -2326,17 +2381,27 @@ model PerfilPessoalColaborador {
   empresaId     String @map("empresa_id")
   colaboradorId String @map("colaborador_id")
 
-  /// Obrigatoria: todo perfil a tem (T177).
-  dataNascimento DateTime @map("data_nascimento") @db.Date
-  sexo           String?
-  saudacao       String?
-  estadoCivil    String?  @map("estado_civil")
-  nacionalidade  String?
-  naturalidade   String?
-  escolaridade   String?
-  curso          String?
-  nomePai        String?  @map("nome_pai")
-  nomeMae        String?  @map("nome_mae")
+  /// T209 — opcional desde a etapa 1 do Novo colaborador (decisão de
+  /// 2026-11-17); antes, obrigatória (T177).
+  dataNascimento            DateTime? @map("data_nascimento") @db.Date
+  /// T209 — só os 11 dígitos, com dígitos verificadores conferidos no
+  /// servidor; único na empresa (CHECK de forma e índice único).
+  cpf                       String?
+  rg                        String?
+  /// T209 — lista fechada (`GENEROS`).
+  genero                    String?
+  sexo                      String?
+  saudacao                  String?
+  estadoCivil               String?   @map("estado_civil")
+  nacionalidade             String?
+  naturalidade              String?
+  escolaridade              String?
+  curso                     String?
+  nomePai                   String?   @map("nome_pai")
+  nomeMae                   String?   @map("nome_mae")
+  /// T209 — contato de emergência (nome e telefone em +55 + DDD + número).
+  contatoEmergenciaNome     String?   @map("contato_emergencia_nome")
+  contatoEmergenciaTelefone String?   @map("contato_emergencia_telefone")
 
   criadoPorUserId     String @map("criado_por_user_id")
   atualizadoPorUserId String @map("atualizado_por_user_id")
@@ -2353,6 +2418,7 @@ model PerfilPessoalColaborador {
 
   @@unique([colaboradorId, empresaId])
   @@unique([id, empresaId, colaboradorId])
+  @@unique([empresaId, cpf])
   @@index([empresaId])
   @@index([criadoPorUserId])
   @@index([atualizadoPorUserId])
@@ -2508,4 +2574,111 @@ model RevisaoNormalizacaoCadastro {
   @@index([empresaId])
   @@index([colaboradorId])
   @@map("revisao_normalizacao_cadastro")
+}
+
+/// T209 — rascunho da Nova admissão: o formulário salvo antes de concluir.
+/// Uma linha por conta e empresa ativa (quem salvou é quem recupera). Só os
+/// campos do contrato atual da admissão, filtrados pelo servidor; nunca cria
+/// colaborador, vínculo ou movimentação. Apagado ao concluir ou descartar.
+model RascunhoAdmissao {
+  id           String   @id @default(uuid())
+  atorUserId   String   @map("ator_user_id")
+  empresaId    String   @map("empresa_id")
+  /// Os valores do formulário (sem foto, sem arquivo).
+  dados        Json
+  /// Sobe a cada gravação.
+  versao       Int      @default(1)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  ator    AccessUser @relation("RascunhoAdmissaoAtor", fields: [atorUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  empresa Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([atorUserId, empresaId])
+  @@index([empresaId])
+  @@map("rascunho_admissao")
+}
+
+/// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela
+/// empresa, nunca à conta de acesso (`AccessUserFoto` é outra coisa). Os bytes
+/// ficam no armazenamento de objetos privado (Cloudflare R2), em três versões
+/// WebP geradas pelo servidor; aqui só os metadados da versão ATUAL. A chave
+/// do objeto só tem ids internos — nunca nome, CPF, e-mail ou matrícula.
+model FotoColaborador {
+  id            String   @id @default(uuid())
+  colaboradorId String   @map("colaborador_id")
+  empresaId     String   @map("empresa_id")
+  /// Id do conjunto de versões atual (segmento da chave do objeto).
+  arquivoId     String   @map("arquivo_id")
+  /// Prefixo das três versões: v1/empresas/{e}/colaboradores/{c}/foto/{a}/
+  chaveAtual    String   @map("chave_atual")
+  /// SHA-256 da versão de 512 px (gerada pelo servidor).
+  hashSha256    String   @map("hash_sha256")
+  /// Bytes da versão de 512 px.
+  tamanhoBytes  Int      @map("tamanho_bytes")
+  tipo          String
+  /// Sobe a cada substituição.
+  versao        Int      @default(1)
+  enviadaPorId  String   @map("enviada_por_id")
+  criadoEm      DateTime @default(now()) @map("criado_em")
+  atualizadoEm  DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadaPor  AccessUser  @relation("FotoColaboradorAutor", fields: [enviadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([colaboradorId, empresaId])
+  @@index([empresaId])
+  @@map("foto_colaborador")
+}
+
+/// T209 — objeto da foto que não pôde ser apagado do armazenamento
+/// (substituição, remoção ou falha no envio). Fica para nova tentativa; só
+/// ids e a chave do objeto, nenhum dado pessoal.
+model LimpezaFotoColaboradorPendente {
+  id                String    @id @default(uuid())
+  empresaId         String    @map("empresa_id")
+  colaboradorId     String    @map("colaborador_id")
+  chave             String    @unique
+  motivo            String
+  tentativas        Int       @default(0)
+  criadoEm          DateTime  @default(now()) @map("criado_em")
+  ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId])
+  @@map("limpeza_foto_colaborador_pendente")
+}
+
+/// T209 — contrato da admissão (etapa 2 do Novo colaborador, 2026-11-17).
+/// Uma linha por vínculo, só com o que a etapa coleta: nível, gestor direto
+/// (pessoa com vínculo na mesma empresa), jornada semanal, escala, salário
+/// bruto, conselho e registro profissional, dependentes para IRRF e pensão
+/// alimentícia. Listas fechadas e faixas por CHECK. O salário líquido não é
+/// guardado: é calculado na tela a partir destes valores.
+model ContratoVinculo {
+  vinculoId String @id @map("vinculo_id")
+  empresaId String @map("empresa_id")
+
+  nivel                       String?
+  gestorDiretoColaboradorId   String?  @map("gestor_direto_colaborador_id")
+  jornadaSemanalHoras         Int?     @map("jornada_semanal_horas")
+  escala                      String?
+  salarioBruto                Decimal? @map("salario_bruto") @db.Decimal(12, 2)
+  conselhoProfissional        String?  @map("conselho_profissional")
+  registroProfissional        String?  @map("registro_profissional")
+  dependentesIrrf             Int?     @map("dependentes_irrf")
+  pensaoAlimenticiaPercentual Decimal? @map("pensao_alimenticia_percentual") @db.Decimal(5, 2)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  vinculo      VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  gestorDireto Colaborador?     @relation("ContratoGestorDireto", fields: [gestorDiretoColaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([vinculoId, empresaId])
+  @@index([empresaId])
+  @@index([gestorDiretoColaboradorId])
+  @@map("contrato_vinculo")
 }

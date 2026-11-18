@@ -1,0 +1,103 @@
+/**
+ * T209 — fundação de interface do Evolli (camada `src/ui`).
+ *
+ * Tailwind CSS 4, integrado de forma INCREMENTAL:
+ *  - sem preflight (nenhum reset global): só o tema e as utilidades;
+ *  - prefixo `ev`: as classes são `ev:flex`, `ev:gap-2`…, e as variáveis do
+ *    tema viram `--ev-*` — nenhuma colide com os tokens atuais
+ *    (`--radius-*`, `--font-sans`, `--text-*`, `--color-*`);
+ *  - em camadas de cascata (`theme`, `utilities`): o CSS atual do produto,
+ *    fora de camada, continua prevalecendo sobre qualquer utilidade — nada que
+ *    já existe muda de aparência.
+ *
+ * Os componentes da camada usam os tokens do Evolli (`tokens.css`) por valor
+ * arbitrário (`ev:bg-[var(--surface-canvas)]`): a identidade é a do produto.
+ */
+@layer theme, utilities;
+
+@import "tailwindcss/theme.css" layer(theme) prefix(ev);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(ev);
+
+/* Só os arquivos da camada e das telas migradas geram utilidades. */
+@source "./";
+@source "../screens/pessoas";
+
+/* ---- Movimento das janelas da camada (Dialog e Sheet), pelo estado que o
+   Radix publica (`data-state`). A saída só termina no fim da animação (o
+   Radix espera o `animationend`); sem animação, sai no mesmo quadro. ---- */
+@keyframes ev-janela-fundo-entra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ev-janela-fundo-sai {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ev-painel-entra {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes ev-painel-sai {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.ev-janela__fundo[data-state="open"] {
+  animation: ev-janela-fundo-entra var(--movimento-painel-entrada) linear both;
+}
+
+.ev-janela__fundo[data-state="closed"] {
+  animation: ev-janela-fundo-sai var(--movimento-painel-saida) linear both;
+}
+
+.ev-janela--lateral[data-state="open"] {
+  animation: ev-painel-entra var(--movimento-painel-entrada)
+    var(--movimento-curva) both;
+}
+
+.ev-janela--lateral[data-state="closed"] {
+  animation: ev-painel-sai var(--movimento-painel-saida) var(--movimento-curva)
+    both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ev-janela__fundo[data-state],
+  .ev-janela--lateral[data-state] {
+    animation: none;
+  }
+}
+
+/* Celular: o rodapé empilha as ações, com a principal em cima. */
+@media (max-width: 640px) {
+  .ev-janela__rodape {
+    flex-direction: column-reverse;
+  }
+
+  .ev-janela__rodape > * {
+    width: 100%;
+  }
+}
+
+/* T209 — o X de fechar é o "mais" do Iconsax girado 45°, no mesmo traço. */
+.ev-icone--fechar {
+  transform: rotate(45deg);
+}

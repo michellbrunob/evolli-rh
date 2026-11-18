@@ -24,6 +24,14 @@ import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais
  * Não há controller nem service de dado restrito ou de aprovação — as duas
  * capacidades ficaram fora desta fatia (Baseline V1, itens 5 e 7).
  */
+import { RascunhoAdmissaoController } from "./rascunho-admissao/rascunho-admissao.controller";
+import { RascunhoAdmissaoService } from "./rascunho-admissao/rascunho-admissao.service";
+
+import { FotoColaboradorController } from "./foto-colaborador/foto-colaborador.controller";
+import { FotoColaboradorService } from "./foto-colaborador/foto-colaborador.service";
+import { ARMAZENAMENTO_DE_FOTOS } from "./foto-colaborador/armazenamento-de-objetos";
+import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armazenamento";
+
 @Module({
   imports: [AuthModule, AuditModule],
   controllers: [
@@ -34,6 +42,10 @@ import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais
     ContatoColaboradorController,
     // T177 — dados pessoais e endereço, agregados e rotas próprios.
     DadosPessoaisColaboradorController,
+    // T209 — rascunho da Nova admissão.
+    RascunhoAdmissaoController,
+    // T209 — foto do colaborador (ADR 0020).
+    FotoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -42,6 +54,13 @@ import { DadosPessoaisColaboradorService } from "./dados-pessoais/dados-pessoais
     MovimentacaoService,
     ContatoColaboradorService,
     DadosPessoaisColaboradorService,
+    RascunhoAdmissaoService,
+    FotoColaboradorService,
+    // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
+    {
+      provide: ARMAZENAMENTO_DE_FOTOS,
+      useFactory: () => escolherArmazenamentoDeFotos(),
+    },
   ],
 })
 export class PessoasModule {}

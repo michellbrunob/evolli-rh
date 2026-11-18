@@ -117,10 +117,23 @@ function sugestaoDoCep(
 export type EstadoCep =
   | { readonly tipo: "ocioso" }
   | { readonly tipo: "buscando" }
-  | { readonly tipo: "aviso"; readonly mensagem: string }
+  | {
+      readonly tipo: "aviso";
+      readonly mensagem: string;
+      /**
+       * T209 — consultar o mesmo CEP de novo pode dar outra resposta (falha
+       * do serviço ou limite); não vale para CEP inexistente ou inválido.
+       */
+      readonly repetivel?: boolean;
+    }
   | {
       readonly tipo: "sugerido";
       readonly mensagem: string;
+      /**
+       * T209 — a consulta preencheu o endereço sem conflito com o que já
+       * estava digitado (a tela pode dizer só "Endereço localizado pelo CEP").
+       */
+      readonly encontrado?: boolean;
       /** Campos que já tinham outro valor: mantidos até a ação explícita. */
       readonly mantidos: readonly {
         readonly chave: CampoDoCep;
@@ -136,7 +149,7 @@ export interface OpcoesCepAssistido {
   readonly onErroNoCep: (mensagem: string) => void;
   /** Campos que a consulta preencheu ou substituiu: os erros deles saem. */
   readonly onCamposAjustados: (campos: readonly ChaveEndereco[]) => void;
-  /** Id do "Buscar CEP", que recebe o foco depois de "Usar endereço do CEP". */
+  /** Id de quem recebe o foco depois de "Usar endereço do CEP". */
   readonly idBotaoBuscar: string;
 }
 
@@ -209,7 +222,12 @@ export function useCepAssistido({
       aplicarSugestao(resposta);
     } catch (erro: unknown) {
       if (!respostaVigente(pedido, digitos)) return;
-      setEstado({ tipo: "aviso", mensagem: mensagemDoErroDeCep(erro) });
+      const status = statusDe(erro);
+      setEstado({
+        tipo: "aviso",
+        mensagem: mensagemDoErroDeCep(erro),
+        repetivel: status !== 404 && status !== 400,
+      });
     } finally {
       if (cepEmVooRef.current === digitos) cepEmVooRef.current = null;
     }
@@ -266,7 +284,12 @@ export function useCepAssistido({
       );
     }
     if (partes.length === 0) partes.push("O endereço já confere com o CEP.");
-    setEstado({ tipo: "sugerido", mensagem: partes.join(" "), mantidos });
+    setEstado({
+      tipo: "sugerido",
+      mensagem: partes.join(" "),
+      mantidos,
+      encontrado: mantidos.length === 0,
+    });
   }
 
   /** Ação explícita: substitui os campos mantidos pelo que o CEP sugeriu. */
@@ -286,8 +309,9 @@ export function useCepAssistido({
       )}. Os campos continuam editáveis.`,
       mantidos: [],
     });
-    // O botão acionado some: o foco volta para "Buscar CEP", ao lado. Por id:
-    // o `Button` do Evolli não repassa `ref`.
+    // O botão acionado some: o foco vai ao elemento indicado (o "Buscar
+    // CEP" da ficha; o próprio CEP na Nova admissão). Por id: o `Button` do
+    // Evolli não repassa `ref`.
     document.getElementById(idBotaoBuscar)?.focus();
   }
 

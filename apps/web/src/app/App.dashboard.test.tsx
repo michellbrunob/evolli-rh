@@ -7,11 +7,11 @@
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -77,9 +77,13 @@ beforeEach(() => {
       ativosPorTipo: {
         clt: 2,
         estagio: 1,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     },
   });
@@ -268,7 +272,7 @@ describe("T205 — quem abre o Dashboard (D-2, D-6)", () => {
     expect(primeiro).toHaveTextContent(/^Dashboard/);
     expect(primeiro).toHaveAttribute("aria-current", "page");
     fireEvent.click(
-      within(nav).getByRole("button", { name: /^Colaboradores/ }),
+      within(nav).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     fireEvent.click(within(nav).getAllByRole("button")[0]!);
@@ -426,16 +430,16 @@ describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
 });
 
 describe("T207 — Dashboard na barra superior do shell", () => {
+  // T209 — o nome da tela vem da trilha da barra superior (último item).
   const naBarra = () =>
     document.querySelector<HTMLElement>(
-      ".app-shell__topbar .app-shell__tela-atual",
+      ".barra-superior__trilha [aria-current='page']",
     );
 
-  it("o nome da tela aparece na barra, só visual: o título da tela continua único e recebe o foco", async () => {
+  it("o nome da tela aparece na barra, na trilha: o título da tela continua único e recebe o foco", async () => {
     montar("#/dashboard?ano=2026");
     await esperarLeitura(2026);
     expect(naBarra()).toHaveTextContent("Dashboard");
-    expect(naBarra()).toHaveAttribute("aria-hidden", "true");
     expect(naBarra()!.tagName).not.toMatch(/^H\d$/);
     expect(naBarra()).not.toHaveAttribute("tabindex");
     expect(screen.getAllByRole("heading", { name: "Dashboard" })).toHaveLength(
@@ -449,7 +453,7 @@ describe("T207 — Dashboard na barra superior do shell", () => {
   it("em outra tela, a barra não diz Dashboard", async () => {
     montar("#/pessoas/colaboradores");
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    expect(naBarra()).toBeNull();
+    expect(naBarra()).not.toHaveTextContent("Dashboard");
   });
 
   it("vista do quadro vinda de quem monta o shell; a troca volta para ele", async () => {
@@ -489,8 +493,8 @@ describe("T207 — Dashboard na barra superior do shell", () => {
   });
 });
 
-describe("T207 — marca do Evolli na faixa lateral marinho", () => {
-  it("o símbolo aparece: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
+describe("T207/T209 — marca do Evolli no topo da faixa marinho", () => {
+  it("o símbolo aparece no topo da faixa marinho: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
     montar("#/dashboard?ano=2026");
     await esperarLeitura(2026);
     const simbolo = document.querySelector<SVGElement>(
@@ -500,9 +504,10 @@ describe("T207 — marca do Evolli na faixa lateral marinho", () => {
     const fundo = simbolo.querySelector(":scope > rect")!.getAttribute("fill");
     const barras = simbolo.querySelector(":scope > g")!.getAttribute("fill");
     // A faixa pinta o texto de branco: o fundo não pode depender dessa cor.
-    expect(fundo).not.toBe("currentColor");
     expect(fundo).toBe("var(--surface-canvas)");
     expect(barras).toBe("var(--color-action)");
-    expect(barras).not.toBe(fundo);
+    expect(
+      document.querySelector(".barra-superior .app-shell__marca-simbolo"),
+    ).toBeNull();
   });
 });

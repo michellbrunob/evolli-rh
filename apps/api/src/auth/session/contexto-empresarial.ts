@@ -76,6 +76,8 @@ export interface EmpresaAutorizada {
   readonly id: string;
   readonly codigo: string;
   readonly nome: string;
+  /** T209 — o CNPJ, quando cadastrado (as empresas antigas não têm). */
+  readonly cnpj: string | null;
 }
 
 /** O contexto resolvido para uma requisição. */
@@ -171,7 +173,8 @@ export async function listarEmpresasAutorizadas(
 ): Promise<EmpresaAutorizada[]> {
   if (!papelSelecionaEmpresa(user.role)) return [];
 
-  const projecao = { id: true, codigo: true, nome: true };
+  // T209 — o CNPJ também (o seletor o mostra abaixo do nome).
+  const projecao = { id: true, codigo: true, nome: true, cnpj: true };
 
   if (papelTemPoliticaGlobal(user.role)) {
     return (await prisma.empresa.findMany({

@@ -11,11 +11,11 @@
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
@@ -214,9 +214,13 @@ beforeEach(() => {
       ativosPorTipo: {
         clt: 2,
         estagio: 0,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     },
   });
@@ -338,6 +342,14 @@ function navegadorVaiPara(fragmento: string) {
   });
 }
 
+/** T209 — "Colaboradores" na trilha da barra superior (a ficha não repete a sua). */
+function voltarPelaTrilha(): HTMLElement {
+  return within(screen.getByRole("navigation", { name: "Trilha" })).getByRole(
+    "button",
+    { name: "Colaboradores" },
+  );
+}
+
 describe("T198 — rota da ficha (rotasDoShell)", () => {
   it("colaborador e aba; sem aba, vale 'dados'", () => {
     expect(fichaDaRota(rotaDe(ana, "jornada"))).toEqual({
@@ -402,13 +414,25 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     );
     expect(abaSelecionada()).toHaveTextContent("Vida funcional");
 
+    // T209 — a trilha é uma só, na barra superior: Pessoas / Colaboradores
+    // / nome da pessoa; a página não repete a sua.
+    expect(
+      screen.queryByRole("navigation", { name: "Trilha de navegação" }),
+    ).toBeNull();
+    const trilhaDoTopo = screen.getByRole("navigation", { name: "Trilha" });
+    expect(trilhaDoTopo).toHaveTextContent(`PessoasColaboradores${ana.nome}`);
+    expect(within(trilhaDoTopo).getByText(ana.nome)).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
+      within(trilhaDoTopo).getByRole("button", { name: "Colaboradores" }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(window.location.hash).toBe(LISTAGEM);
+    expect(
+      screen.getByRole("navigation", { name: "Trilha" }),
+    ).toHaveTextContent(/^PessoasColaboradores$/);
   });
 
   it("rota direta abre a ficha já na aba pedida, sem entrada nova no histórico", async () => {
@@ -513,7 +537,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
       name: "Navegação do painel",
     });
     fireEvent.click(
-      within(barra).getByRole("button", { name: /^Colaboradores/ }),
+      within(barra).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();
@@ -646,11 +670,7 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
     expect(window.location.hash).toBe(rotaDe(ana));
 
     // Voltar devolve à mesma aba de Pessoas de onde se veio.
-    fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     expect(
       await screen.findByRole("tab", {
         name: "Horário de trabalho",
@@ -780,9 +800,13 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
         ativosPorTipo: {
           clt: 1,
           estagio: 0,
+          aprendiz: 0,
           pj: 1,
           temporario: 0,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       },
     }));
@@ -870,11 +894,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(rotaDe(ana));
 
-    fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     await waitFor(() =>
       expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tipo=clt`),
     );
@@ -900,7 +920,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     fireEvent.click(
       within(
         screen.getByRole("navigation", { name: "Navegação do painel" }),
-      ).getByRole("button", { name: /^Colaboradores/ }),
+      ).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(window.location.hash).toBe(LISTAGEM);
@@ -954,7 +974,7 @@ describe("T200 — guarda de saída no App", () => {
     await esperarFicha(ana.nome);
     const campo = editarNome();
     const item = within(barra()).getByRole("button", {
-      name: /^Colaboradores/,
+      name: /^Colaboradores Consulta/,
     });
     item.focus();
     fireEvent.click(item);
@@ -980,9 +1000,7 @@ describe("T200 — guarda de saída no App", () => {
     montarComGuarda();
     await esperarFicha(ana.nome);
     editarNome();
-    const trilha = within(fichaNaTela()!).getByRole("button", {
-      name: "Colaboradores",
-    });
+    const trilha = voltarPelaTrilha();
     fireEvent.click(trilha);
     expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -1088,9 +1106,7 @@ describe("T200 — guarda de saída no App", () => {
     );
     await esperarFicha(ana.nome);
     // Sem edição: a trilha sai direto (entrada nova da listagem).
-    fireEvent.click(
-      within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const entradas = window.history.length;
     await navegador(() => window.history.back());
@@ -1236,7 +1252,9 @@ describe("T200 — guarda de saída no App", () => {
       await esperarFicha(ana.nome);
       editarNome();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
       unmount();
@@ -1246,7 +1264,7 @@ describe("T200 — guarda de saída no App", () => {
     await esperarFicha(ana.nome);
     expect(within(fichaNaTela()!).queryByLabelText("Nome")).toBeNull();
     fireEvent.click(
-      within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+      within(barra()).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
@@ -1279,9 +1297,7 @@ describe("T200 — guarda de saída no App", () => {
     vi.mocked(listarColaboradores).mockImplementationOnce(
       () => new Promise((r) => (responder = r as never)),
     );
-    fireEvent.click(
-      within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
     );
@@ -1298,9 +1314,13 @@ describe("T200 — guarda de saída no App", () => {
           ativosPorTipo: {
             clt: 2,
             estagio: 0,
+            aprendiz: 0,
             pj: 0,
             temporario: 0,
             outro_controlado: 0,
+            part_time: 0,
+            freelancer: 0,
+            trainee: 0,
           },
         },
       } as never);
@@ -1474,9 +1494,7 @@ describe("T200 — guarda de saída no App", () => {
       expect(fichaNaTela()).not.toBeNull();
       // De volta à Jornada pela trilha (só a ficha sai, e ela está limpa):
       // o formulário continua aberto.
-      fireEvent.click(
-        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
-      );
+      fireEvent.click(voltarPelaTrilha());
       await waitFor(() => expect(formularioDeVinculo()).not.toBeNull());
       expect(screen.queryByRole("alertdialog")).toBeNull();
 
@@ -1611,7 +1629,9 @@ describe("T200 — guarda de saída no App", () => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
       // Outro destino desmonta: pergunta.
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Jornadas de trabalho"]);
       sairSemSalvar();
@@ -1629,7 +1649,9 @@ describe("T200 — guarda de saída no App", () => {
       );
       await abrirNovoVinculo();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(formularioDeVinculo()).not.toBeNull();
@@ -1641,13 +1663,17 @@ describe("T200 — guarda de saída no App", () => {
       montarComGuarda();
       await abrirNovoVinculo();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
       continuarEditando();
       expect(formularioDeVinculo()).not.toBeNull();
       fireEvent.click(
-        within(barra()).getByRole("button", { name: /^Colaboradores/ }),
+        within(barra()).getByRole("button", {
+          name: /^Colaboradores Consulta/,
+        }),
       );
       sairSemSalvar();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
@@ -1792,9 +1818,7 @@ describe("T200 — guarda de saída no App", () => {
       );
       await esperarFicha(ana.nome);
       // A listagem à frente da ficha (índices 0 → 1 → 2), e de volta à ficha.
-      fireEvent.click(
-        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
-      );
+      fireEvent.click(voltarPelaTrilha());
       await screen.findByRole("table", { name: /^Colaboradores — / });
       await navegador(() => window.history.back());
       await esperarFicha(ana.nome);
@@ -1837,9 +1861,7 @@ describe("T200 — guarda de saída no App", () => {
         }),
       );
       await esperarFicha(ana.nome);
-      fireEvent.click(
-        within(fichaNaTela()!).getByRole("button", { name: "Colaboradores" }),
-      );
+      fireEvent.click(voltarPelaTrilha());
       const listagem = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
@@ -1978,11 +2000,7 @@ describe("T200 — guarda de saída no App", () => {
           }),
         );
         await esperarFicha(ana.nome);
-        fireEvent.click(
-          within(fichaNaTela()!).getByRole("button", {
-            name: "Colaboradores",
-          }),
-        );
+        fireEvent.click(voltarPelaTrilha());
         await screen.findByRole("table", { name: /^Colaboradores — / });
         await navegador(() => window.history.back());
         await esperarFicha(ana.nome);
@@ -2023,12 +2041,7 @@ describe("T200 — guarda de saída no App", () => {
 describe("T201 — aba Documentos da ficha no shell", () => {
   const painelDocumentos = (nome = ana.nome) =>
     screen.findByRole("table", { name: `Documentos registrados — ${nome}` });
-  const voltarPelaTrilha = () =>
-    fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
-    );
+  const clicarVoltarPelaTrilha = () => fireEvent.click(voltarPelaTrilha());
 
   it("rota direta abre a aba Documentos; recarregar a mantém", async () => {
     window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
@@ -2141,7 +2154,7 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     fireEvent.change(screen.getByLabelText(/^Tipo do documento/), {
       target: { value: "t-rg" },
     });
-    voltarPelaTrilha();
+    clicarVoltarPelaTrilha();
     const pergunta = screen.getByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -2178,7 +2191,7 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Solicitar documento" }),
     );
-    voltarPelaTrilha();
+    clicarVoltarPelaTrilha();
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
   });
@@ -2419,11 +2432,7 @@ describe("T202 — aba Registros de ponto no shell", () => {
     await waitFor(() =>
       expect(window.location.hash).toBe(rotaPonto(ana, "2026-09")),
     );
-    fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(registrarPonto).not.toHaveBeenCalled();
@@ -2630,11 +2639,7 @@ describe("T203 — aba Solicitações no shell", () => {
       level: 4,
       name: "Detalhe da solicitação de Atestado",
     });
-    fireEvent.click(
-      within(
-        document.querySelector<HTMLElement>(".ficha-colaborador")!,
-      ).getByRole("button", { name: "Colaboradores" }),
-    );
+    fireEvent.click(voltarPelaTrilha());
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByRole("table", { name: /^Colaboradores — / });
   });
@@ -2792,5 +2797,154 @@ describe("T204 — Nova solicitação na ficha, no shell", () => {
     expect(screen.queryByRole("button", { name: "Nova solicitação" })).toBe(
       null,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — listagem operacional no shell: o tamanho da página na URL (C-2) e o
+// menu "Ações" da linha abrindo a ficha na aba escolhida, por papel (C-4).
+// ---------------------------------------------------------------------------
+/** T209 — o menu "Ações" (Radix) abre no ponteiro, como no navegador. */
+function abrirMenuDaLinha(botao: HTMLElement) {
+  fireEvent.pointerDown(botao, {
+    button: 0,
+    ctrlKey: false,
+    pointerType: "mouse",
+  });
+}
+
+describe("T209 — tamanho da página e atalhos da linha no shell", () => {
+  const seletorDoTamanho = () =>
+    screen.getByRole("combobox", { name: "Itens por página" });
+  const ultimaConsulta = () =>
+    vi.mocked(listarColaboradores).mock.lastCall?.[0] ?? {};
+
+  it("trocar o tamanho empilha a URL canônica; recarregar mantém; 20 sai da URL", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&pagina=2`);
+    const { unmount } = render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    // Empilhar é `pushState` com a URL nova (o tamanho do histórico depende
+    // da ordem dos testes: entradas à frente são truncadas).
+    const empilhar = vi.spyOn(window.history, "pushState");
+
+    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`),
+    );
+    expect(empilhar).toHaveBeenCalledWith(
+      expect.anything(),
+      "",
+      expect.stringContaining(`${LISTAGEM}?aba=todos&tamanho=50`),
+    );
+    empilhar.mockRestore();
+    await waitFor(() =>
+      expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 }),
+    );
+    const url = window.location.hash;
+    unmount();
+
+    vi.mocked(listarColaboradores).mockClear();
+    window.history.replaceState(null, "", `/${url}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    expect(seletorDoTamanho()).toHaveValue("50");
+    expect(ultimaConsulta()).toMatchObject({ tamanhoPagina: 50 });
+
+    fireEvent.change(seletorDoTamanho(), { target: { value: "20" } });
+    await waitFor(() =>
+      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
+    );
+  });
+
+  it("tamanho inválido na URL cai em 20 e é corrigido no lugar; nada inválido vira consulta", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?tamanho=1000`);
+    const empilhar = vi.spyOn(window.history, "pushState");
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    await waitFor(() => expect(window.location.hash).toBe(LISTAGEM));
+    // Corrigida no lugar: nenhuma entrada nova.
+    expect(empilhar).not.toHaveBeenCalled();
+    empilhar.mockRestore();
+    for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
+      expect([1, 20, 100]).toContain(consulta?.tamanhoPagina);
+      expect(consulta?.tamanhoPagina).not.toBe(1000);
+    }
+  });
+
+  it.each([
+    ["rh", true],
+    ["dp", false],
+    ["master_tecnico", true],
+  ] as const)(
+    "%s: atalhos às abas que o papel vê; Solicitações só para quem as lê (%s)",
+    async (papel, comSolicitacoes) => {
+      render(<App papelDoAtor={papel} />);
+      const tabela = await screen.findByRole("table", {
+        name: /^Colaboradores — /,
+      });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
+      const rotulos = within(await screen.findByRole("menu"))
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent);
+      expect(rotulos.includes("Solicitações")).toBe(comSolicitacoes);
+      expect(rotulos).toContain("Documentos");
+      expect(rotulos).toHaveLength(comSolicitacoes ? 7 : 6);
+    },
+  );
+
+  it("o atalho empilha a rota da ficha na aba; ponto no mês corrente; a trilha devolve o foco ao botão", async () => {
+    render(<App papelDoAtor="rh" />);
+    const tabela = await screen.findByRole("table", {
+      name: /^Colaboradores — /,
+    });
+    const empilhar = vi.spyOn(window.history, "pushState");
+    const botao = within(tabela).getByRole("button", {
+      name: `Ações: ${ana.nome}`,
+    });
+    abrirMenuDaLinha(botao);
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Documentos" }),
+    );
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
+    expect(empilhar).toHaveBeenCalledWith(
+      expect.anything(),
+      "",
+      expect.stringContaining(rotaDe(ana, "documentos")),
+    );
+    empilhar.mockRestore();
+    expect(abaSelecionada()).toHaveTextContent("Documentos");
+
+    fireEvent.click(voltarPelaTrilha());
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+      ).toHaveFocus(),
+    );
+
+    abrirMenuDaLinha(
+      screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Registros de ponto" }),
+    );
+    await esperarFicha(ana.nome);
+    expect(window.location.hash).toBe(
+      `${rotaDe(ana, "ponto")}/${competenciaDoMesAtual()}`,
+    );
+  });
+
+  it("perfis sem Colaboradores não veem menu nenhum (a rota é recusada)", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    render(<App papelDoAtor="gestor" />);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("table", { name: /^Colaboradores — / }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: /^Ações: / })).toBeNull();
   });
 });

@@ -93,6 +93,8 @@ export interface SeletorDeReferenciaProps {
   readonly obrigatorio: boolean;
   readonly ajuda?: string;
   readonly erro?: string;
+  /** T209 — texto do campo vazio (padrão: "Buscar por código ou nome"). */
+  readonly placeholder?: string;
   readonly escolhida: ReferenciaEscolhida | null;
   readonly onEscolher: (referencia: ReferenciaEscolhida | null) => void;
   /** A consulta ao servidor (só ativos da empresa da sessão). */
@@ -178,6 +180,7 @@ export function SeletorDeReferencia({
   obrigatorio,
   ajuda,
   erro,
+  placeholder = "Buscar por código ou nome",
   escolhida,
   onEscolher,
   listar,
@@ -449,7 +452,7 @@ export function SeletorDeReferencia({
               type="text"
               role="combobox"
               autoComplete="off"
-              placeholder="Buscar por código ou nome"
+              placeholder={placeholder}
               aria-autocomplete="list"
               aria-expanded={aberto}
               aria-controls={idLista}
@@ -492,7 +495,10 @@ export function SeletorDeReferencia({
         )}
       </FormField>
 
-      <p id={idEscolha} className="seletor-referencia__escolha">
+      <p
+        id={idEscolha}
+        className={`seletor-referencia__escolha${escolhida ? "" : " seletor-referencia__escolha--vazia"}`}
+      >
         {escolhida ? (
           <>
             Escolha atual:{" "}

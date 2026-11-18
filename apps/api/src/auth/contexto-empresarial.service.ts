@@ -106,7 +106,7 @@ export class ContextoEmpresarialService {
 
     const empresa = await this.prisma.empresa.findFirst({
       where: { id: empresaId, status: "ativo" },
-      select: { id: true, codigo: true, nome: true },
+      select: { id: true, codigo: true, nome: true, cnpj: true },
     });
     if (empresa === null) {
       // Corrida: a empresa saiu do ar entre a checagem e agora.

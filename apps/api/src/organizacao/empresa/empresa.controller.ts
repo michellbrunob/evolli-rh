@@ -22,6 +22,7 @@ import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import { EmpresaService } from "./empresa.service";
 import {
   AtualizarNoOrganizacionalDto,
+  CadastrarEmpresaDto,
   CriarEmpresaDto,
   ListarNosOrganizacionaisQueryDto,
 } from "../dto/organizacao.dto";
@@ -58,6 +59,17 @@ export class EmpresaController {
     });
   }
 
+  /**
+   * T209 — Configurações › Empresas: as empresas que a conta alcança, com
+   * CNPJ, cidade, a principal e os colaboradores ativos. Antes de
+   * `:empresaId`, que só aceita UUID.
+   */
+  @Get("da-conta")
+  @ApiOperation({ summary: "Empresas da conta (Configurações › Empresas)" })
+  async listarDaConta(@CurrentUser() actor: AccessUser) {
+    return { itens: await this.empresaService.listarDaConta(actor) };
+  }
+
   @Get(":empresaId")
   @UseGuards(AuthorizationGuard)
   @RequirePermission("empresa", "read")
@@ -83,6 +95,42 @@ export class EmpresaController {
     @Req() req: Request,
   ) {
     return this.empresaService.criar(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  /**
+   * T209 — Nova empresa (RH e master técnico). O papel é conferido no
+   * serviço: a matriz RBAC nega criar empresa a papel escopado, e esta rota
+   * é a exceção decidida pela proprietária, com a concessão na mesma
+   * transação.
+   */
+  @Post("cadastro")
+  @UseGuards(CsrfGuard)
+  @ApiOperation({ summary: "Cadastra empresa com CNPJ (Nova empresa)" })
+  async cadastrar(
+    @Body() dto: CadastrarEmpresaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.empresaService.cadastrar(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  /** T209 — editar a empresa (painel lateral de Configurações › Empresas). */
+  @Patch(":empresaId/cadastro")
+  @UseGuards(CsrfGuard)
+  @ApiOperation({ summary: "Edita nome, CNPJ, porte e endereço da empresa" })
+  async atualizarCadastro(
+    @Param("empresaId", ParseUUIDPipe) empresaId: string,
+    @Body() dto: CadastrarEmpresaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.empresaService.atualizarCadastro(empresaId, dto, {
       actor,
       metadata: extractRequestMetadata(req),
     });

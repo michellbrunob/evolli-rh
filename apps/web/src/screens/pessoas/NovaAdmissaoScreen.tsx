@@ -72,8 +72,8 @@
  *
  * ## T195 — quatro etapas
  *
- * A página é um fluxo guiado (fatia 2 do dossiê da T194): **Dados básicos**
- * (dados pessoais e contatos), **Dados profissionais e lotação** (vínculo,
+ * A página é um fluxo guiado (fatia 2 do dossiê da T194): **Dados pessoais**
+ * (dados pessoais e contatos), **Dados profissionais e vínculo** (vínculo,
  * lotação e, para o RH, jornada), **Endereço** e **Revisão e conclusão**. Os
  * campos, as regras, as máscaras e o contrato são os de sempre; só a
  * disposição mudou.
@@ -81,14 +81,14 @@
  * - Os quatro painéis ficam montados e só o da etapa atual aparece (`hidden`):
  *   "Voltar", o indicador e "Editar" nunca perdem nada, nem o estado interno
  *   das máscaras e do CEP.
- * - "Continuar" (ou Enter) valida SÓ a etapa atual; com erro, a etapa fica e
+ * - "Próxima etapa" (ou Enter) valida SÓ a etapa atual; com erro, a etapa fica e
  *   o foco vai ao primeiro campo inválido. O indicador volta a qualquer etapa
  *   alcançada e, para ir adiante, valida as etapas do caminho, uma a uma: não
  *   há salto sem validar.
  * - Ao mudar de etapa, o foco vai ao título dela.
  * - A revisão mostra o que foi digitado (opcional em branco não aparece),
  *   cada bloco com "Editar", e avisa que documentos virão em entrega própria
- *   — nada de arquivo aqui. "Confirmar admissão" valida TUDO e abre a mesma
+ *   — nada de arquivo aqui. "Concluir" valida TUDO e abre a mesma
  *   confirmação da T179; erro, inclusive recusa do servidor, abre a etapa do
  *   primeiro campo a corrigir.
  * - Sem rascunho no servidor nem no navegador: recarregar a página começa do
@@ -102,6 +102,11 @@
  */
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
+  CadastroEmEtapas,
+  LinhaDoCadastro,
+  SecaoDoCadastro,
+} from "../../components/cadastro/CadastroEmEtapas";
+import {
   Button,
   CampoMascarado,
   FormActions,
@@ -110,15 +115,22 @@ import {
   PageHeader,
   StatusBadge,
   Surface,
-  TrilhaNavegacao,
 } from "../../components";
-import { destinoPorId, tituloDoGrupoDe } from "../../app/mapaNavegacao";
+import { IconeSucesso } from "../../ui/icones";
 import {
   type AdmissaoRegistradaApi,
   type AdmitirColaboradorDto,
+  type ContratoAdmissaoApi,
+  listarColaboradores,
   type ColaboradorApi,
   type TipoVinculo,
   admitirColaborador,
+  descartarRascunhoAdmissao,
+  enviarFotoColaborador,
+  obterRascunhoAdmissao,
+  salvarRascunhoAdmissao,
+  type DadosDoRascunhoApi,
+  type RascunhoAdmissaoApi,
 } from "../../api/colaboradoresClient";
 import {
   type AreaApi,
@@ -131,28 +143,27 @@ import {
   listarEquipes,
   listarUnidades,
 } from "../../api/organizacaoClient";
-import { listarCargos } from "../../api/cargoClient";
+import { criarCargo, listarCargos } from "../../api/cargoClient";
+import {
+  calcularSalarioLiquido,
+  formatarReais,
+  lerValorEmReais,
+} from "./salarioLiquido";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
 } from "../../api/horariosClient";
 import { rotuloDaJornada } from "./jornadaColaborador";
+import { UFS, siglaDaUf } from "./ufs";
 import {
   falhaAoPrepararEnvio,
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
 } from "../../api/csrfClient";
-import { formatarDiaCivil } from "../../format/data";
-import {
-  DICA_DE_FORMATO,
-  exibirCep,
-  exibirTelefone,
-} from "../../format/mascaras";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { exibirCep, exibirTelefone } from "../../format/mascaras";
 import {
   CAMPOS_ENDERECO,
-  CAMPOS_TEXTO_PERFIL,
-  CAMPO_SEXO,
-  OPCOES_SEXO,
   type ChaveEndereco,
   type ChavePerfil,
   ENDERECO_INICIAL,
@@ -163,7 +174,6 @@ import {
   blocoEndereco,
   blocoPerfil,
   ehPaisBrasil,
-  rotuloDoSexo,
   validarEndereco,
   validarPerfil,
 } from "./dadosPessoais";
@@ -171,6 +181,7 @@ import {
   type CampoContato,
   type ValoresContatos,
   contatosDaAdmissao,
+  normalizarTelefone,
   validarContatos,
 } from "./contatosColaborador";
 import {
@@ -202,9 +213,13 @@ const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 const ROTULO_SITUACAO_VINCULO: Record<string, string> = {
@@ -266,7 +281,6 @@ const ROTULO_DO_BOTAO_REFERENCIA: Record<TipoReferenciaRapida, string> = {
 // T178 — preenchimento ASSISTIDO do endereço pelo CEP: a consulta e o que
 // fazer com a resposta ficam em `cepAssistido.ts` (T181), compartilhados com
 // a edição do endereço na ficha do colaborador.
-const ID_BOTAO_BUSCAR_CEP = "nova-admissao-buscar-cep";
 
 // ---------------------------------------------------------------------------
 // Erros, campo a campo.
@@ -282,6 +296,7 @@ type CampoLotacao =
 type CampoErro =
   | "referencias"
   | "nome"
+  | ChaveIdentificacao
   | ChavePerfil
   | ChaveEndereco
   | CampoContato
@@ -290,6 +305,16 @@ type CampoErro =
   | "dataAdmissao"
   | CampoLotacao
   | "lotacao"
+  // T209 — etapa 2: contrato da admissão.
+  | "nivel"
+  | "gestorDireto"
+  | "jornadaSemanalHoras"
+  | "escala"
+  | "salarioBruto"
+  | "conselhoProfissional"
+  | "registroProfissional"
+  | "dependentesIrrf"
+  | "pensaoAlimenticiaPercentual"
   // T183 — jornada de trabalho opcional (só o RH a vê).
   | "jornada"
   | "geral";
@@ -300,10 +325,29 @@ type Erros = Partial<Record<CampoErro, string>>;
  * T195 — as quatro etapas do cadastro individual, na ordem da tela.
  */
 const ETAPAS = [
+  // T209 — etapa 1 do Novo colaborador (2026-11-17): títulos, subtítulos e
+  // descrições do novo cadastro. A etapa 4 segue como revisão até a fatia
+  // dos documentos.
   "Dados básicos",
-  "Dados profissionais e lotação",
+  "Dados profissionais",
   "Endereço",
   "Revisão e conclusão",
+] as const;
+
+/** T209 — o subtítulo de cada etapa, na coluna das etapas. */
+const SUBTITULOS_DAS_ETAPAS = [
+  "Identificação e contatos",
+  "Lotação e contrato",
+  "CEP e endereço",
+  "Resumo final",
+] as const;
+
+/** T209 — a descrição de cada etapa, no cabeçalho dela. */
+const DESCRICOES_DAS_ETAPAS = [
+  "Quem é a pessoa e como falar com ela.",
+  "Lotação, contrato e remuneração.",
+  "Onde a pessoa mora.",
+  "Revise tudo antes de concluir.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;
@@ -329,26 +373,40 @@ function idDoTituloDaEtapa(indice: IndiceEtapa): string {
  */
 const CAMPOS_DA_ETAPA: readonly (readonly CampoErro[])[] = [
   [
+    // T209 — a ordem da etapa 1: identificação, contato e emergência.
     "nome",
-    "emailPessoal",
+    "cpf",
+    "rg",
     "dataNascimento",
-    // T179 — o sexo é seletor, logo depois da data de nascimento na tela.
-    CAMPO_SEXO.chave,
-    ...CAMPOS_TEXTO_PERFIL.map((c) => c.chave),
+    "genero",
+    "estadoCivil",
+    "emailPessoal",
     "celular",
-    "telefone",
+    "contatoEmergenciaNome",
+    "contatoEmergenciaTelefone",
   ],
   [
+    // T209 — a ordem da etapa 2: cargo e estrutura, contrato, remuneração e
+    // informações adicionais.
     "referencias",
-    "matricula",
+    "cargo",
+    "nivel",
+    "departamento",
+    "area",
+    "centroCusto",
+    "unidade",
+    "gestorDireto",
     "tipo",
     "dataAdmissao",
-    "departamento",
-    "cargo",
-    "area",
-    "unidade",
+    "jornadaSemanalHoras",
+    "escala",
+    "matricula",
+    "salarioBruto",
+    "conselhoProfissional",
+    "registroProfissional",
+    "dependentesIrrf",
+    "pensaoAlimenticiaPercentual",
     "equipe",
-    "centroCusto",
     "lotacao",
     "jornada",
   ],
@@ -370,32 +428,6 @@ const ORDEM_DOS_ERROS: readonly CampoErro[] = [
   ...CAMPOS_DA_ETAPA.flat(),
   "geral",
 ];
-
-/**
- * T179 — nome de cada campo no resumo "Revise N campos". São os rótulos da
- * tela: o resumo diz ONDE corrigir, nunca o valor digitado.
- */
-const ROTULO_DO_CAMPO = {
-  nome: "Nome completo",
-  emailPessoal: "E-mail pessoal",
-  dataNascimento: ROTULO_DATA_NASCIMENTO,
-  sexo: CAMPO_SEXO.rotulo,
-  ...Object.fromEntries(CAMPOS_TEXTO_PERFIL.map((c) => [c.chave, c.rotulo])),
-  ...Object.fromEntries(CAMPOS_ENDERECO.map((c) => [c.chave, c.rotulo])),
-  celular: "Celular",
-  telefone: "Telefone",
-  matricula: "Matrícula",
-  tipo: "Tipo de vínculo",
-  dataAdmissao: "Data de admissão",
-  departamento: "Departamento",
-  cargo: "Cargo",
-  unidade: "Unidade",
-  area: "Área",
-  equipe: "Equipe",
-  centroCusto: "Centro de custo",
-  lotacao: "Lotação inicial",
-  jornada: "Jornada de trabalho",
-} as Record<Exclude<CampoErro, "referencias" | "geral">, string>;
 
 const ERRO_GERAL_ID = "nova-admissao-erro-geral";
 const ID_BOTAO_SALVAR = "nova-admissao-salvar";
@@ -553,6 +585,16 @@ const CAMPO_DO_CONFLITO: Readonly<
   "contatos.emailPessoal": {
     campo: "emailPessoal",
     mensagem: "Este e-mail pessoal já está em uso nesta empresa.",
+  },
+  // T209 — CPF único na empresa.
+  "perfilPessoal.cpf": {
+    campo: "cpf",
+    mensagem: "Este CPF já está cadastrado nesta empresa.",
+  },
+  // T209 — gestor direto sem vínculo na empresa.
+  "contrato.gestorDiretoId": {
+    campo: "gestorDireto",
+    mensagem: "Este gestor não está disponível nesta empresa.",
   },
 };
 
@@ -739,6 +781,18 @@ interface Campos {
   centroCustoId: string;
   /** T183 — jornada de trabalho opcional; vazio é "sem jornada". */
   tabelaHorarioId: string;
+  /** T209 — etapa 2: cargo digitado (vira cargo do cadastro ao concluir). */
+  cargoNome: string;
+  nivel: string;
+  gestorDiretoId: string;
+  jornadaSemanalHoras: string;
+  escala: string;
+  /** Em reais, como digitado: "5.000,00". */
+  salarioBruto: string;
+  conselhoProfissional: string;
+  registroProfissional: string;
+  dependentesIrrf: string;
+  pensaoAlimenticiaPercentual: string;
 }
 
 const CONTATOS_VAZIOS: ValoresContatos = {
@@ -748,6 +802,16 @@ const CONTATOS_VAZIOS: ValoresContatos = {
 };
 
 const CAMPOS_VAZIOS: Campos = {
+  cargoNome: "",
+  nivel: "",
+  gestorDiretoId: "",
+  jornadaSemanalHoras: "",
+  escala: "",
+  salarioBruto: "",
+  conselhoProfissional: "",
+  registroProfissional: "",
+  dependentesIrrf: "",
+  pensaoAlimenticiaPercentual: "",
   nome: "",
   matricula: "",
   tipo: "",
@@ -784,6 +848,416 @@ export interface NovaAdmissaoScreenProps {
   readonly papelDoAtor?: string | null;
 }
 
+// ---- T209 — foto opcional do colaborador (ADR 0020) ------------------------
+
+/** Mesmo teto do servidor: 5 MB. */
+const FOTO_LIMITE_BYTES = 5 * 1024 * 1024;
+const FOTO_TIPOS_ACEITOS = "image/png,image/jpeg";
+const FOTO_TIPO_POR_EXTENSAO: Readonly<Record<string, string>> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+};
+const ID_FOTO_ARQUIVO = "nova-admissao-foto-arquivo";
+const ID_FOTO_ENVIAR = "nova-admissao-foto-enviar";
+const ID_FOTO_OUTRA = "nova-admissao-foto-outra";
+
+/** A foto escolhida: o arquivo e a URL local da prévia (só nesta aba). */
+interface FotoEscolhida {
+  readonly arquivo: File;
+  readonly url: string;
+}
+
+/** O envio da foto, que só acontece depois da admissão concluída. */
+type EnvioDaFoto =
+  | { readonly estado: "nenhum" }
+  | { readonly estado: "enviando" }
+  | { readonly estado: "enviada" }
+  | {
+      readonly estado: "falhou";
+      readonly mensagem: string;
+      /** Falha passageira: o mesmo arquivo pode ser enviado de novo. */
+      readonly podeRepetir: boolean;
+    };
+
+/**
+ * Conferência rápida no navegador (o servidor confere de novo, pelo
+ * conteúdo): PNG ou JPEG, extensão de acordo com o tipo, até 5 MB.
+ */
+function recusaDaFotoNoNavegador(arquivo: File): string | null {
+  const ponto = arquivo.name.lastIndexOf(".");
+  const extensao =
+    ponto === -1 ? "" : arquivo.name.slice(ponto + 1).toLowerCase();
+  const tipoDaExtensao = FOTO_TIPO_POR_EXTENSAO[extensao];
+  if (!tipoDaExtensao || tipoDaExtensao !== arquivo.type) {
+    return "Use uma imagem PNG ou JPEG.";
+  }
+  if (arquivo.size > FOTO_LIMITE_BYTES) return "A foto deve ter até 5 MB.";
+  return null;
+}
+
+const MENSAGEM_DA_RECUSA_DA_FOTO: Readonly<Record<string, string>> = {
+  foto_formato_invalido: "Use uma imagem PNG ou JPEG.",
+  foto_tipo_divergente:
+    "O conteúdo do arquivo não é do formato informado. Use uma imagem PNG ou JPEG.",
+  foto_grande_demais: "A imagem é grande demais.",
+  foto_pequena: "A imagem é pequena demais: use ao menos 64 × 64 pixels.",
+  foto_invalida: "Não foi possível ler a imagem. Escolha outro arquivo.",
+};
+
+/** O que dizer da falha do envio, e se repetir o mesmo arquivo adianta. */
+function falhaDoEnvioDaFoto(erro: unknown): {
+  readonly mensagem: string;
+  readonly podeRepetir: boolean;
+} {
+  const status = statusDe(erro);
+  const { codigo } = detalhesDe(erro);
+  if (status === 413) {
+    return { mensagem: "A foto deve ter até 5 MB.", podeRepetir: false };
+  }
+  if (status === 422 || status === 415) {
+    return {
+      mensagem:
+        (codigo && MENSAGEM_DA_RECUSA_DA_FOTO[codigo]) ??
+        "A imagem foi recusada. Escolha outro arquivo.",
+      podeRepetir: false,
+    };
+  }
+  if (status === 403 || status === 404) {
+    return {
+      mensagem: "Sem permissão para enviar a foto deste colaborador.",
+      podeRepetir: false,
+    };
+  }
+  return {
+    mensagem: "O envio não foi concluído. Tente de novo em instantes.",
+    podeRepetir: true,
+  };
+}
+
+// ---- T209 — etapa 2 do Novo colaborador ------------------------------------
+
+/** Tipo de contratação, na ordem da etapa 2 (sete opções). */
+const TIPOS_DE_CONTRATACAO: readonly TipoVinculo[] = [
+  "clt",
+  "pj",
+  "estagio",
+  "aprendiz",
+  "part_time",
+  "freelancer",
+  "trainee",
+];
+
+const OPCOES_NIVEL = [
+  { codigo: "sem_nivel", rotulo: "Sem nível" },
+  { codigo: "primeiro_emprego", rotulo: "Primeiro emprego" },
+  { codigo: "junior", rotulo: "Júnior" },
+  { codigo: "pleno", rotulo: "Pleno" },
+  { codigo: "senior", rotulo: "Sênior" },
+  { codigo: "lider_tecnico", rotulo: "Líder técnico" },
+  { codigo: "coordenador", rotulo: "Coordenador" },
+  { codigo: "gerente", rotulo: "Gerente" },
+  { codigo: "head", rotulo: "Head" },
+  { codigo: "diretor", rotulo: "Diretor" },
+  { codigo: "vp", rotulo: "VP" },
+  { codigo: "c_level", rotulo: "C-Level" },
+] as const;
+
+/** Escalas: nome e descrição (dias de trabalho no mês). */
+const OPCOES_ESCALA = [
+  { codigo: "nao_informada", nome: "Não informada", descricao: "" },
+  {
+    codigo: "5x2",
+    nome: "5x2",
+    descricao: "Dias fixos na semana · Segunda a sexta, folga sábado e domingo",
+  },
+  {
+    codigo: "6x1",
+    nome: "6x1",
+    descricao:
+      "Dias fixos na semana · Seis dias de trabalho e uma folga · 26 dias no mês",
+  },
+  {
+    codigo: "semana_espanhola",
+    nome: "Semana espanhola",
+    descricao:
+      "Dias fixos na semana · Semanas de 5 e 6 dias alternadas (sábado sim, sábado não) · 24 dias no mês",
+  },
+  {
+    codigo: "4x3",
+    nome: "4x3",
+    descricao:
+      "Dias fixos na semana · Quatro dias de trabalho e três de folga · 17 dias no mês",
+  },
+  {
+    codigo: "fim_de_semana",
+    nome: "Fim de semana",
+    descricao: "Dias fixos na semana · Só sábado e domingo · 9 dias no mês",
+  },
+  {
+    codigo: "5x1",
+    nome: "5x1",
+    descricao:
+      "Revezamento em dias · Cinco dias de trabalho e uma folga, em rodízio · 25 dias no mês",
+  },
+  {
+    codigo: "6x2",
+    nome: "6x2",
+    descricao:
+      "Revezamento em dias · Seis dias de trabalho e duas folgas · 23 dias no mês",
+  },
+  {
+    codigo: "4x2",
+    nome: "4x2",
+    descricao:
+      "Revezamento em dias · Quatro dias de trabalho e duas folgas · 20 dias no mês",
+  },
+  {
+    codigo: "2x2",
+    nome: "2x2",
+    descricao:
+      "Revezamento em dias · Dois dias de trabalho e dois de folga · 15 dias no mês",
+  },
+  {
+    codigo: "3x3",
+    nome: "3x3",
+    descricao:
+      "Revezamento em dias · Três dias de trabalho e três de folga · 15 dias no mês",
+  },
+  {
+    codigo: "4x4",
+    nome: "4x4",
+    descricao:
+      "Revezamento em dias · Quatro dias de trabalho e quatro de folga · 15 dias no mês",
+  },
+  {
+    codigo: "12x36",
+    nome: "12x36",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 36 de descanso · 15 dias no mês",
+  },
+  {
+    codigo: "12x60",
+    nome: "12x60",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 60 de descanso · 10 dias no mês",
+  },
+  {
+    codigo: "12x72",
+    nome: "12x72",
+    descricao:
+      "Plantão em horas · 12 horas de trabalho e 72 de descanso · 9 dias no mês",
+  },
+  {
+    codigo: "18x36",
+    nome: "18x36",
+    descricao:
+      "Plantão em horas · 18 horas de trabalho e 36 de descanso · 13 dias no mês",
+  },
+  {
+    codigo: "24x48",
+    nome: "24x48",
+    descricao:
+      "Plantão em horas · 24 horas de trabalho e 48 de descanso · 10 dias no mês",
+  },
+  {
+    codigo: "24x72",
+    nome: "24x72",
+    descricao:
+      "Plantão em horas · 24 horas de trabalho e 72 de descanso · 8 dias no mês",
+  },
+  {
+    codigo: "7x7",
+    nome: "7x7",
+    descricao:
+      "Embarque e alojamento · Sete dias embarcado e sete de folga · 15 dias no mês",
+  },
+  {
+    codigo: "14x14",
+    nome: "14x14",
+    descricao:
+      "Embarque e alojamento · 14 dias embarcado e 14 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "14x21",
+    nome: "14x21",
+    descricao:
+      "Embarque e alojamento · 14 dias embarcado e 21 de folga · 12 dias no mês",
+  },
+  {
+    codigo: "15x15",
+    nome: "15x15",
+    descricao:
+      "Embarque e alojamento · 15 dias de trabalho e 15 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "20x10",
+    nome: "20x10",
+    descricao:
+      "Embarque e alojamento · 20 dias de trabalho e 10 de folga · 20 dias no mês",
+  },
+  {
+    codigo: "21x21",
+    nome: "21x21",
+    descricao:
+      "Embarque e alojamento · 21 dias de trabalho e 21 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "28x28",
+    nome: "28x28",
+    descricao:
+      "Embarque e alojamento · 28 dias de trabalho e 28 de folga · 15 dias no mês",
+  },
+  {
+    codigo: "outra",
+    nome: "Outra",
+    descricao: "Outra · Escala diferente: benefícios usam os dias úteis do mês",
+  },
+] as const;
+
+const OPCOES_CONSELHO = [
+  { codigo: "nenhum", rotulo: "Nenhum" },
+  ...(
+    [
+      "oab",
+      "crm",
+      "coren",
+      "cro",
+      "crp",
+      "crea",
+      "cau",
+      "cra",
+      "crc",
+      "crf",
+      "crn",
+      "cref",
+      "crefito",
+      "crbm",
+      "crtr",
+    ] as const
+  ).map((codigo) => ({ codigo, rotulo: codigo.toUpperCase() })),
+];
+
+/** Dica da matrícula (ícone de ajuda ao lado do rótulo). */
+const DICA_DA_MATRICULA =
+  "Código da pessoa na folha ou na contabilidade (matrícula, registro ou chapa). Serve para achar a pessoa quando um documento não traz o CPF.";
+
+/** "500000" → "5.000,00", conforme se digita (centavos à direita). */
+function mascararReais(texto: string): string {
+  const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, 12);
+  if (digitos === "") return "";
+  const completo = digitos.padStart(3, "0");
+  const inteiros = completo.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${inteiros},${completo.slice(-2)}`;
+}
+
+/** T209 — o cargo digitado não pôde virar cargo do cadastro. */
+class CargoIndisponivel extends Error {}
+
+/** Gestor direto: as pessoas da empresa ativa, com o cargo vigente. */
+interface OpcaoDeGestor {
+  readonly id: string;
+  readonly nome: string;
+  readonly cargo: string | null;
+}
+
+// ---- T209 — etapa 1 do Novo colaborador ------------------------------------
+
+/** Campos novos da etapa 1, fora do perfil compartilhado com a ficha. */
+type ChaveIdentificacao =
+  | "cpf"
+  | "rg"
+  | "genero"
+  | "contatoEmergenciaNome"
+  | "contatoEmergenciaTelefone";
+type ValoresIdentificacao = Record<ChaveIdentificacao, string>;
+
+const IDENTIFICACAO_VAZIA: ValoresIdentificacao = {
+  cpf: "",
+  rg: "",
+  genero: "",
+  contatoEmergenciaNome: "",
+  contatoEmergenciaTelefone: "",
+};
+
+const CHAVES_IDENTIFICACAO = Object.keys(
+  IDENTIFICACAO_VAZIA,
+) as ChaveIdentificacao[];
+
+/** Gênero em lista fechada (o código vai ao servidor). */
+const OPCOES_GENERO = [
+  { codigo: "feminino", rotulo: "Feminino" },
+  { codigo: "masculino", rotulo: "Masculino" },
+  { codigo: "outro", rotulo: "Outro" },
+  { codigo: "prefiro_nao_informar", rotulo: "Prefiro não informar" },
+] as const;
+
+/** Estado civil: o texto da opção é o que fica gravado. */
+const OPCOES_ESTADO_CIVIL = [
+  "Solteiro(a)",
+  "Casado(a)",
+  "Divorciado(a)",
+  "Viúvo(a)",
+  "União estável",
+] as const;
+
+function rotuloDoGenero(codigo: string | null | undefined): string | null {
+  if (!codigo) return null;
+  return OPCOES_GENERO.find((o) => o.codigo === codigo)?.rotulo ?? codigo;
+}
+
+/** `00000000000` → `000.000.000-00`, conforme se digita. */
+function mascararCpf(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+/** CPF gravado (11 dígitos) como a tela mostra. */
+function exibirCpf(cpf: string | null | undefined): string | null {
+  return cpf ? mascararCpf(cpf) : null;
+}
+
+/** Dígitos verificadores do CPF (a mesma regra do servidor). */
+function cpfValido(digitos: string): boolean {
+  if (!/^\d{11}$/.test(digitos) || /^(\d)\1{10}$/.test(digitos)) return false;
+  const n = [...digitos].map(Number);
+  const dv = (quantos: number) => {
+    let soma = 0;
+    for (let i = 0; i < quantos; i++) soma += n[i]! * (quantos + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return dv(9) === n[9] && dv(10) === n[10];
+}
+
+/** Nome completo: pelo menos 3 letras e até 150 caracteres. */
+const NOME_TRES_LETRAS = /^(?:[^\p{L}]*\p{L}){3}/u;
+const NOME_MAXIMO = 150;
+
+/** Telefone brasileiro como o servidor grava (`+55` + DDD + número). */
+const TELEFONE_GRAVADO = /^\+55[1-9]{2}(?:9[0-9]{8}|[2-5][0-9]{7})$/;
+
+function blocoIdentificacao(
+  valores: ValoresIdentificacao,
+): Record<ChaveIdentificacao, string | null> {
+  const limpo = (v: string) => {
+    const t = v.trim().replace(/ {2,}/g, " ");
+    return t === "" ? null : t;
+  };
+  const telefone = limpo(valores.contatoEmergenciaTelefone);
+  return {
+    cpf: limpo(valores.cpf.replace(/\D/g, "")),
+    rg: limpo(valores.rg),
+    genero: limpo(valores.genero),
+    contatoEmergenciaNome: limpo(valores.contatoEmergenciaNome),
+    contatoEmergenciaTelefone:
+      telefone === null ? null : normalizarTelefone(telefone),
+  };
+}
+
 export function NovaAdmissaoScreen({
   onSair,
   onAbrirAdmitido,
@@ -798,13 +1272,26 @@ export function NovaAdmissaoScreen({
   const [perfil, setPerfil] = useState<ValoresPerfil>(PERFIL_VAZIO);
   const [endereco, setEndereco] = useState<ValoresEndereco>(ENDERECO_INICIAL);
   const [contatos, setContatos] = useState<ValoresContatos>(CONTATOS_VAZIOS);
+  /** T209 — etapa 2: as pessoas da empresa para "Gestor direto". */
+  const [gestores, setGestores] = useState<OpcaoDeGestor[]>([]);
+  const [dicaDaMatricula, setDicaDaMatricula] = useState(false);
+  /** T209 — CPF, RG, gênero e contato de emergência (etapa 1). */
+  const [identificacao, setIdentificacao] =
+    useState<ValoresIdentificacao>(IDENTIFICACAO_VAZIA);
   const [erros, setErros] = useState<Erros>({});
   /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
-  const [tentouSalvar, setTentouSalvar] = useState(false);
   /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [admissao, setAdmissao] = useState<AdmissaoRegistradaApi | null>(null);
+  /** T209 — a foto escolhida (prévia local) e o seu envio, pós-admissão. */
+  const [foto, setFoto] = useState<FotoEscolhida | null>(null);
+  const [recusaDaFoto, setRecusaDaFoto] = useState<string | null>(null);
+  const [envioDaFoto, setEnvioDaFoto] = useState<EnvioDaFoto>({
+    estado: "nenhum",
+  });
+  /** Gatilho de uma vez só: devolver o foco a "Enviar foto". */
+  const focarEnviarFotoRef = useRef(false);
   /**
    * T179 — o servidor disse que a chave deste envio já registrou uma admissão
    * com OUTRO conteúdo (422 `idempotencia_conteudo_divergente`). Toda nova
@@ -828,6 +1315,17 @@ export function NovaAdmissaoScreen({
   /** T195 — a etapa na tela e a mais adiantada já alcançada. */
   const [etapa, setEtapa] = useState<IndiceEtapa>(0);
   const [etapaAlcancada, setEtapaAlcancada] = useState<IndiceEtapa>(0);
+  /** T209 — o rascunho salvo ou recuperado, para o aviso curto. */
+  const [rascunho, setRascunho] = useState<{
+    readonly estado: "salvo" | "recuperado";
+    readonly quando: string;
+  } | null>(null);
+  const [falhaDoRascunho, setFalhaDoRascunho] = useState<string | null>(null);
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
+  /** Os valores do último rascunho salvo ou recuperado (para a guarda). */
+  const [assinaturaSalva, setAssinaturaSalva] = useState<string | null>(null);
+  /** Depois de recuperar, a assinatura é a do formulário já preenchido. */
+  const sincronizarAssinaturaRef = useRef(false);
   /** Trava síncrona contra envio duplicado (cliques no mesmo quadro). */
   const enviandoRef = useRef(false);
   /**
@@ -900,6 +1398,10 @@ export function NovaAdmissaoScreen({
     papelDoAtor === "rh",
   );
   const [jornadasIndisponiveis, setJornadasIndisponiveis] = useState(false);
+  // T209 — etapa 2: a jornada da tabela de horário saiu da admissão
+  // (decisão de 2026-11-17); a leitura fica para a revisão e o rascunho antigo.
+  void carregandoJornadas;
+  void jornadasIndisponiveis;
   useEffect(() => {
     if (papelDoAtor !== "rh") return;
     let vigente = true;
@@ -989,6 +1491,43 @@ export function NovaAdmissaoScreen({
     if (admissao) sucessoTituloRef.current?.focus();
   }, [admissao]);
 
+  // T209 — etapa 2: as pessoas da empresa ativa, para "Gestor direto".
+  // Falha na leitura deixa a lista só com "Sem gestor".
+  useEffect(() => {
+    if (!empresa) return undefined;
+    let vivo = true;
+    void Promise.resolve(listarColaboradores({ tamanhoPagina: 100 }))
+      .then((pagina) => {
+        if (!vivo) return;
+        setGestores(
+          (pagina?.itens ?? []).map((c) => ({
+            id: c.id,
+            nome: c.nome,
+            cargo: c.vinculos?.[0]?.lotacaoVigente?.cargo?.nome ?? null,
+          })),
+        );
+      })
+      .catch(() => {
+        if (vivo) setGestores([]);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [empresa]);
+
+  // T209 — a URL local da prévia vale só enquanto a foto é a escolhida:
+  // trocada, removida ou a página desmontada, ela é liberada.
+  useEffect(() => {
+    if (!foto) return undefined;
+    return () => URL.revokeObjectURL(foto.url);
+  }, [foto]);
+
+  useEffect(() => {
+    if (foto || !focarEnviarFotoRef.current) return;
+    focarEnviarFotoRef.current = false;
+    document.getElementById(ID_FOTO_ENVIAR)?.focus();
+  }, [foto]);
+
   // T180 — ao fechar o cadastro rápido por qualquer caminho, o foco vai ao
   // SELETOR, não ao "+". Este efeito roda depois da limpeza do `Modal`, que
   // devolve o foco a quem o abriu (o botão), e assim prevalece.
@@ -1014,18 +1553,16 @@ export function NovaAdmissaoScreen({
    * sem unidade ativa admite sem ela. Só se calcula com a empresa resolvida:
    * sem ela, o aviso de empresa indefinida já basta.
    */
-  const referenciasFaltando: string[] =
-    carregandoOpcoes || !empresa
-      ? []
-      : [
-          ...(existemAtivos.departamento ? [] : ["Departamento"]),
-          ...(existemAtivos.cargo ? [] : ["Cargo"]),
-        ];
+  // T209 — etapa 2: Departamento e Cargo passaram a opcionais; empresa sem
+  // eles admite do mesmo jeito (o cargo digitado vira cargo do cadastro).
+  const referenciasFaltando: string[] = [];
+  void existemAtivos;
 
   const alterado =
     (Object.keys(campos) as (keyof Campos)[]).some(
       (c) => campos[c] !== CAMPOS_VAZIOS[c],
     ) ||
+    CHAVES_IDENTIFICACAO.some((c) => identificacao[c] !== "") ||
     (Object.keys(perfil) as ChavePerfil[]).some(
       (c) => perfil[c] !== PERFIL_VAZIO[c],
     ) ||
@@ -1039,9 +1576,57 @@ export function NovaAdmissaoScreen({
   // antes de descartar, e espera o envio terminar.
   // T200 — e toda saída do shell, pelo diálogo único, com a frase da T179
   // sobre o que pode (ou não) ter sido gravado.
+  // ---- T209 — rascunho persistente (servidor, por conta e empresa) --------
+
+  /** O que o rascunho guarda: só os valores do formulário e a etapa. */
+  function dadosDoRascunho(): DadosDoRascunhoApi {
+    const preenchidos = (valores: Readonly<Record<string, string>>) =>
+      Object.fromEntries(
+        Object.entries(valores).filter(([, v]) => v !== ""),
+      ) as Record<string, string>;
+    const referencia = (lista: readonly Referencia[], id: string) => {
+      const r = id ? lista.find((x) => x.id === id) : undefined;
+      return r ? { id: r.id, codigo: r.codigo, nome: r.nome } : undefined;
+    };
+    const referencias = Object.fromEntries(
+      (
+        [
+          [
+            "departamento",
+            referencia(opcoes.departamentos, campos.departamentoId),
+          ],
+          ["cargo", referencia(opcoes.cargos, campos.cargoId)],
+          ["unidade", referencia(opcoes.unidades, campos.unidadeId)],
+          [
+            "centroCusto",
+            referencia(opcoes.centrosCusto, campos.centroCustoId),
+          ],
+        ] as const
+      ).filter(([, v]) => v !== undefined),
+    );
+    return {
+      etapa,
+      campos: preenchidos(campos as unknown as Record<string, string>),
+      perfil: preenchidos({
+        ...(perfil as unknown as Record<string, string>),
+        ...identificacao,
+      }),
+      endereco: preenchidos(endereco as unknown as Record<string, string>),
+      contatos: preenchidos(contatos as unknown as Record<string, string>),
+      ...(Object.keys(referencias).length > 0 ? { referencias } : {}),
+    };
+  }
+  const assinaturaAtual = JSON.stringify(dadosDoRascunho());
+
+  // Com o rascunho salvo e nada mudado desde então, sair não perde nada.
+  // T209 — a foto nunca vai para o rascunho: escolhida, sair a perde.
+  const pendenteSemRascunho =
+    admissao === null &&
+    ((alterado && assinaturaAtual !== assinaturaSalva) || foto !== null);
+
   useEdicaoEmAndamento("Nova admissão", {
-    pendente: alterado && admissao === null,
-    salvando,
+    pendente: pendenteSemRascunho,
+    salvando: salvando || envioDaFoto.estado === "enviando",
     aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
 
@@ -1068,16 +1653,40 @@ export function NovaAdmissaoScreen({
   // ---- T178 — consulta assistida de CEP (T181: `useCepAssistido`) ---------
   const consultaCep = useCepAssistido({
     endereco,
-    setEndereco,
+    // T209 — o Estado é um seletor de siglas: o que o CEP sugerir por
+    // extenso entra como sigla.
+    setEndereco: (acao) =>
+      setEndereco((prev) => {
+        const proximo = typeof acao === "function" ? acao(prev) : acao;
+        return { ...proximo, estado: siglaDaUf(proximo.estado) };
+      }),
     onErroNoCep: (mensagem) => setErros((prev) => ({ ...prev, cep: mensagem })),
     onCamposAjustados: (campos) =>
       setErros((prev) => semErroDe(prev, ...campos)),
-    idBotaoBuscar: ID_BOTAO_BUSCAR_CEP,
+    // T209 — sem "Buscar CEP" (a consulta sai ao completar o CEP): o foco
+    // volta ao próprio CEP.
+    idBotaoBuscar: ID_DO_CAMPO.cep,
   });
   const cep = consultaCep.estado;
-  const cepAssistido = consultaCep.assistido;
   const buscarCep = consultaCep.buscar;
   const usarEnderecoDoCep = consultaCep.usarEnderecoDoCep;
+  /**
+   * T209 — completar os 8 dígitos do CEP consulta sozinho (o Evolli
+   * completa o endereço). A consulta sai depois que o
+   * CEP novo chega ao estado (o hook lê o endereço atual), e só por digitação:
+   * abrir um rascunho com CEP não consulta.
+   */
+  const consultarCepAoCompletarRef = useRef(false);
+  useEffect(() => {
+    if (!consultarCepAoCompletarRef.current) return;
+    consultarCepAoCompletarRef.current = false;
+    void buscarCep("botao");
+  }, [endereco.cep, buscarCep]);
+
+  function atualizarIdentificacao(campo: ChaveIdentificacao, valor: string) {
+    setIdentificacao((prev) => ({ ...prev, [campo]: valor }));
+    setErros((prev) => semErroDe(prev, campo));
+  }
 
   function atualizarContato(campo: CampoContato, valor: string) {
     setContatos((prev) => ({ ...prev, [campo]: valor }));
@@ -1304,11 +1913,34 @@ export function NovaAdmissaoScreen({
         papelDoAtor,
       );
     }
+    // T209 — nome com pelo menos 3 letras e até 150 caracteres; CPF
+    // obrigatório e válido; os demais da etapa 1 são opcionais.
     const nome = campos.nome.trim();
-    if (!nome) {
-      novos.nome = "Nome é obrigatório.";
-    } else if (nome.length < 2 || nome.length > 160) {
-      novos.nome = "Nome deve ter entre 2 e 160 caracteres.";
+    if (!NOME_TRES_LETRAS.test(nome)) {
+      novos.nome = "Informe o nome completo (pelo menos 3 letras).";
+    } else if (nome.length > NOME_MAXIMO) {
+      novos.nome = `O nome completo deve ter no máximo ${NOME_MAXIMO} caracteres.`;
+    }
+    const cpf = identificacao.cpf.replace(/\D/g, "");
+    if (cpf === "") {
+      novos.cpf = "Informe o CPF.";
+    } else if (!cpfValido(cpf)) {
+      novos.cpf = "Informe um CPF válido.";
+    }
+    if (identificacao.rg.trim().length > 20) {
+      novos.rg = "O RG deve ter no máximo 20 caracteres.";
+    }
+    if (identificacao.contatoEmergenciaNome.trim().length > 150) {
+      novos.contatoEmergenciaNome =
+        "O nome do contato deve ter no máximo 150 caracteres.";
+    }
+    const telefoneEmergencia = identificacao.contatoEmergenciaTelefone.trim();
+    if (
+      telefoneEmergencia !== "" &&
+      !TELEFONE_GRAVADO.test(normalizarTelefone(telefoneEmergencia))
+    ) {
+      novos.contatoEmergenciaTelefone =
+        "Informe o telefone com DDD, no formato (00) 00000-0000.";
     }
     // T179 — matrícula opcional: o formato só é conferido quando preenchida.
     const matricula = campos.matricula.trim().toUpperCase();
@@ -1316,19 +1948,52 @@ export function NovaAdmissaoScreen({
       novos.matricula =
         "Use apenas letras maiúsculas, números, - e _ (2 a 32 caracteres).";
     }
-    if (!campos.tipo) novos.tipo = "Selecione o tipo de vínculo.";
+    // T209 — etapa 2: tipo e data de admissão obrigatórios; da lotação, ao
+    // menos uma referência (Baseline V1, item 10); salário bruto obrigatório.
+    if (!campos.tipo) novos.tipo = "Selecione o tipo de contratação.";
     if (!campos.dataAdmissao) {
       novos.dataAdmissao = "Informe a data de admissão.";
     }
-    if (!campos.departamentoId) {
-      novos.departamento = existemAtivos.departamento
-        ? "Selecione o departamento."
-        : "Não há departamento ativo nesta empresa.";
+    if (
+      !campos.cargoNome.trim() &&
+      !campos.cargoId &&
+      !campos.departamentoId &&
+      !campos.unidadeId &&
+      !campos.centroCustoId
+    ) {
+      novos.cargo =
+        "Informe ao menos o cargo, o departamento, a unidade ou o centro de custo.";
+    } else if (campos.cargoNome.trim().length > 120) {
+      novos.cargo = "O cargo deve ter no máximo 120 caracteres.";
     }
-    if (!campos.cargoId) {
-      novos.cargo = existemAtivos.cargo
-        ? "Selecione o cargo."
-        : "Não há cargo ativo nesta empresa.";
+    const jornada = campos.jornadaSemanalHoras.trim();
+    if (
+      jornada !== "" &&
+      (!/^\d+$/.test(jornada) || Number(jornada) < 1 || Number(jornada) > 80)
+    ) {
+      novos.jornadaSemanalHoras = "Informe de 1 a 80 horas por semana.";
+    }
+    const bruto = lerValorEmReais(campos.salarioBruto);
+    if (bruto === null || bruto <= 0) {
+      novos.salarioBruto = "Informe o salário bruto.";
+    }
+    if (campos.registroProfissional.trim().length > 40) {
+      novos.registroProfissional =
+        "O número do registro deve ter no máximo 40 caracteres.";
+    }
+    const dependentes = campos.dependentesIrrf.trim();
+    if (
+      dependentes !== "" &&
+      (!/^\d+$/.test(dependentes) || Number(dependentes) > 99)
+    ) {
+      novos.dependentesIrrf = "Informe de 0 a 99 dependentes.";
+    }
+    const pensao = campos.pensaoAlimenticiaPercentual.trim().replace(",", ".");
+    if (
+      pensao !== "" &&
+      (!/^\d{1,3}(\.\d{1,2})?$/.test(pensao) || Number(pensao) > 100)
+    ) {
+      novos.pensaoAlimenticiaPercentual = "Informe um percentual de 0 a 100.";
     }
     Object.assign(
       novos,
@@ -1390,7 +2055,6 @@ export function NovaAdmissaoScreen({
       for (let indice = etapa; indice < alvo; indice++) {
         const novos = errosDaEtapa(indice as IndiceEtapa);
         if (Object.keys(novos).length > 0) {
-          setTentouSalvar(true);
           setErros((prev) => ({ ...prev, ...novos }));
           focarPrimeiroErro(novos);
           return;
@@ -1402,24 +2066,18 @@ export function NovaAdmissaoScreen({
     pedirFoco(idDoFoco);
   }
 
-  /** T179 — um nome do resumo "Revise N campos"; T195 — abre a etapa dele. */
-  function irAoCampo(campo: CampoErro) {
-    const alvo = etapaDoCampo(campo);
-    if (alvo !== null && alvo !== etapa) {
-      irParaEtapa(alvo, ID_DO_CAMPO[campo]);
-      return;
-    }
-    document.getElementById(ID_DO_CAMPO[campo])?.focus();
-  }
-
   /**
    * Corpo da admissão. T179 — opcional vazio fica FORA do corpo: matrícula,
    * Unidade, Área, Equipe, Centro de custo e cada contato (o bloco `contatos`
    * inteiro some quando os três estão vazios). Perfil e endereço seguem com
    * o vazio como `null` — inclusive o sexo sem seleção.
    */
-  function montarDto(empresaId: string): AdmitirColaboradorDto {
+  function montarDto(
+    empresaId: string,
+    cargoResolvido: string | null = campos.cargoId || null,
+  ): AdmitirColaboradorDto {
     const { unidadeId, areaId, equipeId, centroCustoId } = campos;
+    const contrato = blocoDoContrato();
     const matricula = campos.matricula.trim().toUpperCase();
     const blocoContatos = contatosDaAdmissao(contatos);
     return {
@@ -1429,27 +2087,106 @@ export function NovaAdmissaoScreen({
       tipo: campos.tipo as TipoVinculo,
       dataAdmissao: campos.dataAdmissao,
       motivoCodigo: "admissao_inicial",
-      departamentoId: campos.departamentoId,
-      cargoId: campos.cargoId,
+      ...(campos.departamentoId
+        ? { departamentoId: campos.departamentoId }
+        : {}),
+      ...(cargoResolvido ? { cargoId: cargoResolvido } : {}),
       ...(unidadeId ? { unidadeOrganizacionalId: unidadeId } : {}),
       ...(areaId ? { areaId } : {}),
       ...(equipeId ? { equipeId } : {}),
       ...(centroCustoId ? { centroCustoId } : {}),
-      perfilPessoal: blocoPerfil(perfil),
+      perfilPessoal: {
+        ...blocoPerfil(perfil),
+        ...blocoIdentificacao(identificacao),
+      },
       endereco: blocoEndereco(endereco),
       ...(blocoContatos ? { contatos: blocoContatos } : {}),
       // T183 — jornada opcional: só vai quando escolhida (e só o RH a vê).
       ...(campos.tabelaHorarioId
         ? { tabelaHorarioId: campos.tabelaHorarioId }
         : {}),
+      ...(contrato ? { contrato } : {}),
     };
   }
 
+  /** T209 — o bloco `contrato` da etapa 2; sem nenhum valor, nada vai. */
+  function blocoDoContrato(): ContratoAdmissaoApi | null {
+    const bruto = lerValorEmReais(campos.salarioBruto);
+    const pensao = campos.pensaoAlimenticiaPercentual.trim().replace(",", ".");
+    const conselho =
+      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
+        ? campos.conselhoProfissional
+        : null;
+    const registro = campos.registroProfissional.trim();
+    const bloco: ContratoAdmissaoApi = {
+      ...(campos.nivel && campos.nivel !== "sem_nivel"
+        ? { nivel: campos.nivel }
+        : {}),
+      ...(campos.gestorDiretoId && campos.gestorDiretoId !== "sem_gestor"
+        ? { gestorDiretoId: campos.gestorDiretoId }
+        : {}),
+      ...(campos.jornadaSemanalHoras.trim()
+        ? { jornadaSemanalHoras: Number(campos.jornadaSemanalHoras.trim()) }
+        : {}),
+      ...(campos.escala && campos.escala !== "nao_informada"
+        ? { escala: campos.escala }
+        : {}),
+      ...(bruto !== null && bruto > 0
+        ? { salarioBruto: bruto.toFixed(2) }
+        : {}),
+      ...(conselho ? { conselhoProfissional: conselho } : {}),
+      ...(conselho && registro ? { registroProfissional: registro } : {}),
+      ...(campos.dependentesIrrf.trim()
+        ? { dependentesIrrf: Number(campos.dependentesIrrf.trim()) }
+        : {}),
+      ...(pensao ? { pensaoAlimenticiaPercentual: pensao } : {}),
+    };
+    return Object.keys(bloco).length > 0 ? bloco : null;
+  }
+
   /**
-   * T179 — "Salvar" (T195: "Confirmar admissão", na revisão): só valida, e
+   * T209 — o cargo digitado vira cargo do cadastro: o que já existe com esse
+   * nome (ativo) é usado; senão, o RH o cria (código automático, T197). O DP
+   * não cria cargo: sem ele no cadastro, a recusa fica no campo. Vazio, sem
+   * cargo (ou o escolhido antes, de um rascunho antigo).
+   */
+  async function resolverCargo(): Promise<string | null> {
+    const nomeDigitado = campos.cargoNome.trim().replace(/\s+/g, " ");
+    if (!nomeDigitado) return campos.cargoId || null;
+    const chave = nomeDigitado.toLocaleLowerCase("pt-BR");
+    const achados = await listarCargos({
+      busca: nomeDigitado,
+      status: "ativo",
+      pagina: 1,
+      tamanhoPagina: TAMANHO_DA_PAGINA_DE_REFERENCIAS,
+    });
+    const existente = (achados?.itens ?? []).find(
+      (c) => c.nome.trim().toLocaleLowerCase("pt-BR") === chave,
+    );
+    if (existente) return existente.id;
+    if (papelDoAtor !== "rh") {
+      throw new CargoIndisponivel(
+        "Este cargo não está no cadastro. Peça ao RH para cadastrá-lo, ou deixe o campo em branco.",
+      );
+    }
+    try {
+      return (await criarCargo({ nome: nomeDigitado, empresaId: empresa!.id }))
+        .id;
+    } catch (erro: unknown) {
+      const existenteNoConflito = (erro as { referencia?: { id?: string } })
+        ?.referencia?.id;
+      if (existenteNoConflito) return existenteNoConflito;
+      throw new CargoIndisponivel(
+        "Não foi possível usar este cargo. Confira o nome e tente de novo.",
+      );
+    }
+  }
+
+  /**
+   * T179 — "Salvar" (T195: "Concluir", na revisão): só valida, e
    * TUDO. Com falha, o foco vai ao primeiro campo inválido (T195: na etapa
    * dele); sem falha, abre a confirmação. Nada é enviado aqui. T195 — antes da
-   * revisão, o envio do formulário (Enter ou "Continuar") avança uma etapa.
+   * revisão, o envio do formulário (Enter ou "Próxima etapa") avança uma etapa.
    */
   function pedirConfirmacao(evento: React.FormEvent) {
     evento.preventDefault();
@@ -1458,7 +2195,6 @@ export function NovaAdmissaoScreen({
       irParaEtapa((etapa + 1) as IndiceEtapa);
       return;
     }
-    setTentouSalvar(true);
     const novos = validar();
     if (Object.keys(novos).length > 0 || !empresa) {
       setErros(novos);
@@ -1483,15 +2219,37 @@ export function NovaAdmissaoScreen({
     const chave = (chaveIdempotenciaRef.current ??= gerarChaveIdempotencia());
     setSalvando(true);
     try {
-      const resposta = await admitirColaborador(montarDto(empresa.id), {
-        chaveIdempotencia: chave,
-      });
+      // T209 — o cargo digitado vira cargo do cadastro antes de admitir.
+      let cargoResolvido: string | null;
+      try {
+        cargoResolvido = await resolverCargo();
+      } catch (erro: unknown) {
+        if (erro instanceof CargoIndisponivel) {
+          setConfirmando(false);
+          const recusa: Erros = { cargo: erro.message };
+          setErros(recusa);
+          focarPrimeiroErro(recusa);
+          return;
+        }
+        throw erro;
+      }
+      const resposta = await admitirColaborador(
+        montarDto(empresa.id, cargoResolvido),
+        { chaveIdempotencia: chave },
+      );
       // Sucesso: a próxima admissão desta página será OUTRO envio.
       chaveIdempotenciaRef.current = null;
       setEnvioIncerto(false);
       setLimpezaDosAvisos((n) => n + 1);
       setConfirmando(false);
       setAdmissao(resposta);
+      // T209 — a foto vai só agora, para o colaborador já criado; a falha
+      // dela nunca desfaz a admissão.
+      if (foto) void enviarFoto(resposta.id, foto.arquivo);
+      // T209 — concluída a admissão, o rascunho deixa de existir.
+      setRascunho(null);
+      setAssinaturaSalva(null);
+      void descartarRascunhoAdmissao().catch(() => undefined);
     } catch (erro: unknown) {
       // Os dados digitados ficam: só as mensagens e o estado de envio mudam.
       // A chave também fica — a próxima confirmação é o MESMO envio.
@@ -1521,14 +2279,180 @@ export function NovaAdmissaoScreen({
     guarda.solicitarSaida({ executar: onSair });
   }
 
+  // T209 — a assinatura do rascunho recuperado só existe depois de o
+  // formulário ser preenchido com ele.
+  useEffect(() => {
+    if (!sincronizarAssinaturaRef.current) return;
+    sincronizarAssinaturaRef.current = false;
+    setAssinaturaSalva(assinaturaAtual);
+  }, [assinaturaAtual]);
+
+  // T209 — recupera o rascunho da conta na empresa ativa, depois de as
+  // opções carregarem (para as referências escolhidas aparecerem). Falha na
+  // leitura: a página começa vazia, como antes.
+  useEffect(() => {
+    if (carregandoOpcoes) return;
+    let vigente = true;
+    void (async () => {
+      let salvo: RascunhoAdmissaoApi | null | undefined;
+      try {
+        salvo = await obterRascunhoAdmissao();
+      } catch {
+        return;
+      }
+      if (!vigente || !salvo) return;
+      aplicarRascunho(salvo);
+    })();
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregandoOpcoes]);
+
+  function aplicarRascunho(salvo: RascunhoAdmissaoApi) {
+    const d = salvo.dados;
+    const refs = d.referencias ?? {};
+    if (refs.departamento) conhecer("departamentos", refs.departamento);
+    if (refs.cargo) conhecer("cargos", refs.cargo);
+    if (refs.unidade) conhecer("unidades", refs.unidade);
+    if (refs.centroCusto) conhecer("centrosCusto", refs.centroCusto);
+    const so = <T extends object>(
+      base: T,
+      extra?: Readonly<Record<string, string>>,
+    ) =>
+      ({
+        ...base,
+        ...Object.fromEntries(
+          Object.entries(extra ?? {}).filter(([k]) => k in base),
+        ),
+      }) as T;
+    const novosCampos = so(CAMPOS_VAZIOS, d.campos);
+    setCampos(novosCampos);
+    setPerfil(so(PERFIL_VAZIO, d.perfil));
+    setIdentificacao(so(IDENTIFICACAO_VAZIA, d.perfil));
+    setEndereco(so(ENDERECO_INICIAL, d.endereco));
+    setContatos(so(CONTATOS_VAZIOS, d.contatos));
+    const etapaSalva = Math.min(
+      Math.max(d.etapa ?? 0, 0),
+      ULTIMA_ETAPA,
+    ) as IndiceEtapa;
+    setEtapa(etapaSalva);
+    setEtapaAlcancada(etapaSalva);
+    if (novosCampos.departamentoId) {
+      void carregarAreasDe(novosCampos.departamentoId);
+    }
+    setRascunho({ estado: "recuperado", quando: salvo.atualizadoEm });
+    sincronizarAssinaturaRef.current = true;
+  }
+
+  /** As áreas do departamento recuperado, sem limpar a área escolhida. */
+  async function carregarAreasDe(departamentoId: string) {
+    const pedido = ++pedidoAreasRef.current;
+    setCarregandoAreas(true);
+    try {
+      const resp = await listarAreas({
+        departamentoId,
+        status: "ativo",
+        tamanhoPagina: 100,
+      });
+      if (pedido !== pedidoAreasRef.current) return;
+      setAreas(soAtivos(resp.itens));
+    } catch {
+      if (pedido !== pedidoAreasRef.current) return;
+      setAreas([]);
+    } finally {
+      if (pedido === pedidoAreasRef.current) setCarregandoAreas(false);
+    }
+  }
+
+  /** "Salvar rascunho": grava o formulário no servidor; nunca admite. */
+  async function salvarRascunho() {
+    if (salvandoRascunho || admissao !== null) return;
+    const dados = dadosDoRascunho();
+    setSalvandoRascunho(true);
+    setFalhaDoRascunho(null);
+    try {
+      const resposta = await salvarRascunhoAdmissao(dados);
+      setAssinaturaSalva(JSON.stringify(dados));
+      setRascunho({ estado: "salvo", quando: resposta.atualizadoEm });
+    } catch {
+      setFalhaDoRascunho(
+        "Não foi possível salvar o rascunho agora. Os dados digitados continuam aqui.",
+      );
+    } finally {
+      setSalvandoRascunho(false);
+    }
+  }
+
+  /** "Descartar rascunho": apaga no servidor e recomeça a página. */
+  async function descartarRascunho() {
+    setFalhaDoRascunho(null);
+    try {
+      await descartarRascunhoAdmissao();
+    } catch {
+      setFalhaDoRascunho(
+        "Não foi possível descartar o rascunho agora. Tente de novo.",
+      );
+      return;
+    }
+    recomecar();
+    setRascunho(null);
+    setAssinaturaSalva(null);
+  }
+
+  /** T209 — o arquivo escolhido no seletor da etapa 1. */
+  function escolherFoto(arquivo: File | undefined) {
+    if (!arquivo) return;
+    const recusa = recusaDaFotoNoNavegador(arquivo);
+    setRecusaDaFoto(recusa);
+    if (recusa) return;
+    setFoto({ arquivo, url: URL.createObjectURL(arquivo) });
+  }
+
+  function removerFoto() {
+    focarEnviarFotoRef.current = true;
+    setFoto(null);
+    setRecusaDaFoto(null);
+  }
+
+  /** T209 — envia a foto do colaborador já admitido (e as novas tentativas). */
+  async function enviarFoto(colaboradorId: string, arquivo: File) {
+    setEnvioDaFoto({ estado: "enviando" });
+    try {
+      await enviarFotoColaborador(colaboradorId, arquivo);
+      setEnvioDaFoto({ estado: "enviada" });
+    } catch (erro: unknown) {
+      setEnvioDaFoto({ estado: "falhou", ...falhaDoEnvioDaFoto(erro) });
+    }
+  }
+
+  /** Depois de uma recusa: outro arquivo, conferido e enviado na hora. */
+  function enviarOutraFoto(colaboradorId: string, arquivo: File | undefined) {
+    if (!arquivo) return;
+    const recusa = recusaDaFotoNoNavegador(arquivo);
+    if (recusa) {
+      setEnvioDaFoto({
+        estado: "falhou",
+        mensagem: recusa,
+        podeRepetir: false,
+      });
+      return;
+    }
+    setFoto({ arquivo, url: URL.createObjectURL(arquivo) });
+    void enviarFoto(colaboradorId, arquivo);
+  }
+
   function recomecar() {
+    setFoto(null);
+    setRecusaDaFoto(null);
+    setEnvioDaFoto({ estado: "nenhum" });
     setCampos(CAMPOS_VAZIOS);
     setPerfil(PERFIL_VAZIO);
     setEndereco(ENDERECO_INICIAL);
     setContatos(CONTATOS_VAZIOS);
+    setIdentificacao(IDENTIFICACAO_VAZIA);
     setAreas([]);
     setErros({});
-    setTentouSalvar(false);
     setEtapa(0);
     setEtapaAlcancada(0);
     consultaCep.reiniciar();
@@ -1618,104 +2542,6 @@ export function NovaAdmissaoScreen({
    * ajuda e validação continuam vindo de `CAMPOS_TEXTO_PERFIL`; o JSX só
    * decide em que linha da grade ele aparece.
    */
-  function campoPerfil(chave: Exclude<ChavePerfil, "dataNascimento" | "sexo">) {
-    const campo = CAMPOS_TEXTO_PERFIL.find((c) => c.chave === chave)!;
-    return (
-      <FormField
-        id={ID_DO_CAMPO[campo.chave]}
-        label={rotuloOpcional(campo.rotulo)}
-        {...(campo.ajuda ? { help: campo.ajuda } : {})}
-        {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
-      >
-        {(control) => (
-          <input
-            type="text"
-            maxLength={campo.limite}
-            autoComplete="off"
-            value={perfil[campo.chave]}
-            onChange={(e) => atualizarPerfil(campo.chave, e.target.value)}
-            {...control}
-          />
-        )}
-      </FormField>
-    );
-  }
-
-  /**
-   * T179 — o sexo: seletor de lista FECHADA (`OPCOES_SEXO`), opcional. A
-   * opção vazia "Selecione…" é o "não informado" — vai `null`. O valor é o
-   * código; o que se lê é o rótulo.
-   */
-  function campoSexo() {
-    return (
-      <FormField
-        id={ID_DO_CAMPO.sexo}
-        label={rotuloOpcional(CAMPO_SEXO.rotulo)}
-        {...(erros.sexo ? { error: erros.sexo } : {})}
-      >
-        {(control) => (
-          <select
-            value={perfil.sexo}
-            onChange={(e) => atualizarPerfil("sexo", e.target.value)}
-            {...control}
-          >
-            <option value="">Selecione…</option>
-            {OPCOES_SEXO.map((opcao) => (
-              <option key={opcao.codigo} value={opcao.codigo}>
-                {opcao.rotulo}
-              </option>
-            ))}
-          </select>
-        )}
-      </FormField>
-    );
-  }
-
-  /** T178 — idem para o endereço (`CAMPOS_ENDERECO`). */
-  function campoEndereco(chave: ChaveEndereco, aoSair?: () => void) {
-    const campo = CAMPOS_ENDERECO.find((c) => c.chave === chave)!;
-    // T179 — CEP brasileiro tem máscara `00000-000`; com outro país, texto
-    // livre como antes.
-    const cepComMascara = chave === "cep" && cepAssistido;
-    const ajuda =
-      campo.chave === "pais"
-        ? "Sugerido como Brasil; pode ser alterado."
-        : cepComMascara
-          ? DICA_DE_FORMATO.cep
-          : campo.ajuda;
-    return (
-      <FormField
-        id={ID_DO_CAMPO[campo.chave]}
-        label={rotuloOpcional(campo.rotulo)}
-        {...(ajuda ? { help: ajuda } : {})}
-        {...(erros[campo.chave] ? { error: erros[campo.chave]! } : {})}
-      >
-        {(control) =>
-          cepComMascara ? (
-            <CampoMascarado
-              mascara="cep"
-              value={endereco.cep}
-              onValorChange={(valor) => atualizarEndereco("cep", valor)}
-              limparAvisos={limpezaDosAvisos}
-              onBlur={aoSair}
-              {...control}
-            />
-          ) : (
-            <input
-              type="text"
-              maxLength={campo.limite}
-              autoComplete="off"
-              value={endereco[campo.chave]}
-              onChange={(e) => atualizarEndereco(campo.chave, e.target.value)}
-              onBlur={aoSair}
-              {...control}
-            />
-          )
-        }
-      </FormField>
-    );
-  }
-
   /**
    * T179 — um seletor da lotação. Obrigatório (Departamento, Cargo) ou
    * opcional (Unidade, Área, Equipe, Centro de custo); opções `CÓDIGO — Nome`, só
@@ -1786,558 +2612,553 @@ export function NovaAdmissaoScreen({
         onAbrirAdmitido={onAbrirAdmitido}
         onRecomecar={recomecar}
         onSair={onSair}
+        foto={foto}
+        envioDaFoto={envioDaFoto}
+        onTentarFotoDeNovo={() => {
+          if (foto) void enviarFoto(admissao.id, foto.arquivo);
+        }}
+        onEscolherOutraFoto={(arquivo) => enviarOutraFoto(admissao.id, arquivo)}
       />
     );
   }
 
-  // T179 — campos a revisar, na ordem da tela. Só depois de uma tentativa, e
-  // sem o aviso de referências (que tem bloco próprio) nem o erro geral.
-  const camposARevisar = tentouSalvar
-    ? ORDEM_DOS_ERROS.filter(
-        (c): c is Exclude<CampoErro, "referencias" | "geral"> =>
-          c !== "referencias" && c !== "geral" && Boolean(erros[c]),
-      )
-    : [];
+  // T209 — o líquido estimado, recalculado a cada mudança da remuneração.
+  const salarioLiquido = calcularSalarioLiquido({
+    bruto: lerValorEmReais(campos.salarioBruto) ?? 0,
+    dependentes: Number(campos.dependentesIrrf || 0),
+    pensaoPercentual: Number(
+      campos.pensaoAlimenticiaPercentual.replace(",", ".") || 0,
+    ),
+  });
+  const salarioLiquidoExibido =
+    salarioLiquido === null ? "" : formatarReais(salarioLiquido);
 
-  /** T195 — um painel de etapa: montado sempre, visível só na etapa atual. */
-  function painelDaEtapa(indice: IndiceEtapa, conteudo: ReactNode) {
-    const tituloId = idDoTituloDaEtapa(indice);
-    return (
-      <section
-        className="nova-admissao__etapa"
-        aria-labelledby={tituloId}
-        hidden={indice !== etapa}
+  /** T209 — id, estado inválido e descrição do erro de um campo da linha. */
+  function propsDoCampo(campo: CampoErro) {
+    const id = ID_DO_CAMPO[campo];
+    return {
+      id,
+      "aria-invalid": erros[campo] ? ("true" as const) : undefined,
+      "aria-describedby": erros[campo] ? `${id}-erro` : undefined,
+    };
+  }
+
+  /** T209 — a mensagem do erro, embaixo do campo. */
+  function erroDoCampo(campo: CampoErro) {
+    return erros[campo] ? (
+      <p
+        id={`${ID_DO_CAMPO[campo]}-erro`}
+        className="nova-admissao__linha-erro"
       >
-        <h2 id={tituloId} className="nova-admissao__etapa-titulo" tabIndex={-1}>
-          <span className="nova-admissao__etapa-numero">
-            Etapa {indice + 1} de {ETAPAS.length}
-            <span className="nova-admissao__so-leitor">:</span>
-          </span>{" "}
-          {ETAPAS[indice]}
-        </h2>
-        {conteudo}
-      </section>
-    );
+        {erros[campo]}
+      </p>
+    ) : null;
   }
 
   // T195 — o resumo da revisão: o que foi digitado, sem opcional em branco.
   const linhasBasicas = linhasPreenchidas([
     ["Nome completo", campos.nome],
-    ["E-mail pessoal", contatos.emailPessoal],
+    ["CPF", identificacao.cpf],
+    ["RG", identificacao.rg],
     [
       ROTULO_DATA_NASCIMENTO,
       perfil.dataNascimento ? formatarDiaCivil(perfil.dataNascimento) : null,
     ],
-    [CAMPO_SEXO.rotulo, rotuloDoSexo(perfil.sexo)],
-    ...CAMPOS_TEXTO_PERFIL.map((c) => [c.rotulo, perfil[c.chave]] as const),
-    ["Celular", contatos.celular],
-    ["Telefone", contatos.telefone],
+    ["Gênero", rotuloDoGenero(identificacao.genero)],
+    ["Estado civil", perfil.estadoCivil],
+    ["E-mail pessoal", contatos.emailPessoal],
+    ["Telefone pessoal", contatos.celular],
+    ["Nome do contato", identificacao.contatoEmergenciaNome],
+    ["Telefone do contato", identificacao.contatoEmergenciaTelefone],
   ]);
   const linhasProfissionais = linhasPreenchidas([
-    ["Matrícula", campos.matricula.toUpperCase()],
-    ["Tipo de vínculo", campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null],
+    [
+      "Cargo",
+      campos.cargoNome.trim() || escolhida(opcoes.cargos, campos.cargoId),
+    ],
+    [
+      "Nível",
+      OPCOES_NIVEL.find((o) => o.codigo === campos.nivel)?.rotulo ?? null,
+    ],
+    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
+    ["Área", escolhida(areas, campos.areaId)],
+    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
+    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
+    [
+      "Gestor direto",
+      campos.gestorDiretoId === "sem_gestor"
+        ? "Sem gestor"
+        : (gestores.find((g) => g.id === campos.gestorDiretoId)?.nome ?? null),
+    ],
+    [
+      "Tipo de contratação",
+      campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null,
+    ],
     [
       "Data de admissão",
       campos.dataAdmissao ? formatarDiaCivil(campos.dataAdmissao) : null,
     ],
-    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
-    ["Cargo", escolhida(opcoes.cargos, campos.cargoId)],
-    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
-    ["Área", escolhida(areas, campos.areaId)],
-    ["Equipe", escolhida(opcoes.equipes, campos.equipeId)],
-    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
     [
       "Jornada de trabalho",
-      papelDoAtor === "rh" && campos.tabelaHorarioId
-        ? jornadaEscolhida
-          ? rotuloDaJornada(jornadaEscolhida)
-          : "Jornada escolhida"
+      campos.jornadaSemanalHoras
+        ? `${campos.jornadaSemanalHoras} horas por semana`
+        : null,
+    ],
+    [
+      "Escala de trabalho",
+      OPCOES_ESCALA.find((o) => o.codigo === campos.escala)?.nome ?? null,
+    ],
+    ["Matrícula", campos.matricula.toUpperCase()],
+    ["Salário bruto", campos.salarioBruto ? `R$ ${campos.salarioBruto}` : null],
+    [
+      "Salário líquido",
+      salarioLiquidoExibido ? `R$ ${salarioLiquidoExibido}` : null,
+    ],
+    [
+      "Conselho e registro",
+      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
+        ? [
+            campos.conselhoProfissional.toUpperCase(),
+            campos.registroProfissional.trim(),
+          ]
+            .filter(Boolean)
+            .join(" ")
+        : null,
+    ],
+    ["Dependentes (IRRF)", campos.dependentesIrrf || null],
+    [
+      "Pensão alimentícia",
+      campos.pensaoAlimenticiaPercentual
+        ? `${campos.pensaoAlimenticiaPercentual}%`
         : null,
     ],
   ]);
+  // T209 — sem campo País na etapa 3: o país não entra no resumo.
   const linhasDoEndereco = linhasPreenchidas(
-    CAMPOS_ENDERECO.map((c) => [c.rotulo, endereco[c.chave]] as const),
+    CAMPOS_ENDERECO.filter((c) => c.chave !== "pais").map(
+      (c) => [c.rotulo, endereco[c.chave]] as const,
+    ),
   );
 
   return (
-    <div className="nova-admissao">
-      {/* T178 — "Colaboradores" na trilha é o MESMO caminho do Cancelar:
-          com dados digitados, pede a confirmação de descarte antes de sair. */}
-      <TrilhaDaNovaAdmissao onColaboradores={pedirCancelamento} />
-      <PageHeader
-        headingLevel={1}
-        titleId={NOVA_ADMISSAO_TITULO_ID}
-        title="Nova admissão"
-        description="Registre a admissão de um colaborador na empresa ativa, em quatro etapas. Ao concluir, uma só operação cria o colaborador, o vínculo previsto e o ato de admissão; a efetivação continua sendo feita depois, pelo RH ou DP."
-      />
-
-      <Surface
-        as="section"
-        padding="md"
-        className="nova-admissao__aviso"
-        aria-labelledby="nova-admissao-aviso-titulo"
-      >
-        <StatusBadge variant="info">Módulo 1 do cadastro</StatusBadge>
-        <p id="nova-admissao-aviso-titulo" className="nova-admissao__texto">
-          Dados pessoais, endereço e contatos são gravados junto com a admissão.
-          Nome social, gênero, documentos, CPF, dados bancários, dependentes e
-          dados contratuais avançados ainda não são coletados: entram nos
-          próximos módulos.
-        </p>
-      </Surface>
-
-      <form
-        className="nova-admissao__form"
-        aria-label="Formulário de nova admissão"
-        noValidate
-        onSubmit={pedirConfirmacao}
-      >
-        {/* T179 — resumo do que revisar: só NOMES de campos, nunca valores.
-            Cada nome é um botão que leva o foco ao campo. Não é região viva:
-            quem anuncia é o foco, que já vai ao primeiro campo. */}
-        {camposARevisar.length > 0 ? (
-          <div
-            className="nova-admissao__revisar"
-            role="group"
-            aria-labelledby="nova-admissao-revisar-titulo"
-          >
-            <p
-              id="nova-admissao-revisar-titulo"
-              className="nova-admissao__revisar-titulo"
+    <>
+      {/* T209 — o padrão compartilhado de cadastro em etapas: cabeçalho com
+          voltar (o mesmo caminho do Cancelar, com a guarda), título e Salvar
+          rascunho; etapas à esquerda; os quatro painéis sempre montados (só
+          o atual visível, nada do que foi digitado sai do documento); rodapé
+          fixo com o progresso e as ações. Enter num campo faz o mesmo que
+          "Próxima etapa" (envio implícito); duplo clique não salta etapa. */}
+      <CadastroEmEtapas
+        className="nova-admissao"
+        tituloId={NOVA_ADMISSAO_TITULO_ID}
+        titulo="Novo colaborador"
+        descricao="Quatro etapas. Salve o rascunho a qualquer momento e termine depois."
+        rotuloVoltar="Voltar para Colaboradores"
+        onVoltarDaPagina={pedirCancelamento}
+        acaoDoCabecalho={
+          admissao === null ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void salvarRascunho()}
+              disabled={salvando || salvandoRascunho || carregandoOpcoes}
             >
-              Revise {camposARevisar.length}{" "}
-              {camposARevisar.length === 1 ? "campo" : "campos"} antes de
-              confirmar
-            </p>
-            <ul className="nova-admissao__revisar-lista">
-              {camposARevisar.map((campo) => (
-                <li key={campo}>
-                  <Button
-                    type="button"
-                    variant="subtle"
-                    onClick={() => irAoCampo(campo)}
-                  >
-                    {ROTULO_DO_CAMPO[campo]}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <p className="nova-admissao__texto nova-admissao__legenda">
-          Campos com * são obrigatórios. Os marcados como opcionais podem ficar
-          em branco.
-        </p>
-        <section
-          className="nova-admissao__grupo"
-          aria-labelledby="nova-admissao-grupo-empresa"
-        >
-          <h2
-            id="nova-admissao-grupo-empresa"
-            className="nova-admissao__grupo-titulo"
-          >
-            Empresa
-          </h2>
-          {carregandoOpcoes ? (
-            <p className="nova-admissao__texto" role="status">
-              Carregando a empresa ativa…
-            </p>
-          ) : empresa ? (
-            <dl className="nova-admissao__leitura">
-              <dt>Empresa ativa</dt>
-              <dd id="nova-admissao-empresa">
-                <strong>{empresa.nome}</strong> ({empresa.codigo})
-                <span className="nova-admissao__ajuda">
-                  {" "}
-                  — a empresa em que você está trabalhando. Não é editável aqui.
-                </span>
-              </dd>
-            </dl>
-          ) : null}
-          {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
+              {salvandoRascunho ? "Salvando rascunho…" : "Salvar rascunho"}
+            </Button>
+          ) : undefined
+        }
+        aposCabecalho={
+          rascunho || falhaDoRascunho ? (
+            <div className="nova-admissao__rascunho">
+              <p
+                className="nova-admissao__texto"
+                role={falhaDoRascunho ? "alert" : "status"}
+              >
+                {falhaDoRascunho ??
+                  (rascunho?.estado === "recuperado"
+                    ? `Rascunho de ${formatarInstante(rascunho.quando)} recuperado.`
+                    : `Rascunho salvo em ${formatarInstante(rascunho?.quando)}.`)}
+              </p>
+              {rascunho?.estado === "recuperado" && admissao === null ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void descartarRascunho()}
+                  disabled={salvando || salvandoRascunho}
+                >
+                  Descartar rascunho
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
+        etapas={ETAPAS.map((titulo, i) => ({
+          titulo,
+          subtitulo: SUBTITULOS_DAS_ETAPAS[i]!,
+          descricao: DESCRICOES_DAS_ETAPAS[i]!,
+        }))}
+        atual={etapa}
+        alcancada={etapaAlcancada}
+        onIrParaEtapa={(alvo) => irParaEtapa(alvo as IndiceEtapa)}
+        idDoTituloDaEtapa={(i) => idDoTituloDaEtapa(i as IndiceEtapa)}
+        rotuloDoFormulario="Formulário de nova admissão"
+        onSubmit={pedirConfirmacao}
+        rotuloConcluir="Cadastrar colaborador"
+        idBotaoPrincipal={
+          etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR
+        }
+        principalDesabilitado={carregandoOpcoes && etapa > 0}
+        ocupado={salvando}
+        antesDoConteudo={
+          <>
+            {/* T209 — só a empresa ativa, numa frase; sem empresa ativa, o
+              bloqueio de sempre (nenhuma empresa é escolhida em silêncio). */}
+            {carregandoOpcoes ? (
+              <p className="nova-admissao__texto" role="status">
+                Carregando a empresa ativa…
+              </p>
+            ) : empresa ? (
+              <p className="nova-admissao__empresa" id="nova-admissao-empresa">
+                Você está cadastrando um novo colaborador para:{" "}
+                <strong>{empresa.nome}</strong>
+              </p>
+            ) : null}
+            {/* T179 — empresa sem Departamento ou Cargo ativos: o aviso
               fica visível desde o carregamento e recebe o foco ao tentar
               salvar. */}
-          {referenciasFaltando.length > 0 ? (
-            <p
-              id={ID_DO_CAMPO.referencias}
-              className="nova-admissao__sem-referencias"
-              role="alert"
-              tabIndex={-1}
-            >
-              {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
-            </p>
-          ) : null}
-        </section>
-
-        {/* T195 — o indicador das etapas e os quatro painéis; só o da etapa
-            atual aparece, e nenhum perde o que foi digitado. */}
-        <IndicadorDeEtapas
-          atual={etapa}
-          alcancada={etapaAlcancada}
-          desabilitado={salvando}
-          onIr={(alvo) => irParaEtapa(alvo)}
-        />
-
-        {painelDaEtapa(
-          0,
-          <>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-dados-pessoais"
-            >
-              <h3
-                id="nova-admissao-grupo-dados-pessoais"
-                className="nova-admissao__grupo-titulo"
+            {referenciasFaltando.length > 0 ? (
+              <p
+                id={ID_DO_CAMPO.referencias}
+                className="nova-admissao__sem-referencias"
+                role="alert"
+                tabIndex={-1}
               >
-                Dados pessoais
-              </h3>
-              {/* T178 — disposição em linhas (pedido da proprietária): nome e
-              e-mail pessoal; data de nascimento, sexo e saudação; estado
-              civil, nacionalidade e naturalidade; escolaridade e curso; pai e
-              mãe. Em tela estreita cada linha vira uma coluna só. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <FormField
-                  id={ID_DO_CAMPO.nome}
-                  label="Nome completo"
-                  required
-                  help="2 a 160 caracteres."
-                  {...(erros.nome ? { error: erros.nome } : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="text"
-                      maxLength={160}
-                      autoComplete="off"
-                      value={campos.nome}
-                      onChange={(e) =>
-                        atualizar("nome", e.target.value, "nome")
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                {/* O e-mail pessoal é o MESMO campo dos contatos (T169): mesmo
-                estado e validação, e segue em `contatos.emailPessoal`. Só a
-                posição na tela é de Dados pessoais. T179 — opcional. */}
-                <FormField
-                  id={ID_DO_CAMPO.emailPessoal}
-                  label={rotuloOpcional("E-mail pessoal")}
-                  {...(erros.emailPessoal ? { error: erros.emailPessoal } : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="email"
-                      maxLength={254}
-                      autoComplete="off"
-                      value={contatos.emailPessoal}
-                      onChange={(e) =>
-                        atualizarContato("emailPessoal", e.target.value)
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                <FormField
-                  id={ID_DO_CAMPO.dataNascimento}
-                  label={ROTULO_DATA_NASCIMENTO}
-                  required
-                  {...(erros.dataNascimento
-                    ? { error: erros.dataNascimento }
-                    : {})}
-                >
-                  {(control) => (
-                    <input
-                      type="date"
-                      value={perfil.dataNascimento}
-                      onChange={(e) =>
-                        atualizarPerfil("dataNascimento", e.target.value)
-                      }
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                {campoSexo()}
-                {campoPerfil("saudacao")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                {campoPerfil("estadoCivil")}
-                {campoPerfil("nacionalidade")}
-                {campoPerfil("naturalidade")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoPerfil("escolaridade")}
-                {campoPerfil("curso")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoPerfil("nomePai")}
-                {campoPerfil("nomeMae")}
-              </div>
-            </section>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-contatos"
-            >
-              <h3
-                id="nova-admissao-grupo-contatos"
-                className="nova-admissao__grupo-titulo"
-              >
-                Contatos
-              </h3>
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                O e-mail pessoal fica em Dados pessoais, ao lado do nome.
+                {mensagemSemReferencias(referenciasFaltando, papelDoAtor)}
               </p>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <FormField
-                  id={ID_DO_CAMPO.celular}
-                  label={rotuloOpcional("Celular")}
-                  help={DICA_DE_FORMATO.telefone}
-                  {...(erros.celular ? { error: erros.celular } : {})}
-                >
-                  {(control) => (
-                    <CampoMascarado
-                      mascara="telefone"
-                      value={contatos.celular}
-                      onValorChange={(valor) =>
-                        atualizarContato("celular", valor)
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...control}
-                    />
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.telefone}
-                  label={rotuloOpcional("Telefone")}
-                  help={DICA_DE_FORMATO.telefone}
-                  {...(erros.telefone ? { error: erros.telefone } : {})}
-                >
-                  {(control) => (
-                    <CampoMascarado
-                      mascara="telefone"
-                      value={contatos.telefone}
-                      onValorChange={(valor) =>
-                        atualizarContato("telefone", valor)
-                      }
-                      limparAvisos={limpezaDosAvisos}
-                      {...control}
-                    />
-                  )}
-                </FormField>
-              </div>
-            </section>
-          </>,
-        )}
-
-        {painelDaEtapa(
-          1,
+            ) : null}
+          </>
+        }
+        paineis={[
           <>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-vinculo"
+            <SecaoDoCadastro
+              id="nova-admissao-secao-identificacao"
+              titulo="Identificação"
+              descricao="Dados que identificam a pessoa no Evolli."
             >
-              <h3
-                id="nova-admissao-grupo-vinculo"
-                className="nova-admissao__grupo-titulo"
+              <BlocoDaFoto
+                foto={foto}
+                recusa={recusaDaFoto}
+                onEscolher={escolherFoto}
+                onRemover={removerFoto}
+              />
+              <LinhaDoCadastro
+                rotulo="Nome completo"
+                ajuda="Igual ao documento de identidade."
+                paraId={ID_DO_CAMPO.nome}
               >
-                Vínculo
-              </h3>
-              <div className="nova-admissao__linha nova-admissao__linha--3">
-                <FormField
-                  id={ID_DO_CAMPO.matricula}
-                  label={rotuloOpcional("Matrícula")}
-                  help="Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco."
-                  {...(erros.matricula ? { error: erros.matricula } : {})}
-                >
-                  {(control) => (
+                <input
+                  type="text"
+                  maxLength={NOME_MAXIMO}
+                  autoComplete="off"
+                  placeholder="Nome completo"
+                  aria-required="true"
+                  value={campos.nome}
+                  onChange={(e) => atualizar("nome", e.target.value, "nome")}
+                  {...propsDoCampo("nome")}
+                />
+                {erroDoCampo("nome")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="CPF e RG"
+                ajuda="Documentos de identificação da pessoa."
+              >
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
                     <input
                       type="text"
-                      maxLength={32}
+                      inputMode="numeric"
                       autoComplete="off"
-                      value={campos.matricula}
+                      maxLength={14}
+                      placeholder="000.000.000-00"
+                      aria-label="CPF"
+                      aria-required="true"
+                      value={identificacao.cpf}
                       onChange={(e) =>
-                        atualizar(
-                          "matricula",
-                          e.target.value.toUpperCase(),
-                          "matricula",
+                        atualizarIdentificacao(
+                          "cpf",
+                          mascararCpf(e.target.value),
                         )
                       }
-                      {...control}
+                      {...propsDoCampo("cpf")}
                     />
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.tipo}
-                  label="Tipo de vínculo"
-                  required
-                  {...(erros.tipo ? { error: erros.tipo } : {})}
-                >
-                  {(control) => (
-                    <select
-                      value={campos.tipo}
-                      onChange={(e) =>
-                        atualizar("tipo", e.target.value as TipoVinculo, "tipo")
-                      }
-                      {...control}
-                    >
-                      <option value="">Selecione…</option>
-                      {(Object.keys(ROTULO_TIPO_VINCULO) as TipoVinculo[]).map(
-                        (tipo) => (
-                          <option key={tipo} value={tipo}>
-                            {ROTULO_TIPO_VINCULO[tipo]}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  )}
-                </FormField>
-                <FormField
-                  id={ID_DO_CAMPO.dataAdmissao}
-                  label="Data de admissão"
-                  required
-                  help="Data futura deixa o ato de admissão programado para ela."
-                  {...(erros.dataAdmissao ? { error: erros.dataAdmissao } : {})}
-                >
-                  {(control) => (
+                    {erroDoCampo("cpf")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
                     <input
-                      type="date"
-                      value={campos.dataAdmissao}
+                      type="text"
+                      autoComplete="off"
+                      maxLength={20}
+                      placeholder="00.000.000-0"
+                      aria-label="RG"
+                      value={identificacao.rg}
+                      onChange={(e) =>
+                        atualizarIdentificacao("rg", e.target.value)
+                      }
+                      {...propsDoCampo("rg")}
+                    />
+                    {erroDoCampo("rg")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo={ROTULO_DATA_NASCIMENTO}
+                paraId={ID_DO_CAMPO.dataNascimento}
+              >
+                <input
+                  type="date"
+                  value={perfil.dataNascimento}
+                  onChange={(e) =>
+                    atualizarPerfil("dataNascimento", e.target.value)
+                  }
+                  {...propsDoCampo("dataNascimento")}
+                />
+                {erroDoCampo("dataNascimento")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Gênero e estado civil">
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Gênero"
+                      value={identificacao.genero}
+                      onChange={(e) =>
+                        atualizarIdentificacao("genero", e.target.value)
+                      }
+                      {...propsDoCampo("genero")}
+                    >
+                      <option value="">Selecione</option>
+                      {OPCOES_GENERO.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("genero")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Estado civil"
+                      value={perfil.estadoCivil}
+                      onChange={(e) =>
+                        atualizarPerfil("estadoCivil", e.target.value)
+                      }
+                      {...propsDoCampo("estadoCivil")}
+                    >
+                      <option value="">Selecione</option>
+                      {/* Valor gravado antes da lista (rascunho antigo):
+                          continua visível como opção. */}
+                      {perfil.estadoCivil !== "" &&
+                      !(OPCOES_ESTADO_CIVIL as readonly string[]).includes(
+                        perfil.estadoCivil,
+                      ) ? (
+                        <option value={perfil.estadoCivil}>
+                          {perfil.estadoCivil}
+                        </option>
+                      ) : null}
+                      {OPCOES_ESTADO_CIVIL.map((opcao) => (
+                        <option key={opcao} value={opcao}>
+                          {opcao}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("estadoCivil")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-contato"
+              titulo="Contato"
+              descricao="Como a empresa fala com a pessoa."
+            >
+              <LinhaDoCadastro
+                rotulo="E-mail pessoal"
+                ajuda="O e-mail particular, não o da empresa."
+                paraId={ID_DO_CAMPO.emailPessoal}
+              >
+                <input
+                  type="email"
+                  maxLength={254}
+                  autoComplete="off"
+                  placeholder="email@exemplo.com"
+                  value={contatos.emailPessoal}
+                  onChange={(e) =>
+                    atualizarContato("emailPessoal", e.target.value)
+                  }
+                  {...propsDoCampo("emailPessoal")}
+                />
+                {erroDoCampo("emailPessoal")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Telefone pessoal"
+                ajuda="Com DDD."
+                paraId={ID_DO_CAMPO.celular}
+              >
+                <CampoMascarado
+                  mascara="telefone"
+                  placeholder="(00) 00000-0000"
+                  value={contatos.celular}
+                  onValorChange={(valor) => atualizarContato("celular", valor)}
+                  limparAvisos={limpezaDosAvisos}
+                  {...propsDoCampo("celular")}
+                />
+                {erroDoCampo("celular")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-emergencia"
+              titulo="Contato de emergência"
+              descricao="Quem avisar se algo acontecer."
+            >
+              <LinhaDoCadastro
+                rotulo="Nome do contato"
+                paraId={ID_DO_CAMPO.contatoEmergenciaNome}
+              >
+                <input
+                  type="text"
+                  maxLength={150}
+                  autoComplete="off"
+                  placeholder="Nome do contato"
+                  value={identificacao.contatoEmergenciaNome}
+                  onChange={(e) =>
+                    atualizarIdentificacao(
+                      "contatoEmergenciaNome",
+                      e.target.value,
+                    )
+                  }
+                  {...propsDoCampo("contatoEmergenciaNome")}
+                />
+                {erroDoCampo("contatoEmergenciaNome")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Telefone do contato"
+                paraId={ID_DO_CAMPO.contatoEmergenciaTelefone}
+              >
+                <CampoMascarado
+                  mascara="telefone"
+                  placeholder="(00) 00000-0000"
+                  value={identificacao.contatoEmergenciaTelefone}
+                  onValorChange={(valor) =>
+                    atualizarIdentificacao("contatoEmergenciaTelefone", valor)
+                  }
+                  limparAvisos={limpezaDosAvisos}
+                  {...propsDoCampo("contatoEmergenciaTelefone")}
+                />
+                {erroDoCampo("contatoEmergenciaTelefone")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+          </>,
+          <>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-cargo"
+              titulo="Cargo e estrutura"
+              descricao="Posição da pessoa na estrutura da empresa."
+            >
+              <LinhaDoCadastro rotulo="Cargo e nível">
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      placeholder="Ex.: Analista de RH"
+                      aria-label="Cargo"
+                      value={campos.cargoNome}
                       onChange={(e) =>
                         atualizar(
-                          "dataAdmissao",
+                          "cargoNome",
                           e.target.value,
-                          "dataAdmissao",
+                          "cargo",
+                          "lotacao",
                         )
                       }
-                      {...control}
+                      {...propsDoCampo("cargo")}
                     />
-                  )}
-                </FormField>
-              </div>
-            </section>
-            <section
-              className="nova-admissao__grupo"
-              aria-labelledby="nova-admissao-grupo-lotacao"
-            >
-              <h3
-                id="nova-admissao-grupo-lotacao"
-                className="nova-admissao__grupo-titulo"
-              >
-                Lotação inicial
-              </h3>
-              {/* T179 — um seletor por referência. T196 — Departamento,
-                  Cargo, Unidade e Centro de custo são escolhidos pela busca
-                  no servidor, de 20 em 20; em duas colunas, para o campo de
-                  busca caber ao lado dos botões de 44 px. Departamento e
-                  Cargo (obrigatórios) primeiro; a Área logo abaixo do
-                  Departamento que a filtra; os demais opcionais depois. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.departamento}
-                  rotulo="Departamento"
-                  rotuloVisivel="Departamento"
-                  plural="departamentos"
-                  nenhum="Nenhum"
-                  ativo="ativo"
-                  obrigatorio
-                  {...(erros.departamento ? { erro: erros.departamento } : {})}
-                  escolhida={referenciaPorId(
-                    opcoes.departamentos,
-                    campos.departamentoId,
-                  )}
-                  onEscolher={(r) => {
-                    if (r) conhecer("departamentos", r);
-                    void selecionarDepartamento(r?.id ?? "");
-                  }}
-                  listar={consultaDe(listarDepartamentos)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.departamento}
-                  acao={botaoNovaReferencia("departamento")}
-                  criacao={criacaoDe("departamento")}
-                  aviso={avisoDaCriacao.departamento}
-                />
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.cargo}
-                  rotulo="Cargo"
-                  rotuloVisivel="Cargo"
-                  plural="cargos"
-                  nenhum="Nenhum"
-                  ativo="ativo"
-                  obrigatorio
-                  {...(erros.cargo ? { erro: erros.cargo } : {})}
-                  escolhida={referenciaPorId(opcoes.cargos, campos.cargoId)}
-                  onEscolher={(r) => {
-                    if (r) conhecer("cargos", r);
-                    atualizar("cargoId", r?.id ?? "", "cargo", "lotacao");
-                  }}
-                  listar={consultaDe(listarCargos)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.cargo}
-                  acao={botaoNovaReferencia("cargo")}
-                  criacao={criacaoDe("cargo")}
-                  aviso={avisoDaCriacao.cargo}
-                />
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {seletorDeLotacao({
-                  campo: "area",
-                  rotulo: "Área",
-                  obrigatorio: false,
-                  valor: campos.areaId,
-                  lista: areas,
-                  aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
-                  ajuda:
-                    "Escolha antes o departamento: a lista mostra só as áreas dele.",
-                  vazio: campos.departamentoId
-                    ? carregandoAreas
-                      ? "Carregando áreas…"
-                      : "Nenhuma área ativa neste departamento"
-                    : "Escolha antes o departamento",
-                  desabilitado: !campos.departamentoId || carregandoAreas,
-                })}
-                <SeletorDeReferencia
-                  id={ID_DO_CAMPO.unidade}
-                  rotulo="Unidade"
-                  rotuloVisivel={rotuloOpcional("Unidade")}
-                  plural="unidades"
-                  nenhum="Nenhuma"
-                  ativo="ativa"
-                  obrigatorio={false}
-                  {...(erros.unidade ? { erro: erros.unidade } : {})}
-                  escolhida={referenciaPorId(opcoes.unidades, campos.unidadeId)}
-                  onEscolher={(r) => {
-                    if (r) conhecer("unidades", r);
-                    atualizar("unidadeId", r?.id ?? "", "unidade", "lotacao");
-                  }}
-                  listar={consultaDe(listarUnidades)}
-                  desabilitado={carregandoOpcoes}
-                  versao={versaoDaBusca.unidade}
-                  acao={botaoNovaReferencia("unidade")}
-                  criacao={criacaoDe("unidade")}
-                  aviso={avisoDaCriacao.unidade}
-                />
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {seletorDeLotacao({
-                  campo: "equipe",
-                  rotulo: "Equipe",
-                  obrigatorio: false,
-                  valor: campos.equipeId,
-                  lista: opcoes.equipes,
-                  aoMudar: (id) =>
-                    atualizar("equipeId", id, "equipe", "lotacao"),
-                  vazio: "Nenhuma equipe ativa",
-                })}
+                    {erroDoCampo("cargo")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Nível"
+                      value={campos.nivel}
+                      onChange={(e) =>
+                        atualizar("nivel", e.target.value, "nivel")
+                      }
+                      {...propsDoCampo("nivel")}
+                    >
+                      <option value="">Nível</option>
+                      {OPCOES_NIVEL.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Departamento e área">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--seletores">
+                  <SeletorDeReferencia
+                    id={ID_DO_CAMPO.departamento}
+                    rotulo="Departamento"
+                    rotuloVisivel="Departamento"
+                    plural="departamentos"
+                    nenhum="Nenhum"
+                    ativo="ativo"
+                    obrigatorio={false}
+                    placeholder="Departamento"
+                    {...(erros.departamento
+                      ? { erro: erros.departamento }
+                      : {})}
+                    escolhida={referenciaPorId(
+                      opcoes.departamentos,
+                      campos.departamentoId,
+                    )}
+                    onEscolher={(r) => {
+                      if (r) conhecer("departamentos", r);
+                      void selecionarDepartamento(r?.id ?? "");
+                    }}
+                    listar={consultaDe(listarDepartamentos)}
+                    desabilitado={carregandoOpcoes}
+                    versao={versaoDaBusca.departamento}
+                    acao={botaoNovaReferencia("departamento")}
+                    criacao={criacaoDe("departamento")}
+                    aviso={avisoDaCriacao.departamento}
+                  />
+                  {seletorDeLotacao({
+                    campo: "area",
+                    rotulo: "Área",
+                    obrigatorio: false,
+                    valor: campos.areaId,
+                    lista: areas,
+                    aoMudar: (id) => atualizar("areaId", id, "area", "lotacao"),
+                    vazio: campos.departamentoId
+                      ? carregandoAreas
+                        ? "Carregando áreas…"
+                        : "Área"
+                      : "Área",
+                    desabilitado: !campos.departamentoId || carregandoAreas,
+                  })}
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Centro de custo" grupo={false}>
                 <SeletorDeReferencia
                   id={ID_DO_CAMPO.centroCusto}
                   rotulo="Centro de custo"
-                  rotuloVisivel={rotuloOpcional("Centro de custo")}
+                  rotuloVisivel="Centro de custo"
                   plural="centros de custo"
                   nenhum="Nenhum"
                   ativo="ativo"
                   obrigatorio={false}
+                  placeholder="Selecione"
                   {...(erros.centroCusto ? { erro: erros.centroCusto } : {})}
                   escolhida={referenciaPorId(
                     opcoes.centrosCusto,
@@ -2349,6 +3170,7 @@ export function NovaAdmissaoScreen({
                       "centroCustoId",
                       r?.id ?? "",
                       "centroCusto",
+                      "cargo",
                       "lotacao",
                     );
                   }}
@@ -2358,7 +3180,63 @@ export function NovaAdmissaoScreen({
                   criacao={criacaoDe("centroCusto")}
                   aviso={avisoDaCriacao.centroCusto}
                 />
-              </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Unidade"
+                ajuda="Onde a pessoa trabalha."
+                grupo={false}
+              >
+                <SeletorDeReferencia
+                  id={ID_DO_CAMPO.unidade}
+                  rotulo="Unidade"
+                  rotuloVisivel="Unidade"
+                  plural="unidades"
+                  nenhum="Nenhuma"
+                  ativo="ativa"
+                  obrigatorio={false}
+                  placeholder="Selecione"
+                  {...(erros.unidade ? { erro: erros.unidade } : {})}
+                  escolhida={referenciaPorId(opcoes.unidades, campos.unidadeId)}
+                  onEscolher={(r) => {
+                    if (r) conhecer("unidades", r);
+                    atualizar(
+                      "unidadeId",
+                      r?.id ?? "",
+                      "unidade",
+                      "cargo",
+                      "lotacao",
+                    );
+                  }}
+                  listar={consultaDe(listarUnidades)}
+                  desabilitado={carregandoOpcoes}
+                  versao={versaoDaBusca.unidade}
+                  acao={botaoNovaReferencia("unidade")}
+                  criacao={criacaoDe("unidade")}
+                  aviso={avisoDaCriacao.unidade}
+                />
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Gestor direto"
+                ajuda="Quem aprova os pedidos da pessoa."
+                paraId={ID_DO_CAMPO.gestorDireto}
+              >
+                <select
+                  value={campos.gestorDiretoId}
+                  onChange={(e) =>
+                    atualizar("gestorDiretoId", e.target.value, "gestorDireto")
+                  }
+                  {...propsDoCampo("gestorDireto")}
+                >
+                  <option value="">Selecione</option>
+                  <option value="sem_gestor">Sem gestor</option>
+                  {gestores.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.cargo ? `${g.nome} — ${g.cargo}` : g.nome}
+                    </option>
+                  ))}
+                </select>
+                {erroDoCampo("gestorDireto")}
+              </LinhaDoCadastro>
               {erros.lotacao ? (
                 <p
                   className="nova-admissao__erro-geral"
@@ -2369,146 +3247,463 @@ export function NovaAdmissaoScreen({
                   {erros.lotacao}
                 </p>
               ) : null}
-            </section>
-            {/* T183 — jornada de trabalho OPCIONAL, só para o RH: o DP admite,
-            mas não atribui jornada. A vigência começa na data de admissão. */}
-            {papelDoAtor === "rh" ? (
-              <section
-                className="nova-admissao__grupo"
-                aria-labelledby="nova-admissao-grupo-jornada"
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-contrato"
+              titulo="Contrato"
+              descricao="Como e desde quando a pessoa trabalha."
+            >
+              <LinhaDoCadastro
+                rotulo="Tipo de contratação"
+                paraId={ID_DO_CAMPO.tipo}
               >
-                <h3
-                  id="nova-admissao-grupo-jornada"
-                  className="nova-admissao__grupo-titulo"
+                <select
+                  aria-required="true"
+                  value={campos.tipo}
+                  onChange={(e) =>
+                    atualizar("tipo", e.target.value as TipoVinculo, "tipo")
+                  }
+                  {...propsDoCampo("tipo")}
                 >
-                  Jornada de trabalho
-                </h3>
-                <div className="nova-admissao__linha nova-admissao__linha--3">
-                  <FormField
-                    id={ID_DO_CAMPO.jornada}
-                    label={rotuloOpcional("Jornada de trabalho")}
-                    help="Só jornadas ativas. A vigência começa na data de admissão."
-                    {...(erros.jornada ? { error: erros.jornada } : {})}
-                  >
-                    {(control) => (
-                      <select
-                        value={campos.tabelaHorarioId}
-                        onChange={(e) =>
-                          atualizar(
-                            "tabelaHorarioId",
-                            e.target.value,
-                            "jornada",
-                          )
+                  <option value="">Selecione</option>
+                  {TIPOS_DE_CONTRATACAO.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {ROTULO_TIPO_VINCULO[tipo]}
+                    </option>
+                  ))}
+                </select>
+                {erroDoCampo("tipo")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Data de admissão"
+                paraId={ID_DO_CAMPO.dataAdmissao}
+              >
+                <input
+                  type="date"
+                  aria-required="true"
+                  value={campos.dataAdmissao}
+                  onChange={(e) =>
+                    atualizar("dataAdmissao", e.target.value, "dataAdmissao")
+                  }
+                  {...propsDoCampo("dataAdmissao")}
+                />
+                {erroDoCampo("dataAdmissao")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Jornada de trabalho"
+                paraId={ID_DO_CAMPO.jornadaSemanalHoras}
+              >
+                <div className="nova-admissao__com-sufixo">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    placeholder="44"
+                    value={campos.jornadaSemanalHoras}
+                    onChange={(e) =>
+                      atualizar(
+                        "jornadaSemanalHoras",
+                        e.target.value.replace(/\D/g, ""),
+                        "jornadaSemanalHoras",
+                      )
+                    }
+                    {...propsDoCampo("jornadaSemanalHoras")}
+                  />
+                  <span aria-hidden="true">horas por semana</span>
+                </div>
+                {erroDoCampo("jornadaSemanalHoras")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Escala de trabalho"
+                ajuda="Sem escala, contam os dias úteis do mês."
+                paraId={ID_DO_CAMPO.escala}
+              >
+                <select
+                  value={campos.escala}
+                  onChange={(e) =>
+                    atualizar("escala", e.target.value, "escala")
+                  }
+                  {...propsDoCampo("escala")}
+                >
+                  <option value="">Selecione a escala</option>
+                  {OPCOES_ESCALA.map((o) => (
+                    <option key={o.codigo} value={o.codigo}>
+                      {o.descricao ? `${o.nome} — ${o.descricao}` : o.nome}
+                    </option>
+                  ))}
+                </select>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Matrícula"
+                paraId={ID_DO_CAMPO.matricula}
+                dica={
+                  <>
+                    <button
+                      type="button"
+                      className="nova-admissao__dica"
+                      aria-label="Sobre Matrícula"
+                      aria-expanded={dicaDaMatricula}
+                      aria-controls="nova-admissao-dica-matricula"
+                      onClick={() => setDicaDaMatricula((v) => !v)}
+                    >
+                      ?
+                    </button>
+                    {dicaDaMatricula ? (
+                      <span
+                        id="nova-admissao-dica-matricula"
+                        role="tooltip"
+                        className="nova-admissao__dica-texto"
+                      >
+                        {DICA_DA_MATRICULA}
+                      </span>
+                    ) : null}
+                  </>
+                }
+              >
+                <input
+                  type="text"
+                  maxLength={30}
+                  autoComplete="off"
+                  placeholder="Ex.: 000123"
+                  value={campos.matricula}
+                  onChange={(e) =>
+                    atualizar(
+                      "matricula",
+                      e.target.value.toUpperCase(),
+                      "matricula",
+                    )
+                  }
+                  {...propsDoCampo("matricula")}
+                />
+                {erroDoCampo("matricula")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-remuneracao"
+              titulo="Remuneração"
+              descricao="Salário mensal da pessoa."
+            >
+              <LinhaDoCadastro
+                rotulo="Salário bruto"
+                paraId={ID_DO_CAMPO.salarioBruto}
+              >
+                <div className="nova-admissao__com-prefixo">
+                  <span aria-hidden="true">R$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    aria-required="true"
+                    value={campos.salarioBruto}
+                    onChange={(e) =>
+                      atualizar(
+                        "salarioBruto",
+                        mascararReais(e.target.value),
+                        "salarioBruto",
+                      )
+                    }
+                    {...propsDoCampo("salarioBruto")}
+                  />
+                </div>
+                {erroDoCampo("salarioBruto")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Salário líquido"
+                ajuda="Estimativa a partir do salário bruto."
+                paraId="nova-admissao-salario-liquido"
+              >
+                <div className="nova-admissao__com-prefixo">
+                  <span aria-hidden="true">R$</span>
+                  <input
+                    id="nova-admissao-salario-liquido"
+                    type="text"
+                    readOnly
+                    placeholder="—"
+                    value={salarioLiquidoExibido}
+                  />
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
+            <SecaoDoCadastro
+              id="nova-admissao-secao-adicionais"
+              titulo="Informações adicionais"
+              descricao="Conselho de classe e descontos."
+            >
+              <LinhaDoCadastro
+                rotulo="Conselho e registro"
+                ajuda="Exigido em profissões regulamentadas."
+              >
+                <div className="nova-admissao__linha-par">
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Conselho"
+                      value={campos.conselhoProfissional}
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        atualizar(
+                          "conselhoProfissional",
+                          valor,
+                          "conselhoProfissional",
+                          "registroProfissional",
+                        );
+                        if (!valor || valor === "nenhum") {
+                          atualizar("registroProfissional", "");
                         }
-                        disabled={carregandoOpcoes}
-                        {...control}
-                      >
-                        <option value="">Sem jornada por enquanto</option>
-                        {opcoes.jornadas.map((j) => (
-                          <option key={j.id} value={j.id}>
-                            {rotuloDaJornada(j)}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </FormField>
+                      }}
+                      {...propsDoCampo("conselhoProfissional")}
+                    >
+                      <option value="">Selecione</option>
+                      {OPCOES_CONSELHO.map((o) => (
+                        <option key={o.codigo} value={o.codigo}>
+                          {o.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={40}
+                      autoComplete="off"
+                      placeholder="Ex.: 123456/SP"
+                      aria-label="Número do registro"
+                      disabled={
+                        !campos.conselhoProfissional ||
+                        campos.conselhoProfissional === "nenhum"
+                      }
+                      value={campos.registroProfissional}
+                      onChange={(e) =>
+                        atualizar(
+                          "registroProfissional",
+                          e.target.value,
+                          "registroProfissional",
+                        )
+                      }
+                      {...propsDoCampo("registroProfissional")}
+                    />
+                    {erroDoCampo("registroProfissional")}
+                  </div>
                 </div>
-                {jornadasIndisponiveis ? (
-                  <p className="nova-admissao__texto">
-                    Não foi possível carregar as jornadas. A admissão pode
-                    seguir sem jornada; atribua depois, na ficha do colaborador.
-                  </p>
-                ) : !carregandoJornadas && opcoes.jornadas.length === 0 ? (
-                  <p className="nova-admissao__texto">
-                    Nenhuma jornada ativa nesta empresa. A admissão segue sem
-                    jornada.
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Dependentes (IRRF)"
+                paraId={ID_DO_CAMPO.dependentesIrrf}
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={campos.dependentesIrrf}
+                  onChange={(e) =>
+                    atualizar(
+                      "dependentesIrrf",
+                      e.target.value.replace(/\D/g, ""),
+                      "dependentesIrrf",
+                    )
+                  }
+                  {...propsDoCampo("dependentesIrrf")}
+                />
+                {erroDoCampo("dependentesIrrf")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Pensão alimentícia"
+                paraId={ID_DO_CAMPO.pensaoAlimenticiaPercentual}
+              >
+                <div className="nova-admissao__com-sufixo">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    maxLength={6}
+                    value={campos.pensaoAlimenticiaPercentual}
+                    onChange={(e) =>
+                      atualizar(
+                        "pensaoAlimenticiaPercentual",
+                        e.target.value.replace(/[^\d,.]/g, ""),
+                        "pensaoAlimenticiaPercentual",
+                      )
+                    }
+                    {...propsDoCampo("pensaoAlimenticiaPercentual")}
+                  />
+                  <span aria-hidden="true">%</span>
+                </div>
+                {erroDoCampo("pensaoAlimenticiaPercentual")}
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
           </>,
-        )}
-
-        {painelDaEtapa(
-          2,
           <>
-            <div className="nova-admissao__grupo">
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                Todo o endereço é opcional. Com país Brasil, o CEP pode sugerir
-                logradouro, bairro, cidade e estado; tudo continua editável.
-              </p>
-              {/* T178 — país e CEP; logradouro (largo) e número (estreito);
-              complemento e bairro; cidade e estado. */}
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("pais")}
-                {/* T178 — CEP com consulta assistida, só para o Brasil. Com outro
-                país não há botão nem consulta: o CEP é só texto. */}
-                <div className="nova-admissao__cep">
-                  {campoEndereco(
-                    "cep",
-                    cepAssistido ? () => void buscarCep("saida") : undefined,
-                  )}
-                  {cepAssistido ? (
-                    <div className="nova-admissao__cep-acoes">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        id={ID_BOTAO_BUSCAR_CEP}
-                        aria-disabled={cep.tipo === "buscando"}
-                        aria-describedby="nova-admissao-cep-status"
-                        onClick={() => {
-                          if (cep.tipo === "buscando") return;
-                          void buscarCep("botao");
-                        }}
-                      >
-                        {cep.tipo === "buscando"
-                          ? "Buscando CEP…"
-                          : "Buscar CEP"}
-                      </Button>
-                      {/* A única região viva do bloco: anuncia o resultado sem
-                      mover o foco. Sempre montada, para que o anúncio saia. */}
-                      <p
-                        id="nova-admissao-cep-status"
-                        className="nova-admissao__texto nova-admissao__cep-status"
-                        role="status"
-                      >
-                        {cep.tipo === "buscando"
-                          ? "Buscando CEP…"
-                          : cep.tipo === "aviso" || cep.tipo === "sugerido"
-                            ? cep.mensagem
-                            : ""}
-                      </p>
-                      {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="subtle"
-                          onClick={usarEnderecoDoCep}
-                        >
-                          Usar endereço do CEP
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
+            {/* T209 — etapa 3 do Novo colaborador: endereço residencial,
+                tudo opcional; o CEP preenche o resto sozinho. */}
+            <SecaoDoCadastro
+              id="nova-admissao-secao-endereco"
+              titulo="Endereço residencial"
+              descricao="Digite o CEP e o Evolli completa o endereço."
+            >
+              <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
+                <div className="nova-admissao__campo-cep">
+                  <CampoMascarado
+                    mascara="cep"
+                    placeholder="00000-000"
+                    value={endereco.cep}
+                    onValorChange={(valor) => {
+                      atualizarEndereco("cep", valor);
+                      if (/^\d{8}$/.test(valor.replace(/\D/g, ""))) {
+                        consultarCepAoCompletarRef.current = true;
+                      }
+                    }}
+                    limparAvisos={limpezaDosAvisos}
+                    onBlur={() => void buscarCep("saida")}
+                    {...propsDoCampo("cep")}
+                  />
                 </div>
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--larga-estreita">
-                {campoEndereco("logradouro")}
-                {campoEndereco("numero")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("complemento")}
-                {campoEndereco("bairro")}
-              </div>
-              <div className="nova-admissao__linha nova-admissao__linha--2">
-                {campoEndereco("cidade")}
-                {campoEndereco("estado")}
-              </div>
-            </div>
+                {erroDoCampo("cep")}
+                {/* A única região viva do bloco: anuncia o resultado sem
+                    mover o foco. Sempre montada, para que o anúncio saia. */}
+                <p
+                  id="nova-admissao-cep-status"
+                  className={
+                    cep.tipo === "sugerido" && cep.encontrado
+                      ? "nova-admissao__cep-status nova-admissao__cep-status--encontrado"
+                      : "nova-admissao__cep-status"
+                  }
+                  role="status"
+                >
+                  {cep.tipo === "buscando" ? (
+                    "Buscando endereço…"
+                  ) : cep.tipo === "sugerido" && cep.encontrado ? (
+                    <>
+                      <IconeSucesso tamanho={14} />
+                      Endereço localizado pelo CEP
+                    </>
+                  ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
+                    cep.mensagem
+                  ) : (
+                    ""
+                  )}
+                </p>
+                {cep.tipo === "sugerido" && cep.mantidos.length > 0 ? (
+                  <div className="nova-admissao__cep-acoes">
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      onClick={usarEnderecoDoCep}
+                    >
+                      Usar endereço do CEP
+                    </Button>
+                  </div>
+                ) : null}
+                {cep.tipo === "aviso" && cep.repetivel ? (
+                  <div className="nova-admissao__cep-acoes">
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      onClick={() => void buscarCep("botao")}
+                    >
+                      Consultar de novo
+                    </Button>
+                  </div>
+                ) : null}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Logradouro e número">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={200}
+                      autoComplete="off"
+                      placeholder="Rua, avenida…"
+                      aria-label="Logradouro"
+                      value={endereco.logradouro}
+                      onChange={(e) =>
+                        atualizarEndereco("logradouro", e.target.value)
+                      }
+                      {...propsDoCampo("logradouro")}
+                    />
+                    {erroDoCampo("logradouro")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={20}
+                      autoComplete="off"
+                      placeholder="Nº"
+                      aria-label="Número"
+                      value={endereco.numero}
+                      onChange={(e) =>
+                        atualizarEndereco("numero", e.target.value)
+                      }
+                      {...propsDoCampo("numero")}
+                    />
+                    {erroDoCampo("numero")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+              <LinhaDoCadastro
+                rotulo="Complemento"
+                paraId={ID_DO_CAMPO.complemento}
+              >
+                <input
+                  type="text"
+                  maxLength={120}
+                  autoComplete="off"
+                  placeholder="Apto, bloco, sala…"
+                  value={endereco.complemento}
+                  onChange={(e) =>
+                    atualizarEndereco("complemento", e.target.value)
+                  }
+                  {...propsDoCampo("complemento")}
+                />
+                {erroDoCampo("complemento")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Bairro" paraId={ID_DO_CAMPO.bairro}>
+                <input
+                  type="text"
+                  maxLength={120}
+                  autoComplete="off"
+                  value={endereco.bairro}
+                  onChange={(e) => atualizarEndereco("bairro", e.target.value)}
+                  {...propsDoCampo("bairro")}
+                />
+                {erroDoCampo("bairro")}
+              </LinhaDoCadastro>
+              <LinhaDoCadastro rotulo="Cidade e estado">
+                <div className="nova-admissao__linha-par nova-admissao__linha-par--larga-estreita">
+                  <div className="nova-admissao__linha-celula">
+                    <input
+                      type="text"
+                      maxLength={120}
+                      autoComplete="off"
+                      placeholder="Cidade"
+                      aria-label="Cidade"
+                      value={endereco.cidade}
+                      onChange={(e) =>
+                        atualizarEndereco("cidade", e.target.value)
+                      }
+                      {...propsDoCampo("cidade")}
+                    />
+                    {erroDoCampo("cidade")}
+                  </div>
+                  <div className="nova-admissao__linha-celula">
+                    <select
+                      aria-label="Estado"
+                      value={siglaDaUf(endereco.estado)}
+                      onChange={(e) =>
+                        atualizarEndereco("estado", e.target.value)
+                      }
+                      {...propsDoCampo("estado")}
+                    >
+                      <option value="">UF</option>
+                      {UFS.map((uf) => (
+                        <option key={uf.sigla} value={uf.sigla}>
+                          {uf.sigla}
+                        </option>
+                      ))}
+                    </select>
+                    {erroDoCampo("estado")}
+                  </div>
+                </div>
+              </LinhaDoCadastro>
+            </SecaoDoCadastro>
           </>,
-        )}
-
-        {painelDaEtapa(
-          3,
           <>
             <p className="nova-admissao__texto">
               Confira os dados antes de concluir. Para corrigir algo, use
@@ -2535,109 +3730,50 @@ export function NovaAdmissaoScreen({
             <p className="nova-admissao__texto nova-admissao__ajuda">
               Campos opcionais em branco não aparecem neste resumo.
             </p>
-            {/* T195 — decisão aprovada: documentos em entrega própria. Nada de
-                arquivo, upload ou armazenamento nesta página. */}
-            <section
-              className="nova-admissao__documentos"
-              aria-labelledby="nova-admissao-documentos-titulo"
-            >
-              <h3
-                id="nova-admissao-documentos-titulo"
-                className="nova-admissao__subtitulo"
-              >
-                Documentos
-              </h3>
-              <p className="nova-admissao__texto">
-                Documentos serão liberados em uma próxima etapa do Evolli.
-              </p>
-              <p className="nova-admissao__texto nova-admissao__ajuda">
-                Por enquanto, nenhum arquivo é pedido nem enviado neste
-                cadastro.
-              </p>
-            </section>
           </>,
-        )}
-
-        {erros.geral ? (
-          <p
-            className="nova-admissao__erro-geral"
-            role="alert"
-            id={ERRO_GERAL_ID}
-            tabIndex={-1}
-          >
-            {erros.geral}
-          </p>
-        ) : null}
-        {erros.geral && envioDivergente ? (
-          // T179 — saída clara do 422 divergente: recomeçar gera uma chave
-          // nova (o formulário volta vazio, porque a admissão anterior pode
-          // já existir), e conferir leva à listagem pelo caminho de sempre,
-          // com a confirmação de descarte se houver dados digitados.
-          <div className="nova-admissao__acoes-recusa">
-            <p className="nova-admissao__texto">
-              Recomeçar limpa o formulário e prepara um envio novo.
-            </p>
-            <FormActions>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={pedirCancelamento}
+        ]}
+        mensagem={
+          <>
+            {erros.geral ? (
+              <p
+                className="nova-admissao__erro-geral"
+                role="alert"
+                id={ERRO_GERAL_ID}
+                tabIndex={-1}
               >
-                Conferir em Colaboradores
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={recomecarComNovaChave}
-              >
-                Recomeçar a admissão
-              </Button>
-            </FormActions>
-          </div>
-        ) : null}
-
-        <FormActions>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={pedirCancelamento}
-            disabled={salvando}
-          >
-            Cancelar
-          </Button>
-          {etapa > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => irParaEtapa((etapa - 1) as IndiceEtapa)}
-              disabled={salvando}
-            >
-              Voltar
-            </Button>
-          ) : null}
-          {/* T195 — Enter num campo de texto ou de data faz o mesmo que este
-              botão (envio implícito do navegador). Num seletor, Enter é do
-              próprio seletor: avança-se com Tab até aqui e Enter.
-
-              Revisão final — o botão é o mesmo nas quatro etapas e fica no
-              mesmo lugar: o 2º clique de um duplo clique em "Continuar" na
-              etapa 3 caía em "Confirmar admissão" e abria a confirmação sem a
-              revisão ter sido lida. Clique repetido (`detail` > 1, a contagem
-              do próprio navegador) é ignorado; teclado e envio implícito têm
-              `detail` 0 e seguem normais. */}
-          <Button
-            type="submit"
-            variant="primary"
-            id={etapa === ULTIMA_ETAPA ? ID_BOTAO_SALVAR : ID_BOTAO_CONTINUAR}
-            disabled={salvando || (carregandoOpcoes && etapa > 0)}
-            onClick={(evento) => {
-              if (evento.detail > 1) evento.preventDefault();
-            }}
-          >
-            {etapa === ULTIMA_ETAPA ? "Confirmar admissão" : "Continuar"}
-          </Button>
-        </FormActions>
-      </form>
+                {erros.geral}
+              </p>
+            ) : null}
+            {erros.geral && envioDivergente ? (
+              // T179 — saída clara do 422 divergente: recomeçar gera uma chave
+              // nova (o formulário volta vazio, porque a admissão anterior pode
+              // já existir), e conferir leva à listagem pelo caminho de sempre,
+              // com a confirmação de descarte se houver dados digitados.
+              <div className="nova-admissao__acoes-recusa">
+                <p className="nova-admissao__texto">
+                  Recomeçar limpa o formulário e prepara um envio novo.
+                </p>
+                <FormActions>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={pedirCancelamento}
+                  >
+                    Conferir em Colaboradores
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={recomecarComNovaChave}
+                  >
+                    Recomeçar a admissão
+                  </Button>
+                </FormActions>
+              </div>
+            ) : null}
+          </>
+        }
+      />
 
       {/* T179 — confirmação antes de gravar: confirmação curta, o uso de
           modal que a decisão do `DP-FLX-21` mantém. O resumo traz só o que
@@ -2772,7 +3908,7 @@ export function NovaAdmissaoScreen({
           }
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -2781,25 +3917,6 @@ export function NovaAdmissaoScreen({
  * vêm do mapa de navegação, os mesmos da barra lateral. Quem decide o que
  * acontece ao voltar é o chamador (com ou sem confirmação de descarte).
  */
-function TrilhaDaNovaAdmissao({
-  onColaboradores,
-}: {
-  readonly onColaboradores: () => void;
-}) {
-  return (
-    <TrilhaNavegacao
-      itens={[
-        { rotulo: tituloDoGrupoDe("nova-admissao") ?? "Gestão de Pessoas" },
-        {
-          rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-          onSelecionar: onColaboradores,
-        },
-        { rotulo: "Nova admissão" },
-      ]}
-    />
-  );
-}
-
 /** T195 — rótulo e valor, só os preenchidos, sem espaços nas pontas. */
 function linhasPreenchidas(
   pares: readonly (readonly [string, string | null])[],
@@ -2808,130 +3925,6 @@ function linhasPreenchidas(
     valor !== null && valor.trim() !== ""
       ? [[rotulo, valor.trim()] as const]
       : [],
-  );
-}
-
-type EstadoDaEtapa = "atual" | "concluida" | "visitada" | "pendente";
-
-const ROTULO_DO_ESTADO: Record<EstadoDaEtapa, string> = {
-  atual: "etapa atual",
-  concluida: "concluída",
-  visitada: "visitada",
-  pendente: "não iniciada",
-};
-
-/**
- * T195 — o indicador das etapas: progresso de 25% a 100% e a lista das quatro,
- * cada uma com o estado dito em texto (para quem vê, também pela forma do
- * marcador — nunca só pela cor). Só as etapas já alcançadas, fora a atual,
- * são botões; ir adiante passa pela validação de quem chama.
- */
-function IndicadorDeEtapas({
-  atual,
-  alcancada,
-  desabilitado,
-  onIr,
-}: {
-  readonly atual: IndiceEtapa;
-  readonly alcancada: IndiceEtapa;
-  readonly desabilitado: boolean;
-  readonly onIr: (alvo: IndiceEtapa) => void;
-}) {
-  const progresso = ((atual + 1) / ETAPAS.length) * 100;
-  return (
-    <nav className="nova-admissao__etapas" aria-label="Etapas do cadastro">
-      <div className="nova-admissao__progresso">
-        <p
-          id="nova-admissao-progresso"
-          className="nova-admissao__progresso-texto"
-        >
-          Etapa {atual + 1} de {ETAPAS.length} · {progresso}%
-        </p>
-        <progress
-          className="nova-admissao__progresso-barra"
-          max={100}
-          value={progresso}
-          aria-labelledby="nova-admissao-progresso"
-        />
-      </div>
-      <ol className="nova-admissao__etapas-lista">
-        {ETAPAS.map((titulo, i) => {
-          const indice = i as IndiceEtapa;
-          const estado: EstadoDaEtapa =
-            indice === atual
-              ? "atual"
-              : indice < alcancada
-                ? "concluida"
-                : indice === alcancada
-                  ? "visitada"
-                  : "pendente";
-          const conteudo = (
-            <>
-              <span
-                className="nova-admissao__etapa-marcador"
-                aria-hidden="true"
-              >
-                {estado === "concluida" ? <IconeEtapaConcluida /> : indice + 1}
-              </span>
-              {/* O nome visível e o lido são o mesmo título; o lido diz
-                  também o número e o estado, num texto só. */}
-              <span className="nova-admissao__etapa-nome" aria-hidden="true">
-                {titulo}
-              </span>
-              <span className="nova-admissao__so-leitor">
-                {`Etapa ${indice + 1}: ${titulo}, ${ROTULO_DO_ESTADO[estado]}`}
-              </span>
-            </>
-          );
-          return (
-            <li
-              key={titulo}
-              className={`nova-admissao__etapa-item nova-admissao__etapa-item--${estado}`}
-            >
-              {estado === "concluida" || estado === "visitada" ? (
-                <button
-                  type="button"
-                  className="nova-admissao__etapa-passo"
-                  disabled={desabilitado}
-                  onClick={() => onIr(indice)}
-                >
-                  {conteudo}
-                </button>
-              ) : (
-                <span
-                  className="nova-admissao__etapa-passo"
-                  {...(estado === "atual"
-                    ? { "aria-current": "step" as const }
-                    : {})}
-                >
-                  {conteudo}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-/** T195 — marca de etapa concluída, desenhada aqui (sem biblioteca, T159). */
-function IconeEtapaConcluida() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M3.5 8.5l3 3 6-7" />
-    </svg>
   );
 }
 
@@ -2989,6 +3982,11 @@ interface ConfirmacaoProps {
   onAbrirAdmitido: NovaAdmissaoScreenProps["onAbrirAdmitido"];
   onRecomecar: () => void;
   onSair: () => void;
+  /** T209 — a foto escolhida e o seu envio, depois da admissão. */
+  foto: FotoEscolhida | null;
+  envioDaFoto: EnvioDaFoto;
+  onTentarFotoDeNovo: () => void;
+  onEscolherOutraFoto: (arquivo: File | undefined) => void;
 }
 
 /**
@@ -3054,6 +4052,10 @@ function ConfirmacaoDaAdmissao({
   onAbrirAdmitido,
   onRecomecar,
   onSair,
+  foto,
+  envioDaFoto,
+  onTentarFotoDeNovo,
+  onEscolherOutraFoto,
 }: ConfirmacaoProps) {
   const colaborador: ColaboradorApi = {
     id: admissao.id,
@@ -3066,15 +4068,16 @@ function ConfirmacaoDaAdmissao({
   const contatosGravados = admissao.contatos;
   const cepBrasileiro = ehPaisBrasil(enderecoGravado?.pais);
   return (
-    <div className="nova-admissao">
-      {/* Depois da admissão não há o que descartar: a trilha sai direto, como
-          "Voltar para Colaboradores". */}
-      <TrilhaDaNovaAdmissao onColaboradores={onSair} />
-      <PageHeader
-        headingLevel={1}
-        titleId={NOVA_ADMISSAO_TITULO_ID}
-        title="Nova admissão"
-      />
+    <div className="cadastro-etapas nova-admissao">
+      {/* Depois da admissão a trilha da barra superior e "Voltar para
+          Colaboradores", abaixo, saem direto (não há o que descartar). */}
+      <header className="cadastro-etapas__cabecalho">
+        <PageHeader
+          headingLevel={1}
+          titleId={NOVA_ADMISSAO_TITULO_ID}
+          title="Novo colaborador"
+        />
+      </header>
       <Surface
         as="section"
         padding="lg"
@@ -3142,20 +4145,93 @@ function ConfirmacaoDaAdmissao({
           ) : null}
         </dl>
         <ResumoGravado
-          titulo="Dados pessoais"
+          titulo="Dados básicos"
           id="nova-admissao-sucesso-dados-pessoais"
-          linhas={[
-            [
-              ROTULO_DATA_NASCIMENTO,
-              formatarDiaCivil(admissao.perfilPessoal.dataNascimento),
-            ],
-            // T179 — o sexo gravado é código: aparece pelo rótulo.
-            [CAMPO_SEXO.rotulo, rotuloDoSexo(admissao.perfilPessoal.sexo)],
-            ...CAMPOS_TEXTO_PERFIL.map(
-              (c) => [c.rotulo, admissao.perfilPessoal[c.chave]] as const,
-            ),
-          ]}
+          linhas={
+            admissao.perfilPessoal
+              ? [
+                  ["CPF", exibirCpf(admissao.perfilPessoal.cpf)],
+                  ["RG", admissao.perfilPessoal.rg ?? null],
+                  [
+                    ROTULO_DATA_NASCIMENTO,
+                    admissao.perfilPessoal.dataNascimento
+                      ? formatarDiaCivil(admissao.perfilPessoal.dataNascimento)
+                      : null,
+                  ],
+                  ["Gênero", rotuloDoGenero(admissao.perfilPessoal.genero)],
+                  ["Estado civil", admissao.perfilPessoal.estadoCivil],
+                  [
+                    "Contato de emergência",
+                    admissao.perfilPessoal.contatoEmergenciaNome ?? null,
+                  ],
+                  [
+                    "Telefone do contato",
+                    admissao.perfilPessoal.contatoEmergenciaTelefone
+                      ? exibirTelefone(
+                          admissao.perfilPessoal.contatoEmergenciaTelefone,
+                        )
+                      : null,
+                  ],
+                ]
+              : null
+          }
         />
+        {/* T209 — o contrato que o servidor gravou (etapa 2). */}
+        {admissao.contrato ? (
+          <ResumoGravado
+            titulo="Contrato"
+            id="nova-admissao-sucesso-contrato"
+            linhas={[
+              [
+                "Nível",
+                OPCOES_NIVEL.find((o) => o.codigo === admissao.contrato?.nivel)
+                  ?.rotulo ?? null,
+              ],
+              [
+                "Jornada de trabalho",
+                admissao.contrato.jornadaSemanalHoras
+                  ? `${admissao.contrato.jornadaSemanalHoras} horas por semana`
+                  : null,
+              ],
+              [
+                "Escala de trabalho",
+                OPCOES_ESCALA.find(
+                  (o) => o.codigo === admissao.contrato?.escala,
+                )?.nome ?? null,
+              ],
+              [
+                "Salário bruto",
+                admissao.contrato.salarioBruto
+                  ? `R$ ${formatarReais(Number(admissao.contrato.salarioBruto))}`
+                  : null,
+              ],
+              [
+                "Conselho e registro",
+                admissao.contrato.conselhoProfissional
+                  ? [
+                      admissao.contrato.conselhoProfissional.toUpperCase(),
+                      admissao.contrato.registroProfissional ?? "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  : null,
+              ],
+              [
+                "Dependentes (IRRF)",
+                admissao.contrato.dependentesIrrf === null ||
+                admissao.contrato.dependentesIrrf === undefined
+                  ? null
+                  : String(admissao.contrato.dependentesIrrf),
+              ],
+              [
+                "Pensão alimentícia",
+                admissao.contrato.pensaoAlimenticiaPercentual
+                  ? `${admissao.contrato.pensaoAlimenticiaPercentual.replace(".", ",")}%`
+                  : null,
+              ],
+            ]}
+          />
+        ) : null}
         <ResumoGravado
           titulo="Endereço"
           id="nova-admissao-sucesso-endereco"
@@ -3205,6 +4281,14 @@ function ConfirmacaoDaAdmissao({
               : null
           }
         />
+        {envioDaFoto.estado !== "nenhum" ? (
+          <EstadoDaFotoEnviada
+            foto={foto}
+            envio={envioDaFoto}
+            onTentarDeNovo={onTentarFotoDeNovo}
+            onEscolherOutra={onEscolherOutraFoto}
+          />
+        ) : null}
         <FormActions>
           <Button
             type="button"
@@ -3266,5 +4350,185 @@ function ResumoGravado({
         <p className="nova-admissao__texto">{vazio}</p>
       )}
     </section>
+  );
+}
+
+/**
+ * T209 — a foto opcional na etapa 1: prévia local, "Enviar foto" (abre o
+ * seletor) e "Remover". Nada sai do navegador aqui: a foto é enviada só
+ * depois de a admissão ser concluída, e nunca vai para o rascunho.
+ */
+function BlocoDaFoto({
+  foto,
+  recusa,
+  onEscolher,
+  onRemover,
+}: {
+  readonly foto: FotoEscolhida | null;
+  readonly recusa: string | null;
+  readonly onEscolher: (arquivo: File | undefined) => void;
+  readonly onRemover: () => void;
+}) {
+  const campoRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <LinhaDoCadastro rotulo="Foto" ajuda="Mostrada na lista e na ficha.">
+      <div
+        className="nova-admissao__foto"
+        aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}
+      >
+        {foto ? (
+          <img
+            className="nova-admissao__foto-avatar"
+            src={foto.url}
+            alt="Prévia da foto do colaborador"
+          />
+        ) : (
+          <span
+            className="nova-admissao__foto-avatar nova-admissao__foto-avatar--vazio"
+            aria-hidden="true"
+          >
+            <IconePessoaNeutra />
+          </span>
+        )}
+        <div className="nova-admissao__foto-corpo">
+          <div className="nova-admissao__foto-acoes">
+            <Button
+              id={ID_FOTO_ENVIAR}
+              type="button"
+              variant="secondary"
+              onClick={() => campoRef.current?.click()}
+            >
+              Enviar foto
+            </Button>
+            {foto ? (
+              <Button type="button" variant="subtle" onClick={onRemover}>
+                Remover
+              </Button>
+            ) : null}
+          </div>
+          <p
+            id="nova-admissao-foto-ajuda"
+            className="nova-admissao__foto-ajuda"
+          >
+            PNG ou JPG, até 5 MB.
+          </p>
+          {recusa ? (
+            <p
+              id="nova-admissao-foto-recusa"
+              className="nova-admissao__foto-recusa"
+              role="alert"
+            >
+              {recusa}
+            </p>
+          ) : null}
+        </div>
+        <input
+          ref={campoRef}
+          id={ID_FOTO_ARQUIVO}
+          type="file"
+          accept={FOTO_TIPOS_ACEITOS}
+          hidden
+          tabIndex={-1}
+          onChange={(e) => {
+            onEscolher(e.target.files?.[0]);
+            // Escolher o mesmo arquivo de novo também conta.
+            e.target.value = "";
+          }}
+        />
+      </div>
+    </LinhaDoCadastro>
+  );
+}
+
+/** T209 — o envio da foto na confirmação da admissão. */
+function EstadoDaFotoEnviada({
+  foto,
+  envio,
+  onTentarDeNovo,
+  onEscolherOutra,
+}: {
+  readonly foto: FotoEscolhida | null;
+  readonly envio: EnvioDaFoto;
+  readonly onTentarDeNovo: () => void;
+  readonly onEscolherOutra: (arquivo: File | undefined) => void;
+}) {
+  const campoRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <section
+      className="nova-admissao__bloco-gravado nova-admissao__foto-envio"
+      aria-labelledby="nova-admissao-sucesso-foto"
+    >
+      <h3 id="nova-admissao-sucesso-foto" className="nova-admissao__subtitulo">
+        Foto
+      </h3>
+      {foto && envio.estado === "enviada" ? (
+        <img
+          className="nova-admissao__foto-avatar"
+          src={foto.url}
+          alt="Foto do colaborador"
+        />
+      ) : null}
+      {envio.estado === "enviando" ? (
+        <p className="nova-admissao__texto" role="status">
+          Enviando a foto…
+        </p>
+      ) : null}
+      {envio.estado === "enviada" ? (
+        <p className="nova-admissao__texto" role="status">
+          Foto salva.
+        </p>
+      ) : null}
+      {envio.estado === "falhou" ? (
+        <>
+          <div className="nova-admissao__erro-geral" role="alert">
+            <p className="nova-admissao__texto">
+              O colaborador foi criado, mas a foto não foi salva.
+            </p>
+            <p className="nova-admissao__texto">{envio.mensagem}</p>
+          </div>
+          <div className="nova-admissao__foto-acoes">
+            {envio.podeRepetir && foto ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onTentarDeNovo}
+              >
+                Tentar enviar foto novamente
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => campoRef.current?.click()}
+              >
+                Escolher outra foto
+              </Button>
+            )}
+          </div>
+          <input
+            ref={campoRef}
+            id={ID_FOTO_OUTRA}
+            type="file"
+            accept={FOTO_TIPOS_ACEITOS}
+            hidden
+            tabIndex={-1}
+            onChange={(e) => {
+              onEscolherOutra(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+/** Silhueta neutra da foto vazia (decorativa). */
+function IconePessoaNeutra() {
+  return (
+    <svg viewBox="0 0 24 24" width="32" height="32" focusable="false">
+      <circle cx="12" cy="8.5" r="4" fill="currentColor" />
+      <path d="M4 20.5c0-4.1 3.6-7 8-7s8 2.9 8 7z" fill="currentColor" />
+    </svg>
   );
 }

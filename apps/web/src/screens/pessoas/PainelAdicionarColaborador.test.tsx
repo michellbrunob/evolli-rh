@@ -60,14 +60,13 @@ describe("PainelAdicionarColaborador (T194)", () => {
     montar();
     const dialogo = painel();
     expect(dialogo).toHaveAttribute("aria-modal", "true");
-    expect(dialogo.closest(".evolli-modal")).toHaveClass(
-      "evolli-modal--lateral",
-    );
+    // T209 — o Sheet da camada `src/ui` (painel lateral, Radix).
+    expect(dialogo).toHaveAttribute("data-lado", "direita");
     expect(dialogo).toHaveAccessibleDescription(
       "Escolha o caminho mais prático para trazer alguém para a equipe.",
     );
     // O ícone ao lado do título é só ilustração.
-    const icone = dialogo.querySelector(".evolli-modal__icone");
+    const icone = dialogo.querySelector("header svg")?.parentElement;
     expect(icone).toHaveAttribute("aria-hidden", "true");
     expect(
       within(dialogo).getByText(/Você está adicionando em/),
@@ -163,13 +162,60 @@ describe("PainelAdicionarColaborador (T194)", () => {
     ];
     expect(
       focaveis.map((e) =>
-        e instanceof HTMLInputElement ? `radio:${e.value}` : e.textContent,
+        e instanceof HTMLInputElement
+          ? `radio:${e.value}`
+          : // O "Fechar" é botão de ícone: o nome vem do rótulo.
+            (e.getAttribute("aria-label") ?? e.textContent),
       ),
     ).toEqual(["Fechar", "radio:individual", "Cancelar", "Iniciar cadastro"]);
     const ultimo = focaveis[focaveis.length - 1]!;
     ultimo.focus();
-    fireEvent.keyDown(document, { key: "Tab" });
+    // O foco preso do Radix responde ao Tab dentro da janela.
+    fireEvent.keyDown(ultimo, { key: "Tab" });
     expect(document.activeElement).toBe(focaveis[0]);
+  });
+
+  describe("T209 (Bloco C) — importar planilha disponível", () => {
+    it("com onImportarPlanilha, a forma fica habilitada, sem motivo de indisponível", () => {
+      montar({ onImportarPlanilha: vi.fn() });
+      const r = radio("Importar planilha");
+      expect(r).toBeEnabled();
+      const cartao = r.closest("label") as HTMLElement;
+      expect(cartao).toHaveClass("painel-adicionar__forma--disponivel");
+      expect(cartao).not.toHaveTextContent("Indisponível");
+      expect(cartao).toHaveTextContent("Até 200 pessoas por arquivo CSV");
+      // A admissão digital segue indisponível.
+      expect(radio("Admissão digital")).toBeDisabled();
+    });
+
+    it("escolher a planilha troca o botão para 'Iniciar importação', que a inicia", () => {
+      const onImportarPlanilha = vi.fn();
+      const { onCadastroIndividual } = montar({ onImportarPlanilha });
+      fireEvent.click(radio("Importar planilha"));
+      expect(radio("Importar planilha")).toBeChecked();
+      expect(
+        within(painel()).queryByRole("button", {
+          name: ROTULO_INICIAR_CADASTRO,
+        }),
+      ).toBeNull();
+      fireEvent.click(
+        within(painel()).getByRole("button", { name: "Iniciar importação" }),
+      );
+      expect(onImportarPlanilha).toHaveBeenCalledTimes(1);
+      expect(onCadastroIndividual).not.toHaveBeenCalled();
+    });
+
+    it("voltar ao cadastro individual volta o botão e a ação", () => {
+      const onImportarPlanilha = vi.fn();
+      const { onCadastroIndividual } = montar({ onImportarPlanilha });
+      fireEvent.click(radio("Importar planilha"));
+      fireEvent.click(radio("Cadastro individual"));
+      fireEvent.click(
+        within(painel()).getByRole("button", { name: ROTULO_INICIAR_CADASTRO }),
+      );
+      expect(onCadastroIndividual).toHaveBeenCalledTimes(1);
+      expect(onImportarPlanilha).not.toHaveBeenCalled();
+    });
   });
 
   it("sem empresa ativa informada, não mostra a linha da empresa", () => {
@@ -178,12 +224,11 @@ describe("PainelAdicionarColaborador (T194)", () => {
   });
 
   it("375 px e estados visuais: tela inteira, cartões que quebram linha, escolhida e indisponível distintas", () => {
-    const cssModal = readFileSync("src/components/Modal.css", "utf8");
-    expect(cssModal).toMatch(
-      /\.evolli-modal--lateral \{[^}]*justify-content: flex-end/,
-    );
-    expect(cssModal).toMatch(
-      /@media \(max-width: 640px\) \{[\s\S]*\.evolli-modal--lateral \.evolli-modal__caixa \{[^}]*max-width: none/,
+    // T209 — painel lateral do Sheet (`src/ui`): preso à direita, na altura
+    // toda; largura total até 30rem (no celular, a tela inteira).
+    const sheet = readFileSync("src/ui/Dialog.tsx", "utf8");
+    expect(sheet).toContain(
+      "ev:inset-y-0 ev:right-0 ev:h-dvh ev:w-full ev:max-w-[30rem]",
     );
     const css = readFileSync(
       "src/screens/pessoas/PainelAdicionarColaborador.css",

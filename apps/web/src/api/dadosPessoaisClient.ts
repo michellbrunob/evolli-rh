@@ -16,7 +16,14 @@ const BASE = "/v1";
  * auditada no servidor; `no-store` impede cache do navegador.
  */
 export interface PerfilPessoalApi {
-  dataNascimento: string;
+  /** T209 — opcional desde a etapa 1 do Novo colaborador. */
+  dataNascimento: string | null;
+  /** T209 — etapa 1: CPF (11 dígitos), RG, gênero e contato de emergência. */
+  cpf?: string | null;
+  rg?: string | null;
+  genero?: string | null;
+  contatoEmergenciaNome?: string | null;
+  contatoEmergenciaTelefone?: string | null;
   /**
    * T179 — código de `OPCOES_SEXO` (`feminino`, `masculino`, `intersexo`,
    * `nao_informar`), `null` quando não informado, ou o texto livre de um

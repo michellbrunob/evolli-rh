@@ -83,7 +83,7 @@ export class UsersController {
    *
    * - `companyId` é a empresa **ATIVA** desta sessão, não mais a coluna fixa
    *   da conta: o ator já chega com o contexto resolvido pelo `SessionGuard`;
-   * - `empresaAtiva` traz **nome e código** dessa empresa. Existe para matar a
+   * - `empresaAtiva` traz **nome, código e CNPJ** (T209) dessa empresa. Existe para matar a
    *   ressalva R-2 da T162: o Hub lia `GET /v1/empresas` a cada montagem só
    *   para descobrir o nome, e aquela rota chama `registrarConsultaAmpla` —
    *   um registro de auditoria por visita ao Hub. Aqui a leitura é direta, por
@@ -224,7 +224,7 @@ export class UsersController {
         ? null
         : await this.prisma.empresa.findUnique({
             where: { id: user.companyId },
-            select: { id: true, codigo: true, nome: true },
+            select: { id: true, codigo: true, nome: true, cnpj: true },
           });
 
     return {

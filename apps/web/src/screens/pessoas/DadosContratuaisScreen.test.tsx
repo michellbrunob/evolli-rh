@@ -628,9 +628,13 @@ function servidorComCentoECinquenta() {
         ativosPorTipo: {
           clt: filtrada.length,
           estagio: 0,
+          aprendiz: 0,
           pj: 0,
           temporario: 0,
           outro_controlado: 0,
+          part_time: 0,
+          freelancer: 0,
+          trainee: 0,
         },
       },
     };

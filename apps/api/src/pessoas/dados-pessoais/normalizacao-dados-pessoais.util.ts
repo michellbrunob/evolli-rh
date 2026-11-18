@@ -73,10 +73,55 @@ export const SEXOS = [
 ] as const;
 export type Sexo = (typeof SEXOS)[number];
 
+/**
+ * T209 — gênero em lista FECHADA (etapa 1 do Novo colaborador, decisão de
+ * 2026-11-17). Opcional; "prefiro_nao_informar" é escolha explícita.
+ */
+export const GENEROS = [
+  "feminino",
+  "masculino",
+  "outro",
+  "prefiro_nao_informar",
+] as const;
+export type Genero = (typeof GENEROS)[number];
+
+/** T209 — CPF gravado: só os 11 dígitos. */
+export const CPF_GRAVADO = /^[0-9]{11}$/;
+const CPF_ENTRADA = /^[0-9]{3}\.?[0-9]{3}\.?[0-9]{3}-?[0-9]{2}$/;
+
+/**
+ * T209 — CPF: aceita `000.000.000-00` ou os 11 dígitos e devolve só os
+ * dígitos; vazio vira `null`. Fora dessa forma volta como veio, para a
+ * validação recusar — normalizar nunca "conserta".
+ */
+export function normalizarCpf(valor: unknown): unknown {
+  const texto = normalizarTextoPessoal(valor);
+  if (typeof texto !== "string") return texto;
+  return CPF_ENTRADA.test(texto) ? texto.replace(/[.-]/g, "") : texto;
+}
+
+/**
+ * T209 — dígitos verificadores do CPF (módulo 11). Sequências de um dígito
+ * só (`111.111.111-11`) passam no cálculo, mas não são CPF: recusadas.
+ */
+export function cpfValido(cpf: string): boolean {
+  if (!CPF_GRAVADO.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digitos = [...cpf].map(Number);
+  const dv = (quantos: number) => {
+    let soma = 0;
+    for (let i = 0; i < quantos; i++) soma += digitos[i]! * (quantos + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return dv(9) === digitos[9] && dv(10) === digitos[10];
+}
+
 /** Borda inferior da data de nascimento, igual ao CHECK do banco. */
 export const DATA_NASCIMENTO_MINIMA = "1900-01-01";
 
 export const LIMITES_PERFIL = {
+  rg: 20,
+  contatoEmergenciaNome: 150,
   sexo: 60,
   saudacao: 40,
   estadoCivil: 60,
@@ -113,6 +158,9 @@ export function normalizarTextoPessoal(valor: unknown): unknown {
 /** Campos do perfil, na ordem da tela, com o nome do campo no evento. */
 export const CAMPOS_PERFIL = [
   ["dataNascimento", "data_nascimento"],
+  ["cpf", "cpf"],
+  ["rg", "rg"],
+  ["genero", "genero"],
   ["sexo", "sexo"],
   ["saudacao", "saudacao"],
   ["estadoCivil", "estado_civil"],
@@ -122,6 +170,8 @@ export const CAMPOS_PERFIL = [
   ["curso", "curso"],
   ["nomePai", "nome_pai"],
   ["nomeMae", "nome_mae"],
+  ["contatoEmergenciaNome", "contato_emergencia_nome"],
+  ["contatoEmergenciaTelefone", "contato_emergencia_telefone"],
 ] as const satisfies readonly (readonly [string, CampoDadosPessoais])[];
 
 /** Campos do endereço, na ordem da tela, com o nome do campo no evento. */

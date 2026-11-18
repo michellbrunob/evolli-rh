@@ -1,4 +1,17 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
+
+/**
+ * T209 — Segurança, Sessões ativas e Sair moram no menu da conta da barra
+ * superior (Radix: abre pelo teclado).
+ */
+async function itemDaConta(nome: string): Promise<HTMLElement> {
+  const conta = screen.getByRole("button", { name: /^Conta: / });
+  if (conta.getAttribute("aria-expanded") !== "true") {
+    fireEvent.keyDown(conta, { key: "Enter" });
+  }
+  return screen.findByRole("menuitem", { name: nome });
+}
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { App } from "./App";
@@ -37,11 +50,13 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 
-  it("exibe a marca textual 'Evolli RH' e o rótulo do painel", () => {
+  it("exibe a marca textual 'Evolli RH' no topo da faixa (T209)", () => {
     render(<App papelDoAtor="rh" />);
 
     expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Painel Administrativo")).toBeInTheDocument();
+    expect(
+      document.querySelector(".app-shell__cabecalho-lateral")!,
+    ).toHaveTextContent("Evolli RH");
   });
 
   it("tem exatamente um título de nível 1: o da tela de aterrissagem", () => {
@@ -685,14 +700,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout informado, mostra o botão 'Sair' na barra superior e o aciona ao clicar (T116)", () => {
+  it("com onLogout informado, 'Sair' fica no menu da conta da barra superior e o aciona (T116/T209)", async () => {
     const onLogout = vi.fn();
     render(<App papelDoAtor="rh" onLogout={onLogout} />);
 
-    const botaoSair = screen.getByRole("button", { name: "Sair" });
-    expect(botaoSair).toBeInTheDocument();
-
-    fireEvent.click(botaoSair);
+    fireEvent.click(await itemDaConta("Sair"));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
@@ -707,18 +719,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout informado, mostra e abre o painel 'Sessões ativas' ao clicar, e fecha ao clicar em Fechar (T117)", () => {
+  it("com onLogout informado, abre o painel 'Sessões ativas' pelo menu da conta, e fecha ao clicar em Fechar (T117/T209)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} />);
 
-    const botaoAbrir = screen.getByRole("button", { name: "Sessões ativas" });
-    expect(botaoAbrir).toHaveAttribute("aria-expanded", "false");
     expect(
       screen.queryByRole("heading", { name: "Sessões ativas" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(botaoAbrir);
+    fireEvent.click(await itemDaConta("Sessões ativas"));
 
-    expect(botaoAbrir).toHaveAttribute("aria-expanded", "true");
     expect(
       screen.getByRole("heading", { name: "Sessões ativas" }),
     ).toBeInTheDocument();
@@ -746,14 +755,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout e mfaDisponivel: abre e fecha o painel 'Segurança da conta' (T126/T131)", () => {
+  it("com onLogout e mfaDisponivel: abre e fecha o painel 'Segurança da conta' pelo menu da conta (T126/T131/T209)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
 
-    const botao = screen.getByRole("button", { name: "Segurança" });
-    expect(botao).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(botao);
-    expect(botao).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(await itemDaConta("Segurança"));
     expect(
       screen.getByRole("heading", { name: "Segurança da conta" }),
     ).toBeInTheDocument();
@@ -764,15 +769,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", () => {
+  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
+    fireEvent.click(await itemDaConta("Sessões ativas"));
     expect(
       screen.getByRole("heading", { name: "Sessões ativas" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Segurança" }));
+    fireEvent.click(await itemDaConta("Segurança"));
     expect(
       screen.getByRole("heading", { name: "Segurança da conta" }),
     ).toBeInTheDocument();
@@ -795,12 +800,24 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // (`sempreComoModulo`), Estrutura (dois itens desde a T182), Liderança e
     // Demonstração. O Dashboard é item único: módulo e destino fundidos.
     // T208 — Configurações também é item único (a própria conta): 21.
-    expect(botoes).toHaveLength(21);
+    // T209 — menu completo: + 11 itens em desenvolvimento (8 de primeiro
+    // nível e 3 subitens) e o cabeçalho expansível de Recrutamento: 33. O
+    // cabeçalho de Gestão de Pessoas se chama "Colaboradores" na barra.
+    // T209 (menu compacto) — o título da seção Operação vira um botão de
+    // abrir e fechar: 34.
+    expect(botoes).toHaveLength(34);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))
         .map((b) => b.textContent),
-    ).toEqual(["Gestão de Pessoas", "Estrutura", "Liderança", "Demonstração"]);
+    ).toEqual([
+      "Colaboradores",
+      "Recrutamento",
+      "Operação",
+      "Estrutura",
+      "Liderança",
+      "Demonstração",
+    ]);
     for (const botao of botoes) {
       expect(botao.tagName).toBe("BUTTON");
       expect(botao).toHaveAttribute("type", "button");
@@ -853,20 +870,24 @@ describe("App — capacidade condicional do gestor (T153)", () => {
 });
 
 describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
+  /** T209 — o nome de cada controle da barra (o acessível, que vale). */
   function acoesDoCabecalho() {
     return within(screen.getByRole("banner"))
       .getAllByRole("button")
-      .map((b) => b.textContent?.trim());
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());
   }
 
-  it("oferece exatamente as ações que existem — e nada mais", () => {
+  it("oferece exatamente as ações que existem — e nada mais (T209: a conta reúne Segurança, Sessões ativas e Sair)", async () => {
     render(<App papelDoAtor="rh" onLogout={() => {}} mfaDisponivel />);
-    expect(acoesDoCabecalho()).toEqual([
-      "Menu",
-      "Segurança",
-      "Sessões ativas",
-      "Sair",
-    ]);
+    expect(acoesDoCabecalho()).toEqual(["Menu", "Conta: Minha conta"]);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Conta: / }), {
+      key: "Enter",
+    });
+    expect(
+      within(await screen.findByRole("menu"))
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Meu perfil", "Segurança", "Sessões ativas", "Sair"]);
   });
 
   it("não inventa marketplace, busca global, notificação, favorito nem suporte", () => {
@@ -886,16 +907,14 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
     }
   });
 
-  it("sem sessão, o cabeçalho só tem o botão da gaveta", () => {
+  it("sem sessão, o cabeçalho só tem o botão da gaveta (o recolher fica no topo da faixa)", () => {
     render(<App papelDoAtor="rh" />);
     expect(acoesDoCabecalho()).toEqual(["Menu"]);
   });
 
-  it("mostra como contexto o papel que o SERVIDOR informou", () => {
-    render(<App papelDoAtor="gestor" />);
-    expect(
-      within(screen.getByRole("banner")).getByText("Gestor"),
-    ).toBeInTheDocument();
+  it("T209 — não mostra o papel técnico no cabeçalho", () => {
+    render(<App papelDoAtor="gestor" onLogout={() => {}} />);
+    expect(within(screen.getByRole("banner")).queryByText("Gestor")).toBeNull();
   });
 
   it("sem papel confirmado, não inventa contexto nenhum", () => {
@@ -909,7 +928,6 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
   it("a marca do painel é própria e textual, não um ativo de terceiro", () => {
     render(<App papelDoAtor="rh" />);
     expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Painel Administrativo")).toBeInTheDocument();
     // Nenhuma imagem externa: o símbolo é SVG inline, desenhado no projeto.
     expect(document.querySelectorAll("img")).toHaveLength(0);
   });
@@ -1148,7 +1166,9 @@ describe("App — R1: atravessar o breakpoint com a gaveta aberta", () => {
     }
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Conta: / }),
+    ).toBeInTheDocument();
   });
 
   it("o foco deixa de ser preso: Tab a partir do conteúdo não volta à barra", () => {
@@ -1455,15 +1475,11 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     );
   });
 
-  it("o botão 'Hub' só existe quando há Hub acima do shell", () => {
-    const { unmount } = render(<App papelDoAtor="rh" />);
-    expect(screen.queryByRole("button", { name: "Hub" })).toBeNull();
-    unmount();
-
+  it("T209 — não há botão 'Hub', nem com quem monte o shell oferecendo a volta", () => {
     const voltar = vi.fn();
-    render(<App papelDoAtor="rh" onVoltarAoHub={voltar} />);
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    expect(voltar).toHaveBeenCalledTimes(1);
+    render(<App papelDoAtor="rh" onVoltarAoHub={voltar} onLogout={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Hub" })).toBeNull();
+    expect(voltar).not.toHaveBeenCalled();
   });
 });
 
@@ -1506,13 +1522,13 @@ describe("T189 — empresa ativa no topo do menu lateral", () => {
     await screen.findByRole("button", { name: /Empresa ativa/ });
     const barra = document.getElementById("navegacao-lateral")!;
     const filhos = [...barra.children].map((f) => f.className);
-    // T206 — a marca divide o topo da barra com o botão de recolher.
-    const marca = [...barra.children].findIndex(
-      (f) => f.querySelector(".app-shell__marca") !== null,
-    );
     const seletor = filhos.findIndex((c) => c.includes("seletor-empresa"));
     const navegacao = [...barra.children].findIndex(
       (f) => f.querySelector("nav") !== null || f.tagName === "NAV",
+    );
+    // T206/T209 — a marca divide o topo da faixa com o botão de recolher.
+    const marca = [...barra.children].findIndex(
+      (f) => f.querySelector(".app-shell__marca") !== null,
     );
     expect(marca).toBe(0);
     expect(seletor).toBe(1);

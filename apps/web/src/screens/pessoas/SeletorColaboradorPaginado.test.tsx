@@ -80,9 +80,13 @@ function servidor(lista: readonly ColaboradorListadoApi[]) {
           ativosPorTipo: {
             clt: 0,
             estagio: 0,
+            aprendiz: 0,
             pj: 0,
             temporario: 0,
             outro_controlado: 0,
+            part_time: 0,
+            freelancer: 0,
+            trainee: 0,
           },
         },
       } as ListagemColaboradoresApi;
@@ -321,9 +325,13 @@ describe("T188 — seletor: estados", () => {
           ativosPorTipo: {
             clt: 0,
             estagio: 0,
+            aprendiz: 0,
             pj: 0,
             temporario: 0,
             outro_controlado: 0,
+            part_time: 0,
+            freelancer: 0,
+            trainee: 0,
           },
         },
       });

@@ -45,10 +45,15 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T178 — o id segue `pessoas` (o contêiner, aberto na aba Colaboradores).
   pessoas: "#/pessoas/colaboradores",
   "nova-admissao": "#/pessoas/nova-admissao",
+  // T209 (Bloco C) — importação por planilha, sub-página de Colaboradores.
+  "importar-colaboradores": "#/pessoas/importar",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
   configuracoes: "#/configuracoes/meu-perfil",
+  // T209 — Configurações › Empresas e a Nova empresa.
+  "configuracoes-empresas": "#/configuracoes/empresas",
+  "nova-empresa": "#/configuracoes/empresas/nova",
 };
 
 /**
@@ -192,20 +197,35 @@ export type AbaDaListagem = (typeof ABAS_DA_LISTAGEM)[number];
 export const TIPOS_DE_VINCULO = [
   "clt",
   "estagio",
+  // T209 — Aprendiz, logo depois de Estágio (AP-8).
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",
+  // T209 — etapa 2 do Novo colaborador.
+  "part_time",
+  "freelancer",
+  "trainee",
 ] as const;
 export type TipoDeVinculo = (typeof TIPOS_DE_VINCULO)[number];
+
+/**
+ * T209 — tamanhos de página da listagem (C-2): 20 (o padrão), 50 e 100, o
+ * teto que a API aceita. Fechado: outro valor na URL cai no padrão.
+ */
+export const TAMANHOS_DE_PAGINA = [20, 50, 100] as const;
+export type TamanhoDaPagina = (typeof TAMANHOS_DE_PAGINA)[number];
 
 /**
  * T199 — o que o dashboard guarda na URL (D-3): aba, página e os ids dos
  * filtros. **Nunca o texto da busca**, que pode ser nome ou matrícula — dado
  * pessoal não vai para a URL, o histórico ou o servidor de log.
+ * T209 — e o tamanho da página (C-2), no parâmetro canônico `tamanho`.
  */
 export interface EstadoDaListagem {
   readonly aba: AbaDaListagem;
   readonly pagina: number;
+  readonly tamanho: TamanhoDaPagina;
   readonly departamentoId: string | null;
   readonly cargoId: string | null;
   readonly tipo: TipoDeVinculo | null;
@@ -224,6 +244,7 @@ export interface OpcoesDaMudancaDaListagem {
 export const ESTADO_INICIAL_DA_LISTAGEM: EstadoDaListagem = {
   aba: "ativos",
   pagina: 1,
+  tamanho: 20,
   departamentoId: null,
   cargoId: null,
   tipo: null,
@@ -244,7 +265,7 @@ export function abaTemLotacao(aba: AbaDaListagem): boolean {
 /**
  * T199 — o estado coerente com a aba: lotação só onde ela existe; a aba de
  * jornada (outra visão, com paginação e filtros próprios) não leva página,
- * lotação nem tipo.
+ * lotação nem tipo. T209 — nem tamanho de página: ela tem paginação própria.
  */
 export function normalizarEstadoDaListagem(
   estado: EstadoDaListagem,
@@ -276,11 +297,15 @@ export function listagemDaRota(fragmento: string): EstadoDaListagem | null {
   const uuid = (valor: string | null) =>
     valor !== null && UUID.test(valor) ? valor.toLowerCase() : null;
   const tipo = params.get("tipo") ?? "";
+  const tamanho = params.get("tamanho") ?? "";
   return normalizarEstadoDaListagem({
     aba: (ABAS_DA_LISTAGEM as readonly string[]).includes(aba)
       ? (aba as AbaDaListagem)
       : ESTADO_INICIAL_DA_LISTAGEM.aba,
     pagina: numero <= PAGINA_MAXIMA ? numero : 1,
+    tamanho:
+      TAMANHOS_DE_PAGINA.find((n) => String(n) === tamanho) ??
+      ESTADO_INICIAL_DA_LISTAGEM.tamanho,
     departamentoId: uuid(params.get("departamento")),
     cargoId: uuid(params.get("cargo")),
     tipo: (TIPOS_DE_VINCULO as readonly string[]).includes(tipo)
@@ -298,6 +323,8 @@ export function rotaDaListagem(estado: EstadoDaListagem): string {
   const params = new URLSearchParams();
   if (e.aba !== ESTADO_INICIAL_DA_LISTAGEM.aba) params.set("aba", e.aba);
   if (e.pagina > 1) params.set("pagina", String(e.pagina));
+  if (e.tamanho !== ESTADO_INICIAL_DA_LISTAGEM.tamanho)
+    params.set("tamanho", String(e.tamanho));
   if (e.departamentoId) params.set("departamento", e.departamentoId);
   if (e.cargoId) params.set("cargo", e.cargoId);
   if (e.tipo) params.set("tipo", e.tipo);
@@ -461,6 +488,10 @@ export function ehFragmentoDeRota(fragmento: string): boolean {
  */
 const DESTINO_SEGURO_APOS_TROCA: Readonly<Record<string, string>> = {
   "nova-admissao": "pessoas",
+  // T209 (Bloco C) — a planilha conferida é da empresa anterior: descartada.
+  "importar-colaboradores": "pessoas",
+  // T209 — um CNPJ pela metade não segue para a empresa nova: volta à lista.
+  "nova-empresa": "configuracoes-empresas",
 };
 
 export function destinoAposTrocaDeEmpresa(

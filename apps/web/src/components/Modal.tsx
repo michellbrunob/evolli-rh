@@ -34,6 +34,17 @@
  *    devolvem o foco a quem o tinha antes dela.
  *
  * Não empilha: cada tela mantém uma instância e troca o conteúdo dela.
+ *
+ * T209 — painel lateral animado (padrão reutilizável): com
+ * `posicao="lateral"`, o painel entra deslizando da direita e o fundo aparece
+ * por opacidade (CSS, em `Modal.css`). Ao fechar, foco, rolagem e teclado
+ * voltam NA HORA, e o painel fica montado só para a saída — inerte, fora da
+ * árvore acessível e sem receber clique — até o `animationend` da própria
+ * caixa. Sem animação calculada (`prefers-reduced-motion`, ou a janela
+ * central, que não anima), ele sai no mesmo quadro. Nenhum temporizador
+ * decide estado ou foco. No lateral, clicar no fundo pede o fechamento pelo
+ * MESMO caminho do "Fechar" (respeita `bloqueado` e `alterado`); na janela
+ * central, o fundo continua sem fechar.
  */
 import {
   createContext,
@@ -41,10 +52,11 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { AnimationEvent, ReactNode } from "react";
 import { Button } from "./Button";
 import "./Modal.css";
 import { useEdicaoEmAndamento } from "../app/edicoesPendentes";
@@ -139,6 +151,35 @@ export function Modal({
   // ao fluxo de edição quando a pessoa escolhe continuar editando.
   const focoAntesDaConfirmacaoRef = useRef<HTMLElement | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
+
+  /**
+   * T209 — a janela ainda na tela: aberta, ou saindo (animação de saída do
+   * painel lateral). Estado derivado no próprio desenho: abrir (inclusive no
+   * meio de uma saída) volta a mostrar, na hora.
+   */
+  const [naTela, setNaTela] = useState(aberto);
+  if (aberto && !naTela) setNaTela(true);
+  const saindo = !aberto && naTela;
+
+  // Sem animação de saída calculada (movimento reduzido, janela central), a
+  // janela sai no mesmo quadro — sem esperar um evento que não virá.
+  useLayoutEffect(() => {
+    if (!saindo) return;
+    const caixa = caixaRef.current;
+    const nome = caixa ? window.getComputedStyle(caixa).animationName : "";
+    if (!nome || nome === "none") setNaTela(false);
+  }, [saindo]);
+
+  /** Fim da animação de SAÍDA da própria caixa (não a de um filho). */
+  const aoTerminarAnimacao = useCallback(
+    (evento: AnimationEvent<HTMLDivElement>) => {
+      if (!saindo || evento.target !== evento.currentTarget) return;
+      const nome = window.getComputedStyle(evento.currentTarget).animationName;
+      if (evento.animationName !== nome) return;
+      setNaTela(false);
+    },
+    [saindo],
+  );
 
   // T189 — janela aberta com alteração não salva é edição pendente; envio
   // em andamento (`bloqueado`), salvamento. A troca de empresa respeita os
@@ -290,20 +331,32 @@ export function Modal({
     return () => document.removeEventListener("keydown", aoTeclar, true);
   }, [aberto, confirmandoDescarte, pedirFechamento, continuarEditando]);
 
-  if (!aberto) return null;
+  if (!aberto && !naTela) return null;
+
+  const classes = ["evolli-modal"];
+  if (posicao === "lateral") classes.push("evolli-modal--lateral");
+  if (saindo) classes.push("evolli-modal--saindo");
 
   return (
     <div
-      className={
-        posicao === "lateral"
-          ? "evolli-modal evolli-modal--lateral"
-          : "evolli-modal"
-      }
+      className={classes.join(" ")}
       role="presentation"
+      // T209 — saindo: inerte e fora da árvore acessível até a animação acabar.
+      {...(saindo
+        ? ({ "aria-hidden": "true", inert: "" } as Record<string, string>)
+        : {})}
     >
-      {/* O fundo não fecha ao clique: num formulário longo, um clique fora
-          descartaria trabalho sem aviso. Fechar é sempre explícito. */}
-      <div className="evolli-modal__fundo" aria-hidden="true" />
+      {/* Janela central: o fundo não fecha ao clique — num formulário longo,
+          um clique fora descartaria trabalho sem aviso. Painel lateral
+          (T209): o clique pede o fechamento pelo caminho do "Fechar", que
+          confirma antes de descartar e não fecha durante um envio. */}
+      <div
+        className="evolli-modal__fundo"
+        aria-hidden="true"
+        {...(posicao === "lateral" && aberto
+          ? { onClick: pedirFechamento }
+          : {})}
+      />
       <div
         className={`evolli-modal__caixa evolli-modal__caixa--${largura}`}
         role="dialog"
@@ -311,6 +364,7 @@ export function Modal({
         aria-labelledby={tituloId}
         {...(descricao ? { "aria-describedby": descricaoId } : {})}
         ref={caixaRef}
+        onAnimationEnd={aoTerminarAnimacao}
       >
         <header className="evolli-modal__cabecalho">
           <div className="evolli-modal__titulo-grupo">

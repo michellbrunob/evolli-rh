@@ -54,10 +54,15 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import type { KeyboardEvent as KeyboardEventReact, ReactNode } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent as KeyboardEventReact,
+  ReactNode,
+} from "react";
 import { Button } from "../components/Button";
 import {
   ContextoApiError,
@@ -66,6 +71,8 @@ import {
   type EmpresaDoContextoApi,
 } from "../api/contextoEmpresarialClient";
 import { useResumoDasEdicoes } from "./edicoesPendentes";
+import { formatarCnpj } from "../format/cnpj";
+import { IconeConfiguracoes, IconeMais } from "../ui/icones";
 import "./SeletorEmpresaAtiva.css";
 
 /** Empresa ativa como o ator a traz. `id` falta só em montagens de teste. */
@@ -73,6 +80,16 @@ export interface EmpresaAtivaExibida {
   readonly id?: string;
   readonly codigo: string;
   readonly nome: string;
+  /** T209 — o CNPJ, quando cadastrado. */
+  readonly cnpj?: string | null;
+}
+
+/** T209 — a linha de baixo: o CNPJ com máscara, ou o código. */
+function identificacao(empresa: {
+  readonly codigo: string;
+  readonly cnpj?: string | null;
+}): string {
+  return empresa.cnpj ? formatarCnpj(empresa.cnpj) : `Código ${empresa.codigo}`;
 }
 
 export type EstadoOpcoesDeEmpresa =
@@ -180,6 +197,10 @@ export interface SeletorEmpresaAtivaProps {
   readonly compacto?: boolean;
   /** T206 — pedido ao shell para sair do trilho antes de abrir a lista. */
   readonly onExpandirMenu?: () => void;
+  /** T209 — "Adicionar empresa": só quando o shell oferece (quem cria). */
+  readonly onAdicionarEmpresa?: () => void;
+  /** T209 — "Gerenciar empresas": Configurações › Empresas. */
+  readonly onGerenciarEmpresas?: () => void;
 }
 
 /** T206 — símbolo próprio da empresa no trilho, quando não há monograma. */
@@ -236,6 +257,8 @@ export function SeletorEmpresaAtiva({
   onEmpresaTrocada,
   compacto = false,
   onExpandirMenu,
+  onAdicionarEmpresa,
+  onGerenciarEmpresas,
 }: SeletorEmpresaAtivaProps) {
   const { estado: opcoes, recarregar } = useOpcoesDeEmpresa(podeTrocarEmpresa);
   const resumo = useResumoDasEdicoes();
@@ -251,6 +274,15 @@ export function SeletorEmpresaAtiva({
   const confirmacaoRef = useRef<HTMLDivElement | null>(null);
   /** Foco pedido para depois do desenho que abre o painel. */
   const focarListaRef = useRef(false);
+  /**
+   * T209 — no menu do desktop, o painel flutua logo abaixo do cartão (a
+   * lateral recorta o que passa da largura dela). A posição vem do cartão,
+   * relida ao abrir, ao rolar e ao redimensionar; o CSS só a usa no desktop.
+   */
+  const [posicao, setPosicao] = useState<{
+    readonly topo: number;
+    readonly esquerda: number;
+  } | null>(null);
 
   const idBotao = `${id}-botao`;
   const idPainel = `${id}-painel`;
@@ -281,7 +313,12 @@ export function SeletorEmpresaAtiva({
       ? empresa.id === empresaAtiva.id
       : empresa.codigo === empresaAtiva?.codigo;
   const haOutraOpcao = (itensConhecidos ?? []).some((e) => !ehAtual(e));
-  const expansivel = podeTrocarEmpresa && haOutraOpcao;
+  // T209 — com as ações de empresa, o painel abre mesmo com uma só.
+  const temAcoes =
+    onAdicionarEmpresa !== undefined || onGerenciarEmpresas !== undefined;
+  const expansivel =
+    podeTrocarEmpresa &&
+    (haOutraOpcao || (temAcoes && itensConhecidos !== null));
 
   const trocando = troca.tipo === "trocando";
   const salvandoAgora = resumo.salvando.length > 0;
@@ -320,6 +357,22 @@ export function SeletorEmpresaAtiva({
     const atual = botoes.find((b) => b.getAttribute("aria-current") === "true");
     (atual ?? botoes[0])!.focus();
   });
+
+  useLayoutEffect(() => {
+    if (!aberto || variante !== "menu") return;
+    function medir() {
+      const caixa = botaoRef.current?.getBoundingClientRect();
+      if (!caixa) return;
+      setPosicao({ topo: caixa.bottom + 6, esquerda: caixa.left });
+    }
+    medir();
+    window.addEventListener("resize", medir);
+    window.addEventListener("scroll", medir, true);
+    return () => {
+      window.removeEventListener("resize", medir);
+      window.removeEventListener("scroll", medir, true);
+    };
+  }, [aberto, variante, compacto]);
 
   // A confirmação recebe o foco no botão que NÃO descarta nada.
   useEffect(() => {
@@ -360,10 +413,10 @@ export function SeletorEmpresaAtiva({
   // Se a lista deixa de ter para onde ir (recarregada depois de uma empresa
   // indisponível), o painel fecha — não fica um painel sem escolha.
   useEffect(() => {
-    if (aberto && opcoes.tipo === "carregadas" && !haOutraOpcao) {
+    if (aberto && opcoes.tipo === "carregadas" && !haOutraOpcao && !temAcoes) {
       setAberto(false);
     }
-  }, [aberto, opcoes.tipo, haOutraOpcao]);
+  }, [aberto, opcoes.tipo, haOutraOpcao, temAcoes]);
 
   function alternar() {
     if (aberto) {
@@ -472,11 +525,15 @@ export function SeletorEmpresaAtiva({
         </span>
       ) : null}
       <span className="seletor-empresa__textos">
-        <span className="seletor-empresa__rotulo">Empresa ativa</span>
+        {/* T209 — à vista, só nome e código; o rótulo segue no nome
+            acessível. */}
+        <span className="seletor-empresa__rotulo seletor-empresa__oculto">
+          Empresa ativa
+        </span>
         <span className="seletor-empresa__nome">{nomeExibido}</span>
         {empresaAtiva ? (
           <span className="seletor-empresa__codigo">
-            Código {empresaAtiva.codigo}
+            {identificacao(empresaAtiva)}
           </span>
         ) : null}
       </span>
@@ -540,7 +597,7 @@ export function SeletorEmpresaAtiva({
             focusable="false"
           >
             <path
-              d="M4 6l4 4 4-4"
+              d="M5 6.5l3-3 3 3M5 9.5l3 3 3-3"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.6"
@@ -559,7 +616,19 @@ export function SeletorEmpresaAtiva({
       )}
 
       {expansivel ? (
-        <div id={idPainel} className="seletor-empresa__painel" hidden={!aberto}>
+        <div
+          id={idPainel}
+          className="seletor-empresa__painel"
+          hidden={!aberto}
+          style={
+            posicao
+              ? ({
+                  "--seletor-empresa-topo": `${posicao.topo}px`,
+                  "--seletor-empresa-esquerda": `${posicao.esquerda}px`,
+                } as CSSProperties)
+              : undefined
+          }
+        >
           {troca.tipo === "confirmando" ? (
             <div
               className="seletor-empresa__confirmacao"
@@ -655,28 +724,28 @@ export function SeletorEmpresaAtiva({
                           {empresa.nome}
                         </span>
                         <span className="seletor-empresa__opcao-codigo">
-                          Código {empresa.codigo}
+                          {identificacao(empresa)}
                         </span>
                       </span>
                       {atual ? (
                         <span className="seletor-empresa__atual">
                           <svg
                             viewBox="0 0 16 16"
-                            width="14"
-                            height="14"
+                            width="12"
+                            height="12"
                             aria-hidden="true"
                             focusable="false"
                           >
                             <path
-                              d="M3.5 8.5l3 3 6-7"
+                              d="M4 8.5l2.5 2.5 5.5-6"
                               fill="none"
                               stroke="currentColor"
-                              strokeWidth="1.8"
+                              strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
                           </svg>
-                          Atual
+                          <span className="seletor-empresa__oculto">Atual</span>
                         </span>
                       ) : null}
                     </button>
@@ -685,6 +754,37 @@ export function SeletorEmpresaAtiva({
               })}
             </ul>
           )}
+
+          {temAcoes ? (
+            <div className="seletor-empresa__acoes-da-conta">
+              {onAdicionarEmpresa ? (
+                <button
+                  type="button"
+                  className="seletor-empresa__acao"
+                  onClick={() => {
+                    fechar(false);
+                    onAdicionarEmpresa();
+                  }}
+                >
+                  <IconeMais tamanho={16} />
+                  Adicionar empresa
+                </button>
+              ) : null}
+              {onGerenciarEmpresas ? (
+                <button
+                  type="button"
+                  className="seletor-empresa__acao"
+                  onClick={() => {
+                    fechar(false);
+                    onGerenciarEmpresas();
+                  }}
+                >
+                  <IconeConfiguracoes tamanho={16} />
+                  Gerenciar empresas
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {papelDoAtor === "master_tecnico" && empresaAtiva !== null ? (
             <p className="seletor-empresa__nota">

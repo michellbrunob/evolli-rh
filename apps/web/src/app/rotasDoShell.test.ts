@@ -22,6 +22,7 @@ describe("T199 — listagemDaRota", () => {
     expect(ESTADO_INICIAL_DA_LISTAGEM).toEqual({
       aba: "ativos",
       pagina: 1,
+      tamanho: 20,
       departamentoId: null,
       cargoId: null,
       tipo: null,
@@ -36,6 +37,7 @@ describe("T199 — listagemDaRota", () => {
     ).toEqual({
       aba: "todos",
       pagina: 3,
+      tamanho: 20,
       departamentoId: DEP,
       cargoId: CAR,
       tipo: "pj",
@@ -60,6 +62,10 @@ describe("T199 — listagemDaRota", () => {
     ["departamento que não é UUID", "departamento=1", { departamentoId: null }],
     ["cargo que não é UUID", "cargo=x'or'1", { cargoId: null }],
     ["tipo fora dos controlados", "tipo=autonomo", { tipo: null }],
+    ["tamanho fora dos controlados", "tamanho=37", { tamanho: 20 }],
+    ["tamanho acima do teto", "tamanho=200", { tamanho: 20 }],
+    ["tamanho com zero à esquerda", "tamanho=050", { tamanho: 20 }],
+    ["tamanho não numérico", "tamanho=tudo", { tamanho: 20 }],
   ])("%s cai no padrão seguro", (_caso, query, esperado) => {
     expect(listagemDaRota(`${ROTA}?${query}`)).toEqual({
       ...ESTADO_INICIAL_DA_LISTAGEM,
@@ -114,11 +120,12 @@ describe("T199 — rotaDaListagem", () => {
         tipo: "estagio",
         cargoId: CAR,
         departamentoId: DEP,
+        tamanho: 50,
         pagina: 2,
         aba: "todos",
       }),
     ).toBe(
-      `${ROTA}?aba=todos&pagina=2&departamento=${DEP}&cargo=${CAR}&tipo=estagio`,
+      `${ROTA}?aba=todos&pagina=2&tamanho=50&departamento=${DEP}&cargo=${CAR}&tipo=estagio`,
     );
     expect(rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, tipo: "pj" })).toBe(
       `${ROTA}?tipo=pj`,
@@ -134,6 +141,12 @@ describe("T199 — rotaDaListagem", () => {
         tipo: "outro_controlado" as const,
       },
       { ...ESTADO_INICIAL_DA_LISTAGEM, aba: "jornada" as const },
+      { ...ESTADO_INICIAL_DA_LISTAGEM, tamanho: 100 as const, pagina: 3 },
+      {
+        ...ESTADO_INICIAL_DA_LISTAGEM,
+        aba: "desligados" as const,
+        tamanho: 50 as const,
+      },
     ];
     for (const estado of estados) {
       expect(listagemDaRota(rotaDaListagem(estado))).toEqual(estado);
@@ -145,6 +158,7 @@ describe("T199 — rotaDaListagem", () => {
       rotaDaListagem({
         aba: "desligados",
         pagina: 1,
+        tamanho: 20,
         departamentoId: DEP,
         cargoId: CAR,
         tipo: null,
@@ -154,6 +168,7 @@ describe("T199 — rotaDaListagem", () => {
       normalizarEstadoDaListagem({
         aba: "jornada",
         pagina: 5,
+        tamanho: 100,
         departamentoId: DEP,
         cargoId: null,
         tipo: "pj",
@@ -167,8 +182,45 @@ describe("T199 — rotaDaListagem", () => {
       "cargoId",
       "departamentoId",
       "pagina",
+      "tamanho",
       "tipo",
     ]);
+  });
+});
+
+describe("T209 — tamanho da página na URL (C-2)", () => {
+  it("lê 50 e 100; 20 é o padrão e não vai à URL", () => {
+    expect(listagemDaRota(`${ROTA}?tamanho=50`)?.tamanho).toBe(50);
+    expect(listagemDaRota(`${ROTA}?tamanho=100`)?.tamanho).toBe(100);
+    expect(listagemDaRota(`${ROTA}?tamanho=20`)?.tamanho).toBe(20);
+    expect(rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, tamanho: 20 })).toBe(
+      ROTA,
+    );
+    expect(
+      rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, tamanho: 100 }),
+    ).toBe(`${ROTA}?tamanho=100`);
+  });
+
+  it("a aba Jornada não leva tamanho (paginação própria)", () => {
+    expect(listagemDaRota(`${ROTA}?aba=jornada&tamanho=100`)).toEqual({
+      ...ESTADO_INICIAL_DA_LISTAGEM,
+      aba: "jornada",
+    });
+    expect(
+      rotaDaListagem({
+        ...ESTADO_INICIAL_DA_LISTAGEM,
+        aba: "jornada",
+        tamanho: 50,
+      }),
+    ).toBe(`${ROTA}?aba=jornada`);
+  });
+
+  it("o tamanho segue em todas as abas com tabela, com filtros e página", () => {
+    for (const aba of ["ativos", "em-admissao", "desligados", "todos"]) {
+      expect(
+        listagemDaRota(`${ROTA}?aba=${aba}&pagina=2&tamanho=50&tipo=pj`),
+      ).toMatchObject({ pagina: 2, tamanho: 50, tipo: "pj" });
+    }
   });
 });
 

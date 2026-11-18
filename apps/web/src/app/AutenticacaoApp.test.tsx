@@ -6,9 +6,11 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { abrirSecoesFechadasDoMenu } from "../test/menuLateral";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutenticacaoApp } from "./AutenticacaoApp";
+import { definirDuracaoMinimaDaAbertura } from "./abertura/duracaoDaAbertura";
 import { login, logout } from "../api/authClient";
 import { refreshCsrfToken } from "../api/csrfClient";
 import { ApiError, listarSessoesAtivas } from "../api/sessoesClient";
@@ -325,11 +327,37 @@ function dashboardNaTela() {
   });
 }
 
+/**
+ * T209 — o Hub foi desativado como destino de uso normal: depois do login,
+ * a sessão aterrissa no destino do papel (o Dashboard, para o ator padrão).
+ * Os testes que passavam pelo Hub chegam a essa aterrissagem.
+ */
 async function chegarAoHub() {
-  await waitFor(() => expect(hubNaTela() ?? dashboardNaTela()).not.toBeNull());
-  if (hubNaTela()) return;
-  fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-  await chegarAoHub();
+  await waitFor(() => expect(dashboardNaTela()).not.toBeNull());
+}
+
+/**
+ * T209 — "Sair" e "Sessões ativas" moram no menu da conta, na barra
+ * superior; a tela de acesso temporário tem o próprio "Sair".
+ */
+async function itemDaConta(nome: string): Promise<HTMLElement> {
+  const direto = screen.queryByRole("button", { name: nome });
+  if (direto) return direto;
+  const conta = screen.getByRole("button", { name: /^Conta: / });
+  if (conta.getAttribute("aria-expanded") !== "true") {
+    fireEvent.keyDown(conta, { key: "Enter" });
+  }
+  return screen.findByRole("menuitem", { name: nome });
+}
+
+const botaoSair = () => itemDaConta("Sair");
+
+/** T209 — um destino do menu lateral (não o cabeçalho de um módulo). */
+function itemDoMenu(rotulo: RegExp): HTMLElement {
+  const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
+  return within(nav)
+    .getAllByRole("button", { name: rotulo })
+    .find((b) => !b.hasAttribute("aria-expanded"))!;
 }
 
 /** Do login até o Hub (passando pela aterrissagem no Dashboard). */
@@ -338,9 +366,19 @@ async function entrarNoHub() {
   await chegarAoHub();
 }
 
-/** Abre um produto do Hub e espera o shell montar. */
+/**
+ * Abre um produto e espera o shell montar. T209 — sem Hub, pelo item do menu
+ * lateral (o destino, não o cabeçalho de um módulo expansível).
+ */
 async function abrirProduto(rotulo: RegExp | string) {
-  fireEvent.click(screen.getByRole("button", { name: rotulo }));
+  const nav = await screen.findByRole("navigation", {
+    name: "Navegação do painel",
+  });
+  abrirSecoesFechadasDoMenu();
+  const alvo = within(nav)
+    .getAllByRole("button", { name: rotulo })
+    .find((b) => !b.hasAttribute("aria-expanded"));
+  fireEvent.click(alvo!);
   await screen.findByRole("navigation", { name: "Navegação do painel" });
 }
 
@@ -370,11 +408,12 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     ).not.toBeInTheDocument();
 
     resolver!();
-    // Sessão válida leva ao Hub (T162), e nunca ao login.
+    // Sessão válida leva à aterrissagem do papel (T205; T209: sem Hub), e
+    // nunca ao login.
     await chegarAoHub();
     expect(
-      screen.queryByRole("navigation", { name: "Navegação do painel" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeInTheDocument();
   });
 
   it("sessão ausente (401 em /auth/csrf): mostra a tela de login, shell completamente oculto", async () => {
@@ -455,10 +494,10 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     expect(
       screen.queryByRole("heading", { level: 1, name: "Entrar" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(await botaoSair()).toBeInTheDocument();
   });
 
-  it("T162: o login leva ao Hub, e o shell só monta quando um produto é aberto", async () => {
+  it("T209: o login leva direto à aterrissagem do papel — nenhuma tela de Hub antes", async () => {
     vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
     vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
 
@@ -466,34 +505,25 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
     await entrarNoHub();
 
-    // Nada do shell existe ainda, e nenhuma tela funcional foi montada.
-    expect(
-      screen.queryByRole("navigation", { name: "Navegação do painel" }),
-    ).not.toBeInTheDocument();
-    expect(vi.mocked(listarTabelasHorario)).not.toHaveBeenCalled();
-    expect(vi.mocked(listarEquipe)).not.toHaveBeenCalled();
-
-    await abrirProduto(/^Colaboradores/);
+    expect(hubNaTela()).toBeNull();
     expect(
       screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
+    await abrirProduto(/^Colaboradores Consulta/);
+    expect(hubNaTela()).toBeNull();
   });
 
-  it("T162: 'Hub' volta ao ponto de entrada e desmonta o shell", async () => {
+  it("T209: não há 'Hub' no topo para voltar; o shell continua montado", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token-restaurado");
 
     render(<AutenticacaoApp />);
     await chegarAoHub();
-    await abrirProduto(/^Colaboradores/);
+    await abrirProduto(/^Colaboradores Consulta/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-
+    expect(screen.queryByRole("button", { name: "Hub" })).toBeNull();
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      screen.getByRole("navigation", { name: "Navegação do painel" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("navigation", { name: "Navegação do painel" }),
-    ).not.toBeInTheDocument();
   });
 
   it("logout real: chama o endpoint via authClient, limpa o estado e volta ao login", async () => {
@@ -504,7 +534,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
     expect(
@@ -523,7 +553,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "Entrar" }),
@@ -550,7 +580,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
     await entrar();
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     await waitFor(() => expect(logout).toHaveBeenCalled());
 
     expect(localStorageSpy).not.toHaveBeenCalled();
@@ -566,7 +596,7 @@ describe("AutenticacaoApp (T116) — portão de sessão", () => {
     await chegarAoHub();
     await abrirProduto(/^Colaboradores/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sessões ativas" }));
+    fireEvent.click(await itemDaConta("Sessões ativas"));
     await screen.findByRole("heading", { name: "Sessões ativas" });
 
     expect(
@@ -777,6 +807,7 @@ describe("T153 — aterrissagem segura por papel", () => {
       /^Dashboard/,
     );
     // E continua vendo "Minha equipe", porque o contrato lhe concede.
+    abrirSecoesFechadasDoMenu();
     expect(
       screen.getByRole("button", { name: /Minha equipe/ }),
     ).toBeInTheDocument();
@@ -808,32 +839,27 @@ describe("T153 — aterrissagem segura por papel", () => {
       });
 
       expect(destinosAtivos()).toEqual(["Dashboard Visão geral do ano"]);
+      abrirSecoesFechadasDoMenu();
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
     },
   );
 
-  it.each([
-    ["colaborador", "Visão geral", /Visão geral/],
-    ["financeiro", "Visão geral", /Visão geral/],
-  ])(
-    "B1.9 papel %s fica no Hub (sem Dashboard) e abre só %s",
-    async (papel, destino, abrir) => {
+  it.each(["colaborador", "financeiro"])(
+    "B1.9 papel %s não tem Dashboard nem Minha equipe: tela de acesso temporário, sem módulos (T209)",
+    async (papel) => {
       vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
       vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator(papel));
 
       render(<AutenticacaoApp />);
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Acesso em configuração",
+      });
       expect(dashboardNaTela()).toBeNull();
-      expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
-
-      await abrirProduto(abrir);
-
-      expect(destinosAtivos()).toEqual([destino]);
+      expect(hubNaTela()).toBeNull();
       expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
       expect(
-        within(
-          screen.getByRole("navigation", { name: "Navegação do painel" }),
-        ).queryByRole("button", { name: /^Dashboard/ }),
+        screen.queryByRole("navigation", { name: "Navegação do painel" }),
       ).toBeNull();
     },
   );
@@ -867,9 +893,12 @@ describe("T153 — aterrissagem segura por papel", () => {
     // T205 — a aterrissagem vale também depois da nova tentativa.
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
     expect(screen.queryByRole("alert")).toBeNull();
-    // Uma aplicação, não duas: um <main>, uma navegação.
+    // Uma aplicação, não duas: um <main>, uma navegação do painel (T209: a
+    // barra superior tem a própria, a da trilha).
     expect(screen.getAllByRole("main")).toHaveLength(1);
-    expect(screen.getAllByRole("navigation")).toHaveLength(1);
+    expect(
+      screen.getAllByRole("navigation", { name: "Navegação do painel" }),
+    ).toHaveLength(1);
   });
 
   it("B1.12 logout e login com outro papel recalculam o destino", async () => {
@@ -881,7 +910,7 @@ describe("T153 — aterrissagem segura por papel", () => {
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     await screen.findByRole("button", { name: "Entrar" });
 
     vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("rh"));
@@ -909,8 +938,9 @@ describe("T153 — aterrissagem segura por papel", () => {
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
+    abrirSecoesFechadasDoMenu();
     fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
-    await screen.findByRole("navigation");
+    await screen.findByRole("navigation", { name: "Navegação do painel" });
 
     // Vários ciclos de render depois, continua onde a pessoa escolheu.
     await act(async () => {
@@ -920,27 +950,6 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(
       screen.queryByRole("heading", { level: 1, name: "Minha equipe" }),
     ).toBeNull();
-  });
-
-  it("B1.13b voltar ao Hub pelo topo não reaterrissa (T205)", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("rh"));
-
-    render(<AutenticacaoApp />);
-    await screen.findByRole("heading", {
-      level: 1,
-      name: TITULO_DO_DASHBOARD,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
-    expect(hubNaTela()).not.toBeNull();
-    expect(dashboardNaTela()).toBeNull();
-    // E o Dashboard fica a um clique, como cartão do Hub.
-    await abrirProduto(/^Dashboard/);
-    expect(dashboardNaTela()).not.toBeNull();
   });
 
   it("B1.14 montagem dupla (StrictMode) não produz chamada proibida", async () => {
@@ -1099,45 +1108,6 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     const botao = await screen.findByRole("button", { name: /Empresa ativa/ });
     expect(botao).toHaveTextContent("Empresa Alfa");
     expect(botao).toHaveTextContent("Código ALFA");
-  });
-
-  it("troca no Hub: reresolve o ator, fica no Hub, anuncia e foca o título", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    trocarParaBetaNoServidor();
-    const outraAba = new CanalFalso(NOME_DO_CANAL);
-    const avisoNaOutraAba = vi.fn();
-    outraAba.addEventListener("message", avisoNaOutraAba);
-
-    render(<AutenticacaoApp />);
-    await chegarAoHub();
-    fireEvent.click(
-      await screen.findByRole("button", { name: /Empresa ativa/ }),
-    );
-    fireEvent.click(
-      await screen.findByRole("button", { name: /^Empresa Beta/ }),
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /Empresa ativa/ }),
-      ).toHaveTextContent("Empresa Beta"),
-    );
-    expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_BETA.id);
-    // O ator foi lido de NOVO depois da troca — é daí que vem a empresa nova.
-    expect(
-      vi.mocked(obterUsuarioAtual).mock.calls.length,
-    ).toBeGreaterThanOrEqual(2);
-    expect(anuncio()).toHaveTextContent(
-      "Empresa ativa alterada para Empresa Beta (código BETA).",
-    );
-    expect(document.activeElement).toBe(
-      screen.getByRole("heading", { level: 1, name: TITULO_DO_HUB }),
-    );
-    // A outra aba foi avisada — sem id, nome ou código no aviso.
-    expect(avisoNaOutraAba).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(avisoNaOutraAba.mock.calls[0]![0].data)).not.toMatch(
-      /BETA|Beta|ALFA|Alfa|empresa-sintetica/,
-    );
   });
 
   it("troca pelo menu lateral DENTRO de Colaboradores: fica no módulo, limpo, com o título em foco", async () => {
@@ -1621,10 +1591,14 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+      target: { value: "529.982.247-25" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     const titulo = await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e lotação$/,
+      name: /Dados profissionais$/,
     });
 
     await trocarPeloMenuPara("Empresa Beta");
@@ -1682,9 +1656,10 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
     await screen.findByRole("button", { name: /Empresa ativa/ });
-    await abrirProduto(/^Colaboradores/);
+    await abrirProduto(/^Colaboradores Consulta/);
     await waitFor(() => expect(seletorDoMenu()).not.toBeNull());
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    // T209 — sem Hub: outra tela pelo menu.
+    await abrirProduto(/^Dashboard/);
     await screen.findByRole("button", { name: /Empresa ativa/ });
     expect(listarEmpresasDoContexto).toHaveBeenCalledTimes(1);
   });
@@ -1753,6 +1728,25 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
     );
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("T209 — outra CONTA confirmada pelo servidor na mesma aba: sem Hub, vai ao destino do papel novo", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await abrirProduto(/^Colaboradores Consulta/);
+
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...(ATOR_EM_BETA as object),
+      id: "outra-conta-sintetica",
+      role: "gestor",
+    } as never);
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Minha equipe" }),
+    ).toBeInTheDocument();
+    expect(hubNaTela()).toBeNull();
   });
 
   it("com edição pendente, a mudança por fora vira aviso bloqueante — continuar descarta, com aviso", async () => {
@@ -1842,7 +1836,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
 
     render(<AutenticacaoApp />);
     await chegarAoHub();
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
 
     await screen.findByRole("heading", { level: 1, name: "Entrar" });
     // Nenhum resquício de empresa na tela de login, nem no anúncio.
@@ -1920,7 +1914,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
 
   /**
    * Nova admissão com o cadastro rápido de departamento aberto, pelo caminho
-   * que a interface oferece (T195): a etapa 1 é preenchida, "Continuar" leva
+   * que a interface oferece (T195): a etapa 1 é preenchida, "Próxima etapa" leva
    * à etapa 2 e o "+" abre o modal. Nesse estado a Nova admissão também é
    * edição pendente — não há como abrir o "+" com ela vazia. Que o modal,
    * sozinho, conte como pendência só com código ou nome digitados (e vazio
@@ -1935,10 +1929,14 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
+    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+      target: { value: "529.982.247-25" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     await screen.findByRole("heading", {
       level: 2,
-      name: /Dados profissionais e lotação$/,
+      name: /Dados profissionais$/,
     });
     const mais = await screen.findByRole("button", {
       name: "Cadastrar novo departamento",
@@ -1972,14 +1970,16 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
    */
   function esperarEtapa2Ativa() {
     const visiveis = [
-      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
+      ...document.querySelectorAll<HTMLElement>(
+        "section.cadastro-etapas__etapa",
+      ),
     ]
       .filter((painel) => !painel.hasAttribute("hidden"))
       .map((painel) => painel.querySelector("h2")?.textContent);
-    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais e lotação"]);
+    expect(visiveis).toEqual(["Etapa 2 de 4: Dados profissionais"]);
     expect(
-      document.querySelector('.nova-admissao__etapas [aria-current="step"]'),
-    ).toHaveTextContent("Etapa 2: Dados profissionais e lotação, etapa atual");
+      document.querySelector('.cadastro-etapas__etapas [aria-current="step"]'),
+    ).toHaveTextContent("Etapa 2: Dados profissionais, etapa atual");
   }
 
   it("B1: código digitado + troca em outra aba → aviso; voltar preserva empresa, modal e código", async () => {
@@ -2162,7 +2162,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
       }),
     );
     expect(await screen.findByText(/Sua sessão terminou/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(await botaoSair()).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "Continuar na empresa nova e descartar alterações",
@@ -2223,9 +2223,9 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     return nome as HTMLInputElement;
   }
 
-  it("Hub: pergunta, lista a tela e a frase da T179; continuar mantém tudo; sair sem salvar vai ao Hub", async () => {
+  it("menu: pergunta, lista a tela e a frase da T179; continuar mantém tudo; sair sem salvar vai à tela escolhida (T209: sem Hub)", async () => {
     const nome = await novaAdmissaoComNome();
-    const hub = screen.getByRole("button", { name: "Hub" });
+    const hub = itemDoMenu(/^Dashboard/);
     hub.focus();
     fireEvent.click(hub);
     const pergunta = perguntaDeSaida();
@@ -2240,9 +2240,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     );
     expect(nome.value).toBe("Pessoa Sintetica Rascunho");
     expect(hub).toHaveFocus();
-    expect(
-      screen.queryByRole("heading", { level: 1, name: TITULO_DO_HUB }),
-    ).toBeNull();
+    expect(dashboardNaTela()).toBeNull();
 
     fireEvent.click(hub);
     fireEvent.click(
@@ -2251,13 +2249,16 @@ describe("T200 — guarda de saída no shell autenticado", () => {
       }),
     );
     expect(
-      await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
     ).toBeInTheDocument();
   });
 
-  it("Hub: depois de 'Sair sem salvar', o foco vai à área do Hub — nunca ao body", async () => {
+  it("menu: depois de 'Sair sem salvar', o foco fica num elemento real — nunca no body (T209: sem Hub)", async () => {
     await novaAdmissaoComNome();
-    const hub = screen.getByRole("button", { name: "Hub" });
+    const hub = itemDoMenu(/^Dashboard/);
     hub.focus();
     fireEvent.click(hub);
     fireEvent.click(
@@ -2266,15 +2267,12 @@ describe("T200 — guarda de saída no shell autenticado", () => {
       }),
     );
     await chegarAoHub();
-    expect(document.activeElement).not.toBe(document.body);
-    expect(
-      document.getElementById("hub-conteudo")!.contains(document.activeElement),
-    ).toBe(true);
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
   });
 
   it("Sair: continuar não encerra a sessão; sair sem salvar encerra, sem o aviso de perda (foi escolha)", async () => {
     await novaAdmissaoComNome();
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     fireEvent.click(
       within(perguntaDeSaida()).getByRole("button", {
         name: "Continuar editando",
@@ -2282,7 +2280,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     );
     expect(logout).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     fireEvent.click(
       within(perguntaDeSaida()).getByRole("button", {
         name: "Sair sem salvar",
@@ -2352,7 +2350,7 @@ describe("T200 — guarda de saída no shell autenticado", () => {
     expect(disparar()).toBe(false);
     fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
     expect(disparar()).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
+    fireEvent.click(itemDoMenu(/^Dashboard/));
     fireEvent.click(
       within(perguntaDeSaida()).getByRole("button", {
         name: "Sair sem salvar",
@@ -2377,18 +2375,17 @@ describe("T206 — preferência do menu lateral: só nesta aba, por conta e empr
     window.history.replaceState(null, "", window.location.pathname);
   });
 
-  it("sobrevive à volta pelo Hub (mesma conta, mesma empresa)", async () => {
+  it("sobrevive à navegação pelo menu (mesma conta, mesma empresa)", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
     await chegarAoHub();
-    await abrirProduto(/^Colaboradores/);
+    await abrirProduto(/^Colaboradores Consulta/);
     fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
     expect(emTrilho()).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    await chegarAoHub();
-    expect(emTrilho()).toBe(false); // o Hub não tem menu lateral
-    await abrirProduto(/^Colaboradores/);
+    // T209 — sem Hub: outra tela pelo trilho (item único, que navega).
+    await abrirProduto(/^Dashboard/);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD });
 
     expect(emTrilho()).toBe(true);
     expect(
@@ -2437,7 +2434,7 @@ describe("T206 — preferência do menu lateral: só nesta aba, por conta e empr
     fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
     expect(emTrilho()).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     await screen.findByLabelText(/^E-mail\b/i);
     preencherEEntrar();
     await screen.findByRole("navigation", { name: "Navegação do painel" });
@@ -2449,7 +2446,7 @@ describe("T206 — preferência do menu lateral: só nesta aba, por conta e empr
   });
 });
 
-describe("T206 — foco ao abrir um produto pelo Hub", () => {
+describe("T206/T209 — foco na aterrissagem (sem Hub)", () => {
   beforeEach(() => {
     CanalFalso.abertos.clear();
     vi.stubGlobal("BroadcastChannel", CanalFalso);
@@ -2469,35 +2466,6 @@ describe("T206 — foco ao abrir um produto pelo Hub", () => {
     expect(alvo.closest('[aria-hidden="true"]')).toBeNull();
   }
 
-  async function abrirPeloHub(rotulo: RegExp, titulo: string) {
-    fireEvent.click(screen.getByRole("button", { name: rotulo }));
-    return screen.findByRole("heading", { level: 1, name: titulo });
-  }
-
-  it("RH: Hub → Dashboard leva o foco ao título do Dashboard, uma vez só", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    render(<AutenticacaoApp />);
-    await chegarAoHub();
-    const focar = vi.spyOn(HTMLElement.prototype, "focus");
-    const titulo = await abrirPeloHub(/^Dashboard/, "Dashboard");
-    await waitFor(() => esperarFocoValido(titulo));
-    expect(window.location.hash).toMatch(/^#\/dashboard\?ano=\d{4}$/);
-    expect(focar.mock.contexts.filter((c) => c === titulo)).toHaveLength(1);
-    focar.mockRestore();
-  });
-
-  it("RH: Hub → Colaboradores leva o foco ao título de Colaboradores", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    render(<AutenticacaoApp />);
-    await chegarAoHub();
-    const focar = vi.spyOn(HTMLElement.prototype, "focus");
-    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
-    await waitFor(() => esperarFocoValido(titulo));
-    expect(window.location.hash).toBe("#/pessoas/colaboradores");
-    expect(focar.mock.contexts.filter((c) => c === titulo)).toHaveLength(1);
-    focar.mockRestore();
-  });
-
   it("aterrissagem depois do login: o título do Dashboard recebe o foco uma vez só", async () => {
     const focar = vi.spyOn(HTMLElement.prototype, "focus");
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
@@ -2511,52 +2479,17 @@ describe("T206 — foco ao abrir um produto pelo Hub", () => {
     focar.mockRestore();
   });
 
-  it("gestor: Hub → Minha equipe leva o foco ao título de Minha equipe", async () => {
+  it("gestor: a aterrissagem em Minha equipe leva o foco ao título", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor") as never);
     render(<AutenticacaoApp />);
-    await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    const titulo = await abrirPeloHub(/^Minha equipe/, "Minha equipe");
-    await waitFor(() => esperarFocoValido(titulo));
-  });
-
-  it("abrir pelo Hub não muda a preferência do menu recolhido", async () => {
-    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-    render(<AutenticacaoApp />);
-    await chegarAoHub();
-    await abrirProduto(/^Colaboradores/);
-    fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    await chegarAoHub();
-    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
-    await waitFor(() => esperarFocoValido(titulo));
-    expect(document.querySelector(".app-shell--menu-recolhido")).not.toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Expandir menu" }),
-    ).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("a guarda de edição pendente continua valendo, e depois de sair o produto aberto pelo Hub recebe o foco", async () => {
-    const nome = await abrirNovaAdmissaoPorRota();
-    fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    const pergunta = screen.getByRole("alertdialog", {
-      name: "Sair sem salvar?",
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: "Minha equipe",
     });
-    fireEvent.click(
-      within(pergunta).getByRole("button", { name: "Sair sem salvar" }),
-    );
-    await screen.findByRole("heading", { level: 1, name: TITULO_DO_HUB });
-    const titulo = await abrirPeloHub(/^Colaboradores/, "Colaboradores");
     await waitFor(() => esperarFocoValido(titulo));
-    expect(document.body.textContent).not.toContain(
-      "Pessoa Sintetica Rascunho",
-    );
   });
 });
-
 describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e empresa", () => {
   const CONTADORES_VAZIOS = {
     ativos: 0,
@@ -2567,9 +2500,13 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     ativosPorTipo: {
       clt: 0,
       estagio: 0,
+      aprendiz: 0,
       pj: 0,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     },
   };
   const emTabela = () =>
@@ -2620,7 +2557,7 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     expect(emTabela()).toBe(true);
   }
 
-  it("sobrevive à volta pelo Hub; outra conta, depois do logout, começa no gráfico", async () => {
+  it("sobrevive à navegação pelo menu; outra conta, depois do logout, começa no gráfico", async () => {
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     vi.mocked(logout).mockResolvedValueOnce(undefined);
     vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
@@ -2628,13 +2565,13 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     await screen.findByRole("heading", { level: 1, name: "Dashboard" });
     await verComoTabela();
 
-    fireEvent.click(screen.getByRole("button", { name: "Hub" }));
-    await chegarAoHub();
+    // T209 — sem Hub: sai pelo menu e volta.
+    await abrirProduto(/^Colaboradores Consulta/);
     await abrirProduto(/^Dashboard/);
     await acoesDoQuadro();
     expect(emTabela()).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     await screen.findByLabelText(/^E-mail\b/i);
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("dp"));
     preencherEEntrar();
@@ -2651,7 +2588,7 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     await screen.findByRole("heading", { level: 1, name: "Dashboard" });
     await verComoTabela();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sair" }));
+    fireEvent.click(await botaoSair());
     await screen.findByLabelText(/^E-mail\b/i);
     // A MESMA conta e a mesma empresa: só o logout pode apagar a vista.
     vi.mocked(obterUsuarioAtual).mockResolvedValue(ATOR_PADRAO as never);
@@ -2690,5 +2627,387 @@ describe("T207 — vista do Quadro de colaboradores: só nesta aba, por conta e 
     );
     await acoesDoQuadro();
     expect(emTabela()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — tela de abertura institucional: só ao recarregar a página (sessão
+// verificada) e depois de um login aceito, até o acesso estar pronto. Nunca
+// na troca de empresa nem na navegação interna; nunca atrasa login recusado,
+// sessão expirada ou falha ao carregar o acesso.
+// ---------------------------------------------------------------------------
+describe("T209 — tela de abertura institucional", () => {
+  const abertura = () => document.querySelector<HTMLElement>(".tela-abertura");
+
+  beforeEach(() => {
+    CanalFalso.abertos.clear();
+    vi.stubGlobal("BroadcastChannel", CanalFalso);
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+  afterEach(() => {
+    definirDuracaoMinimaDaAbertura(0);
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  it("recarregar com sessão válida: abertura com a marca e 'Verificando sessão…', depois a aterrissagem", async () => {
+    const sessao = deferido<string>();
+    vi.mocked(refreshCsrfToken).mockReturnValueOnce(sessao.promise);
+    render(<AutenticacaoApp />);
+
+    expect(abertura()).not.toBeNull();
+    expect(within(abertura()!).getByRole("status")).toHaveTextContent(
+      "Verificando sessão…",
+    );
+    // Marca e nome são decorativos: o leitor de tela ouve só a mensagem.
+    expect(abertura()!.querySelector(".tela-abertura__marca")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(abertura()!.querySelector("svg")).not.toBeNull();
+    // Nada focável na abertura.
+    expect(
+      abertura()!.querySelectorAll("button, a, input, [tabindex]"),
+    ).toHaveLength(0);
+
+    await commitar(() => sessao.resolve("token"));
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("login aceito: abertura com 'Carregando seu acesso…' até o ator chegar; o foco vai ao título da aterrissagem", async () => {
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    const eu = deferido<never>();
+    vi.mocked(obterUsuarioAtual).mockReturnValueOnce(eu.promise);
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    expect(abertura()).toBeNull();
+
+    preencherEEntrar();
+    await waitFor(() => expect(abertura()).not.toBeNull());
+    expect(within(abertura()!).getByRole("status")).toHaveTextContent(
+      "Carregando seu acesso…",
+    );
+    // Nenhuma tela funcional montada por baixo.
+    expect(
+      screen.queryByRole("navigation", { name: "Navegação do painel" }),
+    ).toBeNull();
+
+    await commitar(() => eu.resolve(ATOR_PADRAO as never));
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: TITULO_DO_DASHBOARD,
+    });
+    expect(abertura()).toBeNull();
+    await waitFor(() => expect(titulo).toHaveFocus());
+  });
+
+  it("duração mínima curta: o acesso pronto em seguida não faz a abertura piscar, e ela sai sozinha", async () => {
+    definirDuracaoMinimaDaAbertura(300);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await commitar(() => undefined);
+    // O acesso já chegou (sem rede), mas a abertura cumpre a duração mínima.
+    expect(abertura()).not.toBeNull();
+    expect(
+      screen.queryByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD }),
+    ).toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("com a duração mínima segurando a abertura, o pedido de foco espera: o título da aterrissagem recebe o foco", async () => {
+    definirDuracaoMinimaDaAbertura(300);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockResolvedValueOnce({ mfaRequerido: false });
+    // O gestor aterrissa em "Minha equipe", que depende do pedido de foco (o
+    // Dashboard foca o próprio título sozinho).
+    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(ator("gestor"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    preencherEEntrar();
+    await waitFor(() => expect(abertura()).not.toBeNull());
+    const titulo = await screen.findByRole("heading", {
+      level: 1,
+      name: "Minha equipe",
+    });
+    expect(abertura()).toBeNull();
+    await waitFor(() => expect(titulo).toHaveFocus());
+  });
+
+  it("sessão expirada ao recarregar: o login aparece na hora, sem esperar a duração mínima", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Entrar" }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("login recusado: o erro aparece na hora e a abertura nunca entra", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockRejectedValueOnce(new Error("401"));
+    vi.mocked(login).mockRejectedValueOnce(new Error("rede"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: "Entrar" });
+    preencherEEntrar();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível entrar.",
+    );
+    expect(abertura()).toBeNull();
+    expect(obterUsuarioAtual).not.toHaveBeenCalled();
+  });
+
+  it("falha ao carregar o acesso: a tela de falha aparece na hora, sem esperar a duração mínima", async () => {
+    definirDuracaoMinimaDaAbertura(60_000);
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockRejectedValueOnce(new Error("rede"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByText("Não foi possível carregar seu acesso."),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("papel sem empresa ativa (acesso global): a abertura sai e a aterrissagem do papel aparece", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValueOnce(
+      ator("master_tecnico", {
+        companyId: null,
+        empresaAtiva: null,
+        podeTrocarEmpresa: false,
+      }),
+    );
+    render(<AutenticacaoApp />);
+    expect(abertura()).not.toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      }),
+    ).toBeInTheDocument();
+    expect(abertura()).toBeNull();
+  });
+
+  it("movimento reduzido: a abertura sabe e o CSS tira a animação", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((consulta: string) => {
+      const base = original(consulta);
+      if (!consulta.includes("prefers-reduced-motion")) return base;
+      return {
+        matches: true,
+        media: consulta,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      } as unknown as MediaQueryList;
+    }) as typeof window.matchMedia;
+    try {
+      const sessao = deferido<string>();
+      vi.mocked(refreshCsrfToken).mockReturnValueOnce(sessao.promise);
+      render(<AutenticacaoApp />);
+      expect(abertura()).toHaveAttribute("data-movimento", "reduzido");
+      await commitar(() => sessao.resolve("token"));
+      await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_DO_DASHBOARD,
+      });
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("navegação interna não mostra a abertura", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD });
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
+    );
+    expect(abertura()).toBeNull();
+    await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
+    expect(abertura()).toBeNull();
+    await abrirProduto(/^Dashboard/);
+    await screen.findByRole("heading", { level: 1, name: TITULO_DO_DASHBOARD });
+    expect(abertura()).toBeNull();
+  });
+
+  it("troca de empresa não mostra a abertura: só o aviso simples enquanto o acesso é relido", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    // Mesmo com a duração mínima ligada, a troca não passa pela abertura.
+    definirDuracaoMinimaDaAbertura(60_000);
+
+    const eu = deferido<never>();
+    vi.mocked(obterUsuarioAtual).mockReturnValueOnce(eu.promise);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Empresa ativa/ }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Empresa Beta/ }),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector(".autenticacao-app__verificando"),
+      ).toHaveTextContent("Carregando seu acesso…"),
+    );
+    expect(abertura()).toBeNull();
+    await commitar(() =>
+      eu.resolve({
+        ...ATOR_PADRAO,
+        companyId: EMPRESA_BETA.id,
+        empresaAtiva: EMPRESA_BETA,
+      } as never),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Empresa ativa/ }),
+      ).toHaveTextContent("Empresa Beta"),
+    );
+    expect(abertura()).toBeNull();
+  });
+});
+
+describe("T209 — Hub desativado como destino de uso normal", () => {
+  const TITULO_TEMPORARIO = "Acesso em configuração";
+  afterEach(() => {
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
+  function telaTemporaria() {
+    return screen.queryByRole("heading", { level: 1, name: TITULO_TEMPORARIO });
+  }
+
+  it.each(["rh", "dp", "master_tecnico"])(
+    "%s aterrissa no Dashboard, sem Hub em lugar nenhum",
+    async (papel) => {
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(ator(papel));
+      render(<AutenticacaoApp />);
+      expect(
+        await screen.findByRole("heading", {
+          level: 1,
+          name: TITULO_DO_DASHBOARD,
+        }),
+      ).toBeInTheDocument();
+      expect(hubNaTela()).toBeNull();
+      expect(screen.queryByRole("button", { name: "Hub" })).toBeNull();
+      expect(document.body).not.toHaveTextContent(/\bHub\b(?! de Benefícios)/);
+    },
+  );
+
+  it("master técnico sem empresa ativa: Dashboard com a orientação de escolher empresa", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(
+      ator("master_tecnico", {
+        companyId: null,
+        empresaAtiva: null,
+        podeTrocarEmpresa: true,
+      }),
+    );
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByText(
+        "Escolha uma empresa ativa no menu para ver o Dashboard.",
+      ),
+    ).toBeInTheDocument();
+    expect(hubNaTela()).toBeNull();
+  });
+
+  it("gestor aterrissa em Minha equipe", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("gestor"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Minha equipe" }),
+    ).toBeInTheDocument();
+    expect(hubNaTela()).toBeNull();
+  });
+
+  it.each(["colaborador", "financeiro", "auditor", "dpo", "admin_tecnico"])(
+    "%s vê só a tela neutra de acesso temporário: sem Hub, módulos, cartões nem atalhos",
+    async (papel) => {
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(ator(papel));
+      render(<AutenticacaoApp />);
+      const titulo = await screen.findByRole("heading", {
+        level: 1,
+        name: TITULO_TEMPORARIO,
+      });
+      await waitFor(() => expect(titulo).toHaveFocus());
+      expect(
+        screen.getByText(
+          "Seu acesso está sendo configurado. Novos recursos serão liberados conforme o seu papel.",
+        ),
+      ).toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent(/Hub/);
+      expect(screen.queryByRole("navigation")).toBeNull();
+      // O único controle é Sair.
+      expect(
+        screen.getAllByRole("button").map((b) => b.textContent?.trim()),
+      ).toEqual(["Sair"]);
+      expect(screen.queryByRole("link")).toBeNull();
+    },
+  );
+
+  it("a tela temporária não faz nenhuma requisição funcional", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("colaborador"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_TEMPORARIO });
+    expect(vi.mocked(obterUsuarioAtual)).toHaveBeenCalledTimes(1);
+  });
+
+  it("'Sair' na tela temporária encerra a sessão e volta ao login", async () => {
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("colaborador"));
+    render(<AutenticacaoApp />);
+    await screen.findByRole("heading", { level: 1, name: TITULO_TEMPORARIO });
+    fireEvent.click(await botaoSair());
+    expect(
+      await screen.findByRole("button", { name: "Entrar" }),
+    ).toBeInTheDocument();
+    expect(telaTemporaria()).toBeNull();
+  });
+
+  it.each([
+    ["rh", TITULO_DO_DASHBOARD],
+    ["gestor", "Minha equipe"],
+    ["colaborador", "Acesso em configuração"],
+  ] as const)(
+    "%s com a URL antiga do Hub (#/hub) cai no mesmo destino do papel",
+    async (papel, titulo) => {
+      window.history.replaceState(null, "", "/#/hub");
+      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+      vi.mocked(obterUsuarioAtual).mockResolvedValue(ator(papel));
+      render(<AutenticacaoApp />);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: titulo }),
+      ).toBeInTheDocument();
+      expect(hubNaTela()).toBeNull();
+    },
+  );
+
+  it("colaborador com rota permitida (Meu perfil) continua abrindo a tela, sem ampliar nada", async () => {
+    window.history.replaceState(null, "", "/#/configuracoes/meu-perfil");
+    vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
+    vi.mocked(obterUsuarioAtual).mockResolvedValue(ator("colaborador"));
+    render(<AutenticacaoApp />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Configurações" }),
+    ).toBeInTheDocument();
+    expect(hubNaTela()).toBeNull();
   });
 });

@@ -88,7 +88,9 @@ import {
   AvisoContextoAlterado,
   type ResultadoDaConferencia,
 } from "./AvisoContextoAlterado";
-import { HubPosLogin } from "./HubPosLogin";
+import { AcessoTemporario } from "./AcessoTemporario";
+import { TelaDeAbertura } from "./abertura/TelaDeAbertura";
+import { duracaoMinimaDaAbertura } from "./abertura/duracaoDaAbertura";
 import { LoginScreen } from "./LoginScreen";
 import { ProvedorDeEdicoes, useRegistroDeEdicoes } from "./edicoesPendentes";
 import { ProvedorDeGuarda } from "./guardaDeSaida";
@@ -184,6 +186,17 @@ export function AutenticacaoApp() {
   const [anuncio, setAnuncio] = useState("");
   /** T189 — a próxima tela montada leva o foco ao próprio título. */
   const [focarTitulo, setFocarTitulo] = useState(false);
+  /**
+   * T209 — tela de abertura institucional: o instante em que ela apareceu, ou
+   * `null` quando não está na tela. Começa ligada (recarregar a página
+   * verifica a sessão) e religa só no login aceito — nunca na troca de
+   * empresa nem na navegação interna. Some ao chegar o acesso, depois de uma
+   * duração mínima curta contra o piscar; login, sessão expirada e falha ao
+   * carregar o acesso a desligam na hora.
+   */
+  const [aberturaDesde, setAberturaDesde] = useState<number | null>(() =>
+    Date.now(),
+  );
   /**
    * T189 — o ator que o servidor informou depois de uma mudança de empresa
    * feita por fora desta aba, enquanto ela tem edição pendente. Não nulo
@@ -292,7 +305,8 @@ export function AutenticacaoApp() {
             setDestinoAberto(destino);
             // A tela de aterrissagem nasce com o foco no título, como
             // depois de uma troca de empresa: nunca no body.
-            if (destino !== null) setFocarTitulo(true);
+            // T209 — também a tela de acesso temporário (sem destino).
+            setFocarTitulo(true);
           }
         }
         setAtor(eu);
@@ -371,9 +385,13 @@ export function AutenticacaoApp() {
    * abas são avisadas para reconferir o próprio contexto.
    */
   const aoTrocarEmpresa = useCallback(
-    (empresa: EmpresaDoContextoApi) => {
+    (empresa: EmpresaDoContextoApi, destinoPedido?: string) => {
       canalRef.current?.avisar();
-      setDestinoAberto(destinoAposTrocaDeEmpresa(destinoAtual()));
+      // T209 — a Nova empresa pede a tela seguinte na empresa nova
+      // (importação ou Novo colaborador); sem pedido, a regra da T189.
+      setDestinoAberto(
+        destinoPedido ?? destinoAposTrocaDeEmpresa(destinoAtual()),
+      );
       setAnuncio(`Empresa ativa alterada para ${descreverEmpresa(empresa)}.`);
       setFocarTitulo(true);
       setEstado("resolvendo-ator");
@@ -477,11 +495,45 @@ export function AutenticacaoApp() {
     };
   }, [estado, reconferirContexto]);
 
-  // O pedido de foco vale para UMA montagem: a tela que acabou de nascer já o
-  // leu no próprio efeito de montagem, que roda antes deste.
+  // T209 — a abertura sai assim que o acesso está pronto (depois da duração
+  // mínima, contada desde que apareceu) e na hora em qualquer outro desfecho.
   useEffect(() => {
-    if (estado === "pronto" && focarTitulo) setFocarTitulo(false);
-  }, [estado, focarTitulo]);
+    if (aberturaDesde === null) return;
+    if (estado === "login" || estado === "falha-ator") {
+      setAberturaDesde(null);
+      return;
+    }
+    if (estado !== "pronto") return;
+    const restante = duracaoMinimaDaAbertura() - (Date.now() - aberturaDesde);
+    if (restante <= 0) {
+      setAberturaDesde(null);
+      return;
+    }
+    const temporizador = window.setTimeout(
+      () => setAberturaDesde(null),
+      restante,
+    );
+    return () => window.clearTimeout(temporizador);
+  }, [estado, aberturaDesde]);
+
+  /**
+   * T209 — o acesso já chegou, mas a abertura ainda cumpre a duração mínima.
+   * Decidido no render: passada a duração, a tela inicial monta no mesmo
+   * commit em que o acesso chega, sem um quadro a mais de abertura.
+   */
+  const segurandoAbertura =
+    estado === "pronto" &&
+    aberturaDesde !== null &&
+    Date.now() - aberturaDesde < duracaoMinimaDaAbertura();
+
+  // O pedido de foco vale para UMA montagem: a tela que acabou de nascer já o
+  // leu no próprio efeito de montagem, que roda antes deste. T209 — enquanto
+  // a abertura está na tela, nada montou ainda: o pedido espera por ela.
+  useEffect(() => {
+    if (estado === "pronto" && !segurandoAbertura && focarTitulo) {
+      setFocarTitulo(false);
+    }
+  }, [estado, segurandoAbertura, focarTitulo]);
 
   /**
    * T189 — volta a sessão para a empresa em que esta aba estava, pelo mesmo
@@ -573,11 +625,7 @@ export function AutenticacaoApp() {
   );
 
   if (estado === "verificando-sessao") {
-    return comContexto(
-      <div className="autenticacao-app__verificando" role="status">
-        Verificando sessão…
-      </div>,
-    );
+    return comContexto(<TelaDeAbertura mensagem="Verificando sessão…" />);
   }
 
   if (estado === "login") {
@@ -592,11 +640,22 @@ export function AutenticacaoApp() {
         <LoginScreen
           onLoginSuccess={() => {
             setEdicoesPerdidas(false);
+            // T209 — login aceito: a abertura cobre o carregamento do acesso.
+            setAberturaDesde(Date.now());
             setEstado("resolvendo-ator");
           }}
         />
       </>,
     );
+  }
+
+  // T209 — com a abertura ligada (login ou página recarregada), ela cobre o
+  // carregamento do acesso; na troca de empresa, o aviso simples de sempre.
+  if (
+    (estado === "resolvendo-ator" && aberturaDesde !== null) ||
+    segurandoAbertura
+  ) {
+    return comContexto(<TelaDeAbertura mensagem="Carregando seu acesso…" />);
   }
 
   if (estado === "resolvendo-ator") {
@@ -647,24 +706,17 @@ export function AutenticacaoApp() {
   const vistasDaConta =
     vistasDoDashboard?.chave === chaveDaArvore ? vistasDoDashboard.vistas : {};
 
+  // T209 — o Hub está desativado como destino de uso normal (o código dele
+  // fica; nada o monta). Sem produto aberto, a sessão vai ao destino padrão
+  // do papel — Dashboard para RH, DP e `master_tecnico`, Minha equipe para o
+  // `gestor` — e os demais papéis veem só a tela neutra de acesso temporário.
+  const destinoEfetivo = destinoAberto ?? destinoPosLoginPara(ator.role);
+
   const arvore =
-    destinoAberto === null ? (
-      <HubPosLogin
+    destinoEfetivo === null ? (
+      <AcessoTemporario
         key={chaveDaArvore}
-        papelDoAtor={ator.role}
-        empresaAtiva={ator.empresaAtiva ?? null}
-        podeTrocarEmpresa={podeTrocarEmpresa}
-        emailDoAtor={ator.email}
-        onAbrirDestino={(destino) => {
-          // T206 — o cartão clicado some com o Hub; sem isto o foco ficaria
-          // no `body`. A tela que nasce leva o foco ao próprio título, pelo
-          // mesmo pedido de uma montagem só da aterrissagem e da troca de
-          // empresa (`focarTitulo`, consumido e desligado logo depois).
-          setFocarTitulo(true);
-          setDestinoAberto(destino);
-        }}
-        onEmpresaTrocada={aoTrocarEmpresa}
-        onLogout={() => void handleLogout()}
+        onSair={() => void handleLogout()}
         focarTituloAoAbrir={focarTitulo}
       />
     ) : (
@@ -703,11 +755,7 @@ export function AutenticacaoApp() {
           destinoExibidoRef.current = destinoId;
         }}
         focarTituloAoAbrir={focarTitulo}
-        destinoInicial={destinoAberto}
-        onVoltarAoHub={() => {
-          destinoExibidoRef.current = null;
-          setDestinoAberto(null);
-        }}
+        destinoInicial={destinoEfetivo}
         menuRecolhido={menuRecolhido}
         onMenuRecolhidoChange={(recolhido) =>
           setPreferenciaDoMenu({ chave: chaveDaArvore, recolhido })

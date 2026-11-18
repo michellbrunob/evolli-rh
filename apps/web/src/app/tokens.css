@@ -78,6 +78,12 @@
   --evolli-ardosia: #6b7c99; /* apoio neutro de gráfico */
   --evolli-fundo: #f4f7fb; /* fundo neutro do Dashboard */
 
+  /* T209 — cor própria do tipo de vínculo Aprendiz nas distribuições
+     (Colaboradores e Dashboard). Objeto gráfico com contraste acima de 3:1
+     sobre o branco e o fundo do Dashboard (teste de contrato); a legenda em
+     texto diz sempre o mesmo número. */
+  --cor-tipo-aprendiz: #6b3fa0;
+
   /* Raios (grade fechada: sm / md / lg / pill). */
   --radius-sm: 8px;
   --radius-md: 11px;
@@ -94,18 +100,24 @@
   --space-2xl: 48px;
   --space-3xl: 80px;
 
-  /* Tipografia — apenas fontes do sistema, com fallback seguro. */
+  /* Tipografia — T209: Parkinsans, servida pela aplicação (main.tsx), com
+     as fontes do sistema como reserva. */
   --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --text-caption: 0.875rem; /* 14px */
-  --text-ui: 0.9375rem; /* 15px — item de navegação e ação de cabeçalho */
-  --text-body: 1.0625rem; /* 17px — o "passo de leitura" da referência */
-  --text-lead: 1.3125rem; /* 21px */
-  --text-title: 1.75rem; /* 28px */
-  --text-display: clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem); /* 28→40px */
-  --leading-body: 1.47;
-  --leading-tight: 1.1;
-  --tracking-body: -0.011em;
+    "Parkinsans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  /* T209 — escala do ecossistema (decisão da proprietária de 2026-11-17),
+     compacta: texto de 14px; ajuda e apoio de 13px; título de seção de
+     16px; título de página de 26px. Entrelinha 1,45; o texto corrido com
+     -0,005em e os títulos com -0,02em. */
+  --text-caption: 0.8125rem; /* 13px — ajuda, apoio, legenda */
+  --text-ui: 0.875rem; /* 14px — item de navegação, botão, campo */
+  --text-body: 0.875rem; /* 14px — texto corrido */
+  --text-lead: 1rem; /* 16px — título de seção */
+  --text-title: 1.625rem; /* 26px — título de página */
+  --text-display: clamp(1.625rem, 1.4rem + 1vw, 2rem); /* 26→32px */
+  --leading-body: 1.45;
+  --leading-tight: 1.2;
+  --tracking-body: -0.005em;
   --tracking-tight: -0.02em;
   --weight-regular: 400;
   --weight-strong: 600;
@@ -128,6 +140,34 @@
      da área principal, que é onde a medida de leitura importa. */
   --sidebar-width: 272px;
   --shell-max: 1440px;
+
+  /* T209 — divisões sutis entre blocos (padrão reutilizável). Só nomes
+     semânticos sobre os valores que já existiam: nenhuma cor nova, e quem
+     troca um literal por um destes tokens não muda nenhum pixel. Rollout: a
+     estrutura do shell e Colaboradores primeiro; cada módulo recebe as
+     divisões quando for aberto para evolução (dossiê da T209). */
+  --divisor-cor: var(--divider-soft);
+  --divisor-cor-forte: var(--hairline);
+  --divisor-cor-sobre-marinho: var(--evolli-marinho-divisa);
+  --borda-espessura: 1px;
+  --divisor: var(--borda-espessura) solid var(--divisor-cor);
+  --divisor-forte: var(--borda-espessura) solid var(--divisor-cor-forte);
+  --secao-espaco: var(--space-lg);
+  --secao-espaco-compacto: var(--space-md);
+  --borda-card: var(--divisor-forte);
+  --borda-tabela: var(--divisor);
+  --borda-painel: var(--divisor-forte);
+  --estado-hover-superficie: var(--surface-pearl);
+  --estado-ativo-cor: var(--color-action);
+  --estado-ativo-espessura: 3px;
+  --estado-selecao-superficie: var(--status-info-surface);
+  --foco-anel: var(--focus-width) solid var(--color-action);
+
+  /* T209 — movimento dos painéis laterais: curto e profissional. Quem pede
+     movimento reduzido não vê animação (`Modal.css`). */
+  --movimento-painel-entrada: 200ms;
+  --movimento-painel-saida: 160ms;
+  --movimento-curva: cubic-bezier(0.2, 0, 0, 1);
 }
 
 *,

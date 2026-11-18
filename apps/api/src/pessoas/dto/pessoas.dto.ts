@@ -18,7 +18,6 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
   ValidateNested,
   ValidateIf,
 } from "class-validator";
@@ -31,6 +30,7 @@ import {
   TipoVinculo,
 } from "@prisma/client";
 import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
+import { ContratoAdmissaoDto } from "../colaborador/contrato-admissao";
 
 /**
  * Matrícula: identificador **funcional**, único dentro da empresa
@@ -39,12 +39,25 @@ import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
  */
 const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
+/**
+ * T209 — nome completo: até 150 caracteres e pelo menos 3 letras (qualquer
+ * alfabeto), decisão de 2026-11-17 para a etapa 1 do Novo colaborador.
+ */
+export const NOME_COMPLETO_MAXIMO = 150;
+export const NOME_COMPLETO_TRES_LETRAS = /^(?:[^\p{L}]*\p{L}){3}/u;
+
 export const TIPOS_VINCULO = [
   "clt",
   "estagio",
+  // T209 — Aprendiz, logo depois de Estágio; sem campo nem regra extra.
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",
+  // T209 — etapa 2 do Novo colaborador (2026-11-17).
+  "part_time",
+  "freelancer",
+  "trainee",
 ] as const satisfies readonly TipoVinculo[];
 
 const TIPOS_MOVIMENTACAO = [
@@ -167,11 +180,17 @@ export class DestinoOrganizacionalDto {
  * (`CriarVinculoDto`) continua com o destino todo opcional.
  */
 export class AdmitirColaboradorDto {
+  /**
+   * T209 — etapa 2 (decisão de 2026-11-17): Departamento e Cargo passaram a
+   * opcionais; tipo e data de admissão continuam obrigatórios.
+   */
+  @IsOptional()
   @IsUUID()
-  departamentoId!: string;
+  departamentoId?: string;
 
+  @IsOptional()
   @IsUUID()
-  cargoId!: string;
+  cargoId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -189,10 +208,11 @@ export class AdmitirColaboradorDto {
   @IsUUID()
   centroCustoId?: string;
 
+  /** T209 — pelo menos 3 letras e até 150 caracteres (`NOME_COMPLETO`). */
   @IsString()
   @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(160)
+  @MaxLength(NOME_COMPLETO_MAXIMO)
+  @Matches(NOME_COMPLETO_TRES_LETRAS)
   nome!: string;
 
   @IsUUID()
@@ -259,6 +279,17 @@ export class AdmitirColaboradorDto {
   @ValidateIf((_, valor) => valor !== undefined)
   @IsUUID()
   tabelaHorarioId?: string;
+
+  /**
+   * T209 — contrato da admissão (etapa 2): nível, gestor direto, jornada
+   * semanal, escala, salário bruto, conselho, dependentes e pensão. Opcional
+   * na API (a importação por planilha não o traz); a tela exige o salário.
+   */
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ContratoAdmissaoDto)
+  contrato?: ContratoAdmissaoDto;
 }
 
 /**
@@ -295,10 +326,11 @@ export class CriarVinculoDto extends DestinoOrganizacionalDto {
  * fatia. Alterar a vida funcional é movimentação, nunca `PATCH`.
  */
 export class RetificarColaboradorDto {
+  /** T209 — a mesma regra da admissão. */
   @IsString()
   @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(160)
+  @MaxLength(NOME_COMPLETO_MAXIMO)
+  @Matches(NOME_COMPLETO_TRES_LETRAS)
   nome!: string;
 }
 

@@ -1,0 +1,21 @@
+/* T209 — navegação interna de Configurações. Só tokens. */
+
+.configuracoes__grupo--seguinte {
+  margin-top: var(--space-md);
+}
+
+/* T209 — ícones da navegação interna (Iconsax Bulk): cinza suave, e o do
+   item atual na cor do texto. */
+.configuracoes__item {
+  gap: 0.625rem;
+}
+
+.configuracoes__item-icone {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.configuracoes__item--atual .configuracoes__item-icone {
+  color: var(--color-ink);
+}

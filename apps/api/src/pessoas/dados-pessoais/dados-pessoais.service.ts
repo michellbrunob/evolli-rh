@@ -33,10 +33,7 @@ import {
  * Valores do perfil como a API devolve. Data em dia civil `AAAA-MM-DD`,
  * obrigatória; os demais campos, opcionais, podem vir `null`.
  */
-export type ValoresPerfil = {
-  [K in Exclude<ChavePerfil, "dataNascimento">]: string | null;
-} & {
-  dataNascimento: string;
+export type ValoresPerfil = { [K in ChavePerfil]: string | null } & {
   atualizadoEm: Date;
 };
 
@@ -93,6 +90,11 @@ interface Evento {
 const PROJECAO_PERFIL = {
   id: true,
   dataNascimento: true,
+  cpf: true,
+  rg: true,
+  genero: true,
+  contatoEmergenciaNome: true,
+  contatoEmergenciaTelefone: true,
   sexo: true,
   saudacao: true,
   estadoCivil: true,
@@ -145,7 +147,12 @@ function diaCivil(data: Date): string {
 /** O perfil como a API devolve, sem o id do registro. */
 function valoresPerfil(p: PerfilProjetado): ValoresPerfil {
   return {
-    dataNascimento: diaCivil(p.dataNascimento),
+    dataNascimento: p.dataNascimento ? diaCivil(p.dataNascimento) : null,
+    cpf: p.cpf,
+    rg: p.rg,
+    genero: p.genero,
+    contatoEmergenciaNome: p.contatoEmergenciaNome,
+    contatoEmergenciaTelefone: p.contatoEmergenciaTelefone,
     sexo: p.sexo,
     saudacao: p.saudacao,
     estadoCivil: p.estadoCivil,
@@ -174,14 +181,19 @@ function valoresEndereco(e: EnderecoProjetado): ValoresEndereco {
 }
 
 /**
- * Bloco do perfil completo, com ausente como `null` (o PUT substitui). A data
- * de nascimento é obrigatória no DTO, então nunca sai `null` daqui.
+ * Bloco do perfil completo, com ausente como `null` (o PUT substitui). T209 —
+ * a data de nascimento passou a opcional.
  */
 export function perfilCompleto(dto: PerfilPessoalDto): {
-  [K in Exclude<ChavePerfil, "dataNascimento">]: string | null;
-} & { dataNascimento: string } {
+  [K in ChavePerfil]: string | null;
+} {
   return {
-    dataNascimento: dto.dataNascimento,
+    dataNascimento: dto.dataNascimento ?? null,
+    cpf: dto.cpf ?? null,
+    rg: dto.rg ?? null,
+    genero: dto.genero ?? null,
+    contatoEmergenciaNome: dto.contatoEmergenciaNome ?? null,
+    contatoEmergenciaTelefone: dto.contatoEmergenciaTelefone ?? null,
     sexo: dto.sexo ?? null,
     saudacao: dto.saudacao ?? null,
     estadoCivil: dto.estadoCivil ?? null,
@@ -228,16 +240,29 @@ export function camposAlterados<K extends string>(
     .map(([, c]) => c);
 }
 
-function dadosDoPerfil(
-  valores: { [K in Exclude<ChavePerfil, "dataNascimento">]: string | null } & {
-    dataNascimento: string;
-  },
-) {
+function dadosDoPerfil(valores: { [K in ChavePerfil]: string | null }) {
   return {
     ...valores,
-    dataNascimento: new Date(`${valores.dataNascimento}T00:00:00.000Z`),
+    dataNascimento:
+      valores.dataNascimento === null
+        ? null
+        : new Date(`${valores.dataNascimento}T00:00:00.000Z`),
   };
 }
+
+/**
+ * T209 — campos que a edição da ficha MANTÉM quando ausentes do corpo (como
+ * o sexo, T181): a ficha ainda não os edita, e um PUT dela não pode apagá-los.
+ * `null` explícito apaga.
+ */
+const MANTIDOS_SE_AUSENTES = [
+  "sexo",
+  "cpf",
+  "rg",
+  "genero",
+  "contatoEmergenciaNome",
+  "contatoEmergenciaTelefone",
+] as const satisfies readonly ChavePerfil[];
 
 function eUnicidadeVioladaNoBanco(erro: unknown): boolean {
   return (
@@ -431,9 +456,9 @@ export class DadosPessoaisColaboradorService {
   /**
    * Gravação na ADMISSÃO, dentro da transação dela: o colaborador e o vínculo
    * acabaram de nascer na mesma transação, então não há registro anterior.
-   * O perfil é obrigatório (tem ao menos a data de nascimento) e é sempre
-   * criado; o endereço, opcional, só é criado quando algum campo tem valor. Se
-   * qualquer gravação falhar, a admissão inteira falha (ADR 0004 §2).
+   * T209 — perfil e endereço só são criados quando algum campo tem valor
+   * (a data de nascimento passou a opcional). Se qualquer gravação falhar, a
+   * admissão inteira falha (ADR 0004 §2).
    */
   async gravarNaAdmissao(
     tx: Prisma.TransactionClient,
@@ -444,29 +469,33 @@ export class DadosPessoaisColaboradorService {
       endereco?: EnderecoDto | undefined;
     },
   ): Promise<{
-    perfilPessoal: ValoresPerfil;
+    perfilPessoal: ValoresPerfil | null;
     endereco: ValoresEndereco | null;
   }> {
     const valoresDoPerfil = perfilCompleto(dto.perfilPessoal);
-    const perfilCriado = await tx.perfilPessoalColaborador.create({
-      data: {
-        ...alvo,
-        ...dadosDoPerfil(valoresDoPerfil),
-        criadoPorUserId: ctx.actor.id,
-        atualizadoPorUserId: ctx.actor.id,
-      },
-      select: PROJECAO_PERFIL,
-    });
-    await this.registrarEvento(tx, ctx, alvo, {
-      categoria: "perfil_pessoal",
-      registroId: perfilCriado.id,
-      acao: "criacao",
-      resultado: "gravado",
-      campos: camposPreenchidos(valoresDoPerfil, CAMPOS_PERFIL),
-      auditAction: "pessoas_dados_pessoais_criados",
-      auditResult: "success",
-    });
-    const perfil = valoresPerfil(perfilCriado);
+    const camposDoPerfil = camposPreenchidos(valoresDoPerfil, CAMPOS_PERFIL);
+    let perfil: ValoresPerfil | null = null;
+    if (camposDoPerfil.length > 0) {
+      const perfilCriado = await tx.perfilPessoalColaborador.create({
+        data: {
+          ...alvo,
+          ...dadosDoPerfil(valoresDoPerfil),
+          criadoPorUserId: ctx.actor.id,
+          atualizadoPorUserId: ctx.actor.id,
+        },
+        select: PROJECAO_PERFIL,
+      });
+      await this.registrarEvento(tx, ctx, alvo, {
+        categoria: "perfil_pessoal",
+        registroId: perfilCriado.id,
+        acao: "criacao",
+        resultado: "gravado",
+        campos: camposDoPerfil,
+        auditAction: "pessoas_dados_pessoais_criados",
+        auditResult: "success",
+      });
+      perfil = valoresPerfil(perfilCriado);
+    }
 
     let endereco: ValoresEndereco | null = null;
     if (dto.endereco) {
@@ -512,14 +541,16 @@ export class DadosPessoaisColaboradorService {
     // inclusive um valor legado, de antes da lista fechada da T179, que nunca
     // é limpo nem convertido sem pedido (decisão da proprietária de
     // 2026-10-23). Alterá-lo exige enviar um código da lista (`SEXOS`); `null`
-    // explícito apaga.
-    if (atual && dto.sexo === undefined) {
-      novo.sexo = atual.sexo;
+    // explícito apaga. T209 — o mesmo para CPF, RG, gênero e emergência.
+    if (atual) {
+      for (const chave of MANTIDOS_SE_AUSENTES) {
+        if (dto[chave] === undefined) novo[chave] = atual[chave];
+      }
     }
     if (!atual) {
-      // A data de nascimento é obrigatória: o bloco sempre tem ao menos um
-      // campo, e criar é sempre gravar.
+      // T209 — sem nenhum valor não há o que criar.
       const campos = camposPreenchidos(novo, CAMPOS_PERFIL);
+      if (campos.length === 0) return;
       const criado = await tx.perfilPessoalColaborador.create({
         data: {
           ...alvo,

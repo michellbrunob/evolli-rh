@@ -96,6 +96,7 @@ export const LIMITE_DA_SERIE_TEXTO = "2.000";
 const TIPOS: readonly TipoVinculo[] = [
   "clt",
   "estagio",
+  "aprendiz",
   "pj",
   "temporario",
   "outro_controlado",
@@ -104,9 +105,13 @@ const TIPOS: readonly TipoVinculo[] = [
 const ROTULO_TIPO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 /** T207 — o nome de cada aba, na ordem da rota. */
@@ -1064,11 +1069,9 @@ export function DashboardScreen({
   return (
     <section className="dashboard" aria-labelledby={DASHBOARD_TITULO_ID}>
       <header className="dashboard__cabecalho">
+        {/* T209 — sem a frase de contexto: a empresa já está no seletor e o
+            módulo, na trilha da barra superior. */}
         {titulo}
-        <p className="dashboard__contexto">
-          Visão geral de {empresaAtiva.nome}: pessoas hoje e movimentações
-          efetivadas no ano.
-        </p>
       </header>
 
       {/* Um só nó de status do começo ao fim: a carga e o fim de cada leitura

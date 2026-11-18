@@ -122,17 +122,60 @@ describe("Módulo 1 — PerfilPessoalDto", () => {
     },
   );
 
-  it("data de nascimento é obrigatória; os demais campos são opcionais", async () => {
-    expect(await erros(PerfilPessoalDto, {})).toEqual(["dataNascimento"]);
+  it("T209 — data de nascimento é opcional; informada, precisa ser data", async () => {
+    expect(await erros(PerfilPessoalDto, {})).toEqual([]);
+    expect(await erros(PerfilPessoalDto, { dataNascimento: null })).toEqual([]);
     expect(await erros(PerfilPessoalDto, { dataNascimento: "" })).toEqual([
       "dataNascimento",
     ]);
-    expect(await erros(PerfilPessoalDto, { dataNascimento: null })).toEqual([
-      "dataNascimento",
-    ]);
+    expect(
+      await erros(PerfilPessoalDto, { dataNascimento: "20/05/1990" }),
+    ).toEqual(["dataNascimento"]);
     expect(
       await erros(PerfilPessoalDto, { dataNascimento: "1990-05-20" }),
     ).toEqual([]);
+  });
+
+  it("T209 — CPF: máscara aceita e normalizada; dígitos verificadores conferidos", async () => {
+    const dto = plainToInstance(PerfilPessoalDto, { cpf: "529.982.247-25" });
+    expect(await validate(dto)).toEqual([]);
+    expect(dto.cpf).toBe("52998224725");
+    for (const invalido of [
+      "529.982.247-26",
+      "111.111.111-11",
+      "5299822472",
+      "abc",
+    ]) {
+      expect(await erros(PerfilPessoalDto, { cpf: invalido })).toEqual(["cpf"]);
+    }
+    expect(await erros(PerfilPessoalDto, { cpf: "  " })).toEqual([]);
+  });
+
+  it("T209 — gênero em lista fechada; RG até 20; emergência com telefone brasileiro", async () => {
+    for (const genero of [
+      "feminino",
+      "masculino",
+      "outro",
+      "prefiro_nao_informar",
+    ]) {
+      expect(await erros(PerfilPessoalDto, { genero })).toEqual([]);
+    }
+    expect(await erros(PerfilPessoalDto, { genero: "Feminino" })).toEqual([
+      "genero",
+    ]);
+    expect(await erros(PerfilPessoalDto, { rg: "x".repeat(21) })).toEqual([
+      "rg",
+    ]);
+    const dto = plainToInstance(PerfilPessoalDto, {
+      contatoEmergenciaNome: "  Nome   Sintetico ",
+      contatoEmergenciaTelefone: "(31) 99999-0000",
+    });
+    expect(await validate(dto)).toEqual([]);
+    expect(dto.contatoEmergenciaNome).toBe("Nome Sintetico");
+    expect(dto.contatoEmergenciaTelefone).toBe("+5531999990000");
+    expect(
+      await erros(PerfilPessoalDto, { contatoEmergenciaTelefone: "123" }),
+    ).toEqual(["contatoEmergenciaTelefone"]);
   });
 
   it.each([
@@ -231,18 +274,19 @@ describe("Módulo 1 — AdmitirColaboradorDto com os blocos", () => {
     },
   };
 
-  it("perfil (com data de nascimento) é obrigatório; T179: contatos e endereço são opcionais", async () => {
+  it("perfil é obrigatório (T209: sem exigir a data de nascimento); T179: contatos e endereço são opcionais", async () => {
     expect(
       await erros(AdmitirColaboradorDto, { ...base, ...obrigatorios }),
     ).toEqual([]);
     expect(await erros(AdmitirColaboradorDto, base)).toEqual(["perfilPessoal"]);
+    // T209 — o bloco segue obrigatório, mas a data de nascimento não.
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,
         ...obrigatorios,
         perfilPessoal: { sexo: "feminino" },
       }),
-    ).toEqual(["perfilPessoal"]);
+    ).toEqual([]);
     expect(
       await erros(AdmitirColaboradorDto, {
         ...base,

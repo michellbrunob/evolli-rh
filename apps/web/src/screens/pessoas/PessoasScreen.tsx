@@ -22,12 +22,7 @@
  * sólida (mesmo princípio do `PainelNavigation`/`StatusBadge`).
  */
 import { useEffect, useRef, useState } from "react";
-import {
-  type EstadoDestino,
-  destinoPorId,
-  tituloDoGrupoDe,
-} from "../../app/mapaNavegacao";
-import { TrilhaNavegacao } from "../../components";
+import { type EstadoDestino } from "../../app/mapaNavegacao";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import type {
@@ -186,8 +181,11 @@ export interface PessoasScreenProps {
    * listagem fica montada por baixo, escondida, com busca, filtros e página.
    */
   ficha?: RotaDaFicha | null;
-  /** T198 — "Abrir ficha": o shell troca a rota. */
-  onAbrirFicha?: (colaboradorId: string) => void;
+  /**
+   * T198 — "Abrir ficha": o shell troca a rota. T209 — o menu "Ações" da
+   * listagem abre a ficha já numa aba; sem aba, "Dados do colaborador".
+   */
+  onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
   /** T198 — outra aba da ficha: o shell troca a rota. */
   onTrocarAbaDaFicha?: (aba: AbaDaFicha) => void;
   /** T202 — outra competência da aba de ponto: o shell troca a rota. */
@@ -198,6 +196,8 @@ export interface PessoasScreenProps {
   focarContatosNaFicha?: boolean;
   /** T177 — leva "Novo colaborador" à página de Nova admissão. */
   onNovaAdmissao?: ColaboradoresScreenProps["onNovaAdmissao"];
+  /** T209 (Bloco C) — importação por planilha (só para quem admite). */
+  onImportarPlanilha?: ColaboradoresScreenProps["onImportarPlanilha"];
   /** T181 — repassado à aba Colaboradores (ver `ColaboradoresScreenProps`). */
   podeEditarFicha?: boolean;
   /**
@@ -231,6 +231,7 @@ export function PessoasScreen({
   onFecharFicha,
   focarContatosNaFicha = false,
   onNovaAdmissao,
+  onImportarPlanilha,
   podeEditarFicha = false,
   podeOperarJornada = false,
   podeVerSolicitacoes = false,
@@ -308,12 +309,13 @@ export function PessoasScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fichaAberta]);
 
-  function abrirFicha(colaboradorId: string) {
+  function abrirFicha(colaboradorId: string, aba?: AbaDaFicha) {
     gatilhoDaFichaRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    onAbrirFicha?.(colaboradorId);
+    if (aba === undefined) onAbrirFicha?.(colaboradorId);
+    else onAbrirFicha?.(colaboradorId, aba);
   }
 
   /** T187 — o atalho da Vida funcional, agora a partir da ficha. */
@@ -370,26 +372,6 @@ export function PessoasScreen({
     document.getElementById("pessoas-tab-colaboradores")?.focus();
   }, [abaAtiva]);
 
-  // T178 — trilha só no modo funcional, que é o destino "Colaboradores" da
-  // barra. Os nomes saem do mapa de navegação: barra e trilha não divergem.
-  // A aba ativa, quando não é Colaboradores, entra como terceiro nível.
-  const trilha =
-    modo === "funcional"
-      ? [
-          { rotulo: tituloDoGrupoDe("pessoas") ?? "Gestão de Pessoas" },
-          {
-            rotulo: destinoPorId("pessoas")?.label ?? "Colaboradores",
-            onSelecionar: () =>
-              trocarAbaDePessoas("colaboradores", () => {
-                focarAbaColaboradoresRef.current = true;
-              }),
-          },
-          ...(definicaoAtiva.id === "colaboradores"
-            ? []
-            : [{ rotulo: definicaoAtiva.rotulo }]),
-        ]
-      : null;
-
   return (
     <div className="pessoas-screen">
       {fichaAberta && ficha ? (
@@ -415,7 +397,7 @@ export function PessoasScreen({
       ) : null}
       {listagemMontada || !fichaAberta ? (
         <div className="pessoas-screen__conteudo" hidden={fichaAberta}>
-          {trilha ? <TrilhaNavegacao itens={trilha} /> : null}
+          {/* T209 — a trilha fica só na barra superior (sem repetição). */}
           <div
             role="tablist"
             aria-label="Seções de Pessoas"
@@ -457,12 +439,14 @@ export function PessoasScreen({
                 <ColaboradoresScreen
                   empresaAtiva={empresaAtiva}
                   {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
+                  {...(onImportarPlanilha ? { onImportarPlanilha } : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
                   atualizacao={atualizacaoDaListagem}
                   {...(listagem && onListagemChange
                     ? { estado: listagem, onEstadoChange: onListagemChange }
                     : {})}
                   podeOperarJornada={podeOperarJornada}
+                  podeVerSolicitacoes={podeVerSolicitacoes}
                 />
               ) : abaAtiva === "horario" ? (
                 <PessoasHorarioScreen

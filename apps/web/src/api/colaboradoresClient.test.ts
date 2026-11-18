@@ -10,6 +10,8 @@ import {
   type AdmitirColaboradorDto,
   BUSCA_COLABORADORES_MAXIMO,
   admitirColaborador,
+  enviarAdmissao,
+  enviarFotoColaborador,
   listarColaboradores,
 } from "./colaboradoresClient";
 
@@ -27,9 +29,13 @@ const VAZIA = {
     ativosPorTipo: {
       clt: 0,
       estagio: 0,
+      aprendiz: 0,
       pj: 0,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     },
   },
 };
@@ -91,6 +97,18 @@ describe("T178 — listarColaboradores", () => {
       "b".repeat(BUSCA_COLABORADORES_MAXIMO),
     );
     expect(BUSCA_COLABORADORES_MAXIMO).toBe(160);
+  });
+
+  it("T209 — o sinal de cancelamento chega ao fetch; sem ele, nenhum sinal", async () => {
+    const controle = new AbortController();
+    await listarColaboradores({ pagina: 1 }, { signal: controle.signal });
+    expect((fetchMock.mock.calls.at(-1)![1] as RequestInit).signal).toBe(
+      controle.signal,
+    );
+    await listarColaboradores({ pagina: 1 });
+    expect(
+      (fetchMock.mock.calls.at(-1)![1] as RequestInit).signal,
+    ).toBeUndefined();
   });
 
   it("T199 — grupo e tipo de vínculo vão na query; ausentes, não vão", async () => {
@@ -264,5 +282,73 @@ describe("T190 — listarColaboradores com filtros de lotação", () => {
     q = queryEnviada();
     expect(q.has("departamentoId")).toBe(false);
     expect(q.has("cargoId")).toBe(false);
+  });
+});
+
+describe("T209 (Bloco C) — enviarAdmissao diz se foi reenvio", () => {
+  function resposta(cabecalhos: Record<string, string>): Response {
+    return {
+      ok: true,
+      status: 201,
+      headers: new Headers(cabecalhos),
+      json: async () => ({ id: "col-1" }),
+    } as unknown as Response;
+  }
+
+  it("Idempotent-Replayed: true → reenvio (nada novo criado)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      resposta({ "Idempotent-Replayed": "true" }),
+    );
+    const enviada = await enviarAdmissao(DTO, {
+      chaveIdempotencia: "12345678-1234-5234-8234-123456789abc",
+    });
+    expect(enviada).toEqual({ admissao: { id: "col-1" }, reenvio: true });
+  });
+
+  it("sem o cabeçalho → admissão nova", async () => {
+    fetchMock.mockResolvedValueOnce(resposta({}));
+    expect((await enviarAdmissao(DTO)).reenvio).toBe(false);
+  });
+});
+
+describe("T209 — enviarFotoColaborador", () => {
+  it("PUT dos bytes do arquivo, octet-stream, com tipo, extensão e CSRF", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        versao: 1,
+        atualizadoEm: "2026-11-16T12:00:00.000Z",
+      }),
+    } as unknown as Response);
+    const arquivo = new File([new Uint8Array([1, 2, 3])], "Retrato.JPG", {
+      type: "image/jpeg",
+    });
+    const r = await enviarFotoColaborador("col-1", arquivo);
+    expect(r).toEqual({ versao: 1, atualizadoEm: "2026-11-16T12:00:00.000Z" });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe("/v1/colaboradores/col-1/foto");
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(arquivo);
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/octet-stream",
+      "x-csrf-token": "token-sintetico",
+      "x-evolli-foto-tipo": "image/jpeg",
+      "x-evolli-foto-extensao": "jpg",
+    });
+  });
+
+  it("recusa do servidor vira ApiError com o código", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: async () => ({ message: "x", codigo: "foto_pequena" }),
+    } as unknown as Response);
+    const erro = await enviarFotoColaborador(
+      "col-1",
+      new File([new Uint8Array([1])], "a.png", { type: "image/png" }),
+    ).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ApiError);
+    expect((erro as ApiError).codigo).toBe("foto_pequena");
   });
 });

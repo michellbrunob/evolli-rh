@@ -74,7 +74,7 @@
   top: 0;
   z-index: 30;
   background: var(--surface-canvas);
-  border-bottom: 1px solid var(--divider-soft);
+  border-bottom: var(--divisor);
 }
 
 .app-shell__topbar-inner {
@@ -219,7 +219,7 @@
   gap: var(--space-lg);
   padding: var(--space-lg) var(--space-sm);
   background: var(--surface-canvas);
-  border-right: 1px solid var(--divider-soft);
+  border-right: var(--divisor);
   position: sticky;
   top: 0;
   align-self: flex-start;
@@ -329,7 +329,7 @@
 
 /* Rodapé técnico discreto — sem dado real, empresa, usuário ou métrica. */
 .app-shell__footer {
-  border-top: 1px solid var(--hairline);
+  border-top: var(--divisor-forte);
   background: var(--surface-canvas);
 }
 
@@ -541,4 +541,30 @@
 .app-shell__sidebar .painel-nav :focus-visible,
 .app-shell__sidebar .seletor-empresa__botao:focus-visible {
   outline-color: var(--evolli-sobre-marinho);
+}
+
+/* T209 — o topo da faixa (marca e recolher) fica na mesma linha da barra
+   superior: a mesma altura e a mesma linha divisória embaixo. */
+.app-shell__sidebar {
+  padding-top: 0;
+}
+
+.app-shell__cabecalho-lateral {
+  /* A barra soma a linha divisória (1 px) à altura. */
+  min-height: calc(var(--altura-barra-superior) + 1px);
+  margin: 0 calc(-1 * var(--space-sm));
+  padding: 0 var(--space-sm);
+  border-bottom: var(--divisor);
+  border-bottom-color: var(--divisor-cor-sobre-marinho);
+}
+
+@media (min-width: 835px) {
+  .app-shell--menu-recolhido .app-shell__sidebar {
+    padding-top: 0;
+  }
+
+  .app-shell--menu-recolhido .app-shell__cabecalho-lateral {
+    margin: 0 calc(-1 * var(--space-xs));
+    padding: var(--space-xs);
+  }
 }

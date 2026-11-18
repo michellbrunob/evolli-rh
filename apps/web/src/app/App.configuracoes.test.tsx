@@ -4,7 +4,8 @@
  * recolhido e gaveta do celular), histórico, recarga, URL inválida, papel
  * desconhecido, foco no título, link de pular e a guarda de saída.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -221,7 +222,10 @@ describe("T208 — menu, histórico e foco", () => {
     montar(ROTA, "rh");
     const interna = screen.getByRole("navigation", { name: "Configurações" });
     const links = within(interna).getAllByRole("link");
-    expect(links).toHaveLength(1);
+    // T209 — o RH vê também "Empresas", no grupo Empresa.
+    expect(links).toHaveLength(2);
+    expect(links[1]).toHaveAccessibleName("Empresas");
+    expect(links[1]).not.toHaveAttribute("aria-current");
     expect(links[0]).toHaveAccessibleName("Meu perfil");
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveAttribute("href", ROTA);

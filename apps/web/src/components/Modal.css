@@ -204,3 +204,76 @@
     border: 0;
   }
 }
+
+/* T209 — animação dos painéis laterais (padrão reutilizável: todo
+   `Modal` com `posicao="lateral"`). O painel entra deslizando da
+   direita e sai para a direita; o fundo aparece e some por opacidade. Curto
+   e sem excesso de movimento; quem pede movimento reduzido não vê animação
+   (e o componente fecha no mesmo quadro). A janela central não anima. */
+@keyframes evolli-painel-entra {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes evolli-painel-sai {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes evolli-fundo-entra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes evolli-fundo-sai {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.evolli-modal--lateral .evolli-modal__caixa {
+  animation: evolli-painel-entra var(--movimento-painel-entrada)
+    var(--movimento-curva) both;
+}
+
+.evolli-modal--lateral .evolli-modal__fundo {
+  animation: evolli-fundo-entra var(--movimento-painel-entrada) linear both;
+}
+
+.evolli-modal--lateral.evolli-modal--saindo .evolli-modal__caixa {
+  animation: evolli-painel-sai var(--movimento-painel-saida)
+    var(--movimento-curva) both;
+}
+
+.evolli-modal--lateral.evolli-modal--saindo .evolli-modal__fundo {
+  animation: evolli-fundo-sai var(--movimento-painel-saida) linear both;
+}
+
+/* Saindo, a camada já não é a janela: nenhum clique para nela. */
+.evolli-modal--saindo {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evolli-modal--lateral.evolli-modal--saindo .evolli-modal__caixa,
+  .evolli-modal--lateral.evolli-modal--saindo .evolli-modal__fundo,
+  .evolli-modal--lateral .evolli-modal__caixa,
+  .evolli-modal--lateral .evolli-modal__fundo {
+    animation: none;
+  }
+}

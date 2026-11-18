@@ -36,7 +36,7 @@
 .painel-nav__modulos--secundario {
   margin-top: auto;
   padding-top: var(--space-md);
-  border-top: 1px solid var(--divider-soft);
+  border-top: var(--divisor);
 }
 
 /* T208 — a própria conta (Configurações) também desce para o pé da barra,
@@ -45,7 +45,7 @@
 .painel-nav__modulos--conta {
   margin-top: auto;
   padding-top: var(--space-md);
-  border-top: 1px solid var(--divider-soft);
+  border-top: var(--divisor);
 }
 
 .painel-nav__modulos--conta + .painel-nav__modulos--secundario {
@@ -338,7 +338,7 @@
 
 .painel-nav .painel-nav__modulos--secundario,
 .painel-nav .painel-nav__modulos--conta {
-  border-top-color: var(--evolli-marinho-divisa);
+  border-top-color: var(--divisor-cor-sobre-marinho);
 }
 
 .painel-nav .painel-nav__modulos--secundario .painel-nav__cabecalho,
@@ -351,4 +351,273 @@
   .painel-nav__modulos--secundario
   .painel-nav__cabecalho--contem-ativo {
   color: var(--evolli-sobre-marinho);
+}
+
+/* ---- T209 — menu completo: seções nomeadas, selos, itens em
+   desenvolvimento, o aviso deles e o rodapé preso ao pé da faixa. Só tokens.
+   Item em desenvolvimento é discreto (texto mais suave e o estado escrito),
+   mas legível: não parece erro nem item removido. ---- */
+
+.painel-nav {
+  gap: var(--space-xxs);
+}
+
+/* Desktop: uma linha de 36 px por item, para o menu caber numa tela (e a
+   faixa dispensar a barra de rolagem, que estreitaria os itens). No
+   celular, 44 px (regra abaixo). */
+.painel-nav .painel-nav__destino,
+.painel-nav .painel-nav__cabecalho {
+  min-height: 36px;
+  padding-top: var(--space-xxs);
+  padding-bottom: var(--space-xxs);
+}
+
+/* O destino não tem seta: a marca de "em desenvolvimento" pode chegar mais
+   perto da borda, e "Hub de Benefícios Novo" cabe numa linha. */
+.painel-nav .painel-nav__destino {
+  padding-right: var(--space-xs);
+}
+
+/* Texto só para leitor de tela (a explicação dos itens em desenvolvimento). */
+.painel-nav__oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* No menu expandido a seção se separa só pelo título; o divisor fica para o
+   trilho, onde o título sai de vista. */
+.painel-nav__secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding-top: var(--space-xs);
+}
+
+.painel-nav .painel-nav__secao-titulo {
+  margin: 0;
+  padding: 0 var(--space-sm) 0 var(--space-md);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+/* Seção recolhível (Operação): o título é o botão de abrir e fechar. */
+.painel-nav__secao-alternar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-height: 32px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.painel-nav .painel-nav__secao-alternar:hover {
+  color: var(--evolli-sobre-marinho);
+}
+
+.painel-nav__secao-alternar[aria-expanded="true"] .painel-nav__seta {
+  transform: rotate(90deg);
+}
+
+/* Fechada com a tela aberta dentro: a marca sobe para o título (forma, além
+   do `aria-current`). */
+.painel-nav .painel-nav__secao-alternar--contem-ativo {
+  color: var(--evolli-sobre-marinho);
+}
+
+.painel-nav .painel-nav__secao-alternar--contem-ativo::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3px;
+  height: 60%;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--evolli-verde-agua);
+}
+
+/* `display: flex` da lista venceria o atributo `hidden`. */
+.painel-nav__modulos[hidden] {
+  display: none;
+}
+
+/* Demonstração deixa de empurrar: quem vai ao pé da faixa é o rodapé. */
+.painel-nav .painel-nav__modulos--secundario {
+  margin-top: 0;
+  padding-top: var(--space-xxs);
+}
+
+.painel-nav__modulos--rodape {
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  border-top: var(--divisor);
+  border-top-color: var(--divisor-cor-sobre-marinho);
+}
+
+/* Cabeçalho expandido da área em que a pessoa está (Colaboradores): o
+   subitem carrega a marca; o cabeçalho só ganha peso. */
+.painel-nav .painel-nav__cabecalho--na-area {
+  color: var(--evolli-sobre-marinho);
+  font-weight: var(--weight-strong);
+}
+
+/* Selos curtos ao lado do nome: Beta e Novo. */
+.painel-nav .painel-nav__selo {
+  display: inline-block;
+  margin-left: var(--space-xxs);
+  padding: 0 var(--space-xxs);
+  border: 1px solid var(--evolli-verde-agua);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: var(--weight-strong);
+  line-height: 1.4;
+  color: var(--evolli-sobre-marinho);
+  vertical-align: middle;
+}
+
+.painel-nav .painel-nav__selo[data-selo="novo"] {
+  background: var(--evolli-verde-agua);
+  color: var(--evolli-marinho);
+}
+
+/* Item em desenvolvimento: texto suave, a marca compacta (relógio) ao fim da
+   linha e o cursor padrão (é acionável: abre o aviso). O estado em texto
+   segue no nome acessível, fora de vista. */
+.painel-nav__destino--em-desenvolvimento {
+  cursor: default;
+}
+
+.painel-nav .painel-nav__destino--em-desenvolvimento,
+.painel-nav .painel-nav__cabecalho--em-desenvolvimento {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.painel-nav .painel-nav__marca-em-desenvolvimento {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Com a seta logo depois (Recrutamento), a marca fica ao lado dela. */
+.painel-nav__marca-em-desenvolvimento + .painel-nav__seta {
+  margin-left: 0;
+}
+
+.painel-nav .painel-nav__marca-em-desenvolvimento {
+  color: var(--evolli-sobre-marinho-suave);
+}
+
+.painel-nav .painel-nav__destino--em-desenvolvimento:hover {
+  background: var(--evolli-marinho-realce);
+  color: var(--evolli-sobre-marinho);
+}
+
+/* No trilho o estado e o selo saem de vista com o resto do texto (seguem no
+   nome); o ícone fica mais suave e a dica diz o nome e o estado. */
+.painel-nav--trilho .painel-nav__secao-titulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.painel-nav--trilho .painel-nav__secao {
+  padding-top: var(--space-xs);
+  border-top: var(--divisor);
+  border-top-color: var(--divisor-cor-sobre-marinho);
+}
+
+.painel-nav--trilho .painel-nav__marca-em-desenvolvimento {
+  display: none;
+}
+
+.painel-nav--trilho
+  .painel-nav__destino--em-desenvolvimento
+  .painel-nav__icone {
+  opacity: 0.75;
+}
+
+/* O aviso: pequeno, claro sobre a faixa escura, preso ao item. */
+.painel-nav__aviso {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: min(18rem, calc(100vw - 2 * var(--space-md)));
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  text-align: left;
+}
+
+.painel-nav__aviso:focus-visible {
+  outline: var(--foco-anel);
+  outline-offset: 2px;
+}
+
+.painel-nav__aviso-titulo {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.painel-nav__aviso-texto {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.painel-nav__aviso-fechar {
+  align-self: flex-end;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.painel-nav__aviso-fechar:hover {
+  background: var(--surface-neutral);
+}
+
+/* No celular, o cabeçalho expansível em desenvolvimento e os subitens também
+   têm 44 px (os subitens já ganham pela regra da T206). */
+@media (max-width: 834px) {
+  .painel-nav__cabecalho--em-desenvolvimento {
+    min-height: var(--touch-target);
+  }
+
+  .painel-nav__secao-alternar {
+    min-height: var(--touch-target);
+  }
+
+  .painel-nav .painel-nav__destino,
+  .painel-nav .painel-nav__cabecalho {
+    min-height: var(--touch-target);
+  }
 }

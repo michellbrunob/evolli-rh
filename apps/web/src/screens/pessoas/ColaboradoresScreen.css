@@ -169,6 +169,11 @@
   background: var(--status-success-ink);
 }
 
+/* T209 — Aprendiz, com a cor própria do tipo. */
+.colaboradores-screen__barra-tipo--aprendiz {
+  background: var(--cor-tipo-aprendiz);
+}
+
 .colaboradores-screen__barra-tipo--pj {
   background: var(--status-warning-ink);
 }
@@ -299,6 +304,7 @@
   color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
+  overflow: hidden;
 }
 
 .colaboradores-screen__nome {
@@ -711,4 +717,258 @@
   .colaboradores-screen__cep-acoes > .evolli-button {
     flex: 1 1 auto;
   }
+}
+
+/* ---- T209 — listagem operacional: rodapé da tabela (tamanho da página e
+   paginação numerada) e menu "Ações" por linha. Só tokens; nada alarga a
+   página a 375 px: tudo quebra linha e encolhe. ---- */
+.colaboradores-screen__rodape-tabela {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
+  margin-top: var(--space-md);
+}
+
+.colaboradores-screen__tamanho {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__tamanho select {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.colaboradores-screen__tamanho select:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.colaboradores-screen__paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.colaboradores-screen__paginas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.colaboradores-screen__pagina-numero {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A página atual não depende só de cor: peso e borda na cor de ação. */
+.colaboradores-screen__pagina-numero[aria-current="page"] {
+  font-weight: var(--weight-strong);
+  border-color: var(--color-action);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+}
+
+.colaboradores-screen__pagina-numero:focus-visible,
+.colaboradores-screen__botao-acoes:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.colaboradores-screen__paginacao-posicao {
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__acoes {
+  display: inline-block;
+}
+
+.colaboradores-screen__botao-acoes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.colaboradores-screen__botao-acoes[aria-expanded="true"] {
+  border-color: var(--color-action);
+}
+
+/* O menu "Ações" é o DropdownMenu da camada `src/ui` (Radix, em portal):
+   o posicionamento e a camada vivem lá. */
+
+/* ---- T209 — faixa de indicadores e barra de filtros. A faixa reúne os
+   totais (com "Ativos" em destaque) e a distribuição por tipo; dois painéis
+   lado a lado quando o PRÓPRIO bloco tem espaço (não a janela: o menu
+   lateral aberto estreita o conteúdo). A barra de busca e filtros fica numa
+   linha, alinhada pela base dos campos, e quebra linha antes de alargar a
+   página. Só tokens. ---- */
+.colaboradores-screen__indicadores {
+  container-type: inline-size;
+}
+
+.colaboradores-screen__faixa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.colaboradores-screen__painel-totais {
+  min-width: 0;
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartoes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartao {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.colaboradores-screen__painel-totais .colaboradores-screen__cartao dd {
+  font-size: var(--text-lead);
+}
+
+.colaboradores-screen__cartao--destaque {
+  grid-column: 1 / -1;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.colaboradores-screen__cartao--destaque dt {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__cartao--destaque dd {
+  font-size: var(--text-display);
+}
+
+@container (min-width: 36rem) {
+  .colaboradores-screen__faixa {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .colaboradores-screen__distribuicao {
+    align-content: start;
+    padding-left: var(--space-lg);
+    border-left: 1px solid var(--divider-soft);
+  }
+}
+
+.colaboradores-screen__filtros select {
+  width: 100%;
+}
+
+/* Acima de 640 px: uma linha que quebra. Abaixo, vale a coluna do celular
+   (lá, um `flex-basis` viraria ALTURA — o vão da T172). */
+@media (min-width: 641px) {
+  .colaboradores-screen__filtros {
+    align-items: flex-end;
+    gap: var(--space-sm) var(--space-md);
+    min-width: 0;
+  }
+
+  .colaboradores-screen__filtros > .evolli-field {
+    flex: 1 1 10rem;
+    min-width: 0;
+  }
+
+  .colaboradores-screen__filtros > .colaboradores-screen__busca {
+    flex: 2 1 18rem;
+    flex-wrap: nowrap;
+  }
+}
+
+/* ---- T209 — divisões sutis (padrão da T209, tokens de `tokens.css`):
+   cabeçalho da página, faixa de indicadores, abas e busca/filtros, tabela e
+   o rodapé da paginação. A tabela compartilhada só muda aqui dentro. ---- */
+.colaboradores-screen > .evolli-page-header {
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen__indicadores {
+  border: var(--borda-card);
+}
+
+.colaboradores-screen__fato + .colaboradores-screen__fato {
+  padding-left: var(--space-sm);
+  border-left: var(--divisor);
+}
+
+.colaboradores-screen__abas {
+  border-bottom: var(--divisor-forte);
+}
+
+.colaboradores-screen__filtros {
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen .evolli-datatable {
+  border: var(--borda-tabela);
+}
+
+.colaboradores-screen .evolli-datatable__th {
+  border-bottom: var(--divisor-forte);
+}
+
+.colaboradores-screen .evolli-datatable__td {
+  border-bottom: var(--divisor);
+}
+
+.colaboradores-screen .evolli-datatable__table tbody tr:hover {
+  background: var(--estado-hover-superficie);
+}
+
+.colaboradores-screen__rodape-tabela {
+  padding-top: var(--secao-espaco-compacto);
+  border-top: var(--divisor);
+}
+
+/* T209 — a foto do colaborador preenche o avatar redondo, sem deformar. */
+.colaboradores-screen__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

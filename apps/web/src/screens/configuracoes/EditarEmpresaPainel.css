@@ -1,0 +1,105 @@
+/* T209 — painel lateral "Editar empresa". Só tokens. */
+
+.editar-empresa__form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.editar-empresa__secao {
+  margin: 0.25rem 0 -0.5rem;
+  font-size: 0.75rem;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-subtle);
+}
+
+.editar-empresa__campo {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.editar-empresa__campo > label {
+  font-size: 0.875rem;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.editar-empresa__obrigatorio {
+  color: var(--status-danger-ink);
+}
+
+.editar-empresa__campo :where(input, select) {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 0.875rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.editar-empresa__campo :where([aria-invalid="true"]) {
+  border-color: var(--status-danger-ink);
+}
+
+.editar-empresa__campo--cep :where(input) {
+  max-width: 10rem;
+}
+
+.editar-empresa__linha {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+@media (min-width: 30rem) {
+  .editar-empresa__linha--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .editar-empresa__linha--numero {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+  }
+
+  .editar-empresa__linha--cidade {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6.75rem;
+  }
+}
+
+.editar-empresa__erro {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--status-danger-ink);
+}
+
+.editar-empresa__cep {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+}
+
+/* Vazia, a região viva fica montada e sem altura (para anunciar depois). */
+.editar-empresa__cep:empty {
+  height: 0;
+  margin-top: -0.5rem;
+}
+
+.editar-empresa__cep--encontrado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Rodapé como no padrão: Cancelar à esquerda, Salvar à direita. */
+.editar-empresa__rodape {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: space-between;
+  gap: 0.75rem;
+}

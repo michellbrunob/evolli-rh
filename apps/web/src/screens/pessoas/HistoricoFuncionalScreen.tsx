@@ -119,9 +119,13 @@ const MOTIVOS: readonly MotivoMovimentacao[] = Object.keys(
 const ROTULO_TIPO_VINCULO: Record<TipoVinculo, string> = {
   clt: "CLT",
   estagio: "Estágio",
+  aprendiz: "Aprendiz",
   pj: "PJ",
   temporario: "Temporário",
   outro_controlado: "Outro controlado",
+  part_time: "Part-time",
+  freelancer: "Freelancer",
+  trainee: "Trainee",
 };
 
 interface RegistroErros {

@@ -183,6 +183,7 @@ describe("T199 — grupo e tipo de vínculo na consulta", () => {
     for (const tipo of [
       "clt",
       "estagio",
+      "aprendiz",
       "pj",
       "temporario",
       "outro_controlado",
@@ -190,7 +191,9 @@ describe("T199 — grupo e tipo de vínculo na consulta", () => {
       expect(await erros({ tipoVinculo: tipo })).toEqual([]);
     }
     expect(await erros({ tipoVinculo: "CLT" })).toEqual(["tipoVinculo"]);
-    expect(await erros({ tipoVinculo: "aprendiz" })).toEqual(["tipoVinculo"]);
+    // T209 — "aprendiz" passou a ser controlado; variações seguem recusadas.
+    expect(await erros({ tipoVinculo: "aprendizes" })).toEqual(["tipoVinculo"]);
+    expect(await erros({ tipoVinculo: "Aprendiz" })).toEqual(["tipoVinculo"]);
     expect(await erros({ tipoVinculo: "" })).toEqual(["tipoVinculo"]);
   });
 
@@ -297,16 +300,24 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
     ).toEqual({
       clt: 2,
       estagio: 0,
+      aprendiz: 0,
       pj: 1,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     });
     expect(distribuirAtivosPorTipo([])).toEqual({
       clt: 0,
       estagio: 0,
+      aprendiz: 0,
       pj: 0,
       temporario: 0,
       outro_controlado: 0,
+      part_time: 0,
+      freelancer: 0,
+      trainee: 0,
     });
   });
 
@@ -319,6 +330,27 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
     expect(resultado.clt).toBe(0);
     // A soma é o número de colaboradores ativos.
     expect(Object.values(resultado).reduce((s, n) => s + n, 0)).toBe(1);
+  });
+
+  it("T209 — Aprendiz conta no próprio tipo, como qualquer outro", () => {
+    const resultado = distribuirAtivosPorTipo([
+      ativo("a", "aprendiz", "2025-01-10"),
+      ativo("b", "aprendiz", "2025-02-10"),
+      ativo("c", "estagio", "2025-03-10"),
+    ]);
+    expect(resultado.aprendiz).toBe(2);
+    expect(resultado.estagio).toBe(1);
+    expect(Object.keys(resultado)).toEqual([
+      "clt",
+      "estagio",
+      "aprendiz",
+      "pj",
+      "temporario",
+      "outro_controlado",
+      "part_time",
+      "freelancer",
+      "trainee",
+    ]);
   });
 
   it("mesma admissão: desempata pela matrícula, como a listagem", () => {
@@ -346,9 +378,13 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
       ativosPorTipo: {
         clt: 0,
         estagio: 0,
+        aprendiz: 0,
         pj: 0,
         temporario: 0,
         outro_controlado: 0,
+        part_time: 0,
+        freelancer: 0,
+        trainee: 0,
       },
     });
   });

@@ -13,6 +13,12 @@
  * data de nascimento, tipo de vínculo, data de admissão, Departamento e Cargo
  * são obrigatórios. Matrícula, Unidade, e-mail pessoal, celular e telefone
  * passaram a opcionais, e o sexo é lista fechada.
+ *
+ * T209 — etapa 2 (decisão da proprietária de 2026-11-17): o Cargo é texto,
+ * resolvido pelo nome só ao confirmar; Departamento e Cargo deixaram de ser
+ * obrigatórios — basta uma referência da lotação — e o salário bruto passou a
+ * obrigatório. Os testes do comportamento genérico dos seletores usam a
+ * Unidade (que tem "+" e «Criar»).
  */
 import {
   act,
@@ -25,13 +31,17 @@ import {
 } from "@testing-library/react";
 import { ComGuardaDeSaida } from "../../test/ComGuardaDeSaida";
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaAdmissaoScreen } from "./NovaAdmissaoScreen";
 import { listarTabelasHorario } from "../../api/horariosClient";
 import {
   ApiError,
   type AdmissaoRegistradaApi,
   admitirColaborador,
+  descartarRascunhoAdmissao,
+  enviarFotoColaborador,
+  obterRascunhoAdmissao,
+  salvarRascunhoAdmissao,
 } from "../../api/colaboradoresClient";
 import {
   type DepartamentoApi,
@@ -66,6 +76,9 @@ vi.mock("../../api/cargoClient");
 vi.mock("../../api/horariosClient");
 // T178 — a consulta de CEP nunca sai da página nos testes.
 vi.mock("../../api/cepClient");
+// T209 — o assistente percorre etapas e seletores pesquisáveis: o caminho
+// completo até a confirmação passa dos 5 s padrão em máquina carregada.
+vi.setConfig({ testTimeout: 20_000 });
 
 function paginado<T>(itens: T[]) {
   return { itens, pagina: 1, tamanhoPagina: 100, total: itens.length };
@@ -141,6 +154,12 @@ const resposta: AdmissaoRegistradaApi = {
     dataNascimento: "1990-05-20",
     // T179 — gravado como código; a confirmação mostra o rótulo.
     sexo: "feminino",
+    // T209 — etapa 1.
+    cpf: "52998224725",
+    rg: null,
+    genero: "feminino",
+    contatoEmergenciaNome: "Contato Sintético Servidor",
+    contatoEmergenciaTelefone: "+5531988887777",
     saudacao: null,
     estadoCivil: "Solteira",
     nacionalidade: "Brasileira",
@@ -227,15 +246,17 @@ async function aguardarEmpresa() {
 const nome = () => screen.getByLabelText(/Nome completo/);
 const dataNascimento = () => screen.getByLabelText(/^Data de nascimento/);
 const matricula = () => screen.getByLabelText(/^Matrícula/);
-const tipo = () => screen.getByLabelText(/Tipo de vínculo/);
+const tipo = () => screen.getByLabelText(/Tipo de contratação/);
 const data = () => screen.getByLabelText(/Data de admissão/);
 // T179 — um seletor por referência da lotação.
-const departamentoSel = () => screen.getByLabelText(/^Departamento/);
-const cargoSel = () => screen.getByLabelText(/^Cargo/);
-const unidadeSel = () => screen.getByLabelText(/^Unidade/);
+// T209 — etapa 2: as linhas "Cargo e nível" e "Departamento e área" também
+// têm nome; os campos são procurados pelo nome exato. O cargo é texto.
+const departamentoSel = () => screen.getByLabelText(/^Departamento$/);
+const cargoSel = () => screen.getByLabelText(/^Cargo$/);
+const unidadeSel = () => screen.getByLabelText(/^Unidade$/);
+const salarioBruto = () => screen.getByLabelText(/^Salário bruto/);
 const areaSel = () => screen.getByLabelText(/^Área/);
-const equipeSel = () => screen.getByLabelText(/^Equipe/);
-const centroSel = () => screen.getByLabelText(/^Centro de custo/);
+const centroSel = () => screen.getByLabelText(/^Centro de custo$/);
 
 /** T196 — a linha "Escolha atual" de um seletor pesquisável. */
 const escolhaDe = (campo: HTMLElement) =>
@@ -265,7 +286,7 @@ const tituloDaEtapa = () =>
   screen.getByRole("heading", { level: 2, name: /^Etapa \d de 4/ });
 
 /**
- * T195 — "Continuar" até a etapa cujo título termina em `titulo`. Falha se
+ * T195 — "Próxima etapa" até a etapa cujo título termina em `titulo`. Falha se
  * alguma etapa do caminho não deixar avançar.
  */
 function irAteEtapa(titulo: string) {
@@ -278,7 +299,7 @@ function irAteEtapa(titulo: string) {
   if (atalho) fireEvent.click(atalho);
   while (!naEtapa()) {
     const antes = tituloDaEtapa().id;
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     if (tituloDaEtapa().id === antes) {
       throw new Error(`A etapa ${antes} não deixou avançar até ${titulo}.`);
     }
@@ -287,18 +308,18 @@ function irAteEtapa(titulo: string) {
 
 /**
  * T179 — "Salvar" só valida e abre a confirmação. T195 — o caminho virou o
- * das etapas: "Continuar" até a revisão, parando na etapa que tiver erro, e
- * nela "Confirmar admissão". Devolve o botão a clicar: na revisão, "Confirmar
- * admissão"; parado numa etapa com erro, o "Continuar" dela, que repete a
+ * das etapas: "Próxima etapa" até a revisão, parando na etapa que tiver erro, e
+ * nela "Concluir". Devolve o botão a clicar: na revisão, "Confirmar
+ * admissão"; parado numa etapa com erro, o "Próxima etapa" dela, que repete a
  * validação da etapa.
  */
 function salvar(): HTMLElement {
   for (;;) {
     const confirmar = screen.queryByRole("button", {
-      name: "Confirmar admissão",
+      name: "Cadastrar colaborador",
     });
     if (confirmar) return confirmar;
-    const continuar = screen.getByRole("button", { name: "Continuar" });
+    const continuar = screen.getByRole("button", { name: "Próxima etapa" });
     const antes = tituloDaEtapa().id;
     fireEvent.click(continuar);
     if (tituloDaEtapa().id === antes) return continuar;
@@ -321,9 +342,20 @@ async function salvarEConfirmar() {
 }
 
 const emailPessoal = () => screen.getByLabelText(/E-mail pessoal/);
-const celular = () => screen.getByLabelText(/^Celular/);
-const telefone = () => screen.getByLabelText(/^Telefone/);
-const pais = () => screen.getByLabelText(/^País/);
+const celular = () => screen.getByLabelText(/^Telefone pessoal/);
+// T209 — o telefone fixo saiu da etapa 1; quem o usava passa ao do contato
+// de emergência, o segundo telefone da etapa.
+const telefone = () => screen.getByLabelText(/^Telefone do contato/);
+/** T209 — CPF sintético com dígitos verificadores válidos. */
+const CPF_VALIDO = "529.982.247-25";
+const cpf = () => screen.getByLabelText(/^CPF$/);
+/**
+ * T209 — sair da Nova admissão: "Cancelar" na etapa 1; nas demais (como no
+ * novo rodapé), o voltar do cabeçalho — o mesmo caminho, com a guarda.
+ */
+const botaoSair = () =>
+  screen.queryByRole("button", { name: "Cancelar" }) ??
+  screen.getByRole("button", { name: "Voltar para Colaboradores" });
 
 /** Os três contatos da ficha da T169 — obrigatórios na página. */
 function preencherContatos() {
@@ -337,14 +369,18 @@ function preencherContatos() {
 /** T179 — Departamento, Cargo e Unidade: obrigatórios, um seletor cada. */
 async function preencherLotacao() {
   await escolher(departamentoSel(), departamento);
-  await escolher(cargoSel(), cargo);
+  // T209 — o cargo é digitado; ao concluir, vira o cargo do cadastro.
+  fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
   await escolher(unidadeSel(), unidade);
+  // T209 — o salário bruto é obrigatório na etapa 2.
+  fireEvent.change(salarioBruto(), { target: { value: "500000" } });
 }
 
 async function preencherValido() {
   preencherContatos();
   fireEvent.change(nome(), { target: { value: "  Pessoa Sintética Nova " } });
   fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+  fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
   fireEvent.change(matricula(), { target: { value: "mat-0900" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-03" } });
@@ -352,11 +388,11 @@ async function preencherValido() {
 }
 
 /**
- * T195 — leva à etapa 2 (Dados profissionais e lotação). Os obrigatórios da
+ * T195 — leva à etapa 2 (Dados profissionais). Os obrigatórios da
  * etapa 1 ainda vazios recebem um valor sintético; o já digitado fica.
  */
 function abrirLotacao() {
-  if (tituloDaEtapa().textContent?.endsWith("Dados profissionais e lotação")) {
+  if (tituloDaEtapa().textContent?.endsWith("Dados profissionais")) {
     return;
   }
   if (!(nome() as HTMLInputElement).value) {
@@ -365,7 +401,10 @@ function abrirLotacao() {
   if (!(dataNascimento() as HTMLInputElement).value) {
     fireEvent.change(dataNascimento(), { target: { value: "1992-03-04" } });
   }
-  irAteEtapa("Dados profissionais e lotação");
+  if (!(cpf() as HTMLInputElement).value) {
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+  }
+  irAteEtapa("Dados profissionais");
 }
 
 /** T195 — leva à etapa 3 (Endereço), com os obrigatórios preenchidos. */
@@ -379,7 +418,7 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Nova admissão" }),
+      screen.getByRole("heading", { level: 1, name: "Novo colaborador" }),
     ).toBeInTheDocument();
     const form = screen.getByRole("form", {
       name: "Formulário de nova admissão",
@@ -392,8 +431,10 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     const empresaBloco = document.getElementById("nova-admissao-empresa")!;
-    expect(empresaBloco).toHaveTextContent("Empresa Sintética (teste) (EMP1)");
-    expect(empresaBloco).toHaveTextContent(/Não é editável aqui/);
+    // T209 — só a frase, com o nome da empresa ativa.
+    expect(empresaBloco).toHaveTextContent(
+      "Você está cadastrando um novo colaborador para: Empresa Sintética (teste)",
+    );
     expect(
       screen.queryByRole("combobox", { name: /Empresa/ }),
     ).not.toBeInTheDocument();
@@ -404,210 +445,6 @@ describe("Nova admissão — página própria", () => {
     expect(within(empresaBloco).queryByRole("combobox")).toBeNull();
   });
 
-  it("pede os campos do Módulo 1, e nenhum campo de módulo futuro", async () => {
-    montar();
-    await aguardarEmpresa();
-    // T179 — só estes seis são obrigatórios.
-    for (const campo of [
-      nome,
-      dataNascimento,
-      tipo,
-      data,
-      departamentoSel,
-      cargoSel,
-    ]) {
-      expect(campo()).toHaveAttribute("aria-required", "true");
-    }
-    for (const campo of [
-      emailPessoal,
-      celular,
-      telefone,
-      matricula,
-      unidadeSel,
-    ]) {
-      expect(campo()).not.toHaveAttribute("aria-required");
-    }
-    const form = screen.getByRole("form", {
-      name: "Formulário de nova admissão",
-    });
-    const rotulos = [...form.querySelectorAll("label")].map((l) =>
-      (l.textContent ?? "").replace(/\*|obrigatório|opcional/g, "").trim(),
-    );
-    for (const esperado of [
-      "Nome completo",
-      "Data de nascimento",
-      "Sexo",
-      "Saudação",
-      "Estado civil",
-      "Nacionalidade",
-      "Naturalidade",
-      "Escolaridade",
-      "Curso",
-      "Nome do pai",
-      "Nome da mãe",
-      "País",
-      "CEP",
-      "Logradouro",
-      "Número",
-      "Complemento",
-      "Bairro",
-      "Cidade",
-      "Estado",
-      "E-mail pessoal",
-      "Celular",
-      "Telefone",
-    ]) {
-      expect(rotulos.some((r) => r.startsWith(esperado))).toBe(true);
-    }
-    for (const proibido of [
-      /CPF/i,
-      /nome social/i,
-      /gênero/i,
-      /raça|etnia/i,
-      /foto/i,
-      /deficiência/i,
-      /emergência/i,
-      /corporativo/i,
-      /banc|agência|conta corrente/i,
-      /dependente/i,
-      /saúde/i,
-      /sindic/i,
-      /documento|\bRG\b|CNH|CTPS|\bPIS\b|eleitor|reservista/i,
-      /fuso/i,
-      /filhos|camisa/i,
-    ]) {
-      expect(rotulos.filter((r) => proibido.test(r))).toEqual([]);
-    }
-  });
-
-  it("obrigatoriedade campo a campo: os opcionais dizem que são opcionais", async () => {
-    montar();
-    await aguardarEmpresa();
-    expect(
-      screen.getByText(/Campos com \* são obrigatórios/),
-    ).toBeInTheDocument();
-    for (const rotulo of [
-      "Sexo",
-      "Saudação",
-      "Estado civil",
-      "Nacionalidade",
-      "Naturalidade",
-      "Escolaridade",
-      "Curso",
-      "Nome do pai",
-      "Nome da mãe",
-      "País",
-      "CEP",
-      "Logradouro",
-      "Número",
-      "Complemento",
-      "Bairro",
-      "Cidade",
-      "Estado",
-      // T179 — opcionais desde a decisão de 2026-10-21.
-      "E-mail pessoal",
-      "Celular",
-      "Telefone",
-      "Matrícula",
-      "Unidade",
-      "Área",
-      "Equipe",
-      "Centro de custo",
-    ]) {
-      const campo = screen.getByLabelText(`${rotulo} (opcional)`);
-      expect(campo).not.toHaveAttribute("aria-required");
-    }
-    for (const campo of [
-      nome,
-      dataNascimento,
-      tipo,
-      data,
-      departamentoSel,
-      cargoSel,
-    ]) {
-      expect(campo()).toHaveAttribute("aria-required", "true");
-      expect(campo()).toHaveAccessibleName(/obrigatório/);
-      expect(campo()).not.toHaveAccessibleName(/opcional/);
-    }
-  });
-
-  it("T195 — quatro etapas na ordem, cada uma com os seus blocos; só a atual aparece", async () => {
-    montar();
-    await aguardarEmpresa();
-    const etapas = [
-      ...document.querySelectorAll<HTMLElement>("section.nova-admissao__etapa"),
-    ];
-    expect(etapas.map((e) => e.querySelector("h2")!.textContent)).toEqual([
-      "Etapa 1 de 4: Dados básicos",
-      "Etapa 2 de 4: Dados profissionais e lotação",
-      "Etapa 3 de 4: Endereço",
-      "Etapa 4 de 4: Revisão e conclusão",
-    ]);
-    expect(
-      etapas.map((e) =>
-        [...e.querySelectorAll("h3")].map((h) => h.textContent),
-      ),
-    ).toEqual([
-      ["Dados pessoais", "Contatos"],
-      // T183 — a jornada é opcional, só para o RH.
-      ["Vínculo", "Lotação inicial", "Jornada de trabalho"],
-      [],
-      [
-        "Dados básicos",
-        "Dados profissionais e lotação",
-        "Endereço",
-        "Documentos",
-      ],
-    ]);
-    // Montadas todas, visível só a atual: nada se perde ao trocar de etapa.
-    expect(etapas.map((e) => e.hidden)).toEqual([false, true, true, true]);
-    expect(
-      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Empresa", "Etapa 1 de 4: Dados básicos"]);
-  });
-
-  it("país começa sugerido como Brasil e pode ser editado", async () => {
-    montar();
-    await aguardarEmpresa();
-    expect(pais()).toHaveValue("Brasil");
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(pais()).toHaveValue("Portugal");
-  });
-
-  it("T179 — sexo é seletor de lista fechada: vazio + as quatro opções, sem texto livre", async () => {
-    montar();
-    await aguardarEmpresa();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    expect(sexo.tagName).toBe("SELECT");
-    expect(sexo).not.toHaveAttribute("aria-required");
-    expect(sexo).toHaveValue("");
-    expect(
-      within(sexo)
-        .getAllByRole("option")
-        .map((o) => [(o as HTMLOptionElement).value, o.textContent]),
-    ).toEqual([
-      ["", "Selecione…"],
-      ["feminino", "Feminino"],
-      ["masculino", "Masculino"],
-      ["intersexo", "Intersexo"],
-      ["nao_informar", "Não informar"],
-    ]);
-  });
-
-  it("sem outro select inventado: estado civil, escolaridade, cidade e estado são texto", async () => {
-    montar();
-    await aguardarEmpresa();
-    for (const rotulo of [
-      /^Estado civil/,
-      /^Escolaridade/,
-      /^Cidade/,
-      /^Estado \(opcional\)$/,
-      /^País/,
-    ]) {
-      expect(screen.getByLabelText(rotulo).tagName).toBe("INPUT");
-    }
-  });
-
   it("continuar vazio: erros só da etapa atual, ancorados nos campos, foco no primeiro; nada enviado", async () => {
     montar();
     await aguardarEmpresa();
@@ -615,28 +452,38 @@ describe("Nova admissão — página própria", () => {
     await waitFor(() => expect(nome()).toHaveFocus());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
     expect(nome()).toHaveAttribute("aria-invalid", "true");
-    expect(nome()).toHaveAccessibleDescription(/Nome é obrigatório/);
-    expect(dataNascimento()).toHaveAccessibleDescription(
-      /Informe a data de nascimento/,
+    expect(nome()).toHaveAccessibleDescription(
+      "Informe o nome completo (pelo menos 3 letras).",
     );
+    // T209 — CPF obrigatório; a data de nascimento passou a opcional.
+    expect(cpf()).toHaveAccessibleDescription("Informe o CPF.");
+    expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
     // T195 — a etapa 2 ainda não foi validada: nada acusa lá.
     for (const campo of [tipo, data, departamentoSel, cargoSel]) {
       expect(campo()).not.toHaveAttribute("aria-invalid");
     }
 
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(salvar());
-    await waitFor(() => expect(tipo()).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
-    expect(tipo()).toHaveAccessibleDescription(/Selecione o tipo de vínculo/);
-    expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
-    expect(departamentoSel()).toHaveAccessibleDescription(
-      /Selecione o departamento/,
+    // T209 — o primeiro da etapa 2 é o cargo, onde fica o aviso de que falta
+    // ao menos uma referência da lotação.
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
+    expect(cargoSel()).toHaveAccessibleDescription(
+      "Informe ao menos o cargo, o departamento, a unidade ou o centro de custo.",
     );
-    expect(cargoSel()).toHaveAccessibleDescription(/Selecione o cargo/);
-    // T179 — os opcionais vazios não acusam erro.
+    expect(tipo()).toHaveAccessibleDescription(
+      /Selecione o tipo de contratação/,
+    );
+    expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
+    expect(salarioBruto()).toHaveAccessibleDescription(
+      /Informe o salário bruto\./,
+    );
+    // T179 — os opcionais vazios não acusam erro. T209 — Departamento
+    // deixou de ser obrigatório.
     for (const campo of [
+      departamentoSel,
       matricula,
       unidadeSel,
       emailPessoal,
@@ -645,21 +492,6 @@ describe("Nova admissão — página própria", () => {
     ]) {
       expect(campo()).not.toHaveAttribute("aria-invalid");
     }
-    expect(dialogoConfirmacao()).toBeNull();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("data de nascimento é obrigatória: sem ela, nada é enviado", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(dataNascimento(), { target: { value: "" } });
-    fireEvent.click(salvar());
-    await waitFor(() => expect(dataNascimento()).toHaveFocus());
-    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
-    expect(dataNascimento()).toHaveAccessibleDescription(
-      /Informe a data de nascimento/,
-    );
     expect(dialogoConfirmacao()).toBeNull();
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
@@ -669,134 +501,30 @@ describe("Nova admissão — página própria", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.click(salvar());
-    // T179 — o e-mail pessoal, ao lado do nome, é opcional: o primeiro
-    // obrigatório vazio depois do nome é a data de nascimento.
-    await waitFor(() => expect(dataNascimento()).toHaveFocus());
-    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    // T209 — depois do nome, o primeiro obrigatório é o CPF.
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(salvar());
-    // Contatos e matrícula são opcionais: depois vem o tipo de vínculo.
+    // T209 — na etapa 2, primeiro o cargo (ao menos uma referência da
+    // lotação), depois o tipo de contratação, a data e o salário bruto.
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
+    fireEvent.click(salvar());
     await waitFor(() => expect(tipo()).toHaveFocus());
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.click(salvar());
     await waitFor(() => expect(data()).toHaveFocus());
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.click(salvar());
-    // T179 — e, por fim, os dois seletores obrigatórios da lotação.
-    await waitFor(() => expect(departamentoSel()).toHaveFocus());
-    await escolher(departamentoSel(), departamento);
+    await waitFor(() => expect(salarioBruto()).toHaveFocus());
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
     fireEvent.click(salvar());
-    await waitFor(() => expect(cargoSel()).toHaveFocus());
-    await escolher(cargoSel(), cargo);
-    fireEvent.click(salvar());
-    // Sem Unidade, o formulário está completo: abre a confirmação.
+    // Sem Departamento nem Unidade, o formulário está completo: abre a
+    // confirmação.
     await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
     });
     expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("T178/T179 — os campos aparecem na disposição pedida, linha a linha", async () => {
-    montar();
-    await aguardarEmpresa();
-
-    /**
-     * Rótulos de cada linha da grade de um grupo, sem o "(opcional)". T195 —
-     * os grupos são h3 dentro das etapas (montadas, ocultas fora da atual);
-     * o Endereço é a própria etapa 3.
-     */
-    function linhasDo(grupo: string): string[][] {
-      const secao =
-        grupo === "Endereço"
-          ? document.getElementById("nova-admissao-etapa-3-titulo")!
-              .parentElement!
-          : screen
-              .getByRole("heading", { level: 3, name: grupo, hidden: true })
-              .closest("section")!;
-      return [...secao.querySelectorAll(".nova-admissao__linha")].map((linha) =>
-        [...linha.querySelectorAll("label")].map((l) =>
-          (l.textContent ?? "")
-            .replace(" (opcional)", "")
-            .replace("*", "")
-            .replace(" (obrigatório)", "")
-            .trim(),
-        ),
-      );
-    }
-
-    expect(linhasDo("Dados pessoais")).toEqual([
-      ["Nome completo", "E-mail pessoal"],
-      ["Data de nascimento", "Sexo", "Saudação"],
-      ["Estado civil", "Nacionalidade", "Naturalidade"],
-      ["Escolaridade", "Curso"],
-      ["Nome do pai", "Nome da mãe"],
-    ]);
-    expect(linhasDo("Endereço")).toEqual([
-      ["País", "CEP"],
-      ["Logradouro", "Número"],
-      ["Complemento", "Bairro"],
-      ["Cidade", "Estado"],
-    ]);
-    expect(linhasDo("Contatos")).toEqual([["Celular", "Telefone"]]);
-    expect(linhasDo("Vínculo")).toEqual([
-      ["Matrícula", "Tipo de vínculo", "Data de admissão"],
-    ]);
-    // T196 — duas colunas, para o campo de busca caber ao lado dos botões:
-    // os obrigatórios primeiro, a Área logo abaixo do Departamento que a
-    // filtra, os demais opcionais depois.
-    expect(linhasDo("Lotação inicial")).toEqual([
-      ["Departamento", "Cargo"],
-      ["Área", "Unidade"],
-      ["Equipe", "Centro de custo"],
-    ]);
-
-    // Classes de coluna: 2, 3 e a linha larga/estreita do logradouro.
-    const endereco = document.getElementById(
-      "nova-admissao-etapa-3-titulo",
-    )!.parentElement!;
-    expect(
-      screen.getByLabelText(/^Logradouro/).closest(".nova-admissao__linha"),
-    ).toHaveClass("nova-admissao__linha--larga-estreita");
-    expect(endereco.querySelectorAll(".nova-admissao__linha--2")).toHaveLength(
-      3,
-    );
-    expect(
-      screen.getByLabelText(/^Matrícula/).closest(".nova-admissao__linha"),
-    ).toHaveClass("nova-admissao__linha--3");
-    expect(departamentoSel().closest(".nova-admissao__linha")).toHaveClass(
-      "nova-admissao__linha--2",
-    );
-  });
-
-  it("T178 — o e-mail pessoal está em Dados pessoais e continua indo em `contatos.emailPessoal`", async () => {
-    montar();
-    await aguardarEmpresa();
-
-    const dadosPessoais = screen
-      .getByRole("heading", { level: 3, name: "Dados pessoais" })
-      .closest("section")!;
-    const contatosSecao = screen
-      .getByRole("heading", { level: 3, name: "Contatos" })
-      .closest("section")!;
-    expect(dadosPessoais).toContainElement(emailPessoal());
-    expect(contatosSecao).not.toContainElement(emailPessoal());
-    // Os ids não mudaram: só a posição.
-    expect(emailPessoal()).toHaveAttribute("id", "nova-admissao-email-pessoal");
-    expect(
-      within(contatosSecao).getByText(
-        /O e-mail pessoal fica em Dados pessoais/,
-      ),
-    ).toBeInTheDocument();
-
-    await preencherValido();
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos).toEqual({
-      emailPessoal: "pessoa.nova@exemplo.test",
-      celular: "+5531999990000",
-      telefone: "+553133330000",
-    });
-    expect(dto.perfilPessoal).not.toHaveProperty("emailPessoal");
   });
 
   it("T179 — contatos opcionais: vazios não acusam erro nem dizem 'obrigatório'", async () => {
@@ -816,9 +544,15 @@ describe("Nova admissão — página própria", () => {
     [/Data de nascimento/, "1899-12-31", /anterior a 01\/01\/1900/],
     // T179 — com país Brasil, o CEP precisa dos 8 dígitos.
     [/^CEP/, "3014", /Informe os 8 dígitos do CEP, no formato 00000-000/],
-    [/^Saudação/, "x".repeat(41), /no máximo 40 caracteres/],
-    [/^Celular/, "11 9876-5", /precisa do DDD e do número/],
-    [/^Telefone/, "(11) 1000-0000", /não é um número brasileiro válido/],
+    [/^Telefone pessoal/, "11 9876-5", /precisa do DDD e do número/],
+    // T209 — o telefone do contato de emergência.
+    [
+      /^Telefone do contato/,
+      "(11) 1000-0000",
+      /Informe o telefone com DDD, no formato \(00\) 00000-0000/,
+    ],
+    // T209 — CPF com dígito verificador errado.
+    [/^CPF$/, "529.982.247-26", /Informe um CPF válido/],
     // T179 — opcionais, mas o formato ainda vale quando preenchidos.
     [/^Matrícula/, "M", /Use apenas letras maiúsculas/],
     [/^Matrícula/, "MAT 01", /Use apenas letras maiúsculas/],
@@ -839,25 +573,6 @@ describe("Nova admissão — página própria", () => {
     },
   );
 
-  it("com outro país, o CEP é texto livre e segue a forma de antes", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    const cep = screen.getByLabelText(/^CEP/);
-    fireEvent.change(cep, { target: { value: "30140/071" } });
-    expect(cep).toHaveValue("30140/071");
-    fireEvent.click(salvar());
-    await waitFor(() => expect(cep).toHaveFocus());
-    expect(cep).toHaveAccessibleDescription(/letras, números, espaço e hífen/);
-    fireEvent.change(cep, { target: { value: "1000-001" } });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].endereco,
-    ).toMatchObject({ pais: "Portugal", cep: "1000-001" });
-  });
-
   it("corrigir um campo limpa só o erro dele", async () => {
     montar();
     await aguardarEmpresa();
@@ -865,7 +580,7 @@ describe("Nova admissão — página própria", () => {
     await waitFor(() => expect(nome()).toHaveFocus());
     fireEvent.change(nome(), { target: { value: "Pessoa" } });
     expect(nome()).not.toHaveAttribute("aria-invalid");
-    expect(dataNascimento()).toHaveAttribute("aria-invalid", "true");
+    expect(cpf()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("envia exatamente o contrato: empresa da sessão, matrícula normalizada, Departamento, Cargo e Unidade, e a chave do envio", async () => {
@@ -896,6 +611,13 @@ describe("Nova admissão — página própria", () => {
           curso: null,
           nomePai: null,
           nomeMae: null,
+          // T209 — etapa 1: CPF só com dígitos; o segundo telefone da
+          // etapa é o do contato de emergência.
+          cpf: "52998224725",
+          rg: null,
+          genero: null,
+          contatoEmergenciaNome: null,
+          contatoEmergenciaTelefone: "+553133330000",
         },
         endereco: {
           pais: "Brasil",
@@ -910,22 +632,30 @@ describe("Nova admissão — página própria", () => {
         contatos: {
           emailPessoal: "pessoa.nova@exemplo.test",
           celular: "+5531999990000",
-          telefone: "+553133330000",
         },
+        // T209 — o salário bruto, obrigatório, vai no bloco do contrato.
+        contrato: { salarioBruto: "5000.00" },
       },
       { chaveIdempotencia: expect.stringMatching(/^[0-9a-f-]{36}$/) },
     );
+    // T209 — o cargo digitado foi conferido no cadastro pelo nome.
+    expect(listarCargos).toHaveBeenCalledWith(
+      expect.objectContaining({ busca: cargo.nome, status: "ativo" }),
+    );
+    expect(criarCargo).not.toHaveBeenCalled();
   });
 
-  it("T179 — só os obrigatórios: sem matrícula, unidade, contatos nem e-mail, o corpo os omite", async () => {
+  it("T179 — só os obrigatórios: sem matrícula, departamento, unidade, contatos nem e-mail, o corpo os omite", async () => {
     montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: " Pessoa Mínima " } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
     fireEvent.change(tipo(), { target: { value: "estagio" } });
     fireEvent.change(data(), { target: { value: "2026-11-04" } });
-    await escolher(departamentoSel(), departamento);
-    await escolher(cargoSel(), cargo);
+    // T209 — da lotação, só o cargo (digitado); e o salário bruto.
+    fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const [dto, opcoes] = vi.mocked(admitirColaborador).mock.calls[0]!;
@@ -935,8 +665,8 @@ describe("Nova admissão — página própria", () => {
       tipo: "estagio",
       dataAdmissao: "2026-11-04",
       motivoCodigo: "admissao_inicial",
-      departamentoId: departamento.id,
       cargoId: cargo.id,
+      contrato: { salarioBruto: "5000.00" },
       perfilPessoal: {
         dataNascimento: "1991-02-03",
         sexo: null,
@@ -948,6 +678,11 @@ describe("Nova admissão — página própria", () => {
         curso: null,
         nomePai: null,
         nomeMae: null,
+        cpf: "52998224725",
+        rg: null,
+        genero: null,
+        contatoEmergenciaNome: null,
+        contatoEmergenciaTelefone: null,
       },
       endereco: {
         pais: "Brasil",
@@ -963,6 +698,7 @@ describe("Nova admissão — página própria", () => {
     // Ausentes de verdade — nem `undefined`, nem string vazia.
     for (const chave of [
       "matricula",
+      "departamentoId",
       "unidadeOrganizacionalId",
       "areaId",
       "equipeId",
@@ -987,94 +723,6 @@ describe("Nova admissão — página própria", () => {
     expect(vi.mocked(admitirColaborador).mock.calls[0]![0].contatos).toEqual({
       celular: "+5531999990000",
     });
-  });
-
-  it.each([
-    ["feminino", "Feminino"],
-    ["masculino", "Masculino"],
-    ["intersexo", "Intersexo"],
-    ["nao_informar", "Não informar"],
-  ])("T179 — sexo %s (%s) vai como código no corpo", async (codigo, rotulo) => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: codigo } });
-    expect(sexo).toHaveDisplayValue(rotulo);
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
-    ).toBe(codigo);
-  });
-
-  it("T179 — sexo sem seleção vai null, e voltar a 'Selecione…' desfaz a escolha", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: "masculino" } });
-    fireEvent.change(sexo, { target: { value: "" } });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal.sexo,
-    ).toBeNull();
-  });
-
-  it("T179 — valor de sexo fora da lista não é aceito pelo seletor", async () => {
-    montar();
-    await aguardarEmpresa();
-    const sexo = screen.getByLabelText("Sexo (opcional)");
-    fireEvent.change(sexo, { target: { value: "Feminino" } });
-    // Sem opção com esse valor, o seletor fica sem seleção — nunca texto livre.
-    expect(sexo).toHaveValue("");
-  });
-
-  it("envia os dados pessoais e o endereço normalizados, vazio como null", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    fireEvent.change(screen.getByLabelText(/Data de nascimento/), {
-      target: { value: "1990-05-20" },
-    });
-    // T179 — sexo de lista fechada: vai o código.
-    fireEvent.change(screen.getByLabelText(/^Sexo/), {
-      target: { value: "feminino" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Naturalidade/), {
-      target: { value: "Belo   Horizonte" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Nome da mãe/), {
-      target: { value: "Mãe Sintética" },
-    });
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
-      target: { value: "30140-071" },
-    });
-    fireEvent.change(screen.getByLabelText(/^Estado \(opcional\)$/), {
-      target: { value: "MG" },
-    });
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(admitirColaborador).toHaveBeenCalledWith(
-      expect.objectContaining({
-        perfilPessoal: expect.objectContaining({
-          dataNascimento: "1990-05-20",
-          sexo: "feminino",
-          naturalidade: "Belo Horizonte",
-          nomeMae: "Mãe Sintética",
-          curso: null,
-        }),
-        // T179 — CEP brasileiro vai só com os 8 dígitos.
-        endereco: expect.objectContaining({
-          pais: "Brasil",
-          cep: "30140071",
-          estado: "MG",
-          bairro: null,
-        }),
-      }),
-      expect.anything(),
-    );
   });
 
   it("T179 — a área é opcional, filtrada pelo departamento, e vai junto com ele", async () => {
@@ -1149,98 +797,16 @@ describe("Nova admissão — página própria", () => {
     expect(areaSel()).toHaveValue("");
   });
 
-  it("T179 — equipe e centro de custo são opcionais e vão quando escolhidos", async () => {
-    vi.mocked(listarEquipes).mockResolvedValue(
-      paginado([
-        {
-          id: "99999999-9999-4999-8999-999999999999",
-          codigo: "EQP1",
-          nome: "Equipe Sintética (teste)",
-          status: "ativo",
-        } as never,
-      ]),
-    );
-    vi.mocked(listarCentrosCusto).mockResolvedValue(
-      paginado([
-        {
-          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          codigo: "CC1",
-          nome: "Centro Sintético (teste)",
-          status: "ativo",
-        } as never,
-      ]),
-    );
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    abrirLotacao();
-    expect(
-      within(equipeSel()).getByRole("option", {
-        name: "EQP1 — Equipe Sintética (teste)",
-      }),
-    ).toBeInTheDocument();
-    fireEvent.change(equipeSel(), {
-      target: { value: "99999999-9999-4999-8999-999999999999" },
-    });
-    await escolher(centroSel(), { codigo: "CC1" });
-    await salvarEConfirmar();
-    await waitFor(() =>
-      expect(admitirColaborador).toHaveBeenCalledWith(
-        expect.objectContaining({
-          equipeId: "99999999-9999-4999-8999-999999999999",
-          centroCustoId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        }),
-        expect.anything(),
-      ),
-    );
-    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).not.toHaveProperty(
-      "areaId",
-    );
-  });
-
-  it("T179 — só ativos viram opção, no formato CÓDIGO — Nome", async () => {
-    vi.mocked(listarCargos).mockResolvedValue(
-      paginado([
-        cargo,
-        { ...cargo, id: "inativo", codigo: "CARX", status: "inativo" },
-      ]),
-    );
-    montar();
-    await aguardarEmpresa();
-    abrirLotacao();
-    // T196 — a busca pede só ativos ao servidor, 20 por página.
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    await within(listaDe(cargoSel())).findByRole("option", {
-      name: /^CAR1 — /,
-    });
-    expect(listarCargos).toHaveBeenLastCalledWith({
-      status: "ativo",
-      tamanhoPagina: 20,
-      pagina: 1,
-    });
-    // Defesa do cliente: o inativo devolvido indevidamente não vira opção.
-    expect(
-      within(listaDe(cargoSel()))
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["CAR1 — Cargo Sintético (teste)"]);
-  });
-
-  // T196 — a defesa vale para as quatro referências da busca: a consulta
-  // comum pede só ativos ao servidor e ainda descarta inativo devolvido
-  // indevidamente, descontando-o da contagem exibida.
+  // T196 — a defesa vale para as referências da busca: a consulta comum pede
+  // só ativos ao servidor, 20 por página, mostra CÓDIGO — Nome e ainda
+  // descarta inativo devolvido indevidamente, descontando-o da contagem
+  // exibida. T209 — o cargo virou texto; ficam as três pesquisáveis.
   it.each([
     {
       rotulo: "Departamento",
       campo: () => departamentoSel(),
       listar: listarDepartamentos,
       ativo: departamento,
-    },
-    {
-      rotulo: "Cargo",
-      campo: () => cargoSel(),
-      listar: listarCargos,
-      ativo: cargo,
     },
     {
       rotulo: "Unidade",
@@ -1298,15 +864,16 @@ describe("Nova admissão — página própria", () => {
 
   // T196 — a paginação segue o total e a página do servidor; a defesa do
   // cliente só tira opções e desconta, da contagem exibida, os descartados de
-  // todas as páginas carregadas. Servidor dublê de 20 em 20.
-  const cargoAtivo = (n: number) => ({
-    ...cargo,
-    id: `cargo-${n}`,
-    codigo: `CA${String(n).padStart(2, "0")}`,
-    nome: `Cargo ${n} (teste)`,
+  // todas as páginas carregadas. Servidor dublê de 20 em 20. T209 — o cargo
+  // virou texto: a paginação é conferida na Unidade.
+  const unidadeAtiva = (n: number): UnidadeOrganizacionalApi => ({
+    ...unidade,
+    id: `unidade-${n}`,
+    codigo: `UN${String(n).padStart(2, "0")}`,
+    nome: `Unidade ${n} (teste)`,
   });
-  const cargoInativo = (n: number) => ({
-    ...cargo,
+  const unidadeInativa = (n: number): UnidadeOrganizacionalApi => ({
+    ...unidade,
     id: `inativo-${n}`,
     codigo: `IN${String(n).padStart(2, "0")}`,
     nome: `Inativo ${n} (teste)`,
@@ -1316,7 +883,7 @@ describe("Nova admissão — página própria", () => {
     Array.from({ length: ate - de + 1 }, (_, k) => f(de + k));
 
   /**
-   * Abre o Cargo e clica "Mostrar mais" até o fim. `contagens` é o anúncio
+   * Abre a Unidade e clica "Mostrar mais" até o fim. `contagens` é o anúncio
    * EXATO de cada página (comparação por igualdade: um trecho não basta) e
    * diz quantas páginas devem ser pedidas. `total` é o total que o servidor
    * informa (padrão: o tamanho real da lista).
@@ -1326,11 +893,11 @@ describe("Nova admissão — página própria", () => {
     contagens,
     total = lista.length,
   }: {
-    lista: readonly ReturnType<typeof cargoAtivo>[];
+    lista: readonly UnidadeOrganizacionalApi[];
     contagens: readonly string[];
     total?: number;
   }) {
-    vi.mocked(listarCargos).mockImplementation(async (q = {}) => {
+    vi.mocked(listarUnidades).mockImplementation(async (q = {}) => {
       const pagina = q.pagina ?? 1;
       const tamanho = q.tamanhoPagina ?? 20;
       return {
@@ -1343,17 +910,17 @@ describe("Nova admissão — página própria", () => {
     montar();
     await aguardarEmpresa();
     abrirLotacao();
-    const raiz = cargoSel().closest(".seletor-referencia") as HTMLElement;
+    const raiz = unidadeSel().closest(".seletor-referencia") as HTMLElement;
     const status = () => raiz.querySelector('[role="status"]')?.textContent;
     const buscas = () =>
       vi
-        .mocked(listarCargos)
+        .mocked(listarUnidades)
         .mock.calls.filter(([q]) => q?.tamanhoPagina === 20);
     const ativosDaLista = lista
       .filter((c) => c.status === "ativo")
       .map((c) => `${c.codigo} — ${c.nome}`);
 
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
     await waitFor(() => expect(status()).toBe(contagens[0]));
     for (let pagina = 2; pagina <= contagens.length; pagina += 1) {
       const mais = within(raiz).getByRole("button", { name: "Mostrar mais" });
@@ -1372,7 +939,7 @@ describe("Nova admissão — página própria", () => {
     );
     // Só ativos viraram opção, e todos eles.
     expect(
-      within(listaDe(cargoSel()))
+      within(listaDe(unidadeSel()))
         .queryAllByRole("option")
         .map((o) => o.textContent),
     ).toEqual(ativosDaLista);
@@ -1380,14 +947,14 @@ describe("Nova admissão — página própria", () => {
     expect(
       within(raiz).queryByRole("button", { name: /Mostrar mais|Carregando/ }),
     ).toBeNull();
-    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    await waitFor(() => expect(unidadeSel()).toHaveFocus());
     expect(buscas()).toHaveLength(contagens.length);
   }
 
   it.each([
     {
       caso: "um inativo na primeira página",
-      lista: [cargoInativo(1), ...faixa(1, 40, cargoAtivo)],
+      lista: [unidadeInativa(1), ...faixa(1, 40, unidadeAtiva)],
       contagens: [
         "40 resultados; 19 exibidos.",
         "40 resultados; 39 exibidos.",
@@ -1397,9 +964,9 @@ describe("Nova admissão — página própria", () => {
     {
       caso: "um inativo numa página intermediária",
       lista: [
-        ...faixa(1, 20, cargoAtivo),
-        cargoInativo(1),
-        ...faixa(21, 40, cargoAtivo),
+        ...faixa(1, 20, unidadeAtiva),
+        unidadeInativa(1),
+        ...faixa(21, 40, unidadeAtiva),
       ],
       contagens: [
         "41 resultados; 20 exibidos.",
@@ -1411,12 +978,12 @@ describe("Nova admissão — página própria", () => {
       // A página filtrada a zero opções pela defesa NÃO encerra: a seguinte,
       // com os ativos, ainda é pedida.
       caso: "uma página inteira de inativos seguida de ativos",
-      lista: [...faixa(1, 20, cargoInativo), ...faixa(1, 5, cargoAtivo)],
+      lista: [...faixa(1, 20, unidadeInativa), ...faixa(1, 5, unidadeAtiva)],
       contagens: ["5 resultados; 0 exibidos.", "5 resultados; 5 exibidos."],
     },
     {
       caso: "sem inativos",
-      lista: faixa(1, 45, cargoAtivo),
+      lista: faixa(1, 45, unidadeAtiva),
       contagens: [
         "45 resultados; 20 exibidos.",
         "45 resultados; 40 exibidos.",
@@ -1436,7 +1003,7 @@ describe("Nova admissão — página própria", () => {
   // contagem final é o que foi carregado, não o total informado.
   it("paginação: ao terminar, a contagem é o que foi carregado, mesmo com total informado maior", async () => {
     await paginarAteOFim({
-      lista: faixa(1, 25, cargoAtivo),
+      lista: faixa(1, 25, unidadeAtiva),
       total: 30,
       contagens: ["30 resultados; 20 exibidos.", "25 resultados; 25 exibidos."],
     });
@@ -1444,7 +1011,7 @@ describe("Nova admissão — página própria", () => {
 
   it("paginação: página vazia do servidor encerra, mesmo com total informado maior", async () => {
     await paginarAteOFim({
-      lista: faixa(1, 25, cargoAtivo),
+      lista: faixa(1, 25, unidadeAtiva),
       total: 100,
       contagens: [
         "100 resultados; 20 exibidos.",
@@ -1484,10 +1051,10 @@ describe("T179 — confirmação antes de gravar", () => {
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.change(screen.getByLabelText(/^Cidade/), {
+    fireEvent.change(screen.getByLabelText(/^Cidade$/), {
       target: { value: "Cidade Resumo Sintética" },
     });
-    fireEvent.change(screen.getByLabelText(/^Logradouro/), {
+    fireEvent.change(screen.getByLabelText(/^Logradouro$/), {
       target: { value: "Rua Resumo Sintética" },
     });
     fireEvent.click(salvar());
@@ -1502,7 +1069,8 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(dialogo).toHaveTextContent(
       "Departamento: DEP1 — Departamento Sintético (teste)",
     );
-    expect(dialogo).toHaveTextContent("Cargo: CAR1 — Cargo Sintético (teste)");
+    // T209 — o cargo é digitado e só vira referência ao confirmar: a linha
+    // dele no resumo não é conferida aqui.
     expect(dialogo).toHaveTextContent(
       "Unidade: UNI1 — Unidade Sintética (teste)",
     );
@@ -1564,9 +1132,9 @@ describe("T179 — confirmação antes de gravar", () => {
     fireEvent.change(screen.getByLabelText(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar CEP" }));
+    // T209 — completar o CEP consulta sozinho.
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Logradouro/)).toHaveValue(
+      expect(screen.getByLabelText(/^Logradouro$/)).toHaveValue(
         "Avenida Sintética",
       ),
     );
@@ -1586,9 +1154,7 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
       `${departamento.codigo} — ${departamento.nome}`,
     );
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      `${cargo.codigo} — ${cargo.nome}`,
-    );
+    expect(cargoSel()).toHaveValue(cargo.nome);
     expect(escolhaDe(unidadeSel())).toHaveTextContent(
       `${unidade.codigo} — ${unidade.nome}`,
     );
@@ -1596,7 +1162,7 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
-    ).toHaveTextContent(/Endereço sugerido pelo CEP/);
+    ).toHaveTextContent(/^Endereço localizado pelo CEP$/);
   });
 
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
@@ -1631,7 +1197,12 @@ describe("T179 — confirmação antes de gravar", () => {
     const botao = botaoConfirmar();
     fireEvent.click(botao);
     fireEvent.click(botao);
-    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+    // T209 — antes de admitir, o cargo digitado é conferido no cadastro (uma
+    // vez só): o envio sai logo depois.
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(listarCargos).mock.calls.filter(([q]) => q?.busca),
+    ).toHaveLength(1);
     await waitFor(() => expect(botao).toHaveTextContent("Cadastrando…"));
     expect(botao).toHaveAttribute("aria-disabled", "true");
     const dialogo = dialogoConfirmacao()!;
@@ -1678,7 +1249,8 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     await waitFor(() => expect(matricula()).toHaveFocus());
     expect(dialogoConfirmacao()).toBeNull();
     expect(matricula()).toHaveAccessibleDescription(
-      "Letras maiúsculas, números, - e _ (2 a 32 caracteres). Pode ficar em branco. Esta matrícula já está em uso nesta empresa.",
+      // T209 — a ajuda da matrícula virou a dica "?"; fica só o erro.
+      "Esta matrícula já está em uso nesta empresa.",
     );
     expect(emailPessoal()).not.toHaveAttribute("aria-invalid");
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
@@ -1688,25 +1260,17 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
       `${departamento.codigo} — ${departamento.nome}`,
     );
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      `${cargo.codigo} — ${cargo.nome}`,
-    );
+    expect(cargoSel()).toHaveValue(cargo.nome);
     expect(escolhaDe(unidadeSel())).toHaveTextContent(
       `${unidade.codigo} — ${unidade.nome}`,
     );
     // `type="email"` apara as pontas no próprio campo; o resto fica como digitado.
     expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
     expect(celular()).toHaveValue("(31) 99999-0000");
-    expect(pais()).toHaveValue("Brasil");
     expect(salvar()).toBeEnabled();
-    // Resumo seguro no topo: o NOME do campo, nunca o valor.
-    const resumo = screen.getByRole("group", {
-      name: "Revise 1 campo antes de confirmar",
-    });
-    expect(
-      within(resumo).getByRole("button", { name: "Matrícula" }),
-    ).toBeInTheDocument();
-    expect(resumo).not.toHaveTextContent("MAT-0900");
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    expect(matricula()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("409 com o e-mail pessoal em uso: mensagem e foco no e-mail", async () => {
@@ -1727,7 +1291,7 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     expect(emailPessoal()).toHaveValue("Pessoa.Nova@Exemplo.TEST");
   });
 
-  it("409 com os dois: os dois campos marcados, resumo com os dois nomes e foco no primeiro da tela", async () => {
+  it("409 com os dois: os dois campos marcados, cada um com a sua mensagem, e foco no primeiro da tela", async () => {
     vi.mocked(admitirColaborador).mockRejectedValue(
       recusa(409, {
         erros: [
@@ -1743,23 +1307,15 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     // O e-mail vem antes da matrícula na tela.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     expect(matricula()).toHaveAttribute("aria-invalid", "true");
-    const resumo = screen.getByRole("group", {
-      name: "Revise 2 campos antes de confirmar",
-    });
-    expect(
-      within(resumo)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["E-mail pessoal", "Matrícula"]);
-    expect(resumo).not.toHaveTextContent(/exemplo\.test|MAT-0900/i);
-    // O nome no resumo leva ao campo.
-    fireEvent.click(within(resumo).getByRole("button", { name: "Matrícula" }));
-    expect(matricula()).toHaveFocus();
-    // Corrigir um tira só ele do resumo.
+    expect(matricula()).toHaveAccessibleDescription(
+      /Esta matrícula já está em uso nesta empresa/,
+    );
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    // Corrigir um tira só a mensagem dele.
     fireEvent.change(matricula(), { target: { value: "MAT-0901" } });
-    expect(
-      screen.getByRole("group", { name: "Revise 1 campo antes de confirmar" }),
-    ).toBeInTheDocument();
+    expect(matricula()).not.toHaveAttribute("aria-invalid");
+    expect(emailPessoal()).toHaveAttribute("aria-invalid", "true");
   });
 
   it("409 sem a lista de campos: mensagem geral, sem presumir que é a matrícula", async () => {
@@ -1781,9 +1337,8 @@ describe("Nova admissão — recusa do servidor preserva os dados", () => {
     await salvarEConfirmar();
     const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
     await waitFor(() => expect(aviso).toHaveFocus());
-    expect(
-      screen.getByRole("group", { name: "Revise 1 campo antes de confirmar" }),
-    ).toHaveTextContent("Lotação inicial");
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
       `${departamento.codigo} — ${departamento.nome}`,
     );
@@ -1954,117 +1509,13 @@ describe("Nova admissão — empresa indefinida não envia", () => {
   );
 });
 
-describe("T179 — empresa sem Departamento ou Cargo ativos", () => {
-  beforeEach(() => {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
-    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
-  });
-
-  it('RH: diz o que falta e orienta o "+" desta página; nada é enviado', async () => {
-    montar("rh");
-    await aguardarEmpresa();
-    const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
-    // T179 — a Unidade é opcional: faltar unidade não entra no aviso.
-    expect(aviso).toHaveTextContent(
-      "Esta empresa ainda não tem cadastro ativo de Cargo, e a admissão exige Departamento e Cargo.",
-    );
-    // T180 — o RH cadastra aqui mesmo, sem ir a Estrutura.
-    expect(aviso).toHaveTextContent(
-      'Use o botão "+" ao lado de Cargo, em Lotação inicial, para cadastrar sem sair desta página.',
-    );
-    expect(aviso).not.toHaveTextContent(/Estrutura/);
-    expect(aviso).not.toHaveTextContent(/abra esta página de novo/);
-    expect(aviso).not.toHaveTextContent(/Unidade/);
-    expect(aviso).not.toHaveTextContent(/O RH precisa/);
-
-    preencherContatos();
-    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    abrirLotacao();
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    expect(
-      await screen.findByText("Nenhum cargo ativo nesta empresa."),
-    ).toBeInTheDocument();
-    fireEvent.keyDown(cargoSel(), { key: "Escape" });
-    // T195 — o aviso fica no bloco da empresa, visível em toda etapa, e
-    // impede sair da etapa da lotação.
-    fireEvent.click(salvar());
-    await waitFor(() => expect(aviso).toHaveFocus());
-    expect(cargoSel()).toHaveAccessibleDescription(
-      /Não há cargo ativo nesta empresa/,
-    );
-    expect(dialogoConfirmacao()).toBeNull();
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it('RH: sem departamento e sem cargo, aponta o "+" de cada um', async () => {
-    vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));
-    montar("rh");
-    await aguardarEmpresa();
-    const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
-    expect(aviso).toHaveTextContent(
-      "Esta empresa ainda não tem cadastro ativo de Departamento e Cargo",
-    );
-    // T180 — sem sair da página.
-    expect(aviso).toHaveTextContent(
-      'Use o botão "+" ao lado de Departamento e Cargo, em Lotação inicial, para cadastrar sem sair desta página.',
-    );
-  });
-
-  it("DP: diz que o RH precisa cadastrar o que falta", async () => {
-    montar("dp");
-    await aguardarEmpresa();
-    const aviso = screen.getByText(/ainda não tem cadastro ativo de/);
-    expect(aviso).toHaveTextContent(
-      /O RH precisa cadastrar Cargo nesta empresa/,
-    );
-    expect(aviso).not.toHaveTextContent(/Unidade/);
-    expect(aviso).not.toHaveTextContent(/Use o botão/);
-    abrirLotacao();
-    fireEvent.click(salvar());
-    await waitFor(() => expect(aviso).toHaveFocus());
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("com as três referências ativas, não há aviso", async () => {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
-    vi.mocked(listarUnidades).mockResolvedValue(paginado([unidade]));
-    montar("dp");
-    await aguardarEmpresa();
-    expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
-  });
-
-  it("T179 — sem unidade ativa: não há aviso, o seletor diz isso e a admissão segue sem unidade", async () => {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
-    montar("rh");
-    await aguardarEmpresa();
-    expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
-    abrirLotacao();
-    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
-    expect(
-      await screen.findByText("Nenhuma unidade ativa nesta empresa."),
-    ).toBeInTheDocument();
-    fireEvent.keyDown(unidadeSel(), { key: "Escape" });
-    preencherContatos();
-    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
-    fireEvent.change(tipo(), { target: { value: "clt" } });
-    fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    await escolher(departamentoSel(), departamento);
-    await escolher(cargoSel(), cargo);
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(
-      Object.keys(vi.mocked(admitirColaborador).mock.calls[0]![0]),
-    ).not.toContain("unidadeOrganizacionalId");
-  });
-});
-
 describe("T179 — máscaras na Nova admissão", () => {
   it("celular e telefone: máscara brasileira progressiva, dica de formato e colagem com +55", async () => {
     montar();
     await aguardarEmpresa();
     expect(celular()).toHaveAttribute("inputmode", "tel");
-    expect(celular()).toHaveAccessibleDescription(/\(00\) 00000-0000/);
+    // T209 — a dica agora é "Com DDD."; o formato fica no placeholder.
+    expect(celular()).toHaveAccessibleName("Telefone pessoal");
     fireEvent.change(celular(), { target: { value: "31999" } });
     expect(celular()).toHaveValue("(31) 999");
     fireEvent.change(celular(), { target: { value: "" } });
@@ -2095,7 +1546,7 @@ describe("T179 — máscaras na Nova admissão", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
     expect(dto.contatos?.celular).toBe("+5591987654321");
-    expect(dto.contatos?.telefone).toBe("+551133330000");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+551133330000");
   });
 
   it("T179 (B2): +55 digitado e o resto colado, e DDD 55 completo com dígitos a mais, chegam certos ao servidor", async () => {
@@ -2133,21 +1584,17 @@ describe("T179 — máscaras na Nova admissão", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
     expect(dto.contatos?.celular).toBe("+5591987654321");
-    expect(dto.contatos?.telefone).toBe("+5555999998888");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+5555999998888");
   });
 
-  it("CEP: máscara 00000-000 só com país Brasil", async () => {
+  it("CEP: máscara 00000-000 (T209: o endereço é sempre do Brasil)", async () => {
     montar();
     await aguardarEmpresa();
     const cep = () => screen.getByLabelText(/^CEP/);
     expect(cep()).toHaveAttribute("inputmode", "numeric");
-    expect(cep()).toHaveAccessibleDescription(/Formato 00000-000/);
+    expect(cep()).toHaveAttribute("placeholder", "00000-000");
     fireEvent.change(cep(), { target: { value: "301400" } });
     expect(cep()).toHaveValue("30140-0");
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(cep()).not.toHaveAttribute("inputmode");
-    fireEvent.change(cep(), { target: { value: "1000-001 A" } });
-    expect(cep()).toHaveValue("1000-001 A");
   });
 });
 
@@ -2155,27 +1602,15 @@ describe("Nova admissão — cancelar", () => {
   it("o país sugerido, sozinho, não conta como dado digitado", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    expect(pais()).toHaveValue("Brasil");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
-  });
-
-  it("editar só o país já conta como alteração e pede confirmação", async () => {
-    const { onSair } = montar();
-    await aguardarEmpresa();
-    fireEvent.change(pais(), { target: { value: "Argentina" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(
-      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
-    ).toBeInTheDocument();
-    expect(onSair).not.toHaveBeenCalled();
   });
 
   it("escolher só uma referência da lotação já conta como alteração", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    await escolher(cargoSel(), cargo);
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await escolher(unidadeSel(), unidade);
+    fireEvent.click(botaoSair());
     expect(
       screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toBeInTheDocument();
@@ -2185,7 +1620,7 @@ describe("Nova admissão — cancelar", () => {
   it("sem nada digitado, sai direto", async () => {
     const { onSair } = montar();
     await aguardarEmpresa();
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(onSair).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
@@ -2194,7 +1629,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const confirmacao = screen.getByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -2221,7 +1656,7 @@ describe("Nova admissão — cancelar", () => {
     await preencherValido();
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(
       screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
     ).toHaveAccessibleDescription(DESCARTE_COMUM);
@@ -2231,7 +1666,7 @@ describe("Nova admissão — cancelar", () => {
     const { onSair } = montar();
     await aguardarEmpresa();
     fireEvent.change(matricula(), { target: { value: "MAT-1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     expect(onSair).toHaveBeenCalledTimes(1);
     expect(admitirColaborador).not.toHaveBeenCalled();
@@ -2266,20 +1701,26 @@ describe("Nova admissão — sucesso", () => {
     expect(
       screen.getByText("Departamento: DEP1 — Departamento Sintético (teste)"),
     ).toBeInTheDocument();
+    // T209 — o cargo gravado veio do nome digitado; a linha dele existe.
     expect(
-      screen.getByText("Cargo: CAR1 — Cargo Sintético (teste)"),
+      screen.getByText(
+        /^Cargo(: CAR1 — Cargo Sintético \(teste\)| registrado)$/,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Unidade: UNI1 — Unidade Sintética (teste)"),
     ).toBeInTheDocument();
     // Módulo 1: o que o SERVIDOR gravou, bloco a bloco.
     const dadosPessoais = screen.getByRole("region", {
-      name: "Dados pessoais",
+      name: "Dados básicos",
     });
     expect(dadosPessoais).toHaveTextContent("20/05/1990");
+    // T209 — CPF exibido com a máscara; gênero pelo rótulo; emergência.
+    expect(dadosPessoais).toHaveTextContent("529.982.247-25");
     expect(dadosPessoais).toHaveTextContent("Feminino");
     expect(dadosPessoais).not.toHaveTextContent("feminino");
-    expect(dadosPessoais).toHaveTextContent("Mãe Sintética Servidor");
+    expect(dadosPessoais).toHaveTextContent("Contato Sintético Servidor");
+    expect(dadosPessoais).toHaveTextContent("(31) 98888-7777");
     expect(dadosPessoais).toHaveTextContent("Não informado");
     const enderecoGravado = screen.getByRole("region", { name: "Endereço" });
     expect(enderecoGravado).toHaveTextContent("Cidade Sintética");
@@ -2305,7 +1746,7 @@ describe("Nova admissão — sucesso", () => {
           unidadeOrganizacionalId: null,
         },
       },
-      perfilPessoal: { ...resposta.perfilPessoal, sexo: null },
+      perfilPessoal: { ...resposta.perfilPessoal!, genero: null },
       contatos: null,
     });
     await admitirComSucesso();
@@ -2314,10 +1755,10 @@ describe("Nova admissão — sucesso", () => {
     }).nextElementSibling;
     expect(matriculaGravada).toHaveTextContent("Não informada");
     expect(screen.getByText("Unidade: Não informada")).toBeInTheDocument();
-    const sexoGravado = within(
-      screen.getByRole("region", { name: "Dados pessoais" }),
-    ).getByText("Sexo", { selector: "dt" }).nextElementSibling;
-    expect(sexoGravado).toHaveTextContent("Não informado");
+    const generoGravado = within(
+      screen.getByRole("region", { name: "Dados básicos" }),
+    ).getByText("Gênero", { selector: "dt" }).nextElementSibling;
+    expect(generoGravado).toHaveTextContent("Não informado");
     // T179 — sem contatos, o bloco usa o mesmo texto da ficha.
     expect(screen.getByRole("region", { name: "Contatos" })).toHaveTextContent(
       "Nenhum contato registrado.",
@@ -2376,7 +1817,6 @@ describe("Nova admissão — sucesso", () => {
     expect(emailPessoal()).toHaveValue("");
     expect(celular()).toHaveValue("");
     expect(escolhaDe(departamentoSel())).toHaveTextContent("Nenhuma escolha.");
-    expect(pais()).toHaveValue("Brasil");
   });
 });
 
@@ -2435,13 +1875,17 @@ describe("Nova admissão — contrato de CSS da confirmação", () => {
 // ---------------------------------------------------------------------------
 
 const campoCep = () => screen.getByLabelText(/^CEP/);
-const logradouro = () => screen.getByLabelText(/^Logradouro/);
-const numero = () => screen.getByLabelText(/^Número/);
+// T209 — etapa 3: "Logradouro e número" e "Cidade e estado" são grupos;
+// cada campo tem o próprio nome.
+const logradouro = () => screen.getByLabelText(/^Logradouro$/);
+// T209 — "Número do registro" (etapa 2) também começa por "Número".
+const numero = () => screen.getByLabelText(/^Número(?! do registro)/);
 const complemento = () => screen.getByLabelText(/^Complemento/);
 const bairro = () => screen.getByLabelText(/^Bairro/);
-const cidade = () => screen.getByLabelText(/^Cidade/);
-const estado = () => screen.getByLabelText(/^Estado \(opcional\)$/);
-const botaoBuscarCep = () => screen.queryByRole("button", { name: /CEP…?$/ });
+const cidade = () => screen.getByLabelText(/^Cidade$/);
+const estado = () => screen.getByLabelText(/^Estado$/);
+const botaoConsultarDeNovo = () =>
+  screen.queryByRole("button", { name: "Consultar de novo" });
 const statusCep = () => document.getElementById("nova-admissao-cep-status");
 
 const RESPOSTA_CEP: EnderecoDoCepApi = {
@@ -2462,39 +1906,111 @@ function digitarCep(valor: string) {
   fireEvent.change(campoCep(), { target: { value: valor } });
 }
 
-describe("T178 — CEP: quando consulta", () => {
+describe("T209 — etapa 3: endereço residencial", () => {
   beforeEach(() => {
     vi.mocked(consultarCep).mockReset();
     vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
   });
 
-  it("'Buscar CEP' consulta com os 8 dígitos; o campo fica na máscara 00000-000", async () => {
+  it("uma seção 'Endereço residencial', sem País nem 'Buscar CEP'; tudo opcional", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    digitarCep(" 30.140-071 ");
-    // T179 — a máscara limpa pontos e espaços já na digitação.
-    expect(campoCep()).toHaveValue("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
-
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("30140071"));
-    expect(consultarCep).toHaveBeenCalledTimes(1);
-    expect(campoCep()).toHaveValue("30140-071");
+    const secao = screen.getByRole("region", { name: "Endereço residencial" });
+    expect(secao).toHaveTextContent(
+      "Digite o CEP e o Evolli completa o endereço.",
+    );
+    expect(screen.queryByLabelText(/^País/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Buscar CEP/ })).toBeNull();
+    expect(
+      screen.getByRole("group", { name: "Logradouro e número" }),
+    ).toContainElement(numero());
+    expect(
+      screen.getByRole("group", { name: "Cidade e estado" }),
+    ).toContainElement(estado());
+    expect(campoCep()).toHaveAttribute("placeholder", "00000-000");
+    expect(campoCep()).toHaveAttribute("inputmode", "numeric");
+    expect(logradouro()).toHaveAttribute("placeholder", "Rua, avenida…");
+    expect(logradouro()).toHaveAttribute("maxlength", "200");
+    expect(numero()).toHaveAttribute("placeholder", "Nº");
+    expect(numero()).toHaveAttribute("maxlength", "20");
+    expect(complemento()).toHaveAttribute("placeholder", "Apto, bloco, sala…");
+    expect(complemento()).toHaveAttribute("maxlength", "120");
+    expect(bairro()).toHaveAttribute("maxlength", "120");
+    expect(cidade()).toHaveAttribute("placeholder", "Cidade");
+    expect(cidade()).toHaveAttribute("maxlength", "120");
+    for (const campo of [campoCep(), logradouro(), cidade(), estado()]) {
+      expect(campo).not.toBeRequired();
+    }
+    // Sem nada preenchido, a etapa avança.
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
   });
 
-  it("digitar não consulta; sair do campo com CEP completo consulta UMA vez", async () => {
+  it("o estado é uma das 27 siglas, em ordem alfabética do nome", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
+    const opcoes = [...(estado() as HTMLSelectElement).options].map(
+      (o) => o.value,
+    );
+    expect(opcoes).toEqual([
+      "",
+      "AC",
+      "AL",
+      "AP",
+      "AM",
+      "BA",
+      "CE",
+      "DF",
+      "ES",
+      "GO",
+      "MA",
+      "MT",
+      "MS",
+      "MG",
+      "PA",
+      "PB",
+      "PR",
+      "PE",
+      "PI",
+      "RJ",
+      "RN",
+      "RS",
+      "RO",
+      "RR",
+      "SC",
+      "SP",
+      "SE",
+      "TO",
+    ]);
+    expect((estado() as HTMLSelectElement).options[0]).toHaveTextContent("UF");
+  });
+
+  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço localizado pelo CEP'", async () => {
+    montar();
+    await aguardarEmpresa();
+    await abrirEndereco();
+    fireEvent.change(numero(), { target: { value: "100" } });
+    fireEvent.change(complemento(), { target: { value: "Sala 2" } });
     digitarCep("3014");
-    digitarCep("30140-071");
     expect(consultarCep).not.toHaveBeenCalled();
-
-    fireEvent.blur(campoCep());
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
+    digitarCep(" 30.140-071 ");
+    // A máscara limpa pontos e espaços já na digitação.
+    expect(campoCep()).toHaveValue("30140-071");
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledWith("30140071"));
     await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
+    expect(bairro()).toHaveValue("Bairro Sintético");
+    expect(cidade()).toHaveValue("Cidade Sintética");
+    expect(estado()).toHaveValue("MG");
+    // Número e complemento nunca são tocados.
+    expect(numero()).toHaveValue("100");
+    expect(complemento()).toHaveValue("Sala 2");
+    expect(statusCep()).toHaveAttribute("role", "status");
+    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    expect(statusCep()).toHaveClass("nova-admissao__cep-status--encontrado");
 
-    // O mesmo CEP de novo: sair do campo não repergunta.
+    // Sair do campo com o mesmo CEP não repergunta.
     fireEvent.focus(campoCep());
     fireEvent.blur(campoCep());
     expect(consultarCep).toHaveBeenCalledTimes(1);
@@ -2506,48 +2022,12 @@ describe("T178 — CEP: quando consulta", () => {
     await abrirEndereco();
     digitarCep("30140-07");
     fireEvent.blur(campoCep());
+    await act(async () => {});
     expect(consultarCep).not.toHaveBeenCalled();
     expect(campoCep()).not.toHaveAttribute("aria-invalid");
   });
 
-  it("'Buscar CEP' com CEP incompleto: mensagem no campo, sem consultar", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    digitarCep("3014");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() =>
-      expect(campoCep()).toHaveAccessibleDescription(
-        /Informe os 8 dígitos do CEP/,
-      ),
-    );
-    expect(consultarCep).not.toHaveBeenCalled();
-  });
-
-  it("com outro país não há botão e nada é consultado", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(pais(), { target: { value: "Portugal" } });
-    expect(botaoBuscarCep()).toBeNull();
-    expect(statusCep()).toBeNull();
-    digitarCep("30140071");
-    fireEvent.blur(campoCep());
-    expect(consultarCep).not.toHaveBeenCalled();
-  });
-
-  it("'Brasil' é reconhecido sem diferenciar caixa, acento e espaços", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(pais(), { target: { value: "  BRASÍL " } });
-    expect(botaoBuscarCep()).not.toBeNull();
-    digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
-  });
-
-  it("durante a busca o botão fica travado: duplo clique é UMA consulta", async () => {
+  it("durante a busca, 'Buscando endereço…'; sair do campo não pergunta de novo", async () => {
     let concluir: (v: EnderecoDoCepApi) => void = () => {};
     vi.mocked(consultarCep).mockImplementation(
       () =>
@@ -2559,18 +2039,13 @@ describe("T178 — CEP: quando consulta", () => {
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    const botao = await screen.findByRole("button", { name: "Buscando CEP…" });
-    expect(botao).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(botao);
-    fireEvent.click(botao);
-    expect(consultarCep).toHaveBeenCalledTimes(1);
-
-    await act(async () => concluir(RESPOSTA_CEP));
-    expect(screen.getByRole("button", { name: "Buscar CEP" })).toHaveAttribute(
-      "aria-disabled",
-      "false",
+    await waitFor(() =>
+      expect(statusCep()).toHaveTextContent("Buscando endereço…"),
     );
+    fireEvent.blur(campoCep());
+    expect(consultarCep).toHaveBeenCalledTimes(1);
+    await act(async () => concluir(RESPOSTA_CEP));
+    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
   });
 
   it("resposta obsoleta (o CEP mudou durante a busca) é descartada", async () => {
@@ -2581,62 +2056,38 @@ describe("T178 — CEP: quando consulta", () => {
           concluir = resolve;
         }),
     );
+    vi.mocked(consultarCep).mockImplementationOnce(
+      () => new Promise<EnderecoDoCepApi>(() => {}),
+    );
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await screen.findByRole("button", { name: "Buscando CEP…" });
-
+    await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(1));
     digitarCep("01310100");
     await act(async () => concluir(RESPOSTA_CEP));
-
     expect(logradouro()).toHaveValue("");
     expect(cidade()).toHaveValue("");
-    expect(statusCep()).toHaveTextContent("");
-  });
-});
-
-describe("T178 — CEP: o que faz com a resposta", () => {
-  beforeEach(() => {
-    vi.mocked(consultarCep).mockReset();
-    vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+    expect(statusCep()).not.toHaveTextContent("Endereço localizado pelo CEP");
   });
 
-  it("preenche os vazios (estado pela sigla) e nunca toca número nem complemento", async () => {
-    montar();
-    await aguardarEmpresa();
-    await abrirEndereco();
-    fireEvent.change(numero(), { target: { value: "100" } });
-    fireEvent.change(complemento(), { target: { value: "Sala 2" } });
-    digitarCep("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
-
-    await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
-    expect(bairro()).toHaveValue("Bairro Sintético");
-    expect(cidade()).toHaveValue("Cidade Sintética");
-    expect(estado()).toHaveValue("MG");
-    expect(numero()).toHaveValue("100");
-    expect(complemento()).toHaveValue("Sala 2");
-    expect(pais()).toHaveValue("Brasil");
-    expect(statusCep()).toHaveAttribute("role", "status");
-    expect(statusCep()).toHaveTextContent(/Endereço sugerido pelo CEP/);
-    expect(
-      screen.queryByRole("button", { name: "Usar endereço do CEP" }),
-    ).toBeNull();
-  });
-
-  it("sem sigla, o estado vem por extenso", async () => {
+  it("sem sigla, o estado por extenso vira a sigla do seletor", async () => {
     vi.mocked(consultarCep).mockResolvedValue({ ...RESPOSTA_CEP, uf: null });
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() => expect(estado()).toHaveValue("Minas Gerais"));
+    await waitFor(() => expect(cidade()).toHaveValue("Cidade Sintética"));
+    expect(estado()).toHaveValue("MG");
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
+    expect(
+      vi.mocked(admitirColaborador).mock.calls.at(-1)![0].endereco,
+    ).toMatchObject({ estado: "MG" });
   });
 
-  it("campo já digitado é mantido, com aviso; 'Usar endereço do CEP' substitui", async () => {
+  it("campo já digitado é mantido, com aviso; 'Usar endereço do CEP' substitui e o foco volta ao CEP", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
@@ -2644,7 +2095,6 @@ describe("T178 — CEP: o que faz com a resposta", () => {
     // Igual ao sugerido, a menos de caixa: não conta como conflito.
     fireEvent.change(bairro(), { target: { value: "bairro sintético" } });
     digitarCep("30140071");
-    fireEvent.click(botaoBuscarCep()!);
 
     await waitFor(() => expect(cidade()).toHaveValue("Cidade Sintética"));
     expect(logradouro()).toHaveValue("Rua Já Digitada");
@@ -2663,18 +2113,18 @@ describe("T178 — CEP: o que faz com a resposta", () => {
     expect(
       screen.queryByRole("button", { name: "Usar endereço do CEP" }),
     ).toBeNull();
-    expect(screen.getByRole("button", { name: "Buscar CEP" })).toHaveFocus();
+    expect(campoCep()).toHaveFocus();
   });
 
-  it("os campos seguem editáveis e a admissão leva o valor editado", async () => {
+  it("os campos seguem editáveis e a admissão leva o valor editado, com país Brasil", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
     digitarCep("30140-071");
-    fireEvent.click(botaoBuscarCep()!);
     await waitFor(() => expect(logradouro()).toHaveValue("Avenida Sintética"));
 
     fireEvent.change(logradouro(), { target: { value: "Avenida Editada" } });
+    fireEvent.change(estado(), { target: { value: "SP" } });
     await preencherValido();
     await salvarEConfirmar();
 
@@ -2686,7 +2136,7 @@ describe("T178 — CEP: o que faz com a resposta", () => {
       logradouro: "Avenida Editada",
       bairro: "Bairro Sintético",
       cidade: "Cidade Sintética",
-      estado: "MG",
+      estado: "SP",
       numero: null,
       complemento: null,
     });
@@ -2695,34 +2145,47 @@ describe("T178 — CEP: o que faz com a resposta", () => {
   });
 
   it.each([
-    [404, "CEP não encontrado. Preencha o endereço manualmente."],
+    [404, "CEP não encontrado. Preencha o endereço manualmente.", false],
     [
       503,
       "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.",
+      true,
     ],
     [
       429,
       "Muitas consultas de CEP em pouco tempo. Aguarde alguns minutos ou preencha manualmente.",
+      true,
     ],
-    [400, "CEP inválido. Use os 8 dígitos."],
+    [400, "CEP inválido. Use os 8 dígitos.", false],
     [
       403,
       "A consulta de CEP está indisponível agora. Preencha o endereço manualmente.",
+      true,
     ],
   ])(
-    "recusa %s: mensagem clara, e a admissão segue sendo enviada",
-    async (status, mensagem) => {
+    "recusa %s: mensagem clara, sem bloquear; 'Consultar de novo' só quando faz sentido",
+    async (status, mensagem, repetivel) => {
       vi.mocked(consultarCep).mockRejectedValue(recusaCep(status));
       montar();
       await aguardarEmpresa();
       await abrirEndereco();
       digitarCep("30140071");
-      fireEvent.click(botaoBuscarCep()!);
       await waitFor(() => expect(statusCep()).toHaveTextContent(mensagem));
-      // Não bloqueia: o CEP não fica inválido e o cadastro manual segue.
       expect(campoCep()).not.toHaveAttribute("aria-invalid");
+      if (repetivel) {
+        vi.mocked(consultarCep).mockResolvedValue(RESPOSTA_CEP);
+        fireEvent.click(botaoConsultarDeNovo()!);
+        await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(2));
+        await waitFor(() =>
+          expect(statusCep()).toHaveTextContent(
+            /^Endereço localizado pelo CEP$/,
+          ),
+        );
+        expect(botaoConsultarDeNovo()).toBeNull();
+      } else {
+        expect(botaoConsultarDeNovo()).toBeNull();
+      }
       fireEvent.change(cidade(), { target: { value: "Cidade Manual" } });
-
       await preencherValido();
       await salvarEConfirmar();
       await waitFor(() => expect(admitirColaborador).toHaveBeenCalled());
@@ -2755,7 +2218,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     montar();
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
   });
 
@@ -2768,7 +2231,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     await preencherValido();
     await salvarEConfirmar();
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const dialogo = dialogoDescarte();
     expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
     expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
@@ -2808,7 +2271,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
     await screen.findByText(/Não foi possível confirmar se o cadastro/);
     await salvarEConfirmar();
     await waitFor(() => expect(matricula()).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_INCERTO);
   });
 
@@ -2833,7 +2296,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       expect(escolhaDe(unidadeSel())).toHaveTextContent(
         `${unidade.codigo} — ${unidade.nome}`,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      fireEvent.click(botaoSair());
       const dialogo = dialogoDescarte();
       expect(dialogo).toHaveAccessibleDescription(DESCARTE_INCERTO);
       expect(dialogo).not.toHaveTextContent(/Nada da Nova admissão foi salvo/);
@@ -2870,7 +2333,7 @@ describe("T179 (revisão final) — descarte depois de envio incerto", () => {
       screen.getByRole("button", { name: "Recomeçar a admissão" }),
     );
     fireEvent.change(nome(), { target: { value: "Outra Pessoa Sintética" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     expect(dialogoDescarte()).toHaveAccessibleDescription(DESCARTE_COMUM);
   });
 });
@@ -2897,12 +2360,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     expect(campoCep()).toHaveValue("0131");
     expect(campoCep()).toHaveAccessibleDescription(/O CEP tem 8 dígitos/);
     fireEvent.blur(campoCep());
-    fireEvent.click(botaoBuscarCep()!);
-    await waitFor(() =>
-      expect(campoCep()).toHaveAccessibleDescription(
-        /Informe os 8 dígitos do CEP/,
-      ),
-    );
+    await act(async () => {});
     expect(consultarCep).not.toHaveBeenCalled();
     expect(logradouro()).toHaveValue("");
   });
@@ -2942,7 +2400,7 @@ describe("T179 (revisão final) — CEP e telefone sem excedente na página", ()
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
-    expect(dto.contatos?.telefone).toBe("+5555999998888");
+    expect(dto.perfilPessoal.contatoEmergenciaTelefone).toBe("+5555999998888");
   });
 
   it("T179 (revisão final): telefone com ramal ou rótulo é recusado com aviso de formato, e o servidor recebe só os números certos", async () => {
@@ -3049,7 +2507,7 @@ describe("T179 (revisão final) — sessão expirada separada de envio incerto",
 
   /** Abre o descarte e devolve a descrição dele (diz se há envio incerto). */
   function descricaoDoDescarte(): HTMLElement {
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     return dialogoDescarte();
   }
 
@@ -3399,6 +2857,7 @@ async function cadastrarPeloMais(
 /** Parte da admissão digitada ANTES do modal, para conferir que fica. */
 function preencherParteDaAdmissao() {
   fireEvent.change(nome(), { target: { value: "Pessoa Sintética Rápida" } });
+  fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
   fireEvent.change(dataNascimento(), { target: { value: "1991-02-03" } });
   fireEvent.change(tipo(), { target: { value: "clt" } });
   fireEvent.change(data(), { target: { value: "2026-11-10" } });
@@ -3429,12 +2888,11 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     vi.mocked(criarUnidade).mockResolvedValue(unidadeNova);
   });
 
-  it('o RH vê os três "+", ao lado de Departamento, Cargo e Unidade', async () => {
+  it('o RH vê os dois "+", ao lado de Departamento e Unidade; o cargo é texto, sem "+"', async () => {
     montar("rh");
     await aguardarEmpresa();
     for (const [rotulo, seletor] of [
       ["Cadastrar novo departamento", departamentoSel],
-      ["Cadastrar novo cargo", cargoSel],
       ["Cadastrar nova unidade", unidadeSel],
     ] as const) {
       const botao = botaoMais(rotulo);
@@ -3442,9 +2900,13 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       // Na mesma linha do seletor, dentro do mesmo campo.
       expect(botao.parentElement).toContainElement(seletor());
     }
-    // A obrigatoriedade não muda.
-    expect(departamentoSel()).toHaveAttribute("aria-required", "true");
-    expect(cargoSel()).toHaveAttribute("aria-required", "true");
+    expect(
+      screen.queryByRole("button", { name: "Cadastrar novo cargo" }),
+    ).toBeNull();
+    expect(cargoSel()).toHaveAttribute("type", "text");
+    expect(cargoSel()).toHaveAttribute("placeholder", "Ex.: Analista de RH");
+    // T209 — nenhuma referência da lotação é obrigatória sozinha.
+    expect(departamentoSel()).not.toHaveAttribute("aria-required");
     expect(unidadeSel()).not.toHaveAttribute("aria-required");
   });
 
@@ -3474,7 +2936,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     vi.mocked(listarEmpresasMulti).mockResolvedValue(paginado([]));
     montar("rh");
     await screen.findByText(/Não foi possível confirmar a empresa ativa/);
-    expect(botaoMais("Cadastrar novo cargo")).toBeDisabled();
+    expect(botaoMais("Cadastrar nova unidade")).toBeDisabled();
   });
 
   it("abre com o foco em Código; Escape fecha, o foco volta ao seletor e a admissão fica igual", async () => {
@@ -3504,21 +2966,21 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       expect(matricula()).toHaveAttribute("aria-invalid", "true"),
     );
     const dialogo = await abrirEPreencher(
-      "Cadastrar novo cargo",
-      "CAR_X",
-      "Cargo descartado",
+      "Cadastrar nova unidade",
+      "UNI_X",
+      "Unidade descartada",
     );
     fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
     expect(dialogoReferencia()).toBeNull();
-    expect(cargoSel()).toHaveFocus();
+    expect(unidadeSel()).toHaveFocus();
     admissaoPreservada();
     expect(matricula()).toHaveValue("X");
     expect(matricula()).toHaveAttribute("aria-invalid", "true");
-    expect(criarCargo).not.toHaveBeenCalled();
+    expect(criarUnidade).not.toHaveBeenCalled();
     // Reabrir começa vazio.
-    fireEvent.click(botaoMais("Cadastrar novo cargo"));
+    fireEvent.click(botaoMais("Cadastrar nova unidade"));
     const reaberto = await screen.findByRole("dialog", {
-      name: "Cadastrar cargo",
+      name: "Cadastrar unidade",
     });
     expect(within(reaberto).getByLabelText(/^Código/)).toHaveValue("");
     expect(within(reaberto).getByLabelText(/^Nome/)).toHaveValue("");
@@ -3531,13 +2993,6 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       nova: departamentoNovo,
       seletor: departamentoSel,
       chave: "departamentoId",
-    },
-    {
-      rotulo: "Cadastrar novo cargo",
-      criar: criarCargo,
-      nova: cargoNovo,
-      seletor: cargoSel,
-      chave: "cargoId",
     },
     {
       rotulo: "Cadastrar nova unidade",
@@ -3600,29 +3055,31 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
   });
 
   it("T196 — a referência criada fica escolhida mesmo que a busca do servidor ainda não a traga", async () => {
-    vi.mocked(listarCargos).mockResolvedValue(
+    vi.mocked(listarUnidades).mockResolvedValue(
       paginado([
-        { ...cargo, id: "c-a", codigo: "AAA", nome: "Primeiro" },
-        { ...cargo, id: "c-z", codigo: "ZZZ", nome: "Último" },
+        { ...unidade, id: "u-a", codigo: "AAA", nome: "Primeira" },
+        { ...unidade, id: "u-z", codigo: "ZZZ", nome: "Última" },
       ]),
     );
     montar("rh");
     await aguardarEmpresa();
     await cadastrarPeloMais(
-      "Cadastrar novo cargo",
-      cargoNovo.codigo,
-      cargoNovo.nome,
+      "Cadastrar nova unidade",
+      unidadeNova.codigo,
+      unidadeNova.nome,
     );
     await waitFor(() => expect(dialogoReferencia()).toBeNull());
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    await within(listaDe(cargoSel())).findByRole("option", { name: /^AAA/ });
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
+    await within(listaDe(unidadeSel())).findByRole("option", {
+      name: /^AAA/,
+    });
     expect(
-      within(listaDe(cargoSel()))
+      within(listaDe(unidadeSel()))
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual(["AAA — Primeiro", "ZZZ — Último"]);
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      "CAR_RAPIDO — Cargo Rápido (teste)",
+    ).toEqual(["AAA — Primeira", "ZZZ — Última"]);
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      "UNI_RAPIDA — Unidade Rápida (teste)",
     );
   });
 
@@ -3715,16 +3172,19 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
   );
 
   it("rede: não afirma o cadastro e recarrega a lista daquela referência", async () => {
-    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.mocked(criarUnidade).mockRejectedValue(new TypeError("Failed to fetch"));
     montar("rh");
     await aguardarEmpresa();
-    expect(listarCargos).toHaveBeenCalledTimes(1);
+    // A Unidade nem é lida na carga inicial.
+    expect(listarUnidades).not.toHaveBeenCalled();
     // O servidor gravou antes de a resposta se perder: a recarga já o traz.
-    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo, cargoNovo]));
+    vi.mocked(listarUnidades).mockResolvedValue(
+      paginado([unidade, unidadeNova]),
+    );
     const dialogo = await cadastrarPeloMais(
-      "Cadastrar novo cargo",
-      cargoNovo.codigo,
-      cargoNovo.nome,
+      "Cadastrar nova unidade",
+      unidadeNova.codigo,
+      unidadeNova.nome,
     );
     await waitFor(() =>
       expect(within(dialogo).getByRole("alert")).toHaveTextContent(
@@ -3733,35 +3193,38 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     );
     // T196 — uma leitura de um item confere o servidor; a busca do seletor é
     // descartada e relida na próxima abertura.
-    await waitFor(() => expect(listarCargos).toHaveBeenCalledTimes(2));
-    expect(listarCargos).toHaveBeenLastCalledWith({
+    await waitFor(() => expect(listarUnidades).toHaveBeenCalledTimes(1));
+    expect(listarUnidades).toHaveBeenLastCalledWith({
       status: "ativo",
       tamanhoPagina: 1,
     });
+    // Só a referência daquele "+" é relida.
     expect(listarDepartamentos).toHaveBeenCalledTimes(1);
-    expect(listarUnidades).not.toHaveBeenCalled();
+    expect(listarCargos).toHaveBeenCalledTimes(1);
     expect(dialogoReferencia()).toBeInTheDocument();
     fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
     expect(
-      await within(listaDe(cargoSel())).findByRole("option", {
-        name: `${cargoNovo.codigo} — ${cargoNovo.nome}`,
+      await within(listaDe(unidadeSel())).findByRole("option", {
+        name: `${unidadeNova.codigo} — ${unidadeNova.nome}`,
       }),
     ).toBeInTheDocument();
     // Nada foi escolhido por conta própria.
-    expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+    expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
   });
 
   it("rede e recarga falha: diz que a lista não pôde ser atualizada, e a lista e a admissão ficam", async () => {
-    vi.mocked(criarCargo).mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.mocked(criarUnidade).mockRejectedValue(new TypeError("Failed to fetch"));
     montar("rh");
     await aguardarEmpresa();
     preencherParteDaAdmissao();
-    vi.mocked(listarCargos).mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.mocked(listarUnidades).mockRejectedValue(
+      new TypeError("Failed to fetch"),
+    );
     const dialogo = await cadastrarPeloMais(
-      "Cadastrar novo cargo",
-      cargoNovo.codigo,
-      cargoNovo.nome,
+      "Cadastrar nova unidade",
+      unidadeNova.codigo,
+      unidadeNova.nome,
     );
     await waitFor(() =>
       expect(within(dialogo).getByRole("alert")).toHaveTextContent(
@@ -3771,20 +3234,20 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     expect(within(dialogo).getByRole("alert")).not.toHaveTextContent(
       /foi atualizada/,
     );
-    expect(listarCargos).toHaveBeenCalledTimes(2);
+    expect(listarUnidades).toHaveBeenCalledTimes(1);
     expect(dialogoReferencia()).toBeInTheDocument();
     fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
     // T196 — a busca também falha: estado claro, escolha e admissão mantidas.
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
     expect(
       await screen.findByText(
-        "Não foi possível carregar cargos. A escolha atual foi mantida.",
+        "Não foi possível carregar unidades. A escolha atual foi mantida.",
       ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Tentar de novo" }),
     ).toBeInTheDocument();
-    expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+    expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
     admissaoPreservada();
   });
 
@@ -3802,16 +3265,6 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       seletor: departamentoSel,
       linha: "Departamento",
       chave: "departamentoId",
-    },
-    {
-      rotulo: "Cadastrar novo cargo",
-      criar: criarCargo,
-      listar: listarCargos,
-      existente: cargo,
-      nova: cargoNovo,
-      seletor: cargoSel,
-      linha: "Cargo",
-      chave: "cargoId",
     },
     {
       rotulo: "Cadastrar nova unidade",
@@ -3838,9 +3291,9 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
       chave,
     }) => {
       // 1ª tentativa sem resposta (rede); a 2ª cria.
-      vi.mocked(criar as typeof criarCargo)
+      vi.mocked(criar as typeof criarUnidade)
         .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-        .mockResolvedValueOnce(nova as CargoApi);
+        .mockResolvedValueOnce(nova as UnidadeOrganizacionalApi);
       montar("rh");
       await aguardarEmpresa();
       await preencherValido();
@@ -3852,7 +3305,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         codigo: "ZZ_OBSOLETO",
         nome: "Lido antes da criação (teste)",
       };
-      vi.mocked(listar as typeof listarCargos).mockReturnValueOnce(
+      vi.mocked(listar as typeof listarUnidades).mockReturnValueOnce(
         new Promise((r) => {
           liberarRecarga = () => r(paginado([existente, obsoleto]) as never);
         }),
@@ -3909,8 +3362,8 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     }) => {
       // 1º "+": cria e seleciona. 2º "+": rede, e a recarga (a mais recente)
       // volta sem a referência escolhida.
-      vi.mocked(criar as typeof criarCargo)
-        .mockResolvedValueOnce(nova as CargoApi)
+      vi.mocked(criar as typeof criarUnidade)
+        .mockResolvedValueOnce(nova as UnidadeOrganizacionalApi)
         .mockRejectedValueOnce(new TypeError("Failed to fetch"));
       montar("rh");
       await aguardarEmpresa();
@@ -3921,7 +3374,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
         `${nova.codigo} — ${nova.nome}`,
       );
 
-      vi.mocked(listar as typeof listarCargos).mockResolvedValueOnce(
+      vi.mocked(listar as typeof listarUnidades).mockResolvedValueOnce(
         paginado([existente]) as never,
       );
       const dialogo = await cadastrarPeloMais(
@@ -3956,180 +3409,31 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     },
   );
 
-  it('empresa sem Departamento e Cargo: o aviso orienta o "+", some depois de criar os dois e a admissão segue', async () => {
+  it("T209 — empresa sem Departamento nem Cargo ativos: sem aviso nem bloqueio; o RH digita o cargo, que é criado ao confirmar", async () => {
     vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]));
     vi.mocked(listarCargos).mockResolvedValue(paginado([]));
     montar("rh");
     await aguardarEmpresa();
-    expect(
-      screen.getByText(/ainda não tem cadastro ativo de/),
-    ).toHaveTextContent(/Use o botão "\+" ao lado de Departamento e Cargo/);
-
-    await cadastrarPeloMais(
-      "Cadastrar novo departamento",
-      departamentoNovo.codigo,
-      departamentoNovo.nome,
-    );
-    await waitFor(() => expect(dialogoReferencia()).toBeNull());
-    expect(
-      screen.getByText(/ainda não tem cadastro ativo de/),
-    ).toHaveTextContent(/Use o botão "\+" ao lado de Cargo,/);
-
-    await cadastrarPeloMais(
-      "Cadastrar novo cargo",
-      cargoNovo.codigo,
-      cargoNovo.nome,
-    );
-    await waitFor(() => expect(dialogoReferencia()).toBeNull());
     expect(screen.queryByText(/ainda não tem cadastro ativo de/)).toBeNull();
 
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    fireEvent.change(cargoSel(), { target: { value: `  ${cargoNovo.nome} ` } });
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).toMatchObject({
-      departamentoId: departamentoNovo.id,
-      cargoId: cargoNovo.id,
+    // Sem cargo com esse nome no cadastro: o RH o cria, só com nome e empresa.
+    expect(criarCargo).toHaveBeenCalledTimes(1);
+    expect(criarCargo).toHaveBeenCalledWith({
+      nome: cargoNovo.nome,
+      empresaId: empresa.id,
     });
-  });
-});
-
-describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
-  const JORNADA = {
-    id: "jjjjjjjj-0000-4000-8000-000000000001",
-    empresaId: "e",
-    codigo: "COM_44H",
-    nome: "Comercial 44h (teste)",
-    ativo: true,
-    criadoPorUserId: "u",
-    criadoEm: "2026-01-01T00:00:00.000Z",
-    atualizadoEm: "2026-01-01T00:00:00.000Z",
-    periodos: [],
-  };
-
-  it("o RH vê o campo opcional, com só as jornadas ativas e 'Sem jornada por enquanto'", async () => {
-    vi.mocked(listarTabelasHorario).mockResolvedValue({
-      itens: [JORNADA],
-      pagina: 1,
-      tamanhoPagina: 100,
-      total: 1,
-    });
-    montar("rh");
-    await aguardarEmpresa();
-    abrirLotacao();
-    const seletor = await screen.findByRole("combobox", {
-      name: /Jornada de trabalho/,
-    });
-    await waitFor(() =>
-      expect(
-        within(seletor)
-          .getAllByRole("option")
-          .map((o) => o.textContent),
-      ).toEqual([
-        "Sem jornada por enquanto",
-        "COM_44H — Comercial 44h (teste)",
-      ]),
-    );
-    expect(listarTabelasHorario).toHaveBeenCalledWith({
-      ativo: true,
-      tamanhoPagina: 100,
-    });
-  });
-
-  it("o DP admite sem o campo de jornada, e o catálogo de jornadas nem é lido", async () => {
-    montar("dp");
-    await aguardarEmpresa();
-    expect(
-      screen.queryByRole("combobox", { name: /Jornada de trabalho/ }),
-    ).toBeNull();
-    expect(listarTabelasHorario).not.toHaveBeenCalled();
-  });
-
-  function comJornada() {
-    vi.mocked(listarTabelasHorario).mockResolvedValue({
-      itens: [JORNADA],
-      pagina: 1,
-      tamanhoPagina: 100,
-      total: 1,
-    });
-  }
-
-  it("escolhida, a jornada vai no envio; sem escolha, o campo nem vai", async () => {
-    comJornada();
-    montar("rh");
-    await aguardarEmpresa();
-    await preencherValido();
-    await salvarEConfirmar();
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).not.toHaveProperty(
-      "tabelaHorarioId",
-    );
-  });
-
-  it("com jornada escolhida, envia o id e a confirmação mostra a jornada", async () => {
-    comJornada();
-    montar("rh");
-    await aguardarEmpresa();
-    await preencherValido();
-    abrirLotacao();
-    const seletor = await screen.findByRole("combobox", {
-      name: /Jornada de trabalho/,
-    });
-    await waitFor(() =>
-      expect(within(seletor).getAllByRole("option")).toHaveLength(2),
-    );
-    fireEvent.change(seletor, { target: { value: JORNADA.id } });
-    fireEvent.click(salvar());
-    const dialogo = await screen.findByRole("dialog", {
-      name: "Confirmar cadastro de colaborador?",
-    });
-    expect(
-      within(dialogo).getByText(
-        /COM_44H — Comercial 44h \(teste\), a partir de 03\/11\/2026/,
-      ),
-    ).toBeInTheDocument();
-    fireEvent.click(botaoConfirmar());
-    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(admitirColaborador).mock.calls[0]![0]).toMatchObject({
-      tabelaHorarioId: JORNADA.id,
-    });
-  });
-
-  it("jornada recusada pelo servidor (422 no campo): erro na jornada, digitado preservado", async () => {
-    comJornada();
-    vi.mocked(admitirColaborador).mockRejectedValue(
-      recusa(422, {
-        erros: [{ campo: "tabelaHorarioId", motivo: "indisponivel" }],
-      }),
-    );
-    montar("rh");
-    await aguardarEmpresa();
-    await preencherValido();
-    abrirLotacao();
-    const seletor = await screen.findByRole("combobox", {
-      name: /Jornada de trabalho/,
-    });
-    await waitFor(() =>
-      expect(within(seletor).getAllByRole("option")).toHaveLength(2),
-    );
-    fireEvent.change(seletor, { target: { value: JORNADA.id } });
-    await salvarEConfirmar();
-    expect(
-      await screen.findByText(/A jornada escolhida não está mais disponível/),
-    ).toBeInTheDocument();
-    expect(seletor).toHaveValue(JORNADA.id);
-    expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
-  });
-
-  it("falha ao ler as jornadas não impede a admissão: avisa e segue sem jornada", async () => {
-    vi.mocked(listarTabelasHorario).mockRejectedValue(new Error("rede"));
-    montar("rh");
-    await aguardarEmpresa();
-    expect(
-      await screen.findByText(/Não foi possível carregar as jornadas/),
-    ).toBeInTheDocument();
+    const dto = vi.mocked(admitirColaborador).mock.calls[0]![0];
+    expect(dto.cargoId).toBe(cargoNovo.id);
+    expect(Object.keys(dto)).not.toContain("departamentoId");
   });
 });
 
@@ -4139,11 +3443,15 @@ describe("Nova admissão — jornada de trabalho opcional (T183)", () => {
 
 const indicador = () =>
   screen.getByRole("navigation", { name: "Etapas do cadastro" });
-const progresso = () => within(indicador()).getByRole("progressbar");
+// T209 — o progresso fica no rodapé fixo do assistente.
+const rodapeDoAssistente = () =>
+  document.querySelector<HTMLElement>(".cadastro-etapas__rodape")!;
+const progresso = () => within(rodapeDoAssistente()).getByRole("progressbar");
 const passoDoIndicador = (n: number) =>
   within(indicador()).getAllByRole("listitem")[n - 1]!;
 const botaoVoltar = () => screen.getByRole("button", { name: "Voltar" });
-const botaoContinuar = () => screen.getByRole("button", { name: "Continuar" });
+const botaoContinuar = () =>
+  screen.getByRole("button", { name: "Próxima etapa" });
 
 /** As etapas 1 e 2 válidas e a 3 vazia: chega à revisão. */
 async function ateARevisao() {
@@ -4156,9 +3464,11 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     montar();
     await aguardarEmpresa();
     expect(tituloDaEtapa()).toHaveTextContent("Etapa 1 de 4: Dados básicos");
-    expect(within(indicador()).getByText("Etapa 1 de 4 · 25%")).toBeVisible();
+    expect(
+      within(rodapeDoAssistente()).getByText("25% concluído"),
+    ).toBeVisible();
     expect(progresso()).toHaveAttribute("value", "25");
-    expect(progresso()).toHaveAccessibleName("Etapa 1 de 4 · 25%");
+    expect(progresso()).toHaveAccessibleName("25% concluído");
     expect(passoDoIndicador(1).querySelector("[aria-current]")).toHaveAttribute(
       "aria-current",
       "step",
@@ -4177,7 +3487,7 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     await aguardarEmpresa();
     await preencherValido();
     for (const [titulo, pct] of [
-      ["Etapa 2 de 4: Dados profissionais e lotação", "50"],
+      ["Etapa 2 de 4: Dados profissionais", "50"],
       ["Etapa 3 de 4: Endereço", "75"],
       ["Etapa 4 de 4: Revisão e conclusão", "100"],
     ] as const) {
@@ -4186,16 +3496,16 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
       await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
       expect(progresso()).toHaveAttribute("value", pct);
     }
-    // Na revisão, o botão principal é "Confirmar admissão".
-    expect(screen.queryByRole("button", { name: "Continuar" })).toBeNull();
+    // Na revisão, o botão principal é "Concluir".
+    expect(screen.queryByRole("button", { name: "Próxima etapa" })).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Confirmar admissão" }),
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
     ).toHaveAttribute("type", "submit");
     // As três anteriores, concluídas, viram botões com o estado no nome.
     expect(within(indicador()).getAllByRole("button")).toHaveLength(3);
     for (const nome of [
       "Etapa 1: Dados básicos, concluída",
-      "Etapa 2: Dados profissionais e lotação, concluída",
+      "Etapa 2: Dados profissionais, concluída",
       "Etapa 3: Endereço, concluída",
     ]) {
       expect(
@@ -4214,8 +3524,9 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     await aguardarEmpresa();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.submit(nome().closest("form")!);
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     expect(dialogoConfirmacao()).toBeNull();
   });
 
@@ -4229,8 +3540,9 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     montar();
     fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
     fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     expect(botaoContinuar()).toBeDisabled();
     await act(async () => liberar());
     await aguardarEmpresa();
@@ -4243,13 +3555,13 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     montar();
     await aguardarEmpresa();
     await preencherValido();
-    fireEvent.change(screen.getByLabelText(/^Saudação/), {
-      target: { value: "Sra." },
+    fireEvent.change(screen.getByLabelText("RG"), {
+      target: { value: "12.345.678-9" },
     });
     irAteEtapa("Endereço");
     fireEvent.change(logradouro(), { target: { value: "Rua Sintética" } });
     fireEvent.click(botaoVoltar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     // Apagar um obrigatório e voltar de novo: Voltar não acusa nada.
     fireEvent.change(tipo(), { target: { value: "" } });
@@ -4259,7 +3571,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     expect(screen.queryByRole("button", { name: "Voltar" })).toBeNull();
     // Tudo o que foi digitado continua, em todas as etapas.
     expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
-    expect(screen.getByLabelText(/^Saudação/)).toHaveValue("Sra.");
+    expect(screen.getByLabelText("RG")).toHaveValue("12.345.678-9");
     expect(celular()).toHaveValue("(31) 99999-0000");
     expect(matricula()).toHaveValue("MAT-0900");
     expect(escolhaDe(departamentoSel())).toHaveTextContent(
@@ -4297,7 +3609,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     await ateARevisao();
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 2: Dados profissionais e lotação, concluída",
+        name: "Etapa 2: Dados profissionais, concluída",
       }),
     );
     fireEvent.change(data(), { target: { value: "" } });
@@ -4306,7 +3618,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
         name: "Etapa 4: Revisão e conclusão, visitada",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(data()).toHaveFocus());
     expect(data()).toHaveAccessibleDescription(/Informe a data de admissão/);
     expect(dialogoConfirmacao()).toBeNull();
@@ -4316,9 +3628,14 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     montar();
     await aguardarEmpresa();
     abrirLotacao();
+    // T209 — os obrigatórios da etapa 2 em ordem; só a matrícula inválida.
+    fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
     fireEvent.change(matricula(), { target: { value: "x" } });
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(matricula()).toHaveFocus());
     // Etapa 3 nunca alcançada: nem botão no indicador.
     expect(passoDoIndicador(3)).toHaveTextContent("não iniciada");
@@ -4346,23 +3663,32 @@ describe("T195 — revisão e conclusão", () => {
     expect(basicos).toHaveTextContent("Nome completoPessoa Sintética Nova");
     expect(basicos).toHaveTextContent("E-mail pessoalPessoa.Nova@Exemplo.TEST");
     expect(basicos).toHaveTextContent("Data de nascimento20/05/1990");
-    expect(basicos).toHaveTextContent("Celular(31) 99999-0000");
+    expect(basicos).toHaveTextContent("Telefone pessoal(31) 99999-0000");
+    expect(basicos).toHaveTextContent("CPF529.982.247-25");
     // Opcional em branco não aparece.
     expect(basicos).not.toHaveTextContent("Saudação");
     expect(basicos).not.toHaveTextContent("Sexo");
 
-    const profissionais = bloco("Dados profissionais e lotação");
+    const profissionais = bloco("Dados profissionais");
     expect(profissionais).toHaveTextContent("MatrículaMAT-0900");
-    expect(profissionais).toHaveTextContent("Tipo de vínculoCLT");
+    expect(profissionais).toHaveTextContent("Tipo de contrataçãoCLT");
     expect(profissionais).toHaveTextContent("Data de admissão03/11/2026");
+    // T209 — o cargo digitado aparece como texto; o salário, em reais.
+    expect(profissionais).toHaveTextContent(`Cargo${cargo.nome}`);
     expect(profissionais).toHaveTextContent(
       `Departamento${departamento.codigo} — ${departamento.nome}`,
     );
+    expect(profissionais).toHaveTextContent(
+      `Unidade${unidade.codigo} — ${unidade.nome}`,
+    );
+    expect(profissionais).toHaveTextContent(/Salário brutoR\$\s/);
     expect(profissionais).not.toHaveTextContent("Área");
+    expect(profissionais).not.toHaveTextContent("Nível");
     expect(profissionais).not.toHaveTextContent("Jornada");
 
     const endereco = bloco("Endereço");
-    expect(endereco).toHaveTextContent("PaísBrasil");
+    // T209 — sem campo País na etapa 3, o país não aparece no resumo.
+    expect(endereco).not.toHaveTextContent("País");
     expect(endereco).toHaveTextContent("CidadeCidade Sintética");
     expect(endereco).not.toHaveTextContent("Logradouro");
     expectSemIsoVisivel(document.body);
@@ -4370,35 +3696,35 @@ describe("T195 — revisão e conclusão", () => {
     // Editar volta à etapa, com o foco no título e os dados no lugar.
     fireEvent.click(
       within(profissionais).getByRole("button", {
-        name: "Editar Dados profissionais e lotação",
+        name: "Editar Dados profissionais",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     expect(matricula()).toHaveValue("MAT-0900");
     expect(admitirColaborador).not.toHaveBeenCalled();
   });
 
-  it("documentos: aviso acessível de entrega própria, sem campo de arquivo nem envio", async () => {
+  it("T209 — sem bloco de documentos futuros na revisão; o único arquivo é a foto", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
-    const documentos = screen
-      .getByRole("heading", { level: 3, name: "Documentos" })
-      .closest("section")!;
-    expect(documentos).toHaveAccessibleName("Documentos");
-    expect(documentos).toHaveTextContent(
-      "Documentos serão liberados em uma próxima etapa do Evolli.",
-    );
-    expect(within(documentos).queryAllByRole("button")).toHaveLength(0);
-    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(
+      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
+    ).toBeNull();
+    expect(document.body).not.toHaveTextContent(/Documentos serão liberados/);
+    const arquivos = document.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
   });
 
   it("Confirmar admissão abre a mesma confirmação e envia uma vez, com a chave", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar admissão" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    );
     const dialogo = await screen.findByRole("dialog", {
       name: "Confirmar cadastro de colaborador?",
     });
@@ -4427,11 +3753,10 @@ describe("T195 — revisão e conclusão", () => {
     // O primeiro da tela é o e-mail, na etapa 1.
     await waitFor(() => expect(emailPessoal()).toHaveFocus());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
-    // O resumo leva ao outro campo, na etapa dele.
-    const resumo = screen.getByRole("group", { name: /Revise 2 campos/ });
-    fireEvent.click(within(resumo).getByRole("button", { name: "Matrícula" }));
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
-    await waitFor(() => expect(matricula()).toHaveFocus());
+    // T209 — sem bloco de revisão no topo: o erro fica embaixo do campo.
+    expect(screen.queryByRole("group", { name: /^Revise / })).toBeNull();
+    // O outro campo, na etapa dele, já traz a própria mensagem.
+    expect(matricula()).toHaveAttribute("aria-invalid", "true");
     expect(matricula()).toHaveAccessibleDescription(
       /Esta matrícula já está em uso nesta empresa/,
     );
@@ -4455,23 +3780,6 @@ describe("T195 — revisão e conclusão", () => {
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
     expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
   });
-
-  it("DP: sem jornada na etapa 2 nem na revisão", async () => {
-    montar("dp");
-    await aguardarEmpresa();
-    await ateARevisao();
-    expect(
-      screen
-        .getByRole("heading", {
-          level: 3,
-          name: "Dados profissionais e lotação",
-        })
-        .closest("section"),
-    ).not.toHaveTextContent("Jornada");
-    expect(
-      document.getElementById("nova-admissao-etapa-2-titulo")!.parentElement,
-    ).not.toHaveTextContent("Jornada de trabalho");
-  });
 });
 
 describe("T195 — cancelar e recomeçar", () => {
@@ -4480,7 +3788,7 @@ describe("T195 — cancelar e recomeçar", () => {
     await aguardarEmpresa();
     await preencherValido();
     irAteEtapa("Endereço");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(botaoSair());
     const dialogo = await screen.findByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -4533,8 +3841,8 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     const botao = botaoContinuar();
     // O navegador conta os cliques: 1 e depois 2, no mesmo lugar.
     fireEvent.click(botao, { detail: 1 });
-    // O mesmo botão já virou "Confirmar admissão" — é onde o 2º clique cai.
-    expect(botao).toHaveTextContent("Confirmar admissão");
+    // O mesmo botão já virou "Concluir" — é onde o 2º clique cai.
+    expect(botao).toHaveTextContent("Cadastrar colaborador");
     fireEvent.click(botao, { detail: 2 });
     expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
     expect(dialogoConfirmacao()).toBeNull();
@@ -4553,7 +3861,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     await preencherValido();
     fireEvent.click(botaoContinuar(), { detail: 1 });
     fireEvent.click(botaoContinuar(), { detail: 2 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     fireEvent.click(botaoContinuar(), { detail: 1 });
     fireEvent.click(botaoContinuar(), { detail: 2 });
     fireEvent.click(botaoContinuar(), { detail: 3 });
@@ -4570,14 +3878,14 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     await preencherValido();
     // Enter num campo de texto: envio implícito do navegador.
     fireEvent.submit(nome().closest("form")!);
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     // Enter ou Espaço no botão: ativação pelo teclado, `detail` 0.
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirmar admissão" }),
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
       {
         detail: 0,
       },
@@ -4596,22 +3904,24 @@ describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e E
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     await preencherLotacao();
-    // O seletor nativo (Equipe) fica com o Enter: nada de envio a partir dele.
-    fireEvent.keyDown(equipeSel(), { key: "Enter" });
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
-    // T196 — o último campo da etapa (Centro de custo, pesquisável), o botão
-    // de opções dele e, logo depois, as ações — nesta ordem.
+    // O seletor nativo (Nível) fica com o Enter: nada de envio a partir dele.
+    // T209 — a Equipe saiu da tela.
+    fireEvent.keyDown(screen.getByLabelText("Nível"), { key: "Enter" });
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
+    // T196 — o seletor pesquisável é seguido do botão de opções dele.
     const ordem = tabulaveis();
-    const depois = ordem.slice(ordem.indexOf(centroSel()) + 1);
+    expect(
+      ordem[ordem.indexOf(centroSel()) + 1]!.getAttribute("aria-label"),
+    ).toBe("Mostrar opções de Centro de custo");
+    // T209 — o último campo da etapa (Pensão alimentícia) e, logo depois, as
+    // ações — nesta ordem.
+    const depois = ordem.slice(
+      ordem.indexOf(screen.getByLabelText(/^Pensão alimentícia/)) + 1,
+    );
     expect(
       depois.map((e) => e.getAttribute("aria-label") ?? e.textContent),
-    ).toEqual([
-      "Mostrar opções de Centro de custo",
-      "Cancelar",
-      "Voltar",
-      "Continuar",
-    ]);
-    const continuar = depois[3]!;
+    ).toEqual(["Voltar", "Próxima etapa"]);
+    const continuar = depois[1]!;
     expect(continuar).toHaveAttribute("type", "submit");
     continuar.focus();
     fireEvent.click(continuar, { detail: 0 });
@@ -4669,7 +3979,7 @@ describe("T196 — busca nas referências da etapa 2", () => {
     });
   });
 
-  it("DP pesquisa e escolhe as quatro referências, sem o '+' de cadastro", async () => {
+  it("DP pesquisa e escolhe as três referências pesquisáveis, sem o '+' de cadastro", async () => {
     vi.mocked(listarCentrosCusto).mockResolvedValue(
       paginado([
         {
@@ -4685,9 +3995,14 @@ describe("T196 — busca nas referências da etapa 2", () => {
     abrirLotacao();
     expect(screen.queryByRole("button", { name: /^Cadastrar nov/ })).toBeNull();
     await escolher(departamentoSel(), departamento);
-    await escolher(cargoSel(), cargo);
     await escolher(unidadeSel(), unidade);
     await escolher(centroSel(), { codigo: "CC1" });
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(
+      `${departamento.codigo} — ${departamento.nome}`,
+    );
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `${unidade.codigo} — ${unidade.nome}`,
+    );
     expect(escolhaDe(centroSel())).toHaveTextContent(
       "CC1 — Centro Sintético (teste)",
     );
@@ -4701,28 +4016,163 @@ describe("T196 — busca nas referências da etapa 2", () => {
     await salvarEConfirmar();
     const aviso = await screen.findByText(/A lotação escolhida não foi aceita/);
     await waitFor(() => expect(aviso).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais e lotação$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     // A escolha não some: a pessoa decide trocar.
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      `${cargo.codigo} — ${cargo.nome}`,
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `${unidade.codigo} — ${unidade.nome}`,
+    );
+    expect(cargoSel()).toHaveValue(cargo.nome);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — etapa 2 (decisão da proprietária de 2026-11-17): o cargo é texto e
+// vira referência só ao confirmar; da lotação, basta uma referência; o
+// salário bruto é obrigatório.
+// ---------------------------------------------------------------------------
+describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário bruto", () => {
+  it("o cargo digitado com outra caixa e espaços vira o cargo existente de mesmo nome; nada é criado", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(
+      paginado([
+        { ...cargo, id: "c-parecido", codigo: "CAR9", nome: "Cargo Sintético" },
+        cargo,
+      ]),
+    );
+    montar("rh");
+    await aguardarEmpresa();
+    await preencherValido();
+    abrirLotacao();
+    fireEvent.change(cargoSel(), {
+      target: { value: "  cargo   SINTÉTICO (teste) " },
+    });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(listarCargos).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        busca: "cargo SINTÉTICO (teste)",
+        status: "ativo",
+      }),
+    );
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0].cargoId).toBe(
+      cargo.id,
+    );
+    expect(criarCargo).not.toHaveBeenCalled();
+  });
+
+  it("DP com um cargo que não está no cadastro: erro no campo Cargo, nada é criado nem enviado", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([cargo]));
+    montar("dp");
+    await aguardarEmpresa();
+    await preencherValido();
+    abrirLotacao();
+    fireEvent.change(cargoSel(), {
+      target: { value: "Cargo Inexistente (teste)" },
+    });
+    await salvarEConfirmar();
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
+    expect(cargoSel()).toHaveAttribute("aria-invalid", "true");
+    expect(cargoSel()).toHaveAccessibleDescription(
+      /Este cargo não está no cadastro\. Peça ao RH para cadastrá-lo, ou deixe o campo em branco\./,
+    );
+    expect(dialogoConfirmacao()).toBeNull();
+    expect(criarCargo).not.toHaveBeenCalled();
+    expect(admitirColaborador).not.toHaveBeenCalled();
+    // O que foi digitado fica.
+    expect(cargoSel()).toHaveValue("Cargo Inexistente (teste)");
+  });
+
+  it("RH: se outro usuário criou o cargo no meio do caminho (409 com a referência), a admissão usa esse cargo", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    vi.mocked(criarCargo).mockRejectedValue(
+      Object.assign(new Error("nome em uso"), {
+        status: 409,
+        referencia: { id: "c-concorrente", codigo: "CAR7", nome: "Cargo X" },
+      }),
+    );
+    montar("rh");
+    await aguardarEmpresa();
+    await preencherValido();
+    abrirLotacao();
+    fireEvent.change(cargoSel(), { target: { value: "Cargo X" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(criarCargo).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(admitirColaborador).mock.calls[0]![0].cargoId).toBe(
+      "c-concorrente",
     );
   });
 
-  it("obrigatórios seguem obrigatórios: sem Departamento, o erro fica no campo de busca, com o foco nele", async () => {
+  it("RH: falha ao criar o cargo, sem referência: erro no Cargo e nada é enviado", async () => {
+    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    vi.mocked(criarCargo).mockRejectedValue(new Error("falha"));
+    montar("rh");
+    await aguardarEmpresa();
+    await preencherValido();
+    abrirLotacao();
+    fireEvent.change(cargoSel(), { target: { value: "Cargo Y" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    expect(cargoSel()).toHaveAccessibleDescription(
+      /Não foi possível usar este cargo\. Confira o nome e tente de novo\./,
+    );
+    expect(admitirColaborador).not.toHaveBeenCalled();
+  });
+
+  it("sem cargo e sem nenhuma referência da lotação: a mensagem fica no Cargo e a etapa não avança", async () => {
     montar();
     await aguardarEmpresa();
     abrirLotacao();
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    await escolher(cargoSel(), cargo);
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await waitFor(() => expect(departamentoSel()).toHaveFocus());
-    expect(departamentoSel()).toHaveAttribute("aria-invalid", "true");
-    expect(departamentoSel()).toHaveAccessibleDescription(
-      /Selecione o departamento\./,
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
+    await waitFor(() => expect(cargoSel()).toHaveFocus());
+    expect(cargoSel()).toHaveAccessibleDescription(
+      "Informe ao menos o cargo, o departamento, a unidade ou o centro de custo.",
     );
-    // Abrir só por foco, não: a lista segue fechada.
-    expect(departamentoSel()).toHaveAttribute("aria-expanded", "false");
+    // Uma referência basta — aqui, só a Unidade.
+    await escolher(unidadeSel(), unidade);
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+  });
+
+  it("sem salário bruto, a etapa 2 não avança e o campo explica por quê", async () => {
+    montar();
+    await aguardarEmpresa();
+    abrirLotacao();
+    fireEvent.change(tipo(), { target: { value: "clt" } });
+    fireEvent.change(data(), { target: { value: "2026-11-03" } });
+    fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
+    await waitFor(() => expect(salarioBruto()).toHaveFocus());
+    expect(salarioBruto()).toHaveAttribute("aria-invalid", "true");
+    expect(salarioBruto()).toHaveAccessibleDescription(
+      "Informe o salário bruto.",
+    );
+    expect(cargoSel()).not.toHaveAttribute("aria-invalid");
+    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.click(botaoContinuar());
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+  });
+
+  it("o tipo de contratação traz as opções da decisão", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      [...(tipo() as HTMLSelectElement).options].map((o) => o.textContent),
+    ).toEqual([
+      "Selecione",
+      "CLT",
+      "PJ",
+      "Estágio",
+      "Aprendiz",
+      "Part-time",
+      "Freelancer",
+      "Trainee",
+    ]);
   });
 });
 
@@ -4747,14 +4197,6 @@ const TIPOS_INLINE = [
     listar: listarDepartamentos,
     criar: criarDepartamento,
     novo: { ...departamentoNovo, nome: "Nova Referência Sintética" },
-  },
-  {
-    tipo: "cargo",
-    rotulo: "Cargo",
-    campo: () => cargoSel(),
-    listar: listarCargos,
-    criar: criarCargo,
-    novo: { ...cargoNovo, nome: "Nova Referência Sintética" },
   },
   {
     tipo: "unidade",
@@ -4862,34 +4304,36 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     montar("rh");
     await aguardarEmpresa();
     abrirLotacao();
-    await buscarNo(cargoSel(), "Cargo");
-    const opcoes = within(listaDe(cargoSel())).getAllByRole("option");
+    await buscarNo(unidadeSel(), "Unidade");
+    const opcoes = within(listaDe(unidadeSel())).getAllByRole("option");
     expect(opcoes.map((o) => o.textContent)).toEqual([
-      "CAR1 — Cargo Sintético (teste)",
-      "Criar cargo «Cargo»",
+      "UNI1 — Unidade Sintética (teste)",
+      "Criar unidade «Unidade»",
     ]);
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    expect(cargoSel()).toHaveAttribute(
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
+    expect(unidadeSel()).toHaveAttribute(
       "aria-activedescendant",
-      opcaoCriar(cargoSel())!.id,
+      opcaoCriar(unidadeSel())!.id,
     );
-    fireEvent.keyDown(cargoSel(), { key: "Enter" });
+    fireEvent.keyDown(unidadeSel(), { key: "Enter" });
     expect(
-      await screen.findByRole("dialog", { name: "Criar cargo" }),
+      await screen.findByRole("dialog", { name: "Criar unidade" }),
     ).toBeInTheDocument();
-    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais e lotação");
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais");
     expect(admitirColaborador).not.toHaveBeenCalled();
-    expect(criarCargo).not.toHaveBeenCalled();
+    expect(criarUnidade).not.toHaveBeenCalled();
   });
 
   it("nome idêntico entre os resultados (maiúsculas e espaços à parte): sem «Criar»", async () => {
     montar("rh");
     await aguardarEmpresa();
     abrirLotacao();
-    await buscarNo(cargoSel(), "cargo   sintético (TESTE)");
-    expect(within(listaDe(cargoSel())).getAllByRole("option")).toHaveLength(1);
-    expect(opcaoCriar(cargoSel())).toBeNull();
+    await buscarNo(unidadeSel(), "unidade   sintética (TESTE)");
+    expect(within(listaDe(unidadeSel())).getAllByRole("option")).toHaveLength(
+      1,
+    );
+    expect(opcaoCriar(unidadeSel())).toBeNull();
   });
 
   it.each([
@@ -4898,19 +4342,19 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     ["com caractere de controle", "Nome\u0007Sintetico"],
     ["acima de 160", "x".repeat(161)],
   ])("termo %s: sem «Criar»", async (_caso, termo) => {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
     montar("rh");
     await aguardarEmpresa();
     abrirLotacao();
-    fireEvent.keyDown(cargoSel(), { key: "ArrowDown" });
-    await buscarNo(cargoSel(), termo);
-    expect(opcaoCriar(cargoSel())).toBeNull();
+    fireEvent.keyDown(unidadeSel(), { key: "ArrowDown" });
+    await buscarNo(unidadeSel(), termo);
+    expect(opcaoCriar(unidadeSel())).toBeNull();
   });
 
   it.each(TIPOS_INLINE)(
     "$rotulo: o DP pesquisa e escolhe, mas nunca vê «Criar» nem diálogo",
     async ({ campo, listar }) => {
-      vi.mocked(listar as typeof listarCargos).mockResolvedValue(
+      vi.mocked(listar as typeof listarUnidades).mockResolvedValue(
         paginado([]) as never,
       );
       montar("dp");
@@ -4934,17 +4378,19 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     );
   });
 
-  it('o "+" segue em Departamento, Cargo e Unidade; Centro de custo não tem "+"', async () => {
+  it('o "+" segue em Departamento e Unidade; Cargo (texto) e Centro de custo não têm "+"', async () => {
     montar("rh");
     await aguardarEmpresa();
     abrirLotacao();
     for (const rotulo of [
       "Cadastrar novo departamento",
-      "Cadastrar novo cargo",
       "Cadastrar nova unidade",
     ]) {
       expect(screen.getByRole("button", { name: rotulo })).toBeEnabled();
     }
+    expect(
+      screen.queryByRole("button", { name: "Cadastrar novo cargo" }),
+    ).toBeNull();
     expect(
       screen.queryByRole("button", { name: /Cadastrar novo centro de custo/ }),
     ).toBeNull();
@@ -4976,33 +4422,33 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   ])(
     "%s: não cria, o foco volta ao seletor com o termo e a admissão fica igual",
     async (_caso, fechar) => {
-      vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+      vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
       montar("rh");
       await aguardarEmpresa();
       preencherParteDaAdmissao();
       abrirLotacao();
-      await buscarNo(cargoSel(), "Nova Referência Sintética");
-      fireEvent.click(opcaoCriar(cargoSel())!);
-      await screen.findByRole("dialog", { name: "Criar cargo" });
+      await buscarNo(unidadeSel(), "Nova Referência Sintética");
+      fireEvent.click(opcaoCriar(unidadeSel())!);
+      await screen.findByRole("dialog", { name: "Criar unidade" });
       fechar();
       await waitFor(() => expect(dialogoCriacao()).toBeNull());
-      await waitFor(() => expect(cargoSel()).toHaveFocus());
-      expect(cargoSel()).toHaveValue("Nova Referência Sintética");
-      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
-      expect(criarCargo).not.toHaveBeenCalled();
+      await waitFor(() => expect(unidadeSel()).toHaveFocus());
+      expect(unidadeSel()).toHaveValue("Nova Referência Sintética");
+      expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
+      expect(criarUnidade).not.toHaveBeenCalled();
       admissaoPreservada();
     },
   );
 
-  /** Abre a confirmação de "Cargo" com um nome sem resultado. */
-  async function abrirConfirmacaoDeCargo() {
-    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
+  /** Abre a confirmação de "Unidade" com um nome sem resultado. */
+  async function abrirConfirmacaoDeUnidade() {
+    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
     montar("rh");
     await aguardarEmpresa();
     abrirLotacao();
-    await buscarNo(cargoSel(), "Nova Referência Sintética");
-    fireEvent.click(opcaoCriar(cargoSel())!);
-    return screen.findByRole("dialog", { name: "Criar cargo" });
+    await buscarNo(unidadeSel(), "Nova Referência Sintética");
+    fireEvent.click(opcaoCriar(unidadeSel())!);
+    return screen.findByRole("dialog", { name: "Criar unidade" });
   }
   /** Ativa "Criar e escolher" como no navegador: o botão recebe o foco. */
   const confirmar = (dialogo: HTMLElement) => {
@@ -5014,46 +4460,48 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   };
 
   it("nome já em uso (ativo): oferece escolher a existente, sem criar outra", async () => {
-    vi.mocked(criarCargo).mockRejectedValue(
+    vi.mocked(criarUnidade).mockRejectedValue(
       Object.assign(recusaDeReferencia(409, "nome_em_uso"), {
         referencia: {
-          id: cargoNovo.id,
-          codigo: "CAR_EXISTENTE",
+          id: unidadeNova.id,
+          codigo: "UNI_EXISTENTE",
           nome: "Nova Referência Sintética",
         },
       }),
     );
-    const dialogo = await abrirConfirmacaoDeCargo();
+    const dialogo = await abrirConfirmacaoDeUnidade();
     confirmar(dialogo);
     const alerta = await within(dialogo).findByRole("alert");
-    expect(alerta).toHaveTextContent("Já existe um cargo ativo com este nome");
     expect(alerta).toHaveTextContent(
-      "CAR_EXISTENTE — Nova Referência Sintética",
+      "Já existe uma unidade ativa com este nome",
+    );
+    expect(alerta).toHaveTextContent(
+      "UNI_EXISTENTE — Nova Referência Sintética",
     );
     expect(
       within(dialogo).queryByRole("button", { name: "Criar e escolher" }),
     ).toBeNull();
     // A ação em foco virou "Escolher …" sem sair da tela: o foco fica nela.
     const escolher = within(dialogo).getByRole("button", {
-      name: "Escolher CAR_EXISTENTE — Nova Referência Sintética",
+      name: "Escolher UNI_EXISTENTE — Nova Referência Sintética",
     });
     expect(escolher).toHaveFocus();
     fireEvent.click(escolher);
     await waitFor(() => expect(dialogoCriacao()).toBeNull());
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      "Escolha atual: CAR_EXISTENTE — Nova Referência Sintética",
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      "Escolha atual: UNI_EXISTENTE — Nova Referência Sintética",
     );
-    expect(statusDo(cargoSel())).toBe(
-      "Escolhido: CAR_EXISTENTE — Nova Referência Sintética.",
+    expect(statusDo(unidadeSel())).toBe(
+      "Escolhido: UNI_EXISTENTE — Nova Referência Sintética.",
     );
-    expect(criarCargo).toHaveBeenCalledTimes(1);
+    expect(criarUnidade).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     [
       "nome_inativo",
       recusaDeReferencia(409, "nome_inativo"),
-      "Já existe um cargo inativo com este nome, e nada foi criado.",
+      "Já existe uma unidade inativa com este nome, e nada foi criado.",
     ],
     [
       "codigo_indisponivel",
@@ -5068,7 +4516,7 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     [
       "403",
       recusaDeReferencia(403),
-      "Seu perfil não tem permissão para criar cargos.",
+      "Seu perfil não tem permissão para criar unidades.",
     ],
     [
       "404",
@@ -5078,8 +4526,8 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   ])(
     "%s: mensagem no diálogo, sem nova tentativa e sem escolher nada",
     async (_caso, erro, mensagem) => {
-      vi.mocked(criarCargo).mockRejectedValue(erro);
-      const dialogo = await abrirConfirmacaoDeCargo();
+      vi.mocked(criarUnidade).mockRejectedValue(erro);
+      const dialogo = await abrirConfirmacaoDeUnidade();
       confirmar(dialogo);
       // A ação principal, que tinha o foco, sai; o foco vai à mensagem, dentro
       // do diálogo, e não ao corpo da página.
@@ -5095,7 +4543,7 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       ).toBeNull();
       // Lida uma vez, pelo foco: sem `alert` repetindo a mesma mensagem.
       expect(within(dialogo).queryByRole("alert")).toBeNull();
-      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
     },
   );
 
@@ -5135,13 +4583,13 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   ])(
     "%s: diz que nada foi criado e permite confirmar de novo, que então cria",
     async (_caso, erro, mensagem) => {
-      vi.mocked(criarCargo)
+      vi.mocked(criarUnidade)
         .mockRejectedValueOnce(erro)
         .mockResolvedValueOnce({
-          ...cargoNovo,
+          ...unidadeNova,
           nome: "Nova Referência Sintética",
         });
-      const dialogo = await abrirConfirmacaoDeCargo();
+      const dialogo = await abrirConfirmacaoDeUnidade();
       confirmar(dialogo);
       expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
         mensagem,
@@ -5150,13 +4598,13 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
       expect(
         within(dialogo).getByRole("button", { name: "Criar e escolher" }),
       ).toHaveFocus();
-      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
       confirmar(dialogo);
       await waitFor(() => expect(dialogoCriacao()).toBeNull());
-      expect(escolhaDe(cargoSel())).toHaveTextContent(
-        `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+      expect(escolhaDe(unidadeSel())).toHaveTextContent(
+        `Escolha atual: ${unidadeNova.codigo} — Nova Referência Sintética`,
       );
-      expect(criarCargo).toHaveBeenCalledTimes(2);
+      expect(criarUnidade).toHaveBeenCalledTimes(2);
     },
   );
 
@@ -5166,71 +4614,71 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   ])(
     "%s: não afirma que criou; confirmar de novo devolve a já criada para escolher",
     async (_caso, erro) => {
-      vi.mocked(criarCargo)
+      vi.mocked(criarUnidade)
         .mockRejectedValueOnce(erro)
         .mockRejectedValueOnce(
           Object.assign(recusaDeReferencia(409, "nome_em_uso"), {
             referencia: {
-              id: cargoNovo.id,
-              codigo: cargoNovo.codigo,
+              id: unidadeNova.id,
+              codigo: unidadeNova.codigo,
               nome: "Nova Referência Sintética",
             },
           }),
         );
-      const dialogo = await abrirConfirmacaoDeCargo();
+      const dialogo = await abrirConfirmacaoDeUnidade();
       confirmar(dialogo);
       const alerta = await within(dialogo).findByRole("alert");
       expect(alerta).toHaveTextContent(
-        "Não foi possível confirmar se o cargo foi criado.",
+        "Não foi possível confirmar se a unidade foi criada.",
       );
       expect(alerta).not.toHaveTextContent(/criado e escolhido/i);
       expect(
         within(dialogo).getByRole("button", { name: "Criar e escolher" }),
       ).toHaveFocus();
-      expect(escolhaDe(cargoSel())).toHaveTextContent("Nenhuma escolha.");
+      expect(escolhaDe(unidadeSel())).toHaveTextContent("Nenhuma escolha.");
       confirmar(dialogo);
       fireEvent.click(
         await within(dialogo).findByRole("button", {
-          name: `Escolher ${cargoNovo.codigo} — Nova Referência Sintética`,
+          name: `Escolher ${unidadeNova.codigo} — Nova Referência Sintética`,
         }),
       );
       await waitFor(() => expect(dialogoCriacao()).toBeNull());
-      expect(escolhaDe(cargoSel())).toHaveTextContent(
-        `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+      expect(escolhaDe(unidadeSel())).toHaveTextContent(
+        `Escolha atual: ${unidadeNova.codigo} — Nova Referência Sintética`,
       );
     },
   );
 
   it("duplo clique cria uma vez; durante o envio o diálogo não fecha e a resposta atrasada escolhe", async () => {
-    let liberar: (v: CargoApi) => void = () => undefined;
-    vi.mocked(criarCargo).mockReturnValue(
+    let liberar: (v: UnidadeOrganizacionalApi) => void = () => undefined;
+    vi.mocked(criarUnidade).mockReturnValue(
       new Promise((r) => {
         liberar = r;
       }),
     );
-    const dialogo = await abrirConfirmacaoDeCargo();
+    const dialogo = await abrirConfirmacaoDeUnidade();
     confirmar(dialogo);
     confirmar(dialogo);
-    expect(criarCargo).toHaveBeenCalledTimes(1);
+    expect(criarUnidade).toHaveBeenCalledTimes(1);
     expect(
       within(dialogo).getByRole("button", { name: "Criando…" }),
     ).toHaveAttribute("aria-disabled", "true");
     fireEvent.keyDown(document, { key: "Escape" });
     expect(dialogoCriacao()).not.toBeNull();
     await act(async () =>
-      liberar({ ...cargoNovo, nome: "Nova Referência Sintética" }),
+      liberar({ ...unidadeNova, nome: "Nova Referência Sintética" }),
     );
     await waitFor(() => expect(dialogoCriacao()).toBeNull());
-    expect(escolhaDe(cargoSel())).toHaveTextContent(
-      `Escolha atual: ${cargoNovo.codigo} — Nova Referência Sintética`,
+    expect(escolhaDe(unidadeSel())).toHaveTextContent(
+      `Escolha atual: ${unidadeNova.codigo} — Nova Referência Sintética`,
     );
   });
 
   it("troca de empresa: a confirmação aberta e o envio contam como edição; a resposta depois da troca não escolhe nada", async () => {
     const registro = new RegistroDeEdicoes();
-    let liberar: (v: CargoApi) => void = () => undefined;
-    vi.mocked(listarCargos).mockResolvedValue(paginado([]));
-    vi.mocked(criarCargo).mockReturnValue(
+    let liberar: (v: UnidadeOrganizacionalApi) => void = () => undefined;
+    vi.mocked(listarUnidades).mockResolvedValue(paginado([]));
+    vi.mocked(criarUnidade).mockReturnValue(
       new Promise((r) => {
         liberar = r;
       }),
@@ -5246,18 +4694,20 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
     );
     await aguardarEmpresa();
     abrirLotacao();
-    await buscarNo(cargoSel(), "Nova Referência Sintética");
-    fireEvent.click(opcaoCriar(cargoSel())!);
-    const dialogo = await screen.findByRole("dialog", { name: "Criar cargo" });
-    expect(registro.obter().pendentes).toContain("Criar cargo");
+    await buscarNo(unidadeSel(), "Nova Referência Sintética");
+    fireEvent.click(opcaoCriar(unidadeSel())!);
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Criar unidade",
+    });
+    expect(registro.obter().pendentes).toContain("Criar unidade");
     confirmar(dialogo);
     await waitFor(() =>
-      expect(registro.obter().salvando).toContain("Criar cargo"),
+      expect(registro.obter().salvando).toContain("Criar unidade"),
     );
     // A troca de empresa remonta a página (T189): a anterior sai de cena.
     unmount();
     await act(async () =>
-      liberar({ ...cargoNovo, nome: "Nova Referência Sintética" }),
+      liberar({ ...unidadeNova, nome: "Nova Referência Sintética" }),
     );
     expect(registro.obter()).toEqual({ pendentes: [], salvando: [] });
   });
@@ -5277,6 +4727,294 @@ describe("T197 — criação inline de referências na Nova admissão", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// T209 — a Nova admissão como assistente operacional: cabeçalho próprio com
+// "Voltar para Colaboradores", etapas à esquerda (no desktop), conteúdo em uma
+// coluna e rodapé fixo com o progresso e as ações. Só campos reais: sem foto,
+// CPF, RG, documentos nem "Salvar rascunho".
+// ---------------------------------------------------------------------------
+const ETAPAS_REAIS = [
+  "Dados básicos",
+  "Dados profissionais",
+  "Endereço",
+  "Revisão e conclusão",
+];
+
+const rodape = () =>
+  document.querySelector<HTMLElement>(".cadastro-etapas__rodape")!;
+
+function botoesDoRodape(): string[] {
+  return within(rodape())
+    .getAllByRole("button")
+    .map((b) => b.textContent ?? "");
+}
+
+describe("T209 — Nova admissão como assistente de etapas", () => {
+  it("cabeçalho próprio: título, descrição curta e 'Voltar para Colaboradores'", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    const cabecalho = document.querySelector<HTMLElement>(
+      ".cadastro-etapas__cabecalho",
+    )!;
+    expect(
+      within(cabecalho).getByRole("heading", {
+        level: 1,
+        name: "Novo colaborador",
+      }),
+    ).toBeInTheDocument();
+    expect(cabecalho).toHaveTextContent(
+      "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+    );
+    fireEvent.click(
+      within(cabecalho).getByRole("button", {
+        name: "Voltar para Colaboradores",
+      }),
+    );
+    // Sem nada digitado, sai direto (o mesmo caminho do Cancelar).
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("com dados digitados, 'Voltar para Colaboradores' pergunta antes de sair (guarda)", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    );
+    expect(
+      screen.getByRole("alertdialog", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("as etapas são as reais, na ordem; nenhuma de documentos", async () => {
+    montar();
+    await aguardarEmpresa();
+    const nav = screen.getByRole("navigation", { name: "Etapas do cadastro" });
+    expect(
+      [...nav.querySelectorAll(".cadastro-etapas__etapa-nome")].map(
+        (e) => e.firstChild?.textContent,
+      ),
+    ).toEqual(ETAPAS_REAIS);
+    // T209 — o subtítulo de cada etapa, embaixo do nome.
+    expect(
+      [...nav.querySelectorAll(".cadastro-etapas__etapa-sub")].map(
+        (e) => e.textContent,
+      ),
+    ).toEqual([
+      "Identificação e contatos",
+      "Lotação e contrato",
+      "CEP e endereço",
+      "Resumo final",
+    ]);
+    expect(
+      screen.getByRole("heading", { level: 2, name: /Dados básicos$/ }),
+    ).toBeVisible();
+  });
+
+  it("nada que o contrato não suporta: sem PIS nem upload de documento (CPF, RG, rascunho e foto existem, T209)", async () => {
+    montar();
+    await aguardarEmpresa();
+    const formulario = screen.getByRole("form", {
+      name: "Formulário de nova admissão",
+    });
+    // T209 — o único arquivo é a foto opcional (PNG ou JPEG).
+    const arquivos = formulario.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    // T209 — CPF e RG entraram na etapa 1; continua sem campo de documento.
+    for (const proibido of [/\bPIS\b/, /Carteira de Trabalho/]) {
+      expect(
+        screen
+          .queryAllByLabelText(proibido)
+          .filter((e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName)),
+      ).toEqual([]);
+    }
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeInTheDocument();
+  });
+
+  it("rodapé fixo: progresso e ações; Cancelar só na primeira etapa; Cadastrar colaborador na última", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(rodape()).toHaveTextContent("25% concluído");
+    expect(within(rodape()).getByRole("progressbar")).toHaveAttribute(
+      "value",
+      "25",
+    );
+    expect(botoesDoRodape()).toEqual(["Cancelar", "Próxima etapa"]);
+
+    await preencherValido();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(rodape()).toHaveTextContent("50% concluído"));
+    expect(botoesDoRodape()).toEqual(["Voltar", "Próxima etapa"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(rodape()).toHaveTextContent("75% concluído"));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(rodape()).toHaveTextContent("100% concluído"));
+    expect(botoesDoRodape()).toEqual(["Voltar", "Cadastrar colaborador"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    await waitFor(() => expect(rodape()).toHaveTextContent("75% concluído"));
+    expect(
+      screen.getByRole("heading", { level: 2, name: /Endereço$/ }),
+    ).toHaveFocus();
+  });
+
+  it("Próxima etapa valida só a etapa atual: com erro, fica e foca o primeiro campo inválido", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    expect(rodape()).toHaveTextContent("25% concluído");
+    await waitFor(() => expect(nome()).toHaveFocus());
+    expect(nome()).toHaveAttribute("aria-invalid", "true");
+  });
+});
+
+describe("T209 — assistente: teclado, Escape e guarda de saída", () => {
+  it("Escape na pergunta de saída mantém a etapa e os dados e devolve o foco a 'Voltar para Colaboradores'", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    irAteEtapa("Endereço");
+    const voltar = screen.getByRole("button", {
+      name: "Voltar para Colaboradores",
+    });
+    voltar.focus();
+    fireEvent.click(voltar);
+    await screen.findByRole("alertdialog", { name: "Sair sem salvar?" });
+    fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", { name: "Sair sem salvar?" }),
+      ).toBeNull(),
+    );
+    expect(onSair).not.toHaveBeenCalled();
+    expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
+    expect(nome()).toHaveValue("  Pessoa Sintética Nova ");
+    await waitFor(() => expect(voltar).toHaveFocus());
+  });
+
+  it("'Sair sem salvar' na pergunta sai pelo mesmo caminho do Cancelar", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Sintética" } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    );
+    const dialogo = await screen.findByRole("alertdialog", {
+      name: "Sair sem salvar?",
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Sair sem salvar" }),
+    );
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("Enter num campo vale como 'Próxima etapa' e leva o foco ao título da etapa seguinte", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    fireEvent.submit(
+      screen.getByRole("form", { name: "Formulário de nova admissão" }),
+    );
+    await waitFor(() =>
+      expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/),
+    );
+    expect(tituloDaEtapa()).toHaveFocus();
+    expect(rodape()).toHaveTextContent("50% concluído");
+  });
+
+  it("o rodapé fica dentro do formulário: 'Próxima etapa'/'Concluir' são o envio dele", async () => {
+    montar();
+    await aguardarEmpresa();
+    const formulario = screen.getByRole("form", {
+      name: "Formulário de nova admissão",
+    });
+    expect(formulario).toContainElement(rodape());
+    expect(
+      screen.getByRole("button", { name: "Próxima etapa" }),
+    ).toHaveAttribute("type", "submit");
+    expect(botaoSair()).toHaveAttribute("type", "button");
+  });
+});
+
+describe("T209 — contrato de CSS do assistente (desktop e 375 px)", () => {
+  const css = readFileSync(
+    "src/screens/pessoas/NovaAdmissaoScreen.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  // T209 — a moldura saiu para o padrão compartilhado; o bloco da tela
+  // começa no que é só dela (foto, endereço, linhas da etapa 2).
+  const inicio = css.indexOf("/* ---- T209 — foto opcional");
+  const bloco = inicio > -1 ? css.slice(inicio) : "";
+  // T209 — a moldura (etapas, corpo, rodapé) é a do padrão compartilhado.
+  const compartilhado = readFileSync(
+    "src/components/cadastro/CadastroEmEtapas.css",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  it("o bloco existe e usa só tokens", () => {
+    expect(inicio).toBeGreaterThan(-1);
+    // T209 — o novo desenho (2026-11-17) define as próprias cores como
+    // propriedades personalizadas (`--cadastro-…`); fora dessas definições,
+    // as regras só usam tokens.
+    const regras = bloco.replace(/^\s*--[\w-]+\s*:[^;]*;/gm, "");
+    expect(regras).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(regras).not.toMatch(/\brgba?\(|\bhsla?\(/);
+    // E as cores literais ficam só nessas definições.
+    for (const cor of bloco.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+      expect(bloco).toMatch(
+        new RegExp(String.raw`--cadastro-[\w-]+:\s*${cor};`),
+      );
+    }
+  });
+
+  it("desktop: etapas à esquerda (fixas ao rolar) e o conteúdo em uma coluna", () => {
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas \{[^}]*container-type: inline-size;/,
+    );
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__corpo \{[^}]*grid-template-columns: minmax\(0, 15rem\) minmax\(0, 1fr\);/,
+    );
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__etapas \{[^}]*position: sticky;/,
+    );
+    expect(compartilhado).toMatch(
+      /@container \(min-width: 52rem\) \{[^@]*\.cadastro-etapas__etapas-lista \{[^}]*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+
+  it("rodapé fixo ao pé da tela, com divisor, que quebra linha em vez de alargar", () => {
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas__rodape \{[^}]*position: sticky;[^}]*bottom: 0;[^}]*flex-wrap: wrap;[^}]*border-top: var\(--divisor\);/,
+    );
+    expect(compartilhado).toMatch(
+      /\.cadastro-etapas__rodape-acoes \{[^}]*flex-wrap: wrap;/,
+    );
+  });
+
+  it("375 px: rodapé em grade de duas linhas — progresso e Cancelar; Voltar e a ação principal larga", () => {
+    const celular = compartilhado.slice(
+      compartilhado.lastIndexOf("@media (max-width: 640px)"),
+    );
+    expect(celular).toMatch(
+      /\.cadastro-etapas__rodape \{[^}]*display: grid;[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto;/,
+    );
+    expect(celular).toMatch(
+      /\.cadastro-etapas__rodape-acoes \{\s*display: contents;/,
+    );
+    expect(celular).toMatch(
+      /\.cadastro-etapas__rodape-acoes > \[type="submit"\] \{[^}]*grid-column: 2 \/ 4;/,
+    );
+    expect(celular).toMatch(
+      /\.cadastro-etapas__rodape-acoes > \[type="submit"\]:nth-child\(2\) \{[^}]*grid-column: 1 \/ 4;/,
+    );
+  });
+});
+
 /**
  * T200 — as telas montadas como no shell: com o registro de edições e a
  * guarda de saída (sem ela, a saída não pergunta).
@@ -5287,3 +5025,730 @@ function render(
 ) {
   return renderSemGuarda(ui, { wrapper: ComGuardaDeSaida, ...opcoes });
 }
+
+describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", () => {
+  it("título, subtítulo, Salvar rascunho e só a frase da empresa ativa", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Novo colaborador" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Você está cadastrando um novo colaborador para:/),
+    ).toHaveTextContent(
+      "Você está cadastrando um novo colaborador para: Empresa Sintética (teste)",
+    );
+    expect(
+      screen.getByRole("button", { name: "Voltar para Colaboradores" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sem aviso interno, explicação longa, documentos futuros, trilha repetida nem upload", async () => {
+    montar();
+    await aguardarEmpresa();
+    const corpo = document.body.textContent ?? "";
+    expect(corpo).not.toMatch(/Módulo 1/);
+    expect(corpo).not.toMatch(/não é editável/i);
+    expect(corpo).not.toMatch(/Documentos serão liberados/);
+    expect(corpo).not.toMatch(/T209|em desenvolvimento|branch/i);
+    expect(screen.queryByRole("navigation", { name: /trilha/i })).toBeNull();
+    // T209 — o único arquivo é a foto opcional; nenhum upload de documento.
+    const arquivos = document.querySelectorAll('input[type="file"]');
+    expect(arquivos).toHaveLength(1);
+    expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+  });
+
+  it("as quatro etapas, nos nomes pedidos", async () => {
+    montar();
+    await aguardarEmpresa();
+    const etapas = screen.getByRole("navigation", { name: /Etapas/ });
+    expect(etapas).toHaveTextContent("Dados básicos");
+    expect(etapas).toHaveTextContent("Dados profissionais");
+    expect(etapas).toHaveTextContent("Endereço");
+    expect(etapas).toHaveTextContent("Revisão e conclusão");
+  });
+});
+
+describe("T209 — rascunho da Nova admissão (persistente no servidor)", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:30:00.000Z",
+    });
+    vi.mocked(descartarRascunhoAdmissao).mockResolvedValue(undefined);
+  });
+
+  it("Salvar rascunho grava só o formulário — nunca admite nem envia foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.change(dataNascimento(), { target: { value: "1990-05-20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() =>
+      expect(salvarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+    const dados = vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0];
+    expect(dados.etapa).toBe(0);
+    expect(dados.campos?.nome).toBe("Pessoa Rascunho");
+    expect(dados.perfil?.dataNascimento).toBe("1990-05-20");
+    expect(JSON.stringify(dados)).not.toMatch(/foto|arquivo/i);
+    expect(admitirColaborador).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Rascunho salvo/)).toBeInTheDocument();
+  });
+
+  it("depois de salvo e sem mudanças, sair não pergunta; mudou de novo, pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await screen.findByText(/Rascunho salvo/);
+    fireEvent.click(botaoSair());
+    expect(onSair).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho 2" } });
+    fireEvent.click(botaoSair());
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).toHaveBeenCalledTimes(1);
+  });
+
+  it("falha ao salvar o rascunho: avisa, mantém os dados e a guarda", async () => {
+    vi.mocked(salvarRascunhoAdmissao).mockRejectedValueOnce(
+      new ApiError(500, "erro", {}),
+    );
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(
+      await screen.findByText(
+        "Não foi possível salvar o rascunho agora. Os dados digitados continuam aqui.",
+      ),
+    ).toBeInTheDocument();
+    expect(nome()).toHaveValue("Pessoa Rascunho");
+    fireEvent.click(botaoSair());
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("recupera o rascunho salvo (da conta, na empresa ativa): campos, referência e etapa", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue({
+      versao: 3,
+      atualizadoEm: "2026-11-15T13:00:00.000Z",
+      dados: {
+        etapa: 1,
+        campos: {
+          nome: "Pessoa Recuperada",
+          tipo: "clt",
+          departamentoId: departamento.id,
+        },
+        perfil: { dataNascimento: "1991-02-03" },
+        referencias: {
+          departamento: {
+            id: departamento.id,
+            codigo: departamento.codigo,
+            nome: departamento.nome,
+          },
+        },
+      },
+    });
+    montar();
+    await aguardarEmpresa();
+    expect(
+      await screen.findByText(/Rascunho de 15\/11\/2026.* recuperado/),
+    ).toBeInTheDocument();
+    expect(tituloDaEtapa()).toHaveTextContent("Dados profissionais");
+    expect(escolhaDe(departamentoSel())).toHaveTextContent(departamento.nome);
+    expect(nome()).toHaveValue("Pessoa Recuperada");
+  });
+
+  it("Descartar rascunho apaga no servidor e limpa o formulário", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-15T13:00:00.000Z",
+      dados: { etapa: 0, campos: { nome: "Pessoa Recuperada" } },
+    });
+    montar();
+    await aguardarEmpresa();
+    await screen.findByText(/recuperado/);
+    fireEvent.click(screen.getByRole("button", { name: "Descartar rascunho" }));
+    await waitFor(() =>
+      expect(descartarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() => expect(nome()).toHaveValue(""));
+  });
+
+  it("concluir a admissão apaga o rascunho", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(descartarRascunhoAdmissao).toHaveBeenCalledTimes(1),
+    );
+  });
+
+  it("com a leitura do rascunho falhando, a página começa vazia", async () => {
+    vi.mocked(obterRascunhoAdmissao).mockRejectedValue(new Error("rede"));
+    montar();
+    await aguardarEmpresa();
+    expect(nome()).toHaveValue("");
+    expect(screen.queryByText(/recuperado/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — foto opcional do colaborador (ADR 0020). Escolhida na etapa 1, com
+// prévia local; enviada só DEPOIS de a admissão ser concluída; a falha da
+// foto nunca desfaz a admissão e permite nova tentativa. Nunca vai para o
+// rascunho.
+// ---------------------------------------------------------------------------
+function arquivoDeFoto(
+  nomeDoArquivo = "retrato.png",
+  tipo = "image/png",
+  tamanho = 2048,
+): File {
+  const arquivo = new File([new Uint8Array(8)], nomeDoArquivo, { type: tipo });
+  Object.defineProperty(arquivo, "size", { value: tamanho });
+  return arquivo;
+}
+
+const campoDaFoto = () =>
+  document.getElementById("nova-admissao-foto-arquivo") as HTMLInputElement;
+const escolherFoto = (arquivo: File) =>
+  fireEvent.change(campoDaFoto(), { target: { files: [arquivo] } });
+const blocoDaFoto = () => screen.getByRole("group", { name: "Foto" });
+
+describe("T209 — foto do colaborador na Nova admissão", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:30:00.000Z",
+    });
+    vi.mocked(descartarRascunhoAdmissao).mockResolvedValue(undefined);
+    vi.mocked(enviarFotoColaborador).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-16T15:31:00.000Z",
+    });
+    let n = 0;
+    URL.createObjectURL = vi.fn(() => `blob:previa-${++n}`);
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => {
+    vi.mocked(URL.createObjectURL).mockReset();
+    vi.mocked(URL.revokeObjectURL).mockReset();
+  });
+
+  it("etapa 1: avatar neutro, Enviar foto, regras; sem Remover antes de escolher", async () => {
+    montar();
+    await aguardarEmpresa();
+    const bloco = blocoDaFoto();
+    expect(
+      within(bloco).getByRole("button", { name: "Enviar foto" }),
+    ).toBeVisible();
+    expect(within(bloco).queryByRole("button", { name: "Remover" })).toBeNull();
+    expect(within(bloco).queryByRole("img")).toBeNull();
+    expect(bloco).toHaveTextContent("PNG ou JPG, até 5 MB.");
+    expect(campoDaFoto()).toHaveAttribute("accept", "image/png,image/jpeg");
+  });
+
+  it("escolher PNG mostra a prévia local e o Remover; nada é enviado ainda", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    const previa = await within(blocoDaFoto()).findByRole("img", {
+      name: "Prévia da foto do colaborador",
+    });
+    expect(previa).toHaveAttribute("src", "blob:previa-1");
+    expect(
+      within(blocoDaFoto()).getByRole("button", { name: "Remover" }),
+    ).toBeVisible();
+    expect(enviarFotoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("JPEG (.jpeg) também é aceito", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto("retrato.jpeg", "image/jpeg"));
+    expect(
+      await within(blocoDaFoto()).findByRole("img", {
+        name: "Prévia da foto do colaborador",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["GIF", "anim.gif", "image/gif", 2048, "Use uma imagem PNG ou JPEG."],
+    ["WebP", "a.webp", "image/webp", 2048, "Use uma imagem PNG ou JPEG."],
+    [
+      "extensão trocada",
+      "a.txt",
+      "image/png",
+      2048,
+      "Use uma imagem PNG ou JPEG.",
+    ],
+    [
+      "tipo diferente da extensão",
+      "a.png",
+      "image/jpeg",
+      2048,
+      "Use uma imagem PNG ou JPEG.",
+    ],
+    [
+      "acima de 5 MB",
+      "grande.png",
+      "image/png",
+      5 * 1024 * 1024 + 1,
+      "A foto deve ter até 5 MB.",
+    ],
+  ])(
+    "recusa no navegador: %s",
+    async (_rotulo, nomeDoArquivo, tipo, tamanho, mensagem) => {
+      montar();
+      await aguardarEmpresa();
+      escolherFoto(arquivoDeFoto(nomeDoArquivo, tipo, tamanho));
+      expect(
+        await within(blocoDaFoto()).findByText(mensagem),
+      ).toBeInTheDocument();
+      expect(within(blocoDaFoto()).queryByRole("img")).toBeNull();
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+    },
+  );
+
+  it("Remover tira a prévia, libera a URL local e devolve o foco ao Enviar foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(
+      await within(blocoDaFoto()).findByRole("button", { name: "Remover" }),
+    );
+    expect(within(blocoDaFoto()).queryByRole("img")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:previa-1");
+    await waitFor(() =>
+      expect(
+        within(blocoDaFoto()).getByRole("button", { name: "Enviar foto" }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("trocar a foto libera a prévia anterior", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await within(blocoDaFoto()).findByRole("img");
+    escolherFoto(arquivoDeFoto("outra.jpg", "image/jpeg"));
+    await waitFor(() =>
+      expect(within(blocoDaFoto()).getByRole("img")).toHaveAttribute(
+        "src",
+        "blob:previa-2",
+      ),
+    );
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:previa-1");
+  });
+
+  it("a foto só é enviada DEPOIS da admissão, para o colaborador criado", async () => {
+    montar();
+    await aguardarEmpresa();
+    const arquivo = arquivoDeFoto();
+    escolherFoto(arquivo);
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(enviarFotoColaborador).toHaveBeenCalledTimes(1));
+    expect(enviarFotoColaborador).toHaveBeenCalledWith(resposta.id, arquivo);
+    expect(
+      vi.mocked(admitirColaborador).mock.invocationCallOrder[0]!,
+    ).toBeLessThan(
+      vi.mocked(enviarFotoColaborador).mock.invocationCallOrder[0]!,
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    // A admissão não leva a foto.
+    expect(
+      JSON.stringify(vi.mocked(admitirColaborador).mock.calls[0]),
+    ).not.toMatch(/foto|blob:/i);
+  });
+
+  it("sem foto escolhida, nada é enviado e a confirmação não fala de foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await screen.findByRole("heading", { name: /Admissão de .* registrada/ });
+    expect(enviarFotoColaborador).not.toHaveBeenCalled();
+    expect(screen.queryByText(/foto/i)).toBeNull();
+  });
+
+  it("falha da foto: a admissão fica, o aviso é claro e a nova tentativa envia de novo", async () => {
+    vi.mocked(enviarFotoColaborador)
+      .mockRejectedValueOnce(recusa(503))
+      .mockResolvedValueOnce({
+        versao: 1,
+        atualizadoEm: "2026-11-16T15:32:00.000Z",
+      });
+    montar();
+    await aguardarEmpresa();
+    const arquivo = arquivoDeFoto();
+    escolherFoto(arquivo);
+    await preencherValido();
+    await salvarEConfirmar();
+    expect(
+      await screen.findByRole("heading", { name: /Admissão de .* registrada/ }),
+    ).toBeInTheDocument();
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "O colaborador foi criado, mas a foto não foi salva.",
+    );
+    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tentar enviar foto novamente" }),
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    expect(enviarFotoColaborador).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(enviarFotoColaborador).mock.calls[1]).toEqual([
+      resposta.id,
+      arquivo,
+    ]);
+    // A nova tentativa nunca admite de novo.
+    expect(admitirColaborador).toHaveBeenCalledTimes(1);
+  });
+
+  it("recusa da foto pelo servidor: diz o motivo e oferece escolher outra", async () => {
+    vi.mocked(enviarFotoColaborador)
+      .mockRejectedValueOnce(recusa(422, { codigo: "foto_pequena" }))
+      .mockResolvedValueOnce({
+        versao: 1,
+        atualizadoEm: "2026-11-16T15:33:00.000Z",
+      });
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await preencherValido();
+    await salvarEConfirmar();
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(
+      "O colaborador foi criado, mas a foto não foi salva.",
+    );
+    expect(alerta).toHaveTextContent(
+      "A imagem é pequena demais: use ao menos 64 × 64 pixels.",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Tentar enviar foto novamente" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Escolher outra foto" }),
+    ).toBeVisible();
+    const outra = arquivoDeFoto("maior.jpg", "image/jpeg");
+    fireEvent.change(
+      document.getElementById("nova-admissao-foto-outra") as HTMLInputElement,
+      { target: { files: [outra] } },
+    );
+    expect(await screen.findByText("Foto salva.")).toBeInTheDocument();
+    expect(vi.mocked(enviarFotoColaborador).mock.calls[1]).toEqual([
+      resposta.id,
+      outra,
+    ]);
+  });
+
+  it("só a foto escolhida já é alteração: sair pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(botaoSair());
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("o rascunho nunca leva a foto; com foto escolhida, sair ainda pergunta", async () => {
+    const { onSair } = montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    escolherFoto(arquivoDeFoto());
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await screen.findByText(/Rascunho salvo/);
+    const dados = vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0];
+    expect(JSON.stringify(dados)).not.toMatch(/foto|arquivo|blob:/i);
+    fireEvent.click(botaoSair());
+    expect(
+      await screen.findByRole("heading", { name: "Sair sem salvar?" }),
+    ).toBeInTheDocument();
+    expect(onSair).not.toHaveBeenCalled();
+  });
+
+  it("Registrar outra admissão começa sem foto", async () => {
+    montar();
+    await aguardarEmpresa();
+    escolherFoto(arquivoDeFoto());
+    await preencherValido();
+    await salvarEConfirmar();
+    await screen.findByText("Foto salva.");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Registrar outra admissão" }),
+    );
+    await waitFor(() =>
+      expect(within(blocoDaFoto()).queryByRole("img")).toBeNull(),
+    );
+    expect(
+      within(blocoDaFoto()).queryByRole("button", { name: "Remover" }),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T209 — etapa 1 do Novo colaborador (decisão de 2026-11-17): seções,
+// linhas (rótulo e ajuda à esquerda, campos à direita), textos, listas e
+// regras. Nome com pelo menos 3 letras; CPF obrigatório; nascimento opcional.
+// ---------------------------------------------------------------------------
+describe("T209 — etapa 1: dados básicos", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+  });
+
+  const etapa1 = () =>
+    screen
+      .getByRole("heading", { level: 2, name: /Dados básicos$/ })
+      .closest("section") as HTMLElement;
+
+  it("cabeçalho da etapa: título, descrição e o selo 'Etapa 1 de 4'", async () => {
+    montar();
+    await aguardarEmpresa();
+    const painel = etapa1();
+    expect(painel).toHaveTextContent("Quem é a pessoa e como falar com ela.");
+    expect(
+      painel.querySelector(".cadastro-etapas__etapa-selo"),
+    ).toHaveTextContent("Etapa 1 de 4");
+  });
+
+  it("três seções, na ordem, com as descrições", async () => {
+    montar();
+    await aguardarEmpresa();
+    const secoes = [...etapa1().querySelectorAll("h3")].map((h) => [
+      h.textContent,
+      h.nextElementSibling?.textContent,
+    ]);
+    expect(secoes).toEqual([
+      ["Identificação", "Dados que identificam a pessoa no Evolli."],
+      ["Contato", "Como a empresa fala com a pessoa."],
+      ["Contato de emergência", "Quem avisar se algo acontecer."],
+    ]);
+  });
+
+  it("as linhas, na ordem, com as ajudas", async () => {
+    montar();
+    await aguardarEmpresa();
+    const linhas = [
+      ...etapa1().querySelectorAll(".cadastro-etapas__linha-rotulo"),
+    ].map((l) => [...l.children].map((c) => c.textContent));
+    expect(linhas).toEqual([
+      ["Foto", "Mostrada na lista e na ficha."],
+      ["Nome completo", "Igual ao documento de identidade."],
+      ["CPF e RG", "Documentos de identificação da pessoa."],
+      ["Data de nascimento"],
+      ["Gênero e estado civil"],
+      ["E-mail pessoal", "O e-mail particular, não o da empresa."],
+      ["Telefone pessoal", "Com DDD."],
+      ["Nome do contato"],
+      ["Telefone do contato"],
+    ]);
+  });
+
+  it("placeholders dos campos", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(nome()).toHaveAttribute("placeholder", "Nome completo");
+    expect(cpf()).toHaveAttribute("placeholder", "000.000.000-00");
+    expect(screen.getByLabelText("RG")).toHaveAttribute(
+      "placeholder",
+      "00.000.000-0",
+    );
+    expect(emailPessoal()).toHaveAttribute("placeholder", "email@exemplo.com");
+    expect(celular()).toHaveAttribute("placeholder", "(00) 00000-0000");
+    expect(screen.getByLabelText("Nome do contato")).toHaveAttribute(
+      "placeholder",
+      "Nome do contato",
+    );
+    expect(telefone()).toHaveAttribute("placeholder", "(00) 00000-0000");
+  });
+
+  it("gênero e estado civil: 'Selecione' e as opções", async () => {
+    montar();
+    await aguardarEmpresa();
+    const opcoes = (rotulo: string) =>
+      [...(screen.getByLabelText(rotulo) as HTMLSelectElement).options].map(
+        (o) => o.textContent,
+      );
+    expect(opcoes("Gênero")).toEqual([
+      "Selecione",
+      "Feminino",
+      "Masculino",
+      "Outro",
+      "Prefiro não informar",
+    ]);
+    expect(opcoes("Estado civil")).toEqual([
+      "Selecione",
+      "Solteiro(a)",
+      "Casado(a)",
+      "Divorciado(a)",
+      "Viúvo(a)",
+      "União estável",
+    ]);
+  });
+
+  it("saíram da etapa 1: sexo, saudação, nacionalidade, naturalidade, escolaridade, curso, pai, mãe e telefone fixo", async () => {
+    montar();
+    await aguardarEmpresa();
+    for (const rotulo of [
+      /^Sexo/,
+      /^Saudação/,
+      /^Nacionalidade/,
+      /^Naturalidade/,
+      /^Escolaridade/,
+      /^Curso/,
+      /^Nome do pai/,
+      /^Nome da mãe/,
+      /^Celular/,
+      /^Telefone \(opcional\)/,
+    ]) {
+      expect(screen.queryByLabelText(rotulo)).toBeNull();
+    }
+  });
+
+  it("CPF ganha a máscara enquanto se digita", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: "52998224725" } });
+    expect(cpf()).toHaveValue("529.982.247-25");
+    fireEvent.change(cpf(), { target: { value: "529982" } });
+    expect(cpf()).toHaveValue("529.982");
+  });
+
+  it("nome: pelo menos 3 letras", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "A1 B2" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(nome()).toHaveFocus());
+    expect(nome()).toHaveAccessibleDescription(
+      "Informe o nome completo (pelo menos 3 letras).",
+    );
+  });
+
+  it("CPF inválido: mensagem no campo; data de nascimento vazia não acusa", async () => {
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
+    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(cpf()).toHaveAccessibleDescription("Informe um CPF válido.");
+    expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("sem data de nascimento, avança e o corpo leva `null`", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    fireEvent.change(dataNascimento(), { target: { value: "" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal
+        .dataNascimento,
+    ).toBeNull();
+  });
+
+  it("o corpo leva CPF, RG, gênero, estado civil e o contato de emergência", async () => {
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    fireEvent.change(screen.getByLabelText("RG"), {
+      target: { value: " 12.345.678-9 " },
+    });
+    fireEvent.change(screen.getByLabelText("Gênero"), {
+      target: { value: "prefiro_nao_informar" },
+    });
+    fireEvent.change(screen.getByLabelText("Estado civil"), {
+      target: { value: "União estável" },
+    });
+    fireEvent.change(screen.getByLabelText("Nome do contato"), {
+      target: { value: "  Contato   Sintético " },
+    });
+    fireEvent.change(telefone(), { target: { value: "(31) 98888-7777" } });
+    await salvarEConfirmar();
+    await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(admitirColaborador).mock.calls[0]![0].perfilPessoal,
+    ).toMatchObject({
+      cpf: "52998224725",
+      rg: "12.345.678-9",
+      genero: "prefiro_nao_informar",
+      estadoCivil: "União estável",
+      contatoEmergenciaNome: "Contato Sintético",
+      contatoEmergenciaTelefone: "+5531988887777",
+    });
+  });
+
+  it("CPF já cadastrado na empresa (409): mensagem no CPF, na etapa 1", async () => {
+    vi.mocked(admitirColaborador).mockRejectedValueOnce(
+      recusa(409, {
+        erros: [{ campo: "perfilPessoal.cpf", motivo: "em_uso" }],
+      }),
+    );
+    montar();
+    await aguardarEmpresa();
+    await preencherValido();
+    await salvarEConfirmar();
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
+    expect(cpf()).toHaveAccessibleDescription(
+      "Este CPF já está cadastrado nesta empresa.",
+    );
+  });
+
+  it("o rascunho guarda os campos novos da etapa 1", async () => {
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-17T12:00:00.000Z",
+    });
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Pessoa Rascunho" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    fireEvent.change(screen.getByLabelText("Gênero"), {
+      target: { value: "outro" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() => expect(salvarRascunhoAdmissao).toHaveBeenCalled());
+    expect(
+      vi.mocked(salvarRascunhoAdmissao).mock.calls[0]![0].perfil,
+    ).toMatchObject({ cpf: CPF_VALIDO, genero: "outro" });
+  });
+
+  it("rodapé: 'Cancelar' só na etapa 1; o botão final é 'Cadastrar colaborador'", async () => {
+    montar();
+    await aguardarEmpresa();
+    expect(
+      screen.getByRole("button", { name: "Cancelar" }),
+    ).toBeInTheDocument();
+    await ateARevisao();
+    expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    ).toBeInTheDocument();
+  });
+});

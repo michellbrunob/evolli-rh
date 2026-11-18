@@ -15,7 +15,14 @@
  * validação local (dossiê, seção de evidências). Aqui se prende o que as
  * produz — classes, atributos e as regras do CSS.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as renderPuro,
+  screen,
+  within,
+} from "@testing-library/react";
+import { renderComMenuAberto as render } from "../test/menuLateral";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -222,7 +229,9 @@ describe("T206 — trilho de ícones", () => {
     for (const item of barra().querySelectorAll<HTMLElement>(
       ".painel-nav [data-dica]",
     )) {
-      const rotulo = item.getAttribute("data-dica")!;
+      // T209 — item em desenvolvimento: a dica soma ao nome o estado
+      // ("Portal — Em desenvolvimento. …"), que está no DOM como descrição.
+      const rotulo = item.getAttribute("data-dica")!.split(" — ")[0]!;
       expect(item).not.toHaveAttribute("aria-label");
       expect(item.textContent).toContain(rotulo);
     }
@@ -242,7 +251,7 @@ describe("T206 — trilho de ícones", () => {
     expect(document.activeElement).toBe(jornada);
   });
 
-  it.each(["Gestão de Pessoas", "Estrutura", "Liderança", "Demonstração"])(
+  it.each(["Colaboradores", "Estrutura", "Liderança", "Demonstração"])(
     "módulo com submenu (%s): expande o menu, abre o módulo e o foco fica no cabeçalho",
     (modulo) => {
       render(<App papelDoAtor="rh" />);
@@ -290,8 +299,10 @@ describe("T206 — item ativo nos dois estados", () => {
 
   it("destino dentro de submenu: no trilho o cabeçalho herda a marca e a semântica", () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Colaboradores/ }));
-    const cabecalho = screen.getByRole("button", { name: "Gestão de Pessoas" });
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
+    );
+    const cabecalho = screen.getByRole("button", { name: "Colaboradores" });
     expect(cabecalho).not.toHaveAttribute("aria-current");
     expect(cabecalho).not.toHaveClass("painel-nav__cabecalho--contem-ativo");
 
@@ -305,8 +316,10 @@ describe("T206 — item ativo nos dois estados", () => {
 
   it("módulo fechado à mão no menu expandido também carrega a semântica", () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Colaboradores/ }));
-    const cabecalho = screen.getByRole("button", { name: "Gestão de Pessoas" });
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
+    );
+    const cabecalho = screen.getByRole("button", { name: "Colaboradores" });
     fireEvent.click(cabecalho);
     expect(cabecalho).toHaveAttribute("aria-expanded", "false");
     expect(cabecalho).toHaveAttribute("aria-current", "true");
@@ -400,9 +413,25 @@ describe("T206 — dica visual do trilho", () => {
     expect(dica()).toHaveTextContent("Expandir menu");
   });
 
-  it("menu expandido: os itens não têm dica (o texto está à vista)", () => {
+  it("menu expandido: a dica de um item funcional é o sub-rótulo (fora de vista, T209); a dos em desenvolvimento, a explicação", () => {
     render(<App papelDoAtor="rh" />);
-    expect(navegacao().querySelectorAll("[data-dica]")).toHaveLength(0);
+    const comDica = [
+      ...navegacao().querySelectorAll<HTMLElement>("[data-dica]"),
+    ];
+    expect(comDica.length).toBeGreaterThan(0);
+    for (const item of comDica) {
+      if (/--em-desenvolvimento/.test(item.className)) {
+        expect(item).toHaveAttribute(
+          "data-dica",
+          "Em desenvolvimento. Esta funcionalidade ainda não está disponível.",
+        );
+        continue;
+      }
+      // O nome do item não se repete na dica: o texto dele está à vista.
+      const sub = item.querySelector(".painel-nav__sub");
+      expect(sub).not.toBeNull();
+      expect(item).toHaveAttribute("data-dica", sub!.textContent!.trim());
+    }
   });
 });
 
@@ -524,7 +553,10 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
 
   it("gaveta: diálogo modal, fundo inerte, foco no primeiro item (nunca no botão oculto) e Escape devolve ao Menu", () => {
     definirLarguraDaJanela(375);
-    render(<App papelDoAtor="rh" onLogout={() => undefined} menuRecolhido />);
+    // `render` puro: aqui importa o estado inicial de cada cabeçalho.
+    renderPuro(
+      <App papelDoAtor="rh" onLogout={() => undefined} menuRecolhido />,
+    );
     const menu = screen.getByRole("button", { name: "Menu" });
     menu.focus();
     fireEvent.click(menu);
@@ -535,11 +567,19 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
     }
     expect(document.activeElement).not.toBe(botaoRecolher());
     expect(barra().contains(document.activeElement)).toBe(true);
-    // Todos os submenus à vista: a gaveta é sempre o menu inteiro.
+    // A gaveta nunca é o trilho: os submenus funcionais ficam à vista mesmo
+    // com o menu recolhido no desktop. T209 (menu compacto) — Recrutamento
+    // (só itens em desenvolvimento) e Demonstração começam fechados.
+    const fechadosPorPadrao = ["Recrutamento", "Demonstração"];
     for (const cabecalho of barra().querySelectorAll(
       ".painel-nav__cabecalho",
     )) {
-      expect(cabecalho).toHaveAttribute("aria-expanded", "true");
+      expect(cabecalho).toHaveAttribute(
+        "aria-expanded",
+        fechadosPorPadrao.includes(cabecalho.textContent ?? "")
+          ? "false"
+          : "true",
+      );
     }
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();

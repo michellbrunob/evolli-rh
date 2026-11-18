@@ -64,6 +64,12 @@ import {
   contatosInformados,
 } from "../contatos/contato-colaborador.service";
 import { escaparCuringas } from "../../common/busca.util";
+import {
+  type ContratoDaAdmissao,
+  contratoConfere,
+  contratoGravado,
+  gravarContratoNaAdmissao,
+} from "./contrato-admissao";
 
 /**
  * Resposta da admissão (T167).
@@ -110,10 +116,10 @@ export interface AdmissaoRegistrada extends Pick<
     };
   };
   /**
-   * T177 — o que o servidor gravou do Módulo 1. Perfil e contatos são
-   * obrigatórios na admissão; endereço é `null` quando nenhum campo veio.
+   * T177 — o que o servidor gravou do Módulo 1. T209 — perfil e endereço são
+   * `null` quando nenhum campo deles veio.
    */
-  perfilPessoal: ValoresPerfil;
+  perfilPessoal: ValoresPerfil | null;
   endereco: ValoresEndereco | null;
   /** T179 — `null` quando nenhum contato foi informado na admissão. */
   contatos: ValoresContatos | null;
@@ -122,6 +128,8 @@ export interface AdmissaoRegistrada extends Pick<
    * nenhuma jornada foi escolhida (é opcional).
    */
   jornada: JornadaDaAdmissao | null;
+  /** T209 — o contrato da admissão (etapa 2), ou `null` sem nenhum valor. */
+  contrato: ContratoDaAdmissao | null;
 }
 
 /** T183 — a jornada da admissão: só ids e a data de início. */
@@ -210,7 +218,26 @@ export interface ColaboradorListado {
   atualizadoEm: Date;
   /** Ordenados: ativo, previsto, encerrado; depois admissão mais recente. */
   vinculos: VinculoListado[];
+  /** T209 — se há foto do colaborador NA EMPRESA ATIVA (ver `FotoAnunciada`). */
+  foto: FotoAnunciada | null;
 }
+
+/**
+ * T209 — a foto do colaborador, anunciada na listagem e na ficha: SÓ a
+ * versão (para a tela montar a rota autenticada `GET
+ * /v1/colaboradores/:id/foto?tamanho=…&v=…`). Nunca chave do objeto, hash,
+ * tamanho, autor nem endereço do armazenamento (ADR 0020). `null` sem foto,
+ * sem empresa ativa (a rota não a entregaria) ou sem leitura de dados
+ * pessoais na empresa.
+ */
+export interface FotoAnunciada {
+  versao: number;
+}
+
+/** T209 — o detalhe da ficha: o cadastro e a foto anunciada. */
+export type ColaboradorDetalhado = Colaborador & {
+  foto: FotoAnunciada | null;
+};
 
 export interface ListagemColaboradores extends ResultadoPaginado<ColaboradorListado> {
   contadores: ContadoresColaboradores;
@@ -328,9 +355,13 @@ export function distribuirAtivosPorTipo(
   const contagem: Record<TipoVinculo, number> = {
     clt: 0,
     estagio: 0,
+    aprendiz: 0,
     pj: 0,
     temporario: 0,
     outro_controlado: 0,
+    part_time: 0,
+    freelancer: 0,
+    trainee: 0,
   };
   for (const v of principal.values()) contagem[v.tipo] += 1;
   return contagem;
@@ -369,7 +400,9 @@ export function ordenarVinculosListados(
 export async function conflitosDaAdmissao(
   tx: Prisma.TransactionClient,
   empresaId: string,
-  dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos">,
+  dto: Pick<AdmitirColaboradorDto, "matricula" | "contatos"> & {
+    readonly perfilPessoal?: { readonly cpf?: string | null } | undefined;
+  },
 ): Promise<ErroDeCampo[]> {
   // T179 — matrícula e e-mail são opcionais: só o que veio é conferido.
   const emailPessoal = contatosInformados(dto.contatos).emailPessoal;
@@ -387,9 +420,19 @@ export async function conflitosDaAdmissao(
           where: { empresaId, emailPessoal },
           select: { id: true },
         });
+  // T209 — CPF único na empresa (só a empresa ativa é consultada).
+  const cpfInformado = dto.perfilPessoal?.cpf ?? null;
+  const cpf =
+    cpfInformado === null
+      ? null
+      : await tx.perfilPessoalColaborador.findFirst({
+          where: { empresaId, cpf: cpfInformado },
+          select: { id: true },
+        });
   const erros: ErroDeCampo[] = [];
   if (matricula) erros.push({ campo: "matricula", motivo: "em_uso" });
   if (email) erros.push({ campo: "contatos.emailPessoal", motivo: "em_uso" });
+  if (cpf) erros.push({ campo: "perfilPessoal.cpf", motivo: "em_uso" });
   return erros;
 }
 
@@ -413,6 +456,9 @@ export function camposDaUnicidadeViolada(erro: unknown): ErroDeCampo[] | null {
   }
   if (/email_pessoal|emailPessoal/.test(texto)) {
     return [{ campo: "contatos.emailPessoal", motivo: "em_uso" }];
+  }
+  if (/cpf/.test(texto)) {
+    return [{ campo: "perfilPessoal.cpf", motivo: "em_uso" }];
   }
   return null;
 }
@@ -460,6 +506,8 @@ export interface AdmissaoGravada {
   > | null;
   /** T183 — a jornada criada com a admissão; ausente ou `null` é nenhuma. */
   jornada?: Pick<VinculoHorario, "tabelaHorarioId"> | null;
+  /** T209 — o contrato gravado com a admissão; ausente ou `null` é nenhum. */
+  contrato?: Prisma.ContratoVinculoGetPayload<object> | null;
 }
 
 /**
@@ -477,6 +525,9 @@ export function admissaoConfere(
     gravada;
   const destino = extrairDestino(dto);
   const iguais = (a: unknown, b: unknown) => a === b;
+
+  // T209 — o contrato (etapa 2) também precisa ser o mesmo do envio.
+  if (!contratoConfere(dto.contrato, gravada.contrato ?? null)) return false;
 
   // T183 — a jornada opcional também precisa ser a mesma do envio.
   if (
@@ -509,16 +560,22 @@ export function admissaoConfere(
     return false;
   }
 
-  if (!perfil) return false;
   const perfilEnviado = perfilCompleto(dto.perfilPessoal);
-  if (
-    perfil.dataNascimento.toISOString().slice(0, 10) !==
-    perfilEnviado.dataNascimento
-  ) {
-    return false;
-  }
-  for (const chave of CHAVES_PERFIL_SEM_DATA) {
-    if (!iguais(perfil[chave], perfilEnviado[chave])) return false;
+  const perfilTemValor = Object.values(perfilEnviado).some((v) => v !== null);
+  // T209 — perfil sem nenhum valor não nasce: os dois lados precisam bater.
+  if (!perfilTemValor) {
+    if (perfil !== null) return false;
+  } else {
+    if (!perfil) return false;
+    if (
+      (perfil.dataNascimento?.toISOString().slice(0, 10) ?? null) !==
+      perfilEnviado.dataNascimento
+    ) {
+      return false;
+    }
+    for (const chave of CHAVES_PERFIL_SEM_DATA) {
+      if (!iguais(perfil[chave], perfilEnviado[chave])) return false;
+    }
   }
 
   const enderecoEnviado = dto.endereco ? enderecoCompleto(dto.endereco) : null;
@@ -549,6 +606,11 @@ export function admissaoConfere(
 }
 
 const CHAVES_PERFIL_SEM_DATA = [
+  "cpf",
+  "rg",
+  "genero",
+  "contatoEmergenciaNome",
+  "contatoEmergenciaTelefone",
   "sexo",
   "saudacao",
   "estadoCivil",
@@ -825,6 +887,13 @@ export class ColaboradorService {
                 dataAdmissao,
               });
 
+        // T209 — contrato da admissão (etapa 2), na MESMA transação.
+        const contrato = await gravarContratoNaAdmissao(
+          tx,
+          { vinculoId: vinculo.id, empresaId: escopo.empresaId },
+          dto.contrato,
+        );
+
         // T179 — registro de idempotência na MESMA transação: existe se, e só
         // se, a admissão existe. Só chave, ator, empresa e ids — nenhum dado
         // pessoal.
@@ -874,6 +943,7 @@ export class ColaboradorService {
           endereco: modulo1.endereco,
           contatos: contatosGravados,
           jornada,
+          contrato,
         };
       });
       return { admissao, reenvio: false };
@@ -1082,6 +1152,10 @@ export class ColaboradorService {
         orderBy: { criadoEm: "asc" },
         select: { id: true, tabelaHorarioId: true, vigenciaInicio: true },
       });
+      // T209 — o contrato gravado com a admissão (etapa 2).
+      const contrato = await tx.contratoVinculo.findUnique({
+        where: { vinculoId: registro.vinculoId },
+      });
       return {
         colaborador,
         vinculo,
@@ -1090,6 +1164,7 @@ export class ColaboradorService {
         endereco,
         contato,
         jornada,
+        contrato,
       };
     });
 
@@ -1102,11 +1177,7 @@ export class ColaboradorService {
       ctx,
     );
     const contatos = await this.contatos.consultar(registro.colaboradorId, ctx);
-    if (
-      !dados.perfilPessoal ||
-      dados.situacao === "bloqueado" ||
-      contatos.situacao === "bloqueado"
-    ) {
+    if (dados.situacao === "bloqueado" || contatos.situacao === "bloqueado") {
       // A admissão confere, mas o uso operacional foi bloqueado depois dela
       // (desligamento): não há o que devolver como admissão registrada.
       throw new ConflictException();
@@ -1148,6 +1219,7 @@ export class ColaboradorService {
         endereco: dados.endereco,
         contatos: contatos.contatos,
         jornada: gravada.jornada,
+        contrato: contratoGravado(gravada.contrato),
       },
     };
   }
@@ -1329,6 +1401,13 @@ export class ColaboradorService {
       ),
     );
 
+    // T209 — a foto da página, numa consulta só (sem ler o armazenamento).
+    const fotos = await this.fotosAnunciadas(
+      ctx,
+      empresaId,
+      linhas.map((c) => c.id),
+    );
+
     const itens: ColaboradorListado[] = linhas.map((c) => ({
       id: c.id,
       nome: c.nome,
@@ -1355,6 +1434,7 @@ export class ColaboradorService {
               : [],
         })),
       ),
+      foto: fotos.get(c.id) ?? null,
     }));
 
     return {
@@ -1376,9 +1456,50 @@ export class ColaboradorService {
   async detalhar(
     colaboradorId: string,
     ctx: PessoasAuditContext,
-  ): Promise<Colaborador> {
+  ): Promise<ColaboradorDetalhado> {
     const escopo = resolverEscopoLeituraPessoas(ctx.actor);
-    return this.carregarNoEscopo(colaboradorId, ctx, escopo, "read");
+    const colaborador = await this.carregarNoEscopo(
+      colaboradorId,
+      ctx,
+      escopo,
+      "read",
+    );
+    const fotos = await this.fotosAnunciadas(
+      ctx,
+      escopo.global ? undefined : escopo.empresaId,
+      [colaborador.id],
+    );
+    return { ...colaborador, foto: fotos.get(colaborador.id) ?? null };
+  }
+
+  /**
+   * T209 — a versão da foto de cada colaborador, SÓ na empresa ativa e só
+   * para quem lê dados pessoais nela (a mesma regra da rota da foto, ADR
+   * 0020). Global (sem empresa ativa): nada — a rota não entregaria. Lê só o
+   * banco: o armazenamento de objetos nunca é tocado aqui.
+   */
+  private async fotosAnunciadas(
+    ctx: PessoasAuditContext,
+    empresaId: string | undefined,
+    colaboradorIds: readonly string[],
+  ): Promise<Map<string, FotoAnunciada>> {
+    if (
+      empresaId === undefined ||
+      colaboradorIds.length === 0 ||
+      !podeAcessarPessoas(
+        ctx.actor,
+        "dados_pessoais_colaborador",
+        "read",
+        empresaId,
+      )
+    ) {
+      return new Map();
+    }
+    const fotos = await this.prisma.fotoColaborador.findMany({
+      where: { empresaId, colaboradorId: { in: [...colaboradorIds] } },
+      select: { colaboradorId: true, versao: true },
+    });
+    return new Map(fotos.map((f) => [f.colaboradorId, { versao: f.versao }]));
   }
 
   /**

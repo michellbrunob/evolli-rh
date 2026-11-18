@@ -17,6 +17,14 @@
   max-width: 32rem;
 }
 
+/* T209 — no menu lateral, a empresa ativa se separa da navegação por um
+   divisor sobre o marinho (o padrão de divisões da T209). */
+.seletor-empresa--menu {
+  min-width: 0;
+  padding-bottom: var(--secao-espaco-compacto);
+  border-bottom: var(--borda-espessura) solid var(--divisor-cor-sobre-marinho);
+}
+
 .seletor-empresa__cartao {
   /* Posicionado: o texto só para leitor de tela (absoluto) fica contido
      aqui e não escapa para alargar a página (lição da T188). */
@@ -82,10 +90,6 @@
 .seletor-empresa__seta {
   flex: 0 0 auto;
   color: var(--color-ink-muted);
-}
-
-.seletor-empresa__botao[aria-expanded="true"] .seletor-empresa__seta {
-  transform: rotate(180deg);
 }
 
 .seletor-empresa__painel {
@@ -252,12 +256,6 @@
   display: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .seletor-empresa__seta {
-    transition: transform 120ms ease;
-  }
-}
-
 /* T207 — paleta Evolli (P-1) e lista "Empresas da conta" (E-1). O cartão é
    claro sobre a faixa azul-marinho; o monograma é azul com iniciais
    brancas (contraste acima de 4,5:1); a empresa atual soma superfície,
@@ -274,8 +272,8 @@
 }
 
 .seletor-empresa__monograma {
-  background: var(--evolli-azul);
-  color: var(--evolli-sobre-marinho);
+  background: var(--evolli-azul-suave);
+  color: var(--evolli-azul);
 }
 
 .seletor-empresa__monograma--opcao {
@@ -292,8 +290,8 @@
 
 .seletor-empresa__opcao[aria-current="true"]
   .seletor-empresa__monograma--opcao {
-  background: var(--evolli-azul);
-  color: var(--evolli-sobre-marinho);
+  background: var(--evolli-azul-suave);
+  color: var(--evolli-azul);
 }
 
 .seletor-empresa__atual {
@@ -353,17 +351,149 @@
    sozinha). */
 .seletor-empresa__opcao {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-sm);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 0.625rem;
   row-gap: var(--space-xxs);
   align-items: center;
 }
 
 .seletor-empresa__atual {
-  grid-column: 2;
-  justify-self: start;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 .seletor-empresa__opcao-nome {
   overflow-wrap: break-word;
+}
+
+/* T209 — cartão e lista no novo desenho do módulo (medidas aprovadas):
+   cartão compacto com monograma de 32 px, nome e código; painel com sombra
+   em camadas, título discreto, opção de 48 px e o visto à direita. */
+.seletor-empresa__cartao {
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem 0.5rem 0.5rem;
+  border-radius: 10px;
+}
+
+.seletor-empresa__monograma {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.78125rem;
+  font-weight: var(--weight-strong);
+}
+
+.seletor-empresa__nome,
+.seletor-empresa__opcao-nome {
+  font-size: 0.84375rem;
+  font-weight: var(--weight-strong);
+  line-height: 1.4;
+  color: var(--color-ink);
+  overflow-wrap: break-word;
+}
+
+.seletor-empresa__codigo,
+.seletor-empresa__opcao-codigo {
+  font-size: 0.75rem;
+  line-height: 1.33;
+  color: var(--color-ink-subtle);
+}
+
+.seletor-empresa__seta {
+  color: var(--color-ink-muted);
+}
+
+.seletor-empresa__painel {
+  gap: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-canvas);
+  box-shadow:
+    0 0 0 1px rgba(23, 23, 28, 0.06),
+    0 2px 4px rgba(23, 23, 28, 0.06),
+    0 12px 28px -6px rgba(23, 23, 28, 0.1);
+}
+
+.seletor-empresa__titulo-lista {
+  padding: 8px 0 6px 10px;
+  font-size: 0.71875rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-ink-subtle);
+}
+
+.seletor-empresa__lista {
+  gap: 2px;
+}
+
+.seletor-empresa__opcao {
+  min-height: 48px;
+  padding: 0 0.625rem 0 0.5rem;
+  border: 0;
+  border-radius: 4px;
+}
+
+.seletor-empresa__opcao[aria-current="true"] {
+  background: var(--surface-neutral);
+}
+
+.seletor-empresa__atual {
+  background: var(--evolli-azul);
+  color: var(--evolli-sobre-marinho);
+}
+
+/* No menu do desktop, o painel flutua logo abaixo do cartão: a lateral
+   recorta o que passa da largura dela, então a posição é fixa, lida do
+   cartão. No celular (gaveta) e no Hub, ele segue no fluxo. */
+@media (min-width: 641px) {
+  .seletor-empresa--menu .seletor-empresa__painel {
+    position: fixed;
+    top: var(--seletor-empresa-topo);
+    left: var(--seletor-empresa-esquerda);
+    z-index: 70;
+    width: min(20.75rem, calc(100vw - 2rem));
+  }
+}
+
+/* T209 — ações da conta, depois da lista: divisor fino, itens de 36 px. */
+.seletor-empresa__acoes-da-conta {
+  display: grid;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.seletor-empresa__acao {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seletor-empresa__acao:hover {
+  background: var(--surface-neutral);
+}
+
+.seletor-empresa__acao:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
+  outline-offset: 1px;
 }

@@ -1,14 +1,25 @@
 import {
   clearCsrfToken,
   descartarTokenSeDesatualizado,
+  getCsrfToken,
   tokenCsrfParaGravacao,
 } from "./csrfClient";
 import type { EnderecoApi, PerfilPessoalApi } from "./dadosPessoaisClient";
 
 const BASE = "/v1";
 
+/** T209 — Aprendiz entrou no catálogo, logo depois de Estágio. */
 export type TipoVinculo =
-  "clt" | "estagio" | "pj" | "temporario" | "outro_controlado";
+  | "clt"
+  | "estagio"
+  | "aprendiz"
+  | "pj"
+  | "temporario"
+  | "outro_controlado"
+  // T209 — etapa 2 do Novo colaborador.
+  | "part_time"
+  | "freelancer"
+  | "trainee";
 
 export type SituacaoColaborador = "ativo" | "inativo";
 
@@ -20,6 +31,20 @@ export interface ColaboradorApi {
   situacao: SituacaoColaborador;
   criadoEm: string;
   atualizadoEm: string;
+  /**
+   * T209 — a foto do colaborador na empresa ativa, como a listagem e a ficha
+   * a anunciam: só a versão, ou `null` sem foto. Ausente nas respostas que
+   * não a trazem (admissão, retificação).
+   */
+  foto?: FotoAnunciadaApi | null;
+}
+
+/**
+ * T209 — só a versão da foto: a tela monta a rota autenticada
+ * (`/v1/colaboradores/:id/foto`). Nunca chave nem endereço do armazenamento.
+ */
+export interface FotoAnunciadaApi {
+  readonly versao: number;
 }
 
 export interface VinculoApi {
@@ -198,8 +223,9 @@ export interface DestinoOrganizacionalDto {
  * muda.
  */
 export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
-  departamentoId: string;
-  cargoId: string;
+  /** T209 — etapa 2: opcionais (ao menos uma referência da lotação). */
+  departamentoId?: string;
+  cargoId?: string;
   nome: string;
   empresaId: string;
   /** T179 — opcional; omitida quando vazia. */
@@ -211,15 +237,15 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * T177 — Módulo 1, gravado na MESMA transação da admissão. Vazio vai como
    * `null`.
    *
-   * OBRIGATÓRIO: `perfilPessoal` com `dataNascimento`. OPCIONAIS: os demais
-   * campos do perfil (`sexo` só com um código de `OPCOES_SEXO`), o `endereco`
-   * inteiro e os `contatos` — T179: cada contato vazio é omitido, e o bloco
-   * inteiro some quando os três estão vazios.
+   * OBRIGATÓRIO: o bloco `perfilPessoal` (T209 — a data de nascimento passou
+   * a opcional). OPCIONAIS: os campos do perfil (`sexo` só com um código de
+   * `OPCOES_SEXO`; T209 — CPF, RG, gênero e contato de emergência), o
+   * `endereco` inteiro e os `contatos` — T179: cada contato vazio é omitido, e
+   * o bloco inteiro some quando os três estão vazios.
    */
-  perfilPessoal: Record<
-    Exclude<keyof PerfilPessoalApi, "atualizadoEm" | "dataNascimento">,
-    string | null
-  > & { dataNascimento: string };
+  perfilPessoal: Partial<
+    Record<Exclude<keyof PerfilPessoalApi, "atualizadoEm">, string | null>
+  >;
   endereco?: Record<Exclude<keyof EnderecoApi, "atualizadoEm">, string | null>;
   contatos?: { emailPessoal?: string; celular?: string; telefone?: string };
   /**
@@ -227,7 +253,32 @@ export interface AdmitirColaboradorDto extends DestinoOrganizacionalDto {
    * na data de admissão. Ausente é "sem jornada".
    */
   tabelaHorarioId?: string;
+  /** T209 — o contrato da admissão (etapa 2); ausente sem nenhum valor. */
+  contrato?: ContratoAdmissaoApi;
 }
+
+/**
+ * T209 — o contrato da admissão (etapa 2): nível, gestor direto, jornada
+ * semanal, escala, salário bruto (reais, com ponto: "5000.00"), conselho e
+ * registro profissional, dependentes para IRRF e pensão (percentual, com
+ * ponto). Cada campo vazio é omitido.
+ */
+export interface ContratoAdmissaoApi {
+  nivel?: string;
+  gestorDiretoId?: string;
+  jornadaSemanalHoras?: number;
+  escala?: string;
+  salarioBruto?: string;
+  conselhoProfissional?: string;
+  registroProfissional?: string;
+  dependentesIrrf?: number;
+  pensaoAlimenticiaPercentual?: string;
+}
+
+/** T209 — o contrato como o servidor o gravou (decimais em 2 casas). */
+export type ContratoGravadoApi = {
+  [K in keyof ContratoAdmissaoApi]-?: ContratoAdmissaoApi[K] | null;
+};
 
 /**
  * Resposta da admissão (T167): o colaborador no topo, como antes, mais a
@@ -258,7 +309,7 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
    * endereço é `null` quando nenhum campo veio. T179 — contatos também são
    * `null` quando nenhum veio, e cada um pode ser `null` sozinho.
    */
-  perfilPessoal: PerfilPessoalApi;
+  perfilPessoal: PerfilPessoalApi | null;
   endereco: EnderecoApi | null;
   contatos: {
     emailPessoal: string | null;
@@ -275,6 +326,8 @@ export interface AdmissaoRegistradaApi extends ColaboradorApi {
     tabelaHorarioId: string;
     vigenciaInicio: string;
   } | null;
+  /** T209 — o contrato da admissão, ou `null` sem nenhum valor. */
+  contrato?: ContratoGravadoApi | null;
 }
 
 export interface RetificarColaboradorDto {
@@ -396,8 +449,17 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * T209 — opções da leitura: `signal` cancela a requisição (busca, filtro,
+ * aba, página ou tamanho trocados, empresa trocada, tela desmontada).
+ */
+export interface OpcoesDaLeitura {
+  readonly signal?: AbortSignal;
+}
+
 export async function listarColaboradores(
   query: ListarColaboradoresQuery = {},
+  opcoes: OpcoesDaLeitura = {},
 ): Promise<ListagemColaboradoresApi> {
   const params = new URLSearchParams();
   if (query.situacao) params.set("situacao", query.situacao);
@@ -418,7 +480,10 @@ export async function listarColaboradores(
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));
   const qs = params.toString();
-  const res = await apiFetch(`/colaboradores${qs ? `?${qs}` : ""}`);
+  const res = await apiFetch(
+    `/colaboradores${qs ? `?${qs}` : ""}`,
+    opcoes.signal ? { signal: opcoes.signal } : {},
+  );
   return jsonOrThrow(res);
 }
 
@@ -443,6 +508,24 @@ export async function admitirColaborador(
   dto: AdmitirColaboradorDto,
   opcoes: OpcoesDaAdmissao = {},
 ): Promise<AdmissaoRegistradaApi> {
+  return (await enviarAdmissao(dto, opcoes)).admissao;
+}
+
+/** T209 (Bloco C) — a admissão e se ela já existia (reenvio da mesma chave). */
+export interface AdmissaoEnviada {
+  readonly admissao: AdmissaoRegistradaApi;
+  /**
+   * `true` quando o servidor devolveu a admissão já gravada com a mesma
+   * chave (`Idempotent-Replayed: true`): nada novo foi criado.
+   */
+  readonly reenvio: boolean;
+}
+
+/** O mesmo envio de `admitirColaborador`, dizendo se foi reenvio. */
+export async function enviarAdmissao(
+  dto: AdmitirColaboradorDto,
+  opcoes: OpcoesDaAdmissao = {},
+): Promise<AdmissaoEnviada> {
   const token = await getCsrf();
   const res = await apiFetch("/colaboradores", {
     method: "POST",
@@ -454,7 +537,11 @@ export async function admitirColaborador(
     },
     body: JSON.stringify(dto),
   });
-  return jsonOrThrow(res);
+  const admissao = await jsonOrThrow<AdmissaoRegistradaApi>(res);
+  return {
+    admissao,
+    reenvio: res.headers?.get("Idempotent-Replayed") === "true",
+  };
 }
 
 export async function retificarColaborador(
@@ -468,4 +555,115 @@ export async function retificarColaborador(
     body: JSON.stringify(dto),
   });
   return jsonOrThrow(res);
+}
+
+/**
+ * T209 — rascunho da Nova admissão, guardado no servidor por conta e empresa
+ * ativa (`/v1/admissoes/rascunho`). Só os valores do formulário — nunca foto
+ * ou arquivo; o servidor recusa campo fora do contrato da admissão.
+ */
+export interface ReferenciaDoRascunhoApi {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nome: string;
+}
+
+export interface DadosDoRascunhoApi {
+  readonly etapa?: number;
+  readonly campos?: Readonly<Record<string, string>>;
+  readonly perfil?: Readonly<Record<string, string>>;
+  readonly endereco?: Readonly<Record<string, string>>;
+  readonly contatos?: Readonly<Record<string, string>>;
+  readonly referencias?: Readonly<
+    Partial<
+      Record<
+        "departamento" | "cargo" | "unidade" | "centroCusto",
+        ReferenciaDoRascunhoApi
+      >
+    >
+  >;
+}
+
+export interface RascunhoAdmissaoApi {
+  readonly dados: DadosDoRascunhoApi;
+  readonly versao: number;
+  readonly atualizadoEm: string;
+}
+
+const ROTA_RASCUNHO = "/admissoes/rascunho";
+
+/** O rascunho da própria conta na empresa ativa, ou `null`. */
+export async function obterRascunhoAdmissao(): Promise<RascunhoAdmissaoApi | null> {
+  const res = await apiFetch(ROTA_RASCUNHO);
+  const corpo = await jsonOrThrow<{ rascunho: RascunhoAdmissaoApi | null }>(
+    res,
+  );
+  return corpo.rascunho;
+}
+
+/** Grava (ou substitui) o rascunho. Nunca admite ninguém. */
+export async function salvarRascunhoAdmissao(
+  dados: DadosDoRascunhoApi,
+): Promise<{ versao: number; atualizadoEm: string }> {
+  const token = await getCsrf();
+  const res = await apiFetch(ROTA_RASCUNHO, {
+    method: "PUT",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify({ dados }),
+  });
+  return jsonOrThrow(res);
+}
+
+/** Apaga o rascunho (sem rascunho, nada acontece). */
+export async function descartarRascunhoAdmissao(): Promise<void> {
+  const token = await getCsrf();
+  const res = await apiFetch(ROTA_RASCUNHO, {
+    method: "DELETE",
+    headers: { "x-csrf-token": token },
+  });
+  if (!res.ok) await jsonOrThrow(res);
+}
+
+// ---- T209 — foto do colaborador (ADR 0020) --------------------------------
+
+/** O que o servidor devolve ao gravar a foto: só a versão e a data. */
+export interface FotoColaboradorGravadaApi {
+  readonly versao: number;
+  readonly atualizadoEm: string;
+}
+
+/** A extensão do nome do arquivo, sem o ponto, em minúsculas. */
+function extensaoDoArquivo(nome: string): string {
+  const ponto = nome.lastIndexOf(".");
+  return ponto === -1 ? "" : nome.slice(ponto + 1).toLowerCase();
+}
+
+/**
+ * T209 — envia ou substitui a foto do colaborador
+ * (`PUT /v1/colaboradores/:id/foto`). O corpo é o arquivo como veio; o tipo
+ * declarado e a extensão vão em cabeçalhos para o servidor conferir com o
+ * conteúdo. Recusa responde 422 com `codigo`, 413 acima de 5 MB; indisponível,
+ * 503. 403 `csrf_invalido` (outra aba renovou o token): renova e reenvia uma
+ * vez.
+ */
+export async function enviarFotoColaborador(
+  colaboradorId: string,
+  arquivo: File,
+): Promise<FotoColaboradorGravadaApi> {
+  const enviar = async () =>
+    apiFetch(`/colaboradores/${encodeURIComponent(colaboradorId)}/foto`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await getCsrf(),
+        "x-evolli-foto-tipo": arquivo.type,
+        "x-evolli-foto-extensao": extensaoDoArquivo(arquivo.name),
+      },
+      body: arquivo,
+    });
+  let res = await enviar();
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow<FotoColaboradorGravadaApi>(res);
 }

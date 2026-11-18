@@ -302,7 +302,8 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
     const data = campo(/^Data de nascimento/);
     await waitFor(() => expect(data).toHaveFocus());
     expect(data).toHaveValue("1990-05-20");
-    expect(data).toHaveAttribute("aria-required", "true");
+    // T209 — a data de nascimento passou a opcional.
+    expect(data).not.toHaveAttribute("aria-required");
     expect(campo(/^Sexo/)).toHaveValue("feminino");
     expect(campo(/^Estado civil/)).toHaveValue("Casada");
     expect(campo(/^Nome da mãe/)).toHaveValue("Mãe Sintética");
@@ -400,10 +401,7 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
     ).toBeInTheDocument();
   });
 
-  it.each([
-    ["", "Informe a data de nascimento."],
-    ["2999-01-01", "A data de nascimento não pode estar no futuro."],
-  ])(
+  it.each([["2999-01-01", "A data de nascimento não pode estar no futuro."]])(
     "data de nascimento %j: erro no campo, foco nele e nada enviado",
     async (valor, mensagem) => {
       montarEdicao();
@@ -545,7 +543,7 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
     ).toBe("feminino");
   });
 
-  it("sem dados pessoais gravados: 'Preencher' abre o formulário vazio e a data é obrigatória", async () => {
+  it("sem dados pessoais gravados: 'Preencher' abre o formulário vazio; a data é opcional (T209)", async () => {
     montarEdicao(
       {},
       {
@@ -556,15 +554,10 @@ describe("T181 — edição dos dados pessoais na ficha", () => {
       },
     );
     await editar("Preencher dados pessoais");
-    expect(campo(/^Data de nascimento/)).toHaveValue("");
+    expect(campo(/^Data de nascimento \(opcional\)/)).toHaveValue("");
+    expect(campo(/^Data de nascimento/)).not.toHaveAttribute("aria-required");
     fireEvent.click(botao("Salvar dados pessoais"));
-    await waitFor(() =>
-      expect(campo(/^Data de nascimento/)).toHaveAttribute(
-        "aria-invalid",
-        "true",
-      ),
-    );
-    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
+    expect(campo(/^Data de nascimento/)).not.toHaveAttribute("aria-invalid");
   });
 });
 

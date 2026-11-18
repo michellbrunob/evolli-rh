@@ -114,6 +114,8 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Consulta de colaboradores por nome ou matrícula, ficha, vida funcional e vínculo com horário de trabalho.",
   "nova-admissao":
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
+  "importar-colaboradores":
+    "Várias admissões de uma vez, por planilha CSV conferida linha a linha na empresa ativa.",
   cadastros:
     "Estrutura organizacional da empresa: unidades, departamentos, áreas, equipes, cargos e centros de custo.",
   // T182 — tela própria do catálogo de jornadas (antes a aba Horários).
@@ -128,6 +130,11 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   // T208 — Meu perfil: a foto, o nome de exibição e os dados da conta.
   configuracoes:
     "Meu perfil: a sua foto, o seu nome de exibição e os dados da sua conta de acesso.",
+  // T209 — Configurações › Empresas e a Nova empresa.
+  "configuracoes-empresas":
+    "Empresas que a sua conta alcança, com CNPJ, cidade e colaboradores ativos.",
+  "nova-empresa":
+    "Cadastro de uma empresa (CNPJ) em duas etapas: dados da empresa e colaboradores.",
 };
 
 /** Ícone do grupo a que o destino pertence — mesma identidade da barra lateral. */

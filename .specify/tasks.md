@@ -3362,10 +3362,11 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         do squash e `git diff --check` verdes.
 
 105.  **T208 - Configurações: Meu Perfil**
-      - **Estado:** **em implementação, ampliada antes do Ready por decisão de produto**; a
-        entrega segue na PR #201, em Draft, sem Ready for review e sem merge. O Meu Perfil somente
-        leitura abaixo (validado localmente, validação visual aprovada em 2026-11-12) é a base
-        existente, não a entrega final.
+      - **Estado:** **integrada** em `main` pela PR #201, squash
+        `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2`, com a CI de push 3/3 verde (run
+        43442498632); branch remota preservada. Ampliada antes do Ready por decisão de produto: o
+        Meu Perfil somente leitura (validação visual aprovada em 2026-11-12) ganhou o nome de
+        exibição e a foto de perfil (validação visual aprovada em 2026-11-13).
       - **Ampliação (seção 21 do dossiê, em levantamento):** mapa de nome de exibição, foto,
         cargo, telefone, e-mail e confirmação, data de alteração, senha, Google, segundo fator e
         sessões por domínio (conta, colaborador, empresa e autenticação), com privacidade, LGPD,
@@ -3417,7 +3418,117 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         E2E serial com PostgreSQL real 20 suítes, 1017 testes; scripts 182 testes; 22 mutações,
         todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e
         `git diff --check` verdes.
-      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow; Ready for review e merge. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
+      - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
+
+106.  **T209 - Colaboradores**
+      - **Estado:** **em implementação local**. Branch `codex/t209-colaboradores`, a partir do
+        squash `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201). Decisões
+        C-1 a C-15 aprovadas em 2026-11-13, com a C-10 corrigida (sem data de nascimento na
+        planilha); o Bloco C (importação CSV) está pausado porque a admissão exige a data de
+        nascimento (seção 13 do dossiê). Blocos A (listagem operacional) e B (ações por pessoa)
+        implementados e validados localmente (seções 14 a 16), sem push, PR, Ready ou merge até a
+        validação visual.
+      - **Entrega:** tamanho da página 20/50/100 na URL (`tamanho`), paginação numerada com
+        primeira e última, "Mostrando X–Y de Z", cancelamento das leituras antigas, aviso de
+        auditoria fiel; menu "Ações" por linha com atalhos às abas da ficha que o papel vê. Só
+        web; sem API, migration, RBAC ou dependência.
+      - **Refinamento, divisões e animação (seções 17 a 21):** faixa de indicadores e barra de
+        filtros; padrão de divisões sutis (tokens, shell e Colaboradores, com rollout por módulo);
+        animação reutilizável dos painéis laterais (Modal lateral, sem temporizador, com
+        movimento reduzido); massa sintética por tipo no banco próprio da prévia (Aprendiz
+        indisponível no contrato). Bateria proporcional: web 136 arquivos, 3918 testes; lint, typecheck e build da web; Prettier, `spec:check`, prévia do squash e `git diff --check` verdes (API e E2E sem mudança desde a bateria completa).
+      - **Aprovações de 2026-11-13 (seção 22):** visual dos blocos atuais aprovado; fechamento
+        pelo fundo do painel lateral, com a guarda de alterações, aprovado; Aprendiz autorizado
+        como próxima ampliação da T209 (seção 23).
+      - **Aprendiz (seção 24):** AP-1 a AP-9 aprovadas; migration aditiva
+        `20261113180000_tipo_vinculo_aprendiz`; tipo propagado à API e a todas as superfícies
+        que exibem, filtram ou contam o tipo; cor própria; sem regra legal. Bateria: web 137 arquivos, 3937 testes (na rodada completa, 2 testes de tempo da Nova admissão estouraram 5 s sob carga; o arquivo isolado passou 264 de 264); API unitária 62 suítes, 1545 testes; E2E com PostgreSQL real 23 suítes, 1092 testes (com 4 workers); scripts 182 testes; lint, typecheck, build e Prettier verdes.
+      - **Fundação de interface (seção 25; ADR 0019):** Tailwind 4 sem preflight (prefixo
+        `ev`), Radix (menu, diálogo, painel lateral, tooltip) e Lucide; camada `src/ui`;
+        Colaboradores migrado. Bateria: web 138 arquivos, 3960 testes (na rodada completa, 3 testes de tempo, 2 da guarda T200 e 1 da Nova admissão, falharam sob carga e passaram isolados); lint, typecheck e build da web verdes; CSS final 26,5 kB comprimido.
+      - **Nova admissão como assistente (seção 26):** cabeçalho próprio com "Voltar para
+        Colaboradores", etapas à esquerda no desktop, conteúdo em uma coluna e rodapé fixo com
+        progresso e ações; etapas com os dados reais (Dados pessoais; Dados profissionais e
+        vínculo; Endereço; Revisão e conclusão); lacunas registradas (CPF/RG, documentos, foto,
+        rascunho, nome social). Só web.
+      - **Tela de abertura (seção 27):** marca aprovada com transição em CSS ao recarregar e
+        depois do login, até o acesso estar pronto (duração mínima de 300 ms contra o piscar);
+        nunca na navegação interna nem na troca de empresa; base Lottie (`lottie-web` 5.13.0,
+        sob demanda) com o ponto de conexão em `apps/web/src/app/abertura/animacaoOficial.ts`.
+      - **Menu lateral completo (seção 28):** seções Pessoas, Remuneração e Operação, Demonstração
+        e rodapé (Suporte, Roadmap, Configurações); 12 itens em desenvolvimento como botões com
+        `aria-disabled`, explicação e aviso não modal (sem URL, sem rota, sem `href="#"`); menu
+        compacto aprovado (A–E1: uma linha por item, relógio compacto, Recrutamento, Operação e
+        Demonstração fechados, sem divisórias no expandido; 36 px no desktop, 44 px no celular,
+        selos de 12 px, rolagem interna em janelas menores). Web 140 arquivos, 4062 testes numa
+        rodada limpa; 8 mutações detectadas. Só web.
+      - **Aprendiz fechado (seção 24):** auditoria das listas de tipo de vínculo (API e web, todas
+        com `aprendiz`) e Histórico funcional visto no navegador com um vínculo Aprendiz.
+      - **Importação CSV (seção 29):** Bloco C retomado com data de nascimento obrigatória (ordem
+        de 2026-11-16); ficha de tratamento escrita antes do código; página `#/pessoas/importar`
+        (RH e DP) com modelo, conferência por linha sem repetir valores, confirmação, uma
+        admissão por linha com `Idempotency-Key` própria, resultado e nova tentativa só das que
+        não entraram. Web 143 arquivos, 4143 testes numa rodada limpa; 7 mutações detectadas. Só
+        web.
+      - **Barra superior e Hub desativado (seção 30):** barra fixa com marca, recolher, trilha
+        derivada das rotas e só a conta (nome de exibição, avatar, menu com Meu perfil e Sair; sem
+        e-mail, papel ou empresa); Hub nunca montado — RH, DP e master técnico no Dashboard,
+        gestor em Minha equipe, demais papéis numa tela neutra de acesso temporário, sem módulos.
+        Web 145 arquivos, 4188 testes numa rodada limpa; 5 mutações detectadas. Só web.
+      - **Reimportação, rascunho e Novo colaborador (seção 31):** chave determinística por
+        pessoa e empresa (reimportar não duplica); rascunho persistente no servidor (tabela e
+        migration próprias, `/v1/admissoes/rascunho`, RH e DP, por conta e empresa, auditoria sem
+        conteúdo); tela "Novo colaborador" enxuta, com erro embaixo de cada campo. Web 145
+        arquivos, 4210 testes numa rodada limpa; API unitária 63 suítes, 1561 testes; E2E do
+        rascunho 14. Foto em R2 pendente (`R2_BUCKET`).
+      - **Foto do colaborador no R2 privado (seção 32, ADR 0020):** tabela e migration próprias
+        (`20261116180000_foto_colaborador`, com limpeza pendente),
+        `PUT/GET/DELETE /v1/colaboradores/:id/foto`, só PNG/JPEG até 5 MB conferidos pelo conteúdo, três WebP sem
+        metadados (96, 256, 512), escrita por RH e DP na empresa ativa, leitura autenticada
+        `private, no-store`, auditoria sem conteúdo; na Nova admissão, prévia, Enviar foto e
+        Remover, envio só depois da admissão, falha sem desfazer a admissão e nova tentativa.
+        API unitária 66 suítes, 1581 testes; E2E da foto 17; web 145 arquivos, 4229 testes numa rodada limpa; 3 mutações
+        detectadas; envio real ao bucket validado no navegador (desktop e 375 px).
+      - **Foto na listagem e na ficha (seção 33):** listagem e detalhe anunciam só `{ versao }`
+        da foto na empresa ativa (sem chave nem endereço); avatar de 96 px preguiçoso na
+        listagem e de 256 px na ficha pela rota autenticada, com iniciais sem foto ou na falha;
+        `EVOLLI_FOTO_ARMAZENAMENTO=memoria` para a prévia, recusado em produção. E2E da foto
+        26 testes (9 novos); API unitária 67 suítes, 1585 testes; web 146 arquivos, 4242 testes numa rodada limpa; 4 mutações detectadas; validado no navegador
+        com armazenamento em memória (desktop e 375 px) e uma validação real no R2 com imagem
+        sintética (credenciais mantidas por decisão da usuária).
+      - **Novo colaborador, etapa 1 e moldura (seção 34):** CPF (dígitos verificadores, único na
+        empresa), RG, gênero, estado civil e contato de emergência; nascimento opcional; nome com
+        3+ letras; linhas com rótulo e ajuda à esquerda; rodapé com "% concluído". Migration
+        `20261117120000_cadastro_etapa_1`. E2E 26 suítes / 1142; API 67 / 1587; web 146 / 4240.
+      - **Novo colaborador, etapa 2 e acabamento (seção 35):** contrato da admissão em tabela própria
+        (migration `20261117160000_cadastro_etapa_2`, tipos part_time/freelancer/trainee),
+        departamento e cargo opcionais com lotação mínima (Baseline V1), cargo digitado que vira
+        cargo do cadastro, líquido calculado na tela; linhas, divisórias, rodapé e fade no novo
+        desenho. E2E 27 suítes / 1167; API 67 / 1587; web 147 / 4239.
+      - **Fonte, etapa 3, empresas com CNPJ, cadastro em etapas e ícones (seção 36):** Parkinsans;
+        endereço com CEP automático; migration `20261117200000_empresa_cnpj_cadastro`, cadastro,
+        edição e lista de empresas (RH e master criam, concessão na hora); Nova empresa em 2
+        etapas sobre `CadastroEmEtapas`; Configurações › Empresas com painel lateral; Iconsax no
+        lugar do lucide. E2E cadastro-empresa 22; API 68 / 1604; web 152 / 4294.
+      - **Escopo de fechamento (seção 37):** Documentos (upload, categorias, R2 de documentos,
+        OCR, assinatura e retenção) sai da T209 e fica reservado para uma entrega própria, não iniciada; o
+        Novo colaborador fecha em quatro etapas com Revisão e conclusão.
+      - **Fechamento (seção 38):** Novo colaborador sobre o `CadastroEmEtapas` compartilhado; trilha
+        única na barra superior (também na ficha); `GET /v1/empresas/da-conta` só para RH, DP e
+        master técnico. Web 153 / 4298; API 68 / 1604; E2E 28 suítes / 1189; lint, typecheck,
+        build, `spec:check` e `git diff --check` limpos; papéis validados no navegador.
+      - **Validação local:** web 134 arquivos, 3863 testes; API unitária 62 suítes, 1544 testes; E2E serial com PostgreSQL real 22 suítes, 1081 testes; scripts 182 testes; 38 mutações, todas detectadas; lint, typecheck, build, Prettier, `spec:check`, prévia do squash e `git diff --check` verdes.
+      - **Objetivo:** levar Colaboradores de uma listagem de consulta a uma área de trabalho do RH
+        e do DP: levantar, com evidência no código, nos contratos e no RBAC, rotas, listagem,
+        abas, busca, filtros, paginação, indicadores, tabela, ficha, permissões, isolamento por
+        empresa, exportação, importação e exposição de campos; separar o que cabe nos contratos
+        atuais, o que exige API, migration, RBAC, auditoria ou decisão e o que fica
+        indisponível; propor a primeira fatia (listagem operacional, atalhos por pessoa e
+        importação CSV sobre o contrato atual de admissão) e as decisões C-1 a C-15 para
+        aprovação, no [dossiê](../docs/decisions/t209-dossie-colaboradores.md).
+      - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
+        Docker, dependências, lockfile, workflow, push, PR, promoção e merge; CPF, salário,
+        contatos na listagem e exportação de pessoas.
 
 ## Regra obrigatória para as próximas tarefas
 
