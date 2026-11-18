@@ -3375,3 +3375,17 @@ item direto de Pessoas; sem Operação e sem Demonstração no menu
 
 **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos; mudança
 funcional nas telas; Documentos.
+
+## Importação por `.xlsx` — T212 (em implementação local)
+
+| Tarefa | Estado                     | Resultado principal                                                                      |
+| ------ | -------------------------- | ---------------------------------------------------------------------------------------- |
+| T212   | **Em implementação local** | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+
+**Escopo:** modelo `.xlsx` (abas Colaboradores, Exemplos e Instruções) gerado da mesma definição
+de colunas do importador; leitura só no navegador, pela mesma conferência, idempotência e envio
+do CSV; painel "Adicionar colaborador" em três passos
+([documento de decisão](../docs/decisions/t212-importacao-xlsx.md)).
+
+**Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
+Documentos.

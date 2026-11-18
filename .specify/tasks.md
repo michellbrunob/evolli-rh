@@ -3577,6 +3577,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
         mudança funcional nas telas; Documentos.
 
+109.  **T212 - Importação de colaboradores por planilha `.xlsx`**
+      - **Estado:** **em implementação local**. Branch `codex/t212-importacao-xlsx`, a partir do
+        squash da T211 em `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+      - **Objetivo:** importar colaboradores por `.xlsx`, mantendo o CSV, com o modelo `.xlsx`
+        gerado no navegador como download principal e o painel "Adicionar colaborador" em três
+        passos, conforme o [documento de decisão](../docs/decisions/t212-importacao-xlsx.md).
+      - **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; colunas além
+        das 8 do modelo; dependência nova; Documentos.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
