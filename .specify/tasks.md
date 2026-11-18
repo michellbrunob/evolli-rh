@@ -3555,6 +3555,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema
         escuro e Documentos.
 
+108.  **T211 - Organização do menu**
+      - **Estado:** **em implementação local**. Branch `codex/t211-organizacao-menu`, a partir do
+        squash da T210 em `main` (`053aa3d`, PR #203). Sem push, PR, Ready ou merge.
+      - **Objetivo:** reorganizar só a navegação, mantendo a identidade própria do Evolli:
+        Escala de trabalho e Organograma no submenu de Colaboradores; Equipe e permissões em
+        Configurações; Ponto e Administração da liderança fora do menu, com URL própria;
+        Liderança como item direto de Pessoas (abre Minha equipe); sem a seção Operação e sem
+        Demonstração no menu, conforme o
+        [documento de decisão](../docs/decisions/t211-organizacao-do-menu.md).
+      - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
+        mudança funcional nas telas; Documentos.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

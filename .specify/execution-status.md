@@ -3356,3 +3356,17 @@ e `git diff --check` limpos; quatro temas e 375 px validados no navegador.
 **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema escuro e
 Documentos (entrega própria, não iniciada). A T209 está integrada
 (PR #202, squash `b7d2d03`).
+
+## Organização do menu — T211 (em implementação local)
+
+| Tarefa | Estado                     | Resultado principal                                                            |
+| ------ | -------------------------- | ------------------------------------------------------------------------------ |
+| T211   | **Em implementação local** | Menu lateral reorganizado só na navegação, com a identidade própria do Evolli. |
+
+**Escopo:** Escala de trabalho e Organograma em Colaboradores; Equipe e permissões em
+Configurações; Ponto e Administração da liderança fora do menu, com URL própria; Liderança como
+item direto de Pessoas; sem Operação e sem Demonstração no menu
+([documento de decisão](../docs/decisions/t211-organizacao-do-menu.md)).
+
+**Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos; mudança
+funcional nas telas; Documentos.
