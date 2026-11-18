@@ -128,12 +128,11 @@ describe("T209 — menu completo no desktop (expandido)", () => {
     const titulos = [
       ...navegacao().querySelectorAll(".painel-nav__secao-titulo"),
     ].map((t) => t.textContent);
-    expect(titulos).toEqual(["Pessoas", "Remuneração", "Operação"]);
+    // T211 — sem a seção Operação.
+    expect(titulos).toEqual(["Pessoas", "Remuneração"]);
 
-    // Cada seção é uma lista nomeada pelo próprio título (Operação começa
-    // fechada: abre-se para alcançá-la).
-    abrirCabecalho("Operação");
-    for (const titulo of ["Pessoas", "Remuneração", "Operação"]) {
+    // Cada seção é uma lista nomeada pelo próprio título.
+    for (const titulo of ["Pessoas", "Remuneração"]) {
       expect(
         within(navegacao()).getByRole("list", { name: titulo }),
       ).toBeInTheDocument();
@@ -165,6 +164,8 @@ describe("T209 — menu completo no desktop (expandido)", () => {
       "Recrutamento",
       "Pesquisas",
       "Calendário",
+      // T211 — Liderança como item direto de Pessoas.
+      "Liderança",
       "Folha de Pagamento",
       "Benefícios",
       "Hub de Benefícios",
@@ -173,20 +174,18 @@ describe("T209 — menu completo no desktop (expandido)", () => {
     expect(rotulos.slice(-3)).toEqual(["Suporte", "Roadmap", "Configurações"]);
   });
 
-  it("nenhum destino funcional some: Estrutura, Jornada, Liderança, Administração e Demonstração continuam", () => {
+  it("T211 — nenhum destino funcional fica sem caminho: menu, Configurações ou URL própria", () => {
     render(<App papelDoAtor="rh" />);
-    abrirCabecalho("Operação");
-    abrirCabecalho("Demonstração");
-    for (const rotulo of [
-      "Estrutura organizacional",
-      "Jornadas de trabalho",
-      "Jornada",
-      "Minha equipe",
-      "Administração da liderança",
-      "Contas de acesso",
-      "Visão geral",
-    ]) {
+    for (const rotulo of ["Escala de trabalho", "Organograma", "Liderança"]) {
       expect(item(rotulo)).not.toHaveAttribute("aria-disabled");
+    }
+    // Fora do menu lateral, com URL própria.
+    for (const destino of [
+      "ponto",
+      "administracao-lideranca",
+      "contas-acesso",
+    ]) {
+      expect(rotaDoDestino(destino), destino).not.toBeNull();
     }
   });
 
@@ -505,103 +504,59 @@ describe("T209 — menu compacto: uma linha por item", () => {
     );
   });
 
-  it("começam fechados Recrutamento, Operação e Demonstração; Colaboradores, aberto", () => {
+  it("começa fechado Recrutamento; Colaboradores, aberto (T211: sem Operação nem Demonstração)", () => {
     render(<App papelDoAtor="rh" destinoInicial="dashboard" />);
-    for (const rotulo of ["Recrutamento", "Operação", "Demonstração"]) {
-      expect(
-        within(navegacao()).getByRole("button", { name: rotulo }),
-      ).toHaveAttribute("aria-expanded", "false");
-    }
+    expect(
+      within(navegacao()).getByRole("button", { name: "Recrutamento" }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(
       within(navegacao()).getByRole("button", { name: "Colaboradores" }),
     ).toHaveAttribute("aria-expanded", "true");
+    for (const ausente of ["Operação", "Demonstração"]) {
+      expect(
+        within(navegacao()).queryByRole("button", { name: ausente }),
+      ).toBeNull();
+    }
   });
 
-  it("Operação: o título da seção abre e fecha a lista, com os módulos funcionais", () => {
-    render(<App papelDoAtor="rh" destinoInicial="dashboard" />);
-    const titulo = within(navegacao()).getByRole("button", {
-      name: "Operação",
-    });
-    const lista = document.getElementById(
-      titulo.getAttribute("aria-controls")!,
-    )!;
-    expect(lista).not.toBeVisible();
-    fireEvent.click(titulo);
-    expect(titulo).toHaveAttribute("aria-expanded", "true");
-    expect(lista).toBeVisible();
-    expect(
-      within(lista)
-        .getAllByRole("button")
-        .map(
-          (b) =>
-            b.querySelector(".painel-nav__rotulo")?.firstChild?.textContent,
-        ),
-    ).toEqual(
-      expect.arrayContaining([
-        "Estrutura",
-        "Jornada",
-        "Liderança",
-        "Contas de acesso",
-      ]),
-    );
-    fireEvent.click(titulo);
-    expect(lista).not.toBeVisible();
-  });
-
-  it("a tela aberta nunca fica escondida: Estrutura organizacional abre Operação já aberta e marcada", () => {
+  it("T211 — a tela aberta nunca fica escondida: Organograma abre Colaboradores já aberto e marcado", () => {
     render(<App papelDoAtor="rh" destinoInicial="cadastros" />);
     expect(
-      within(navegacao()).getByRole("button", { name: "Operação" }),
+      within(navegacao()).getByRole("button", { name: "Colaboradores" }),
     ).toHaveAttribute("aria-expanded", "true");
-    expect(item("Estrutura organizacional")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(item("Organograma")).toHaveAttribute("aria-current", "page");
   });
 
-  it("idem para Demonstração: com uma tela de demonstração aberta, o módulo começa aberto", () => {
+  it("T211 — tela de demonstração aberta (fora do menu): nenhum item marcado", () => {
     render(<App papelDoAtor="rh" destinoInicial="inicio" />);
-    expect(
-      within(navegacao()).getByRole("button", { name: "Demonstração" }),
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(item("Visão geral")).toHaveAttribute("aria-current", "page");
+    expect(tituloDaTela()).toBe("Visão geral");
+    expect(navegacao().querySelectorAll('[aria-current="page"]')).toHaveLength(
+      0,
+    );
   });
 
-  it("Operação fechada com a tela ativa dentro: o título da seção carrega a marca", () => {
-    render(<App papelDoAtor="rh" destinoInicial="cadastros" />);
-    const titulo = within(navegacao()).getByRole("button", {
-      name: "Operação",
-    });
-    fireEvent.click(titulo);
-    expect(titulo).toHaveAttribute("aria-expanded", "false");
-    expect(titulo).toHaveAttribute("aria-current", "true");
-  });
-
-  it("no trilho, Operação não esconde nada: os módulos dela seguem como ícones", () => {
+  it("T211 — no trilho, Colaboradores e Liderança seguem como ícones", () => {
     render(<App papelDoAtor="rh" destinoInicial="dashboard" />);
     fireEvent.click(screen.getByRole("button", { name: "Recolher menu" }));
     expect(
-      within(navegacao()).queryByRole("button", { name: "Operação" }),
-    ).toBeNull();
-    expect(
-      within(navegacao()).getByRole("button", { name: "Estrutura" }),
-    ).toHaveAttribute("data-dica", "Estrutura");
-    expect(item("Jornada")).toBeVisible();
+      within(navegacao()).getByRole("button", { name: "Colaboradores" }),
+    ).toHaveAttribute("data-dica", "Colaboradores");
+    expect(item("Liderança")).toBeVisible();
   });
 
-  it("na gaveta do celular também: Recrutamento, Operação e Demonstração fechados", () => {
+  it("na gaveta do celular: Recrutamento fechado; Organograma à vista em Colaboradores", () => {
     act(() => definirLarguraDaJanela(375));
     render(<App papelDoAtor="rh" destinoInicial="dashboard" />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     const gaveta = screen.getByRole("dialog", { name: "Menu de navegação" });
-    for (const rotulo of ["Recrutamento", "Operação", "Demonstração"]) {
-      expect(
-        within(gaveta).getByRole("button", { name: rotulo }),
-      ).toHaveAttribute("aria-expanded", "false");
-    }
-    fireEvent.click(within(gaveta).getByRole("button", { name: "Operação" }));
     expect(
-      within(gaveta).getByRole("button", { name: /^Estrutura organizacional/ }),
+      within(gaveta).getByRole("button", { name: "Recrutamento" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(gaveta).getByRole("button", { name: /^Organograma/ }),
+    ).toBeVisible();
+    expect(
+      within(gaveta).getByRole("button", { name: /^Liderança/ }),
     ).toBeVisible();
   });
 });
@@ -625,11 +580,14 @@ describe("T209 — contrato do menu completo", () => {
     expect(MENSAGEM_EM_DESENVOLVIMENTO).toBe(MENSAGEM);
   });
 
-  it("todo grupo funcional do mapa aparece exatamente uma vez no menu", () => {
+  it("T211 — todo grupo do mapa aparece no máximo uma vez no menu; fora dele, só Jornada (Ponto) e Demonstração", () => {
     const usados = MENU_LATERAL.flatMap((secao) =>
       secao.entradas.flatMap((e) => (e.tipo === "modulo" ? [e.grupo] : [])),
     );
-    expect([...usados].sort()).toEqual(GRUPOS.map((g) => g.titulo).sort());
+    expect(new Set(usados).size).toBe(usados.length);
+    expect(
+      GRUPOS.map((g) => g.titulo).filter((t) => !usados.includes(t)),
+    ).toEqual(["Jornada", "Demonstração"]);
   });
 
   it("todo item em desenvolvimento renderizado tem nome, descrição e nenhum handler de rota", () => {

@@ -5,10 +5,16 @@
  * pela rota, como o resto do shell.
  */
 import type { ReactNode } from "react";
-import { IconeAparencia, IconeEmpresa, IconePerfil } from "../../ui/icones";
+import {
+  IconeAparencia,
+  IconeEmpresa,
+  IconeEquipe,
+  IconePerfil,
+} from "../../ui/icones";
 import "./NavegacaoConfiguracoes.css";
 
-export type ItemDeConfiguracoes = "meu-perfil" | "aparencia" | "empresas";
+export type ItemDeConfiguracoes =
+  "meu-perfil" | "aparencia" | "empresas" | "equipe-e-permissoes";
 
 const GRUPO_SUA_CONTA_ID = "configuracoes-grupo-sua-conta";
 const GRUPO_EMPRESA_ID = "configuracoes-grupo-empresa";
@@ -45,9 +51,15 @@ function Item({
 export function NavegacaoConfiguracoes({
   atual,
   mostrarEmpresas = false,
+  mostrarEquipe = false,
 }: {
   readonly atual: ItemDeConfiguracoes;
   readonly mostrarEmpresas?: boolean;
+  /**
+   * T211 — a conta alcança Equipe e permissões (Contas de acesso, pela
+   * capacidade de sempre). O grupo Empresa só aparece com algum item.
+   */
+  readonly mostrarEquipe?: boolean;
 }) {
   return (
     <nav className="configuracoes__navegacao" aria-label="Configurações">
@@ -70,7 +82,7 @@ export function NavegacaoConfiguracoes({
           Aparência
         </Item>
       </ul>
-      {mostrarEmpresas ? (
+      {mostrarEmpresas || mostrarEquipe ? (
         <>
           <p
             className="configuracoes__grupo configuracoes__grupo--seguinte"
@@ -82,13 +94,24 @@ export function NavegacaoConfiguracoes({
             className="configuracoes__itens"
             aria-labelledby={GRUPO_EMPRESA_ID}
           >
-            <Item
-              href="#/configuracoes/empresas"
-              atual={atual === "empresas"}
-              icone={<IconeEmpresa />}
-            >
-              Empresas
-            </Item>
+            {mostrarEmpresas ? (
+              <Item
+                href="#/configuracoes/empresas"
+                atual={atual === "empresas"}
+                icone={<IconeEmpresa />}
+              >
+                Empresas
+              </Item>
+            ) : null}
+            {mostrarEquipe ? (
+              <Item
+                href="#/configuracoes/equipe-e-permissoes"
+                atual={atual === "equipe-e-permissoes"}
+                icone={<IconeEquipe />}
+              >
+                Equipe e permissões
+              </Item>
+            ) : null}
           </ul>
         </>
       ) : null}

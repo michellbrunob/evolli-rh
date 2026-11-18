@@ -121,18 +121,20 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Dashboard",
         "Colaboradores",
+        // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
+        "Escala de trabalho",
+        "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
-        "Estrutura organizacional",
-        "Jornadas de trabalho",
         "Jornada",
         "Minha equipe",
         "Administração da liderança",
-        "Contas de acesso",
         "Configurações",
         // T209 — Empresas e Nova empresa.
         "Empresas",
+        // T211 — Contas de acesso como Equipe e permissões.
+        "Equipe e permissões",
         "Nova empresa",
       ],
     ],
@@ -143,16 +145,17 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Dashboard",
         "Colaboradores",
+        // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
+        "Escala de trabalho",
+        "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
-        "Estrutura organizacional",
-        "Jornadas de trabalho",
         "Jornada",
-        "Contas de acesso",
         "Configurações",
         // T209 — Configurações › Empresas (o DP vê a própria).
         "Empresas",
+        "Equipe e permissões",
       ],
     ],
     [
@@ -160,13 +163,14 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       [
         "Dashboard",
         "Colaboradores",
-        "Estrutura organizacional",
-        "Jornadas de trabalho",
+        // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
+        "Escala de trabalho",
+        "Organograma",
         "Jornada",
-        "Contas de acesso",
         "Configurações",
         // T209 — Empresas e Nova empresa (quem cria).
         "Empresas",
+        "Equipe e permissões",
         "Nova empresa",
       ],
     ],

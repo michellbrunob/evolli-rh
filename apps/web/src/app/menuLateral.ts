@@ -20,8 +20,15 @@
  *
  * Um item por linha: o sub-rótulo dos destinos vira a dica (e segue no nome
  * acessível); o estado "Em desenvolvimento" vira uma marca compacta na mesma
- * linha (e segue no nome e na descrição). Recrutamento, Operação e
- * Demonstração começam fechados.
+ * linha (e segue no nome e na descrição). Recrutamento começa fechado.
+ *
+ * ## T211 — organização
+ *
+ * Colaboradores reúne Escala de trabalho e Organograma (destinos do grupo
+ * Gestão de Pessoas); Liderança é item direto de Pessoas; Equipe e
+ * permissões vive em Configurações. Ponto, Administração da liderança e as
+ * telas de Demonstração não estão no menu: as duas primeiras abrem pela URL
+ * própria.
  *
  * ## Permissões
  *
@@ -156,6 +163,13 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         rotulo: "Calendário",
         icone: IconeCalendario,
       },
+      {
+        // T211 — item direto, como Folha de Pagamento e Benefícios: abre
+        // Minha equipe (a Administração da liderança fica fora do menu).
+        tipo: "modulo",
+        grupo: "Liderança",
+        rotulo: "Liderança",
+      },
     ],
   },
   {
@@ -182,28 +196,6 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         icone: IconeHubBeneficios,
         selo: "Novo",
       },
-    ],
-  },
-  {
-    // Os módulos que já operam e não entram em Pessoas nem em Remuneração:
-    // nada funcional sai da barra por causa da nova disposição. Fechada por
-    // padrão, para o menu caber numa tela.
-    id: "operacao",
-    titulo: "Operação",
-    lugar: "principal",
-    recolhivel: true,
-    entradas: [
-      { tipo: "modulo", grupo: "Estrutura" },
-      { tipo: "modulo", grupo: "Jornada" },
-      { tipo: "modulo", grupo: "Liderança" },
-      { tipo: "modulo", grupo: "Administração" },
-    ],
-  },
-  {
-    id: "demonstracao",
-    lugar: "secundario",
-    entradas: [
-      { tipo: "modulo", grupo: "Demonstração", fechadoPorPadrao: true },
     ],
   },
   {

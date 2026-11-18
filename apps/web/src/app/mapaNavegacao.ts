@@ -58,6 +58,12 @@ export interface DestinoNavegacao {
    * navega saiba em que área está.
    */
   readonly agrupadoEm?: string;
+  /**
+   * T211 — o destino continua no mapa (tela, capacidade, URL própria), mas
+   * não é item do menu lateral: abre pela URL. Usado onde o módulo do menu
+   * mostra só parte dos destinos do grupo (Liderança mostra Minha equipe).
+   */
+  readonly foraDoMenu?: boolean;
 }
 
 export interface GrupoNavegacao {
@@ -266,6 +272,26 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         estado: "funcional",
       },
       {
+        // T182 — tela própria do catálogo de jornadas (antes a aba Horários
+        // de Cadastros), sobre o mesmo contrato de `/v1/horarios`.
+        // T211 — no submenu de Colaboradores, como "Escala de trabalho"
+        // (rótulo de navegação; a tela mantém o título dela).
+        id: "jornadas-trabalho",
+        label: "Escala de trabalho",
+        subRotulo: "Turnos da empresa",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
+      },
+      {
+        // T182 — sem a aba Horários, o contêiner abre na Estrutura
+        // organizacional. T211 — no submenu de Colaboradores, como
+        // "Organograma" (rótulo de navegação; a tela mantém o título dela).
+        id: "cadastros",
+        label: "Organograma",
+        subRotulo: "Unidades, cargos e centros de custo",
+        estado: "funcional",
+      },
+      {
         // T176 — página própria da admissão (decisão da proprietária sobre o
         // `DP-FLX-21`). Usa só o contrato atual de `POST /v1/colaboradores`.
         // T178 — sub-página de Colaboradores: sai da barra lateral (abre pela
@@ -292,29 +318,8 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
     ],
   },
   {
-    titulo: "Estrutura",
-    icone: "estrutura",
-    destinos: [
-      {
-        // T182 — sem a aba Horários, o contêiner abre na Estrutura
-        // organizacional; o rótulo diz isso, e não repete o nome do módulo.
-        id: "cadastros",
-        label: "Estrutura organizacional",
-        subRotulo: "Unidades, cargos e centros de custo",
-        estado: "funcional",
-      },
-      {
-        // T182 — tela própria do catálogo de jornadas (antes a aba Horários
-        // de Cadastros), sobre o mesmo contrato de `/v1/horarios`.
-        id: "jornadas-trabalho",
-        label: "Jornadas de trabalho",
-        subRotulo: "Turnos da empresa",
-        estado: "funcional",
-        papeis: PAPEIS_CONSULTA_JORNADAS,
-      },
-    ],
-  },
-  {
+    // T211 — fora do menu lateral (não está em `MENU_LATERAL`): abre pela
+    // URL própria (`#/jornada/ponto`), com a capacidade de sempre.
     titulo: "Jornada",
     icone: "jornada",
     destinos: [
@@ -343,21 +348,9 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         subRotulo: "Vínculos e equipes",
         estado: "funcional",
         papeis: PAPEIS_ADMINISTRACAO_LIDERANCA,
+        // T211 — fora do menu; abre por `#/lideranca/administracao`.
+        foraDoMenu: true,
       },
-    ],
-  },
-  {
-    titulo: "Administração",
-    icone: "administracao",
-    destinos: [
-      {
-        id: "contas-acesso",
-        label: "Contas de acesso",
-        estado: "funcional",
-      },
-      // Auditoria NÃO entra aqui. A API existe (`GET /v1/audit`), mas não há
-      // tela — e um item de menu sem tela é exatamente a promessa vazia que
-      // esta tarefa existe para eliminar.
     ],
   },
   {
@@ -391,6 +384,17 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         subRotulo: "Empresas da conta",
         estado: "funcional",
         papeis: PAPEIS_EMPRESAS_DA_CONTA,
+        agrupadoEm: "configuracoes",
+      },
+      {
+        // T211 — Contas de acesso, como "Equipe e permissões" na navegação
+        // interna de Configurações (grupo Empresa), com URL própria. A tela é
+        // a mesma; quem a vê segue a capacidade de sempre (`contas-acesso`).
+        // Auditoria continua sem item: a API existe, mas não há tela.
+        id: "contas-acesso",
+        label: "Equipe e permissões",
+        subRotulo: "Contas de acesso e papéis",
+        estado: "funcional",
         agrupadoEm: "configuracoes",
       },
       {

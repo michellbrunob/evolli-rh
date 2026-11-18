@@ -226,7 +226,7 @@ describe("T208 — o nome de exibição na sessão", () => {
       perfilAtualizadoEmLido: null,
     });
 
-    fireEvent.click(menu(/^Jornada Visão/));
+    fireEvent.click(menu(/^Organograma/));
     await waitFor(() =>
       expect(
         screen.queryByRole("heading", { level: 1, name: "Configurações" }),
@@ -347,7 +347,7 @@ describe("T208 — a foto de perfil na sessão", () => {
       ),
     );
 
-    fireEvent.click(menu(/^Jornada Visão/));
+    fireEvent.click(menu(/^Organograma/));
     await waitFor(() =>
       expect(
         screen.queryByRole("heading", { level: 1, name: "Configurações" }),

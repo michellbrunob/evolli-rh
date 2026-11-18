@@ -224,11 +224,17 @@ describe("T208 — menu, histórico e foco", () => {
     const links = within(interna).getAllByRole("link");
     // T209 — o RH vê também "Empresas", no grupo Empresa; T210 — e
     // "Aparência", em Sua conta.
-    expect(links).toHaveLength(3);
+    // T211 — e "Equipe e permissões", no grupo Empresa, depois de Empresas.
+    expect(links).toHaveLength(4);
     expect(links[1]).toHaveAccessibleName("Aparência");
     expect(links[1]).toHaveAttribute("href", "#/configuracoes/aparencia");
     expect(links[2]).toHaveAccessibleName("Empresas");
     expect(links[2]).not.toHaveAttribute("aria-current");
+    expect(links[3]).toHaveAccessibleName("Equipe e permissões");
+    expect(links[3]).toHaveAttribute(
+      "href",
+      "#/configuracoes/equipe-e-permissoes",
+    );
     expect(links[0]).toHaveAccessibleName("Meu perfil");
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveAttribute("href", ROTA);
@@ -314,7 +320,7 @@ describe("T208 — guarda de saída da própria edição de Meu perfil", () => {
   const campo = () => screen.getByRole("textbox", { name: "Nome de exibição" });
   const irParaHorario = () =>
     fireEvent.click(
-      within(navegacao()).getByRole("button", { name: /^Jornada Visão/ }),
+      within(navegacao()).getByRole("button", { name: /^Organograma/ }),
     );
 
   function abrirComShell() {
@@ -431,7 +437,7 @@ describe("T208 — guarda de saída com a foto escolhida e não enviada", () => 
     });
     const irParaJornada = () =>
       fireEvent.click(
-        within(navegacao()).getByRole("button", { name: /^Jornada Visão/ }),
+        within(navegacao()).getByRole("button", { name: /^Organograma/ }),
       );
     irParaJornada();
     const dialogo = screen.getByRole("alertdialog");

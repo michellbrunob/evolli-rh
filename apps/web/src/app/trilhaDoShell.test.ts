@@ -19,11 +19,13 @@ describe("trilha da barra superior", () => {
     ],
     ["dashboard", ["Dashboard"]],
     ["configuracoes", ["Configurações", "Meu perfil"]],
-    ["cadastros", ["Operação", "Estrutura", "Estrutura organizacional"]],
-    ["jornadas-trabalho", ["Operação", "Estrutura", "Jornadas de trabalho"]],
-    ["ponto", ["Operação", "Jornada"]],
-    ["equipe", ["Operação", "Liderança", "Minha equipe"]],
-    ["contas-acesso", ["Operação", "Administração", "Contas de acesso"]],
+    // T211 — Escala de trabalho e Organograma em Colaboradores; Liderança em
+    // Pessoas; Equipe e permissões em Configurações; Ponto fora do menu.
+    ["cadastros", ["Pessoas", "Colaboradores", "Organograma"]],
+    ["jornadas-trabalho", ["Pessoas", "Colaboradores", "Escala de trabalho"]],
+    ["ponto", ["Jornada"]],
+    ["equipe", ["Pessoas", "Liderança", "Minha equipe"]],
+    ["contas-acesso", ["Configurações", "Equipe e permissões"]],
     ["inicio", ["Demonstração", "Visão geral"]],
   ])("%s → %j", (id, esperado) => {
     expect(rotulos(id)).toEqual(esperado);

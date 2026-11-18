@@ -531,7 +531,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
     fireEvent.click(
-      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+      screen.getByRole("button", { name: /^Organograma/ }),
     );
     const barra = screen.getByRole("navigation", {
       name: "Navegação do painel",
@@ -619,7 +619,7 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
 
   it("gestor digitando a URL da ficha com o painel aberto fica onde está", async () => {
     render(<App papelDoAtor="gestor" />);
-    const atual = await screen.findByRole("button", { name: /^Minha equipe/ });
+    const atual = await screen.findByRole("button", { name: /^Liderança/ });
     expect(atual).toHaveAttribute("aria-current", "page");
     act(() => {
       window.history.pushState(null, "", `/${rotaDe(ana)}`);
@@ -915,7 +915,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
     fireEvent.click(
-      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+      screen.getByRole("button", { name: /^Organograma/ }),
     );
     fireEvent.click(
       within(
@@ -1619,7 +1619,7 @@ describe("T200 — guarda de saída no App", () => {
 
       // Jornadas de trabalho com o formulário aberto.
       const jornadas = () =>
-        within(barra()).getByRole("button", { name: /^Jornadas de trabalho/ });
+        within(barra()).getByRole("button", { name: /^Escala de trabalho/ });
       fireEvent.click(jornadas());
       const nova = await screen.findAllByRole("button", {
         name: "Nova jornada",
@@ -1913,7 +1913,7 @@ describe("T200 — guarda de saída no App", () => {
         // Um destino do shell sem rota: a URL fica sem hash (índice 1).
         fireEvent.click(
           within(barra()).getByRole("button", {
-            name: /^Estrutura organizacional/,
+            name: /^Organograma/,
           }),
         );
         await screen.findByRole("heading", {
