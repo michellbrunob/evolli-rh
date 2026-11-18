@@ -3578,8 +3578,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         mudança funcional nas telas; Documentos.
 
 109.  **T212 - Importação de colaboradores por planilha `.xlsx`**
-      - **Estado:** **em implementação local**. Branch `codex/t212-importacao-xlsx`, a partir do
-        squash da T211 em `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+      - **Estado:** **implementada localmente; aguarda a validação visual da proprietária**.
+        Branch `codex/t212-importacao-xlsx`, a partir do squash da T211 em `main` (`255a886`,
+        PR #204). Sem push, PR, Ready ou merge.
+      - **Comprovado:** suíte web completa com 160 arquivos e 4436 testes verdes; E2E com
+        PostgreSQL real 14 de 14; Excel real; navegador como RH e DP, desktop e 375 px (`.xlsx`,
+        reenvio sem duplicar, CSV).
       - **Objetivo:** importar colaboradores por `.xlsx`, mantendo o CSV, com o modelo `.xlsx`
         gerado no navegador como download principal e o painel "Adicionar colaborador" em três
         passos, conforme o [documento de decisão](../docs/decisions/t212-importacao-xlsx.md).

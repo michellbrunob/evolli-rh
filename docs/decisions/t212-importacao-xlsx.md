@@ -63,3 +63,63 @@
   duplicar; demais papéis recusados.
 - **Navegador:** RH e DP, desktop e 375 px — baixar o modelo, importar um arquivo sintético válido
   e conferir erro controlado.
+
+## 4. Painel "Adicionar colaborador" (ajuste visual da proprietária)
+
+- Escolhida a planilha, o próprio cartão se abre nos três passos, numerados e ligados por uma
+  linha vertical; a divisória fica dentro do cartão, recuada dos dois lados.
+- **Passo 1:** botão "Baixar modelo (.xlsx)" com ícone.
+- **Passo 2:** "Preencha no Excel ou no Google Planilhas", com os seis dados obrigatórios em
+  etiquetas (o asterisco é só visual).
+- **Passo 3:** área tracejada com "Escolher arquivo" (campo nativo oculto, aberto pelo botão) e
+  arrastar e soltar; mostra o nome do arquivo e recusa ali mesmo o que não é `.xlsx` nem `.csv`.
+- **Rodapé:** "Iniciar importação" fica desabilitado, com o motivo, até haver arquivo; com ele,
+  fecha o painel e abre a página de importação já na conferência. O arquivo fica só em memória,
+  nesta aba, e é esquecido ao fechar o painel.
+- **Foco:** o anel aparece só pelo teclado, dentro da caixa; com o cartão aberto, contorna o
+  bloco inteiro (cartão e passos).
+- O modelo em CSV continua na página de importação, não no painel.
+
+## 5. Resultados comprovados
+
+- **Testes web:** suíte completa com 160 arquivos e 4436 testes verdes. Inclui 29 testes do
+  módulo `.xlsx` (modelo, leitura, recusas, entradas comprimidas como o Excel grava, entrada
+  corrompida), a página de importação
+  com `.xlsx` e CSV (mesma conferência, mesmo corpo e mesma chave nos dois formatos, reenvio), o
+  painel em três passos e o shell (arquivo do painel abre a página na conferência; sem arquivo,
+  nada abre).
+- **E2E (PostgreSQL real, `test/importacao-planilha.e2e-spec.ts`):** 14 de 14. A suíte envia o
+  corpo e a chave da página, linha a linha:
+  - RH e DP admitem (201) na própria empresa, com e sem matrícula e unidade;
+  - reenviar a mesma linha responde com `Idempotent-Replayed: true` e não cria nada;
+  - a mesma pessoa com outros dados (mesma chave) é 422, sem gravar;
+  - gestor, financeiro, colaborador, auditor, dpo, admin_tecnico e master_tecnico recebem 403,
+    sem gravar;
+  - RH de outra empresa recebe 404, sem gravar.
+- **Excel de verdade:** o modelo gerado abre no Excel com as três abas, cabeçalho exato, colunas
+  em texto, lista de tipos e cabeçalho congelado. Preenchido e salvo pelo próprio Excel
+  (entradas comprimidas e textos compartilhados), é lido pela página; uma data gravada como data
+  do Excel é convertida.
+- **Navegador (banco isolado da prévia, dados sintéticos):**
+  - **RH, desktop:** pelo painel, `.xlsx` com 3 linhas — 2 prontas e 1 com erro controlado
+    (departamento inexistente) —, 2 admitidas;
+  - **RH, 375 px:** reenvio do mesmo `.xlsx` — "Nenhuma admitida, 2 já importadas antes";
+    CSV com 1 linha válida e 1 com data impossível — 1 admitida; sem rolagem horizontal;
+  - **DP, 375 px:** pelo painel, `.xlsx` com 1 linha válida (data de nascimento como data do
+    Excel) e 1 com tipo inválido — 1 admitida;
+  - **DP, desktop:** reenvio do `.xlsx` — "1 já importada antes"; CSV — 1 admitida;
+  - contagem por nome no banco da prévia: cada pessoa válida uma vez, nenhuma linha com erro
+    gravada;
+  - **gestor:** a rota da importação não abre (vai para "Minha equipe"), sem campo de arquivo
+    nem "Adicionar colaborador".
+- **Qualidade:** lint, typecheck e build do monorepo sem erro.
+
+## 6. Limites conhecidos
+
+- **Chave por pessoa da conta:** a idempotência continua por ator e empresa (regra da T179, sem
+  mudança aqui). O mesmo arquivo reenviado por outra conta (por exemplo, RH e depois DP) admite de
+  novo as linhas sem matrícula; com matrícula, a duplicidade é recusada pelo banco (409).
+- **Planilhas fora do modelo:** só a aba Colaboradores é lida; arquivos `.xls`, protegidos por
+  senha, com macro ou com fórmula são recusados por inteiro, e a pessoa recebe a orientação.
+- **Formatação do Excel:** só os valores importam; estilos e validações que a pessoa acrescentar
+  são ignorados.
