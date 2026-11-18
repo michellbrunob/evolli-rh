@@ -3421,7 +3421,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 106.  **T209 - Colaboradores**
-      - **Estado:** **em implementação local**. Branch `codex/t209-colaboradores`, a partir do
+      - **Estado:** **integrada** em `main` pela PR #202, squash
+        `b7d2d0353166d35ab8e31a49f4e520efb8177ab9`, com a CI de push 3/3 verde (run
+        44318802859); branch remota preservada. Histórico abaixo.
+      - **Histórico:** branch `codex/t209-colaboradores`, a partir do
         squash `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201). Decisões
         C-1 a C-15 aprovadas em 2026-11-13, com a C-10 corrigida (sem data de nascimento na
         planilha); o Bloco C (importação CSV) está pausado porque a admissão exige a data de

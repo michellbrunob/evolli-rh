@@ -3225,11 +3225,16 @@ resolvida no primeiro commit da T209.
 
 **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
-## Colaboradores — T209 (em implementação local)
+## Colaboradores — T209 (integrada)
 
-| Tarefa | Estado                     | Resultado principal                                                               |
-| ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| T209   | **Em implementação local** | Listagem operacional e ações por pessoa em Colaboradores; importação CSV pausada. |
+| Tarefa | Estado                                    | Resultado principal                                                                                                                    |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| T209   | **Integrada** (PR #202, squash `b7d2d03`) | Colaboradores como área de trabalho do RH e do DP: listagem operacional, cadastro em etapas, importação CSV, foto e empresas com CNPJ. |
+
+**Observação de relatório:** a integração funcional da T209 está concluída (PR #202, squash
+`b7d2d0353166d35ab8e31a49f4e520efb8177ab9`, CI de push 3/3 verde, run 44318802859; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da tarefa seguinte. O histórico da preparação segue abaixo.
 
 **Escopo da preparação:** levantamento e preparação de decisão, no
 [dossiê](../docs/decisions/t209-dossie-colaboradores.md):
