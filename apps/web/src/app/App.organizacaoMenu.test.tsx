@@ -9,7 +9,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { PainelNavigation } from "./PainelNavigation";
-import { MENU_LATERAL } from "./menuLateral";
+import { MENU_LATERAL, PAPEIS_OPERACAO_DE_PESSOAS } from "./menuLateral";
+import { capacidadeFuncionalDe } from "./mapaNavegacao";
 import { destinoDaRota, rotaDoDestino } from "./rotasDoShell";
 import { trilhaDoDestino } from "./trilhaDoShell";
 import { NavegacaoConfiguracoes } from "../screens/configuracoes/NavegacaoConfiguracoes";
@@ -72,6 +73,123 @@ function submenuDe(rotulo: string): string[] {
     (r) => r.firstChild?.textContent ?? "",
   );
 }
+
+/** Títulos das seções à vista. */
+function titulosDeSecao(): string[] {
+  return [...navegacao().querySelectorAll(".painel-nav__secao-titulo")].map(
+    (t) => t.textContent ?? "",
+  );
+}
+
+describe("T211 — menu por papel (correção final)", () => {
+  it("gestor: só Liderança (Minha equipe) entre os destinos, além de Portal, Suporte, Roadmap e Configurações", () => {
+    montarMenu("gestor", "equipe");
+    expect(primeiroNivel()).toEqual([
+      "Portal",
+      "Liderança",
+      "Suporte",
+      "Roadmap",
+      "Configurações",
+    ]);
+    expect(titulosDeSecao()).toEqual(["Pessoas"]);
+    const texto = navegacao().textContent ?? "";
+    for (const ausente of [
+      "Colaboradores",
+      "Escala de trabalho",
+      "Organograma",
+      "Desenvolvimento",
+      "Recrutamento",
+      "Pesquisas",
+      "Calendário",
+      "Remuneração",
+      "Folha de Pagamento",
+      "Benefícios",
+      "Hub de Benefícios",
+      "Empresas",
+      "Equipe e permissões",
+      "Dashboard",
+    ]) {
+      expect(texto, ausente).not.toContain(ausente);
+    }
+    expect(
+      within(navegacao()).getByRole("button", { name: /^Liderança/ }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it.each(["dp", "master_tecnico"])(
+    "%s: a árvore aprovada, sem Liderança",
+    (papel) => {
+      montarMenu(papel);
+      expect(primeiroNivel()).toEqual([
+        "Dashboard",
+        "Portal",
+        "Colaboradores",
+        "Recrutamento",
+        "Pesquisas",
+        "Calendário",
+        "Folha de Pagamento",
+        "Benefícios",
+        "Hub de Benefícios",
+        "Suporte",
+        "Roadmap",
+        "Configurações",
+      ]);
+      expect(titulosDeSecao()).toEqual(["Pessoas", "Remuneração"]);
+    },
+  );
+
+  it("sem papel conhecido, nada que dependa de papel aparece (negação por padrão)", () => {
+    render(
+      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+    );
+    const texto = navegacao().textContent ?? "";
+    for (const ausente of ["Colaboradores", "Recrutamento", "Remuneração"]) {
+      expect(texto, ausente).not.toContain(ausente);
+    }
+  });
+
+  it("os papéis que veem Pessoas e Remuneração no menu são exatamente os que abrem Colaboradores", () => {
+    const comCapacidade = [
+      "rh",
+      "dp",
+      "master_tecnico",
+      "gestor",
+      "financeiro",
+      "colaborador",
+      "auditor",
+      "dpo",
+      "admin_tecnico",
+    ].filter((papel) =>
+      capacidadeFuncionalDe(papel).some((d) => d.id === "pessoas"),
+    );
+    expect([...PAPEIS_OPERACAO_DE_PESSOAS].sort()).toEqual(
+      comCapacidade.sort(),
+    );
+    expect(PAPEIS_OPERACAO_DE_PESSOAS).not.toContain("gestor");
+  });
+
+  it("App do gestor: a gaveta (375 px) mostra o mesmo menu enxuto", async () => {
+    const { definirLarguraDaJanela, redefinirLarguraDaJanela } =
+      await import("../test/viewport");
+    definirLarguraDaJanela(375);
+    try {
+      render(<App papelDoAtor="gestor" />);
+      fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+      const gaveta = screen.getByRole("dialog", { name: "Menu de navegação" });
+      expect(
+        within(gaveta).getByRole("button", { name: /^Liderança/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(gaveta).queryByRole("button", { name: /^Colaboradores/ }),
+      ).toBeNull();
+      expect(
+        within(gaveta).queryByRole("button", { name: /^Folha de Pagamento/ }),
+      ).toBeNull();
+    } finally {
+      redefinirLarguraDaJanela();
+    }
+  });
+});
 
 describe("T211 — árvore do menu", () => {
   it("RH: primeiro nível na ordem, com Liderança depois de Calendário e o rodapé de sempre", () => {

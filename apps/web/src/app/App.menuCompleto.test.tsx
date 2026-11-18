@@ -372,13 +372,22 @@ describe("T209 — menu completo no desktop (expandido)", () => {
     expect(tituloDaTela()).toBe("Dashboard");
   });
 
-  it("gestor: sem Dashboard (permissão existente), com os mesmos itens em desenvolvimento", () => {
+  // T211 — o gestor vê só Liderança entre os destinos; dos itens em
+  // desenvolvimento, só os de uso geral (Portal, Suporte e Roadmap).
+  it("gestor: sem Dashboard (permissão existente); em desenvolvimento, só Portal, Suporte e Roadmap", () => {
     render(<App papelDoAtor="gestor" />);
     expect(
       within(navegacao()).queryByRole("button", { name: /^Dashboard/ }),
     ).toBeNull();
     for (const rotulo of ITENS_EM_DESENVOLVIMENTO) {
-      expect(item(rotulo)).toHaveAttribute("aria-disabled", "true");
+      const geral = ["Portal", "Suporte", "Roadmap"].includes(rotulo);
+      const botao = within(navegacao()).queryByRole("button", {
+        name: new RegExp(
+          `^${escapar(rotulo)}( (Beta|Novo))? Em desenvolvimento$`,
+        ),
+      });
+      if (geral) expect(botao).toHaveAttribute("aria-disabled", "true");
+      else expect(botao, rotulo).toBeNull();
     }
   });
 });

@@ -333,7 +333,11 @@ describe("destinos preservados", () => {
 describe("semântica de item ativo, seleção e teclado", () => {
   it("marca somente o destino ativo com aria-current='page'", () => {
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={() => {}}
+      />,
     );
     expect(
       screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
@@ -346,7 +350,11 @@ describe("semântica de item ativo, seleção e teclado", () => {
   it("chama onSelecionar com o id do destino clicado", () => {
     const onSelecionar = vi.fn();
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={onSelecionar} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={onSelecionar}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     expect(onSelecionar).toHaveBeenCalledWith("cadastros");
@@ -354,7 +362,11 @@ describe("semântica de item ativo, seleção e teclado", () => {
 
   it("os sub-rótulos situam o destino sem repetir o grupo", () => {
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={() => {}}
+      />,
     );
     expect(
       screen.getByRole("button", {

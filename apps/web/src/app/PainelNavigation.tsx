@@ -714,6 +714,11 @@ export function PainelNavigation({
   function renderizarEntrada(
     entrada: SecaoDoMenu["entradas"][number],
   ): ReactNode {
+    // T211 — entrada restrita a papéis: sem o papel (ou sem papel conhecido),
+    // não aparece. Disposição do menu, não autorização.
+    if (entrada.papeis && !(papel !== null && entrada.papeis.includes(papel))) {
+      return null;
+    }
     if (entrada.tipo === "em-desenvolvimento") {
       if (entrada.subitens && entrada.subitens.length > 0) {
         const chave = `em-desenvolvimento:${entrada.id}`;
