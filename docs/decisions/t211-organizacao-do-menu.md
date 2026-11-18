@@ -40,8 +40,18 @@
 - **M7 — Demonstração fora do menu:** as telas de exemplo ficam no código, sem caminho na interface.
 - **M8 — Itens em desenvolvimento:** continuam com a indicação acessível de indisponibilidade
   (marca, descrição e aviso), sem rota.
+- **M9 — Menu por papel (correção final, proprietária, 2026-11-18):**
+  - o gestor não vê Colaboradores (nem Escala de trabalho e Organograma), Recrutamento,
+    Pesquisas, Calendário, Remuneração, Empresas ou Equipe e permissões;
+  - para ele ficam Liderança (Minha equipe) e, em Configurações, Meu perfil e Aparência;
+  - as entradas do menu declaram os papéis que as veem (só disposição do menu, não autorização);
+    Colaboradores e os itens em desenvolvimento de Pessoas e Remuneração ficam para RH, DP e
+    master técnico — os papéis que abrem Colaboradores pela tabela de capacidade;
+  - sem papel conhecido, essas entradas não aparecem (negação por padrão).
 
 ## 3. Árvore do menu
+
+### 3.1 RH (completa)
 
 - Dashboard; Portal (Beta, em desenvolvimento).
 - **Pessoas:**
@@ -56,6 +66,17 @@
 - **Configurações › navegação interna:**
   - Sua conta: Meu perfil, Aparência;
   - Empresa: Empresas, Equipe e permissões.
+
+### 3.2 DP e master técnico
+
+A árvore do RH sem Liderança; Configurações igual.
+
+### 3.3 Gestor
+
+- Portal (Beta, em desenvolvimento).
+- **Pessoas:** Liderança (abre Minha equipe, a tela de entrada dele).
+- **Rodapé:** Suporte, Roadmap (em desenvolvimento) e Configurações.
+- **Configurações › navegação interna:** Sua conta: Meu perfil, Aparência.
 
 ## 4. Permissões e rotas
 
@@ -74,6 +95,8 @@
   funcional nas telas, por escopo).
 - **Telas fora do menu:** Ponto e Administração da liderança abrem pela URL própria até ganharem
   lugar definitivo. As telas de exemplo de Demonstração ficam sem caminho na interface.
+- **Itens de uso geral para o gestor:** Portal, Suporte e Roadmap (em desenvolvimento) seguem
+  visíveis para ele, porque não entraram na lista da M9.
 
 ## 6. Validação no navegador (2026-11-18, prévia local)
 
@@ -88,31 +111,38 @@
   - `#/jornada/ponto` e `#/lideranca/administracao` abrem as telas, sem item marcado.
 - **DP e master técnico** (sem empresa, acesso global): Colaboradores com Escala de trabalho e
   Organograma, sem Liderança; Equipe e permissões em Configurações.
-- **Gestor:**
-  - entra direto em Minha equipe, com Liderança marcada;
+- **Gestor (depois da M9):**
+  - menu: Portal, Pessoas › Liderança (marcada), Suporte, Roadmap e Configurações;
+  - entra direto em Minha equipe;
   - em Configurações, só Meu perfil e Aparência;
-  - as URLs de Equipe e permissões e de Administração da liderança são recusadas (fica na tela
-    atual).
-- **375 px:** a gaveta mostra a árvore nova, todos os alvos com 44 px, sem rolagem horizontal.
-- **Comportamento anterior, sem mudança:** destinos sem restrição de papel no mapa (Colaboradores,
-  Organograma) aparecem no menu do gestor, e o shell recusa ao abrir. Antes da T211, Estrutura
-  organizacional também aparecia para ele, na seção Operação.
+  - as URLs de Colaboradores, Escala de trabalho, Empresas, Equipe e permissões e Administração
+    da liderança continuam recusadas (fica na tela atual).
+- **375 px:** a gaveta mostra a árvore de cada papel, todos os alvos com 44 px, sem rolagem
+  horizontal (RH e gestor conferidos).
 
 ## 7. Testes e verificações (2026-11-18)
 
-- **Testes da T211** (`App.organizacaoMenu.test.tsx`, 32): árvore e ordem, Colaboradores com os
+- **Testes da T211** (`App.organizacaoMenu.test.tsx`, 38): árvore e ordem, Colaboradores com os
   três destinos e Desenvolvimento, Liderança como item único por papel, nada de Operação,
   Estrutura, Jornada, Administração ou Demonstração, URLs novas de ida e volta, URLs antigas
   iguais, trilhas, Equipe e permissões em Configurações por papel, Ponto e Administração da
-  liderança pela URL, gestor em Minha equipe.
+  liderança pela URL, gestor em Minha equipe; menu por papel (gestor, DP, master técnico, sem
+  papel, gaveta do gestor a 375 px) e o espelho da tabela de capacidade. Uma mutação que desliga
+  o filtro por papel derruba 4 testes.
 - **Testes do menu antigo atualizados:**
   - as telas fora do menu passam a abrir pelo destino inicial ou pela URL própria;
   - saem dois testes de "sair e voltar pelo menu" de telas de demonstração (Portal do
     Colaborador e Relatórios), porque esse percurso não existe mais.
-- **Suíte web:** 159 arquivos / 4381 testes, sem falhas.
+- **Suíte web:** 159 arquivos / 4387 testes, sem falhas.
 - **Gerais:** lint, typecheck e build da web verdes. A API não mudou.
 
-## 8. Plano de testes
+## 8. Próximas entregas (planejamento da proprietária, 2026-11-18)
+
+- **T212 — Importação de colaboradores por `.xlsx`.**
+- **T213 — Documentos** (antes reservada como entrega própria).
+- Nenhuma das duas foi iniciada.
+
+## 9. Plano de testes
 
 - **Menu:** árvore e ordem; Colaboradores com os três destinos e Desenvolvimento; Liderança como
   item único; sem Operação, Estrutura, Jornada, Administração e Demonstração; itens em

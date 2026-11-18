@@ -3564,9 +3564,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         Liderança como item direto de Pessoas (abre Minha equipe); sem a seção Operação e sem
         Demonstração no menu, conforme o
         [documento de decisão](../docs/decisions/t211-organizacao-do-menu.md).
-      - **Validação local:** web 159 arquivos / 4381 testes; lint, typecheck e build da web;
+      - **Correção final (M9):** o menu do gestor fica com Liderança (Minha equipe) e, em
+        Configurações, Meu perfil e Aparência; Colaboradores e os itens de Pessoas e Remuneração
+        ficam para RH, DP e master técnico. Só disposição do menu: servidor, API e rotas sem
+        mudança.
+      - **Validação local:** web 159 arquivos / 4387 testes; lint, typecheck e build da web;
         navegador com RH, DP, master técnico, gestor e 375 px. Aguarda a validação visual da
         proprietária.
+      - **Próximas (proprietária, 2026-11-18):** T212 — Importação de colaboradores por `.xlsx`;
+        T213 — Documentos. Nenhuma iniciada.
       - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
         mudança funcional nas telas; Documentos.
 
