@@ -171,8 +171,13 @@ Faixas: menor e maior valor sobre canvas, fundo neutro e superfície clara.
 - **API:** E2E `aparencia` 18/18 (padrão nulo, gravação e nova sessão, inválidos 400, sem CSRF 403,
   sem sessão 401, isolamento, todos os papéis, CHECK no banco, sem auditoria); bateria E2E serial
   29 suítes / 1207 testes, com as migrations do zero (smoke da migration); unitária 68 / 1604.
-- **Web:** 158 arquivos / 4359 testes; um teste de temporização da T189 estourou 5 s na suíte
-  completa e passou isolado (instabilidade conhecida). Inclui temas (paletas, contrastes dos
+- **Web:** 158 arquivos / 4359 testes, sem falhas. Estabilização: os testes da T189 (aviso de
+  troca de empresa com a Nova admissão aberta) estouravam 5 s na suíte completa porque cada
+  consulta por papel ou rótulo na árvore inteira do app custava ~0,4 s no jsdom (nome acessível e
+  `getComputedStyle` de cada candidato), somando ~4,9 s mesmo isolado. As consultas passaram a
+  usar o contêiner certo (etapas, rodapé do cadastro, aviso), com as mesmas asserções: o B1 caiu
+  de ~4,9 s para ~1,7–1,9 s, sem mudar timeout nem repetir teste. Mutação no "Voltar à empresa
+  anterior" derruba os dois testes que o usam. Inclui temas (paletas, contrastes dos
   quatro temas, menu, contorno de campo, nenhuma cor fixa), `MarcaEvolli`, Aparência (tela, rota,
   sessão, falha, sessão expirada, teclado, descrições acessíveis) e Hub sem o cartão.
 - **Gerais:** lint, typecheck e build limpos; `spec:check` e `git diff --check` limpos.

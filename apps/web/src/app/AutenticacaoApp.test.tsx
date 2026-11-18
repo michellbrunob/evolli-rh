@@ -1083,6 +1083,18 @@ async function trocarPeloMenuPara(nome: string) {
   );
 }
 
+/**
+ * T210 (estabilização) — consultas da Nova admissão no contêiner certo (as
+ * etapas, o rodapé do cadastro). Na árvore inteira do app (menu, barra e as
+ * quatro etapas montadas), cada consulta por papel ou rótulo custa ~0,4 s no
+ * jsdom (nome acessível e `getComputedStyle` de cada candidato), e os testes
+ * da T189 encostavam nos 5 s. As asserções continuam as mesmas.
+ */
+const conteudoDoCadastro = () =>
+  document.querySelector<HTMLElement>(".cadastro-etapas__conteudo")!;
+const rodapeDoCadastro = () =>
+  document.querySelector<HTMLElement>(".cadastro-etapas__rodape")!;
+
 async function abrirNovaAdmissaoPorRota() {
   window.history.replaceState(null, "", "#/pessoas/nova-admissao");
   vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
@@ -1587,16 +1599,19 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("T195 — edição pendente numa etapa adiantada: continuar editando mantém a etapa e os dados", async () => {
     trocarParaBetaNoServidor();
     const nome = await abrirNovaAdmissaoPorRota();
+    const etapas = within(conteudoDoCadastro());
     fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
-    fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
+    fireEvent.change(etapas.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
     // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
-    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+    fireEvent.change(etapas.getByLabelText(/^CPF$/), {
       target: { value: "529.982.247-25" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    const titulo = await screen.findByRole("heading", {
+    fireEvent.click(
+      within(rodapeDoCadastro()).getByRole("button", { name: "Próxima etapa" }),
+    );
+    const titulo = await etapas.findByRole("heading", {
       level: 2,
       name: /Dados profissionais$/,
     });
@@ -1609,7 +1624,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
     expect(titulo).toBeVisible();
     expect(
-      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+      (etapas.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
     ).toBe("Pessoa Sintetica Rascunho");
   });
 
@@ -1923,22 +1938,25 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
    */
   async function abrirReferenciaRapida() {
     await abrirNovaAdmissaoPorRota();
-    fireEvent.change(screen.getByLabelText(/Nome completo/), {
+    const etapas = within(conteudoDoCadastro());
+    fireEvent.change(etapas.getByLabelText(/Nome completo/), {
       target: { value: "Pessoa Sintetica Referencia" },
     });
-    fireEvent.change(screen.getByLabelText(/^Data de nascimento/), {
+    fireEvent.change(etapas.getByLabelText(/^Data de nascimento/), {
       target: { value: "1990-05-20" },
     });
     // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
-    fireEvent.change(screen.getByLabelText(/^CPF$/), {
+    fireEvent.change(etapas.getByLabelText(/^CPF$/), {
       target: { value: "529.982.247-25" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
-    await screen.findByRole("heading", {
+    fireEvent.click(
+      within(rodapeDoCadastro()).getByRole("button", { name: "Próxima etapa" }),
+    );
+    await etapas.findByRole("heading", {
       level: 2,
       name: /Dados profissionais$/,
     });
-    const mais = await screen.findByRole("button", {
+    const mais = await etapas.findByRole("button", {
       name: "Cadastrar novo departamento",
     });
     await waitFor(() => expect(mais).toBeEnabled());
@@ -1990,7 +2008,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     });
 
     trocaEmOutraAba(ATOR_EM_BETA);
-    await aviso();
+    const alerta = await aviso();
     // Nada recriado enquanto a pessoa não escolhe.
     expect(campoDaReferencia(/^Código/).value).toBe("DEP_RASCUNHO");
     expect(document.querySelector(".autenticacao-app__arvore")).toHaveAttribute(
@@ -1998,7 +2016,7 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     );
 
     fireEvent.click(
-      screen.getByRole("button", {
+      within(alerta).getByRole("button", {
         name: "Voltar à empresa anterior e continuar editando",
       }),
     );
@@ -2011,7 +2029,11 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
     // A admissão por trás do modal também ficou, na mesma etapa.
     expect(
-      (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
+      (
+        within(conteudoDoCadastro()).getByLabelText(
+          /Nome completo/,
+        ) as HTMLInputElement
+      ).value,
     ).toBe("Pessoa Sintetica Referencia");
     esperarEtapa2Ativa();
   });
@@ -2023,11 +2045,11 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     });
 
     trocaEmOutraAba(ATOR_EM_BETA);
-    await aviso();
+    const alerta = await aviso();
     expect(campoDaReferencia(/^Nome/).value).toBe("Departamento Rascunho");
 
     fireEvent.click(
-      screen.getByRole("button", {
+      within(alerta).getByRole("button", {
         name: "Continuar na empresa nova e descartar alterações",
       }),
     );
@@ -2066,9 +2088,9 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     vi.mocked(trocarEmpresaDoContexto).mockResolvedValue(EMPRESA_ALFA);
     await abrirReferenciaRapida();
     trocaEmOutraAba(ATOR_EM_BETA);
-    await aviso();
+    const alerta = await aviso();
     fireEvent.click(
-      screen.getByRole("button", {
+      within(alerta).getByRole("button", {
         name: "Voltar à empresa anterior e continuar editando",
       }),
     );
@@ -2078,7 +2100,11 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     ).toBeInTheDocument();
     expect(campoDaReferencia(/^Código/).value).toBe("");
     expect(
-      (screen.getByLabelText(/Nome completo/) as HTMLInputElement).value,
+      (
+        within(conteudoDoCadastro()).getByLabelText(
+          /Nome completo/,
+        ) as HTMLInputElement
+      ).value,
     ).toBe("Pessoa Sintetica Referencia");
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
     esperarEtapa2Ativa();
