@@ -1476,3 +1476,16 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
 - **Seletor de empresa:** depois de editar o CNPJ da empresa ativa, o seletor só o mostra na
   próxima leitura do ator.
 - **Bundle:** cresce com o Iconsax (+16 kB gzip).
+
+### 38.5 Textos próprios (2026-11-18)
+
+- **Decisão da proprietária (2026-11-18):** a referência visual vale só para hierarquia,
+  espaçamento, posições e clareza; nenhum texto, marca, código, imagem, ícone ou layout de
+  terceiros. As frases descritivas que tinham vindo de fora foram reescritas com redação
+  própria (`6709661`):
+  - Novo colaborador: cabeçalho, descrições e subtítulos das etapas, descrições das seções,
+    ajudas dos campos, dica da matrícula e confirmação do CEP;
+  - Nova empresa e Empresas: textos das etapas, das seções e das opções.
+- **O que ficou:** termos genéricos de interface ("Novo colaborador", "Próxima etapa", "Salvar
+  rascunho", "Limpar filtros", máscaras de campo).
+- **Prova:** web 153 / 4298.
