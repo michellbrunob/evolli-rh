@@ -3011,3 +3011,54 @@ describe("T209 — Hub desativado como destino de uso normal", () => {
     expect(hubNaTela()).toBeNull();
   });
 });
+
+describe("T210 — o tema da conta vai para o <html> (data-theme)", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+
+  it("começa no padrão e, com a identidade, aplica o tema da conta", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR_PADRAO,
+      temaAparencia: "verde_petroleo",
+    } as never);
+    render(<AutenticacaoApp />);
+    // Antes da identidade da sessão: o padrão.
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    await chegarAoHub();
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute("data-theme")).toBe(
+        "verde_petroleo",
+      ),
+    );
+  });
+
+  it("sem tema, ou com valor desconhecido, fica no padrão (sem atributo)", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR_PADRAO,
+      temaAparencia: "roxo",
+    } as never);
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+  });
+
+  it("ao sair, volta ao padrão", async () => {
+    vi.mocked(obterUsuarioAtual).mockResolvedValue({
+      ...ATOR_PADRAO,
+      temaAparencia: "alto_contraste",
+    } as never);
+    vi.mocked(logout).mockResolvedValue(undefined as never);
+    render(<AutenticacaoApp />);
+    await chegarAoHub();
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute("data-theme")).toBe(
+        "alto_contraste",
+      ),
+    );
+    fireEvent.click(await botaoSair());
+    await waitFor(() =>
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false),
+    );
+  });
+});

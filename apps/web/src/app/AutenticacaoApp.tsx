@@ -79,6 +79,7 @@
  * única leitura que faz (`GET /v1/empresas`, para o nome da empresa) acontece
  * só para papéis a que o RBAC concede `empresa:read`.
  */
+import { aplicarTema } from "./aparencia";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import "./tokens.css";
@@ -154,6 +155,12 @@ export function AutenticacaoApp() {
    * ator da sessão anterior.
    */
   const [ator, setAtor] = useState<SafeAccessUserApi | null>(null);
+  // T210 — o tema da conta vai para o <html> assim que a identidade da
+  // sessão chega (e volta ao padrão sem sessão). O tema vem do servidor:
+  // nada fica guardado no navegador.
+  useEffect(() => {
+    aplicarTema(ator?.temaAparencia ?? null);
+  }, [ator]);
   /**
    * Produto aberto a partir do Hub. `null` é o Hub — o estado em que a sessão
    * nasce e ao qual ela volta.

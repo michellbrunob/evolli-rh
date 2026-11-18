@@ -56,6 +56,25 @@
     0 0 0 1px color-mix(in srgb, var(--color-ink) 6%, transparent),
     0 2px 4px color-mix(in srgb, var(--color-ink) 6%, transparent),
     0 12px 28px -6px color-mix(in srgb, var(--color-ink) 10%, transparent);
+  /* T210 — cores fixas das AMOSTRAS dos cartões de Aparência: cada cartão
+     mostra o próprio tema, qualquer que seja o tema em uso. */
+  --amostra-azul-acao: #0066cc;
+  --amostra-azul-fundo: #f5f5f7;
+  --amostra-azul-superficie: #ffffff;
+  --amostra-azul-texto: #1d1d1f;
+  --amostra-claro-acao: #b42362;
+  --amostra-claro-fundo: #f8f7f9;
+  --amostra-claro-superficie: #fffdfe;
+  --amostra-claro-texto: #25151e;
+  --amostra-verde-acao: #006d77;
+  --amostra-verde-fundo: #f2f8f8;
+  --amostra-verde-superficie: #fcfefe;
+  --amostra-verde-texto: #132b2d;
+  --amostra-contraste-acao: #0046ad;
+  --amostra-contraste-fundo: #ffffff;
+  --amostra-contraste-superficie: #ffffff;
+  --amostra-contraste-texto: #000000;
+
   /* T210 — fundo do que vai para a impressão: sempre branco, em todo tema
      (o tema não muda impressão nem PDF). */
   --papel-impressao: #ffffff;

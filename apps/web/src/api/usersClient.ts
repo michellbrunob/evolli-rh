@@ -31,6 +31,11 @@ export interface SafeAccessUserApi {
    */
   mfaAvailable?: boolean;
   /**
+   * T210 — o tema de Aparência da própria conta (`null` = padrão, Azul
+   * Institucional). Valor desconhecido é tratado como o padrão na tela.
+   */
+  temaAparencia?: string | null;
+  /**
    * T163 — o papel pode ESCOLHER a empresa de trabalho?
    *
    * Decidido pelo servidor, como `mfaAvailable`. Controla se o Hub desenha o
@@ -207,6 +212,31 @@ export async function atualizarPerfilProprio(entrada: {
         "x-csrf-token": await getCsrf(),
       },
       body: corpo,
+    });
+  let res = await enviar();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow(res);
+}
+
+/**
+ * T210 — grava o tema de Aparência da PRÓPRIA conta (sem `:id`) e devolve o
+ * ator atualizado. Um 403 `csrf_invalido` é recusado antes de gravar: repetir
+ * uma vez com o token novo é seguro (e a gravação é idempotente).
+ */
+export async function atualizarAparenciaPropria(
+  tema: string,
+): Promise<SafeAccessUserApi> {
+  const enviar = async () =>
+    apiFetch(`${USERS_ENDPOINT}/me/aparencia`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": await getCsrf(),
+      },
+      body: JSON.stringify({ tema }),
     });
   let res = await enviar();
   await descartarTokenSeDesatualizado(res);
