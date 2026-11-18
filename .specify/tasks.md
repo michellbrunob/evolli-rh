@@ -3564,6 +3564,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         Liderança como item direto de Pessoas (abre Minha equipe); sem a seção Operação e sem
         Demonstração no menu, conforme o
         [documento de decisão](../docs/decisions/t211-organizacao-do-menu.md).
+      - **Validação local:** web 159 arquivos / 4381 testes; lint, typecheck e build da web;
+        navegador com RH, DP, master técnico, gestor e 375 px. Aguarda a validação visual da
+        proprietária.
       - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
         mudança funcional nas telas; Documentos.
 

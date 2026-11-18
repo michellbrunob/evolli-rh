@@ -75,7 +75,44 @@
 - **Telas fora do menu:** Ponto e Administração da liderança abrem pela URL própria até ganharem
   lugar definitivo. As telas de exemplo de Demonstração ficam sem caminho na interface.
 
-## 6. Plano de testes
+## 6. Validação no navegador (2026-11-18, prévia local)
+
+- **RH:**
+  - a árvore da seção 3, completa;
+  - Escala de trabalho abre a tela de jornadas (título "Jornadas de trabalho"), com a URL de
+    sempre e a trilha Pessoas › Colaboradores › Escala de trabalho;
+  - Organograma abre a estrutura organizacional (trilha Pessoas › Colaboradores › Organograma);
+  - Liderança abre Minha equipe (trilha Pessoas › Liderança › Minha equipe);
+  - Configurações mostra Meu perfil, Aparência, Empresas e Equipe e permissões;
+  - `#/configuracoes/equipe-e-permissoes` abre Contas de acesso, com Configurações marcado;
+  - `#/jornada/ponto` e `#/lideranca/administracao` abrem as telas, sem item marcado.
+- **DP e master técnico** (sem empresa, acesso global): Colaboradores com Escala de trabalho e
+  Organograma, sem Liderança; Equipe e permissões em Configurações.
+- **Gestor:**
+  - entra direto em Minha equipe, com Liderança marcada;
+  - em Configurações, só Meu perfil e Aparência;
+  - as URLs de Equipe e permissões e de Administração da liderança são recusadas (fica na tela
+    atual).
+- **375 px:** a gaveta mostra a árvore nova, todos os alvos com 44 px, sem rolagem horizontal.
+- **Comportamento anterior, sem mudança:** destinos sem restrição de papel no mapa (Colaboradores,
+  Organograma) aparecem no menu do gestor, e o shell recusa ao abrir. Antes da T211, Estrutura
+  organizacional também aparecia para ele, na seção Operação.
+
+## 7. Testes e verificações (2026-11-18)
+
+- **Testes da T211** (`App.organizacaoMenu.test.tsx`, 32): árvore e ordem, Colaboradores com os
+  três destinos e Desenvolvimento, Liderança como item único por papel, nada de Operação,
+  Estrutura, Jornada, Administração ou Demonstração, URLs novas de ida e volta, URLs antigas
+  iguais, trilhas, Equipe e permissões em Configurações por papel, Ponto e Administração da
+  liderança pela URL, gestor em Minha equipe.
+- **Testes do menu antigo atualizados:**
+  - as telas fora do menu passam a abrir pelo destino inicial ou pela URL própria;
+  - saem dois testes de "sair e voltar pelo menu" de telas de demonstração (Portal do
+    Colaborador e Relatórios), porque esse percurso não existe mais.
+- **Suíte web:** 159 arquivos / 4381 testes, sem falhas.
+- **Gerais:** lint, typecheck e build da web verdes. A API não mudou.
+
+## 8. Plano de testes
 
 - **Menu:** árvore e ordem; Colaboradores com os três destinos e Desenvolvimento; Liderança como
   item único; sem Operação, Estrutura, Jornada, Administração e Demonstração; itens em
