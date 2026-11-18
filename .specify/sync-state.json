@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T212",
-    "status": "importacao_xlsx_aguardando_validacao_visual",
-    "reason": "T211 integrada em main pela PR #204 (squash 255a88627460bfed1ffc37f121d77ecb39da621f), com a CI de push 3/3 verde (run 44378071052); convergida no primeiro commit da T212. T212 implementada localmente e aguardando a validacao visual da proprietaria: importacao de colaboradores por .xlsx, mantendo o CSV, com modelo gerado no navegador e painel em tres passos (docs/decisions/t212-importacao-xlsx.md), sem API, migration, RBAC, auditoria ou dependencia nova. Sem push, PR, Ready ou merge."
+    "status": "importacao_xlsx_aprovada_visualmente",
+    "reason": "T211 integrada em main pela PR #204 (squash 255a88627460bfed1ffc37f121d77ecb39da621f), com a CI de push 3/3 verde (run 44378071052); convergida no primeiro commit da T212. T212 implementada localmente e aprovada visualmente pela proprietaria em 18/11/2026: importacao de colaboradores por .xlsx, mantendo o CSV, com modelo gerado no navegador e painel em tres passos (docs/decisions/t212-importacao-xlsx.md), sem API, migration, RBAC, auditoria ou dependencia nova; limite conhecido: reenvio por outra conta admite de novo linhas sem matricula. Aguarda a ordem de publicacao; sem push, PR, Ready ou merge."
   },
   "openDeliveries": [
     {
       "id": "T212",
       "pullRequest": null,
-      "status": "importacao_xlsx_aguardando_validacao_visual"
+      "status": "importacao_xlsx_aprovada_visualmente"
     }
   ],
   "requiredArtifacts": [

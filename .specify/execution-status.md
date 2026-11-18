@@ -3376,11 +3376,11 @@ item direto de Pessoas; sem Operação e sem Demonstração no menu
 **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos; mudança
 funcional nas telas; Documentos.
 
-## Importação por `.xlsx` — T212 (aguardando validação visual)
+## Importação por `.xlsx` — T212 (aprovada visualmente; aguarda publicação)
 
-| Tarefa | Estado                                                | Resultado principal                                                                      |
-| ------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| T212   | **Implementada localmente; aguarda validação visual** | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+| Tarefa | Estado                                                     | Resultado principal                                                                      |
+| ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| T212   | **Aprovada visualmente em 18/11/2026; aguarda publicação** | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
 
 **Escopo:** modelo `.xlsx` (abas Colaboradores, Exemplos e Instruções) gerado da mesma definição
 de colunas do importador; leitura só no navegador, pela mesma conferência, idempotência e envio
@@ -3391,6 +3391,11 @@ do CSV; painel "Adicionar colaborador" em três passos
 PostgreSQL real 14 de 14 (RH e DP admitem, reenvio não duplica, demais papéis recusados); modelo
 aberto, preenchido e salvo no Excel e lido pela página; navegador como RH e DP, desktop e 375 px, com `.xlsx`, reenvio e CSV
 ([resultados e limites](../docs/decisions/t212-importacao-xlsx.md)).
+
+**Aprovação visual:** recebida da proprietária em 18/11/2026, com os cenários validados (RH e DP,
+desktop e 375 px; `.xlsx` do Excel, erro controlado, reenvio sem duplicar, CSV e recusa ao
+gestor) e o limite conhecido: o mesmo arquivo reenviado por outra conta admite de novo as linhas
+sem matrícula (idempotência por ator e empresa, regra da T179).
 
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.

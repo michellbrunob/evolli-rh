@@ -1,7 +1,8 @@
 # T212 — Importação de colaboradores por planilha `.xlsx`
 
-- **Estado:** aberta em 2026-11-18, em implementação local. Branch `codex/t212-importacao-xlsx`, a
-  partir do squash da T211 em `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+- **Estado:** aberta e implementada em 2026-11-18; **aprovação visual da proprietária recebida
+  em 18/11/2026**. Branch local `codex/t212-importacao-xlsx`, a partir do squash da T211 em
+  `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge; publicação só com ordem.
 - **Pedido da proprietária:** importar colaboradores por `.xlsx`, mantendo o CSV atual, e tornar o
   modelo `.xlsx` o download principal.
 
@@ -114,7 +115,15 @@
     nem "Adicionar colaborador".
 - **Qualidade:** lint, typecheck e build do monorepo sem erro.
 
-## 6. Limites conhecidos
+## 6. Aprovação visual
+
+- **Recebida em 18/11/2026**, da proprietária, sobre a prévia em funcionamento e a planilha gerada.
+- **Cenários validados** (seção 5): RH e DP, desktop e 375 px — painel em três passos, `.xlsx`
+  salvo pelo próprio Excel com linhas válidas e com erro controlado, reenvio sem duplicar, CSV
+  legado e recusa ao gestor.
+- **Aceita com o limite conhecido** da seção 7 (reenvio entre contas sem matrícula).
+
+## 7. Limites conhecidos
 
 - **Chave por pessoa da conta:** a idempotência continua por ator e empresa (regra da T179, sem
   mudança aqui). O mesmo arquivo reenviado por outra conta (por exemplo, RH e depois DP) admite de
