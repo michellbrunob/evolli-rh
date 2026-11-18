@@ -281,9 +281,12 @@ describe("T209 — barra superior no celular (375 px)", () => {
     ).toBeInTheDocument();
     expect(botaoConta()).toHaveAccessibleName("Conta: Ana Paula Sintética");
     // No celular a faixa é gaveta: a marca vem para a barra.
+    const marca = within(topo).getByRole("img", { name: "Evolli" });
+    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal\.svg$/);
+    // T210 — até 400 px o navegador troca para o símbolo (prancha da marca).
     expect(
-      within(topo).getByRole("img", { name: "Evolli" }).getAttribute("src"),
-    ).toMatch(/evolli-horizontal\.svg$/);
+      marca.closest("picture")?.querySelector("source")?.getAttribute("srcset"),
+    ).toMatch(/evolli-symbol\.svg$/);
     expect(
       within(topo).queryByRole("button", { name: "Recolher menu" }),
     ).toBeNull();

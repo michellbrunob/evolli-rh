@@ -64,7 +64,15 @@ export interface MarcaEvolliProps {
   /** O nome "Evolli" já está escrito ao lado: não ler duas vezes. */
   readonly decorativa?: boolean;
   readonly className?: string;
+  /**
+   * Até esta largura de janela (px), o navegador troca a assinatura pelo
+   * símbolo (`<picture>`): abaixo de 156 px de largura disponível, a prancha
+   * da marca pede o símbolo. Continua uma imagem só, com o mesmo nome.
+   */
+  readonly simboloAte?: number;
 }
+
+const ALTURA_DO_SIMBOLO_COMPACTO = 28;
 
 export function MarcaEvolli({
   variante = "horizontal",
@@ -72,13 +80,14 @@ export function MarcaEvolli({
   altura,
   decorativa = false,
   className,
+  simboloAte,
 }: MarcaEvolliProps) {
   const h = Math.max(
     altura ?? ALTURA_PADRAO[variante],
     ALTURA_MINIMA[variante],
   );
   const w = Math.round(h * PROPORCAO[variante]);
-  return (
+  const imagem = (
     <img
       className={[`marca-evolli marca-evolli--${variante}`, className]
         .filter(Boolean)
@@ -90,5 +99,17 @@ export function MarcaEvolli({
       draggable={false}
       decoding="async"
     />
+  );
+  if (simboloAte === undefined || variante === "simbolo") return imagem;
+  return (
+    <picture className="marca-evolli__quadro">
+      <source
+        media={`(max-width: ${simboloAte}px)`}
+        srcSet={ARQUIVO.simbolo[tom]}
+        width={ALTURA_DO_SIMBOLO_COMPACTO}
+        height={ALTURA_DO_SIMBOLO_COMPACTO}
+      />
+      {imagem}
+    </picture>
   );
 }

@@ -11,3 +11,8 @@
   object-fit: contain;
   user-select: none;
 }
+
+/* O quadro do <picture> não acrescenta caixa: a imagem manda no tamanho. */
+.marca-evolli__quadro {
+  display: contents;
+}

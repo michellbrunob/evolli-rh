@@ -138,7 +138,7 @@ export function BarraSuperior({
             celular (faixa em gaveta) ela vem para a barra. */}
         {modoGaveta ? (
           <span className="barra-superior__marca">
-            <MarcaEvolli />
+            <MarcaEvolli simboloAte={400} />
           </span>
         ) : null}
 

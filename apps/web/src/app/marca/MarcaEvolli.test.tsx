@@ -72,6 +72,18 @@ describe("T210 — MarcaEvolli", () => {
     expect(Number(imagem().getAttribute("width"))).toBeGreaterThanOrEqual(156);
   });
 
+  it("telas estreitas: a horizontal vira o símbolo (uma imagem só, mesmo nome)", () => {
+    render(<MarcaEvolli simboloAte={400} />);
+    const img = imagem();
+    expect(arquivo(img)).toBe("evolli-horizontal.svg");
+    const fonte = img.closest("picture")!.querySelector("source")!;
+    expect(fonte).toHaveAttribute("media", "(max-width: 400px)");
+    expect(fonte.getAttribute("srcset")).toMatch(/evolli-symbol.svg$/);
+    expect(fonte).toHaveAttribute("width", "28");
+    expect(fonte).toHaveAttribute("height", "28");
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+  });
+
   it("os arquivos brancos têm a mesma geometria dos oficiais (só o preenchimento muda)", () => {
     for (const nome of ["horizontal", "symbol", "vertical"]) {
       const oficial = readFileSync(join(PASTA, `evolli-${nome}.svg`), "utf8");
