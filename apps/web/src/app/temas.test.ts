@@ -289,7 +289,7 @@ describe("T210 — contorno dos campos ≥ 3:1 (--borda-controle)", () => {
       for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
         const seletor = m[1]!.replace(/\/\*[\s\S]*?\*\//g, "").trim();
         if (/:focus|:hover|:disabled/.test(seletor)) continue;
-        if (!/(input|select|textarea)|campo|busca/.test(seletor)) continue;
+        if (!/\b(input|select|textarea)\b|campo|busca/.test(seletor)) continue;
         if (/border(-color)?:[^;]*var\(--hairline\)/.test(m[2]!)) {
           fora.push(`${arquivo}: ${seletor.replace(/\s+/g, " ")}`);
         }
