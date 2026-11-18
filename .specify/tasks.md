@@ -3556,8 +3556,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         escuro e Documentos.
 
 108.  **T211 - Organização do menu**
-      - **Estado:** **em implementação local**. Branch `codex/t211-organizacao-menu`, a partir do
-        squash da T210 em `main` (`053aa3d`, PR #203). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #204, squash
+        `255a88627460bfed1ffc37f121d77ecb39da621f`, com a CI de push 3/3 verde (run
+        44378071052); branch remota `codex/t211-organizacao-menu` preservada.
       - **Objetivo:** reorganizar só a navegação, mantendo a identidade própria do Evolli:
         Escala de trabalho e Organograma no submenu de Colaboradores; Equipe e permissões em
         Configurações; Ponto e Administração da liderança fora do menu, com URL própria;

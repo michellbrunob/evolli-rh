@@ -3357,11 +3357,16 @@ e `git diff --check` limpos; quatro temas e 375 px validados no navegador.
 Documentos (entrega própria, não iniciada). A T209 está integrada
 (PR #202, squash `b7d2d03`).
 
-## Organização do menu — T211 (em implementação local)
+## Organização do menu — T211 (integrada)
 
-| Tarefa | Estado                     | Resultado principal                                                            |
-| ------ | -------------------------- | ------------------------------------------------------------------------------ |
-| T211   | **Em implementação local** | Menu lateral reorganizado só na navegação, com a identidade própria do Evolli. |
+| Tarefa | Estado                                    | Resultado principal                                                            |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| T211   | **Integrada** (PR #204, squash `255a886`) | Menu lateral reorganizado só na navegação, com a identidade própria do Evolli. |
+
+**Observação de relatório:** a integração funcional da T211 está concluída (PR #204, squash
+`255a88627460bfed1ffc37f121d77ecb39da621f`, CI de push 3/3 verde, run 44378071052; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da tarefa seguinte.
 
 **Escopo:** Escala de trabalho e Organograma em Colaboradores; Equipe e permissões em
 Configurações; Ponto e Administração da liderança fora do menu, com URL própria; Liderança como
