@@ -1407,11 +1407,11 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
 - **Defeito achado na validação e corrigido com teste:** a criação chamava a navegação ainda
   "salvando", e a guarda de saída a barrava.
 
-## 37. Escopo de fechamento da T209: Documentos fica para a T211 (2026-11-17)
+## 37. Escopo de fechamento da T209: Documentos fica para entrega própria (2026-11-17)
 
 - **Decisão da proprietária (2026-11-17):** a T209 termina **sem a etapa documental**. Upload de
   documentos, categorias documentais, armazenamento de documentos no R2, OCR, assinatura e
-  retenção documental pertencem exclusivamente à futura **T211**, que **não foi iniciada**.
+  retenção documental pertencem exclusivamente a uma entrega futura própria, que **não foi iniciada**.
 - **O que fica na T209:**
   - **Novo colaborador em quatro etapas:** Dados pessoais, Dados profissionais e vínculo,
     Endereço e Revisão e conclusão. A quarta etapa continua sendo a revisão; não há
@@ -1447,8 +1447,7 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
 ### 38.2 Corrigido na revisão
 
 - **`GET /v1/empresas/da-conta`** respondia a qualquer papel autenticado com a própria empresa, a
-  contagem de ativos e o endereço. Agora só RH, DP e master técnico a leem; os demais recebem
-  403. O E2E cobre o gestor.
+  contagem de ativos e o endereço. Agora só RH, DP e master técnico a leem; os demais recebem 403. O E2E cobre o gestor.
 
 ### 38.3 Validação
 
@@ -1470,7 +1469,7 @@ Decisão registrada na [ADR 0020](../adr/0020-foto-do-colaborador-no-r2-privado.
 
 ### 38.4 Limites conhecidos
 
-- **Documentos:** fora da T209, reservado à T211 (seção 37).
+- **Documentos:** fora da T209, reservado a uma entrega própria (seção 37).
 - **Teste instável:** um teste de tempo do `AutenticacaoApp` (T189) às vezes estoura na suíte
   cheia; passa sozinho.
 - **Seletor de empresa:** depois de editar o CNPJ da empresa ativa, o seletor só o mostra na

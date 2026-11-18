@@ -3511,7 +3511,7 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         etapas sobre `CadastroEmEtapas`; Configurações › Empresas com painel lateral; Iconsax no
         lugar do lucide. E2E cadastro-empresa 22; API 68 / 1604; web 152 / 4294.
       - **Escopo de fechamento (seção 37):** Documentos (upload, categorias, R2 de documentos,
-        OCR, assinatura e retenção) sai da T209 e fica reservado para a T211, não iniciada; o
+        OCR, assinatura e retenção) sai da T209 e fica reservado para uma entrega própria, não iniciada; o
         Novo colaborador fecha em quatro etapas com Revisão e conclusão.
       - **Fechamento (seção 38):** Novo colaborador sobre o `CadastroEmEtapas` compartilhado; trilha
         única na barra superior (também na ficha); `GET /v1/empresas/da-conta` só para RH, DP e
