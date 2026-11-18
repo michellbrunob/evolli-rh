@@ -495,7 +495,7 @@ button.cadastro-etapas__etapa-passo:focus-visible {
   font: inherit;
   color: var(--color-ink);
   background: var(--surface-canvas);
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--borda-controle);
   border-radius: var(--radius-sm);
 }
 

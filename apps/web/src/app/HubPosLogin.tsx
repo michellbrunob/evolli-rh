@@ -267,7 +267,7 @@ export function HubPosLogin({
               <p className="hub__vazio">
                 Nenhum produto está liberado para o seu papel no momento. Se
                 você precisa de acesso a algum módulo, fale com quem administra
-                o Evolli RH na sua empresa.
+                o Evolli na sua empresa.
               </p>
             ) : (
               <ul className="hub__cartoes">

@@ -676,7 +676,7 @@ describe("T208 — foto de perfil: o que aparece", () => {
     expect(botao("Enviar foto")).toBeInTheDocument();
     expect(botao("Remover foto")).toBeNull();
     expect(painel()).toHaveTextContent(
-      "Sem foto: o Evolli RH mostra as suas iniciais.",
+      "Sem foto: o Evolli mostra as suas iniciais.",
     );
   });
 

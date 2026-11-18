@@ -744,7 +744,7 @@
 .colaboradores-screen__tamanho select {
   min-height: var(--touch-target);
   padding: 0 var(--space-sm);
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--borda-controle);
   border-radius: var(--radius-sm);
   background: var(--surface-canvas);
   color: var(--color-ink);

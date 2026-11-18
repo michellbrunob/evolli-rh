@@ -464,7 +464,7 @@ export function MeuPerfilScreen({
         headingLevel={1}
         titleId={CONFIGURACOES_TITULO_ID}
         title="Configurações"
-        description="A sua conta de acesso ao Evolli RH."
+        description="A sua conta de acesso ao Evolli."
       />
 
       <div className="configuracoes__corpo">
@@ -482,7 +482,7 @@ export function MeuPerfilScreen({
               Meu perfil
             </h2>
             <p className="configuracoes__texto">
-              Como você aparece no Evolli RH e os dados da sua conta de acesso.
+              Como você aparece no Evolli e os dados da sua conta de acesso.
             </p>
           </div>
 
@@ -504,7 +504,7 @@ export function MeuPerfilScreen({
                   Identificação
                 </h3>
                 <p className="configuracoes__secao-texto">
-                  O nome com que você aparece e o seu lugar no Evolli RH.
+                  O nome com que você aparece e o seu lugar no Evolli.
                 </p>
               </div>
 
@@ -531,7 +531,7 @@ export function MeuPerfilScreen({
                   <p className="configuracoes__identidade-nota">
                     {salvo.fotoVersao !== null
                       ? "Só você vê a sua foto."
-                      : "Sem foto: o Evolli RH mostra as suas iniciais."}
+                      : "Sem foto: o Evolli mostra as suas iniciais."}
                   </p>
                 </div>
               </div>
@@ -571,7 +571,7 @@ export function MeuPerfilScreen({
                   ) : null}
                   <p className="configuracoes__ajuda">
                     JPEG, PNG ou WebP, até 5 MB e com ao menos 128 × 128 pixels.
-                    O Evolli RH recorta o centro e grava uma cópia de 256 × 256.
+                    O Evolli recorta o centro e grava uma cópia de 256 × 256.
                   </p>
                 </div>
               )}
@@ -665,8 +665,8 @@ export function MeuPerfilScreen({
                       Nome de exibição
                     </label>
                     <p className="configuracoes__ajuda" id={AJUDA_NOME_ID}>
-                      Opcional, de 2 a 80 caracteres. Em branco, o Evolli RH usa
-                      o seu e-mail de acesso.
+                      Opcional, de 2 a 80 caracteres. Em branco, o Evolli usa o
+                      seu e-mail de acesso.
                     </p>
                   </div>
                   <div className="configuracoes__valor">
@@ -757,8 +757,8 @@ export function MeuPerfilScreen({
                   Contato
                 </h3>
                 <p className="configuracoes__secao-texto">
-                  O e-mail com que você entra no Evolli RH. A alteração do
-                  e-mail ainda não está disponível.
+                  O e-mail com que você entra no Evolli. A alteração do e-mail
+                  ainda não está disponível.
                 </p>
               </div>
               <dl className="configuracoes__dados">
@@ -781,7 +781,7 @@ export function MeuPerfilScreen({
                   Formas de entrada
                 </h3>
                 <p className="configuracoes__secao-texto">
-                  Como você entra no Evolli RH hoje.
+                  Como você entra no Evolli hoje.
                 </p>
               </div>
               <dl className="configuracoes__dados">

@@ -90,7 +90,7 @@
   min-width: 0;
   min-height: var(--touch-target);
   padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--borda-controle);
   border-radius: var(--radius-sm);
   background: var(--surface-canvas);
   color: var(--color-ink);
