@@ -134,7 +134,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
     },
   );
 
-  it("rh: 'Adicionar colaborador' › 'Importar planilha' › 'Iniciar importação' abre a página", async () => {
+  it("T212 — rh: no painel, 'Iniciar importação' espera o arquivo do passo 3 (nada abre antes)", async () => {
     render(<App papelDoAtor="rh" destinoInicial="pessoas" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Adicionar colaborador" }),
@@ -145,6 +145,82 @@ describe("T209 (Bloco C) — rota da importação", () => {
     fireEvent.click(
       within(painel).getByRole("radio", { name: /^Importar planilha/ }),
     );
+    const iniciar = within(painel).getByRole("button", {
+      name: "Iniciar importação",
+    });
+    expect(iniciar).toBeDisabled();
+    fireEvent.click(iniciar);
+    expect(
+      screen.queryByRole("heading", { level: 1, name: TITULO }),
+    ).toBeNull();
+    expect(window.location.hash).not.toBe(ROTA);
+  });
+
+  it("T212 — rh: escolher o arquivo no passo 3 do painel abre a página já na conferência", async () => {
+    vi.mocked(listarDepartamentos).mockResolvedValue(
+      paginado([
+        {
+          id: "dep-1",
+          codigo: "ADM",
+          nome: "ADM",
+          empresaId: "emp-1",
+          status: "ativo",
+          criadoEm: "",
+          atualizadoEm: "",
+        },
+      ]) as never,
+    );
+    vi.mocked(listarCargos).mockResolvedValue(
+      paginado([
+        {
+          id: "car-1",
+          codigo: "ANALISTA",
+          nome: "ANALISTA",
+          empresaId: "emp-1",
+          status: "ativo",
+          criadoEm: "",
+          atualizadoEm: "",
+        },
+      ]) as never,
+    );
+    render(<App papelDoAtor="rh" destinoInicial="pessoas" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Adicionar colaborador" }),
+    );
+    const painel = screen.getByRole("dialog", {
+      name: "Adicionar colaborador",
+    });
+    fireEvent.click(
+      within(painel).getByRole("radio", { name: /^Importar planilha/ }),
+    );
+    const { ABA_COLABORADORES, montarXlsx } =
+      await import("../screens/pessoas/importacao/planilhaXlsx");
+    const bytes = montarXlsx([
+      {
+        nome: ABA_COLABORADORES,
+        linhas: [
+          "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo".split(
+            ";",
+          ),
+          [
+            "Pessoa Sintética",
+            "clt",
+            "01/12/2026",
+            "15/05/1990",
+            "ADM",
+            "ANALISTA",
+          ],
+        ],
+      },
+    ]);
+    fireEvent.change(
+      within(painel).getByLabelText("Arquivo da planilha (.xlsx ou .csv)"),
+      {
+        target: {
+          files: [new File([bytes as unknown as BlobPart], "do-painel.xlsx")],
+        },
+      },
+    );
     fireEvent.click(
       within(painel).getByRole("button", { name: "Iniciar importação" }),
     );
@@ -152,6 +228,17 @@ describe("T209 (Bloco C) — rota da importação", () => {
       await screen.findByRole("heading", { level: 1, name: TITULO }),
     ).toBeInTheDocument();
     expect(window.location.hash).toBe(ROTA);
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Conferência" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "1 linha lida: 1 pronta para importar, nenhuma com erro.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Adicionar colaborador" }),
+    ).toBeNull();
   });
 
   it("'Voltar para Colaboradores' sem arquivo volta à listagem", async () => {

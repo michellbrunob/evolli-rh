@@ -380,6 +380,11 @@ export interface ColaboradoresScreenProps {
   /** T209 (Bloco C) — leva à página de importação por planilha. */
   readonly onImportarPlanilha?: () => void;
   /**
+   * T212 — o arquivo escolhido no passo 3 do painel "Adicionar
+   * colaborador": o shell abre a importação já na conferência.
+   */
+  readonly onImportarArquivo?: (arquivo: File) => void;
+  /**
    * T199 — o estado do dashboard (aba, página e ids de filtros), guardado
    * pelo shell na URL. Sem ele, o dashboard guarda o próprio estado.
    */
@@ -457,6 +462,7 @@ export function ColaboradoresScreen({
   empresaAtiva = null,
   onNovaAdmissao,
   onImportarPlanilha,
+  onImportarArquivo,
   onAbrirFicha,
   atualizacao = 0,
   estado: estadoControlado,
@@ -1988,6 +1994,14 @@ export function ColaboradoresScreen({
                 onImportarPlanilha: () => {
                   setPainelAdicionarAberto(false);
                   onImportarPlanilha();
+                },
+              }
+            : {})}
+          {...(onImportarPlanilha && onImportarArquivo
+            ? {
+                onImportarArquivo: (arquivo: File) => {
+                  setPainelAdicionarAberto(false);
+                  onImportarArquivo(arquivo);
                 },
               }
             : {})}
