@@ -20,8 +20,15 @@
  *
  * Um item por linha: o sub-rótulo dos destinos vira a dica (e segue no nome
  * acessível); o estado "Em desenvolvimento" vira uma marca compacta na mesma
- * linha (e segue no nome e na descrição). Recrutamento, Operação e
- * Demonstração começam fechados.
+ * linha (e segue no nome e na descrição). Recrutamento começa fechado.
+ *
+ * ## T211 — organização
+ *
+ * Colaboradores reúne Escala de trabalho e Organograma (destinos do grupo
+ * Gestão de Pessoas); Liderança é item direto de Pessoas; Equipe e
+ * permissões vive em Configurações. Ponto, Administração da liderança e as
+ * telas de Demonstração não estão no menu: as duas primeiras abrem pela URL
+ * própria.
  *
  * ## Permissões
  *
@@ -42,6 +49,19 @@ import {
   type IconeDoEcossistema,
 } from "../ui/icones";
 
+/**
+ * T211 — quem vê, no menu, as entradas da operação de pessoas (Colaboradores
+ * e os itens em desenvolvimento de Pessoas e Remuneração): os papéis que
+ * abrem Colaboradores pela tabela de capacidade (`capacidadeFuncionalDe`).
+ * É só disposição do menu — não é autorização: o servidor decide cada
+ * requisição, e o shell continua recusando o destino que o papel não abre.
+ */
+export const PAPEIS_OPERACAO_DE_PESSOAS: readonly string[] = [
+  "rh",
+  "dp",
+  "master_tecnico",
+];
+
 /** O texto da dica e do aviso de todo item em desenvolvimento. */
 export const MENSAGEM_EM_DESENVOLVIMENTO =
   "Em desenvolvimento. Esta funcionalidade ainda não está disponível.";
@@ -61,6 +81,8 @@ export interface EntradaEmDesenvolvimento {
   readonly rotulo: string;
   readonly icone: IconeDoEcossistema;
   readonly selo?: SeloDoMenu;
+  /** T211 — papéis que veem a entrada no menu; ausente = todos. */
+  readonly papeis?: readonly string[];
   /**
    * Conteúdo futuro: o item vira um cabeçalho expansível, e cada subitem
    * também está em desenvolvimento.
@@ -75,6 +97,8 @@ export interface EntradaDeModulo {
   readonly grupo: string;
   /** Nome na barra, quando difere do título do grupo (a trilha usa o título). */
   readonly rotulo?: string;
+  /** T211 — papéis que veem a entrada no menu; ausente = todos. */
+  readonly papeis?: readonly string[];
   /** Subitens em desenvolvimento acrescentados ao fim do submenu do módulo. */
   readonly subitensEmDesenvolvimento?: readonly SubitemEmDesenvolvimento[];
   /**
@@ -130,6 +154,7 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         tipo: "modulo",
         grupo: "Gestão de Pessoas",
         rotulo: "Colaboradores",
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
         subitensEmDesenvolvimento: [
           { id: "desenvolvimento", rotulo: "Desenvolvimento" },
         ],
@@ -139,6 +164,7 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         id: "recrutamento",
         rotulo: "Recrutamento",
         icone: IconeRecrutamento,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
         subitens: [
           { id: "vagas", rotulo: "Vagas" },
           { id: "banco-de-talentos", rotulo: "Banco de talentos" },
@@ -149,12 +175,21 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         id: "pesquisas",
         rotulo: "Pesquisas",
         icone: IconePesquisas,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
         tipo: "em-desenvolvimento",
         id: "calendario",
         rotulo: "Calendário",
         icone: IconeCalendario,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
+      },
+      {
+        // T211 — item direto, como Folha de Pagamento e Benefícios: abre
+        // Minha equipe (a Administração da liderança fica fora do menu).
+        tipo: "modulo",
+        grupo: "Liderança",
+        rotulo: "Liderança",
       },
     ],
   },
@@ -168,42 +203,23 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         id: "folha-de-pagamento",
         rotulo: "Folha de Pagamento",
         icone: IconeFolha,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
         tipo: "em-desenvolvimento",
         id: "beneficios",
         rotulo: "Benefícios",
         icone: IconeBeneficios,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
         tipo: "em-desenvolvimento",
         id: "hub-de-beneficios",
         rotulo: "Hub de Benefícios",
         icone: IconeHubBeneficios,
+        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
         selo: "Novo",
       },
-    ],
-  },
-  {
-    // Os módulos que já operam e não entram em Pessoas nem em Remuneração:
-    // nada funcional sai da barra por causa da nova disposição. Fechada por
-    // padrão, para o menu caber numa tela.
-    id: "operacao",
-    titulo: "Operação",
-    lugar: "principal",
-    recolhivel: true,
-    entradas: [
-      { tipo: "modulo", grupo: "Estrutura" },
-      { tipo: "modulo", grupo: "Jornada" },
-      { tipo: "modulo", grupo: "Liderança" },
-      { tipo: "modulo", grupo: "Administração" },
-    ],
-  },
-  {
-    id: "demonstracao",
-    lugar: "secundario",
-    entradas: [
-      { tipo: "modulo", grupo: "Demonstração", fechadoPorPadrao: true },
     ],
   },
   {

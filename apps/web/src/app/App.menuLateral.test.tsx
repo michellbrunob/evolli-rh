@@ -236,22 +236,25 @@ describe("T206 — trilho de ícones", () => {
       expect(item.textContent).toContain(rotulo);
     }
     expect(itemDoTrilho("Dashboard")).toHaveAccessibleName(/^Dashboard/);
-    expect(itemDoTrilho("Estrutura")).toHaveAccessibleName("Estrutura");
+    expect(itemDoTrilho("Colaboradores")).toHaveAccessibleName("Colaboradores");
   });
 
   it("destino direto: navega e o menu continua recolhido", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const jornada = itemDoTrilho("Jornada");
+    const jornada = itemDoTrilho("Liderança");
     jornada.focus();
     fireEvent.click(jornada);
-    expect(tituloDaTela()).toBe("Visão do período");
+    // T211 — Liderança (item direto) abre Minha equipe.
+    expect(tituloDaTela()).toBe("Minha equipe");
     expect(jornada).toHaveAttribute("aria-current", "page");
     expect(emTrilho()).toBe(true);
     expect(document.activeElement).toBe(jornada);
   });
 
-  it.each(["Colaboradores", "Estrutura", "Liderança", "Demonstração"])(
+  // T211 — Colaboradores é o módulo funcional com submenu; Liderança virou
+  // item direto, e Estrutura e Demonstração saíram do menu.
+  it.each(["Colaboradores"])(
     "módulo com submenu (%s): expande o menu, abre o módulo e o foco fica no cabeçalho",
     (modulo) => {
       render(<App papelDoAtor="rh" />);
@@ -276,11 +279,11 @@ describe("T206 — trilho de ícones", () => {
 
   it("um módulo fechado à mão continua abrível pelo trilho", () => {
     render(<App papelDoAtor="rh" />);
-    const estrutura = screen.getByRole("button", { name: "Estrutura" });
+    const estrutura = screen.getByRole("button", { name: "Colaboradores" });
     fireEvent.click(estrutura); // fecha
     expect(estrutura).toHaveAttribute("aria-expanded", "false");
     recolher();
-    fireEvent.click(itemDoTrilho("Estrutura"));
+    fireEvent.click(itemDoTrilho("Colaboradores"));
     expect(estrutura).toHaveAttribute("aria-expanded", "true");
   });
 });
@@ -288,8 +291,8 @@ describe("T206 — trilho de ícones", () => {
 describe("T206 — item ativo nos dois estados", () => {
   it("destino direto: aria-current e marca visual expandido e no trilho", () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Jornada Visão/ }));
-    const jornada = screen.getByRole("button", { name: /^Jornada Visão/ });
+    fireEvent.click(screen.getByRole("button", { name: /^Liderança/ }));
+    const jornada = screen.getByRole("button", { name: /^Liderança/ });
     expect(jornada).toHaveAttribute("aria-current", "page");
     expect(jornada).toHaveClass("painel-nav__destino--ativo");
     recolher();
@@ -330,10 +333,10 @@ describe("T206 — dica visual do trilho", () => {
   it("aparece ao focar, com o rótulo, aria-hidden; some ao perder o foco", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const estrutura = itemDoTrilho("Estrutura");
+    const estrutura = itemDoTrilho("Colaboradores");
     act(() => estrutura.focus());
     expect(dica()).not.toBeNull();
-    expect(dica()).toHaveTextContent("Estrutura");
+    expect(dica()).toHaveTextContent("Colaboradores");
     expect(dica()).toHaveAttribute("aria-hidden", "true");
     act(() => estrutura.blur());
     expect(dica()).toBeNull();
@@ -342,9 +345,9 @@ describe("T206 — dica visual do trilho", () => {
   it("aparece ao passar o ponteiro e some ao sair dele", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const jornada = itemDoTrilho("Jornada");
+    const jornada = itemDoTrilho("Liderança");
     fireEvent.pointerOver(jornada);
-    expect(dica()).toHaveTextContent("Jornada");
+    expect(dica()).toHaveTextContent("Liderança");
     ponteiroSai(jornada, document.body);
     expect(dica()).toBeNull();
   });
@@ -352,7 +355,7 @@ describe("T206 — dica visual do trilho", () => {
   it("o ponteiro pode passar do item para a dica sem que ela suma (1.4.13)", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const jornada = itemDoTrilho("Jornada");
+    const jornada = itemDoTrilho("Liderança");
     fireEvent.pointerOver(jornada);
     const caixa = dica()!;
     ponteiroSai(jornada, caixa);
@@ -364,20 +367,20 @@ describe("T206 — dica visual do trilho", () => {
   it("Escape e clique a escondem", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const estrutura = itemDoTrilho("Estrutura");
+    const estrutura = itemDoTrilho("Colaboradores");
     act(() => estrutura.focus());
     fireEvent.keyDown(document, { key: "Escape" });
     expect(dica()).toBeNull();
     fireEvent.pointerOver(estrutura);
     expect(dica()).not.toBeNull();
-    fireEvent.click(itemDoTrilho("Jornada"));
+    fireEvent.click(itemDoTrilho("Liderança"));
     expect(dica()).toBeNull();
   });
 
   it("reposiciona ao fim da transição da faixa (o foco pode chegar com a largura andando)", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    const estrutura = itemDoTrilho("Estrutura");
+    const estrutura = itemDoTrilho("Colaboradores");
     const caixa = (direita: number, topo: number) =>
       ({ top: topo, height: 40, right: direita }) as DOMRect;
     // Durante a transição a faixa ainda é larga: a medida sai deslocada.
@@ -396,7 +399,7 @@ describe("T206 — dica visual do trilho", () => {
   it("some quando a janela é redimensionada", () => {
     render(<App papelDoAtor="rh" />);
     recolher();
-    act(() => itemDoTrilho("Estrutura").focus());
+    act(() => itemDoTrilho("Colaboradores").focus());
     expect(dica()).not.toBeNull();
     act(() => {
       window.dispatchEvent(new Event("resize"));
@@ -529,7 +532,7 @@ describe("T206 — guarda de edição pendente com o menu recolhido", () => {
         salvando: false,
       }),
     );
-    fireEvent.click(itemDoTrilho("Jornada"));
+    fireEvent.click(itemDoTrilho("Liderança"));
     const dialogo = screen.getByRole("alertdialog", {
       name: "Sair sem salvar?",
     });
@@ -569,8 +572,8 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
     expect(barra().contains(document.activeElement)).toBe(true);
     // A gaveta nunca é o trilho: os submenus funcionais ficam à vista mesmo
     // com o menu recolhido no desktop. T209 (menu compacto) — Recrutamento
-    // (só itens em desenvolvimento) e Demonstração começam fechados.
-    const fechadosPorPadrao = ["Recrutamento", "Demonstração"];
+    // (só itens em desenvolvimento) começa fechado (T211: sem Demonstração).
+    const fechadosPorPadrao = ["Recrutamento"];
     for (const cabecalho of barra().querySelectorAll(
       ".painel-nav__cabecalho",
     )) {
@@ -620,7 +623,7 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
 
   it("foco perdido em qualquer item da faixa vai ao Menu; fora da faixa, nada é movido", () => {
     render(<App papelDoAtor="rh" />);
-    const jornada = screen.getByRole("button", { name: /^Jornada Visão/ });
+    const jornada = screen.getByRole("button", { name: /^Liderança/ });
     jornada.focus();
     act(() => {
       jornada.blur();

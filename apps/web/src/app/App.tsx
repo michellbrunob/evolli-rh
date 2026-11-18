@@ -490,6 +490,8 @@ function conteudoDoDestino(
   empresas: {
     readonly podeVer: boolean;
     readonly podeAdicionar: boolean;
+    /** T211 — Configurações › Equipe e permissões (Contas de acesso). */
+    readonly podeVerEquipe: boolean;
     readonly aviso: string | undefined;
     readonly onCriadaSemAbrir: (nome: string) => void;
     readonly onEmpresaAberta: (
@@ -504,6 +506,7 @@ function conteudoDoDestino(
         conta={contaDoAtor}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
+        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -513,6 +516,7 @@ function conteudoDoDestino(
         temaAtual={contaDoAtor?.temaAparencia}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
+        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -523,6 +527,7 @@ function conteudoDoDestino(
         podeEditar={empresas.podeAdicionar}
         onAdicionar={() => onNavegar("nova-empresa")}
         aviso={empresas.aviso}
+        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -1275,6 +1280,9 @@ export function App({
     "configuracoes-empresas";
   const podeAdicionarEmpresa =
     resolverEntrada("nova-empresa", papelDoAtor) === "nova-empresa";
+  // T211 — Configurações › Equipe e permissões, pela mesma regra.
+  const podeVerEquipe =
+    resolverEntrada("contas-acesso", papelDoAtor) === "contas-acesso";
   /** T209 — "Empresa X criada." ao voltar da Nova empresa sem abri-la. */
   const [avisoDeEmpresas, setAvisoDeEmpresas] = useState<string | undefined>(
     undefined,
@@ -1982,6 +1990,7 @@ export function App({
                 onContaAtualizada,
                 {
                   podeVer: podeVerEmpresas,
+                  podeVerEquipe,
                   podeAdicionar: podeAdicionarEmpresa,
                   aviso: avisoDeEmpresas,
                   onCriadaSemAbrir: (nome) => {

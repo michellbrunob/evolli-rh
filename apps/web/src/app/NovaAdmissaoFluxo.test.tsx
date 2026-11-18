@@ -22,6 +22,30 @@ import { ComGuardaDeSaida } from "../test/ComGuardaDeSaida";
 import { abrirSecoesFechadasDoMenu } from "../test/menuLateral";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { rotaDoDestino } from "./rotasDoShell";
+
+/**
+ * T211 — a tela em que o papel está: pelo item marcado no menu, quando ela
+ * tem item (Liderança, Colaboradores), ou pelo título, quando está fora do
+ * menu (Ponto, Relatórios e a Visão geral de demonstração).
+ */
+const TITULO_FORA_DO_MENU: Readonly<Record<string, string>> = {
+  ponto: "Visão do período",
+  relatorios: "Exceções de Ponto",
+  inicio: "Visão geral",
+};
+async function esperarTelaAtual(tela: RegExp | string) {
+  if (typeof tela === "string") {
+    expect(
+      await screen.findByRole("heading", { level: 1, name: tela }),
+    ).toBeInTheDocument();
+    return;
+  }
+  expect(await screen.findByRole("button", { name: tela })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+}
 import { NOVA_ADMISSAO_TITULO_ID } from "../screens/pessoas";
 import {
   type AdmissaoRegistradaApi,
@@ -523,18 +547,16 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
   });
 
   it.each([
-    ["gestor", /^Minha equipe/],
-    ["colaborador", /^Visão geral/],
-    ["financeiro", /^Visão geral/],
+    ["gestor", /^Liderança/],
+    ["colaborador", TITULO_FORA_DO_MENU.inicio!],
+    ["financeiro", TITULO_FORA_DO_MENU.inicio!],
   ] as const)(
     "%s com a URL da listagem não monta Colaboradores, e a URL é corrigida",
     async (papel, telaInicial) => {
       window.history.replaceState(null, "", `/${ROTA_COLABORADORES}`);
       const entradasAntes = window.history.length;
       render(<App papelDoAtor={papel} />);
-      expect(
-        await screen.findByRole("button", { name: telaInicial }),
-      ).toHaveAttribute("aria-current", "page");
+      await esperarTelaAtual(telaInicial);
       expect(
         screen.queryByRole("heading", { level: 1, name: "Colaboradores" }),
       ).not.toBeInTheDocument();
@@ -546,22 +568,23 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
 
   it("gestor digitando a rota com o painel aberto fica na tela atual", async () => {
     render(<App papelDoAtor="gestor" />);
-    const atual = await screen.findByRole("button", { name: /^Minha equipe/ });
+    const atual = await screen.findByRole("button", { name: /^Liderança/ });
     expect(atual).toHaveAttribute("aria-current", "page");
     act(() => {
       window.history.pushState(null, "", `/${ROTA_COLABORADORES}`);
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     await waitFor(() => expect(window.location.hash).toBe(""));
-    expect(
-      screen.getByRole("button", { name: /^Minha equipe/ }),
-    ).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: /^Liderança/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expect(listarColaboradores).not.toHaveBeenCalled();
   });
 
   it("de outro destino, a URL da listagem digitada leva à listagem", async () => {
     render(<App papelDoAtor="rh" destinoInicial="ponto" />);
-    await screen.findByRole("button", { name: /^Jornada Visão/ });
+    await esperarTelaAtual(TITULO_FORA_DO_MENU.ponto!);
     act(() => {
       window.history.pushState(null, "", `/${ROTA_COLABORADORES}`);
       window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -588,9 +611,7 @@ describe("T178 — rota própria da listagem (#/pessoas/colaboradores)", () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     abrirSecoesFechadasDoMenu();
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     await screen.findByRole("heading", {
       level: 1,
       name: "Estrutura organizacional",
@@ -623,10 +644,9 @@ describe("T176/T178 — Nova admissão: rota, voltar e cancelar", () => {
   it("rota que o papel não abre não sequestra a escolha do Hub", async () => {
     window.history.replaceState(null, "", `/${ROTA}`);
     render(<App papelDoAtor="master_tecnico" destinoInicial="ponto" />);
-    expect(
-      await screen.findByRole("button", { name: /^Jornada Visão/ }),
-    ).toHaveAttribute("aria-current", "page");
-    expect(window.location.hash).toBe("");
+    await esperarTelaAtual(TITULO_FORA_DO_MENU.ponto!);
+    // T211 — o Ponto tem URL própria: é ela que fica.
+    expect(window.location.hash).toBe(rotaDoDestino("ponto"));
   });
 
   it("a URL da Nova admissão abre a página direto para rh", async () => {
@@ -741,8 +761,8 @@ describe("T176 — rota recusada para quem não admite", () => {
   /** Quem não recebe `colaborador`/`create` no servidor, e a tela em que aterrissa. */
   const SEM_ACESSO = [
     ["master_tecnico", /^Colaboradores Consulta/, ROTA_COLABORADORES],
-    ["gestor", /^Minha equipe/, ""],
-    ["colaborador", /^Visão geral/, ""],
+    ["gestor", /^Liderança/, ""],
+    ["colaborador", TITULO_FORA_DO_MENU.inicio!, ""],
   ] as const;
 
   it.each(SEM_ACESSO)(
@@ -751,9 +771,7 @@ describe("T176 — rota recusada para quem não admite", () => {
       window.history.replaceState(null, "", `/${ROTA}`);
       const entradasAntes = window.history.length;
       render(<App papelDoAtor={papel} />);
-      expect(
-        await screen.findByRole("button", { name: telaInicial }),
-      ).toHaveAttribute("aria-current", "page");
+      await esperarTelaAtual(telaInicial);
       expect(
         screen.queryByRole("heading", { level: 1, name: "Novo colaborador" }),
       ).not.toBeInTheDocument();
@@ -768,24 +786,23 @@ describe("T176 — rota recusada para quem não admite", () => {
   );
 
   it.each([
-    ["master_tecnico", "ponto", /^Jornada Visão/],
-    ["gestor", "equipe", /^Minha equipe/],
-    ["colaborador", "relatorios", /^Relatórios/],
+    ["master_tecnico", "ponto", TITULO_FORA_DO_MENU.ponto!],
+    ["gestor", "equipe", /^Liderança/],
+    ["colaborador", "relatorios", TITULO_FORA_DO_MENU.relatorios!],
   ] as const)(
     "%s digitando a rota com o painel aberto fica na tela atual (%s)",
-    async (papel, destino, rotulo) => {
+    async (papel, destino, tela) => {
       render(<App papelDoAtor={papel} destinoInicial={destino} />);
-      const atual = await screen.findByRole("button", { name: rotulo });
-      expect(atual).toHaveAttribute("aria-current", "page");
+      await esperarTelaAtual(tela);
       act(() => {
         window.history.pushState(null, "", `/${ROTA}`);
         window.dispatchEvent(new HashChangeEvent("hashchange"));
       });
-      await waitFor(() => expect(window.location.hash).toBe(""));
-      expect(screen.getByRole("button", { name: rotulo })).toHaveAttribute(
-        "aria-current",
-        "page",
+      // T211 — volta a URL da tela atual (o Ponto tem a dele).
+      await waitFor(() =>
+        expect(window.location.hash).toBe(rotaDoDestino(destino) ?? ""),
       );
+      await esperarTelaAtual(tela);
       expect(
         screen.queryByRole("heading", { level: 1, name: "Novo colaborador" }),
       ).not.toBeInTheDocument();
@@ -794,7 +811,7 @@ describe("T176 — rota recusada para quem não admite", () => {
 
   it("rh digitando a rota com o painel aberto vai à página", async () => {
     render(<App papelDoAtor="rh" destinoInicial="ponto" />);
-    await screen.findByRole("button", { name: /^Jornada Visão/ });
+    await esperarTelaAtual(TITULO_FORA_DO_MENU.ponto!);
     act(() => {
       window.history.pushState(null, "", `/${ROTA}`);
       window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -992,9 +1009,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(window.location.hash).toBe(ROTA_COLABORADORES);
     abrirSecoesFechadasDoMenu();
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Estrutura organizacional/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
     expect(document.querySelector(".ficha-colaborador")).toBeNull();

@@ -19,6 +19,7 @@ import { renderComMenuAberto as render } from "../test/menuLateral";
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { PainelNavigation } from "./PainelNavigation";
+import { MENU_LATERAL } from "./menuLateral";
 import {
   DESTINOS,
   GRUPOS,
@@ -50,14 +51,14 @@ function botoesDeDestino(): HTMLElement[] {
 
 describe("estrutura dos grupos", () => {
   // T205 — o Dashboard vem antes de todos (D-9).
-  it("o Dashboard e os cinco módulos operacionais, depois Configurações (T208), vêm antes de Demonstração", () => {
+  // T211 — Estrutura entrou em Gestão de Pessoas; Administração (Contas de
+  // acesso) entrou em Configurações.
+  it("o Dashboard e os módulos operacionais, depois Configurações (T208), vêm antes de Demonstração", () => {
     expect(GRUPOS.map((g) => g.titulo)).toEqual([
       "Dashboard",
       "Gestão de Pessoas",
-      "Estrutura",
       "Jornada",
       "Liderança",
-      "Administração",
       "Configurações",
       "Demonstração",
     ]);
@@ -91,6 +92,14 @@ describe("estrutura dos grupos", () => {
         ["rh", "dp", "master_tecnico"],
         "configuracoes",
       ],
+      // T211 — Contas de acesso como Equipe e permissões.
+      [
+        "contas-acesso",
+        "Equipe e permissões",
+        "funcional",
+        undefined,
+        "configuracoes",
+      ],
       [
         "nova-empresa",
         "Nova empresa",
@@ -116,17 +125,14 @@ describe("estrutura dos grupos", () => {
     }
   });
 
-  it("o grupo Demonstração é descrito para leitor de tela", () => {
+  it("T211 — o grupo Demonstração fica fora do menu (as telas seguem no mapa)", () => {
     render(
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
-    const lista = navegacao().querySelector(
-      'ul[aria-labelledby="nav-grupo-Demonstração"]',
-    )!;
-    const descricaoId = lista.getAttribute("aria-describedby")!;
-    expect(document.getElementById(descricaoId)!.textContent).toMatch(
-      /Nada aqui grava/,
-    );
+    expect(
+      navegacao().querySelector('ul[aria-labelledby="nav-grupo-Demonstração"]'),
+    ).toBeNull();
+    expect(GRUPOS.some((g) => g.titulo === "Demonstração")).toBe(true);
   });
 });
 
@@ -210,7 +216,7 @@ describe("visibilidade por capacidade", () => {
     expect(screen.queryByText("Liderança")).toBeNull();
   });
 
-  it("gestor vê Minha equipe e não vê a administração dela", () => {
+  it("gestor vê Minha equipe (o item Liderança, T211) e não vê a administração dela", () => {
     render(
       <PainelNavigation
         destinoAtivoId="equipe"
@@ -219,14 +225,14 @@ describe("visibilidade por capacidade", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: /Minha equipe/ }),
+      screen.getByRole("button", { name: /^Liderança/ }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Administração da liderança/ }),
     ).toBeNull();
   });
 
-  it("rh vê os dois destinos de Liderança", () => {
+  it("T211 — rh vê Liderança (Minha equipe); a Administração da liderança fica fora do menu", () => {
     render(
       <PainelNavigation
         destinoAtivoId="pessoas"
@@ -235,11 +241,12 @@ describe("visibilidade por capacidade", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: /Minha equipe/ }),
+      screen.getByRole("button", { name: /^Liderança/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Administração da liderança/ }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Administração da liderança/ }),
+    ).toBeNull();
+    expect(destinoPorId("administracao-lideranca")?.foraDoMenu).toBe(true);
   });
 
   it("dp não vê nenhum destino de Liderança", () => {
@@ -262,7 +269,9 @@ describe("visibilidade por capacidade", () => {
 });
 
 describe("destinos preservados", () => {
-  it("rh continua alcançando todos os destinos funcionais", () => {
+  // T211 — Ponto e Administração da liderança saem do menu (URL própria);
+  // Contas de acesso vai para Configurações (Equipe e permissões).
+  it("rh alcança pelo menu Colaboradores, Escala de trabalho, Organograma e Liderança", () => {
     render(
       <PainelNavigation
         destinoAtivoId="pessoas"
@@ -272,11 +281,9 @@ describe("destinos preservados", () => {
     );
     for (const rotulo of [
       "Colaboradores",
-      "Estrutura",
-      "Jornada",
-      "Minha equipe",
-      "Administração da liderança",
-      "Contas de acesso",
+      "Escala de trabalho",
+      "Organograma",
+      "Liderança",
     ]) {
       expect(
         screen.getAllByRole("button", { name: new RegExp(rotulo) }).length,
@@ -284,14 +291,20 @@ describe("destinos preservados", () => {
     }
   });
 
-  it("os demonstrativos continuam alcançáveis, agrupados e nomeados", () => {
+  it("T211 — os demonstrativos continuam no mapa, fora do menu", () => {
+    const demo = GRUPOS.find((g) => g.titulo === "Demonstração")!;
+    expect(demo.destinos).toHaveLength(8);
     render(
       <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
     );
-    const lista = navegacao().querySelector(
-      'ul[aria-labelledby="nav-grupo-Demonstração"]',
-    )! as HTMLElement;
-    expect(within(lista).getAllByRole("button")).toHaveLength(8);
+    for (const d of demo.destinos) {
+      expect(
+        within(navegacao()).queryByRole("button", {
+          name: new RegExp(`^${d.label}\b`),
+        }),
+        d.id,
+      ).toBeNull();
+    }
   });
 
   it("com papel que permite tudo, nenhum destino do mapa some", () => {
@@ -306,8 +319,13 @@ describe("destinos preservados", () => {
     // com submenu tem um `<li>` próprio além do de cada destino, e contar
     // marcação faria o teste falhar por motivo errado.
     // T178 — sub-página (`agrupadoEm`, Nova admissão) não é item da barra.
+    // T211 — nem o que está fora do menu: `foraDoMenu`, os grupos Jornada
+    // (Ponto) e Demonstração.
+    const foraDoMenu = new Set(["Jornada", "Demonstração"]);
     expect(botoesDeDestino()).toHaveLength(
-      DESTINOS.filter((d) => !d.agrupadoEm).length,
+      GRUPOS.filter((g) => !foraDoMenu.has(g.titulo))
+        .flatMap((g) => g.destinos)
+        .filter((d) => !d.agrupadoEm && !d.foraDoMenu).length,
     );
   });
 });
@@ -315,28 +333,40 @@ describe("destinos preservados", () => {
 describe("semântica de item ativo, seleção e teclado", () => {
   it("marca somente o destino ativo com aria-current='page'", () => {
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={() => {}}
+      />,
     );
     expect(
       screen.getByRole("button", { name: /^Colaboradores Consulta/ }),
     ).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByRole("button", { name: /^Relatórios/ }),
+      screen.getByRole("button", { name: /^Organograma/ }),
     ).not.toHaveAttribute("aria-current");
   });
 
   it("chama onSelecionar com o id do destino clicado", () => {
     const onSelecionar = vi.fn();
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={onSelecionar} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={onSelecionar}
+      />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Jornada Visão/ }));
-    expect(onSelecionar).toHaveBeenCalledWith("ponto");
+    fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
+    expect(onSelecionar).toHaveBeenCalledWith("cadastros");
   });
 
   it("os sub-rótulos situam o destino sem repetir o grupo", () => {
     render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
+      <PainelNavigation
+        destinoAtivoId="pessoas"
+        papel="rh"
+        onSelecionar={() => {}}
+      />,
     );
     expect(
       screen.getByRole("button", {
@@ -344,7 +374,9 @@ describe("semântica de item ativo, seleção e teclado", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Jornada.*Visão do período/ }),
+      screen.getByRole("button", {
+        name: /Organograma.*Unidades, cargos e centros de custo/,
+      }),
     ).toBeInTheDocument();
   });
 
@@ -409,23 +441,22 @@ describe("aterrissagem por papel", () => {
 
 describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => {
   it("módulo de um destino só É o destino: nenhum clique sem informação", () => {
-    // T176 — para `rh`, Pessoas passou a ter dois destinos (Nova admissão);
-    // T182 — Estrutura também (Jornadas de trabalho). Jornada continua com
-    // um só, e é ela que prende a regra.
+    // T211 — Liderança mostra só Minha equipe (a administração está fora do
+    // menu): o item é o destino, com o nome do módulo.
     render(
       <PainelNavigation
-        destinoAtivoId="ponto"
+        destinoAtivoId="equipe"
         onSelecionar={() => {}}
         papel="rh"
       />,
     );
-    const jornada = screen.getByRole("button", { name: /^Jornada Visão/ });
-    expect(jornada).not.toHaveAttribute("aria-expanded");
-    expect(jornada).toHaveAttribute("aria-current", "page");
+    const lideranca = screen.getByRole("button", { name: /^Liderança/ });
+    expect(lideranca).not.toHaveAttribute("aria-expanded");
+    expect(lideranca).toHaveAttribute("aria-current", "page");
   });
 
   it.each(["rh", "dp", "master_tecnico"])(
-    "T182 — %s vê Estrutura com 'Estrutura organizacional' e 'Jornadas de trabalho'",
+    "T211 — %s vê Escala de trabalho e Organograma dentro de Colaboradores",
     (papel) => {
       render(
         <PainelNavigation
@@ -434,19 +465,19 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
           papel={papel}
         />,
       );
-      const modulo = screen.getByRole("button", { name: "Estrutura" });
+      const modulo = screen.getByRole("button", { name: "Colaboradores" });
       expect(modulo).toHaveAttribute("aria-expanded", "true");
       expect(
-        screen.getByRole("button", { name: /^Estrutura organizacional/ }),
+        screen.getByRole("button", { name: /^Organograma/ }),
       ).not.toHaveAttribute("aria-current");
       expect(
-        screen.getByRole("button", { name: /^Jornadas de trabalho/ }),
+        screen.getByRole("button", { name: /^Escala de trabalho/ }),
       ).toHaveAttribute("aria-current", "page");
     },
   );
 
   it.each(["gestor", "financeiro", "colaborador", null])(
-    "T182 — %s não vê Jornadas de trabalho",
+    "T182 — %s não vê Escala de trabalho",
     (papel) => {
       render(
         <PainelNavigation
@@ -456,13 +487,13 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
         />,
       );
       expect(
-        screen.queryByRole("button", { name: /^Jornadas de trabalho/ }),
+        screen.queryByRole("button", { name: /^Escala de trabalho/ }),
       ).toBeNull();
     },
   );
 
   it.each(["rh", "dp", "master_tecnico"])(
-    "T178 — %s vê 'Gestão de Pessoas' com 'Colaboradores' e sem item próprio de Nova admissão",
+    "T178/T211 — %s vê o módulo Colaboradores com os destinos dele e sem item próprio de Nova admissão",
     (papel) => {
       render(
         <PainelNavigation
@@ -471,8 +502,8 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
           papel={papel}
         />,
       );
-      // Módulo com um só item, mas com cabeçalho (`sempreComoModulo`): o nome
-      // do módulo não some, e é o mesmo da trilha de navegação.
+      // Cabeçalho próprio (`sempreComoModulo`): o nome do módulo não some, e
+      // é o mesmo da trilha de navegação.
       const modulo = screen.getByRole("button", { name: "Colaboradores" });
       expect(modulo).toHaveAttribute("aria-expanded", "true");
       const regiao = document.getElementById(
@@ -489,7 +520,9 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
           .map((b) => b.textContent),
       ).toEqual([
         "Colaboradores Consulta, ficha e vida funcional",
-        // T209 — subitem em desenvolvimento, ao lado do funcional.
+        "Escala de trabalho Turnos da empresa",
+        "Organograma Unidades, cargos e centros de custo",
+        // T209 — subitem em desenvolvimento, ao lado dos funcionais.
         "Desenvolvimento Em desenvolvimento",
       ]);
       // Nova admissão é sub-página de Colaboradores: abre pela listagem.
@@ -524,6 +557,9 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     expect(itemDaBarraPara("nova-admissao")).toBe("pessoas");
     expect(itemDaBarraPara("cadastros")).toBe("cadastros");
     expect(tituloDoGrupoDe("nova-admissao")).toBe("Gestão de Pessoas");
+    // T211 — Escala de trabalho e Organograma no mesmo grupo.
+    expect(tituloDoGrupoDe("cadastros")).toBe("Gestão de Pessoas");
+    expect(tituloDoGrupoDe("jornadas-trabalho")).toBe("Gestão de Pessoas");
   });
 
   it("módulo com mais de um destino é um disclosure que controla o seu submenu", () => {
@@ -534,24 +570,16 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
         papel="rh"
       />,
     );
-    const lideranca = screen.getByRole("button", { name: "Liderança" });
-    expect(lideranca).toHaveAttribute("aria-expanded", "true");
+    const colaboradores = screen.getByRole("button", { name: "Colaboradores" });
+    expect(colaboradores).toHaveAttribute("aria-expanded", "true");
 
     // O cabeçalho controla a REGIÃO recolhível (aviso + lista), não só a
     // lista — ver R4.
     const regiao = document.getElementById(
-      lideranca.getAttribute("aria-controls")!,
+      colaboradores.getAttribute("aria-controls")!,
     )!;
     const lista = regiao.querySelector("ul")!;
-    expect(lista.getAttribute("aria-labelledby")).toBe(lideranca.id);
-    expect(
-      within(regiao as HTMLElement)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual([
-      "Minha equipe Consulta do gestor",
-      "Administração da liderança Vínculos e equipes",
-    ]);
+    expect(lista.getAttribute("aria-labelledby")).toBe(colaboradores.id);
   });
 
   it("fechar o módulo tira os destinos da árvore de acessibilidade e da tabulação", () => {
@@ -562,15 +590,17 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
         papel="rh"
       />,
     );
-    const lideranca = screen.getByRole("button", { name: "Liderança" });
-    fireEvent.click(lideranca);
+    const colaboradores = screen.getByRole("button", { name: "Colaboradores" });
+    fireEvent.click(colaboradores);
 
-    expect(lideranca).toHaveAttribute("aria-expanded", "false");
+    expect(colaboradores).toHaveAttribute("aria-expanded", "false");
     // `hidden` no <ul> é o que remove de uma vez a árvore e a ordem de
     // tabulação — esconder só por CSS deixaria os botões alcançáveis.
-    expect(screen.queryByRole("button", { name: /Minha equipe/ })).toBeNull();
     expect(
-      document.getElementById(lideranca.getAttribute("aria-controls")!),
+      screen.queryByRole("button", { name: /^Escala de trabalho/ }),
+    ).toBeNull();
+    expect(
+      document.getElementById(colaboradores.getAttribute("aria-controls")!),
     ).toHaveAttribute("hidden");
   });
 
@@ -578,14 +608,14 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     // Senão a seleção some da tela e quem navega perde a referência.
     render(
       <PainelNavigation
-        destinoAtivoId="equipe"
+        destinoAtivoId="cadastros"
         onSelecionar={() => {}}
         papel="rh"
       />,
     );
-    const lideranca = screen.getByRole("button", { name: "Liderança" });
-    fireEvent.click(lideranca);
-    expect(lideranca).toHaveClass("painel-nav__cabecalho--contem-ativo");
+    const colaboradores = screen.getByRole("button", { name: "Colaboradores" });
+    fireEvent.click(colaboradores);
+    expect(colaboradores).toHaveClass("painel-nav__cabecalho--contem-ativo");
   });
 
   it("o destino ativo não depende só de cor: semântica, peso e forma juntos", () => {
@@ -618,10 +648,15 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
       />,
     );
     const icones = navegacao().querySelectorAll("svg.painel-nav__icone");
-    // T209 — um por módulo do mapa e um por item em desenvolvimento de
+    // T209 — um por módulo do menu e um por item em desenvolvimento de
     // primeiro nível (Portal, Recrutamento, Pesquisas, Calendário, Folha,
-    // Benefícios, Hub de Benefícios, Suporte e Roadmap).
-    expect(icones.length).toBe(GRUPOS.length + 9);
+    // Benefícios, Hub de Benefícios, Suporte e Roadmap). T211 — módulos no
+    // menu: Dashboard, Colaboradores, Liderança e Configurações.
+    const modulosNoMenu = MENU_LATERAL.flatMap((secao) =>
+      secao.entradas.filter((e) => e.tipo === "modulo"),
+    ).length;
+    expect(modulosNoMenu).toBe(4);
+    expect(icones.length).toBe(modulosNoMenu + 9);
     for (const icone of icones) {
       expect(icone).toHaveAttribute("aria-hidden", "true");
       expect(icone).toHaveAttribute("focusable", "false");
@@ -629,14 +664,14 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
   });
 });
 
-describe("Demonstração é separada e secundária (T159 — evolução visual)", () => {
+describe("T211 — sem Demonstração e sem Operação no menu", () => {
   function listasDeModulo() {
     return [
       ...navegacao().querySelectorAll<HTMLElement>("ul.painel-nav__modulos"),
     ];
   }
 
-  it("fica numa lista própria, depois de todos os módulos operacionais", () => {
+  it("listas: início, Pessoas, Remuneração e o rodapé com a própria conta", () => {
     render(
       <PainelNavigation
         destinoAtivoId="pessoas"
@@ -645,43 +680,19 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
       />,
     );
     const listas = listasDeModulo();
-    // T209 — início, Pessoas, Remuneração, Operação, Demonstração e o
-    // rodapé (utilidades e a própria conta, presos ao pé da faixa).
-    expect(listas).toHaveLength(6);
-
-    const operacionais = listas[3]!;
-    const secundaria = listas[4]!;
-    const daConta = listas[5]!;
+    expect(listas).toHaveLength(4);
+    const daConta = listas[3]!;
     expect(daConta).toHaveClass("painel-nav__modulos--conta");
     expect(daConta).toHaveClass("painel-nav__modulos--rodape");
     expect(
       within(daConta).getByRole("button", { name: /^Configurações/ }),
     ).toBeInTheDocument();
     expect(
-      within(operacionais).queryByRole("button", { name: /^Configurações/ }),
+      navegacao().querySelector(".painel-nav__modulos--secundario"),
     ).toBeNull();
-    expect(
-      operacionais.compareDocumentPosition(daConta) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // T209 — Demonstração vem antes do rodapé.
-    expect(
-      secundaria.compareDocumentPosition(daConta) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(secundaria).toHaveClass("painel-nav__modulos--secundario");
-    // Ordem no documento: a lista secundária vem depois.
-    expect(
-      operacionais.compareDocumentPosition(secundaria) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-
-    expect(
-      within(secundaria).getByRole("button", { name: "Demonstração" }),
-    ).toBeInTheDocument();
   });
 
-  it("nenhum destino demonstrativo aparece entre os módulos operacionais", () => {
+  it("nenhum destino demonstrativo aparece no menu, nem o aviso de Demonstração", () => {
     render(
       <PainelNavigation
         destinoAtivoId="pessoas"
@@ -689,66 +700,16 @@ describe("Demonstração é separada e secundária (T159 — evolução visual)"
         papel="rh"
       />,
     );
-    const operacionais = listasDeModulo()[0]!;
     for (const destino of DESTINOS.filter(
       (d) => d.estado === "demonstrativo",
     )) {
       expect(
-        within(operacionais).queryByRole("button", {
-          name: new RegExp(`^${destino.label}`),
+        within(navegacao()).queryByRole("button", {
+          name: new RegExp(`^${destino.label}\\b`),
         }),
+        destino.id,
       ).toBeNull();
     }
-  });
-
-  it("o aviso é texto, fica antes da lista e é lido junto com ela", () => {
-    render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
-    );
-    const cabecalho = screen.getByRole("button", { name: "Demonstração" });
-    const regiao = document.getElementById(
-      cabecalho.getAttribute("aria-controls")!,
-    )!;
-    const lista = regiao.querySelector("ul")!;
-    const aviso = document.getElementById(
-      lista.getAttribute("aria-describedby")!,
-    )!;
-    expect(aviso.textContent).toMatch(
-      /Nada aqui grava, consulta o servidor ou representa capacidade disponível/,
-    );
-    expect(
-      aviso.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // Aviso e lista moram na MESMA região recolhível (R4).
-    expect(regiao.contains(aviso)).toBe(true);
-    expect(regiao.contains(lista)).toBe(true);
-  });
-
-  it("R4 — fechado, aviso e lista somem juntos: nenhum parágrafo órfão", () => {
-    render(
-      <PainelNavigation destinoAtivoId="pessoas" onSelecionar={() => {}} />,
-    );
-    const cabecalho = screen.getByRole("button", { name: "Demonstração" });
-    const regiao = document.getElementById(
-      cabecalho.getAttribute("aria-controls")!,
-    )!;
-
-    expect(regiao).not.toHaveAttribute("hidden");
-    expect(
-      screen.getByText(/Nada aqui grava, consulta o servidor/),
-    ).toBeInTheDocument();
-
-    fireEvent.click(cabecalho);
-
-    expect(regiao).toHaveAttribute("hidden");
-    // `hidden` na região tira o aviso E a lista da árvore de acessibilidade
-    // de uma vez — nada de parágrafo anunciando um grupo que não está à
-    // vista. (`queryByText` não filtra por `hidden`, então o que se afirma é
-    // o fato estrutural: o aviso está DENTRO do que foi escondido.)
-    const aviso = screen.getByText(/Nada aqui grava, consulta o servidor/);
-    expect(aviso.closest("[hidden]")).toBe(regiao);
-    expect(screen.queryByRole("button", { name: /^Visão geral/ })).toBeNull();
-    // Antes da R4 o aviso ficava FORA da região e sobrava sozinho na tela.
-    expect(regiao.contains(aviso)).toBe(true);
+    expect(navegacao().textContent).not.toMatch(/Nada aqui grava/);
   });
 });

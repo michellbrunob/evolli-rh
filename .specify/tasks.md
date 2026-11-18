@@ -3534,9 +3534,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         contatos na listagem e exportação de pessoas.
 
 107.  **T210 - Configurações › Aparência e marca oficial**
-      - **Estado:** **fechada localmente** (2026-11-18), sem publicação. Branch
-        `codex/t210-marca-aparencia`, a partir do squash da T209 em `main` (`b7d2d03`, PR
-        #202). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #203, squash
+        `053aa3df015723e09cd64399ce4205e7e00f8901`, com a CI de push 3/3 verde (run
+        44335080581); branch remota `codex/t210-marca-aparencia` preservada.
       - **Entregue:** `PATCH /v1/users/me/aparencia` e `temaAparencia` em `/users/me`
         (migration `20261118120000_tema_aparencia`, coluna anulável com CHECK; nula = Azul
         Institucional, inclusive em toda conta nova); `data-theme` aplicado depois da identidade;
@@ -3554,6 +3554,27 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         [documento de decisão](../docs/decisions/t210-temas-de-aparencia.md).
       - **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema
         escuro e Documentos.
+
+108.  **T211 - Organização do menu**
+      - **Estado:** **em implementação local**. Branch `codex/t211-organizacao-menu`, a partir do
+        squash da T210 em `main` (`053aa3d`, PR #203). Sem push, PR, Ready ou merge.
+      - **Objetivo:** reorganizar só a navegação, mantendo a identidade própria do Evolli:
+        Escala de trabalho e Organograma no submenu de Colaboradores; Equipe e permissões em
+        Configurações; Ponto e Administração da liderança fora do menu, com URL própria;
+        Liderança como item direto de Pessoas (abre Minha equipe); sem a seção Operação e sem
+        Demonstração no menu, conforme o
+        [documento de decisão](../docs/decisions/t211-organizacao-do-menu.md).
+      - **Correção final (M9):** o menu do gestor fica com Liderança (Minha equipe) e, em
+        Configurações, Meu perfil e Aparência; Colaboradores e os itens de Pessoas e Remuneração
+        ficam para RH, DP e master técnico. Só disposição do menu: servidor, API e rotas sem
+        mudança.
+      - **Validação local:** web 159 arquivos / 4387 testes; lint, typecheck e build da web;
+        navegador com RH, DP, master técnico, gestor e 375 px. Aguarda a validação visual da
+        proprietária.
+      - **Próximas (proprietária, 2026-11-18):** T212 — Importação de colaboradores por `.xlsx`;
+        T213 — Documentos. Nenhuma iniciada.
+      - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
+        mudança funcional nas telas; Documentos.
 
 ## Regra obrigatória para as próximas tarefas
 

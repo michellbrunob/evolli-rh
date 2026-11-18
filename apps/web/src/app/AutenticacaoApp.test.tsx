@@ -721,7 +721,8 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Minha equipe" }),
     ).toBeInTheDocument();
-    expect(destinosAtivos()).toEqual(["Minha equipe Consulta do gestor"]);
+    // T211 — no menu, o item de Minha equipe se chama Liderança.
+    expect(destinosAtivos()).toEqual(["Liderança Consulta do gestor"]);
     expect(hubNaTela()).toBeNull();
     // Aterrissar numa tela não deixa o foco no body: ele vai ao título.
     await waitFor(() =>
@@ -806,10 +807,11 @@ describe("T153 — aterrissagem segura por papel", () => {
     expect(within(nav).getAllByRole("button")[0]).toHaveTextContent(
       /^Dashboard/,
     );
-    // E continua vendo "Minha equipe", porque o contrato lhe concede.
+    // E continua vendo Minha equipe (o item Liderança), porque o contrato lhe
+    // concede.
     abrirSecoesFechadasDoMenu();
     expect(
-      screen.getByRole("button", { name: /Minha equipe/ }),
+      screen.getByRole("button", { name: /^Liderança/ }),
     ).toBeInTheDocument();
   });
 
@@ -938,15 +940,16 @@ describe("T153 — aterrissagem segura por papel", () => {
     render(<AutenticacaoApp />);
     await screen.findByRole("heading", { level: 1, name: "Minha equipe" });
 
-    abrirSecoesFechadasDoMenu();
-    fireEvent.click(screen.getByRole("button", { name: /^Relatórios/ }));
+    // T211 — Relatórios (demonstração) saiu do menu: Configurações é o
+    // outro destino que o gestor abre.
+    fireEvent.click(screen.getByRole("button", { name: /^Configurações/ }));
     await screen.findByRole("navigation", { name: "Navegação do painel" });
 
     // Vários ciclos de render depois, continua onde a pessoa escolheu.
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
-    expect(destinosAtivos()).toEqual(["Relatórios"]);
+    expect(destinosAtivos()).toEqual(["Configurações Meu perfil"]);
     expect(
       screen.queryByRole("heading", { level: 1, name: "Minha equipe" }),
     ).toBeNull();

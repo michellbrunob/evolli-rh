@@ -330,6 +330,11 @@ interface ModuloProps {
   readonly grupo: GrupoNavegacao;
   /** T209 — nome na barra, quando difere do título do grupo. */
   readonly rotulo: string;
+  /**
+   * T211 — nome do item quando o módulo mostra um destino só e a entrada do
+   * menu nomeia o módulo (Liderança abre Minha equipe).
+   */
+  readonly rotuloDoItemUnico?: string | undefined;
   readonly visiveis: readonly DestinoNavegacao[];
   readonly extras: readonly SubitemEmDesenvolvimento[];
   readonly destinoAtivoId: string;
@@ -345,6 +350,7 @@ interface ModuloProps {
 function Modulo({
   grupo,
   rotulo,
+  rotuloDoItemUnico,
   visiveis,
   extras,
   destinoAtivoId,
@@ -378,7 +384,10 @@ function Modulo({
   // → Colaboradores) — fundir os dois apagaria o nome do módulo. T209: e o
   // módulo com subitens em desenvolvimento, que já tem mais de um filho.
   if (visiveis.length === 1 && !grupo.sempreComoModulo && extras.length === 0) {
-    const unico = visiveis[0]!;
+    const destino = visiveis[0]!;
+    const unico = rotuloDoItemUnico
+      ? { ...destino, label: rotuloDoItemUnico }
+      : destino;
     return (
       <li className="painel-nav__modulo">
         <BotaoDestino
@@ -687,8 +696,9 @@ export function PainelNavigation({
   function visiveisDoModulo(titulo: string): readonly DestinoNavegacao[] {
     const grupo = grupoPorTitulo.get(titulo);
     if (!grupo) return [];
+    // T211 — destino `foraDoMenu` também não é item: abre pela URL.
     return grupo.destinos.filter(
-      (d) => !d.agrupadoEm && destinoVisivelPara(d, papel),
+      (d) => !d.agrupadoEm && !d.foraDoMenu && destinoVisivelPara(d, papel),
     );
   }
 
@@ -704,6 +714,11 @@ export function PainelNavigation({
   function renderizarEntrada(
     entrada: SecaoDoMenu["entradas"][number],
   ): ReactNode {
+    // T211 — entrada restrita a papéis: sem o papel (ou sem papel conhecido),
+    // não aparece. Disposição do menu, não autorização.
+    if (entrada.papeis && !(papel !== null && entrada.papeis.includes(papel))) {
+      return null;
+    }
     if (entrada.tipo === "em-desenvolvimento") {
       if (entrada.subitens && entrada.subitens.length > 0) {
         const chave = `em-desenvolvimento:${entrada.id}`;
@@ -745,6 +760,7 @@ export function PainelNavigation({
         key={chave}
         grupo={grupo}
         rotulo={entrada.rotulo ?? grupo.titulo}
+        rotuloDoItemUnico={entrada.rotulo}
         visiveis={visiveis}
         extras={entrada.subitensEmDesenvolvimento ?? []}
         destinoAtivoId={itemAtivo}

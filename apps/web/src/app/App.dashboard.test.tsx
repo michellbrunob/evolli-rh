@@ -393,10 +393,11 @@ describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
     montar("#/dashboard/pessoas?ano=2024");
     await screen.findByRole("tab", { name: "Pessoas" });
     const nav = screen.getByRole("navigation", { name: "Navegação do painel" });
-    fireEvent.click(
-      within(nav).getByRole("button", { name: /^Jornada Visão/ }),
-    );
-    await screen.findByRole("heading", { level: 1, name: "Visão do período" });
+    fireEvent.click(within(nav).getByRole("button", { name: /^Organograma/ }));
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Estrutura organizacional",
+    });
     fireEvent.click(within(nav).getByRole("button", { name: /^Dashboard/ }));
     await waitFor(() =>
       expect(window.location.hash).toBe("#/dashboard?ano=2026"),

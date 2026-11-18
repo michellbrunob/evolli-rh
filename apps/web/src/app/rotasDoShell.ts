@@ -56,6 +56,11 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T209 — Configurações › Empresas e a Nova empresa.
   "configuracoes-empresas": "#/configuracoes/empresas",
   "nova-empresa": "#/configuracoes/empresas/nova",
+  // T211 — Contas de acesso como Configurações › Equipe e permissões.
+  "contas-acesso": "#/configuracoes/equipe-e-permissoes",
+  // T211 — fora do menu lateral: abrem pela URL própria.
+  ponto: "#/jornada/ponto",
+  "administracao-lideranca": "#/lideranca/administracao",
 };
 
 /**
