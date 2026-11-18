@@ -3421,7 +3421,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** edição de e-mail e senha, cargo, telefone, Google, segundo fator e sessões em Meu perfil; foto vista por outras pessoas, foto de colaborador, R2, antivírus e editor de enquadramento; Segurança, Empresas e Equipe e permissões; seed, Docker e workflow. A base somente leitura não alterou API nem schema; as ampliações aprovadas acrescentam migrations aditivas, rotas, uso de `own_account`/`manage`, auditoria e a dependência `sharp` (lockfile).
 
 106.  **T209 - Colaboradores**
-      - **Estado:** **em implementação local**. Branch `codex/t209-colaboradores`, a partir do
+      - **Estado:** **integrada** em `main` pela PR #202, squash
+        `b7d2d0353166d35ab8e31a49f4e520efb8177ab9`, com a CI de push 3/3 verde (run
+        44318802859); branch remota preservada. Histórico abaixo.
+      - **Histórico:** branch `codex/t209-colaboradores`, a partir do
         squash `5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2` (T208 integrada, PR #201). Decisões
         C-1 a C-15 aprovadas em 2026-11-13, com a C-10 corrigida (sem data de nascimento na
         planilha); o Bloco C (importação CSV) está pausado porque a admissão exige a data de
@@ -3529,6 +3532,28 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** código de produto, API, schema, migration, RBAC, auditoria, seed,
         Docker, dependências, lockfile, workflow, push, PR, promoção e merge; CPF, salário,
         contatos na listagem e exportação de pessoas.
+
+107.  **T210 - Configurações › Aparência e marca oficial**
+      - **Estado:** **fechada localmente** (2026-11-18), sem publicação. Branch
+        `codex/t210-marca-aparencia`, a partir do squash da T209 em `main` (`b7d2d03`, PR
+        #202). Sem push, PR, Ready ou merge.
+      - **Entregue:** `PATCH /v1/users/me/aparencia` e `temaAparencia` em `/users/me`
+        (migration `20261118120000_tema_aparencia`, coluna anulável com CHECK; nula = Azul
+        Institucional, inclusive em toda conta nova); `data-theme` aplicado depois da identidade;
+        Configurações › Aparência (quatro cartões, aplicação imediata, falha volta ao anterior,
+        fora do Hub); menu lateral claro com 4% da ação do tema (decisão da proprietária pela
+        prancha da marca); contorno de campo `--borda-controle` ≥ 3:1; marca oficial pelos SVGs
+        locais (horizontal, símbolo, vertical e versões brancas de mesma geometria), símbolo na
+        barra até 400 px.
+      - **Validação:** E2E serial 29 suítes / 1207 (aparência 18); API 68 / 1604; lint,
+        typecheck, build, `spec:check` e `git diff --check` limpos; quatro temas e 375 px
+        validados no navegador.
+      - **Objetivo:** quatro temas fechados por conta (Azul Institucional, Evolli Claro, Verde
+        Petróleo e Alto Contraste), gravados no servidor e aplicados por `data-theme`, e a marca
+        oficial do Evolli a partir dos SVGs locais, conforme o
+        [documento de decisão](../docs/decisions/t210-temas-de-aparencia.md).
+      - **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema
+        escuro e Documentos.
 
 ## Regra obrigatória para as próximas tarefas
 

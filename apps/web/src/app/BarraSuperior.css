@@ -47,13 +47,6 @@
   color: var(--color-action);
 }
 
-.barra-superior__marca-nome {
-  color: var(--color-ink);
-  font-size: var(--text-ui);
-  font-weight: var(--weight-bold);
-  white-space: nowrap;
-}
-
 /* Separador sutil entre grupos. */
 .barra-superior__separador {
   flex: 0 0 auto;
@@ -206,12 +199,6 @@
   .barra-superior__conta {
     max-width: 10rem;
     min-height: var(--touch-target);
-  }
-}
-
-@media (max-width: 400px) {
-  .barra-superior__marca-nome {
-    display: none;
   }
 }
 

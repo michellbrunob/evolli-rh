@@ -74,6 +74,10 @@ model AccessUser {
   nomeExibicao       String?   @map("nome_exibicao") @db.VarChar(80)
   perfilAtualizadoEm DateTime? @map("perfil_atualizado_em")
 
+  // T210 — Configuracoes > Aparencia: o tema visual da propria conta (um dos
+  // quatro codigos fechados, por CHECK). Nulo = Azul Institucional.
+  temaAparencia String? @map("tema_aparencia")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

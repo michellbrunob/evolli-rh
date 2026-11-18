@@ -51,6 +51,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
   configuracoes: "#/configuracoes/meu-perfil",
+  // T210 — Configurações › Aparência (o tema da própria conta).
+  "configuracoes-aparencia": "#/configuracoes/aparencia",
   // T209 — Configurações › Empresas e a Nova empresa.
   "configuracoes-empresas": "#/configuracoes/empresas",
   "nova-empresa": "#/configuracoes/empresas/nova",

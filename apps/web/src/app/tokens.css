@@ -18,14 +18,20 @@
 :root {
   color-scheme: light;
 
-  /* Cor de ação — única, para todo elemento interativo (links, CTAs, foco). */
+  /* T210 — o padrão é o tema Azul Institucional; os outros três temas
+     redefinem estes mesmos tokens semânticos em `:root[data-theme="…"]`,
+     no fim do arquivo (docs/decisions/t210-temas-de-aparencia.md). */
+
+  /* Cor de ação — única, para todo elemento interativo (links, CTAs). */
   --color-action: #0066cc;
-  --color-action-hover: #0071e3;
+  --color-action-hover: #004f9e;
+  /* T210 — foco de teclado (≥ 3:1 contra o entorno em todos os temas). */
+  --focus-color: #0066cc;
 
   /* Tinta e texto (contraste AA sobre superfícies claras). */
   --color-ink: #1d1d1f; /* texto principal (~16:1 no branco) */
-  --color-ink-muted: #333333; /* texto secundário (~12:1) */
-  --color-ink-subtle: #4b4b4d; /* legendas/rodapé (~8:1, passa AA) */
+  --color-ink-muted: #475467; /* texto secundário (7,7:1 no branco) */
+  --color-ink-subtle: #475467; /* legendas e ajuda (7,7:1 no branco) */
   --color-on-action: #ffffff; /* texto sobre a cor de ação */
   --color-on-dark: #ffffff; /* texto sobre a superfície escura */
   --color-on-dark-muted: #d2d2d7; /* texto secundário sobre escuro (~11:1) */
@@ -39,6 +45,41 @@
   /* Bordas sutis. */
   --hairline: #d2d2d7;
   --divider-soft: #e8e8ed;
+  /* T210 — contorno de campo de formulário: a "borda" da paleta fica abaixo
+     de 3:1; o campo usa este, com pelo menos 3:1 contra o fundo. */
+  --borda-controle: #86868b;
+
+  /* T210 — véu atrás de janelas e sombras de camada flutuante, a partir da
+     tinta do tema (sem cor literal nas telas). */
+  --veu: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  --sombra-flutuante:
+    0 0 0 1px color-mix(in srgb, var(--color-ink) 6%, transparent),
+    0 2px 4px color-mix(in srgb, var(--color-ink) 6%, transparent),
+    0 12px 28px -6px color-mix(in srgb, var(--color-ink) 10%, transparent);
+  /* T210 — cores fixas das AMOSTRAS dos cartões de Aparência: cada cartão
+     mostra o próprio tema, qualquer que seja o tema em uso. */
+  --amostra-azul-acao: #0066cc;
+  --amostra-azul-fundo: #f5f5f7;
+  --amostra-azul-superficie: #ffffff;
+  --amostra-azul-texto: #1d1d1f;
+  --amostra-claro-acao: #b42362;
+  --amostra-claro-fundo: #f8f7f9;
+  --amostra-claro-superficie: #fffdfe;
+  --amostra-claro-texto: #25151e;
+  --amostra-verde-acao: #006d77;
+  --amostra-verde-fundo: #f2f8f8;
+  --amostra-verde-superficie: #fcfefe;
+  --amostra-verde-texto: #132b2d;
+  --amostra-contraste-acao: #0046ad;
+  --amostra-contraste-fundo: #ffffff;
+  --amostra-contraste-superficie: #ffffff;
+  --amostra-contraste-texto: #000000;
+
+  /* T210 — fundo do que vai para a impressão: sempre branco, em todo tema
+     (o tema não muda impressão nem PDF). */
+  --papel-impressao: #ffffff;
+  --sombra-cartao: 0 8px 24px
+    color-mix(in srgb, var(--evolli-marinho) 12%, transparent);
 
   /* Estados semânticos (badges/alertas): tinta ESCURA sobre superfície clara,
      todas com contraste AA. A cor nunca é o único sinal — o componente
@@ -67,16 +108,42 @@
   --evolli-marinho: #0b2d5b;
   --evolli-marinho-realce: #16407a; /* hover sobre o marinho */
   --evolli-marinho-divisa: #2a4f86; /* filetes sobre o marinho */
-  --evolli-azul: #0066ff;
-  --evolli-azul-escuro: #0052cc; /* hover do azul */
-  --evolli-azul-suave: #eaf1ff; /* superfície de destaque */
+  /* T210 — o azul de interface segue a ação do tema escolhido. */
+  --evolli-azul: var(--color-action);
+  --evolli-azul-escuro: var(--color-action-hover); /* hover do azul */
+  --evolli-azul-suave: color-mix(
+    in srgb,
+    var(--color-action) 9%,
+    var(--surface-canvas)
+  ); /* superfície de destaque */
   --evolli-verde-agua: #00d4a3;
   --evolli-verde-agua-escuro: #00a07a; /* barra de gráfico (3:1 no branco) */
   --evolli-verde-agua-suave: #e1f9f2;
   --evolli-sobre-marinho: #ffffff;
   --evolli-sobre-marinho-suave: #c9d6ea; /* texto secundário no marinho */
   --evolli-ardosia: #6b7c99; /* apoio neutro de gráfico */
-  --evolli-fundo: #f4f7fb; /* fundo neutro do Dashboard */
+  --evolli-fundo: var(--surface-neutral); /* fundo neutro do Dashboard */
+  /* T210 — menu lateral CLARO, no tema da conta (decisão da proprietária,
+     2026-11-18, pela prancha da marca), com um tom bem leve da ação do tema
+     (4%): só derivados da paleta do tema, nenhuma cor nova. Item ativo: a ação sobre a superfície de destaque, com
+     a barra indicadora e `aria-current` (nunca só cor). O realce do hover
+     mistura a tinta, para existir também onde neutro = canvas. */
+  --menu-fundo: color-mix(
+    in srgb,
+    var(--color-action) 4%,
+    var(--surface-canvas)
+  );
+  --menu-texto: var(--color-ink);
+  --menu-texto-suave: var(--color-ink-muted);
+  --menu-realce: color-mix(in srgb, var(--color-ink) 6%, var(--menu-fundo));
+  --menu-divisa: var(--divider-soft);
+  --menu-ativo-fundo: color-mix(
+    in srgb,
+    var(--color-action) 12%,
+    var(--surface-canvas)
+  );
+  --menu-ativo-texto: var(--color-action);
+  --menu-indicador: var(--color-action);
 
   /* T209 — cor própria do tipo de vínculo Aprendiz nas distribuições
      (Colaboradores e Dashboard). Objeto gráfico com contraste acima de 3:1
@@ -148,7 +215,6 @@
      divisões quando for aberto para evolução (dossiê da T209). */
   --divisor-cor: var(--divider-soft);
   --divisor-cor-forte: var(--hairline);
-  --divisor-cor-sobre-marinho: var(--evolli-marinho-divisa);
   --borda-espessura: 1px;
   --divisor: var(--borda-espessura) solid var(--divisor-cor);
   --divisor-forte: var(--borda-espessura) solid var(--divisor-cor-forte);
@@ -199,4 +265,55 @@ body {
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
   border-radius: var(--radius-sm);
+}
+
+/* ---- T210 — temas de Configurações › Aparência -------------------------
+   Preferência da própria conta, aplicada por `data-theme` no <html> depois
+   que a identidade da sessão chega. Cada tema redefine só os tokens
+   semânticos de ação, texto, superfícies, bordas e foco; os estados
+   semânticos (sucesso, atenção, erro, informação), a marca e o menu marinho
+   ficam iguais. Contrastes calculados em `temas.test.ts`. */
+:root[data-theme="evolli_claro"] {
+  --color-action: #b42362;
+  --color-action-hover: #961c51;
+  --focus-color: #b42362;
+  --color-ink: #25151e;
+  --color-ink-muted: #5d4553;
+  --color-ink-subtle: #5d4553;
+  --surface-canvas: #fffdfe;
+  --surface-neutral: #f8f7f9;
+  --surface-pearl: #fff8fb;
+  --hairline: #e8dde4;
+  --divider-soft: #f1e7ec;
+  --borda-controle: #9a7a8b;
+}
+
+:root[data-theme="verde_petroleo"] {
+  --color-action: #006d77;
+  --color-action-hover: #005963;
+  --focus-color: #006d77;
+  --color-ink: #132b2d;
+  --color-ink-muted: #40595b;
+  --color-ink-subtle: #40595b;
+  --surface-canvas: #fcfefe;
+  --surface-neutral: #f2f8f8;
+  --surface-pearl: #f7fbfb;
+  --hairline: #cde0e0;
+  --divider-soft: #e0eeee;
+  --borda-controle: #6b8c8e;
+}
+
+:root[data-theme="alto_contraste"] {
+  --color-action: #0046ad;
+  --color-action-hover: #003780;
+  --focus-color: #0046ad;
+  --color-ink: #000000;
+  --color-ink-muted: #1a1a1a;
+  --color-ink-subtle: #1a1a1a;
+  --surface-canvas: #ffffff;
+  --surface-neutral: #ffffff;
+  --surface-pearl: #ffffff;
+  --hairline: #1a1a1a;
+  --divider-soft: #666666;
+  --borda-controle: #1a1a1a;
 }

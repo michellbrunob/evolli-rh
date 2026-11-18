@@ -275,82 +275,83 @@
 }
 
 /* T207 — paleta Evolli (P-1), só dentro da raiz `.painel-nav` (o ícone também
-   aparece no Hub). A navegação mora na faixa azul-marinho: itens
-   em texto claro, hover em marinho realçado, item ativo em azul sólido com
-   texto branco e a barra indicadora em verde-água — forma e superfície, além
-   do `aria-current`; nunca só cor. */
+   aparece no Hub). T210 — a navegação mora na faixa CLARA do tema: itens em
+   texto secundário, hover em realce neutro, item ativo na cor de ação sobre
+   a superfície de destaque, com peso e a barra indicadora — forma e
+   superfície, além do `aria-current`; nunca só cor. */
 .painel-nav .painel-nav__destino,
 .painel-nav .painel-nav__cabecalho {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__icone,
 .painel-nav .painel-nav__seta,
 .painel-nav .painel-nav__sub {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__destino:hover,
 .painel-nav .painel-nav__cabecalho:hover {
-  background: var(--evolli-marinho-realce);
-  color: var(--evolli-sobre-marinho);
+  background: var(--menu-realce);
+  color: var(--menu-texto);
 }
 
 .painel-nav .painel-nav__destino--ativo,
 .painel-nav .painel-nav__destino--ativo:hover {
-  background: var(--evolli-azul);
-  color: var(--evolli-sobre-marinho);
+  background: var(--menu-ativo-fundo);
+  color: var(--menu-ativo-texto);
+  font-weight: var(--weight-strong);
 }
 
 .painel-nav .painel-nav__destino--ativo .painel-nav__icone,
 .painel-nav .painel-nav__destino--ativo .painel-nav__sub {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-ativo-texto);
 }
 
 .painel-nav .painel-nav__destino--ativo::before,
 .painel-nav .painel-nav__cabecalho--contem-ativo::before {
-  background: var(--evolli-verde-agua);
+  background: var(--menu-indicador);
 }
 
 .painel-nav .painel-nav__cabecalho--contem-ativo {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
 }
 
 .painel-nav--trilho .painel-nav__cabecalho--contem-ativo {
-  background: var(--evolli-marinho-realce);
+  background: var(--menu-ativo-fundo);
 }
 
 .painel-nav--trilho .painel-nav__cabecalho--contem-ativo .painel-nav__icone {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-ativo-texto);
 }
 
 .painel-nav .painel-nav__submenu {
-  border-left-color: var(--evolli-marinho-divisa);
+  border-left-color: var(--menu-divisa);
 }
 
 .painel-nav .painel-nav__destino--sub.painel-nav__destino--ativo::before {
-  background: var(--evolli-verde-agua);
+  background: var(--menu-indicador);
 }
 
 .painel-nav .painel-nav__descricao {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__modulos--secundario,
 .painel-nav .painel-nav__modulos--conta {
-  border-top-color: var(--divisor-cor-sobre-marinho);
+  border-top-color: var(--menu-divisa);
 }
 
 .painel-nav .painel-nav__modulos--secundario .painel-nav__cabecalho,
 .painel-nav .painel-nav__modulos--secundario .painel-nav__destino {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__modulos--secundario .painel-nav__destino--ativo,
 .painel-nav
   .painel-nav__modulos--secundario
   .painel-nav__cabecalho--contem-ativo {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-ativo-texto);
 }
 
 /* ---- T209 — menu completo: seções nomeadas, selos, itens em
@@ -407,7 +408,7 @@
   font-weight: var(--weight-strong);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 /* Seção recolhível (Operação): o título é o botão de abrir e fechar. */
@@ -427,7 +428,7 @@
 }
 
 .painel-nav .painel-nav__secao-alternar:hover {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
 }
 
 .painel-nav__secao-alternar[aria-expanded="true"] .painel-nav__seta {
@@ -437,7 +438,7 @@
 /* Fechada com a tela aberta dentro: a marca sobe para o título (forma, além
    do `aria-current`). */
 .painel-nav .painel-nav__secao-alternar--contem-ativo {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
 }
 
 .painel-nav .painel-nav__secao-alternar--contem-ativo::before {
@@ -449,7 +450,7 @@
   height: 60%;
   transform: translateY(-50%);
   border-radius: var(--radius-pill);
-  background: var(--evolli-verde-agua);
+  background: var(--menu-indicador);
 }
 
 /* `display: flex` da lista venceria o atributo `hidden`. */
@@ -467,13 +468,13 @@
   margin-top: auto;
   padding-top: var(--space-sm);
   border-top: var(--divisor);
-  border-top-color: var(--divisor-cor-sobre-marinho);
+  border-top-color: var(--menu-divisa);
 }
 
 /* Cabeçalho expandido da área em que a pessoa está (Colaboradores): o
    subitem carrega a marca; o cabeçalho só ganha peso. */
 .painel-nav .painel-nav__cabecalho--na-area {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
   font-weight: var(--weight-strong);
 }
 
@@ -482,18 +483,18 @@
   display: inline-block;
   margin-left: var(--space-xxs);
   padding: 0 var(--space-xxs);
-  border: 1px solid var(--evolli-verde-agua);
+  border: 1px solid var(--menu-indicador);
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: var(--weight-strong);
   line-height: 1.4;
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
   vertical-align: middle;
 }
 
 .painel-nav .painel-nav__selo[data-selo="novo"] {
-  background: var(--evolli-verde-agua);
-  color: var(--evolli-marinho);
+  background: var(--menu-indicador);
+  color: var(--color-on-action);
 }
 
 /* Item em desenvolvimento: texto suave, a marca compacta (relógio) ao fim da
@@ -505,7 +506,7 @@
 
 .painel-nav .painel-nav__destino--em-desenvolvimento,
 .painel-nav .painel-nav__cabecalho--em-desenvolvimento {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__marca-em-desenvolvimento {
@@ -519,12 +520,12 @@
 }
 
 .painel-nav .painel-nav__marca-em-desenvolvimento {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .painel-nav .painel-nav__destino--em-desenvolvimento:hover {
-  background: var(--evolli-marinho-realce);
-  color: var(--evolli-sobre-marinho);
+  background: var(--menu-realce);
+  color: var(--menu-texto);
 }
 
 /* No trilho o estado e o selo saem de vista com o resto do texto (seguem no
@@ -542,7 +543,7 @@
 .painel-nav--trilho .painel-nav__secao {
   padding-top: var(--space-xs);
   border-top: var(--divisor);
-  border-top-color: var(--divisor-cor-sobre-marinho);
+  border-top-color: var(--menu-divisa);
 }
 
 .painel-nav--trilho .painel-nav__marca-em-desenvolvimento {
@@ -555,7 +556,7 @@
   opacity: 0.75;
 }
 
-/* O aviso: pequeno, claro sobre a faixa escura, preso ao item. */
+/* O aviso: pequeno, em cartão sobre a faixa, preso ao item. */
 .painel-nav__aviso {
   position: fixed;
   z-index: 30;

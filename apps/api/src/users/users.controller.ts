@@ -26,6 +26,7 @@ import { UsersService } from "./users.service";
 import { CreateUserDto } from "../auth/dto/create-user.dto";
 import { UpdateUserRoleDto } from "../auth/dto/update-user-role.dto";
 import { ListarUsuariosQueryDto } from "./dto/listar-usuarios-query.dto";
+import { AtualizarAparenciaDto } from "./dto/atualizar-aparencia.dto";
 import { AtualizarPerfilProprioDto } from "./dto/atualizar-perfil-proprio.dto";
 import {
   FotoRecusada,
@@ -132,6 +133,26 @@ export class UsersController {
   }
 
   /**
+   * T210 — Configurações › Aparência: a própria pessoa grava o próprio tema.
+   * Mesma permissão de Meu perfil (`own_account`/`manage`, todo papel, sempre
+   * a conta da sessão — sem `:id`). Sem auditoria: é só preferência visual,
+   * não muda dado nem permissão. Responde com o ator inteiro.
+   */
+  @Patch("me/aparencia")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("own_account", "manage")
+  async atualizarAparencia(
+    @Body() dto: AtualizarAparenciaDto,
+    @CurrentUser() user: AccessUser,
+  ) {
+    const temaAparencia = await this.usersService.gravarTemaProprio(
+      user.id,
+      dto.tema,
+    );
+    return this.projetarAtor({ ...user, temaAparencia });
+  }
+
+  /**
    * T208 — a própria foto (ADR 0018), só para a titular: sem `:id`, não há
    * como pedir a de outra conta. Imagem privada: sem cache persistente, sem
    * farejar tipo, sem executar nada (CSP `sandbox`) e exibida no lugar.
@@ -231,6 +252,8 @@ export class UsersController {
       ...toSafeUser(user),
       nomeExibicao: user.nomeExibicao ?? null,
       perfilAtualizadoEm: user.perfilAtualizadoEm ?? null,
+      // T210 — o tema da própria conta (`null` = Azul Institucional).
+      temaAparencia: user.temaAparencia ?? null,
       // T208 — versão da foto (instante da gravação) ou `null` sem foto. Só
       // a versão: os bytes saem por `GET /users/me/foto`, para a titular.
       fotoVersao:

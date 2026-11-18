@@ -8,13 +8,11 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { tokenResolvido } from "../test/tokensResolvidos";
 
-const tokens = readFileSync("src/app/tokens.css", "utf8");
-
+// T210 — tokens resolvidos no tema padrão (o azul de interface segue a ação).
 function token(nome: string): string {
-  const achado = new RegExp(`--${nome}:\\s*(#[0-9a-fA-F]{6})`).exec(tokens);
-  if (!achado) throw new Error(`token --${nome} não existe`);
-  return achado[1]!;
+  return tokenResolvido(nome);
 }
 
 function luminancia(hex: string): number {
@@ -35,7 +33,8 @@ const BRANCO = "#ffffff";
 describe("T207 — paleta Evolli (P-1): as cores-base", () => {
   it("marinho, azul e verde-água são os da identidade Evolli", () => {
     expect(token("evolli-marinho").toLowerCase()).toBe("#0b2d5b");
-    expect(token("evolli-azul").toLowerCase()).toBe("#0066ff");
+    // T210 — o azul de interface segue a ação do tema (padrão #0066cc).
+    expect(token("evolli-azul").toLowerCase()).toBe("#0066cc");
     expect(token("evolli-verde-agua").toLowerCase()).toBe("#00d4a3");
   });
 });
@@ -87,16 +86,13 @@ describe("T207 — paleta Evolli (P-1): elementos gráficos e foco (3:1)", () =>
     }
   });
 
-  it("dentro da faixa marinho o foco é branco: o azul de ação ali não chega a 3:1", () => {
+  it("T210 — na faixa clara o foco é o do tema (≥ 3:1 sobre o fundo do menu)", () => {
     expect(
-      contraste(token("color-action"), token("evolli-marinho")),
-    ).toBeLessThan(3);
-    expect(
-      contraste(token("evolli-sobre-marinho"), token("evolli-marinho")),
+      contraste(token("focus-color"), token("menu-fundo")),
     ).toBeGreaterThanOrEqual(3);
     const shell = readFileSync("src/app/app-shell.css", "utf8");
     expect(shell).toMatch(
-      /\.app-shell__sidebar \.painel-nav :focus-visible[\s\S]*?outline-color: var\(--evolli-sobre-marinho\)/,
+      /\.app-shell__sidebar \.painel-nav :focus-visible[\s\S]*?outline-color: var\(--focus-color\)/,
     );
   });
 
@@ -121,10 +117,10 @@ describe("T207 — paleta Evolli (P-1): só no menu, no Dashboard e no seletor",
     expect(token("color-action").toLowerCase()).toBe("#0066cc");
   });
 
-  it("a faixa lateral é marinho; o cabeçalho e o conteúdo não usam a paleta", () => {
+  it("T210 — a faixa lateral é clara (fundo do menu); o cabeçalho e o conteúdo não usam a paleta", () => {
     const shell = readFileSync("src/app/app-shell.css", "utf8");
     expect(shell).toMatch(
-      /\.app-shell__sidebar \{[^}]*background: var\(--evolli-marinho\)/,
+      /\.app-shell__sidebar \{[^}]*background: var\(--menu-fundo\)/,
     );
     const semFaixa = shell
       .split(/\n(?=[.@])/)

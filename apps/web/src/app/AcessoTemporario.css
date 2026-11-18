@@ -28,10 +28,6 @@
   font-weight: var(--weight-bold);
 }
 
-.acesso-temporario__marca span {
-  color: var(--color-ink);
-}
-
 .acesso-temporario__titulo {
   margin: 0;
   font-size: var(--text-title);

@@ -63,18 +63,19 @@ describe("T209 — TelaDeAbertura", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Verificando sessão…");
     const marca = document.querySelector(".tela-abertura__marca")!;
     expect(marca).toHaveAttribute("aria-hidden", "true");
-    expect(marca.querySelector("svg")).not.toBeNull();
+    // T210 — a assinatura vertical oficial (arquivo local), decorativa.
+    const img = marca.querySelector("img")!;
+    expect(img).toHaveAttribute("alt", "");
+    expect(img.getAttribute("src")).toMatch(/evolli-vertical\.svg$/);
     expect(document.querySelector(".tela-abertura__lottie")).toBeNull();
     await act(async () => undefined);
     expect(loadAnimation).not.toHaveBeenCalled();
   });
 
-  it("nome decorativo, mensagem como status e nada focável", () => {
+  it("T210 — o nome vem na assinatura (sem texto 'Evolli RH'), mensagem como status e nada focável", () => {
     render(<TelaDeAbertura mensagem="Carregando seu acesso…" />);
-    expect(document.querySelector(".tela-abertura__nome")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
+    expect(document.querySelector(".tela-abertura__nome")).toBeNull();
+    expect(document.body.textContent).not.toContain("Evolli RH");
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(
       document.querySelectorAll(
@@ -184,7 +185,7 @@ describe("T209 — contrato de CSS da abertura", () => {
       /\.tela-abertura__marca \{[^}]*animation: tela-abertura-entra 320ms/,
     );
     expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.tela-abertura__marca,\s*\.tela-abertura__nome \{\s*animation: none;/,
+      /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.tela-abertura__marca \{\s*animation: none;/,
     );
   });
 

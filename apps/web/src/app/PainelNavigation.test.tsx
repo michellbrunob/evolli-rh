@@ -78,6 +78,13 @@ describe("estrutura dos grupos", () => {
     ).toEqual([
       ["configuracoes", "Configurações", "funcional", undefined, undefined],
       [
+        "configuracoes-aparencia",
+        "Aparência",
+        "funcional",
+        undefined,
+        "configuracoes",
+      ],
+      [
         "configuracoes-empresas",
         "Empresas",
         "funcional",
@@ -141,6 +148,8 @@ describe("o estado declarado bate com o código", () => {
     // depende do contrato e dos rótulos de `usersClient`, sem requisição
     // própria. Funcional: dado real do servidor, não fixture.
     configuracoes: "src/screens/configuracoes/MeuPerfilScreen.tsx",
+    // T210 — Configurações › Aparência.
+    "configuracoes-aparencia": "src/screens/configuracoes/AparenciaScreen.tsx",
     // T209 — Configurações › Empresas e Nova empresa.
     "configuracoes-empresas": "src/screens/configuracoes/EmpresasScreen.tsx",
     "nova-empresa": "src/screens/configuracoes/NovaEmpresaScreen.tsx",

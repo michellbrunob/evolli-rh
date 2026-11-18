@@ -375,6 +375,15 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         estado: "funcional",
       },
       {
+        // T210 — Configurações › Aparência: o tema da própria conta, para
+        // todo papel (como Meu perfil). Abre pela navegação interna.
+        id: "configuracoes-aparencia",
+        label: "Aparência",
+        subRotulo: "Tema da conta",
+        estado: "funcional",
+        agrupadoEm: "configuracoes",
+      },
+      {
         // T209 — Configurações › Empresas: abre pela navegação interna de
         // Configurações e pelo "Gerenciar empresas" do seletor.
         id: "configuracoes-empresas",
@@ -593,6 +602,7 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
  * | `contas-acesso`           | `other_account` read    | `rh`, `dp`, `master_tecnico`     |
  * | `configuracoes` (T208)    | `own_account` read      | todos os papéis                  |
+ * | `configuracoes-aparencia` | `own_account` manage    | todos os papéis (T210)           |
  *
  * Os dois casos que surpreendem, e por isso valem dito:
  *
@@ -638,6 +648,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "administracao-lideranca",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-aparencia",
     "configuracoes-empresas",
     "nova-empresa",
   ],
@@ -651,6 +662,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "ponto",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-aparencia",
     "configuracoes-empresas",
   ],
   master_tecnico: [
@@ -661,15 +673,16 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "ponto",
     "contas-acesso",
     "configuracoes",
+    "configuracoes-aparencia",
     "configuracoes-empresas",
     "nova-empresa",
   ],
-  gestor: ["equipe", "configuracoes"],
-  financeiro: ["configuracoes"],
-  colaborador: ["configuracoes"],
-  auditor: ["configuracoes"],
-  dpo: ["configuracoes"],
-  admin_tecnico: ["configuracoes"],
+  gestor: ["equipe", "configuracoes", "configuracoes-aparencia"],
+  financeiro: ["configuracoes", "configuracoes-aparencia"],
+  colaborador: ["configuracoes", "configuracoes-aparencia"],
+  auditor: ["configuracoes", "configuracoes-aparencia"],
+  dpo: ["configuracoes", "configuracoes-aparencia"],
+  admin_tecnico: ["configuracoes", "configuracoes-aparencia"],
 };
 
 /**

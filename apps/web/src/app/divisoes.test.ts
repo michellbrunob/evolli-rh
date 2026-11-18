@@ -28,7 +28,8 @@ describe("T209 — tokens de divisão", () => {
   it.each([
     ["--divisor-cor", "var(--divider-soft)"],
     ["--divisor-cor-forte", "var(--hairline)"],
-    ["--divisor-cor-sobre-marinho", "var(--evolli-marinho-divisa)"],
+    // T210 — o menu ficou claro: a divisão dele é a do tema.
+    ["--menu-divisa", "var(--divider-soft)"],
     ["--borda-espessura", "1px"],
     ["--divisor", "var(--borda-espessura) solid var(--divisor-cor)"],
     [
@@ -89,14 +90,14 @@ describe("T209 — divisões na estrutura compartilhada do shell", () => {
         navegacao,
         ".painel-nav .painel-nav__modulos--secundario,\n.painel-nav .painel-nav__modulos--conta",
       ),
-    ).toMatch(/border-top-color: var\(--divisor-cor-sobre-marinho\);/);
+    ).toMatch(/border-top-color: var\(--menu-divisa\);/);
   });
 
-  it("seletor de empresa do menu separado da navegação por um divisor sobre o marinho", () => {
+  it("seletor de empresa do menu separado da navegação por um divisor da faixa", () => {
     const corpo = regra(seletor, ".seletor-empresa--menu");
     expect(corpo).toMatch(/padding-bottom: var\(--secao-espaco-compacto\);/);
     expect(corpo).toMatch(
-      /border-bottom: var\(--borda-espessura\) solid var\(--divisor-cor-sobre-marinho\);/,
+      /border-bottom: var\(--borda-espessura\) solid var\(--menu-divisa\);/,
     );
   });
 

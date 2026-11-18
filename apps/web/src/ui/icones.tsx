@@ -20,6 +20,7 @@ import {
   Building,
   Calendar,
   Clock,
+  ColorSwatch,
   Cup,
   DocumentText,
   Edit2,
@@ -100,6 +101,7 @@ export const IconeConta = decorativo(ProfileCircle, "Bulk");
 export const IconeSeguranca = decorativo(ShieldTick, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
+export const IconeAparencia = decorativo(ColorSwatch, "Bulk");
 
 // ---- Ações (Bulk) --------------------------------------------------------
 export const IconeEditar = decorativo(Edit2, "Bulk");

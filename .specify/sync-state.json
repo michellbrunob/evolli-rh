@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-13",
-  "lastIntegratedTask": 208,
-  "lastRecordedTask": 209,
+  "lastConvergedAt": "2026-11-18",
+  "lastIntegratedTask": 209,
+  "lastRecordedTask": 210,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T209",
-    "status": "colaboradores_em_implementacao",
-    "reason": "T208 integrada em main pela PR #201 (squash 5b4c498fe0f44ccdfdf233a25c9568aad94eb8f2), com a CI de push 3/3 verde (run 43442498632); convergida no primeiro commit da T209. T209 em implementacao local: decisoes C-1 a C-15 aprovadas em 2026-11-13, com a C-10 corrigida; Blocos A (listagem operacional) e B (acoes por pessoa) implementados e validados localmente (secoes 14 a 16), mais o refinamento da listagem, o padrao de divisoes e a animacao dos paineis laterais (secoes 17 a 21), com o visual aprovado em 2026-11-13 (secao 22); Aprendiz como tipo de vinculo implementado na fatia minima (secao 24; AP-1 a AP-9 aprovadas; migration 20261113180000_tipo_vinculo_aprendiz), mais a fundacao de interface incremental (secao 25; ADR 0019: Tailwind 4 sem preflight, Radix, Lucide; Colaboradores migrado), a espera da validacao visual; Bloco C (importacao CSV) pausado porque a admissao exige a data de nascimento (docs/decisions/t209-dossie-colaboradores.md, secao 13). Sem push, PR, Ready ou merge."
+    "id": "T210",
+    "status": "aparencia_fechada_localmente",
+    "reason": "T210 fechada localmente em 2026-11-18, sem publicacao: Configuracoes > Aparencia (quatro temas por conta, persistidos no servidor), menu lateral claro com tom do tema e a marca oficial do Evolli pelos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Sem push, PR, Ready ou merge."
   },
   "openDeliveries": [
     {
-      "id": "T209",
+      "id": "T210",
       "pullRequest": null,
-      "status": "colaboradores_em_implementacao"
+      "status": "aparencia_fechada_localmente"
     }
   ],
   "requiredArtifacts": [

@@ -58,12 +58,6 @@
   gap: var(--space-xs);
 }
 
-.hub__marca-nome {
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  letter-spacing: var(--tracking-tight);
-}
-
 .hub__acoes {
   display: flex;
   align-items: center;

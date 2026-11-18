@@ -111,10 +111,6 @@
   color: var(--color-action);
 }
 
-.app-shell__marca-compacta .app-shell__marca-nome {
-  color: var(--color-ink);
-}
-
 /* T207 — nome da tela atual, junto da área principal. Só visual (o título
    da tela continua sendo o h1 dela); some onde a barra não tem espaço. Nas
    cores neutras do cabeçalho (a paleta Evolli fica no menu e no Dashboard). */
@@ -291,30 +287,6 @@
   color: var(--color-action);
 }
 
-.app-shell__marca-simbolo {
-  flex: 0 0 auto;
-}
-
-.app-shell__marca-texto {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.app-shell__marca-nome {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
-  color: var(--color-ink);
-}
-
-.app-shell__marca-tag {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-regular);
-  color: var(--color-ink-subtle);
-}
-
 /* Área principal. `min-width: 0` impede que uma tabela larga com rolagem
    própria vaze a rolagem para a página inteira. Sem `max-width` (T206): o
    conteúdo ocupa a largura da coluna, e a largura que o trilho libera. */
@@ -398,18 +370,6 @@
     justify-content: center;
     padding: 0;
   }
-
-  .app-shell--menu-recolhido .app-shell__marca-texto {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -475,7 +435,7 @@
     position: fixed;
     inset: 0;
     z-index: 35;
-    background: rgb(29 29 31 / 45%);
+    background: var(--veu);
     border: none;
     padding: 0;
     cursor: pointer;
@@ -504,43 +464,33 @@
   }
 }
 
-/* T207 — paleta Evolli na faixa lateral (P-1): estrutura em azul-marinho,
-   marca e textos claros. Escopado à faixa: o cabeçalho, o conteúdo e as
-   demais telas não mudam de cor. Contraste: branco e o texto suave sobre o
-   marinho passam de 4,5:1; o foco dentro da faixa é branco, porque o azul
-   de ação sobre o marinho fica abaixo de 3:1. */
+/* T210 — faixa lateral CLARA, no tema da conta (antes marinho, T207):
+   fundo do tema, filete à direita, textos na tinta do tema. Contraste dos
+   textos e do foco conferido por tema (temas.test.ts). */
 .app-shell__sidebar {
-  background: var(--evolli-marinho);
-  border-right-color: var(--evolli-marinho);
-  color: var(--evolli-sobre-marinho);
-  scrollbar-color: var(--evolli-marinho-divisa) var(--evolli-marinho);
+  background: var(--menu-fundo);
+  border-right-color: var(--hairline);
+  color: var(--menu-texto);
+  scrollbar-color: var(--hairline) var(--menu-fundo);
 }
 
 .app-shell__sidebar .app-shell__marca {
-  color: var(--evolli-sobre-marinho);
-}
-
-.app-shell__sidebar .app-shell__marca-nome {
-  color: var(--evolli-sobre-marinho);
-}
-
-.app-shell__sidebar .app-shell__marca-tag {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto);
 }
 
 .app-shell__sidebar .app-shell__recolher {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .app-shell__sidebar .app-shell__recolher:hover {
-  background: var(--evolli-marinho-realce);
-  color: var(--evolli-sobre-marinho);
+  background: var(--menu-realce);
+  color: var(--menu-texto);
 }
 
 .app-shell__sidebar .app-shell__recolher:focus-visible,
 .app-shell__sidebar .painel-nav :focus-visible,
 .app-shell__sidebar .seletor-empresa__botao:focus-visible {
-  outline-color: var(--evolli-sobre-marinho);
+  outline-color: var(--focus-color);
 }
 
 /* T209 — o topo da faixa (marca e recolher) fica na mesma linha da barra
@@ -555,7 +505,7 @@
   margin: 0 calc(-1 * var(--space-sm));
   padding: 0 var(--space-sm);
   border-bottom: var(--divisor);
-  border-bottom-color: var(--divisor-cor-sobre-marinho);
+  border-bottom-color: var(--menu-divisa);
 }
 
 @media (min-width: 835px) {

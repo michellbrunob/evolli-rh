@@ -81,7 +81,7 @@ export function EmpresasScreen({
         headingLevel={1}
         titleId={EMPRESAS_TITULO_ID}
         title="Configurações"
-        description="A sua conta de acesso e as empresas do Evolli RH."
+        description="A sua conta de acesso e as empresas do Evolli."
       />
 
       <div className="configuracoes__corpo">

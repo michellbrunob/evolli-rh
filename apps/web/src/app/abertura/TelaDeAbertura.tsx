@@ -6,17 +6,18 @@
  * ativa e tela inicial) é carregado. Não aparece na navegação interna nem na
  * troca de empresa. Quem decide quando mostrar é `AutenticacaoApp`.
  *
- * Hoje mostra a marca aprovada do Evolli (`MarcaEvolli`) com uma transição em
+ * Hoje mostra a assinatura vertical oficial do Evolli (T210, `MarcaEvolli`,
+ * arquivo local da pasta de marca) com uma transição em
  * CSS. A animação oficial em Lottie entra por `carregarAnimacaoOficial`
  * (ver `animacaoOficial.ts` — é lá que o `.json` do Bodymovin se conecta).
  *
  * Acessibilidade: a mensagem é uma região `role="status"` (o leitor de tela
- * ouve "Verificando sessão…" ou "Carregando seu acesso…"); marca e nome são
- * decorativos. Nada aqui recebe foco: quem leva o foco ao título é a tela que
+ * ouve "Verificando sessão…" ou "Carregando seu acesso…"); a marca é
+ * decorativa. Nada aqui recebe foco: quem leva o foco ao título é a tela que
  * nasce depois.
  */
 import { useEffect, useState } from "react";
-import { MarcaEvolli } from "../IconeModulo";
+import { MarcaEvolli } from "../marca/MarcaEvolli";
 import { AnimacaoLottie, type CarregadorDeAnimacao } from "./AnimacaoLottie";
 import { carregarAnimacaoOficial } from "./animacaoOficial";
 import "./TelaDeAbertura.css";
@@ -57,7 +58,7 @@ export function TelaDeAbertura({
   const reduzirMovimento = usePrefereMovimentoReduzido();
   const marca = (
     <span className="tela-abertura__marca-estatica">
-      <MarcaEvolli />
+      <MarcaEvolli variante="vertical" decorativa />
     </span>
   );
   return (
@@ -76,9 +77,6 @@ export function TelaDeAbertura({
           marca
         )}
       </div>
-      <p className="tela-abertura__nome" aria-hidden="true">
-        Evolli RH
-      </p>
       <p className="tela-abertura__mensagem" role="status">
         {mensagem}
       </p>

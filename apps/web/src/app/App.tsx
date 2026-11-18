@@ -69,7 +69,7 @@ import "./tokens.css";
 import "./app-shell.css";
 import type { SafeAccessUserApi } from "../api/usersClient";
 import { BarraSuperior } from "./BarraSuperior";
-import { MarcaEvolli } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
 import { ProvedorDeTrilhaComplementar } from "./trilhaComplementar";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
@@ -96,6 +96,10 @@ import {
   MeuPerfilScreen,
   type ContaDoMeuPerfil,
 } from "../screens/configuracoes/MeuPerfilScreen";
+import {
+  APARENCIA_TITULO_ID,
+  AparenciaScreen,
+} from "../screens/configuracoes/AparenciaScreen";
 import {
   EMPRESAS_TITULO_ID,
   EmpresasScreen,
@@ -272,6 +276,13 @@ function areasDescartadasEmPessoas(
  * `cadastrosTituloId`/`pessoasTituloId`/`pontoTituloId`/`documentosTituloId`/`portalTituloId`/`relatoriosTituloId`).
  * "solicitacoes-rh" tem tela única, sem aba local, então usa o mapa estático
  * normalmente. */
+/**
+ * T208/T210 — o que o shell recebe da conta da sessão: os campos de Meu
+ * perfil e o tema da conta (Configurações › Aparência).
+ */
+type ContaDaSessao = ContaDoMeuPerfil &
+  Pick<SafeAccessUserApi, "temaAparencia">;
+
 const TITULO_ID_POR_DESTINO: Record<string, string> = {
   dashboard: DASHBOARD_TITULO_ID,
   inicio: "inicio-visao-geral-titulo",
@@ -283,6 +294,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
   "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
+  "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
   "nova-empresa": NOVA_EMPRESA_TITULO_ID,
 };
@@ -472,7 +484,7 @@ function conteudoDoDestino(
   },
   // T208 — a conta da sessão, para Configurações › Meu perfil, e quem
   // recebe o ator depois que a própria pessoa salva o perfil.
-  contaDoAtor: ContaDoMeuPerfil | null,
+  contaDoAtor: ContaDaSessao | null,
   onContaAtualizada: ((ator: SafeAccessUserApi) => void) | undefined,
   // T209 — Configurações › Empresas e a Nova empresa.
   empresas: {
@@ -490,6 +502,15 @@ function conteudoDoDestino(
     return (
       <MeuPerfilScreen
         conta={contaDoAtor}
+        onContaAtualizada={onContaAtualizada}
+        mostrarEmpresas={empresas.podeVer}
+      />
+    );
+  }
+  if (destinoId === "configuracoes-aparencia") {
+    return (
+      <AparenciaScreen
+        temaAtual={contaDoAtor?.temaAparencia}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
       />
@@ -821,7 +842,7 @@ export interface AppProps {
    * `GET /v1/users/me`: a tela não faz leitura própria. Ausente (testes que
    * montam `App` sozinho), a tela mostra "—".
    */
-  contaDoAtor?: ContaDoMeuPerfil | null;
+  contaDoAtor?: ContaDaSessao | null;
   /**
    * T208 — o ator como o servidor devolveu depois que a própria pessoa salvou
    * o perfil. O `AutenticacaoApp` troca o ator da sessão por ele: mesma conta
@@ -1785,10 +1806,8 @@ export function App({
               sempre o menu inteiro. */}
             <div className="app-shell__cabecalho-lateral">
               <span className="app-shell__marca">
-                <MarcaEvolli tom="clara" />
-                <span className="app-shell__marca-texto">
-                  <span className="app-shell__marca-nome">Evolli RH</span>
-                </span>
+                {/* T210 — a assinatura horizontal; no trilho, o símbolo. */}
+                <MarcaEvolli variante={trilho ? "simbolo" : "horizontal"} />
               </span>
               <button
                 type="button"
@@ -1980,7 +1999,7 @@ export function App({
               {...(gavetaModal ? FUNDO_INERTE : {})}
             >
               <div className="app-shell__footer-inner">
-                <span className="app-shell__footer-brand">Evolli RH</span>
+                <span className="app-shell__footer-brand">Evolli</span>
                 <span>Ambiente interno · sem dados reais</span>
               </div>
             </footer>

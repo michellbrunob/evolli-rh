@@ -99,7 +99,7 @@
 .aviso-contexto__fundo {
   position: absolute;
   inset: 0;
-  background: rgb(29 29 31 / 45%);
+  background: var(--veu);
 }
 
 .aviso-contexto__caixa {
