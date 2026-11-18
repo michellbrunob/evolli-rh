@@ -222,10 +222,13 @@ describe("T208 — menu, histórico e foco", () => {
     montar(ROTA, "rh");
     const interna = screen.getByRole("navigation", { name: "Configurações" });
     const links = within(interna).getAllByRole("link");
-    // T209 — o RH vê também "Empresas", no grupo Empresa.
-    expect(links).toHaveLength(2);
-    expect(links[1]).toHaveAccessibleName("Empresas");
-    expect(links[1]).not.toHaveAttribute("aria-current");
+    // T209 — o RH vê também "Empresas", no grupo Empresa; T210 — e
+    // "Aparência", em Sua conta.
+    expect(links).toHaveLength(3);
+    expect(links[1]).toHaveAccessibleName("Aparência");
+    expect(links[1]).toHaveAttribute("href", "#/configuracoes/aparencia");
+    expect(links[2]).toHaveAccessibleName("Empresas");
+    expect(links[2]).not.toHaveAttribute("aria-current");
     expect(links[0]).toHaveAccessibleName("Meu perfil");
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveAttribute("href", ROTA);

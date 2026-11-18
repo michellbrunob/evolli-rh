@@ -1,0 +1,137 @@
+/**
+ * T210 — Configurações › Aparência. Só tokens. Os cartões ficam em grade que
+ * se ajusta à largura do painel: uma coluna a 375 px, até quatro no desktop.
+ * O cartão marcado não depende só de cor: contorno mais grosso e o selo
+ * "Em uso" no tema gravado. Sem transição (prefers-reduced-motion nem entra
+ * em jogo).
+ */
+
+.aparencia__rotulo-grupo {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.aparencia__temas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.aparencia__cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.aparencia__cartao--marcado {
+  border-color: var(--color-action);
+  box-shadow: inset 0 0 0 1px var(--color-action);
+}
+
+.aparencia__cartao:has(.aparencia__radio:focus-visible) {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+/* A amostra: o fundo, um cartão claro com duas linhas de texto e o botão de
+   ação do tema. Decorativa. */
+.aparencia__amostra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 5.5rem;
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-sm);
+}
+
+.aparencia__amostra-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  width: 70%;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+}
+
+.aparencia__amostra-linha {
+  display: block;
+  height: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.aparencia__amostra-linha--curta {
+  width: 60%;
+  opacity: 0.6;
+}
+
+.aparencia__amostra-acao {
+  display: block;
+  width: 45%;
+  height: 0.75rem;
+  margin-top: var(--space-xxs);
+  border-radius: var(--radius-sm);
+}
+
+.aparencia__cartao-topo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.aparencia__radio {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--color-action);
+}
+
+.aparencia__nome {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.aparencia__em-uso {
+  margin-left: auto;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-action);
+  border-radius: var(--radius-pill);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.aparencia__descricao {
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.aparencia__aviso {
+  margin: var(--space-md) 0 0;
+  font-size: var(--text-ui);
+  color: var(--color-ink);
+}
+
+.aparencia__aviso:empty {
+  margin: 0;
+}
+
+.aparencia__aviso--falha {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}

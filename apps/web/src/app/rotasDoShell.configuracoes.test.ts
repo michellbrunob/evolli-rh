@@ -35,4 +35,17 @@ describe("T208 — rota de Configurações", () => {
   it("trocar de empresa em Configurações volta a Configurações", () => {
     expect(destinoAposTrocaDeEmpresa("configuracoes")).toBe("configuracoes");
   });
+
+  it("T210 — Aparência tem rota própria; trocar de empresa nela fica nela", () => {
+    expect(rotaDoDestino("configuracoes-aparencia")).toBe(
+      "#/configuracoes/aparencia",
+    );
+    expect(destinoDaRota("#/configuracoes/aparencia")).toBe(
+      "configuracoes-aparencia",
+    );
+    expect(destinoDaRota("#/configuracoes/aparencia/tema")).toBeNull();
+    expect(destinoAposTrocaDeEmpresa("configuracoes-aparencia")).toBe(
+      "configuracoes-aparencia",
+    );
+  });
 });

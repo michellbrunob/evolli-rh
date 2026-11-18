@@ -240,13 +240,16 @@ describe("T208 — o que Meu perfil mostra", () => {
     ).toBeNull();
   });
 
-  it("navegação interna só com Meu perfil, no grupo Sua conta — nenhum item sem tela", () => {
+  it("navegação interna com Meu perfil e Aparência (T210), no grupo Sua conta — nenhum item sem tela", () => {
     render(<MeuPerfilScreen conta={CONTA} />);
     const interna = screen.getByRole("navigation", { name: "Configurações" });
     const links = within(interna).getAllByRole("link");
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveTextContent("Meu perfil");
+    expect(links.map((l) => l.textContent)).toEqual([
+      "Meu perfil",
+      "Aparência",
+    ]);
     expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(links[1]).not.toHaveAttribute("aria-current");
     expect(within(interna).getByRole("list")).toHaveAccessibleName("Sua conta");
     expect(interna).not.toHaveTextContent(
       /Segurança|Empresas|Equipe|Permiss|Sessões/,

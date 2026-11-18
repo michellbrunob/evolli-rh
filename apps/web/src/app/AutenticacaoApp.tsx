@@ -753,6 +753,7 @@ export function AutenticacaoApp() {
           nomeExibicao: ator.nomeExibicao ?? null,
           perfilAtualizadoEm: ator.perfilAtualizadoEm ?? null,
           fotoVersao: ator.fotoVersao ?? null,
+          temaAparencia: ator.temaAparencia ?? null,
         }}
         onContaAtualizada={(atualizado) => {
           if (atualizado.id === atorRef.current?.id) setAtor(atualizado);

@@ -188,6 +188,15 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
     },
   );
 
+  it("T210 — Aparência não vira cartão do Hub (é preferência de conta, aberta por Configurações)", async () => {
+    for (const papel of ["rh", "colaborador"]) {
+      const { unmount } = montar({ papel, podeTrocarEmpresa: false });
+      await waitFor(() => expect(cartoesVisiveis()).toContain("Configurações"));
+      expect(cartoesVisiveis()).not.toContain("Aparência");
+      unmount();
+    }
+  });
+
   it("papel desconhecido não recebe nada: vê o aviso, e nenhum cartão", async () => {
     montar({ papel: "papel_desconhecido", podeTrocarEmpresa: false });
     expect(
@@ -516,7 +525,10 @@ describe("T162 — acessibilidade e estrutura", () => {
     montar({ papel: "rh" });
     // T209 — 13 com Empresas e Nova empresa.
     await waitFor(() => expect(cartoesVisiveis().length).toBe(13));
-    for (const destino of capacidadeFuncionalDe("rh")) {
+    // T210 — Aparência fica fora do Hub (preferência de conta).
+    for (const destino of capacidadeFuncionalDe("rh").filter(
+      (d) => d.id !== "configuracoes-aparencia",
+    )) {
       // T182 — "Jornada" também casa com "Jornadas de trabalho".
       expect(
         screen.getAllByRole("button", { name: new RegExp(destino.label) })

@@ -1,13 +1,14 @@
 /**
- * T209 — a navegação interna de Configurações: "Sua conta" (Meu perfil) e,
+ * T209 — a navegação interna de Configurações: "Sua conta" (Meu perfil e,
+ * desde a T210, Aparência) e,
  * para quem alcança empresas, "Empresa" (Empresas). Só itens com tela; links
  * pela rota, como o resto do shell.
  */
 import type { ReactNode } from "react";
-import { IconeEmpresa, IconePerfil } from "../../ui/icones";
+import { IconeAparencia, IconeEmpresa, IconePerfil } from "../../ui/icones";
 import "./NavegacaoConfiguracoes.css";
 
-export type ItemDeConfiguracoes = "meu-perfil" | "empresas";
+export type ItemDeConfiguracoes = "meu-perfil" | "aparencia" | "empresas";
 
 const GRUPO_SUA_CONTA_ID = "configuracoes-grupo-sua-conta";
 const GRUPO_EMPRESA_ID = "configuracoes-grupo-empresa";
@@ -60,6 +61,13 @@ export function NavegacaoConfiguracoes({
           icone={<IconePerfil />}
         >
           Meu perfil
+        </Item>
+        <Item
+          href="#/configuracoes/aparencia"
+          atual={atual === "aparencia"}
+          icone={<IconeAparencia />}
+        >
+          Aparência
         </Item>
       </ul>
       {mostrarEmpresas ? (

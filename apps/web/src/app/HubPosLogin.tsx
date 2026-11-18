@@ -137,6 +137,13 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Cadastro de uma empresa (CNPJ) em duas etapas: dados da empresa e colaboradores.",
 };
 
+/**
+ * T210 — destinos que a conta alcança mas que não são produto: preferência
+ * da conta, aberta pela navegação interna de Configurações (o cartão de
+ * Configurações já leva lá).
+ */
+const FORA_DO_HUB: ReadonlySet<string> = new Set(["configuracoes-aparencia"]);
+
 /** Ícone do grupo a que o destino pertence — mesma identidade da barra lateral. */
 const ICONE_DO_DESTINO: Readonly<Record<string, IconeModuloId>> =
   Object.fromEntries(
@@ -186,7 +193,9 @@ export function HubPosLogin({
   onLogout,
   focarTituloAoAbrir = false,
 }: HubPosLoginProps) {
-  const produtos = capacidadeFuncionalDe(papelDoAtor);
+  const produtos = capacidadeFuncionalDe(papelDoAtor).filter(
+    (destino) => !FORA_DO_HUB.has(destino.id),
+  );
 
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   const areaRef = useRef<HTMLElement | null>(null);
