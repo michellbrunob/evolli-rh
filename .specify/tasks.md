@@ -3533,6 +3533,16 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         Docker, dependências, lockfile, workflow, push, PR, promoção e merge; CPF, salário,
         contatos na listagem e exportação de pessoas.
 
+107.  **T210 - Configurações › Aparência e marca oficial**
+      - **Estado:** **em preparação**. Branch `codex/t210-aparencia`, a partir do HEAD local da T209
+        (`b81c312`), que segue aberta sem publicação. T211 (Documentos) reservada, não iniciada.
+      - **Objetivo:** quatro temas fechados por conta (Azul Institucional, Evolli Claro, Verde
+        Petróleo e Alto Contraste), gravados no servidor e aplicados por `data-theme`, e a marca
+        oficial do Evolli a partir dos SVGs locais, conforme o
+        [documento de decisão](../docs/decisions/t210-temas-de-aparencia.md).
+      - **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema
+        escuro, versão branca da marca e Documentos.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

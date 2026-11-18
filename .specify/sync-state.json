@@ -3,7 +3,7 @@
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-18",
   "lastIntegratedTask": 209,
-  "lastRecordedTask": 209,
+  "lastRecordedTask": 210,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,11 +11,17 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T209",
-    "status": "integrada",
-    "reason": "T209 integrada em main pela PR #202 (squash b7d2d0353166d35ab8e31a49f4e520efb8177ab9), com a CI de push 3/3 verde (run 44318802859); branch remota preservada. Colaboradores como area de trabalho do RH e do DP: listagem operacional, acoes por pessoa, Aprendiz, importacao CSV, Novo colaborador em quatro etapas com rascunho, foto do colaborador no R2 privado (ADR 0020) e empresas com CNPJ (docs/decisions/t209-dossie-colaboradores.md). Nenhuma entrega aberta ate a abertura da proxima tarefa."
+    "id": "T210",
+    "status": "aparencia_em_preparacao",
+    "reason": "T209 fechada localmente e aprovada pela proprietaria em 2026-11-18 (sem Documentos, reservados a T211, nao iniciada), ainda sem publicacao. T210 aberta como unica entrega nova: Configuracoes > Aparencia (quatro temas por conta, persistidos no servidor) e a marca oficial do Evolli a partir dos SVGs locais (docs/decisions/t210-temas-de-aparencia.md). Sem push, PR, Ready ou merge."
   },
-  "openDeliveries": [],
+  "openDeliveries": [
+    {
+      "id": "T210",
+      "pullRequest": null,
+      "status": "aparencia_em_preparacao"
+    }
+  ],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",
