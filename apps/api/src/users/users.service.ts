@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common";
+import type { TemaDeAparencia } from "./dto/atualizar-aparencia.dto";
 import { AccessRole, AccessUser, Prisma } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { PasswordHashService } from "../auth/password/password-hash.service";
@@ -179,6 +180,22 @@ export class UsersService {
    *   as duas.
    * - **Auditoria** na mesma transação (ADR 0004 §2), sem o conteúdo do nome.
    */
+  /**
+   * T210 — grava o tema da própria conta. Sem auditoria (preferência visual)
+   * e sem concorrência otimista: a última escolha vale.
+   */
+  async gravarTemaProprio(
+    userId: string,
+    tema: TemaDeAparencia,
+  ): Promise<TemaDeAparencia> {
+    const gravado = await this.prisma.accessUser.update({
+      where: { id: userId },
+      data: { temaAparencia: tema },
+      select: { temaAparencia: true },
+    });
+    return gravado.temaAparencia as TemaDeAparencia;
+  }
+
   async atualizarPerfilProprio(
     input: PerfilProprioInput,
     auditCtx: AuditActorContext,
