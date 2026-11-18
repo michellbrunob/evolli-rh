@@ -129,8 +129,9 @@ Faixas: menor e maior valor sobre canvas, fundo neutro e superfície clara.
 ## 5. Limites
 
 - **Sem tema escuro:** fora do pedido; a versão branca da marca já existe para quando houver.
-- **Superfícies próprias:** o Dashboard (paleta de gráficos e títulos em marinho) mantém as cores
-  dele em todos os temas.
+- **Gráficos do Dashboard:** as séries que usam a cor de ação (`--evolli-azul`, que segue a ação
+  do tema pela D5: barra CLT, admissões por mês, primeiro grupo e faixa) acompanham o tema
+  escolhido; as demais séries e os títulos em marinho permanecem fixos em todos os temas.
 - **Respiro da marca** (x = ¼ da altura do símbolo, prancha): seguido pelo espaçamento dos
   contêineres, sem regra automática.
 - **Tema da empresa:** fica para entrega futura, com o logotipo por empresa e a personalização
