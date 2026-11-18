@@ -18,11 +18,11 @@
 }
 
 /* T209 — no menu lateral, a empresa ativa se separa da navegação por um
-   divisor sobre o marinho (o padrão de divisões da T209). */
+   divisor da faixa (o padrão de divisões da T209). */
 .seletor-empresa--menu {
   min-width: 0;
   padding-bottom: var(--secao-espaco-compacto);
-  border-bottom: var(--borda-espessura) solid var(--divisor-cor-sobre-marinho);
+  border-bottom: var(--borda-espessura) solid var(--menu-divisa);
 }
 
 .seletor-empresa__cartao {
@@ -257,13 +257,13 @@
 }
 
 /* T207 — paleta Evolli (P-1) e lista "Empresas da conta" (E-1). O cartão é
-   claro sobre a faixa azul-marinho; o monograma é azul com iniciais
-   brancas (contraste acima de 4,5:1); a empresa atual soma superfície,
+   claro, com filete, sobre a faixa (T210: clara, no tema); o monograma
+   usa a ação do tema; a empresa atual soma superfície,
    ícone, o texto "Atual" e `aria-current`. */
 .seletor-empresa__cartao {
   border-color: var(--hairline);
   background: var(--surface-canvas);
-  color: var(--evolli-marinho);
+  color: var(--color-ink);
 }
 
 .seletor-empresa__botao:hover,
@@ -280,7 +280,7 @@
   width: 32px;
   height: 32px;
   background: var(--evolli-azul-suave);
-  color: var(--evolli-marinho);
+  color: var(--color-ink);
 }
 
 .seletor-empresa__opcao[aria-current="true"] {
@@ -296,7 +296,7 @@
 
 .seletor-empresa__atual {
   background: var(--evolli-azul);
-  color: var(--evolli-sobre-marinho);
+  color: var(--color-on-action);
 }
 
 .seletor-empresa__opcao:focus-visible,
@@ -445,7 +445,7 @@
 
 .seletor-empresa__atual {
   background: var(--evolli-azul);
-  color: var(--evolli-sobre-marinho);
+  color: var(--color-on-action);
 }
 
 /* No menu do desktop, o painel flutua logo abaixo do cartão: a lateral

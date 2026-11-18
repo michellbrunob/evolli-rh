@@ -504,43 +504,41 @@
   }
 }
 
-/* T207 — paleta Evolli na faixa lateral (P-1): estrutura em azul-marinho,
-   marca e textos claros. Escopado à faixa: o cabeçalho, o conteúdo e as
-   demais telas não mudam de cor. Contraste: branco e o texto suave sobre o
-   marinho passam de 4,5:1; o foco dentro da faixa é branco, porque o azul
-   de ação sobre o marinho fica abaixo de 3:1. */
+/* T210 — faixa lateral CLARA, no tema da conta (antes marinho, T207):
+   fundo do tema, filete à direita, textos na tinta do tema. Contraste dos
+   textos e do foco conferido por tema (temas.test.ts). */
 .app-shell__sidebar {
-  background: var(--evolli-marinho);
-  border-right-color: var(--evolli-marinho);
-  color: var(--evolli-sobre-marinho);
-  scrollbar-color: var(--evolli-marinho-divisa) var(--evolli-marinho);
+  background: var(--menu-fundo);
+  border-right-color: var(--hairline);
+  color: var(--menu-texto);
+  scrollbar-color: var(--hairline) var(--menu-fundo);
 }
 
 .app-shell__sidebar .app-shell__marca {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
 }
 
 .app-shell__sidebar .app-shell__marca-nome {
-  color: var(--evolli-sobre-marinho);
+  color: var(--menu-texto);
 }
 
 .app-shell__sidebar .app-shell__marca-tag {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .app-shell__sidebar .app-shell__recolher {
-  color: var(--evolli-sobre-marinho-suave);
+  color: var(--menu-texto-suave);
 }
 
 .app-shell__sidebar .app-shell__recolher:hover {
-  background: var(--evolli-marinho-realce);
-  color: var(--evolli-sobre-marinho);
+  background: var(--menu-realce);
+  color: var(--menu-texto);
 }
 
 .app-shell__sidebar .app-shell__recolher:focus-visible,
 .app-shell__sidebar .painel-nav :focus-visible,
 .app-shell__sidebar .seletor-empresa__botao:focus-visible {
-  outline-color: var(--evolli-sobre-marinho);
+  outline-color: var(--focus-color);
 }
 
 /* T209 — o topo da faixa (marca e recolher) fica na mesma linha da barra
@@ -555,7 +553,7 @@
   margin: 0 calc(-1 * var(--space-sm));
   padding: 0 var(--space-sm);
   border-bottom: var(--divisor);
-  border-bottom-color: var(--divisor-cor-sobre-marinho);
+  border-bottom-color: var(--menu-divisa);
 }
 
 @media (min-width: 835px) {

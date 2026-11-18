@@ -123,6 +123,19 @@
   --evolli-sobre-marinho-suave: #c9d6ea; /* texto secundário no marinho */
   --evolli-ardosia: #6b7c99; /* apoio neutro de gráfico */
   --evolli-fundo: var(--surface-neutral); /* fundo neutro do Dashboard */
+  /* T210 — menu lateral CLARO, no tema da conta (decisão da proprietária,
+     2026-11-18, pela prancha da marca): só derivados da paleta do tema,
+     nenhuma cor nova. Item ativo: a ação sobre a superfície de destaque, com
+     a barra indicadora e `aria-current` (nunca só cor). O realce do hover
+     mistura a tinta, para existir também onde neutro = canvas. */
+  --menu-fundo: var(--surface-canvas);
+  --menu-texto: var(--color-ink);
+  --menu-texto-suave: var(--color-ink-muted);
+  --menu-realce: color-mix(in srgb, var(--color-ink) 6%, var(--surface-canvas));
+  --menu-divisa: var(--divider-soft);
+  --menu-ativo-fundo: var(--evolli-azul-suave);
+  --menu-ativo-texto: var(--color-action);
+  --menu-indicador: var(--color-action);
 
   /* T209 — cor própria do tipo de vínculo Aprendiz nas distribuições
      (Colaboradores e Dashboard). Objeto gráfico com contraste acima de 3:1
@@ -194,7 +207,6 @@
      divisões quando for aberto para evolução (dossiê da T209). */
   --divisor-cor: var(--divider-soft);
   --divisor-cor-forte: var(--hairline);
-  --divisor-cor-sobre-marinho: var(--evolli-marinho-divisa);
   --borda-espessura: 1px;
   --divisor: var(--borda-espessura) solid var(--divisor-cor);
   --divisor-forte: var(--borda-espessura) solid var(--divisor-cor-forte);

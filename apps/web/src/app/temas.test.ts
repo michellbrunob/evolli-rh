@@ -191,3 +191,65 @@ describe("T210 — nenhuma cor fixa fora dos tokens", () => {
     expect(comCor).toEqual([]);
   });
 });
+
+/** `color-mix(in srgb, A p%, B)` em hex. */
+function misturar(a: string, p: number, b: string): string {
+  const ca = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const cb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return (
+    "#" +
+    ca
+      .map((c, i) => Math.round(c * p + cb[i]! * (1 - p)))
+      .map((c) => c.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
+describe("T210 — menu lateral claro, no tema da conta", () => {
+  it("os tokens do menu derivam da paleta do tema (nenhuma cor nova)", () => {
+    const raiz = bloco(":root");
+    expect(raiz["--menu-fundo"]).toBe("var(--surface-canvas)");
+    expect(raiz["--menu-texto"]).toBe("var(--color-ink)");
+    expect(raiz["--menu-texto-suave"]).toBe("var(--color-ink-muted)");
+    expect(raiz["--menu-ativo-texto"]).toBe("var(--color-action)");
+    expect(raiz["--menu-ativo-fundo"]).toBe("var(--evolli-azul-suave)");
+    expect(raiz["--menu-indicador"]).toBe("var(--color-action)");
+    expect(raiz["--menu-divisa"]).toBe("var(--divider-soft)");
+    expect(raiz["--menu-realce"]).toMatch(
+      /^color-mix\(in srgb, var\(--color-ink\) 6%, var\(--surface-canvas\)\)$/,
+    );
+    expect(raiz["--evolli-azul-suave"]?.replace(/\s+/g, " ")).toBe(
+      "color-mix( in srgb, var(--color-action) 9%, var(--surface-canvas) )",
+    );
+  });
+
+  for (const tema of Object.keys(PALETAS) as Tema[]) {
+    it(`${tema}: item ativo e texto do menu (inclusive no hover) ≥ 4,5:1`, () => {
+      const p = PALETAS[tema];
+      const ativoFundo = misturar(p.acao, 0.09, p.canvas);
+      const realce = misturar(p.tinta, 0.06, p.canvas);
+      expect(contraste(p.acao, ativoFundo)).toBeGreaterThanOrEqual(4.5);
+      for (const fundo of [p.canvas, realce]) {
+        expect(contraste(p.tinta, fundo)).toBeGreaterThanOrEqual(4.5);
+        expect(contraste(p.secundario, fundo)).toBeGreaterThanOrEqual(4.5);
+        expect(contraste(p.foco, fundo)).toBeGreaterThanOrEqual(3);
+      }
+      // O hover se distingue do fundo mesmo onde neutro = canvas (Alto Contraste).
+      expect(realce).not.toBe(p.canvas.toLowerCase());
+    });
+  }
+
+  it("o CSS do menu e do seletor não usa mais o marinho nem o verde-água", () => {
+    for (const arquivo of [
+      "app/PainelNavigation.css",
+      "app/app-shell.css",
+      "app/SeletorEmpresaAtiva.css",
+    ]) {
+      const texto = readFileSync(join(RAIZ, arquivo), "utf8").replace(
+        /\/\*[\s\S]*?\*\//g,
+        "",
+      );
+      expect(texto, arquivo).not.toMatch(/marinho|verde-agua/);
+    }
+  });
+});
