@@ -21,8 +21,7 @@
 - **Fora desta entrega:**
   - tema por empresa, logotipo por empresa e personalização livre (seletor de cor);
   - tema escuro;
-  - Documentos (T212, não iniciada; a T211 passou a ser o menu lateral pela árvore da
-    referência, decisão da proprietária de 2026-11-18).
+  - Documentos (entrega própria, não iniciada).
 - **O tema não altera** dados, permissões, relatórios, PDFs, CSVs, impressão ou e-mails: muda só
   as cores da tela.
 

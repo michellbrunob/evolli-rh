@@ -3548,10 +3548,6 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Validação:** E2E serial 29 suítes / 1207 (aparência 18); API 68 / 1604; lint,
         typecheck, build, `spec:check` e `git diff --check` limpos; quatro temas e 375 px
         validados no navegador.
-      - **Próximas (decisão da proprietária, 2026-11-18):** **T211** = menu lateral com a mesma
-        árvore da referência, realocando as telas funcionais (Jornadas → aba Escala de trabalho,
-        Estrutura → aba Organograma, Contas de acesso → Configurações › Equipe e permissões);
-        **T212** = Documentos (antes reservada como T211), não iniciada.
       - **Objetivo:** quatro temas fechados por conta (Azul Institucional, Evolli Claro, Verde
         Petróleo e Alto Contraste), gravados no servidor e aplicados por `data-theme`, e a marca
         oficial do Evolli a partir dos SVGs locais, conforme o

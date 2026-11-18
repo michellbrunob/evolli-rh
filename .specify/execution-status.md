@@ -3348,9 +3348,6 @@ da ação do tema ([documento de decisão](../docs/decisions/t210-temas-de-apare
 **Validação:** E2E serial 29 suítes / 1207; API 68 / 1604; lint, typecheck, build, `spec:check`
 e `git diff --check` limpos; quatro temas e 375 px validados no navegador.
 
-**Próximas:** T211 = menu lateral pela árvore da referência (decisão da proprietária,
-2026-11-18); T212 = Documentos, não iniciada.
-
 **Fora de escopo:** tema por empresa, logotipo por empresa, personalização livre, tema escuro e
-Documentos (T212, não iniciada). A T209 segue aberta, fechada
+Documentos (entrega própria, não iniciada). A T209 segue aberta, fechada
 localmente e aprovada, sem publicação.
