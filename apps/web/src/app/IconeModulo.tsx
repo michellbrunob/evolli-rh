@@ -77,7 +77,7 @@ export interface MarcaEvolliProps {
 
 export function MarcaEvolli({ tom = "acao" }: MarcaEvolliProps = {}) {
   const fundo = tom === "clara" ? "var(--surface-canvas)" : "currentColor";
-  const barras = tom === "clara" ? "var(--color-action)" : "#ffffff";
+  const barras = tom === "clara" ? "var(--color-action)" : "var(--color-on-action)";
   return (
     <svg
       className="app-shell__marca-simbolo"

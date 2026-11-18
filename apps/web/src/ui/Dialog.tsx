@@ -124,7 +124,7 @@ function Janela({
       }}
     >
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="ev-janela__fundo ev:fixed ev:inset-0 ev:z-[100] ev:bg-[rgb(29_29_31/45%)]" />
+        <RadixDialog.Overlay className="ev-janela__fundo ev:fixed ev:inset-0 ev:z-[100] ev:bg-[var(--veu)]" />
         <RadixDialog.Content
           data-lado={lado}
           aria-modal="true"

@@ -65,7 +65,7 @@ function FundoInstitucional() {
           (ver `LoginScreen.css`) se aplique ao grupo, sem sobrescrever o
           `transform` de rotação que o retângulo já carrega como atributo. */}
       <g className="login-screen__forma login-screen__forma--1">
-        <circle cx="505" cy="135" r="250" fill="#ffffff" fillOpacity="0.09" />
+        <circle cx="505" cy="135" r="250" fill="var(--color-on-action)" fillOpacity="0.09" />
       </g>
       <g className="login-screen__forma login-screen__forma--2">
         <circle
@@ -73,7 +73,7 @@ function FundoInstitucional() {
           cy="735"
           r="185"
           fill="none"
-          stroke="#ffffff"
+          stroke="var(--color-on-action)"
           strokeOpacity="0.22"
           strokeWidth="2"
         />
@@ -85,7 +85,7 @@ function FundoInstitucional() {
           width="300"
           height="300"
           rx="92"
-          fill="#ffffff"
+          fill="var(--color-on-action)"
           fillOpacity="0.07"
           transform="rotate(-18 400 580)"
         />
@@ -94,16 +94,16 @@ function FundoInstitucional() {
         <path
           d="M-40 300 C 140 236, 300 360, 480 292 S 760 200, 900 268"
           fill="none"
-          stroke="#ffffff"
+          stroke="var(--color-on-action)"
           strokeOpacity="0.2"
           strokeWidth="2"
         />
       </g>
       <g className="login-screen__forma login-screen__forma--5">
-        <circle cx="96" cy="196" r="7" fill="#ffffff" fillOpacity="0.5" />
+        <circle cx="96" cy="196" r="7" fill="var(--color-on-action)" fillOpacity="0.5" />
       </g>
       <g className="login-screen__forma login-screen__forma--6">
-        <circle cx="430" cy="830" r="11" fill="#ffffff" fillOpacity="0.35" />
+        <circle cx="430" cy="830" r="11" fill="var(--color-on-action)" fillOpacity="0.35" />
       </g>
     </svg>
   );

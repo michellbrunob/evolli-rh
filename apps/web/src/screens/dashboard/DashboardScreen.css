@@ -1138,7 +1138,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   color: var(--color-ink);
   font-size: var(--text-caption);
   line-height: var(--leading-body);
-  box-shadow: 0 8px 24px rgb(11 45 91 / 12%);
+  box-shadow: var(--sombra-cartao);
 }
 
 .dashboard__info-painel[hidden] {
@@ -1200,7 +1200,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface-canvas);
-  box-shadow: 0 8px 24px rgb(11 45 91 / 14%);
+  box-shadow: var(--sombra-cartao);
   scroll-margin-top: calc(var(--topbar-altura, 60px) + var(--space-md));
   scroll-margin-bottom: var(--space-md);
 }
@@ -1263,7 +1263,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 
   .evolli-imprimindo-bloco,
   .evolli-imprimindo-bloco body {
-    background: #fff;
+    background: var(--papel-impressao);
   }
 
   .evolli-imprimindo-bloco [data-bloco-impresso] {

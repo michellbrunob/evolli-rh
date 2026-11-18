@@ -597,9 +597,9 @@ button.cadastro-etapas__etapa-passo:focus-visible {
    ========================================================================== */
 .cadastro-etapas {
   --cadastro-divisor: var(--hairline);
-  --cadastro-borda-campo: #e2e2e7;
-  --cadastro-texto: #17171c;
-  --cadastro-texto-suave: #8e8e98;
+  --cadastro-borda-campo: var(--borda-controle);
+  --cadastro-texto: var(--color-ink);
+  --cadastro-texto-suave: var(--color-ink-subtle);
 }
 
 .cadastro-etapas__etapa-cabecalho {

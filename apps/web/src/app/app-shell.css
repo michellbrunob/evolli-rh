@@ -475,7 +475,7 @@
     position: fixed;
     inset: 0;
     z-index: 35;
-    background: rgb(29 29 31 / 45%);
+    background: var(--veu);
     border: none;
     padding: 0;
     cursor: pointer;

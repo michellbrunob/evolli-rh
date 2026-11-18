@@ -7,6 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { tokenResolvido } from "../test/tokensResolvidos";
 import {
   TIPOS_DE_VINCULO,
   listagemDaRota,
@@ -84,12 +85,8 @@ function contraste(a: string, b: string): number {
 }
 
 describe("T209 — cor própria e acessível de Aprendiz na distribuição", () => {
-  const tokens = ler("src/app/tokens.css");
-  const token = (nome: string) => {
-    const achado = new RegExp(`--${nome}: (#[0-9a-fA-F]{6});`).exec(tokens);
-    if (!achado) throw new Error(`token ${nome} sem hexadecimal`);
-    return achado[1]!;
-  };
+  // T210 — tokens resolvidos no tema padrão (aliases e color-mix).
+  const token = (nome: string) => tokenResolvido(nome);
 
   it("o token existe e tem contraste de objeto gráfico (3:1) sobre os fundos", () => {
     const cor = token("cor-tipo-aprendiz");

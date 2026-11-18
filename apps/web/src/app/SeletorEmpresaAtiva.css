@@ -416,10 +416,7 @@
   border: 0;
   border-radius: 10px;
   background: var(--surface-canvas);
-  box-shadow:
-    0 0 0 1px rgba(23, 23, 28, 0.06),
-    0 2px 4px rgba(23, 23, 28, 0.06),
-    0 12px 28px -6px rgba(23, 23, 28, 0.1);
+  box-shadow: var(--sombra-flutuante);
 }
 
 .seletor-empresa__titulo-lista {
