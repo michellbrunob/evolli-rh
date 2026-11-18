@@ -1,0 +1,13 @@
+/**
+ * T210 — a marca como está no arquivo: sem recolorir, sem efeito, sem
+ * distorção. `object-fit: contain` garante a proporção mesmo se um
+ * contêiner apertar a caixa; `flex: none` impede que ela encolha.
+ */
+.marca-evolli {
+  display: block;
+  flex: none;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+}

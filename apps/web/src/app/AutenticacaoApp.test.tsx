@@ -2659,12 +2659,14 @@ describe("T209 — tela de abertura institucional", () => {
     expect(within(abertura()!).getByRole("status")).toHaveTextContent(
       "Verificando sessão…",
     );
-    // Marca e nome são decorativos: o leitor de tela ouve só a mensagem.
+    // A marca é decorativa: o leitor de tela ouve só a mensagem.
     expect(abertura()!.querySelector(".tela-abertura__marca")).toHaveAttribute(
       "aria-hidden",
       "true",
     );
-    expect(abertura()!.querySelector("svg")).not.toBeNull();
+    expect(
+      abertura()!.querySelector("img.marca-evolli")?.getAttribute("src"),
+    ).toMatch(/evolli-vertical\.svg$/);
     // Nada focável na abertura.
     expect(
       abertura()!.querySelectorAll("button, a, input, [tabindex]"),

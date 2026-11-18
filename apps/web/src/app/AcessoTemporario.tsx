@@ -9,7 +9,7 @@
  * por exemplo) continuam abrindo pela URL, como antes.
  */
 import { useEffect, useRef } from "react";
-import { MarcaEvolli } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import "./AcessoTemporario.css";
 
 export const TITULO_ACESSO_TEMPORARIO = "Acesso em configuração";
@@ -35,9 +35,8 @@ export function AcessoTemporario({
       aria-labelledby="acesso-temporario-titulo"
     >
       <div className="acesso-temporario__cartao">
-        <span className="acesso-temporario__marca" aria-hidden="true">
+        <span className="acesso-temporario__marca">
           <MarcaEvolli />
-          <span>Evolli RH</span>
         </span>
         <h1
           id="acesso-temporario-titulo"

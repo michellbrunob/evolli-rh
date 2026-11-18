@@ -493,21 +493,15 @@ describe("T207 — Dashboard na barra superior do shell", () => {
   });
 });
 
-describe("T207/T209 — marca do Evolli no topo da faixa marinho", () => {
-  it("o símbolo aparece no topo da faixa marinho: quadrado claro com as barras em azul (nunca branco sobre branco)", async () => {
+describe("T210 — marca do Evolli no topo da faixa clara", () => {
+  it("a assinatura azul oficial no topo da faixa; a barra superior não a repete no desktop", async () => {
     montar("#/dashboard?ano=2026");
     await esperarLeitura(2026);
-    const simbolo = document.querySelector<SVGElement>(
-      ".app-shell__sidebar .app-shell__marca-simbolo",
+    const marca = document.querySelector<HTMLImageElement>(
+      ".app-shell__sidebar .marca-evolli",
     )!;
-    expect(simbolo).not.toBeNull();
-    const fundo = simbolo.querySelector(":scope > rect")!.getAttribute("fill");
-    const barras = simbolo.querySelector(":scope > g")!.getAttribute("fill");
-    // A faixa pinta o texto de branco: o fundo não pode depender dessa cor.
-    expect(fundo).toBe("var(--surface-canvas)");
-    expect(barras).toBe("var(--color-action)");
-    expect(
-      document.querySelector(".barra-superior .app-shell__marca-simbolo"),
-    ).toBeNull();
+    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal\.svg$/);
+    expect(marca).toHaveAttribute("alt", "Evolli");
+    expect(document.querySelector(".barra-superior .marca-evolli")).toBeNull();
   });
 });

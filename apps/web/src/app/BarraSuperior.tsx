@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui";
-import { MarcaEvolli } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import type { ItemDaTrilha } from "./trilhaDoShell";
 import { useComplementoDaTrilha } from "./trilhaComplementar";
 import "./BarraSuperior.css";
@@ -139,7 +139,6 @@ export function BarraSuperior({
         {modoGaveta ? (
           <span className="barra-superior__marca">
             <MarcaEvolli />
-            <span className="barra-superior__marca-nome">Evolli RH</span>
           </span>
         ) : null}
 

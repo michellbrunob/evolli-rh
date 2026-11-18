@@ -207,35 +207,51 @@ function misturar(a: string, p: number, b: string): string {
 
 describe("T210 — menu lateral claro, no tema da conta", () => {
   it("os tokens do menu derivam da paleta do tema (nenhuma cor nova)", () => {
-    const raiz = bloco(":root");
-    expect(raiz["--menu-fundo"]).toBe("var(--surface-canvas)");
+    const declarado = bloco(":root");
+    // Valor sem as quebras de linha da formatação.
+    const raiz = Object.fromEntries(
+      Object.entries(declarado).map(([k, v]) => [
+        k,
+        v.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")"),
+      ]),
+    );
+    // Um tom bem leve da ação do tema (pedido da proprietária, 2026-11-18).
+    expect(raiz["--menu-fundo"]).toBe(
+      "color-mix(in srgb, var(--color-action) 4%, var(--surface-canvas))",
+    );
     expect(raiz["--menu-texto"]).toBe("var(--color-ink)");
     expect(raiz["--menu-texto-suave"]).toBe("var(--color-ink-muted)");
     expect(raiz["--menu-ativo-texto"]).toBe("var(--color-action)");
-    expect(raiz["--menu-ativo-fundo"]).toBe("var(--evolli-azul-suave)");
+    expect(raiz["--menu-ativo-fundo"]).toBe(
+      "color-mix(in srgb, var(--color-action) 12%, var(--surface-canvas))",
+    );
     expect(raiz["--menu-indicador"]).toBe("var(--color-action)");
     expect(raiz["--menu-divisa"]).toBe("var(--divider-soft)");
-    expect(raiz["--menu-realce"]).toMatch(
-      /^color-mix\(in srgb, var\(--color-ink\) 6%, var\(--surface-canvas\)\)$/,
+    expect(raiz["--menu-realce"]).toBe(
+      "color-mix(in srgb, var(--color-ink) 6%, var(--menu-fundo))",
     );
-    expect(raiz["--evolli-azul-suave"]?.replace(/\s+/g, " ")).toBe(
-      "color-mix( in srgb, var(--color-action) 9%, var(--surface-canvas) )",
+    expect(raiz["--evolli-azul-suave"]).toBe(
+      "color-mix(in srgb, var(--color-action) 9%, var(--surface-canvas))",
     );
   });
 
   for (const tema of Object.keys(PALETAS) as Tema[]) {
     it(`${tema}: item ativo e texto do menu (inclusive no hover) ≥ 4,5:1`, () => {
       const p = PALETAS[tema];
-      const ativoFundo = misturar(p.acao, 0.09, p.canvas);
-      const realce = misturar(p.tinta, 0.06, p.canvas);
+      const menu = misturar(p.acao, 0.04, p.canvas);
+      const ativoFundo = misturar(p.acao, 0.12, p.canvas);
+      const realce = misturar(p.tinta, 0.06, menu);
       expect(contraste(p.acao, ativoFundo)).toBeGreaterThanOrEqual(4.5);
-      for (const fundo of [p.canvas, realce]) {
+      // O tom do menu se vê (não é o canvas) e o ativo se destaca dele.
+      expect(menu).not.toBe(p.canvas.toLowerCase());
+      expect(contraste(menu, ativoFundo)).toBeGreaterThan(1.05);
+      for (const fundo of [menu, realce]) {
         expect(contraste(p.tinta, fundo)).toBeGreaterThanOrEqual(4.5);
         expect(contraste(p.secundario, fundo)).toBeGreaterThanOrEqual(4.5);
         expect(contraste(p.foco, fundo)).toBeGreaterThanOrEqual(3);
       }
-      // O hover se distingue do fundo mesmo onde neutro = canvas (Alto Contraste).
-      expect(realce).not.toBe(p.canvas.toLowerCase());
+      // O hover se distingue do fundo do menu em todo tema.
+      expect(realce).not.toBe(menu);
     });
   }
 

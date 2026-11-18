@@ -111,10 +111,6 @@
   color: var(--color-action);
 }
 
-.app-shell__marca-compacta .app-shell__marca-nome {
-  color: var(--color-ink);
-}
-
 /* T207 — nome da tela atual, junto da área principal. Só visual (o título
    da tela continua sendo o h1 dela); some onde a barra não tem espaço. Nas
    cores neutras do cabeçalho (a paleta Evolli fica no menu e no Dashboard). */
@@ -291,30 +287,6 @@
   color: var(--color-action);
 }
 
-.app-shell__marca-simbolo {
-  flex: 0 0 auto;
-}
-
-.app-shell__marca-texto {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.app-shell__marca-nome {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
-  color: var(--color-ink);
-}
-
-.app-shell__marca-tag {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-regular);
-  color: var(--color-ink-subtle);
-}
-
 /* Área principal. `min-width: 0` impede que uma tabela larga com rolagem
    própria vaze a rolagem para a página inteira. Sem `max-width` (T206): o
    conteúdo ocupa a largura da coluna, e a largura que o trilho libera. */
@@ -397,18 +369,6 @@
     flex: 0 0 auto;
     justify-content: center;
     padding: 0;
-  }
-
-  .app-shell--menu-recolhido .app-shell__marca-texto {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
   }
 }
 
@@ -516,14 +476,6 @@
 
 .app-shell__sidebar .app-shell__marca {
   color: var(--menu-texto);
-}
-
-.app-shell__sidebar .app-shell__marca-nome {
-  color: var(--menu-texto);
-}
-
-.app-shell__sidebar .app-shell__marca-tag {
-  color: var(--menu-texto-suave);
 }
 
 .app-shell__sidebar .app-shell__recolher {

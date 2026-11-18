@@ -21,18 +21,15 @@
 .tela-abertura__marca {
   display: grid;
   place-items: center;
-  width: 4rem;
-  height: 4rem;
+  min-width: 4rem;
+  min-height: 4rem;
   color: var(--color-action);
   animation: tela-abertura-entra 320ms ease-out both;
 }
 
-/* A marca aprovada, ampliada (o desenho é vetorial). */
-.tela-abertura__marca-estatica,
-.tela-abertura__marca-estatica svg {
+/* T210 — a assinatura vertical oficial, no tamanho do componente. */
+.tela-abertura__marca-estatica {
   display: block;
-  width: 4rem;
-  height: 4rem;
 }
 
 /* Área da animação oficial (Lottie): o mesmo quadro da marca. */
@@ -45,13 +42,6 @@
 .tela-abertura__lottie {
   position: absolute;
   inset: 0;
-}
-
-.tela-abertura__nome {
-  margin: 0;
-  font-size: var(--text-title);
-  font-weight: var(--weight-strong);
-  animation: tela-abertura-entra 320ms ease-out 60ms both;
 }
 
 .tela-abertura__mensagem {
@@ -73,8 +63,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tela-abertura__marca,
-  .tela-abertura__nome {
+  .tela-abertura__marca {
     animation: none;
   }
 }

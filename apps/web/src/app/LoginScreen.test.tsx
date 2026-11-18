@@ -366,11 +366,14 @@ describe("LoginScreen (T116)", () => {
 describe("LoginScreen — composição institucional (T160)", () => {
   const css = readFileSync("src/app/LoginScreen.css", "utf8");
 
-  it("apresenta a marca Evolli em texto, não em imagem", () => {
+  it("T210 — a marca oficial em versão branca sobre o painel na cor de ação", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
-    expect(screen.getByText("Evolli RH")).toBeInTheDocument();
-    // Nenhum ativo externo: o símbolo é SVG desenhado no projeto.
-    expect(document.querySelectorAll("img")).toHaveLength(0);
+    const marca = screen.getByRole("img", { name: "Evolli" });
+    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal-branco\.svg$/);
+    expect(marca.closest(".login-screen__painel")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("Evolli RH");
+    // Só o arquivo local da marca, nenhuma outra imagem.
+    expect(document.querySelectorAll("img")).toHaveLength(1);
   });
 
   it("o fundo é geometria própria: nada de imagem, uso externo ou referência", () => {
@@ -400,7 +403,10 @@ describe("LoginScreen — composição institucional (T160)", () => {
       expect(svg).toHaveAttribute("aria-hidden", "true");
       expect(svg).toHaveAttribute("focusable", "false");
     }
-    expect(screen.queryAllByRole("img")).toHaveLength(0);
+    // T210 — a única imagem com papel é a marca, com o nome "Evolli".
+    expect(
+      screen.queryAllByRole("img").map((i) => i.getAttribute("alt")),
+    ).toEqual(["Evolli"]);
   });
 
   it("o conteúdo da entrada vive num <main>, com um único h1", () => {
@@ -463,7 +469,7 @@ describe("LoginScreen — composição institucional (T160)", () => {
       name: "Verificação em duas etapas",
     });
 
-    expect(screen.getByText("Evolli RH")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Evolli" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("main")).toBeInTheDocument();
   });

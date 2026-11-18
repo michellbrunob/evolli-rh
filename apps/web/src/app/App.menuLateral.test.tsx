@@ -722,17 +722,13 @@ describe("T206 — contrato de CSS do shell", () => {
     );
   });
 
-  it("no trilho o texto fica visualmente oculto, nunca removido (continua sendo o nome)", () => {
+  it("no trilho o texto fica visualmente oculto, nunca removido (continua sendo o nome); a marca vira o símbolo, com o mesmo nome", () => {
     const textoDoItem = regra(navCss, ".painel-nav--trilho .painel-nav__texto");
     const textoDaEmpresa = regra(
       seletorCss,
       ".seletor-empresa--compacto .seletor-empresa__textos",
     );
-    const textoDaMarca = bloco(
-      desktop,
-      /\.app-shell--menu-recolhido\s+\.app-shell__marca-texto\s*\{/,
-    );
-    for (const corpo of [textoDoItem, textoDaEmpresa, textoDaMarca]) {
+    for (const corpo of [textoDoItem, textoDaEmpresa]) {
       expect(corpo).toMatch(/clip:\s*rect\(0 0 0 0\)/);
       expect(corpo).toMatch(/position:\s*absolute/);
       expect(corpo).not.toMatch(/display:\s*none/);

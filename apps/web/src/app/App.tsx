@@ -69,7 +69,7 @@ import "./tokens.css";
 import "./app-shell.css";
 import type { SafeAccessUserApi } from "../api/usersClient";
 import { BarraSuperior } from "./BarraSuperior";
-import { MarcaEvolli } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
 import { ProvedorDeTrilhaComplementar } from "./trilhaComplementar";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
@@ -1806,10 +1806,8 @@ export function App({
               sempre o menu inteiro. */}
             <div className="app-shell__cabecalho-lateral">
               <span className="app-shell__marca">
-                <MarcaEvolli tom="clara" />
-                <span className="app-shell__marca-texto">
-                  <span className="app-shell__marca-nome">Evolli RH</span>
-                </span>
+                {/* T210 — a assinatura horizontal; no trilho, o símbolo. */}
+                <MarcaEvolli variante={trilho ? "simbolo" : "horizontal"} />
               </span>
               <button
                 type="button"
@@ -2001,7 +1999,7 @@ export function App({
               {...(gavetaModal ? FUNDO_INERTE : {})}
             >
               <div className="app-shell__footer-inner">
-                <span className="app-shell__footer-brand">Evolli RH</span>
+                <span className="app-shell__footer-brand">Evolli</span>
                 <span>Ambiente interno · sem dados reais</span>
               </div>
             </footer>

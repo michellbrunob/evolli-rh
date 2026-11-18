@@ -36,7 +36,7 @@
 import { useId, useState } from "react";
 import { Button, FormField } from "../components";
 import { ApiError, login, verifyMfa } from "../api/authClient";
-import { MarcaEvolli } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import "./LoginScreen.css";
 
 export const LOGIN_TITULO_ID = "login-titulo";
@@ -65,7 +65,13 @@ function FundoInstitucional() {
           (ver `LoginScreen.css`) se aplique ao grupo, sem sobrescrever o
           `transform` de rotação que o retângulo já carrega como atributo. */}
       <g className="login-screen__forma login-screen__forma--1">
-        <circle cx="505" cy="135" r="250" fill="var(--color-on-action)" fillOpacity="0.09" />
+        <circle
+          cx="505"
+          cy="135"
+          r="250"
+          fill="var(--color-on-action)"
+          fillOpacity="0.09"
+        />
       </g>
       <g className="login-screen__forma login-screen__forma--2">
         <circle
@@ -100,10 +106,22 @@ function FundoInstitucional() {
         />
       </g>
       <g className="login-screen__forma login-screen__forma--5">
-        <circle cx="96" cy="196" r="7" fill="var(--color-on-action)" fillOpacity="0.5" />
+        <circle
+          cx="96"
+          cy="196"
+          r="7"
+          fill="var(--color-on-action)"
+          fillOpacity="0.5"
+        />
       </g>
       <g className="login-screen__forma login-screen__forma--6">
-        <circle cx="430" cy="830" r="11" fill="var(--color-on-action)" fillOpacity="0.35" />
+        <circle
+          cx="430"
+          cy="830"
+          r="11"
+          fill="var(--color-on-action)"
+          fillOpacity="0.35"
+        />
       </g>
     </svg>
   );
@@ -121,8 +139,8 @@ function PainelInstitucional() {
       <FundoInstitucional />
       <div className="login-screen__painel-conteudo">
         <span className="login-screen__marca">
-          <MarcaEvolli tom="clara" />
-          <span className="login-screen__marca-nome">Evolli RH</span>
+          {/* T210 — sobre a cor de ação, a versão branca oficial. */}
+          <MarcaEvolli tom="branco" altura={40} />
         </span>
         <p className="login-screen__lema">
           Pessoas, estrutura e jornada no mesmo lugar.

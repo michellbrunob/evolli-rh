@@ -50,13 +50,14 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 
-  it("exibe a marca textual 'Evolli RH' no topo da faixa (T209)", () => {
+  it("T210 — a assinatura horizontal oficial no topo da faixa, com o nome 'Evolli'", () => {
     render(<App papelDoAtor="rh" />);
-
-    expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
-    expect(
-      document.querySelector(".app-shell__cabecalho-lateral")!,
-    ).toHaveTextContent("Evolli RH");
+    const topo = document.querySelector(".app-shell__cabecalho-lateral")!;
+    const marca = within(topo as HTMLElement).getByRole("img", {
+      name: "Evolli",
+    });
+    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal\.svg$/);
+    expect(document.body.textContent).not.toContain("Evolli RH");
   });
 
   it("tem exatamente um título de nível 1: o da tela de aterrissagem", () => {
@@ -925,11 +926,16 @@ describe("App — cabeçalho enxuto (T159 — evolução visual)", () => {
     }
   });
 
-  it("a marca do painel é própria e textual, não um ativo de terceiro", () => {
+  it("T210 — as imagens do painel são só os SVGs locais da marca", () => {
     render(<App papelDoAtor="rh" />);
-    expect(screen.getAllByText("Evolli RH").length).toBeGreaterThanOrEqual(1);
-    // Nenhuma imagem externa: o símbolo é SVG inline, desenhado no projeto.
-    expect(document.querySelectorAll("img")).toHaveLength(0);
+    expect(
+      screen.getAllByRole("img", { name: "Evolli" }).length,
+    ).toBeGreaterThanOrEqual(1);
+    for (const img of document.querySelectorAll("img")) {
+      expect(img.getAttribute("src")).toMatch(
+        /assets\/brand\/evolli-[a-z-]+\.svg$/,
+      );
+    }
   });
 });
 

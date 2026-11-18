@@ -78,7 +78,8 @@
  */
 import { useEffect, useRef } from "react";
 import "./HubPosLogin.css";
-import { IconeModulo, MarcaEvolli } from "./IconeModulo";
+import { IconeModulo } from "./IconeModulo";
+import { MarcaEvolli } from "./marca/MarcaEvolli";
 import type { IconeModuloId } from "./IconeModulo";
 import {
   capacidadeFuncionalDe,
@@ -227,7 +228,6 @@ export function HubPosLogin({
         <div className="hub__topo-inner">
           <span className="hub__marca">
             <MarcaEvolli />
-            <span className="hub__marca-nome">Evolli RH</span>
           </span>
           <div className="hub__acoes">
             <span className="hub__papel">{rotuloDoPapel}</span>

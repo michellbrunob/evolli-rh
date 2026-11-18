@@ -70,13 +70,6 @@
   gap: var(--space-sm);
 }
 
-.login-screen__marca-nome {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
-}
-
 .login-screen__lema {
   margin: var(--space-xs) 0 0;
   font-size: var(--text-lead);

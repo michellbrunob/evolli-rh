@@ -115,14 +115,14 @@ describe("T209 — barra superior: esquerda", () => {
     const topoDaFaixa = lateral.querySelector(".app-shell__cabecalho-lateral")!;
     expect(lateral.firstElementChild).toBe(topoDaFaixa);
     expect(
-      within(topoDaFaixa as HTMLElement).getByText("Evolli RH"),
+      within(topoDaFaixa as HTMLElement).getByRole("img", { name: "Evolli" }),
     ).toBeInTheDocument();
     expect(
       within(topoDaFaixa as HTMLElement).getByRole("button", {
         name: "Recolher menu",
       }),
     ).toHaveAttribute("aria-expanded", "true");
-    expect(within(barra()).queryByText("Evolli RH")).toBeNull();
+    expect(within(barra()).queryByRole("img", { name: "Evolli" })).toBeNull();
     expect(
       within(barra()).queryByRole("button", { name: "Recolher menu" }),
     ).toBeNull();
@@ -281,7 +281,9 @@ describe("T209 — barra superior no celular (375 px)", () => {
     ).toBeInTheDocument();
     expect(botaoConta()).toHaveAccessibleName("Conta: Ana Paula Sintética");
     // No celular a faixa é gaveta: a marca vem para a barra.
-    expect(within(topo).getByText("Evolli RH")).toBeInTheDocument();
+    expect(
+      within(topo).getByRole("img", { name: "Evolli" }).getAttribute("src"),
+    ).toMatch(/evolli-horizontal\.svg$/);
     expect(
       within(topo).queryByRole("button", { name: "Recolher menu" }),
     ).toBeNull();
