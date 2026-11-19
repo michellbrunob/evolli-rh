@@ -82,6 +82,14 @@ export const AUDIT_ACTIONS = [
   "pessoas_foto_colaborador_enviada",
   "pessoas_foto_colaborador_substituida",
   "pessoas_foto_colaborador_removida",
+  // T213 — documentos do colaborador (ADR 0021).
+  "pessoas_documento_colaborador_enviado",
+  "pessoas_documento_colaborador_substituido",
+  "pessoas_documento_colaborador_removido",
+  "pessoas_documento_colaborador_aprovado",
+  "pessoas_documento_colaborador_reprovado",
+  "pessoas_documento_colaborador_nao_verificado",
+  "pessoas_documento_colaborador_baixado",
   "pessoas_vinculo_criado",
   "pessoas_vinculo_ativado",
   "pessoas_vinculo_encerrado",
@@ -282,7 +290,10 @@ export type AuditResource =
   // Nunca nome, data ou qualquer valor do formulario.
   | "rascunho_admissao"
   // T209 — foto do colaborador: o `resourceId` e o id do COLABORADOR.
-  | "foto_colaborador";
+  | "foto_colaborador"
+  // T213 — documento do colaborador com arquivo: o `resourceId` e o id do
+  // DOCUMENTO. Nunca nome, categoria, tamanho, hash ou chave do objeto.
+  | "documento_colaborador";
 
 export type RecordAuditEventInput =
   | {

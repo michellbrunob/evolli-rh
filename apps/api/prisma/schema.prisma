@@ -161,11 +161,15 @@ model AccessUser {
   dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
 
   // T179 — admissões que esta conta enviou com chave de idempotência.
-  idempotenciasAdmissao    IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  idempotenciasAdmissao          IdempotenciaAdmissao[]       @relation("IdempotenciaAdmissaoAtor")
   // T209 — rascunho da Nova admissão, por conta e empresa.
-  rascunhosAdmissao        RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
+  rascunhosAdmissao              RascunhoAdmissao[]           @relation("RascunhoAdmissaoAtor")
   // T209 — fotos de colaborador enviadas por esta conta (autoria).
-  fotosColaboradorEnviadas FotoColaborador[]      @relation("FotoColaboradorAutor")
+  fotosColaboradorEnviadas       FotoColaborador[]            @relation("FotoColaboradorAutor")
+  // T213 — documentos do colaborador: quem registrou, enviou ou removeu.
+  documentosColaboradorCriados   DocumentoColaborador[]       @relation("DocumentoColaboradorAutor")
+  documentosColaboradorRemovidos DocumentoColaborador[]       @relation("DocumentoColaboradorRemocao")
+  versoesDocumentoEnviadas       VersaoDocumentoColaborador[] @relation("VersaoDocumentoColaboradorAutor")
 
   @@index([companyId])
   @@map("access_user")
@@ -486,6 +490,17 @@ enum AuditAction {
   pessoas_foto_colaborador_substituida @map("pessoas.foto_colaborador.substituida")
   pessoas_foto_colaborador_removida    @map("pessoas.foto_colaborador.removida")
 
+  // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
+  // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
+  // categoria, tamanho, hash ou chave do objeto.
+  pessoas_documento_colaborador_enviado        @map("pessoas.documento_colaborador.enviado")
+  pessoas_documento_colaborador_substituido    @map("pessoas.documento_colaborador.substituido")
+  pessoas_documento_colaborador_removido       @map("pessoas.documento_colaborador.removido")
+  pessoas_documento_colaborador_aprovado       @map("pessoas.documento_colaborador.aprovado")
+  pessoas_documento_colaborador_reprovado      @map("pessoas.documento_colaborador.reprovado")
+  pessoas_documento_colaborador_nao_verificado @map("pessoas.documento_colaborador.nao_verificado")
+  pessoas_documento_colaborador_baixado        @map("pessoas.documento_colaborador.baixado")
+
   pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
   pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
   pessoas_vinculo_encerrado @map("pessoas.vinculo.encerrado")
@@ -798,13 +813,17 @@ model Empresa {
   eventosDadosPessoais      DadosPessoaisColaboradorEvento[]
 
   // T179 — idempotência da admissão e relação técnica de revisão.
-  idempotenciasAdmissao IdempotenciaAdmissao[]
-  revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+  idempotenciasAdmissao       IdempotenciaAdmissao[]
+  revisoesNormalizacao        RevisaoNormalizacaoCadastro[]
   // T209 — rascunhos da Nova admissão desta empresa.
-  rascunhosAdmissao     RascunhoAdmissao[]
+  rascunhosAdmissao           RascunhoAdmissao[]
   // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
-  fotosColaborador      FotoColaborador[]
-  limpezasFotoPendentes LimpezaFotoColaboradorPendente[]
+  fotosColaborador            FotoColaborador[]
+  limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
+  // T213 — documentos do colaborador.
+  documentosColaborador       DocumentoColaborador[]
+  versoesDocumentoColaborador VersaoDocumentoColaborador[]
+  limpezasDocumentoPendentes  LimpezaDocumentoColaboradorPendente[]
 
   @@index([status])
   @@map("empresa")
@@ -1146,7 +1165,9 @@ model Colaborador {
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
 
   // T209 — foto do colaborador, por empresa (ADR 0020).
-  fotos FotoColaborador[]
+  fotos      FotoColaborador[]
+  // T213 — documentos do colaborador.
+  documentos DocumentoColaborador[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -2685,4 +2706,106 @@ model ContratoVinculo {
   @@index([empresaId])
   @@index([gestorDiretoColaboradorId])
   @@map("contrato_vinculo")
+}
+
+/// T213 — categorias iniciais dos documentos do colaborador (ADR 0021). Fixas
+/// nesta fase; "outros" leva um nome curto dado por quem envia.
+enum CategoriaDocumentoColaborador {
+  rg
+  cpf
+  comprovante_endereco
+  carteira_trabalho
+  certidoes
+  outros
+}
+
+/// T213 — formatos aceitos (conferidos pela extensão, pelo tipo declarado e
+/// pelo conteúdo real).
+enum FormatoDocumentoColaborador {
+  pdf
+  jpg
+  png
+}
+
+/// T213 — quarentena: toda versão nasce `em_verificacao`; só `aprovado` pode
+/// ser baixado. Falha do antivírus mantém `em_verificacao` (fail-closed).
+enum EstadoVerificacaoDocumento {
+  em_verificacao
+  aprovado
+  reprovado
+}
+
+/// T213 — documento do colaborador naquela empresa (ADR 0021). Opcional:
+/// nunca condiciona a admissão. Remoção LÓGICA (`removidoEm`); os bytes
+/// ficam no R2 privado. O nome original do arquivo nunca é guardado.
+model DocumentoColaborador {
+  id            String                        @id @default(uuid())
+  empresaId     String                        @map("empresa_id")
+  colaboradorId String                        @map("colaborador_id")
+  categoria     CategoriaDocumentoColaborador
+  /// Só para "outros": nome curto dado por quem envia (até 60 caracteres).
+  nomeOutros    String?                       @map("nome_outros") @db.VarChar(60)
+  criadoPorId   String                        @map("criado_por_id")
+  criadoEm      DateTime                      @default(now()) @map("criado_em")
+  atualizadoEm  DateTime                      @updatedAt @map("atualizado_em")
+  removidoEm    DateTime?                     @map("removido_em")
+  removidoPorId String?                       @map("removido_por_id")
+
+  empresa     Empresa                      @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador                  @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser                   @relation("DocumentoColaboradorAutor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor AccessUser?                  @relation("DocumentoColaboradorRemocao", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  versoes     VersaoDocumentoColaborador[]
+
+  @@index([empresaId, colaboradorId])
+  @@map("documento_colaborador")
+}
+
+/// T213 — cada arquivo enviado para um documento (a troca cria versão nova e
+/// preserva a anterior). A chave do objeto só tem ids internos:
+/// v1/empresas/{e}/colaboradores/{c}/documentos/{d}/{v}.
+model VersaoDocumentoColaborador {
+  id                String                      @id @default(uuid())
+  documentoId       String                      @map("documento_id")
+  empresaId         String                      @map("empresa_id")
+  /// Sobe a cada troca, a partir de 1.
+  numero            Int
+  chave             String                      @unique
+  formato           FormatoDocumentoColaborador
+  tamanhoBytes      Int                         @map("tamanho_bytes")
+  hashSha256        String                      @map("hash_sha256")
+  estado            EstadoVerificacaoDocumento  @default(em_verificacao)
+  verificadoEm      DateTime?                   @map("verificado_em")
+  enviadaPorId      String                      @map("enviada_por_id")
+  /// Chave de idempotência do envio (por conta e empresa).
+  chaveIdempotencia String?                     @map("chave_idempotencia") @db.Uuid
+  criadoEm          DateTime                    @default(now()) @map("criado_em")
+
+  documento  DocumentoColaborador @relation(fields: [documentoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa    Empresa              @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadaPor AccessUser           @relation("VersaoDocumentoColaboradorAutor", fields: [enviadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([documentoId, numero])
+  @@unique([enviadaPorId, empresaId, chaveIdempotencia])
+  @@index([empresaId])
+  @@map("versao_documento_colaborador")
+}
+
+/// T213 — objeto de documento no R2 sem registro concluído (envio
+/// interrompido ou que falhou depois de gravar). Fica para nova tentativa de
+/// apagar; só ids e a chave, nenhum dado pessoal.
+model LimpezaDocumentoColaboradorPendente {
+  id                String    @id @default(uuid())
+  empresaId         String    @map("empresa_id")
+  colaboradorId     String    @map("colaborador_id")
+  chave             String    @unique
+  motivo            String
+  tentativas        Int       @default(0)
+  criadoEm          DateTime  @default(now()) @map("criado_em")
+  ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId])
+  @@map("limpeza_documento_colaborador_pendente")
 }

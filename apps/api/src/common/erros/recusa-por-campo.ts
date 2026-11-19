@@ -91,7 +91,19 @@ export type CodigoDeRecusa =
   // T209 — foto do colaborador (ADR 0020): tipo declarado, extensão e
   // conteúdo que não concordam, e tamanho de versão pedido fora da lista.
   | "foto_tipo_divergente"
-  | "foto_tamanho_invalido";
+  | "foto_tamanho_invalido"
+  // T213 — documentos do colaborador (ADR 0021).
+  | "documento_arquivo_vazio"
+  | "documento_arquivo_grande_demais"
+  | "documento_formato_invalido"
+  | "documento_arquivo_malformado"
+  | "documento_categoria_invalida"
+  | "documento_nome_obrigatorio"
+  | "documento_nome_invalido"
+  | "documento_nome_nao_permitido"
+  | "documento_limite_categoria"
+  | "documento_limite_colaborador"
+  | "documento_nao_disponivel";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência
