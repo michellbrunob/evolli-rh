@@ -3405,19 +3405,17 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
 
-## Documentos do colaborador — T213 (em preparação)
+## Documentos do colaborador — T213 (implementada localmente; aguarda validação visual)
 
-| Tarefa | Estado            | Resultado principal                                                             |
-| ------ | ----------------- | ------------------------------------------------------------------------------- |
-| T213   | **Em preparação** | Dossiê e proposta da primeira fatia: etapa 4 "Documentos" com envio real ao R2. |
+| Tarefa | Estado                                                | Resultado principal                                                        |
+| ------ | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| T213   | **Implementada localmente; aguarda validação visual** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
 
-**Escopo da preparação:** levantamento em leitura (R2, foto do colaborador, documentos só como
-metadados, Nova admissão, permissões, auditoria, exclusão e retenção) e decisões D1–D20 para
-aprovação ([documento de decisão](../docs/decisions/t213-documentos-colaborador.md)).
+**Escopo:** primeira fatia da [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md)
+— API (migration, rotas, RBAC, auditoria, ClamAV com quarentena fail-closed, limpeza pendente) e
+tela (etapa 4 "Documentos" do Novo colaborador, envio depois do cadastro, proteção de saída e
+seção da ficha) ([documento de decisão](../docs/decisions/t213-documentos-colaborador.md)).
 
-**Condição:** o upload real depende dos portões de Nível 2 das ADRs 0011 e 0013 (antivírus e
-quarentena, limites, acesso ao conteúdo, MFA, retenção) aprovados em ADR nova; a admissão nunca
-depende de anexo.
-
-**Fora de escopo:** código nesta preparação; OCR, assinatura, leitura automática,
-compartilhamento externo, vencimentos, retenção automática e envio pela importação.
+**Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
+configuráveis, OCR, assinatura, leitura automática, compartilhamento externo, vencimentos e
+envio pela importação.
