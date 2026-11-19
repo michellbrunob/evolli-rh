@@ -452,6 +452,13 @@ function conteudoDoDestino(
      * referências que faltam (RH) ou a quem pedir (DP). Não concede nada.
      */
     readonly papelDoAtor: string | null;
+    /**
+     * T212 — o arquivo escolhido no painel "Adicionar colaborador", à espera
+     * da página de importação (só em memória, nesta aba).
+     */
+    readonly arquivoParaImportar: File | null;
+    readonly onImportarArquivo: (arquivo: File) => void;
+    readonly onArquivoParaImportarLido: () => void;
   },
   // T198 — a ficha unificada do colaborador, aberta pela rota.
   fichaDoColaborador: {
@@ -599,6 +606,7 @@ function conteudoDoDestino(
           ? {
               onNovaAdmissao: () => onNavegar("nova-admissao"),
               onImportarPlanilha: () => onNavegar("importar-colaboradores"),
+              onImportarArquivo: admissao.onImportarArquivo,
             }
           : {})}
         // T181 — a edição da ficha é só de RH e DP.
@@ -611,7 +619,13 @@ function conteudoDoDestino(
     );
   }
   if (destinoId === "importar-colaboradores") {
-    return <ImportarColaboradoresScreen onSair={() => onNavegar("pessoas")} />;
+    return (
+      <ImportarColaboradoresScreen
+        onSair={() => onNavegar("pessoas")}
+        arquivoInicial={admissao.arquivoParaImportar}
+        onArquivoInicialLido={admissao.onArquivoParaImportarLido}
+      />
+    );
   }
   if (destinoId === "nova-admissao") {
     return (
@@ -928,6 +942,10 @@ export function App({
    * colaborador e a aba, sempre os da URL. `null` é a listagem.
    */
   const [ficha, setFicha] = useState<RotaDaFicha | null>(entradaDaUrl.ficha);
+  // T212 — o arquivo escolhido no painel, até a página de importação o ler.
+  const [arquivoParaImportar, setArquivoParaImportar] = useState<File | null>(
+    null,
+  );
   /**
    * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
    * filtros), sempre o da URL: recarregar, voltar e avançar o restauram.
@@ -1966,6 +1984,12 @@ export function App({
                   onAbrirAdmitido: abrirAdmitido,
                   podeAdmitir,
                   papelDoAtor,
+                  arquivoParaImportar,
+                  onImportarArquivo: (arquivo: File) => {
+                    setArquivoParaImportar(arquivo);
+                    irPara("importar-colaboradores");
+                  },
+                  onArquivoParaImportarLido: () => setArquivoParaImportar(null),
                 },
                 {
                   ficha,

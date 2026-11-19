@@ -32,6 +32,7 @@ import {
   IMPORTAR_COLABORADORES_TITULO_ID,
   ImportarColaboradoresScreen,
 } from "./ImportarColaboradoresScreen";
+import { ABA_COLABORADORES, montarXlsx } from "./planilhaXlsx";
 
 vi.mock("../../../api/colaboradoresClient", async (original) => ({
   ...(await original<typeof import("../../../api/colaboradoresClient")>()),
@@ -88,8 +89,31 @@ function montar() {
 }
 
 async function escolherArquivo(texto: string, nome = "pessoas.csv") {
-  const campo = await screen.findByLabelText("Arquivo CSV da planilha");
+  const campo = await screen.findByLabelText(ROTULO_DO_ARQUIVO);
   const arquivo = new File([texto], nome, { type: "text/csv" });
+  await act(async () => {
+    fireEvent.change(campo, { target: { files: [arquivo] } });
+  });
+}
+
+/** T212 — o rótulo do campo de arquivo (aceita .xlsx e .csv). */
+const ROTULO_DO_ARQUIVO = "Arquivo da planilha (.xlsx ou .csv)";
+
+/** A mesma planilha, como `.xlsx` (aba Colaboradores). */
+function planilhaXlsx(...linhas: string[]): Uint8Array {
+  return montarXlsx([
+    {
+      nome: ABA_COLABORADORES,
+      linhas: [CABECALHO, ...linhas].map((linha) => linha.split(";")),
+    },
+  ]);
+}
+
+async function escolherXlsx(bytes: Uint8Array, nome = "pessoas.xlsx") {
+  const campo = await screen.findByLabelText(ROTULO_DO_ARQUIVO);
+  const arquivo = new File([bytes as unknown as BlobPart], nome, {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   await act(async () => {
     fireEvent.change(campo, { target: { files: [arquivo] } });
   });
@@ -174,22 +198,41 @@ describe("passo 1 — modelo e arquivo", () => {
     expect(await screen.findByText(/Empresa Alfa/)).toBeInTheDocument();
   });
 
-  it("'Baixar modelo' gera o CSV no navegador, sem chamar a API", () => {
-    const criar = vi.fn(() => "blob:modelo");
+  it("T212 — 'Baixar modelo (.xlsx)' é o principal; o CSV segue como alternativa, ambos no navegador", () => {
+    const blobs: Blob[] = [];
+    const criar = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return "blob:modelo";
+    });
     Object.assign(URL, { createObjectURL: criar, revokeObjectURL: vi.fn() });
+    const nomes: string[] = [];
     const clicar = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(() => undefined);
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        nomes.push(this.download);
+      });
     montar();
-    fireEvent.click(screen.getByRole("button", { name: "Baixar modelo" }));
-    expect(criar).toHaveBeenCalledTimes(1);
-    expect(clicar).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Baixar modelo (.xlsx)" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Baixar modelo em CSV" }),
+    );
+    expect(criar).toHaveBeenCalledTimes(2);
+    expect(clicar).toHaveBeenCalledTimes(2);
+    expect(nomes).toEqual([
+      "modelo-importacao-colaboradores.xlsx",
+      "modelo-importacao-colaboradores.csv",
+    ]);
+    expect(blobs[0]!.type).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
     expect(enviarAdmissao).not.toHaveBeenCalled();
   });
 
   it("arquivo acima de 1 MB é recusado sem ser lido nem consultar catálogos", async () => {
     montar();
-    const campo = await screen.findByLabelText("Arquivo CSV da planilha");
+    const campo = await screen.findByLabelText(ROTULO_DO_ARQUIVO);
     const grande = new File(["x"], "grande.csv", { type: "text/csv" });
     Object.defineProperty(grande, "size", { value: 1024 * 1024 + 1 });
     await act(async () => {
@@ -271,9 +314,7 @@ describe("passo 2 — conferência", () => {
       screen.queryByRole("heading", { level: 2, name: "Conferência" }),
     ).toBeNull();
     expect(screen.queryByText("Ana Souza")).toBeNull();
-    expect(
-      screen.getByLabelText("Arquivo CSV da planilha"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(ROTULO_DO_ARQUIVO)).toBeInTheDocument();
   });
 
   it("a confirmação diz quantas e em qual empresa; 'Voltar' não envia nada", async () => {
@@ -589,5 +630,130 @@ describe("reimportar não duplica (chave determinística por pessoa e empresa)",
       vi.mocked(enviarAdmissao).mock.calls[1]![1]!.chaveIdempotencia,
     ).not.toBe(chaveNaAlfa);
     expect(criadas).toEqual(["emp-1:Ana Souza", "emp-2:Ana Souza"]);
+  });
+});
+
+describe("T212 — planilha .xlsx", () => {
+  it("o campo aceita .xlsx e .csv, e o texto diz que o modelo é .xlsx e o CSV continua aceito", async () => {
+    montar();
+    const campo = await screen.findByLabelText(ROTULO_DO_ARQUIVO);
+    expect(campo.getAttribute("accept")).toMatch(/\.xlsx/);
+    expect(campo.getAttribute("accept")).toMatch(/\.csv/);
+    expect(
+      screen.getByText(/O modelo é uma planilha \.xlsx/),
+    ).toHaveTextContent(/\.csv em UTF-8 continua aceito/);
+  });
+
+  it("um .xlsx chega à mesma conferência do CSV", async () => {
+    montar();
+    await escolherXlsx(planilhaXlsx(ANA, RUIM, BIA));
+    await screen.findByRole("heading", { level: 2, name: "Conferência" });
+    expect(
+      screen.getByText("3 linhas lidas: 2 prontas para importar, 1 com erro."),
+    ).toBeInTheDocument();
+    const erros = screen.getByRole("table", { name: "Linhas com erro" });
+    expect(within(erros).getByRole("row", { name: /^3/ })).toHaveTextContent(
+      "Tipo de vínculo",
+    );
+    expect(erros).not.toHaveTextContent("estatutario");
+    expect(screen.getByText(/pessoas\.xlsx/)).toBeInTheDocument();
+  });
+
+  it("cabeçalho alterado no .xlsx recusa o arquivo inteiro, sem conferência", async () => {
+    montar();
+    const bytes = montarXlsx([
+      {
+        nome: ABA_COLABORADORES,
+        linhas: [
+          CABECALHO.replace("nome;", "nome_completo;").split(";"),
+          ANA.split(";"),
+        ],
+      },
+    ]);
+    await escolherXlsx(bytes);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /cabeçalho da aba Colaboradores foi alterado/,
+    );
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "Conferência" }),
+    ).toBeNull();
+    expect(listarDepartamentos).not.toHaveBeenCalled();
+  });
+
+  it("arquivo protegido por senha (ou .xls) é recusado com a orientação", async () => {
+    montar();
+    const cfb = new Uint8Array(512);
+    cfb.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    await escolherXlsx(cfb, "protegido.xlsx");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /protegido por senha/,
+    );
+  });
+
+  it(".xlsx e .csv com as mesmas pessoas enviam o mesmo corpo e a mesma chave (reimportar não duplica)", async () => {
+    vi.mocked(enviarAdmissao).mockImplementation(async (dto) =>
+      admitida(dto.nome),
+    );
+    montar();
+    await escolherArquivo(planilha(ANA, BIA));
+    await screen.findByRole("heading", { level: 2, name: "Conferência" });
+    await confirmarImportacao(2);
+    await screen.findByRole("heading", { level: 2, name: "Resultado" });
+    const doCsv = vi
+      .mocked(enviarAdmissao)
+      .mock.calls.map(([dto, opcoes]) => [dto, opcoes?.chaveIdempotencia]);
+
+    vi.mocked(enviarAdmissao).mockClear();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Importar outra planilha" }),
+    );
+    await escolherXlsx(planilhaXlsx(ANA, BIA));
+    await screen.findByRole("heading", { level: 2, name: "Conferência" });
+    await confirmarImportacao(2);
+    await screen.findByRole("heading", { level: 2, name: "Resultado" });
+    const doXlsx = vi
+      .mocked(enviarAdmissao)
+      .mock.calls.map(([dto, opcoes]) => [dto, opcoes?.chaveIdempotencia]);
+    expect(doXlsx).toEqual(doCsv);
+  });
+
+  it("reenvio do .xlsx já importado: o servidor devolve o que já existia, nada é criado de novo", async () => {
+    vi.mocked(enviarAdmissao).mockImplementation(async (dto) => ({
+      ...admitida(dto.nome),
+      reenvio: true,
+    }));
+    montar();
+    await escolherXlsx(planilhaXlsx(ANA, BIA));
+    await screen.findByRole("heading", { level: 2, name: "Conferência" });
+    await confirmarImportacao(2);
+    await screen.findByRole("heading", { level: 2, name: "Resultado" });
+    expect(
+      screen.getByText(
+        "Nenhuma admitida, 2 já importadas antes, nenhuma pendente.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("arquivo escolhido no painel (arquivo inicial) já abre na conferência", async () => {
+    const lido = vi.fn();
+    const arquivo = new File(
+      [planilhaXlsx(ANA) as unknown as BlobPart],
+      "do-painel.xlsx",
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    );
+    render(
+      <ImportarColaboradoresScreen
+        onSair={onSair}
+        arquivoInicial={arquivo}
+        onArquivoInicialLido={lido}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Conferência" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/do-painel\.xlsx/)).toBeInTheDocument();
+    expect(lido).toHaveBeenCalledTimes(1);
   });
 });

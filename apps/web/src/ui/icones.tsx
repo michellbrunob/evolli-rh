@@ -22,12 +22,15 @@ import {
   Clock,
   ColorSwatch,
   Cup,
+  DocumentDownload,
   DocumentText,
+  DocumentUpload,
   Edit2,
   Element3,
   Eye,
   Gift,
   Hierarchy,
+  InfoCircle,
   MessageQuestion,
   Messages1,
   People,
@@ -109,6 +112,12 @@ export const IconeAdicionarPessoa = decorativo(UserAdd, "Bulk");
 export const IconePlanilha = decorativo(DocumentText, "Bulk");
 export const IconeRelogio = decorativo(Clock, "Bulk");
 export const IconeSucesso = decorativo(TickCircle, "Bulk");
+/** T212 — baixar um modelo de arquivo. */
+export const IconeBaixarArquivo = decorativo(DocumentDownload, "Bulk");
+/** T212 — enviar (escolher) um arquivo. */
+export const IconeEnviarArquivo = decorativo(DocumentUpload, "Bulk");
+/** T212 — aviso curto, informativo. */
+export const IconeInformacao = decorativo(InfoCircle, "Bulk");
 
 // ---- Glifos de interface (Linear) ----------------------------------------
 export const IconeVoltar = decorativo(ArrowLeft2, "Linear");

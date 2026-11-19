@@ -72,11 +72,14 @@ export function nomeDoArquivo(
 
 /** Baixa o texto como arquivo, pelo próprio navegador. */
 export function baixarArquivo(
-  conteudo: string,
+  conteudo: string | Uint8Array,
   nome: string,
   tipo = "text/csv;charset=utf-8",
 ): void {
-  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  // T212 — também bytes (o modelo .xlsx gerado no navegador).
+  const url = URL.createObjectURL(
+    new Blob([conteudo as BlobPart], { type: tipo }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = nome;

@@ -183,7 +183,10 @@ describe("PainelAdicionarColaborador (T194)", () => {
       const cartao = r.closest("label") as HTMLElement;
       expect(cartao).toHaveClass("painel-adicionar__forma--disponivel");
       expect(cartao).not.toHaveTextContent("Indisponível");
-      expect(cartao).toHaveTextContent("Até 200 pessoas por arquivo CSV");
+      // T212 — o modelo é .xlsx; o CSV continua aceito.
+      expect(cartao).toHaveTextContent(
+        "Até 200 pessoas por arquivo .xlsx ou .csv",
+      );
       // A admissão digital segue indisponível.
       expect(radio("Admissão digital")).toBeDisabled();
     });
@@ -245,6 +248,246 @@ describe("PainelAdicionarColaborador (T194)", () => {
     );
     expect(css).toMatch(
       /\.painel-adicionar__forma--indisponivel \{[^}]*cursor: default/,
+    );
+  });
+});
+
+describe("T212 — importação em três passos no painel", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function comPlanilha(props: Parameters<typeof montar>[0] = {}) {
+    const onImportarPlanilha = vi.fn();
+    const onImportarArquivo = vi.fn();
+    const utils = montar({ onImportarPlanilha, onImportarArquivo, ...props });
+    fireEvent.click(radio("Importar planilha"));
+    return { ...utils, onImportarPlanilha, onImportarArquivo };
+  }
+
+  const comoImportar = () =>
+    within(painel()).getByRole("region", { name: "Como importar" });
+  const campoArquivo = () =>
+    within(comoImportar()).getByLabelText(
+      "Arquivo da planilha (.xlsx ou .csv)",
+    ) as HTMLInputElement;
+  const iniciar = () =>
+    within(painel()).getByRole("button", { name: "Iniciar importação" });
+  const escolher = (arquivo: File) =>
+    fireEvent.change(campoArquivo(), { target: { files: [arquivo] } });
+
+  it("escolhida a planilha, o próprio cartão se abre nos três passos, em ordem", () => {
+    comPlanilha();
+    // Os passos ficam dentro do bloco do cartão da planilha (mesma moldura).
+    const bloco = radio("Importar planilha").closest(
+      ".painel-adicionar__bloco",
+    );
+    expect(bloco).toHaveClass("painel-adicionar__bloco--expandido");
+    expect(bloco).toContainElement(comoImportar());
+    const passos = comoImportar().querySelector("ol")!;
+    expect(
+      Array.from(passos.children).map(
+        (item) =>
+          item.querySelector(".painel-adicionar__passo-titulo")?.textContent,
+      ),
+    ).toEqual([
+      "Baixe o modelo",
+      "Preencha no Excel ou no Google Planilhas",
+      "Escolha o arquivo preenchido",
+    ]);
+  });
+
+  it("com o cadastro individual escolhido, os passos não aparecem", () => {
+    montar({ onImportarPlanilha: vi.fn(), onImportarArquivo: vi.fn() });
+    expect(
+      within(painel()).queryByRole("region", { name: "Como importar" }),
+    ).toBeNull();
+    expect(
+      painel().querySelector(".painel-adicionar__bloco--expandido"),
+    ).toBeNull();
+  });
+
+  it("passo 1: 'Baixar modelo (.xlsx)' gera o modelo no navegador", () => {
+    const blobs: Blob[] = [];
+    Object.assign(URL, {
+      createObjectURL: vi.fn((blob: Blob) => {
+        blobs.push(blob);
+        return "blob:modelo";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    const nomes: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      nomes.push(this.download);
+    });
+    comPlanilha();
+    fireEvent.click(
+      within(comoImportar()).getByRole("button", {
+        name: "Baixar modelo (.xlsx)",
+      }),
+    );
+    expect(nomes).toEqual(["modelo-importacao-colaboradores.xlsx"]);
+    expect(blobs[0]!.type).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+  });
+
+  it("passo 2: orienta o preenchimento e lista os dados obrigatórios em etiquetas", () => {
+    comPlanilha();
+    expect(comoImportar()).toHaveTextContent(/códigos ativos/);
+    expect(comoImportar()).toHaveTextContent(/linha de exemplo/);
+    const obrigatorios = within(comoImportar()).getByRole("list", {
+      name: "Dados obrigatórios",
+    });
+    expect(
+      within(obrigatorios)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "Nome*",
+      "Tipo de vínculo*",
+      "Data de admissão*",
+      "Data de nascimento*",
+      "Departamento*",
+      "Cargo*",
+    ]);
+    // O asterisco é só visual; o texto já diz que são obrigatórios.
+    for (const marca of obrigatorios.querySelectorAll(
+      ".painel-adicionar__obrigatorio-marca",
+    )) {
+      expect(marca).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
+  it("passo 3: área de arquivo com formatos e limite; o botão abre o campo nativo", () => {
+    comPlanilha();
+    const campo = campoArquivo();
+    expect(campo.type).toBe("file");
+    expect(campo.accept).toMatch(/\.xlsx/);
+    expect(campo.accept).toMatch(/\.csv/);
+    const abrir = vi.spyOn(campo, "click").mockImplementation(() => undefined);
+    const botao = within(comoImportar()).getByRole("button", {
+      name: "Escolher arquivo",
+    });
+    expect(botao).toHaveAccessibleDescription(
+      ".xlsx ou .csv em UTF-8 · até 200 linhas e 1 MB",
+    );
+    fireEvent.click(botao);
+    expect(abrir).toHaveBeenCalledTimes(1);
+    expect(comoImportar()).toHaveTextContent(/ou solte o arquivo nesta área/);
+  });
+
+  it("sem arquivo, 'Iniciar importação' fica desabilitado e o rodapé diz por quê", () => {
+    const { onImportarArquivo, onImportarPlanilha } = comPlanilha();
+    expect(iniciar()).toBeDisabled();
+    expect(iniciar()).toHaveAccessibleDescription(
+      "Escolha o arquivo no passo 3 para seguir",
+    );
+    fireEvent.click(iniciar());
+    expect(onImportarArquivo).not.toHaveBeenCalled();
+    expect(onImportarPlanilha).not.toHaveBeenCalled();
+  });
+
+  it("escolhido o arquivo: o nome aparece, o botão habilita e entrega o arquivo ao shell", () => {
+    const { onImportarArquivo } = comPlanilha();
+    const arquivo = new File(["x"], "pessoas.xlsx");
+    escolher(arquivo);
+    expect(onImportarArquivo).not.toHaveBeenCalled();
+    expect(within(comoImportar()).getByRole("status")).toHaveTextContent(
+      "Arquivo escolhido: pessoas.xlsx",
+    );
+    expect(
+      within(comoImportar()).getByRole("button", { name: "Trocar arquivo" }),
+    ).toBeInTheDocument();
+    expect(iniciar()).toBeEnabled();
+    expect(
+      within(painel()).queryByText("Escolha o arquivo no passo 3 para seguir"),
+    ).toBeNull();
+    fireEvent.click(iniciar());
+    expect(onImportarArquivo).toHaveBeenCalledWith(arquivo);
+  });
+
+  it("soltar um .csv na área também o escolhe", () => {
+    const { onImportarArquivo } = comPlanilha();
+    const area = comoImportar().querySelector(".painel-adicionar__soltar")!;
+    const arquivo = new File(["x"], "pessoas.csv", { type: "text/csv" });
+    fireEvent.dragOver(area, { dataTransfer: { files: [arquivo] } });
+    expect(area).toHaveClass("painel-adicionar__soltar--arrastando");
+    fireEvent.drop(area, { dataTransfer: { files: [arquivo] } });
+    expect(area).not.toHaveClass("painel-adicionar__soltar--arrastando");
+    fireEvent.click(iniciar());
+    expect(onImportarArquivo).toHaveBeenCalledWith(arquivo);
+  });
+
+  it("arquivo que não é .xlsx nem .csv é recusado ali mesmo, sem habilitar o botão", () => {
+    const { onImportarArquivo } = comPlanilha();
+    escolher(new File(["x"], "pessoas.pdf"));
+    expect(within(comoImportar()).getByRole("alert")).toHaveTextContent(
+      '"pessoas.pdf" não é .xlsx nem .csv.',
+    );
+    expect(iniciar()).toBeDisabled();
+    fireEvent.click(iniciar());
+    expect(onImportarArquivo).not.toHaveBeenCalled();
+  });
+
+  it("fechar o painel esquece o arquivo escolhido", () => {
+    const props = {
+      onImportarPlanilha: vi.fn(),
+      onImportarArquivo: vi.fn(),
+    };
+    const { rerender, onFechar, onCadastroIndividual } = montar(props);
+    fireEvent.click(radio("Importar planilha"));
+    escolher(new File(["x"], "pessoas.xlsx"));
+    expect(iniciar()).toBeEnabled();
+    const comAberto = (aberto: boolean) => (
+      <PainelAdicionarColaborador
+        aberto={aberto}
+        empresaAtiva={EMPRESA}
+        onFechar={onFechar}
+        onCadastroIndividual={onCadastroIndividual}
+        {...props}
+      />
+    );
+    rerender(comAberto(false));
+    rerender(comAberto(true));
+    fireEvent.click(radio("Importar planilha"));
+    expect(iniciar()).toBeDisabled();
+  });
+
+  it("teclado: só controles nativos; o campo de arquivo oculto não é parada extra", () => {
+    comPlanilha();
+    for (const nome of ["Baixar modelo (.xlsx)", "Escolher arquivo"]) {
+      const botao = within(comoImportar()).getByRole("button", { name: nome });
+      expect(botao.tagName).toBe("BUTTON");
+      expect(botao).toBeEnabled();
+    }
+    expect(campoArquivo()).toHaveAttribute("hidden");
+  });
+
+  it("CSS dos passos: só tokens, sem largura fixa (375 px) e animação só sem movimento reduzido", () => {
+    const css = readFileSync(
+      "src/screens/pessoas/PainelAdicionarColaborador.css",
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const bloco = css.slice(css.indexOf(".painel-adicionar__bloco"));
+    expect(bloco).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+    // Anel de foco: só pelo teclado e dentro da caixa (não é cortado nem
+    // para na divisória); aberto, contorna o bloco inteiro.
+    expect(css).not.toMatch(/painel-adicionar__forma:focus-within/);
+    expect(css).toMatch(
+      /\.painel-adicionar__bloco--expandido:has\(\s*\.painel-adicionar__radio:focus-visible\s*\)\s*\{[^}]*outline-offset: -1px/,
+    );
+    // Só traços de 1px; nenhuma largura fixa de layout.
+    expect(bloco).not.toMatch(/(^|[^-])width:\s*(?!1px)\d+px/m);
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: no-preference\)[\s\S]*painel-adicionar__importacao/,
+    );
+    // A divisória dos passos fica dentro do cartão, recuada dos dois lados —
+    // não atravessa o painel inteiro.
+    expect(css).toMatch(
+      /\.painel-adicionar__importacao \{[^}]*margin: 0 var\(--space-md\)/,
     );
   });
 });

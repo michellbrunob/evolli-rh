@@ -39,6 +39,12 @@ const COLUNAS: readonly Coluna[] = [
   ...COLUNAS_OPCIONAIS,
 ];
 
+/**
+ * T212 — o cabeçalho técnico do modelo, na ordem: a mesma definição serve ao
+ * CSV e ao `.xlsx` (gerar e ler).
+ */
+export const COLUNAS_DO_MODELO: readonly Coluna[] = COLUNAS;
+
 /** O nome de cada coluna como a pessoa o lê (tela e relatório). */
 export const ROTULO_DA_COLUNA: Readonly<Record<Coluna, string>> = {
   nome: "Nome",
@@ -85,6 +91,10 @@ function normalizar(texto: string): string {
     .replace(/[\s-]+/g, "_");
 }
 
+/** T212 — os tipos aceitos (código e rótulo), para o modelo `.xlsx`. */
+export const TIPOS_ACEITOS: ReadonlyArray<readonly [TipoVinculo, string]> =
+  TIPOS;
+
 const TIPO_POR_TEXTO = new Map<string, TipoVinculo>(
   TIPOS.flatMap(([tipo, rotulo]) => [
     [tipo, tipo],
@@ -94,21 +104,27 @@ const TIPO_POR_TEXTO = new Map<string, TipoVinculo>(
 
 // ---------------------------------------------------------------- modelo
 
-/** O modelo: BOM, cabeçalho fixo e uma linha de exemplo sintética. */
+/**
+ * A linha de exemplo do modelo (CSV e `.xlsx`): sintética, reconhecida pelo
+ * nome e recusada na conferência — quem esquece de apagá-la não importa nada
+ * por engano.
+ */
+export const LINHA_DE_EXEMPLO: readonly string[] = [
+  NOME_DA_LINHA_DE_EXEMPLO,
+  "clt",
+  "01/12/2026",
+  "15/05/1990",
+  "CODIGO-DO-DEPARTAMENTO",
+  "CODIGO-DO-CARGO",
+  "",
+  "",
+];
+
+/** O modelo CSV: BOM, cabeçalho fixo e a linha de exemplo sintética. */
 export function gerarModelo(): string {
-  const exemplo = [
-    NOME_DA_LINHA_DE_EXEMPLO,
-    "clt",
-    "01/12/2026",
-    "15/05/1990",
-    "CODIGO-DO-DEPARTAMENTO",
-    "CODIGO-DO-CARGO",
-    "",
-    "",
-  ];
   return (
     BOM +
-    [COLUNAS.join(";"), exemplo.join(";")].join(FIM_DE_LINHA) +
+    [COLUNAS.join(";"), LINHA_DE_EXEMPLO.join(";")].join(FIM_DE_LINHA) +
     FIM_DE_LINHA
   );
 }

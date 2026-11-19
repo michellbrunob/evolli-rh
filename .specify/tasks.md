@@ -3556,8 +3556,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         escuro e Documentos.
 
 108.  **T211 - Organização do menu**
-      - **Estado:** **em implementação local**. Branch `codex/t211-organizacao-menu`, a partir do
-        squash da T210 em `main` (`053aa3d`, PR #203). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #204, squash
+        `255a88627460bfed1ffc37f121d77ecb39da621f`, com a CI de push 3/3 verde (run
+        44378071052); branch remota `codex/t211-organizacao-menu` preservada.
       - **Objetivo:** reorganizar só a navegação, mantendo a identidade própria do Evolli:
         Escala de trabalho e Organograma no submenu de Colaboradores; Equipe e permissões em
         Configurações; Ponto e Administração da liderança fora do menu, com URL própria;
@@ -3575,6 +3576,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         T213 — Documentos. Nenhuma iniciada.
       - **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos;
         mudança funcional nas telas; Documentos.
+
+109.  **T212 - Importação de colaboradores por planilha `.xlsx`**
+      - **Estado:** **aprovada visualmente pela proprietária em 18/11/2026; aguarda a ordem de
+        publicação**. Branch `codex/t212-importacao-xlsx`, a partir do squash da T211 em
+        `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+      - **Comprovado:** suíte web completa com 160 arquivos e 4436 testes verdes; E2E com
+        PostgreSQL real 14 de 14; Excel real; navegador como RH e DP, desktop e 375 px (`.xlsx`,
+        reenvio sem duplicar, CSV).
+      - **Limite conhecido:** o mesmo arquivo reenviado por outra conta admite de novo as linhas
+        sem matrícula (idempotência por ator e empresa, regra da T179).
+      - **Objetivo:** importar colaboradores por `.xlsx`, mantendo o CSV, com o modelo `.xlsx`
+        gerado no navegador como download principal e o painel "Adicionar colaborador" em três
+        passos, conforme o [documento de decisão](../docs/decisions/t212-importacao-xlsx.md).
+      - **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; colunas além
+        das 8 do modelo; dependência nova; Documentos.
 
 ## Regra obrigatória para as próximas tarefas
 

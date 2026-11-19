@@ -51,12 +51,21 @@ import {
   type ReferenciaDoCatalogo,
   type Referencias,
 } from "./planilhaColaboradores";
+import {
+  NOME_DO_MODELO_XLSX,
+  TIPO_MIME_XLSX,
+  gerarModeloXlsx,
+  lerPlanilhaXlsx,
+  pareceXlsx,
+} from "./planilhaXlsx";
 import "./ImportarColaboradoresScreen.css";
 
 export const IMPORTAR_COLABORADORES_TITULO_ID = "importar-colaboradores-titulo";
 
 const TITULO = "Importar planilha de colaboradores";
-const ROTULO_DO_ARQUIVO = "Arquivo CSV da planilha";
+const ROTULO_DO_ARQUIVO = "Arquivo da planilha (.xlsx ou .csv)";
+/** T212 — o que o campo de arquivo aceita. */
+const FORMATOS_ACEITOS = `.xlsx,.csv,${TIPO_MIME_XLSX},text/csv`;
 const AVISO_NADA_IMPORTADO = "Nenhuma pessoa da planilha foi importada ainda.";
 
 /** O que cada coluna aceita, para a tabela do passo 1. */
@@ -124,13 +133,27 @@ function hojeLocal(): string {
   return `${agora.getFullYear()}-${mes}-${dia}`;
 }
 
-function lerTexto(arquivo: File): Promise<string> {
+/** Os bytes do arquivo, lidos só nesta aba. */
+function lerBytes(arquivo: File): Promise<Uint8Array> {
   return new Promise((resolver, rejeitar) => {
     const leitor = new FileReader();
-    leitor.onload = () => resolver(String(leitor.result ?? ""));
+    leitor.onload = () =>
+      resolver(new Uint8Array(leitor.result as ArrayBuffer));
     leitor.onerror = () => rejeitar(leitor.error);
-    leitor.readAsText(arquivo, "utf-8");
+    leitor.readAsArrayBuffer(arquivo);
   });
+}
+
+/**
+ * T212 — `.xlsx` (pelo nome ou pela assinatura) vai à leitura da aba
+ * Colaboradores; o resto, ao CSV em UTF-8 de sempre. As duas chegam à mesma
+ * estrutura e à mesma conferência.
+ */
+async function lerArquivo(arquivo: File) {
+  const bytes = await lerBytes(arquivo);
+  return pareceXlsx(arquivo.name, bytes)
+    ? lerPlanilhaXlsx(bytes)
+    : lerPlanilha(new TextDecoder("utf-8").decode(bytes));
 }
 
 /** Todas as páginas de um catálogo ativo — sem o teto de 100 (T190). */
@@ -175,10 +198,19 @@ function motivoDaRecusa(erro: ApiError): string {
 export interface ImportarColaboradoresScreenProps {
   /** Voltar à listagem de Colaboradores. */
   readonly onSair: () => void;
+  /**
+   * T212 — arquivo já escolhido no painel "Adicionar colaborador": a página
+   * o confere assim que a empresa ativa é conhecida.
+   */
+  readonly arquivoInicial?: File | null;
+  /** Avisado depois de ler o arquivo inicial (o shell o esquece). */
+  readonly onArquivoInicialLido?: () => void;
 }
 
 export function ImportarColaboradoresScreen({
   onSair,
+  arquivoInicial = null,
+  onArquivoInicialLido,
 }: ImportarColaboradoresScreenProps) {
   const prefixo = useId();
   const [empresa, setEmpresa] = useState<EmpresaApi | null>(null);
@@ -264,7 +296,23 @@ export function ImportarColaboradoresScreen({
     const arquivo = campo.files?.[0];
     // O mesmo arquivo pode ser escolhido de novo depois de corrigido.
     campo.value = "";
-    if (!arquivo || !empresa) return;
+    if (arquivo) await processarArquivo(arquivo);
+  }
+
+  // T212 — o arquivo escolhido no painel é conferido uma vez, quando a
+  // empresa ativa chega.
+  const arquivoInicialLidoRef = useRef(false);
+  useEffect(() => {
+    if (!arquivoInicial || !empresa || arquivoInicialLidoRef.current) return;
+    arquivoInicialLidoRef.current = true;
+    void processarArquivo(arquivoInicial).finally(() =>
+      onArquivoInicialLido?.(),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arquivoInicial, empresa]);
+
+  async function processarArquivo(arquivo: File) {
+    if (!empresa) return;
     setErroDoArquivo(null);
     const porTamanho = verificarTamanho(arquivo.size);
     if (porTamanho) {
@@ -273,7 +321,7 @@ export function ImportarColaboradoresScreen({
     }
     setLendo(true);
     try {
-      const lida = lerPlanilha(await lerTexto(arquivo));
+      const lida = await lerArquivo(arquivo);
       if ("erro" in lida) {
         setErroDoArquivo(lida.erro);
         return;
@@ -369,7 +417,11 @@ export function ImportarColaboradoresScreen({
     irPara("resultado");
   }
 
-  function baixarModelo() {
+  function baixarModeloXlsx() {
+    baixarArquivo(gerarModeloXlsx(), NOME_DO_MODELO_XLSX, TIPO_MIME_XLSX);
+  }
+
+  function baixarModeloCsv() {
     baixarArquivo(gerarModelo(), "modelo-importacao-colaboradores.csv");
   }
 
@@ -491,10 +543,11 @@ export function ImportarColaboradoresScreen({
             Modelo e arquivo
           </h2>
           <p className="importar-colaboradores__texto">
-            Use o modelo: só CSV, até {LIMITE_DE_LINHAS} linhas e 1 MB. O
-            arquivo é lido só neste navegador — não é enviado nem guardado.
-            Colunas fora do modelo (como CPF, salário ou contatos) recusam o
-            arquivo inteiro.
+            O modelo é uma planilha .xlsx, com as abas Colaboradores, Exemplos e
+            Instruções; um .csv em UTF-8 continua aceito, com o mesmo cabeçalho.
+            Até {LIMITE_DE_LINHAS} linhas e 1 MB. O arquivo é lido só neste
+            navegador — não é enviado nem guardado. Colunas fora do modelo (como
+            CPF, salário ou contatos) recusam o arquivo inteiro.
           </p>
           <div className="importar-colaboradores__tabela-rolagem">
             <table className="importar-colaboradores__tabela">
@@ -528,8 +581,11 @@ export function ImportarColaboradoresScreen({
             </table>
           </div>
           <div className="importar-colaboradores__acoes">
-            <Button variant="secondary" onClick={baixarModelo}>
-              Baixar modelo
+            <Button variant="secondary" onClick={baixarModeloXlsx}>
+              Baixar modelo (.xlsx)
+            </Button>
+            <Button variant="subtle" onClick={baixarModeloCsv}>
+              Baixar modelo em CSV
             </Button>
           </div>
           <div className="importar-colaboradores__arquivo">
@@ -537,7 +593,7 @@ export function ImportarColaboradoresScreen({
             <input
               id={`${prefixo}-arquivo`}
               type="file"
-              accept=".csv,text/csv"
+              accept={FORMATOS_ACEITOS}
               disabled={!empresa || lendo}
               aria-describedby={
                 erroDoArquivo ? `${prefixo}-erro-arquivo` : undefined
