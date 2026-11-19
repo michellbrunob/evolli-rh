@@ -201,6 +201,18 @@ import {
   SeletorDeReferencia,
   TAMANHO_DA_PAGINA_DE_REFERENCIAS,
 } from "./SeletorDeReferencia";
+import {
+  EtapaDocumentos,
+  documentosIniciais,
+  type DocumentoDaEtapa,
+} from "./documentos/EtapaDocumentos";
+import {
+  EnvioDosDocumentos,
+  algumEnviando,
+  enviarDocumentoDaEtapa,
+  type EnvioDeDocumento,
+} from "./documentos/EnvioDosDocumentos";
+import { novaChaveDeEnvio } from "./documentos/documentosDoColaborador";
 import "./NovaAdmissaoScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
@@ -326,12 +338,11 @@ type Erros = Partial<Record<CampoErro, string>>;
  */
 const ETAPAS = [
   // T209 — etapa 1 do Novo colaborador (2026-11-17): títulos, subtítulos e
-  // descrições do novo cadastro. A etapa 4 segue como revisão até a fatia
-  // dos documentos.
+  // descrições do novo cadastro. T213 — a etapa 4 é "Documentos" (opcional).
   "Dados básicos",
   "Dados profissionais",
   "Endereço",
-  "Revisão e conclusão",
+  "Documentos",
 ] as const;
 
 /** T209 — o subtítulo de cada etapa, na coluna das etapas. */
@@ -339,7 +350,7 @@ const SUBTITULOS_DAS_ETAPAS = [
   "Identificação e contatos",
   "Lotação e contrato",
   "CEP e endereço",
-  "Resumo final",
+  "Envio de arquivos",
 ] as const;
 
 /** T209 — a descrição de cada etapa, no cabeçalho dela. */
@@ -347,7 +358,7 @@ const DESCRICOES_DAS_ETAPAS = [
   "Quem é a pessoa e como falar com ela.",
   "Lotação, contrato e remuneração.",
   "Onde a pessoa mora.",
-  "Revise tudo antes de concluir.",
+  "Opcional. Os arquivos são enviados quando o cadastro é concluído.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;
@@ -1287,6 +1298,13 @@ export function NovaAdmissaoScreen({
   /** T209 — a foto escolhida (prévia local) e o seu envio, pós-admissão. */
   const [foto, setFoto] = useState<FotoEscolhida | null>(null);
   const [recusaDaFoto, setRecusaDaFoto] = useState<string | null>(null);
+  // T213 — documentos da etapa 4: só na memória desta aba (nunca no
+  // rascunho); sobem depois de o colaborador ser criado.
+  const [documentos, setDocumentos] =
+    useState<DocumentoDaEtapa[]>(documentosIniciais);
+  const [enviosDosDocumentos, setEnviosDosDocumentos] = useState<
+    Record<string, EnvioDeDocumento>
+  >({});
   const [envioDaFoto, setEnvioDaFoto] = useState<EnvioDaFoto>({
     estado: "nenhum",
   });
@@ -1620,13 +1638,21 @@ export function NovaAdmissaoScreen({
 
   // Com o rascunho salvo e nada mudado desde então, sair não perde nada.
   // T209 — a foto nunca vai para o rascunho: escolhida, sair a perde.
+  // T213 — os documentos escolhidos também (só na memória desta aba).
+  const comDocumentoEscolhido = documentos.some((d) => d.arquivo !== null);
   const pendenteSemRascunho =
     admissao === null &&
-    ((alterado && assinaturaAtual !== assinaturaSalva) || foto !== null);
+    ((alterado && assinaturaAtual !== assinaturaSalva) ||
+      foto !== null ||
+      comDocumentoEscolhido);
+  // T213 — enquanto os documentos sobem, a página não pode ser trocada.
+  const enviandoDocumentos =
+    admissao !== null && algumEnviando(documentos, enviosDosDocumentos);
 
   useEdicaoEmAndamento("Nova admissão", {
     pendente: pendenteSemRascunho,
-    salvando: salvando || envioDaFoto.estado === "enviando",
+    salvando:
+      salvando || envioDaFoto.estado === "enviando" || enviandoDocumentos,
     aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
 
@@ -2246,6 +2272,9 @@ export function NovaAdmissaoScreen({
       // T209 — a foto vai só agora, para o colaborador já criado; a falha
       // dela nunca desfaz a admissão.
       if (foto) void enviarFoto(resposta.id, foto.arquivo);
+      // T213 — os documentos também: um por vez, e a falha de um nunca
+      // desfaz a admissão.
+      void enviarDocumentos(resposta.id);
       // T209 — concluída a admissão, o rascunho deixa de existir.
       setRascunho(null);
       setAssinaturaSalva(null);
@@ -2442,7 +2471,30 @@ export function NovaAdmissaoScreen({
     void enviarFoto(colaboradorId, arquivo);
   }
 
+  /** T213 — envia os documentos escolhidos (todos, ou só os indicados). */
+  async function enviarDocumentos(
+    colaboradorId: string,
+    somente?: readonly string[],
+  ) {
+    const alvo = documentos.filter(
+      (d) => d.arquivo && (!somente || somente.includes(d.id)),
+    );
+    for (const documento of alvo) {
+      setEnviosDosDocumentos((atual) => ({
+        ...atual,
+        [documento.id]: { estado: "enviando" },
+      }));
+      const resultado = await enviarDocumentoDaEtapa(colaboradorId, documento);
+      setEnviosDosDocumentos((atual) => ({
+        ...atual,
+        [documento.id]: resultado,
+      }));
+    }
+  }
+
   function recomecar() {
+    setDocumentos(documentosIniciais());
+    setEnviosDosDocumentos({});
     setFoto(null);
     setRecusaDaFoto(null);
     setEnvioDaFoto({ estado: "nenhum" });
@@ -2618,6 +2670,11 @@ export function NovaAdmissaoScreen({
           if (foto) void enviarFoto(admissao.id, foto.arquivo);
         }}
         onEscolherOutraFoto={(arquivo) => enviarOutraFoto(admissao.id, arquivo)}
+        documentos={documentos}
+        enviosDosDocumentos={enviosDosDocumentos}
+        onTentarDocumentoDeNovo={(id) =>
+          void enviarDocumentos(admissao.id, [id])
+        }
       />
     );
   }
@@ -2654,91 +2711,6 @@ export function NovaAdmissaoScreen({
       </p>
     ) : null;
   }
-
-  // T195 — o resumo da revisão: o que foi digitado, sem opcional em branco.
-  const linhasBasicas = linhasPreenchidas([
-    ["Nome completo", campos.nome],
-    ["CPF", identificacao.cpf],
-    ["RG", identificacao.rg],
-    [
-      ROTULO_DATA_NASCIMENTO,
-      perfil.dataNascimento ? formatarDiaCivil(perfil.dataNascimento) : null,
-    ],
-    ["Gênero", rotuloDoGenero(identificacao.genero)],
-    ["Estado civil", perfil.estadoCivil],
-    ["E-mail pessoal", contatos.emailPessoal],
-    ["Telefone pessoal", contatos.celular],
-    ["Nome do contato", identificacao.contatoEmergenciaNome],
-    ["Telefone do contato", identificacao.contatoEmergenciaTelefone],
-  ]);
-  const linhasProfissionais = linhasPreenchidas([
-    [
-      "Cargo",
-      campos.cargoNome.trim() || escolhida(opcoes.cargos, campos.cargoId),
-    ],
-    [
-      "Nível",
-      OPCOES_NIVEL.find((o) => o.codigo === campos.nivel)?.rotulo ?? null,
-    ],
-    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
-    ["Área", escolhida(areas, campos.areaId)],
-    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
-    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
-    [
-      "Gestor direto",
-      campos.gestorDiretoId === "sem_gestor"
-        ? "Sem gestor"
-        : (gestores.find((g) => g.id === campos.gestorDiretoId)?.nome ?? null),
-    ],
-    [
-      "Tipo de contratação",
-      campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null,
-    ],
-    [
-      "Data de admissão",
-      campos.dataAdmissao ? formatarDiaCivil(campos.dataAdmissao) : null,
-    ],
-    [
-      "Jornada de trabalho",
-      campos.jornadaSemanalHoras
-        ? `${campos.jornadaSemanalHoras} horas por semana`
-        : null,
-    ],
-    [
-      "Escala de trabalho",
-      OPCOES_ESCALA.find((o) => o.codigo === campos.escala)?.nome ?? null,
-    ],
-    ["Matrícula", campos.matricula.toUpperCase()],
-    ["Salário bruto", campos.salarioBruto ? `R$ ${campos.salarioBruto}` : null],
-    [
-      "Salário líquido",
-      salarioLiquidoExibido ? `R$ ${salarioLiquidoExibido}` : null,
-    ],
-    [
-      "Conselho e registro",
-      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
-        ? [
-            campos.conselhoProfissional.toUpperCase(),
-            campos.registroProfissional.trim(),
-          ]
-            .filter(Boolean)
-            .join(" ")
-        : null,
-    ],
-    ["Dependentes (IRRF)", campos.dependentesIrrf || null],
-    [
-      "Pensão alimentícia",
-      campos.pensaoAlimenticiaPercentual
-        ? `${campos.pensaoAlimenticiaPercentual}%`
-        : null,
-    ],
-  ]);
-  // T209 — sem campo País na etapa 3: o país não entra no resumo.
-  const linhasDoEndereco = linhasPreenchidas(
-    CAMPOS_ENDERECO.filter((c) => c.chave !== "pais").map(
-      (c) => [c.rotulo, endereco[c.chave]] as const,
-    ),
-  );
 
   return (
     <>
@@ -3704,33 +3676,41 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
             </SecaoDoCadastro>
           </>,
-          <>
-            <p className="nova-admissao__texto">
-              Confira os dados antes de concluir. Para corrigir algo, use
-              Editar: o que você já digitou continua aqui.
-            </p>
-            <BlocoDaRevisao
-              titulo={ETAPAS[0]}
-              id="nova-admissao-revisao-basicos"
-              linhas={linhasBasicas}
-              onEditar={() => irParaEtapa(0)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[1]}
-              id="nova-admissao-revisao-profissionais"
-              linhas={linhasProfissionais}
-              onEditar={() => irParaEtapa(1)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[2]}
-              id="nova-admissao-revisao-endereco"
-              linhas={linhasDoEndereco}
-              onEditar={() => irParaEtapa(2)}
-            />
-            <p className="nova-admissao__texto nova-admissao__ajuda">
-              Campos opcionais em branco não aparecem neste resumo.
-            </p>
-          </>,
+          <EtapaDocumentos
+            key="documentos"
+            documentos={documentos}
+            onEscolherArquivo={(id, arquivo) =>
+              setDocumentos((atual) =>
+                atual.map((d) =>
+                  d.id === id
+                    ? { ...d, arquivo, chaveDeEnvio: novaChaveDeEnvio() }
+                    : d,
+                ),
+              )
+            }
+            onTirarArquivo={(id) =>
+              setDocumentos((atual) =>
+                atual.map((d) =>
+                  d.id === id ? { ...d, arquivo: null, chaveDeEnvio: null } : d,
+                ),
+              )
+            }
+            onAdicionarOutro={(nome) =>
+              setDocumentos((atual) => [
+                ...atual,
+                {
+                  id: `outro-${novaChaveDeEnvio()}`,
+                  categoria: "outros",
+                  nome,
+                  arquivo: null,
+                  chaveDeEnvio: null,
+                },
+              ])
+            }
+            onRemoverOutro={(id) =>
+              setDocumentos((atual) => atual.filter((d) => d.id !== id))
+            }
+          />,
         ]}
         mensagem={
           <>
@@ -3918,62 +3898,6 @@ export function NovaAdmissaoScreen({
  * acontece ao voltar é o chamador (com ou sem confirmação de descarte).
  */
 /** T195 — rótulo e valor, só os preenchidos, sem espaços nas pontas. */
-function linhasPreenchidas(
-  pares: readonly (readonly [string, string | null])[],
-): (readonly [string, string])[] {
-  return pares.flatMap(([rotulo, valor]) =>
-    valor !== null && valor.trim() !== ""
-      ? [[rotulo, valor.trim()] as const]
-      : [],
-  );
-}
-
-/**
- * T195 — um bloco da revisão: o que foi digitado em uma etapa e "Editar",
- * que volta a ela sem perder nada.
- */
-function BlocoDaRevisao({
-  titulo,
-  id,
-  linhas,
-  onEditar,
-}: {
-  readonly titulo: string;
-  readonly id: string;
-  readonly linhas: readonly (readonly [string, string])[];
-  readonly onEditar: () => void;
-}) {
-  return (
-    <section className="nova-admissao__revisao-bloco" aria-labelledby={id}>
-      <div className="nova-admissao__revisao-cabecalho">
-        <h3 id={id} className="nova-admissao__subtitulo">
-          {titulo}
-        </h3>
-        <Button
-          type="button"
-          variant="subtle"
-          aria-label={`Editar ${titulo}`}
-          onClick={onEditar}
-        >
-          Editar
-        </Button>
-      </div>
-      {linhas.length > 0 ? (
-        <dl className="nova-admissao__resumo">
-          {linhas.map(([rotulo, valor]) => (
-            <div key={rotulo} className="nova-admissao__resumo-linha">
-              <dt>{rotulo}</dt>
-              <dd>{valor}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="nova-admissao__texto">Nada informado nesta etapa.</p>
-      )}
-    </section>
-  );
-}
-
 interface ConfirmacaoProps {
   admissao: AdmissaoRegistradaApi;
   opcoes: Opcoes;
@@ -3987,6 +3911,10 @@ interface ConfirmacaoProps {
   envioDaFoto: EnvioDaFoto;
   onTentarFotoDeNovo: () => void;
   onEscolherOutraFoto: (arquivo: File | undefined) => void;
+  /** T213 — os documentos da etapa 4 e o envio de cada um. */
+  documentos: readonly DocumentoDaEtapa[];
+  enviosDosDocumentos: Readonly<Record<string, EnvioDeDocumento>>;
+  onTentarDocumentoDeNovo: (id: string) => void;
 }
 
 /**
@@ -4056,6 +3984,9 @@ function ConfirmacaoDaAdmissao({
   envioDaFoto,
   onTentarFotoDeNovo,
   onEscolherOutraFoto,
+  documentos,
+  enviosDosDocumentos,
+  onTentarDocumentoDeNovo,
 }: ConfirmacaoProps) {
   const colaborador: ColaboradorApi = {
     id: admissao.id,
@@ -4289,6 +4220,11 @@ function ConfirmacaoDaAdmissao({
             onEscolherOutra={onEscolherOutraFoto}
           />
         ) : null}
+        <EnvioDosDocumentos
+          documentos={documentos}
+          envios={enviosDosDocumentos}
+          onTentarDeNovo={onTentarDocumentoDeNovo}
+        />
         <FormActions>
           <Button
             type="button"
@@ -4304,7 +4240,18 @@ function ConfirmacaoDaAdmissao({
           >
             Revisar contatos na ficha
           </Button>
-          <Button type="button" variant="secondary" onClick={onRecomecar}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRecomecar}
+            // T213 — com documento subindo, recomeçar perderia o envio.
+            disabled={algumEnviando(documentos, enviosDosDocumentos)}
+            aria-describedby={
+              algumEnviando(documentos, enviosDosDocumentos)
+                ? "nova-admissao-documentos-aguarde"
+                : undefined
+            }
+          >
             Registrar outra admissão
           </Button>
           <Button type="button" variant="secondary" onClick={onSair}>

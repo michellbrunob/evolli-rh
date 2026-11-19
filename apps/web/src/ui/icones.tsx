@@ -33,6 +33,7 @@ import {
   InfoCircle,
   MessageQuestion,
   Messages1,
+  More,
   People,
   Personalcard,
   Profile,
@@ -40,12 +41,17 @@ import {
   ProfileCircle,
   Rank,
   Receipt,
+  Refresh2,
   Routing2,
   SecurityUser,
+  ShieldCross,
+  ShieldSearch,
   Setting,
   ShieldTick,
   TickCircle,
+  Trash,
   UserAdd,
+  Warning2,
   type Icon,
 } from "iconsax-react";
 
@@ -118,6 +124,19 @@ export const IconeBaixarArquivo = decorativo(DocumentDownload, "Bulk");
 export const IconeEnviarArquivo = decorativo(DocumentUpload, "Bulk");
 /** T212 — aviso curto, informativo. */
 export const IconeInformacao = decorativo(InfoCircle, "Bulk");
+
+// ---- T213 — documentos do colaborador (Bulk) ------------------------------
+/** Arquivo em análise pelo antivírus. */
+export const IconeEmVerificacao = decorativo(ShieldSearch, "Bulk");
+/** Arquivo recusado pelo antivírus. */
+export const IconeReprovado = decorativo(ShieldCross, "Bulk");
+/** Envio que não chegou ao servidor. */
+export const IconeNaoEnviado = decorativo(Warning2, "Bulk");
+export const IconeVer = decorativo(Eye, "Bulk");
+export const IconeRemover = decorativo(Trash, "Bulk");
+export const IconeTentarDeNovo = decorativo(Refresh2, "Linear");
+/** Os três pontos de "mais ações". */
+export const IconeMaisAcoes = decorativo(More, "Linear");
 
 // ---- Glifos de interface (Linear) ----------------------------------------
 export const IconeVoltar = decorativo(ArrowLeft2, "Linear");
