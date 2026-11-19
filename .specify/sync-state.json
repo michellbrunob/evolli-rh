@@ -3,7 +3,7 @@
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-18",
   "lastIntegratedTask": 212,
-  "lastRecordedTask": 212,
+  "lastRecordedTask": 213,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,11 +11,17 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T212",
-    "status": "integrada",
-    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); branch remota preservada. Importacao de colaboradores por .xlsx, mantendo o CSV, com modelo gerado no navegador, leitura so no navegador e painel em tres passos (docs/decisions/t212-importacao-xlsx.md); limite conhecido: reenvio por outra conta admite de novo linhas sem matricula. Nenhuma entrega aberta ate a abertura da proxima tarefa."
+    "id": "T213",
+    "status": "documentos_colaborador_em_preparacao",
+    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); convergida no primeiro commit da T213. T213 em preparacao: levantamento, dossie e proposta da primeira fatia (etapa 4 Documentos com envio real ao R2) para aprovacao da proprietaria (docs/decisions/t213-documentos-colaborador.md); upload real condicionado aos portoes de Nivel 2 das ADRs 0011 e 0013. Sem codigo, push, PR, Ready ou merge."
   },
-  "openDeliveries": [],
+  "openDeliveries": [
+    {
+      "id": "T213",
+      "pullRequest": null,
+      "status": "documentos_colaborador_em_preparacao"
+    }
+  ],
   "requiredArtifacts": [
     ".specify/memory/constitution.md",
     ".specify/spec.md",

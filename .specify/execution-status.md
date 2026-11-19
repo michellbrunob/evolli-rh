@@ -3404,3 +3404,20 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
+
+## Documentos do colaborador — T213 (em preparação)
+
+| Tarefa | Estado            | Resultado principal                                                             |
+| ------ | ----------------- | ------------------------------------------------------------------------------- |
+| T213   | **Em preparação** | Dossiê e proposta da primeira fatia: etapa 4 "Documentos" com envio real ao R2. |
+
+**Escopo da preparação:** levantamento em leitura (R2, foto do colaborador, documentos só como
+metadados, Nova admissão, permissões, auditoria, exclusão e retenção) e decisões D1–D20 para
+aprovação ([documento de decisão](../docs/decisions/t213-documentos-colaborador.md)).
+
+**Condição:** o upload real depende dos portões de Nível 2 das ADRs 0011 e 0013 (antivírus e
+quarentena, limites, acesso ao conteúdo, MFA, retenção) aprovados em ADR nova; a admissão nunca
+depende de anexo.
+
+**Fora de escopo:** código nesta preparação; OCR, assinatura, leitura automática,
+compartilhamento externo, vencimentos, retenção automática e envio pela importação.

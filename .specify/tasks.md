@@ -3593,6 +3593,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; colunas além
         das 8 do modelo; dependência nova; Documentos.
 
+110.  **T213 - Documentos do colaborador**
+      - **Estado:** **em preparação**: levantamento, dossiê e proposta da primeira fatia para
+        aprovação da proprietária, sem código. Branch `codex/t213-documentos-colaborador`, a
+        partir do squash da T212 em `main` (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Objetivo:** RH e DP anexarem documentos reais do colaborador com rapidez e segurança,
+        começando pela etapa 4 "Documentos" do fluxo "Novo colaborador", conforme o
+        [documento de decisão](../docs/decisions/t213-documentos-colaborador.md).
+      - **Condição:** upload real só depois das decisões de Nível 2 (ADRs 0011 e 0013) aprovadas e
+        registradas em ADR nova; a admissão nunca depende de anexo.
+      - **Fora de escopo:** OCR, assinatura, leitura automática, compartilhamento externo,
+        vencimentos, retenção automática e envio de documentos pela importação.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.
