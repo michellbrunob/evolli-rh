@@ -168,6 +168,9 @@ model AccessUser {
   fotosColaboradorEnviadas       FotoColaborador[]            @relation("FotoColaboradorAutor")
   desativacoesFeitas             DesativacaoColaborador[]     @relation("DesativacaoColaboradorAutor")
   reativacoesFeitas              DesativacaoColaborador[]     @relation("ReativacaoColaboradorAutor")
+  // T215 — Férias e ausências: quem registrou e quem decidiu.
+  ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
+  ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
   // T213 — documentos do colaborador: quem registrou, enviou ou removeu.
   documentosColaboradorCriados   DocumentoColaborador[]       @relation("DocumentoColaboradorAutor")
   documentosColaboradorRemovidos DocumentoColaborador[]       @relation("DocumentoColaboradorRemocao")
@@ -496,6 +499,13 @@ enum AuditAction {
   // Editar colaborador). Sem conteudo: so o id do colaborador e a empresa.
   pessoas_colaborador_desativado @map("pessoas.colaborador.desativado")
   pessoas_colaborador_reativado  @map("pessoas.colaborador.reativado")
+
+  // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
+  // ausência e a empresa (nunca tipo, datas, motivo ou observação).
+  pessoas_ausencia_registrada @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada   @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada   @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada  @map("pessoas.ausencia.cancelada")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -827,6 +837,8 @@ model Empresa {
   // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
   fotosColaborador            FotoColaborador[]
   desativacoesColaborador     DesativacaoColaborador[]
+  // T215 — Férias e ausências.
+  ausencias                   Ausencia[]
   limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
   // T213 — documentos do colaborador.
   documentosColaborador       DocumentoColaborador[]
@@ -1173,11 +1185,13 @@ model Colaborador {
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
 
   // T209 — foto do colaborador, por empresa (ADR 0020).
-  fotos      FotoColaborador[]
+  fotos        FotoColaborador[]
   /// T215 — desativações NA EMPRESA (lixeira do Editar colaborador).
   desativacoes DesativacaoColaborador[]
   // T213 — documentos do colaborador.
-  documentos DocumentoColaborador[]
+  documentos   DocumentoColaborador[]
+  /// T215 — Férias e ausências.
+  ausencias    Ausencia[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1228,6 +1242,9 @@ model VinculoFuncional {
   /// T209 — o contrato da admissão (etapa 2): tabela própria, fora do
   /// vínculo, para o salário não sair pelas rotas do vínculo.
   contrato ContratoVinculo?
+
+  /// T215 — ausências registradas com este vínculo como o principal.
+  ausencias Ausencia[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -2659,6 +2676,76 @@ model DesativacaoColaborador {
   @@index([colaboradorId, empresaId])
   @@index([empresaId])
   @@map("desativacao_colaborador")
+}
+
+/// T215 — Férias e ausências: tipos de ausência (lista fechada).
+enum TipoAusencia {
+  ferias
+  licenca_medica
+  licenca_maternidade
+  licenca_paternidade
+  afastamento
+  falta_justificada
+  falta_sem_justificativa
+  day_off
+  home_office
+}
+
+/// T215 — motivo do afastamento (só para `afastamento`, e obrigatório nele).
+enum MotivoAfastamento {
+  auxilio_doenca
+  acidente_trabalho
+  licenca_nao_remunerada
+  licenca_remunerada
+  outro
+}
+
+/// T215 — situação da ausência no fluxo de aprovação.
+enum StatusAusencia {
+  aguardando_gestor
+  aguardando_rh
+  aprovada
+  cancelamento_pedido
+  ajuste_sugerido
+  recusada
+  cancelada
+}
+
+/// T215 — Férias e ausências do colaborador NA EMPRESA. Uma linha por
+/// ausência; nada se apaga (cancelar e recusar mudam o status; o banco nega o
+/// DELETE). `fim` nulo só no afastamento sem data de volta. `vinculoId` é o
+/// vínculo principal no registro; `periodoAquisitivoInicio` diz de que
+/// período aquisitivo as férias descontam. Datas são dias civis.
+model Ausencia {
+  id                      String             @id @default(uuid())
+  empresaId               String             @map("empresa_id")
+  colaboradorId           String             @map("colaborador_id")
+  vinculoId               String             @map("vinculo_id")
+  tipo                    TipoAusencia
+  motivoAfastamento       MotivoAfastamento? @map("motivo_afastamento")
+  inicio                  DateTime           @db.Date
+  fim                     DateTime?          @db.Date
+  diasVendidos            Int                @default(0) @map("dias_vendidos")
+  periodoAquisitivoInicio DateTime?          @map("periodo_aquisitivo_inicio") @db.Date
+  status                  StatusAusencia
+  observacao              String?
+  registradoPorId         String             @map("registrado_por_id")
+  decididoPorId           String?            @map("decidido_por_id")
+  decididoEm              DateTime?          @map("decidido_em")
+  motivoDecisao           String?            @map("motivo_decisao")
+  criadoEm                DateTime           @default(now()) @map("criado_em")
+  atualizadoEm            DateTime           @updatedAt @map("atualizado_em")
+
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  decididoPor   AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, inicio])
+  @@index([empresaId, status])
+  @@index([colaboradorId, empresaId])
+  @@map("ausencia")
 }
 
 /// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela

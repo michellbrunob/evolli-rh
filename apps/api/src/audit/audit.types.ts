@@ -86,6 +86,11 @@ export const AUDIT_ACTIONS = [
   // Editar colaborador), sem conteudo.
   "pessoas_colaborador_desativado",
   "pessoas_colaborador_reativado",
+  // T215 — Férias e ausências: registro e decisões, sem conteúdo.
+  "pessoas_ausencia_registrada",
+  "pessoas_ausencia_aprovada",
+  "pessoas_ausencia_recusada",
+  "pessoas_ausencia_cancelada",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",
@@ -300,7 +305,11 @@ export type AuditResource =
   | "documento_colaborador"
   // T215 — contrato do vinculo (edicao do colaborador): o `resourceId` e o
   // id do VINCULO. Nunca salario, nivel, registro ou qualquer valor.
-  | "contrato_vinculo";
+  | "contrato_vinculo"
+  // T215 — Férias e ausências: o `resourceId` é o id da AUSÊNCIA (no
+  // registro e nas decisões) ou do COLABORADOR (consultas negadas). Nunca
+  // tipo, datas, motivo ou observação.
+  | "ausencia";
 
 export type RecordAuditEventInput =
   | {

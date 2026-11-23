@@ -3,6 +3,7 @@ import {
   AuthorizationResource,
   AuthorizationSubject,
   AuthorizationTarget,
+  isAusenciaResource,
   isContatosResource,
   isContratoResource,
   isDadosPessoaisResource,
@@ -75,6 +76,9 @@ export function evaluatePermission(
       }
       if (isDocumentosColaboradorResource(target.resource)) {
         return evaluateDocumentosColaborador(subject, target);
+      }
+      if (isAusenciaResource(target.resource)) {
+        return evaluateAusencia(subject, target);
       }
       return false;
   }
@@ -783,6 +787,43 @@ function evaluateDocumentosColaborador(
       }
       // Só com empresa ativa, e só nela.
       return subject.companyId !== null && isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * T215 — Férias e ausências. Duas fases: sem empresa-alvo decide a
+ * CAPACIDADE; com ela, a FRONTEIRA.
+ *
+ * - `rh` e `dp`: leem, registram e decidem, só na própria empresa.
+ * - `master_tecnico`: só lê, e só com empresa ativa.
+ * - Os demais papéis: negados.
+ */
+function evaluateAusencia(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const acoes: readonly AuthorizationAction[] = ["read", "create", "alter"];
+  if (!acoes.includes(target.action)) {
+    return false;
+  }
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      if (target.action !== "read" || subject.companyId === null) {
+        return false;
+      }
+      return escopoResolvido ? isSameCompany(subject, target) : true;
 
     case "rh":
     case "dp":

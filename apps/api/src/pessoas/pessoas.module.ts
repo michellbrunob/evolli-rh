@@ -8,6 +8,11 @@ import { ContratoColaboradorController } from "./colaborador/contrato-colaborado
 import { ContratoColaboradorService } from "./colaborador/contrato-colaborador.service";
 import { DesativacaoColaboradorController } from "./colaborador/desativacao-colaborador.controller";
 import { DesativacaoColaboradorService } from "./colaborador/desativacao-colaborador.service";
+import {
+  AusenciasController,
+  FeriasDoColaboradorController,
+} from "./ausencias/ausencias.controller";
+import { AusenciasService } from "./ausencias/ausencias.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
 import { VinculoService } from "./vinculo/vinculo.service";
 import { MovimentacaoController } from "./movimentacao/movimentacao.controller";
@@ -65,6 +70,9 @@ import {
     // T215 — contrato do vínculo na edição do colaborador.
     ContratoColaboradorController,
     DesativacaoColaboradorController,
+    // T215 — Férias e ausências.
+    AusenciasController,
+    FeriasDoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -78,6 +86,7 @@ import {
     DocumentoColaboradorService,
     ContratoColaboradorService,
     DesativacaoColaboradorService,
+    AusenciasService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,

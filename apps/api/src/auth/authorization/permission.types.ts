@@ -158,6 +158,17 @@ export const CONTRATO_RESOURCES = ["contrato_vinculo"] as const;
 export type ContratoResource = (typeof CONTRATO_RESOURCES)[number];
 
 /**
+ * T215 — Férias e ausências: a lista, o saldo e a simulação (`read`), o
+ * registro (`create`) e as decisões (`alter`: aprovar, recusar,
+ * cancelar). `rh` e `dp` fazem tudo na empresa ativa; o `master_tecnico`
+ * só lê, com empresa ativa; os demais papéis são negados (gestor e portal
+ * entram numa fatia futura).
+ */
+export const AUSENCIA_RESOURCES = ["ausencia"] as const;
+
+export type AusenciaResource = (typeof AUSENCIA_RESOURCES)[number];
+
+/**
  * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
  * metadados da Etapa 2 (`documento_metadado`):
  *
@@ -201,7 +212,8 @@ export type AuthorizationResource =
   | ContatosResource
   | DadosPessoaisResource
   | DocumentosColaboradorResource
-  | ContratoResource;
+  | ContratoResource
+  | AusenciaResource;
 
 export type AuthorizationAction =
   | "read"
@@ -288,6 +300,12 @@ export function isDocumentosColaboradorResource(
   return (DOCUMENTOS_COLABORADOR_RESOURCES as readonly string[]).includes(
     resource,
   );
+}
+
+export function isAusenciaResource(
+  resource: AuthorizationResource,
+): resource is AusenciaResource {
+  return (AUSENCIA_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isContratoResource(

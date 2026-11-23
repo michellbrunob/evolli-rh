@@ -34,7 +34,14 @@ export type MotivoDoCampo =
   | "igual_a_vigente"
   | "fora_de_ordem"
   | "ja_encerrada"
-  | "sobreposta";
+  | "sobreposta"
+  // T215 — Férias e ausências.
+  | "obrigatorio"
+  | "nao_se_aplica"
+  | "fim_antes_do_inicio"
+  | "sobreposicao"
+  | "saldo_insuficiente"
+  | "venda_acima_do_limite";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -57,7 +64,14 @@ export type CampoPublico =
   // T183 — jornada do colaborador e a sua vigência.
   | "tabelaHorarioId"
   | "vigenciaInicio"
-  | "vigenciaFim";
+  | "vigenciaFim"
+  // T215 — registro de ausência.
+  | "colaboradorId"
+  | "motivoAfastamento"
+  | "inicio"
+  | "fim"
+  | "diasVendidos"
+  | "periodoAquisitivoInicio";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

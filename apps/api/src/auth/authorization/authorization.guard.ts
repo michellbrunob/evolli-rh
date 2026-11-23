@@ -20,6 +20,7 @@ import {
   isContatosResource,
   isDadosPessoaisResource,
   isContratoResource,
+  isAusenciaResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -76,6 +77,10 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   }
   // T215 — o contrato do vinculo, pelo mesmo motivo.
   if (isContratoResource(resource)) {
+    return resource;
+  }
+  // T215 — Férias e ausências.
+  if (isAusenciaResource(resource)) {
     return resource;
   }
   return "access_user";
