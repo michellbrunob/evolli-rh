@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 
@@ -111,6 +112,19 @@ export type CodigoDeRecusa =
  */
 export class RecusaDeNegocioException extends UnprocessableEntityException {
   constructor(readonly codigo: CodigoDeRecusa) {
+    super();
+  }
+}
+
+/**
+ * T213 — serviço de que a operação depende está fora do ar (503). A resposta
+ * leva só um código de uma lista fechada, para a tela dizer o que fazer;
+ * nunca host, porta, nome do serviço ou mensagem interna.
+ */
+export type CodigoDeIndisponibilidade = "documento_verificacao_indisponivel";
+
+export class IndisponibilidadeException extends ServiceUnavailableException {
+  constructor(readonly codigo: CodigoDeIndisponibilidade) {
     super();
   }
 }

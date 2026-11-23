@@ -163,12 +163,22 @@ describe("escolherVerificadorDeArquivos (T213)", () => {
     ).toThrow(/CLAMAV_PORT/);
   });
 
-  it("falso só fora de produção", () => {
-    expect(
+  it("falso só em desenvolvimento e testes; nunca em produção nem em ambiente desconhecido", () => {
+    // Sem NODE_ENV vale o padrão da configuração: desenvolvimento.
+    for (const NODE_ENV of [undefined, "development", "test"]) {
+      expect(
+        escolherVerificadorDeArquivos({
+          EVOLLI_DOCUMENTOS_VERIFICADOR: "falso",
+          ...(NODE_ENV ? { NODE_ENV } : {}),
+        }),
+      ).toBeInstanceOf(VerificadorFalso);
+    }
+    expect(() =>
       escolherVerificadorDeArquivos({
         EVOLLI_DOCUMENTOS_VERIFICADOR: "falso",
+        NODE_ENV: "staging",
       }),
-    ).toBeInstanceOf(VerificadorFalso);
+    ).toThrow(/produção/);
     expect(() =>
       escolherVerificadorDeArquivos({
         EVOLLI_DOCUMENTOS_VERIFICADOR: "falso",

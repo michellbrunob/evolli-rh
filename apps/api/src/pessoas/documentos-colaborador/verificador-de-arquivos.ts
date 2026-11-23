@@ -140,7 +140,10 @@ export function escolherVerificadorDeArquivos(
     if (modo !== "falso") {
       throw new Error("EVOLLI_DOCUMENTOS_VERIFICADOR: valor desconhecido.");
     }
-    if (ambiente.NODE_ENV === "production") {
+    // Só em desenvolvimento (o padrão da configuração) e testes; produção ou
+    // qualquer outro valor é recusado.
+    const ambienteDoProcesso = ambiente.NODE_ENV?.trim() || "development";
+    if (ambienteDoProcesso !== "development" && ambienteDoProcesso !== "test") {
       throw new Error(
         "EVOLLI_DOCUMENTOS_VERIFICADOR=falso não é permitido em produção.",
       );

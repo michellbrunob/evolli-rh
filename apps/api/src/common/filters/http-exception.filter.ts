@@ -16,6 +16,8 @@ import {
   CodigoDeRecusa,
   ConflitoDeCamposException,
   ErroDeCampo,
+  IndisponibilidadeException,
+  type CodigoDeIndisponibilidade,
   RecusaCsrfException,
   RecusaDeNegocioException,
 } from "../erros/recusa-por-campo";
@@ -28,7 +30,8 @@ interface ErrorBody {
   /** T179 — campos recusados e o motivo, sem o valor (`DP-ADM-15`). */
   erros?: readonly ErroDeCampo[];
   /** T179 — código estável de recusa de negócio sem campo próprio. */
-  codigo?: CodigoDeRecusa | CodigoDeConflitoDeReferencia;
+  codigo?:
+    CodigoDeRecusa | CodigoDeConflitoDeReferencia | CodigoDeIndisponibilidade;
   /** T197 — a referência ativa da empresa que já tem o nome (`nome_em_uso`). */
   referencia?: ReferenciaExistente;
 }
@@ -108,7 +111,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
           }
         : {}),
       ...(exception instanceof RecusaDeNegocioException ||
-      exception instanceof RecusaCsrfException
+      exception instanceof RecusaCsrfException ||
+      // T213 — 503 com código fixo (o que fazer), sem detalhe interno.
+      exception instanceof IndisponibilidadeException
         ? { codigo: exception.codigo }
         : {}),
       // T197 — código do conflito e, no `nome_em_uso`, só id, código e nome

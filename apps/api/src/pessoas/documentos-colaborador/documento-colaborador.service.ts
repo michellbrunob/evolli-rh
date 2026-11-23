@@ -12,7 +12,10 @@ import {
   type FormatoDocumentoColaborador,
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
-import { RecusaDeNegocioException } from "../../common/erros/recusa-por-campo";
+import {
+  IndisponibilidadeException,
+  RecusaDeNegocioException,
+} from "../../common/erros/recusa-por-campo";
 import type { AuthorizationResource } from "../../auth/authorization/permission.types";
 import type { AuthorizationAction } from "../../auth/authorization/permission.types";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
@@ -26,6 +29,7 @@ import type { ArmazenamentoDeObjetos } from "../foto-colaborador/armazenamento-d
 import { ARMAZENAMENTO_DE_DOCUMENTOS } from "./armazenamento-de-documentos";
 import {
   VERIFICADOR_DE_ARQUIVOS,
+  type ResultadoDaVerificacao,
   type VerificadorDeArquivos,
 } from "./verificador-de-arquivos";
 import {
@@ -90,6 +94,12 @@ type VersaoComDocumento = Prisma.VersaoDocumentoColaboradorGetPayload<{
   include: { documento: true };
 }>;
 
+/** O que o antivírus respondeu, antes de qualquer gravação. */
+interface VerificacaoFeita {
+  readonly resultado: ResultadoDaVerificacao;
+  readonly verificadoEm: Date;
+}
+
 const recusar = (erro: unknown): never => {
   if (erro instanceof DocumentoRecusado) {
     throw new RecusaDeNegocioException(erro.motivo);
@@ -107,11 +117,17 @@ const recusar = (erro: unknown): never => {
  *   livre de "outros" não vai ao `master_tecnico`.
  * - **Download:** só RH e DP, só de versão APROVADA pelo antivírus, e com a
  *   trilha gravada antes (sem registro, sem download).
- * - **Ordem segura do envio:** limpeza pendente registrada → objeto gravado
- *   no R2 → documento e versão no banco (com a trilha) → limpeza baixada.
- *   O que sobrar no R2 sem registro concluído é apagado depois.
- * - **Quarentena fail-closed:** a versão nasce `em_verificacao`; só o
- *   antivírus a aprova ou reprova; falha dele mantém o bloqueio.
+ * - **Trava do antivírus:** o arquivo passa pelo antivírus ANTES de qualquer
+ *   gravação. Sem verificador configurado e operante (ClamAV ausente, fora
+ *   do ar ou sem resposta no tempo), o envio é recusado com 503 e nada é
+ *   gravado — nem no R2, nem no banco.
+ * - **Ordem segura do envio:** antivírus → limpeza pendente registrada →
+ *   objeto gravado no R2 → documento e versão no banco, já com o resultado
+ *   (e a trilha) → limpeza baixada. O que sobrar no R2 sem registro
+ *   concluído é apagado depois.
+ * - **Quarentena fail-closed:** só o aprovado é baixado; o reprovado fica
+ *   guardado e bloqueado. Versão antiga ainda `em_verificacao` só muda pela
+ *   nova tentativa do antivírus.
  * - **Auditoria:** sem conteúdo, nome, categoria, tamanho, hash ou chave.
  */
 @Injectable()
@@ -304,6 +320,7 @@ export class DocumentoColaboradorService {
     if (reenvio) return reenvio;
 
     await this.conferirLimites(this.prisma, alvo, identificacao.categoria);
+    const verificacao = await this.verificarAntesDeGravar(pedido.arquivo.bytes);
 
     const documentoId = randomUUID();
     const versaoId = randomUUID();
@@ -335,6 +352,7 @@ export class DocumentoColaboradorService {
           numero: 1,
           chave,
           conferido,
+          verificacao,
           chaveIdempotencia,
           alvo,
           ctx,
@@ -347,6 +365,7 @@ export class DocumentoColaboradorService {
           documentoId,
           alvo.empresaId,
         );
+        await this.registrarResultado(tx, ctx, verificacao, criada);
         return criada;
       });
     } catch (erro) {
@@ -361,9 +380,8 @@ export class DocumentoColaboradorService {
       throw erro;
     }
 
-    const estado = await this.verificar(versao, pedido.arquivo.bytes, ctx);
     return {
-      documento: this.dto(versao.documento, { ...versao, ...estado }, true),
+      documento: this.dto(versao.documento, versao, true),
       reenvio: false,
     };
   }
@@ -397,6 +415,7 @@ export class DocumentoColaboradorService {
         v.hashSha256 === conferido.hashSha256,
     );
     if (reenvio) return reenvio;
+    const verificacao = await this.verificarAntesDeGravar(arquivo.bytes);
 
     const versaoId = randomUUID();
     const chave = chaveDoDocumento(
@@ -416,6 +435,7 @@ export class DocumentoColaboradorService {
           numero: atual.numero + 1,
           chave,
           conferido,
+          verificacao,
           chaveIdempotencia,
           alvo,
           ctx,
@@ -428,6 +448,7 @@ export class DocumentoColaboradorService {
           documentoId,
           alvo.empresaId,
         );
+        await this.registrarResultado(tx, ctx, verificacao, criada);
         return criada;
       });
     } catch (erro) {
@@ -442,9 +463,8 @@ export class DocumentoColaboradorService {
       throw erro;
     }
 
-    const estado = await this.verificar(versao, arquivo.bytes, ctx);
     return {
-      documento: this.dto(versao.documento, { ...versao, ...estado }, true),
+      documento: this.dto(versao.documento, versao, true),
       reenvio: false,
     };
   }
@@ -526,6 +546,7 @@ export class DocumentoColaboradorService {
       numero: number;
       chave: string;
       conferido: ArquivoConferido;
+      verificacao: VerificacaoFeita;
       chaveIdempotencia: string | undefined;
       alvo: Alvo;
       ctx: PessoasAuditContext;
@@ -542,6 +563,9 @@ export class DocumentoColaboradorService {
           formato: dados.conferido.formato,
           tamanhoBytes: dados.conferido.tamanhoBytes,
           hashSha256: dados.conferido.hashSha256,
+          // O antivírus já respondeu: a versão nasce com o resultado.
+          estado: dados.verificacao.resultado,
+          verificadoEm: dados.verificacao.verificadoEm,
           enviadaPorId: dados.ctx.actor.id,
           chaveIdempotencia: dados.chaveIdempotencia ?? null,
         },
@@ -682,8 +706,46 @@ export class DocumentoColaboradorService {
   }
 
   /**
-   * Passa a versão pelo antivírus. Aprovado ou reprovado muda o estado (com a
-   * trilha); falha mantém `em_verificacao` — e o download bloqueado.
+   * A trava: o arquivo passa pelo antivírus antes de qualquer gravação. Sem
+   * verificador configurado, fora do ar ou sem resposta no tempo, 503 com
+   * código fixo — e nada é gravado no R2 nem no banco.
+   */
+  private async verificarAntesDeGravar(
+    bytes: Buffer,
+  ): Promise<VerificacaoFeita> {
+    try {
+      const resultado = await this.verificador.verificar(bytes);
+      return { resultado, verificadoEm: new Date() };
+    } catch {
+      throw new IndisponibilidadeException(
+        "documento_verificacao_indisponivel",
+      );
+    }
+  }
+
+  /** A trilha do resultado da verificação, na mesma transação do registro. */
+  private registrarResultado(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    verificacao: VerificacaoFeita,
+    versao: VersaoComDocumento,
+  ) {
+    return this.auditoria.registrarMutacao(
+      tx,
+      ctx,
+      verificacao.resultado === "aprovado"
+        ? "pessoas_documento_colaborador_aprovado"
+        : "pessoas_documento_colaborador_reprovado",
+      "documento_colaborador",
+      versao.documentoId,
+      versao.empresaId,
+    );
+  }
+
+  /**
+   * Nova tentativa para versão antiga ainda em verificação. Aprovado ou
+   * reprovado muda o estado (com a trilha); falha mantém `em_verificacao` —
+   * e o download bloqueado.
    */
   private async verificar(
     versao: VersaoComDocumento,

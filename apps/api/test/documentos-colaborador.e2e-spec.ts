@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { createServer, type AddressInfo, type Server } from "node:net";
 import { join } from "node:path";
 import {
   INestApplication,
@@ -19,7 +20,10 @@ import { ARMAZENAMENTO_DE_DOCUMENTOS } from "../src/pessoas/documentos-colaborad
 import {
   ASSINATURA_DE_TESTE_ANTIVIRUS,
   VERIFICADOR_DE_ARQUIVOS,
+  VerificadorClamav,
   VerificadorFalso,
+  escolherVerificadorDeArquivos,
+  type VerificadorDeArquivos,
 } from "../src/pessoas/documentos-colaborador/verificador-de-arquivos";
 import { LIMPEZA_ENVIO_PARADO_MS } from "../src/pessoas/documentos-colaborador/documento-colaborador.service";
 import {
@@ -125,6 +129,15 @@ describe("T213 — documentos do colaborador (e2e)", () => {
   let appUrl: string;
   const armazenamento = new ArmazenamentoEmMemoria();
   const verificador = new VerificadorFalso();
+  /**
+   * T213 — o verificador em uso, trocável por teste: o falso (padrão), o
+   * "sem ClamAV configurado" e um ClamAV real apontado para um servidor que
+   * não responde ou para uma porta fechada.
+   */
+  let verificadorAtual: VerificadorDeArquivos = verificador;
+  const verificadorDaApp: VerificadorDeArquivos = {
+    verificar: (bytes) => verificadorAtual.verificar(bytes),
+  };
 
   let master: Credencial;
   let rhA: Credencial;
@@ -336,7 +349,7 @@ describe("T213 — documentos do colaborador (e2e)", () => {
       .overrideProvider(ARMAZENAMENTO_DE_DOCUMENTOS)
       .useValue(armazenamento)
       .overrideProvider(VERIFICADOR_DE_ARQUIVOS)
-      .useValue(verificador)
+      .useValue(verificadorDaApp)
       .compile();
     app = moduleRef.createNestApplication();
     app.use(requestIdMiddleware);
@@ -404,6 +417,7 @@ describe("T213 — documentos do colaborador (e2e)", () => {
   beforeEach(() => {
     armazenamento.falhar = () => false;
     verificador.falhar = false;
+    verificadorAtual = verificador;
   });
 
   // -------------------------------------------------------------------------
@@ -614,34 +628,188 @@ describe("T213 — documentos do colaborador (e2e)", () => {
     });
   });
 
-  describe("quarentena", () => {
-    it("antivírus fora do ar: fica em verificação, não baixa; nova tentativa aprova", async () => {
-      verificador.falhar = true;
-      const { body } = await enviar(rhA, colaboradorA2, pdf()).expect(201);
-      expect(body.estado).toBe("em_verificacao");
-      expect(body.verificadoEm).toBeNull();
-      const recusa = await baixar(rhA, colaboradorA2, body.id).expect(422);
-      expect(recusa.body.codigo).toBe("documento_nao_disponivel");
-      expect(
-        await eventos("pessoas.documento_colaborador.nao_verificado", body.id),
-      ).toBe(1);
-
-      // Ainda fora do ar: continua bloqueado.
-      const outra = await verificarDeNovo(rhA, colaboradorA2, body.id).expect(
-        200,
-      );
-      expect(outra.body.estado).toBe("em_verificacao");
-
-      verificador.falhar = false;
-      const aprovado = await verificarDeNovo(
-        dpA,
-        colaboradorA2,
-        body.id,
-      ).expect(200);
-      expect(aprovado.body.estado).toBe("aprovado");
-      await baixar(rhA, colaboradorA2, body.id).expect(200);
+  describe("trava: sem antivírus operante, nenhum envio é aceito", () => {
+    /** Fotografia do que existe: R2, documentos, versões, limpezas e trilha. */
+    const retrato = async () => ({
+      objetos: armazenamento.objetos.size,
+      documentos: await prisma.documentoColaborador.count(),
+      versoes: await prisma.versaoDocumentoColaborador.count(),
+      limpezas: await prisma.limpezaDocumentoColaboradorPendente.count(),
+      trilha: await prisma.auditEvent.count({
+        where: { resource: "documento_colaborador" },
+      }),
     });
 
+    let colaboradorTrava: string;
+    /** Um clamd que aceita a conexão e nunca responde (tempo esgotado). */
+    let mudo: Server;
+    let portaMuda: number;
+    beforeAll(async () => {
+      const dep = await prisma.departamento.findFirstOrThrow({
+        where: { empresaId: empresaA, codigo: "DDA" },
+      });
+      colaboradorTrava = await admitir(
+        rhA,
+        "Pessoa Documento Trava",
+        empresaA,
+        dep.id,
+      );
+      mudo = createServer((socket) => socket.on("data", () => undefined));
+      await new Promise<void>((ok) => mudo.listen(0, "127.0.0.1", ok));
+      portaMuda = (mudo.address() as AddressInfo).port;
+    });
+    afterAll(async () => {
+      await new Promise<void>((ok) => mudo.close(() => ok()));
+    });
+
+    /** Uma porta que acabou de ser fechada: conexão recusada. */
+    async function portaFechada(): Promise<number> {
+      const s = createServer();
+      await new Promise<void>((ok) => s.listen(0, "127.0.0.1", ok));
+      const porta = (s.address() as AddressInfo).port;
+      await new Promise<void>((ok) => s.close(() => ok()));
+      return porta;
+    }
+
+    const cenarios: [string, () => Promise<VerificadorDeArquivos>][] = [
+      ["ClamAV não configurado", async () => escolherVerificadorDeArquivos({})],
+      [
+        "ClamAV sem resposta (tempo esgotado)",
+        async () =>
+          new VerificadorClamav({
+            host: "127.0.0.1",
+            porta: portaMuda,
+            tempoLimiteMs: 300,
+          }),
+      ],
+      [
+        "ClamAV recusando a conexão",
+        async () =>
+          new VerificadorClamav({
+            host: "127.0.0.1",
+            porta: await portaFechada(),
+            tempoLimiteMs: 2_000,
+          }),
+      ],
+      [
+        "antivírus falhando",
+        async () => {
+          verificador.falhar = true;
+          return verificador;
+        },
+      ],
+    ];
+
+    it.each(cenarios)(
+      "%s: envio recusado com 503 acionável, antes de gravar no R2 ou no banco",
+      async (_, montar) => {
+        verificadorAtual = await montar();
+        const antes = await retrato();
+        const r = await enviar(rhA, colaboradorTrava, pdf()).expect(503);
+        expect(r.body.codigo).toBe("documento_verificacao_indisponivel");
+        // Nada de configuração interna na resposta.
+        expect(JSON.stringify(r.body)).not.toMatch(
+          /clam|127\.0\.0\.1|porta|host|instream/i,
+        );
+        expect(await retrato()).toEqual(antes);
+      },
+    );
+
+    it.each(cenarios)(
+      "%s: troca recusada com 503, sem versão nova e com a anterior intacta",
+      async (_, montar) => {
+        const { body } = await enviar(rhA, colaboradorTrava, pdf()).expect(201);
+        verificadorAtual = await montar();
+        const antes = await retrato();
+        const r = await trocar(rhA, colaboradorTrava, body.id, pdf()).expect(
+          503,
+        );
+        expect(r.body.codigo).toBe("documento_verificacao_indisponivel");
+        expect(await retrato()).toEqual(antes);
+        const lista = await listar(rhA, colaboradorTrava).expect(200);
+        expect(
+          lista.body.find((d: { id: string }) => d.id === body.id),
+        ).toMatchObject({ versao: 1, estado: "aprovado" });
+        await baixar(rhA, colaboradorTrava, body.id).expect(200);
+      },
+    );
+
+    it("com o antivírus operante, o envio grava já com o resultado (aprovado), numa trilha só", async () => {
+      const { body } = await enviar(rhA, colaboradorTrava, pdf(), {
+        categoria: "cpf",
+      }).expect(201);
+      expect(body.estado).toBe("aprovado");
+      expect(body.verificadoEm).toEqual(expect.any(String));
+      const versao = await prisma.versaoDocumentoColaborador.findFirstOrThrow({
+        where: { documentoId: body.id },
+      });
+      expect(versao.estado).toBe("aprovado");
+      expect(
+        await eventos("pessoas.documento_colaborador.enviado", body.id),
+      ).toBe(1);
+      expect(
+        await eventos("pessoas.documento_colaborador.aprovado", body.id),
+      ).toBe(1);
+    });
+
+    it("versão antiga ainda em verificação: a nova tentativa continua bloqueada sem antivírus e aprova quando ele volta", async () => {
+      // Uma versão que ficou em verificação antes da trava (dado legado).
+      const documentoId = randomUUID();
+      const versaoId = randomUUID();
+      const chave = `v1/empresas/${empresaA}/colaboradores/${colaboradorTrava}/documentos/${documentoId}/${versaoId}`;
+      await armazenamento.gravar(chave, pdf(), "application/pdf");
+      const autor = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "rh.doca@example.test" },
+      });
+      await prisma.documentoColaborador.create({
+        data: {
+          id: documentoId,
+          empresaId: empresaA,
+          colaboradorId: colaboradorTrava,
+          categoria: "certidoes",
+          criadoPorId: autor.id,
+          versoes: {
+            create: {
+              id: versaoId,
+              empresaId: empresaA,
+              numero: 1,
+              chave,
+              formato: "pdf",
+              tamanhoBytes: pdf().length,
+              hashSha256: "a".repeat(64),
+              enviadaPorId: autor.id,
+            },
+          },
+        },
+      });
+      await baixar(rhA, colaboradorTrava, documentoId).expect(422);
+
+      verificadorAtual = escolherVerificadorDeArquivos({});
+      const ainda = await verificarDeNovo(
+        rhA,
+        colaboradorTrava,
+        documentoId,
+      ).expect(200);
+      expect(ainda.body.estado).toBe("em_verificacao");
+      expect(
+        await eventos(
+          "pessoas.documento_colaborador.nao_verificado",
+          documentoId,
+        ),
+      ).toBe(1);
+
+      verificadorAtual = verificador;
+      const aprovado = await verificarDeNovo(
+        dpA,
+        colaboradorTrava,
+        documentoId,
+      ).expect(200);
+      expect(aprovado.body.estado).toBe("aprovado");
+      await baixar(rhA, colaboradorTrava, documentoId).expect(200);
+    });
+  });
+
+  describe("quarentena", () => {
     it("ameaça encontrada: reprovado, nunca baixa, e a nova tentativa não muda", async () => {
       const { body } = await enviar(
         rhA,
@@ -904,6 +1072,48 @@ describe("T213 — documentos do colaborador (e2e)", () => {
         }),
       ).toEqual([{ chave: recente }]);
       await prisma.limpezaDocumentoColaboradorPendente.deleteMany();
+    });
+  });
+
+  describe("banco: remoção só lógica", () => {
+    it("o usuário da aplicação não apaga documento nem versão; a remoção lógica e a limpeza continuam", async () => {
+      const { body } = await enviar(rhA, colaboradorA, pdf(), {
+        categoria: "outros",
+        nome: "Documento para remoção",
+      }).expect(201);
+      // O PrismaClient do teste conecta como evolli_app, o mesmo da API.
+      await expect(
+        prisma.versaoDocumentoColaborador.deleteMany({
+          where: { documentoId: body.id },
+        }),
+      ).rejects.toThrow(/permission denied|42501/i);
+      await expect(
+        prisma.documentoColaborador.deleteMany({ where: { id: body.id } }),
+      ).rejects.toThrow(/permission denied|42501/i);
+      expect(
+        await prisma.versaoDocumentoColaborador.count({
+          where: { documentoId: body.id },
+        }),
+      ).toBe(1);
+
+      // Remoção lógica (UPDATE) segue funcionando.
+      await remover(rhA, colaboradorA, body.id).expect(204);
+      const linha = await prisma.documentoColaborador.findUniqueOrThrow({
+        where: { id: body.id },
+      });
+      expect(linha.removidoEm).not.toBeNull();
+
+      // A limpeza pendente continua podendo apagar a própria fila.
+      await prisma.limpezaDocumentoColaboradorPendente.create({
+        data: {
+          chave: `v1/empresas/${empresaA}/colaboradores/${colaboradorA}/documentos/${randomUUID()}/${randomUUID()}`,
+          motivo: "falha_no_envio",
+          empresaId: empresaA,
+          colaboradorId: colaboradorA,
+        },
+      });
+      await prisma.limpezaDocumentoColaboradorPendente.deleteMany();
+      expect(await prisma.limpezaDocumentoColaboradorPendente.count()).toBe(0);
     });
   });
 
