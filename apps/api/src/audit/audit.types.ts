@@ -293,7 +293,10 @@ export type AuditResource =
   | "foto_colaborador"
   // T213 — documento do colaborador com arquivo: o `resourceId` e o id do
   // DOCUMENTO. Nunca nome, categoria, tamanho, hash ou chave do objeto.
-  | "documento_colaborador";
+  | "documento_colaborador"
+  // T215 — contrato do vinculo (edicao do colaborador): o `resourceId` e o
+  // id do VINCULO. Nunca salario, nivel, registro ou qualquer valor.
+  | "contrato_vinculo";
 
 export type RecordAuditEventInput =
   | {

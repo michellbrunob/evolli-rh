@@ -145,6 +145,19 @@ export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
 export type DadosPessoaisResource = (typeof DADOS_PESSOAIS_RESOURCES)[number];
 
 /**
+ * T215 — contrato do vínculo na edição do colaborador (nível, gestor direto,
+ * jornada semanal, escala, salário bruto, conselho e registro, dependentes
+ * para IRRF, pensão e a matrícula). Recurso próprio porque a matriz é outra:
+ * o salário é dado sensível, e nem o ramo de pessoas (que o gestor alcança
+ * pela equipe) nem o de dados pessoais devem estendê-lo por herança. `rh` e
+ * `dp` leem e editam na empresa ativa; o `master_tecnico` só lê; os demais
+ * papéis são negados.
+ */
+export const CONTRATO_RESOURCES = ["contrato_vinculo"] as const;
+
+export type ContratoResource = (typeof CONTRATO_RESOURCES)[number];
+
+/**
  * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
  * metadados da Etapa 2 (`documento_metadado`):
  *
@@ -187,7 +200,8 @@ export type AuthorizationResource =
   | GestorResource
   | ContatosResource
   | DadosPessoaisResource
-  | DocumentosColaboradorResource;
+  | DocumentosColaboradorResource
+  | ContratoResource;
 
 export type AuthorizationAction =
   | "read"
@@ -274,6 +288,12 @@ export function isDocumentosColaboradorResource(
   return (DOCUMENTOS_COLABORADOR_RESOURCES as readonly string[]).includes(
     resource,
   );
+}
+
+export function isContratoResource(
+  resource: AuthorizationResource,
+): resource is ContratoResource {
+  return (CONTRATO_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isDadosPessoaisResource(

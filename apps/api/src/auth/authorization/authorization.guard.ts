@@ -19,6 +19,7 @@ import {
   isSolicitacoesPessoasResource,
   isContatosResource,
   isDadosPessoaisResource,
+  isContratoResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -71,6 +72,10 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // (master técnico, gestor, colaborador…) aparece na trilha pelo recurso
   // certo, nunca como `access_user`.
   if (isDadosPessoaisResource(resource)) {
+    return resource;
+  }
+  // T215 — o contrato do vinculo, pelo mesmo motivo.
+  if (isContratoResource(resource)) {
     return resource;
   }
   return "access_user";

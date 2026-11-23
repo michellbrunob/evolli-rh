@@ -4,6 +4,8 @@ import { AuditModule } from "../audit/audit.module";
 import { PessoasAuditoriaService } from "./pessoas-auditoria.service";
 import { ColaboradorController } from "./colaborador/colaborador.controller";
 import { ColaboradorService } from "./colaborador/colaborador.service";
+import { ContratoColaboradorController } from "./colaborador/contrato-colaborador.controller";
+import { ContratoColaboradorService } from "./colaborador/contrato-colaborador.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
 import { VinculoService } from "./vinculo/vinculo.service";
 import { MovimentacaoController } from "./movimentacao/movimentacao.controller";
@@ -58,6 +60,8 @@ import {
     FotoColaboradorController,
     // T213 — documentos do colaborador (ADR 0021).
     DocumentoColaboradorController,
+    // T215 — contrato do vínculo na edição do colaborador.
+    ContratoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -69,6 +73,7 @@ import {
     RascunhoAdmissaoService,
     FotoColaboradorService,
     DocumentoColaboradorService,
+    ContratoColaboradorService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,

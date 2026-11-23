@@ -4,6 +4,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isContatosResource,
+  isContratoResource,
   isDadosPessoaisResource,
   isDocumentosColaboradorResource,
   isDocumentosResource,
@@ -65,6 +66,11 @@ export function evaluatePermission(
         return evaluateContatos(subject, target);
       }
       if (isDadosPessoaisResource(target.resource)) {
+        return evaluateDadosPessoais(subject, target);
+      }
+      if (isContratoResource(target.resource)) {
+        // T215 — mesma matriz dos dados pessoais: rh e dp leem e editam na
+        // empresa ativa; master_tecnico so le; os demais, negados.
         return evaluateDadosPessoais(subject, target);
       }
       if (isDocumentosColaboradorResource(target.resource)) {

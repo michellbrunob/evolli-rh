@@ -60,7 +60,7 @@ export function emLista(valor: unknown): unknown {
  * (Baseline V1, item 2). Restrita a maiúsculas, dígitos, `-` e `_` — nunca
  * é, nem deriva de, documento pessoal (RI-C1).
  */
-const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
+export const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
 /**
  * T209 — nome completo: até 150 caracteres e pelo menos 3 letras (qualquer

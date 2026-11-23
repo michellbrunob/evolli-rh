@@ -50,6 +50,8 @@ export type CampoPublico =
   | "cnpj"
   // T209 — gestor direto sem vínculo na empresa.
   | "contrato.gestorDiretoId"
+  // T215 — o mesmo campo na edição do contrato (corpo sem o bloco).
+  | "gestorDiretoId"
   // T182 — código de jornada repetido na empresa.
   | "codigo"
   // T183 — jornada do colaborador e a sua vigência.
