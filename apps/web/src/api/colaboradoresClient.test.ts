@@ -91,6 +91,51 @@ describe("T178 — listarColaboradores", () => {
     expect(queryEnviada().has("busca")).toBe(false);
   });
 
+  it.each([
+    ["CPF com máscara", "529.982.247-25"],
+    ["e-mail", "Ana@Example.test"],
+    ["id", "8f0c2a4e-1b2c-4d3e-8f4a-5b6c7d8e9f01"],
+  ])(
+    "T215 — busca por %s vai como digitada (o servidor decide)",
+    async (_nome, termo) => {
+      await listarColaboradores({ busca: termo });
+      expect(queryEnviada().get("busca")).toBe(termo);
+    },
+  );
+
+  it("T215 — devolve CPF, contatos, salário e os indicadores do cartão como vieram", async () => {
+    const linha = {
+      id: "c-1",
+      nome: "Pessoa Sintetica",
+      situacao: "ativo",
+      criadoEm: "2026-11-01T12:00:00.000Z",
+      atualizadoEm: "2026-11-01T12:00:00.000Z",
+      vinculos: [],
+      cpf: "52998224725",
+      contatos: { emailPessoal: "pessoa@example.test", celular: null },
+      salarioBruto: "5000.00",
+    };
+    const contadores = {
+      ...VAZIA.contadores,
+      admitidosNoMes: 1,
+      desligadosNoAno: 0,
+      serieAtivos: [0, 0, 0, 0, 1, 1],
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...VAZIA, itens: [linha], total: 1, contadores }),
+    } as unknown as Response);
+    const r = await listarColaboradores();
+    expect(r.itens[0]).toMatchObject({
+      cpf: "52998224725",
+      contatos: { emailPessoal: "pessoa@example.test", celular: null },
+      salarioBruto: "5000.00",
+    });
+    expect(r.contadores.serieAtivos).toEqual([0, 0, 0, 0, 1, 1]);
+    expect(r.contadores.admitidosNoMes).toBe(1);
+  });
+
   it("busca acima do teto é cortada em 160 caracteres", async () => {
     await listarColaboradores({ busca: "b".repeat(300) });
     expect(queryEnviada().get("busca")).toBe(

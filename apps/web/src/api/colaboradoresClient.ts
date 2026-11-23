@@ -140,6 +140,22 @@ export interface ColaboradorListadoApi extends ColaboradorApi {
    * `situacao` vem "inativo" e a linha só aparece em Todos.
    */
   desativado?: boolean;
+  /**
+   * T215 — CPF (11 dígitos) na empresa ativa. AUSENTE para quem não lê dados
+   * pessoais (e sem empresa ativa); `null` sem CPF ou com o dado bloqueado
+   * (desligado). A tela distingue "sem permissão" de "vazio".
+   */
+  cpf?: string | null;
+  /**
+   * T215 — e-mail pessoal e celular do contato ativo na empresa. AUSENTE
+   * para quem não lê contatos; `null` sem contato ou bloqueado.
+   */
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  /**
+   * T215 — salário bruto do contrato do vínculo principal ("5000.00").
+   * AUSENTE para quem não lê o contrato; `null` sem contrato ou salário.
+   */
+  salarioBruto?: string | null;
 }
 
 /**
@@ -164,6 +180,18 @@ export interface ContadoresColaboradoresApi {
   desativados?: number;
   /** T199 — ativos pelo tipo do vínculo principal ativo; a soma é `ativos`. */
   ativosPorTipo: Record<TipoVinculo, number>;
+  /**
+   * T215 — cartão "Colaboradores ativos": pessoas com vínculo ativo admitido
+   * no mês civil de hoje (America/Sao_Paulo).
+   */
+  admitidosNoMes?: number;
+  /** T215 — pessoas com vínculo encerrado no ano civil de hoje. */
+  desligadosNoAno?: number;
+  /**
+   * T215 — ativos ao fim de cada um dos 6 meses até hoje (o mais antigo
+   * primeiro; o atual fecha hoje), para o gráfico do cartão.
+   */
+  serieAtivos?: number[];
 }
 
 /** T199 — grupo da aba do dashboard (ausente: todos). */

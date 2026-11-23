@@ -2757,12 +2757,19 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(linha.celular).toBe("+5511987650009");
     });
 
-    it("listagem e detalhe do colaborador NÃO expõem contatos", async () => {
+    it("detalhe NÃO expõe contatos; a listagem só e-mail e celular, nunca o telefone (T215)", async () => {
       const lista = await get("/v1/colaboradores", rhA).expect(200);
       const detalhe = await get(`/v1/colaboradores/${pessoaA}`, rhA).expect(
         200,
       );
-      for (const corpoResposta of [lista.body, detalhe.body]) {
+      // T215 — a página inicial no desenho da referência mostra, na linha,
+      // e-mail pessoal e celular (com a trilha da leitura); o telefone fixo
+      // segue só na ficha.
+      const textoDaLista = JSON.stringify(lista.body);
+      for (const proibido of [TELEFONE_NOVO, "telefone"]) {
+        expect(textoDaLista).not.toContain(proibido);
+      }
+      for (const corpoResposta of [detalhe.body]) {
         const texto = JSON.stringify(corpoResposta);
         for (const proibido of [
           EMAIL,

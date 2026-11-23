@@ -43,6 +43,19 @@ export interface ContadoresColaboradores {
    * `ativos`. Todos os tipos presentes, com zero quando não há ninguém.
    */
   ativosPorTipo: Record<TipoVinculo, number>;
+  /**
+   * T215 — cartão "Colaboradores ativos" da página inicial: pessoas com
+   * vínculo ATIVO admitido no mês civil de hoje (America/Sao_Paulo).
+   */
+  admitidosNoMes: number;
+  /** T215 — pessoas com vínculo encerrado no ano civil de hoje. */
+  desligadosNoAno: number;
+  /**
+   * T215 — ativos ao fim de cada um dos 6 meses até hoje, o mais antigo
+   * primeiro; o mês atual fecha hoje. Pela admissão e pelo desligamento dos
+   * vínculos; quem está desativado na empresa fica fora.
+   */
+  serieAtivos: number[];
 }
 
 export const TAMANHO_PAGINA_PADRAO = 20;

@@ -508,6 +508,11 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(Object.keys(r.itens[0]!).sort()).toEqual(
         [
           "atualizadoEm",
+          // T215 — página inicial no desenho da referência: contatos, CPF e
+          // salário bruto, só para quem os lê na ficha (aqui, o RH).
+          "contatos",
+          "cpf",
+          "salarioBruto",
           "criadoEm",
           // T215 — desativado na empresa (lixeira do Editar colaborador).
           "desativado",
@@ -867,13 +872,17 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       ]);
       // T199 — os contadores do dashboard, ao lado dos de sempre.
       expect(Object.keys(r.body.contadores).sort()).toEqual([
+        // T215 — indicadores do cartão da página inicial.
+        "admitidosNoMes",
         "ativos",
         "ativosPorTipo",
         // T215 — desativados na empresa.
         "desativados",
         "desligados",
+        "desligadosNoAno",
         "emAdmissao",
         "inativos",
+        "serieAtivos",
         "total",
       ]);
       for (const cred of [gestorA, colaboradorA]) {
@@ -1366,6 +1375,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       desligados: number;
       total: number;
       ativosPorTipo: Record<string, number>;
+      /** T215 — a série de ativos do cartão (6 meses). */
+      serieAtivos: number[];
     }
 
     async function listarD(
@@ -1565,7 +1576,10 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
 
     it("contadores do escopo: grupos exclusivos que somam o total, e ativos por tipo pelo principal", async () => {
       const r = await listarD(rhD);
-      expect(r.contadores).toEqual({
+      // T215 — os indicadores do cartão (que dependem do dia de hoje) têm
+      // suíte própria; aqui, só a forma da série.
+      expect(r.contadores.serieAtivos).toHaveLength(6);
+      expect(r.contadores).toMatchObject({
         ativos: 4,
         inativos: 4,
         emAdmissao: 2,
@@ -1661,12 +1675,14 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         r.itens[0]!.vinculos.map((v) => [v.matricula, v.situacao, v.tipo]),
       ).toEqual([["MAT-D-NIN", "ativo", "temporario"]]);
       const texto = JSON.stringify(r);
+      // T215 — CPF, e-mail, celular e salário passaram a ser da linha (a
+      // página inicial no desenho da referência); o resto segue fora.
       for (const proibido of [
-        "cpf",
-        "salario",
-        "email",
-        "celular",
         "telefone",
+        '"rg"',
+        "logradouro",
+        "nascimento",
+        "genero",
       ]) {
         expect(texto.toLowerCase()).not.toContain(proibido);
       }

@@ -389,6 +389,10 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
         freelancer: 0,
         trainee: 0,
       },
+      // T215 — indicadores do cartão da página inicial.
+      admitidosNoMes: 0,
+      desligadosNoAno: 0,
+      serieAtivos: [0, 0, 0, 0, 0, 0],
     });
   });
 });

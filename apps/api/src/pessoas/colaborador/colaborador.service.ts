@@ -64,6 +64,8 @@ import {
   contatosInformados,
 } from "../contatos/contato-colaborador.service";
 import { escaparCuringas } from "../../common/busca.util";
+import { dataLocalDe } from "../../ponto/competencia.util";
+import { clausulasDeBusca, indicadoresDoEscopo } from "./listagem-pagina";
 import {
   comDesativacaoVigente,
   grupoExcluiDesativados,
@@ -231,6 +233,31 @@ export interface ColaboradorListado {
    * "inativo"; a linha só aparece em Todos.
    */
   desativado: boolean;
+  /**
+   * T215 — o CPF (11 dígitos) do perfil pessoal na empresa ativa. AUSENTE
+   * para quem não lê dados pessoais e sem empresa ativa; `null` sem CPF ou
+   * com o dado bloqueado (desligado: só a ficha diz que existe).
+   */
+  cpf?: string | null;
+  /**
+   * T215 — e-mail pessoal e celular do contato ATIVO na empresa. AUSENTE
+   * para quem não lê contatos e sem empresa ativa; `null` sem contato ou
+   * bloqueado.
+   */
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  /**
+   * T215 — salário bruto do contrato do vínculo PRINCIPAL ("5000.00").
+   * AUSENTE para quem não lê `contrato_vinculo` e sem empresa ativa; `null`
+   * sem contrato ou sem salário.
+   */
+  salarioBruto?: string | null;
+}
+
+/** T215 — o que a página lê de cada linha, além da projeção de sempre. */
+interface DadosDaLinha {
+  cpf?: string | null;
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  salarioBruto?: string | null;
 }
 
 /**
@@ -467,6 +494,9 @@ export function contadoresVazios(): ContadoresColaboradores {
     total: 0,
     desativados: 0,
     ativosPorTipo: distribuirAtivosPorTipo([]),
+    admitidosNoMes: 0,
+    desligadosNoAno: 0,
+    serieAtivos: [0, 0, 0, 0, 0, 0],
   };
 }
 
@@ -1388,19 +1418,21 @@ export class ColaboradorService {
       );
     }
     if (query.busca) {
-      const termo = escaparCuringas(query.busca);
+      // T215 — nome, matrícula, CPF, e-mail pessoal e id (ver
+      // `clausulasDeBusca`); CPF e e-mail só para quem os lê na ficha.
+      const pode = (
+        recurso: "dados_pessoais_colaborador" | "contato_colaborador",
+      ) =>
+        empresaId !== undefined
+          ? podeAcessarPessoas(ctx.actor, recurso, "read", empresaId)
+          : podeConsultarPessoas(ctx.actor, recurso, "read", escopo);
       filtros.push({
-        OR: [
-          { nome: { contains: termo, mode: "insensitive" } },
-          {
-            vinculos: {
-              some: {
-                ...noEscopo,
-                matricula: { contains: termo, mode: "insensitive" },
-              },
-            },
-          },
-        ],
+        OR: clausulasDeBusca(query.busca, {
+          noEscopo,
+          empresaId,
+          podeCpf: pode("dados_pessoais_colaborador"),
+          podeEmail: pode("contato_colaborador"),
+        }),
       });
     }
     const porLotacao = filtroDeLotacaoVigente(
@@ -1461,6 +1493,7 @@ export class ColaboradorService {
       desligados,
       vinculosAtivos,
       desativados,
+      vinculosDoEscopo,
     ] = await Promise.all([
       this.prisma.colaborador.findMany({
         where,
@@ -1526,6 +1559,21 @@ export class ColaboradorService {
       this.prisma.colaborador.count({
         where: { AND: [base, comDesativacaoVigente(empresaId)] },
       }),
+      // T215 — indicadores do cartão: admitidos no mês, desligados no ano e
+      // a série de 6 meses, sem quem está desativado na empresa.
+      this.prisma.vinculoFuncional.findMany({
+        where: {
+          ...noEscopo,
+          situacao: { in: ["ativo", "encerrado"] },
+          colaborador: semDesativacaoVigente(empresaId),
+        },
+        select: {
+          colaboradorId: true,
+          situacao: true,
+          dataAdmissao: true,
+          dataDesligamento: true,
+        },
+      }),
     ]);
 
     if (escopo.global) {
@@ -1550,6 +1598,9 @@ export class ColaboradorService {
       empresaId,
       linhas.map((c) => c.id),
     );
+
+    // T215 — CPF, contatos e salário da página, em lote e com a trilha.
+    const dadosDasLinhas = await this.dadosDasLinhas(ctx, empresaId, linhas);
 
     const itens: ColaboradorListado[] = linhas.map((c) => ({
       id: c.id,
@@ -1581,6 +1632,7 @@ export class ColaboradorService {
       ),
       foto: fotos.get(c.id) ?? null,
       desativado: c.desativacoes.length > 0,
+      ...(dadosDasLinhas.get(c.id) ?? {}),
     }));
 
     return {
@@ -1596,8 +1648,195 @@ export class ColaboradorService {
         desativados,
         total: totalNoEscopo,
         ativosPorTipo: distribuirAtivosPorTipo(vinculosAtivos),
+        ...indicadoresDoEscopo(vinculosDoEscopo, dataLocalDe(new Date())),
       },
     };
+  }
+
+  /**
+   * T215 — CPF, contatos e salário bruto das linhas da página, em três
+   * consultas (nunca uma por linha).
+   *
+   * - Só com empresa ativa (o `master_tecnico` global não recebe nenhum dos
+   *   três: os dados são por empresa, como a foto).
+   * - Cada campo só para quem o lê na ficha: `dados_pessoais_colaborador`
+   *   (CPF), `contato_colaborador` (contatos) e `contrato_vinculo` (salário).
+   *   Sem a permissão, o campo nem vai — a tela distingue "sem permissão" de
+   *   "vazio".
+   * - CPF e contatos de quem não está em uso operacional na empresa
+   *   (desligado) vêm `null`: o dado é bloqueado, como na ficha.
+   * - Toda leitura que devolve valor deixa a trilha de sempre, na mesma
+   *   transação (fail-safe): o evento da categoria (leitura, valores
+   *   devolvidos, só os NOMES dos campos) e o `audit_event` da consulta.
+   */
+  private async dadosDasLinhas(
+    ctx: PessoasAuditContext,
+    empresaId: string | undefined,
+    linhas: readonly {
+      id: string;
+      vinculos: readonly {
+        id: string;
+        situacao: SituacaoVinculo;
+        dataAdmissao: Date;
+        matricula: string | null;
+      }[];
+    }[],
+  ): Promise<Map<string, DadosDaLinha>> {
+    const resultado = new Map<string, DadosDaLinha>();
+    if (empresaId === undefined || linhas.length === 0) return resultado;
+    const lerCpf = podeAcessarPessoas(
+      ctx.actor,
+      "dados_pessoais_colaborador",
+      "read",
+      empresaId,
+    );
+    const lerContatos = podeAcessarPessoas(
+      ctx.actor,
+      "contato_colaborador",
+      "read",
+      empresaId,
+    );
+    const lerSalario = podeAcessarPessoas(
+      ctx.actor,
+      "contrato_vinculo",
+      "read",
+      empresaId,
+    );
+    if (!lerCpf && !lerContatos && !lerSalario) return resultado;
+
+    const operacionais = linhas
+      .filter((c) => c.vinculos.some((v) => v.situacao !== "encerrado"))
+      .map((c) => c.id);
+    // O vínculo principal: a mesma ordem da linha, da ficha e do contrato.
+    const principais = new Map<string, string>();
+    for (const c of linhas) {
+      const [principal] = [...c.vinculos].sort(
+        (a, b) =>
+          ORDEM_SITUACAO_VINCULO[a.situacao] -
+            ORDEM_SITUACAO_VINCULO[b.situacao] ||
+          b.dataAdmissao.getTime() - a.dataAdmissao.getTime() ||
+          compararMatriculas(a.matricula, b.matricula),
+      );
+      if (principal) principais.set(c.id, principal.id);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const perfis =
+        lerCpf && operacionais.length > 0
+          ? await tx.perfilPessoalColaborador.findMany({
+              where: { empresaId, colaboradorId: { in: operacionais } },
+              select: { id: true, colaboradorId: true, cpf: true },
+            })
+          : [];
+      const contatos =
+        lerContatos && operacionais.length > 0
+          ? await tx.contatoColaborador.findMany({
+              where: {
+                empresaId,
+                colaboradorId: { in: operacionais },
+                ativo: true,
+              },
+              select: {
+                id: true,
+                colaboradorId: true,
+                emailPessoal: true,
+                celular: true,
+              },
+            })
+          : [];
+      const contratos = lerSalario
+        ? await tx.contratoVinculo.findMany({
+            where: { empresaId, vinculoId: { in: [...principais.values()] } },
+            select: { vinculoId: true, salarioBruto: true },
+          })
+        : [];
+
+      const cpfPor = new Map(perfis.map((p) => [p.colaboradorId, p]));
+      const contatoPor = new Map(contatos.map((c) => [c.colaboradorId, c]));
+      const salarioPor = new Map(
+        contratos.map((c) => [
+          c.vinculoId,
+          c.salarioBruto === null ? null : c.salarioBruto.toFixed(2),
+        ]),
+      );
+
+      for (const c of linhas) {
+        const dados: DadosDaLinha = {};
+        if (lerCpf) dados.cpf = cpfPor.get(c.id)?.cpf ?? null;
+        if (lerContatos) {
+          const contato = contatoPor.get(c.id);
+          dados.contatos = contato
+            ? { emailPessoal: contato.emailPessoal, celular: contato.celular }
+            : null;
+        }
+        if (lerSalario) {
+          const vinculoId = principais.get(c.id);
+          dados.salarioBruto = vinculoId
+            ? (salarioPor.get(vinculoId) ?? null)
+            : null;
+        }
+        resultado.set(c.id, dados);
+      }
+
+      // A trilha de cada valor devolvido (só os NOMES dos campos).
+      const cpfsLidos = perfis.filter((p) => p.cpf !== null);
+      if (cpfsLidos.length > 0) {
+        await tx.dadosPessoaisColaboradorEvento.createMany({
+          data: cpfsLidos.map((p) => ({
+            colaboradorId: p.colaboradorId,
+            empresaId,
+            categoria: "perfil_pessoal" as const,
+            perfilId: p.id,
+            enderecoId: null,
+            acao: "leitura" as const,
+            resultado: "valores_devolvidos" as const,
+            campos: ["cpf" as const],
+            atorUserId: ctx.actor.id,
+            requestId: ctx.metadata.requestId,
+          })),
+        });
+        for (const p of cpfsLidos) {
+          await this.auditoria.registrarNaTransacao(tx, ctx, {
+            action: "pessoas_dados_pessoais_consultados",
+            resource: "dados_pessoais_colaborador",
+            resourceId: p.colaboradorId,
+            empresaId,
+            result: "success",
+          });
+        }
+      }
+      // A leitura alcança o registro de contato inteiro (a regra do banco
+      // para a leitura com valores: os três campos), como na ficha — mesmo
+      // que a linha mostre só e-mail e celular.
+      const contatosLidos = contatos.map((c) => ({
+        contato: c,
+        campos: ["email_pessoal", "celular", "telefone"] as const,
+      }));
+      if (contatosLidos.length > 0) {
+        await tx.contatoColaboradorEvento.createMany({
+          data: contatosLidos.map(({ contato, campos }) => ({
+            colaboradorId: contato.colaboradorId,
+            empresaId,
+            contatoId: contato.id,
+            acao: "leitura" as const,
+            resultado: "valores_devolvidos" as const,
+            campos: [...campos],
+            atorUserId: ctx.actor.id,
+            requestId: ctx.metadata.requestId,
+          })),
+        });
+        for (const { contato } of contatosLidos) {
+          await this.auditoria.registrarNaTransacao(tx, ctx, {
+            action: "pessoas_contato_consultado",
+            resource: "contato_colaborador",
+            resourceId: contato.colaboradorId,
+            empresaId,
+            result: "success",
+          });
+        }
+      }
+    });
+    return resultado;
   }
 
   async detalhar(
