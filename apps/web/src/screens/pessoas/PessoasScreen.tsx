@@ -210,6 +210,8 @@ export interface PessoasScreenProps {
   podeOperarJornada?: boolean;
   /** T203 — a aba Solicitações da ficha existe para este papel (não o DP). */
   podeVerSolicitacoes?: boolean;
+  /** T215 — a aba "Organograma" da listagem leva à estrutura. */
+  onAbrirOrganograma?: ColaboradoresScreenProps["onAbrirOrganograma"];
   /**
    * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
    * filtros), guardado pelo shell na URL. Sem ele, o dashboard guarda o
@@ -238,6 +240,7 @@ export function PessoasScreen({
   podeEditarFicha = false,
   podeOperarJornada = false,
   podeVerSolicitacoes = false,
+  onAbrirOrganograma,
   listagem,
   onListagemChange,
 }: PessoasScreenProps) {
@@ -444,6 +447,7 @@ export function PessoasScreen({
                   {...(onNovaAdmissao ? { onNovaAdmissao } : {})}
                   {...(onImportarPlanilha ? { onImportarPlanilha } : {})}
                   {...(onImportarArquivo ? { onImportarArquivo } : {})}
+                  {...(onAbrirOrganograma ? { onAbrirOrganograma } : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
                   {...(onAbrirFicha && podeEditarFicha
                     ? {

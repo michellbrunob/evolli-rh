@@ -615,6 +615,8 @@ function conteudoDoDestino(
         podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
         // T203 — a aba Solicitações só existe para quem a lê (não o DP).
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
+        // T215 — a aba Organograma da listagem abre a estrutura.
+        onAbrirOrganograma={() => onNavegar("cadastros")}
       />
     );
   }

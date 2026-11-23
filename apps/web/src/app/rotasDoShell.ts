@@ -187,15 +187,27 @@ export function rotaDaFicha(ficha: RotaDaFicha): string {
 /**
  * T199 — as abas do dashboard de Colaboradores. Ativos é a inicial (N-6);
  * "jornada" mostra a visão de jornadas que já existia (N-4).
+ * T215 — na ordem da tela: Ativos, Em admissão, Férias e ausências
+ * ("ferias"), Escala de trabalho (o id "jornada" fica, para endereços
+ * salvos), Desligados e Todos. O Organograma é atalho, não aba com estado.
  */
 export const ABAS_DA_LISTAGEM = [
   "ativos",
   "em-admissao",
+  "ferias",
+  "jornada",
   "desligados",
   "todos",
-  "jornada",
 ] as const;
 export type AbaDaListagem = (typeof ABAS_DA_LISTAGEM)[number];
+
+/**
+ * T215 — abas com a tabela de colaboradores. Escala de trabalho e Férias e
+ * ausências são outras visões, com conteúdo e filtros próprios.
+ */
+export function abaTemTabela(aba: AbaDaListagem): boolean {
+  return aba !== "jornada" && aba !== "ferias";
+}
 
 /**
  * T199 — os tipos de vínculo controlados. Aqui, e não importados do cliente da
@@ -277,8 +289,8 @@ export function abaTemLotacao(aba: AbaDaListagem): boolean {
 export function normalizarEstadoDaListagem(
   estado: EstadoDaListagem,
 ): EstadoDaListagem {
-  if (estado.aba === "jornada") {
-    return { ...ESTADO_INICIAL_DA_LISTAGEM, aba: "jornada" };
+  if (!abaTemTabela(estado.aba)) {
+    return { ...ESTADO_INICIAL_DA_LISTAGEM, aba: estado.aba };
   }
   return abaTemLotacao(estado.aba)
     ? estado

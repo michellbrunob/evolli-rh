@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Button,
@@ -35,6 +42,7 @@ import {
   TAMANHOS_DE_PAGINA,
   TIPOS_DE_VINCULO,
   abaTemLotacao,
+  abaTemTabela,
   normalizarEstadoDaListagem,
 } from "../../app/rotasDoShell";
 import { formatarDiaCivil } from "../../format/data";
@@ -116,9 +124,10 @@ function rotuloDaReferencia(ref: { nome: string; codigo: string }): string {
 const ROTULO_DA_ABA: Readonly<Record<AbaDaListagem, string>> = {
   ativos: "Ativos",
   "em-admissao": "Em admissão",
+  ferias: "Férias e ausências",
+  jornada: "Escala de trabalho",
   desligados: "Desligados",
   todos: "Todos",
-  jornada: "Jornada de trabalho",
 };
 
 /** O grupo que cada aba pede ao servidor ("Todos": sem grupo). */
@@ -361,6 +370,11 @@ export interface ColaboradoresScreenProps {
   /** T215 — "Editar colaborador" no ⋯ da linha: só para quem edita. */
   readonly onEditarColaborador?: (colaboradorId: string) => void;
   /**
+   * T215 — a aba "Organograma" leva à estrutura (outra tela, decidida pelo
+   * shell). Sem esta prop, a aba não aparece.
+   */
+  readonly onAbrirOrganograma?: () => void;
+  /**
    * T198 — muda quando a pessoa volta da ficha: o dashboard (que ficou
    * montado, com busca, filtros e página) relê a página atual.
    */
@@ -459,6 +473,7 @@ export function ColaboradoresScreen({
   onImportarArquivo,
   onAbrirFicha,
   onEditarColaborador,
+  onAbrirOrganograma,
   atualizacao = 0,
   estado: estadoControlado,
   onEstadoChange,
@@ -486,7 +501,7 @@ export function ColaboradoresScreen({
     [onEstadoChange],
   );
   const { aba, tipo, departamentoId, cargoId, tamanho } = estado;
-  const temTabela = aba !== "jornada";
+  const temTabela = abaTemTabela(aba);
 
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -792,7 +807,7 @@ export function ColaboradoresScreen({
   const buscaRef = useRef(buscaAplicada);
   buscaRef.current = buscaAplicada;
   useEffect(() => {
-    if (atualizacao === 0 || estadoRef.current.aba === "jornada") return;
+    if (atualizacao === 0 || !abaTemTabela(estadoRef.current.aba)) return;
     void carregarDados(estadoRef.current, buscaRef.current, true);
   }, [atualizacao, carregarDados]);
 
@@ -1394,34 +1409,50 @@ export function ColaboradoresScreen({
             const selecionada = a === aba;
             const numero = contadores ? totalDaAba(a, contadores) : null;
             return (
-              <TabsTrigger
-                key={a}
-                id={idDaAba(a)}
-                data-aba={a}
-                selected={selecionada}
-                controls={idDoPainel}
-                className={
-                  selecionada
-                    ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
-                    : "colaboradores-screen__aba"
-                }
-                // Nome acessível "Ativos, 12": a pausa que o número
-                // colado ao rótulo não dá.
-                {...(numero !== null
-                  ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
-                  : {})}
-                onClick={() => trocarAba(a)}
-              >
-                {ROTULO_DA_ABA[a]}
-                {numero !== null ? (
-                  <span
-                    className="colaboradores-screen__aba-total"
-                    aria-hidden="true"
+              <Fragment key={a}>
+                <TabsTrigger
+                  key={a}
+                  id={idDaAba(a)}
+                  data-aba={a}
+                  selected={selecionada}
+                  controls={idDoPainel}
+                  className={
+                    selecionada
+                      ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
+                      : "colaboradores-screen__aba"
+                  }
+                  // Nome acessível "Ativos, 12": a pausa que o número
+                  // colado ao rótulo não dá.
+                  {...(numero !== null
+                    ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
+                    : {})}
+                  onClick={() => trocarAba(a)}
+                >
+                  {ROTULO_DA_ABA[a]}
+                  {numero !== null ? (
+                    <span
+                      className="colaboradores-screen__aba-total"
+                      aria-hidden="true"
+                    >
+                      {numero}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                {a === "jornada" && onAbrirOrganograma ? (
+                  // T215 — atalho: abre a estrutura (outra tela); nunca fica
+                  // selecionado nem controla o painel.
+                  <TabsTrigger
+                    data-aba="organograma"
+                    selected={false}
+                    controls={idDoPainel}
+                    aria-controls={undefined}
+                    className="colaboradores-screen__aba"
+                    onClick={onAbrirOrganograma}
                   >
-                    {numero}
-                  </span>
+                    Organograma
+                  </TabsTrigger>
                 ) : null}
-              </TabsTrigger>
+              </Fragment>
             );
           })}
         </TabsList>
@@ -1431,7 +1462,17 @@ export function ColaboradoresScreen({
           labelledBy={idDaAba(aba)}
           className="colaboradores-screen__painel-conteudo"
         >
-          {aba === "jornada" ? (
+          {aba === "ferias" ? (
+            /* T215 — o módulo de Férias e ausências chega na próxima
+               entrega; até lá, a aba só diz isso. */
+            <div className="colaboradores-screen__aba-em-breve">
+              <h2>Férias e ausências</h2>
+              <p>
+                O registro de férias e ausências está em construção e chega na
+                próxima versão.
+              </p>
+            </div>
+          ) : aba === "jornada" ? (
             /* D-5, N-4 — a mesma visão de jornadas da empresa, com as mesmas
                permissões: só o RH opera. */
             <AreaDeEdicao id={AREAS_DE_EDICAO.jornadaDoDashboard}>

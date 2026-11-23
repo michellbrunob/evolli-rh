@@ -1228,7 +1228,7 @@ describe("T200 — guarda de saída no App", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
     fireEvent.click(
-      within(grupos).getByRole("tab", { name: /^Jornada de trabalho/ }),
+      within(grupos).getByRole("tab", { name: /^Escala de trabalho/ }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Novo vínculo" }),
@@ -1378,7 +1378,7 @@ describe("T200 — guarda de saída no App", () => {
       screen.getByRole("tablist", { name: "Grupos de colaboradores" });
     async function irParaJornada() {
       fireEvent.click(
-        within(grupos()).getByRole("tab", { name: /^Jornada de trabalho/ }),
+        within(grupos()).getByRole("tab", { name: /^Escala de trabalho/ }),
       );
       await screen.findByRole("button", { name: "Novo vínculo" });
     }
@@ -2923,5 +2923,28 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       ).toBeNull(),
     );
     expect(screen.queryByRole("button", { name: /^Ações: / })).toBeNull();
+  });
+});
+
+describe("T215 — aba Organograma da listagem no shell", () => {
+  it("abre a estrutura (o item Organograma do menu fica atual) e sai da listagem", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    const grupos = screen.getByRole("tablist", {
+      name: "Grupos de colaboradores",
+    });
+    fireEvent.click(within(grupos).getByRole("tab", { name: "Organograma" }));
+    const barra = screen.getByRole("navigation", {
+      name: "Navegação do painel",
+    });
+    await waitFor(() =>
+      expect(
+        within(barra).getByRole("button", { name: /^Organograma/ }),
+      ).toHaveAttribute("aria-current", "page"),
+    );
+    expect(
+      screen.queryByRole("table", { name: /^Colaboradores — / }),
+    ).toBeNull();
   });
 });

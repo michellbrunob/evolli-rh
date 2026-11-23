@@ -2793,7 +2793,12 @@ function vinculoListado(
  */
 function abrirAba(
   rotulo:
-    "Ativos" | "Em admissão" | "Desligados" | "Todos" | "Jornada de trabalho",
+    | "Ativos"
+    | "Em admissão"
+    | "Férias e ausências"
+    | "Escala de trabalho"
+    | "Desligados"
+    | "Todos",
 ) {
   fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${rotulo}`) }));
 }
@@ -4647,13 +4652,17 @@ describe("T199 — dashboard de Colaboradores", () => {
     expect(
       regiao.querySelector(".colaboradores-screen__barra-tipos"),
     ).toHaveAttribute("aria-hidden", "true");
-    // As abas mostram o total de cada grupo; Jornada não tem número.
+    // As abas mostram o total de cada grupo; Férias e ausências e Escala
+    // de trabalho não têm número.
     expect(aba(/^Ativos/)).toHaveAccessibleName("Ativos, 7");
     expect(aba(/^Em admissão/)).toHaveAccessibleName("Em admissão, 2");
     expect(aba(/^Desligados/)).toHaveAccessibleName("Desligados, 3");
     expect(aba(/^Todos/)).toHaveAccessibleName("Todos, 12");
-    expect(aba(/^Jornada de trabalho/)).toHaveTextContent(
-      /^Jornada de trabalho$/,
+    expect(aba(/^Férias e ausências/)).toHaveTextContent(
+      /^Férias e ausências$/,
+    );
+    expect(aba(/^Escala de trabalho/)).toHaveTextContent(
+      /^Escala de trabalho$/,
     );
   });
 
@@ -4679,31 +4688,31 @@ describe("T199 — dashboard de Colaboradores", () => {
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     const abas = within(tablist()).getAllByRole("tab");
-    expect(abas.map((a) => a.tabIndex)).toEqual([0, -1, -1, -1, -1]);
+    expect(abas.map((a) => a.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
 
     abas[0]!.focus();
     fireEvent.keyDown(abas[0]!, { key: "ArrowRight" });
     expect(abas[1]).toHaveFocus();
     fireEvent.keyDown(abas[1]!, { key: "End" });
-    expect(abas[4]).toHaveFocus();
-    fireEvent.keyDown(abas[4]!, { key: "ArrowRight" });
+    expect(abas[5]).toHaveFocus();
+    fireEvent.keyDown(abas[5]!, { key: "ArrowRight" });
     expect(abas[0]).toHaveFocus();
     fireEvent.keyDown(abas[0]!, { key: "ArrowLeft" });
-    expect(abas[4]).toHaveFocus();
-    fireEvent.keyDown(abas[4]!, { key: "Home" });
+    expect(abas[5]).toHaveFocus();
+    fireEvent.keyDown(abas[5]!, { key: "Home" });
     expect(abas[0]).toHaveFocus();
     // Mover o foco não troca de aba (ativação manual: Enter, Espaço ou clique).
     expect(abas[0]).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(abas[2]!);
+    fireEvent.click(abas[4]!);
     await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
     const depois = within(tablist()).getAllByRole("tab");
-    expect(depois[2]).toHaveAttribute("aria-selected", "true");
-    expect(depois.map((a) => a.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
+    expect(depois[4]).toHaveAttribute("aria-selected", "true");
+    expect(depois.map((a) => a.tabIndex)).toEqual([-1, -1, -1, -1, 0, -1]);
     // O painel é rotulado pela aba selecionada.
     expect(screen.getByRole("tabpanel")).toHaveAttribute(
       "aria-labelledby",
-      depois[2]!.id,
+      depois[4]!.id,
     );
   });
 
@@ -4711,7 +4720,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     [true, "Somente RH"],
     [false, "Somente consulta"],
   ])(
-    "aba Jornada de trabalho: a visão existente, embutida (opera: %s)",
+    "aba Escala de trabalho: a visão de jornadas existente, embutida (opera: %s)",
     async (podeOperarJornada, selo) => {
       render(
         <ColaboradoresScreen
@@ -4721,7 +4730,7 @@ describe("T199 — dashboard de Colaboradores", () => {
       );
       await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
       const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
-      abrirAba("Jornada de trabalho");
+      abrirAba("Escala de trabalho");
       const painel = screen.getByRole("tabpanel");
       expect(
         await within(painel).findByRole("heading", {
@@ -7182,7 +7191,7 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     ).toEqual(["Em admissão", "Desligados", "Total nesta empresa"]);
   });
 
-  it("nada de indicador, aba ou ação sem contrato: ausência, salário, CPF, contato, exportação, férias, escala, organograma", async () => {
+  it("nada de indicador, aba ou ação sem contrato: salário, CPF, contato, exportação, calendário; sem destino, sem Organograma", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([colaborador1]),
       contadores: CONTADORES_REAIS,
@@ -7193,14 +7202,12 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const visivel = document.body.textContent ?? "";
     for (const proibido of [
-      /ausent/i,
+      /ausente/i,
       /sal[aá]rio/i,
       /\bCPF\b/,
       /telefone/i,
       /e-mail/i,
       /exportar/i,
-      /f[eé]rias/i,
-      /escala/i,
       /organograma/i,
       /calend[aá]rio/i,
     ]) {
@@ -7213,9 +7220,10 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     ).toEqual([
       "Ativos",
       "Em admissão",
+      "Férias e ausências",
+      "Escala de trabalho",
       "Desligados",
       "Todos",
-      "Jornada de trabalho",
     ]);
   });
 
@@ -7659,5 +7667,102 @@ describe("T209 — foto na listagem de Colaboradores", () => {
     expect(css).toMatch(
       /\.colaboradores-screen__avatar \{[^}]*overflow: hidden;/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T215 — as abas da listagem: Ativos, Em admissão, Férias e ausências, Escala
+// de trabalho, Organograma (atalho para a estrutura), Desligados e Todos.
+// ---------------------------------------------------------------------------
+describe("T215 — abas da listagem", () => {
+  const nomesDasAbas = () =>
+    within(screen.getByRole("tablist", { name: "Grupos de colaboradores" }))
+      .getAllByRole("tab")
+      .map((t) => t.textContent?.replace(/\d+$/, ""));
+
+  it("com destino para o Organograma: sete abas, na ordem", async () => {
+    render(<ColaboradoresScreen onAbrirOrganograma={vi.fn()} />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    expect(nomesDasAbas()).toEqual([
+      "Ativos",
+      "Em admissão",
+      "Férias e ausências",
+      "Escala de trabalho",
+      "Organograma",
+      "Desligados",
+      "Todos",
+    ]);
+  });
+
+  it("Organograma abre a estrutura: chama o destino e não troca a aba", async () => {
+    const onAbrirOrganograma = vi.fn();
+    const onMudanca = vi.fn();
+    render(
+      <ColaboradoresScreen
+        estado={ESTADO_PADRAO}
+        onEstadoChange={onMudanca}
+        onAbrirOrganograma={onAbrirOrganograma}
+      />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    const organograma = screen.getByRole("tab", { name: "Organograma" });
+    expect(organograma).toHaveAttribute("aria-selected", "false");
+    fireEvent.click(organograma);
+    expect(onAbrirOrganograma).toHaveBeenCalledTimes(1);
+    expect(onMudanca).not.toHaveBeenCalled();
+    expect(screen.getByRole("tab", { name: /^Ativos/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("Férias e ausências: painel próprio, sem tabela, busca nem filtros; não relê a listagem por grupo", async () => {
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={onMudanca} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    const chamadas = vi.mocked(listarColaboradores).mock.calls.length;
+    abrirAba("Férias e ausências");
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "ferias",
+    });
+    const painel = screen.getByRole("tabpanel");
+    expect(
+      within(painel).getByRole("heading", {
+        level: 2,
+        name: "Férias e ausências",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: /^Colaboradores — / }),
+    ).toBeNull();
+    expect(screen.queryByLabelText("Buscar por nome ou matrícula")).toBeNull();
+    for (const [consulta] of vi
+      .mocked(listarColaboradores)
+      .mock.calls.slice(chamadas)) {
+      expect(consulta).not.toHaveProperty("grupo");
+      expect(consulta).not.toHaveProperty("situacao");
+    }
+  });
+
+  it("Escala de trabalho é a visão de jornadas (aba 'jornada' na URL)", async () => {
+    const onMudanca = vi.fn();
+    render(
+      <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={onMudanca} />,
+    );
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    abrirAba("Escala de trabalho");
+    expect(onMudanca).toHaveBeenLastCalledWith({
+      ...ESTADO_PADRAO,
+      aba: "jornada",
+    });
+    expect(
+      await within(screen.getByRole("tabpanel")).findByRole("heading", {
+        level: 2,
+        name: "Jornada de trabalho",
+      }),
+    ).toBeInTheDocument();
   });
 });

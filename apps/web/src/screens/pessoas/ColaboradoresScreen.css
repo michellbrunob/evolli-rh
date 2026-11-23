@@ -284,6 +284,25 @@
   min-width: 0;
 }
 
+/* T215 — a aba Férias e ausências antes do módulo: título e uma frase. */
+.colaboradores-screen__aba-em-breve {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-lg) 0;
+  text-align: center;
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__aba-em-breve h2 {
+  margin: 0;
+  font-size: var(--text-lead);
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__aba-em-breve p {
+  margin: 0;
+}
+
 /* Linha da tabela: avatar neutro por iniciais e o nome, que abre a ficha. */
 .colaboradores-screen__pessoa {
   display: inline-flex;

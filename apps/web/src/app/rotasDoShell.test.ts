@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ABAS_DA_LISTAGEM,
   ESTADO_INICIAL_DA_LISTAGEM,
   destinoDaRota,
   listagemDaRota,
@@ -106,6 +107,26 @@ describe("T199 — listagemDaRota", () => {
         `${ROTA}?aba=jornada&pagina=4&departamento=${DEP}&tipo=pj`,
       ),
     ).toEqual({ ...ESTADO_INICIAL_DA_LISTAGEM, aba: "jornada" });
+  });
+
+  it("T215 — a aba Férias e ausências também não leva página, lotação nem tipo", () => {
+    expect(
+      listagemDaRota(`${ROTA}?aba=ferias&pagina=4&departamento=${DEP}&tipo=pj`),
+    ).toEqual({ ...ESTADO_INICIAL_DA_LISTAGEM, aba: "ferias" });
+    expect(
+      rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, aba: "ferias" }),
+    ).toBe(`${ROTA}?aba=ferias`);
+  });
+
+  it("T215 — a ordem das abas: Ativos, Em admissão, Férias e ausências, Escala de trabalho, Desligados, Todos", () => {
+    expect([...ABAS_DA_LISTAGEM]).toEqual([
+      "ativos",
+      "em-admissao",
+      "ferias",
+      "jornada",
+      "desligados",
+      "todos",
+    ]);
   });
 });
 
