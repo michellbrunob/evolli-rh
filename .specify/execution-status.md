@@ -3412,7 +3412,12 @@ Documentos.
 | T213   | **Validação visual aprovada em 23/11/2026; aguarda publicação** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
 
 **Arquivos reais:** bloqueados até o ClamAV estar configurado e a revisão de segurança estar
-concluída; até lá, só arquivos sintéticos.
+concluída; até lá, só arquivos sintéticos. Tecnicamente, o envio depende de verificador
+configurado e operante (sem ele, 503 antes de gravar).
+
+**Correções pós-revisão (23/11/2026, PR #206 em Draft):** antivírus antes de gravar, `DELETE`
+revogado no banco, foco depois de cada ação e download pelo padrão do Dashboard; aguardam
+validação antes do Ready.
 
 **Escopo:** primeira fatia da [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md)
 — API (migration, rotas, RBAC, auditoria, ClamAV com quarentena fail-closed, limpeza pendente) e

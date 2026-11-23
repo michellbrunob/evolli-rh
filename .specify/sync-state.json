@@ -12,14 +12,14 @@
   },
   "nextTask": {
     "id": "T213",
-    "status": "documentos_colaborador_aprovada_aguardando_publicacao",
-    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); convergida no primeiro commit da T213. T213 com a primeira fatia implementada localmente (API e tela) conforme a ADR 0021 e o dossie (docs/decisions/t213-documentos-colaborador.md); validacao visual aprovada pela proprietaria em 2026-11-23. Arquivos reais bloqueados ate o ClamAV estar configurado e a revisao de seguranca concluida. Aguarda autorizacao para publicar a PR; sem push, PR, Ready ou merge."
+    "status": "documentos_colaborador_correcoes_pos_revisao_aguardando_validacao",
+    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); convergida no primeiro commit da T213. T213 com validacao visual aprovada em 2026-11-23 e PR #206 aberta em Draft; correcoes pos-revisao (antivirus antes de gravar, DELETE revogado no banco, foco e download) aguardando validacao da proprietaria antes do Ready. Arquivos reais bloqueados ate o ClamAV estar configurado e a revisao de seguranca concluida. Sem Ready nem merge."
   },
   "openDeliveries": [
     {
       "id": "T213",
-      "pullRequest": null,
-      "status": "documentos_colaborador_aprovada_aguardando_publicacao"
+      "pullRequest": 206,
+      "status": "documentos_colaborador_correcoes_pos_revisao_aguardando_validacao"
     }
   ],
   "requiredArtifacts": [

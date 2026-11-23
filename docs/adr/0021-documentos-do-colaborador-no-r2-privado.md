@@ -30,10 +30,15 @@
    foto (ADR 0020). Chave só com ids internos:
    `v1/empresas/{empresa}/colaboradores/{colaborador}/documentos/{documento}/{versao}`. O nome
    original do arquivo **não** é guardado; o download sai como `categoria-AAAA-MM-DD.ext`.
-5. **Quarentena fail-closed:** toda versão nasce `em_verificacao`; o antivírus (ClamAV do
-   servidor, protocolo `INSTREAM`, configurado por `CLAMAV_HOST` e `CLAMAV_PORT`) aprova ou
-   reprova. Falha, tempo esgotado ou falta de configuração mantêm a versão bloqueada; há rota de
-   nova verificação. Só `aprovado` pode ser baixado. O arquivo nunca vai a serviço de terceiros.
+5. **Antivírus antes de gravar (fail-closed):** o arquivo passa pelo antivírus (ClamAV do
+   servidor, protocolo `INSTREAM`, configurado por `CLAMAV_HOST` e `CLAMAV_PORT`) **antes de
+   qualquer gravação**. Sem verificador configurado e operante — ausente, fora do ar, recusando
+   conexão ou sem resposta no tempo —, envio e troca respondem 503 com o código
+   `documento_verificacao_indisponivel` e nada é gravado: nem no R2, nem documento, versão,
+   limpeza pendente ou trilha. Com resposta, a versão nasce `aprovado` ou `reprovado`, com a
+   trilha na mesma transação. Só `aprovado` pode ser baixado; o reprovado fica guardado e
+   bloqueado. Versão antiga ainda `em_verificacao` só muda pela rota de nova verificação. O
+   arquivo nunca vai a serviço de terceiros.
 6. **Acesso só pela API:** envio e download passam por rotas autenticadas; nunca há URL do R2 no
    navegador. Resposta do download: `attachment`, `private, no-store`, `nosniff` e CSP restritiva.
 7. **Papéis:** RH e DP enviam, veem, baixam, trocam e removem, só na empresa ativa;
@@ -41,7 +46,9 @@
    demais papéis são negados. Documento de outra empresa responde como não encontrado (404).
 8. **Versões e remoção:** trocar cria versão nova e preserva a anterior; remover é **lógico** (sai
    da lista e do download, o objeto fica). Nenhuma exclusão física de documento registrado
-   nesta fase.
+   nesta fase — garantida também no banco: o usuário da aplicação não tem `DELETE` em
+   `documento_colaborador` nem em `versao_documento_colaborador` (migration
+   `20261123120000_documentos_colaborador_remocao_logica`).
 9. **Limpeza pendente:** o objeto é registrado como pendente antes de ser gravado no R2 e baixado
    quando o registro conclui; o que sobrar sem registro (falha, ou envio parado há mais de
    15 minutos) é apagado na passagem seguinte.
@@ -74,10 +81,17 @@ não está configurado nesse ambiente). Cenários conferidos no navegador:
 
 - **Arquivos reais continuam bloqueados** até o ClamAV estar configurado no ambiente e a
   revisão de segurança do fluxo de envio estar concluída. Até lá, só arquivos sintéticos.
-- Em ambiente sem ClamAV configurado, os arquivos ficam em verificação e não podem ser baixados.
-- O verificador falso (`EVOLLI_DOCUMENTOS_VERIFICADOR=falso`) e o armazenamento em memória
-  (`EVOLLI_DOCUMENTOS_ARMAZENAMENTO=memoria`) existem só para testes e prévia local; ambos são
-  recusados em produção.
+- **O envio depende tecnicamente de verificador configurado e operante:** sem ClamAV (ou com
+  ele fora do ar), a API recusa o envio e a troca com 503 antes de gravar.
+- O verificador falso (`EVOLLI_DOCUMENTOS_VERIFICADOR=falso`) só é aceito com `NODE_ENV` de
+  desenvolvimento ou teste, e o armazenamento em memória
+  (`EVOLLI_DOCUMENTOS_ARMAZENAMENTO=memoria`) só fora de produção; existem para testes e prévia
+  local.
+- Limites conhecidos, mantidos nesta fatia: dois envios simultâneos podem passar do limite de 5
+  por categoria ou 30 por colaborador (a contagem não trava a linha); duas trocas simultâneas do
+  mesmo documento sem chave de idempotência respondem 500 em vez de 409; se a versão nova for
+  reprovada, a anterior aprovada fica preservada mas não é baixada; o hash não é conferido no
+  download.
 - Ficam para depois: MFA para baixar, retenção e descarte (DP-2E-15), obrigatoriedade por
   empresa, cargo ou vínculo (DP-2E-10/11), categorias configuráveis, outros formatos, acesso do
   próprio colaborador (DP-2E-14), OCR, assinatura, vencimentos e envio pela importação.

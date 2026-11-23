@@ -3600,6 +3600,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
       - **Arquivos reais:** continuam bloqueados até o ClamAV estar configurado e a revisão de
         segurança estar concluída; até lá, só arquivos sintéticos.
+      - **Correções pós-revisão (23/11/2026, PR #206 em Draft):** antivírus antes de gravar (sem
+        verificador operante, 503 e nada gravado); `DELETE` revogado do usuário da aplicação em
+        documento e versão; foco depois de cada ação na etapa 4 e na ficha; download pelo padrão do
+        Dashboard. Aguardam a validação da proprietária antes do Ready.
       - **Objetivo:** RH e DP anexarem documentos reais do colaborador com rapidez e segurança,
         pela etapa 4 "Documentos" do Novo colaborador e pela ficha, conforme a
         [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md) e o

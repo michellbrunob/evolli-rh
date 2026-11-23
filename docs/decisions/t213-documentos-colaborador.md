@@ -75,8 +75,10 @@ as decisões da seção 3, e de uma trava de ambiente: sem antivírus operante, 
 A proprietária aprovou a primeira fatia com estas decisões, registradas na
 [ADR 0021](../adr/0021-documentos-do-colaborador-no-r2-privado.md):
 
-- **Upload real via R2 liberado.** Jurídico e DPO validaram finalidade e base legal (registro só
-  da confirmação).
+- **Upload via R2 liberado, com condição.** Jurídico e DPO validaram finalidade e base legal
+  (registro só da confirmação). **Arquivos reais** só depois de o ClamAV estar configurado e a
+  revisão de segurança concluída; tecnicamente, o envio depende de verificador configurado e
+  operante (seção 3.1).
 - **MFA não exigido nesta fase**; fica como endurecimento futuro.
 - **Opcionais:** nenhum documento bloqueia a admissão. Obrigatórios, opcionais ou configuráveis
   por empresa ou cargo continua **pendente** (DP-2E-10/11).
@@ -108,8 +110,16 @@ A proprietária aprovou a primeira fatia com estas decisões, registradas na
   (`/:id/versoes`), verificar de novo (`/:id/verificacao`), remover e baixar (`/:id/arquivo`).
   Corpo `application/octet-stream`; categoria, nome, tipo e extensão em cabeçalhos;
   `Idempotency-Key` opcional.
-- **Conferência do arquivo** antes de gravar e **antivírus** pelo `clamd` (sem dependência nova),
-  com verificador falso só fora de produção.
+- **Conferência do arquivo** antes de gravar e **antivírus** pelo `clamd` (sem dependência nova).
+- **Trava do antivírus (correção pós-revisão, 2026-11-23):** o arquivo passa pelo antivírus antes
+  de qualquer gravação. Sem verificador configurado e operante (ausente, fora do ar, recusando
+  conexão ou sem resposta no tempo), envio e troca respondem 503 com o código
+  `documento_verificacao_indisponivel`, sem detalhe interno, e nada é gravado (R2, documento,
+  versão, limpeza ou trilha). Com resposta, a versão nasce aprovada ou reprovada. O verificador
+  falso só é aceito com `NODE_ENV` de desenvolvimento ou teste.
+- **Remoção só lógica no banco:** migration `20261123120000_documentos_colaborador_remocao_logica`
+  revoga o `DELETE` do usuário da aplicação em `documento_colaborador` e
+  `versao_documento_colaborador`; a limpeza pendente mantém o `DELETE`.
 - **RBAC:** recursos `documento_colaborador` (lista e escrita) e `conteudo_documento_colaborador`
   (download).
 
@@ -137,6 +147,14 @@ A proprietária aprovou a primeira fatia com estas decisões, registradas na
   removem (com confirmação); o `master_tecnico` vê só a lista e o estado.
 - **Ver** abre o arquivo numa aba nova a partir da memória do navegador, buscado pela rota
   autenticada; nunca por URL do armazenamento.
+- **Baixar** (correção pós-revisão) usa o mesmo padrão do Dashboard: link temporário inserido no
+  documento e endereço revogado depois do clique.
+- **Foco** (correção pós-revisão): ao escolher, trocar ou remover arquivo, na etapa 4 e na
+  ficha, o foco vai a um controle visível da mesma linha — "Ver" quando há arquivo (ou o "⋯" se
+  ele não pode ser visto), "Enviar arquivo" quando não há; ao tirar um Outro da lista, o campo
+  "Novo documento". O foco adiado nunca fecha um menu ou diálogo já aberto.
+- **Antivírus indisponível:** a tela diz que a verificação está indisponível, que o arquivo não foi
+  enviado e oferece nova tentativa.
 
 ### 3.3 Diferenças em relação à proposta de preparação
 
@@ -146,8 +164,9 @@ A proprietária aprovou a primeira fatia com estas decisões, registradas na
   "N de 5 anexados".
 - O exemplo do campo de "Outros" é "Contrato de experiência", para não induzir dado de saúde no
   nome; não há outra orientação na tela.
-- A trava de ambiente (D19) não foi feita na tela: sem ClamAV, o arquivo sobe e fica "Em
-  verificação", sem download.
+- A trava de ambiente (D19) ficou na API, não na tela: sem ClamAV operante, o envio é recusado
+  (503) antes de gravar. Na primeira versão, o arquivo subia e ficava "Em verificação"; a
+  revisão final trocou isso pela recusa.
 
 ## 4. Validação visual (2026-11-23)
 
@@ -170,8 +189,13 @@ ambiente local e o verificador falso de desenvolvimento. Cenários conferidos no
   revisão de segurança do fluxo de envio (portão "Revisão humana" da seção 1.2) estar
   concluída.
 - **ClamAV:** a integração existe, mas o serviço não está configurado no ambiente local
-  (`CLAMAV_HOST`, `CLAMAV_PORT`); a prévia usa o verificador falso, só de desenvolvimento e
-  recusado em produção. Sem ele, o arquivo fica "Em verificação" e não é baixado.
+  (`CLAMAV_HOST`, `CLAMAV_PORT`); a prévia usa o verificador falso, só de desenvolvimento ou
+  teste. Sem verificador operante, a API recusa o envio (503) e nada é gravado.
+- Limites conhecidos, mantidos nesta fatia: dois envios simultâneos podem passar do limite de 5
+  por categoria ou 30 por colaborador (a contagem não trava a linha); duas trocas simultâneas do
+  mesmo documento sem chave de idempotência respondem 500 em vez de 409; se a versão nova for
+  reprovada, a anterior aprovada fica preservada mas não é baixada; o hash não é conferido no
+  download.
 - **Retenção e descarte** (DP-2E-15), **MFA para baixar**, **obrigatoriedade** (DP-2E-10/11),
   **categorias configuráveis**, **outros formatos** e **acesso do próprio colaborador**
   (DP-2E-14) ficam para depois.
