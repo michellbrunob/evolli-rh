@@ -1801,7 +1801,7 @@ describe("Nova admissão — sucesso", () => {
   it("revisar contatos na ficha é uma ação separada", async () => {
     const { onAbrirAdmitido } = await admitirComSucesso();
     fireEvent.click(
-      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
+      screen.getByRole("button", { name: "Revisar contatos" }),
     );
     expect(onAbrirAdmitido).toHaveBeenCalledWith(
       expect.objectContaining({ id: resposta.id }),

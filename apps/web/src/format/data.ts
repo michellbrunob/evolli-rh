@@ -150,6 +150,23 @@ export function formatarDiaCivil(valor: string | null | undefined): string {
 }
 
 /**
+ * Data civil → só o ano (`AAAA`), com a mesma validação de
+ * `formatarDiaCivil`. Qualquer recusa devolve `null`.
+ */
+export function anoDoDiaCivil(valor: string | null | undefined): string | null {
+  if (typeof valor !== "string") return null;
+  const casado = CIVIL_EXATA.exec(valor) ?? CIVIL_SERIALIZADA.exec(valor);
+  if (!casado) return null;
+  const [, ano, mes, dia] = casado as unknown as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  return diaExiste(Number(ano), Number(mes), Number(dia)) ? ano : null;
+}
+
+/**
  * Mês de referência → `MM/AAAA`.
  *
  * Aceita **só** `AAAA-MM`. Não deriva competência de data completa: nenhum

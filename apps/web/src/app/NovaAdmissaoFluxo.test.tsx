@@ -229,8 +229,8 @@ const ROTA_COLABORADORES = "#/pessoas/colaboradores";
 
 /** T198 — a ficha é página própria: espera a navegação interna dela. */
 async function esperarFicha(): Promise<HTMLElement> {
-  await screen.findByRole("tablist", { name: /^Seções da ficha de / });
-  const ficha = document.querySelector<HTMLElement>(".ficha-colaborador");
+  await screen.findByRole("tablist", { name: "Seções da ficha" });
+  const ficha = document.querySelector<HTMLElement>(".ficha-ref");
   if (!ficha) throw new Error("A ficha não está aberta.");
   return ficha;
 }
@@ -934,31 +934,31 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
       `${ROTA_COLABORADORES}/${resposta.id}/dados`,
     );
     expect(listarVinculosDoColaborador).toHaveBeenCalledWith(resposta.id);
-    expect(within(ficha).getByLabelText("Nome")).toHaveValue(
-      "Pessoa Sintética Fluxo",
-    );
   });
 
-  it("'Revisar contatos na ficha' abre a ficha com o foco no primeiro contato", async () => {
+  it("T215 — 'Revisar contatos' abre Editar colaborador em Dados básicos, com volta para a ficha", async () => {
     render(<App papelDoAtor="dp" />);
     await abrirNovaAdmissaoPelaListagem();
     await admitirPelaPagina();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
+    fireEvent.click(screen.getByRole("button", { name: "Revisar contatos" }));
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Editar colaborador",
+      }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe(
+      `#/pessoas/colaboradores/${resposta.id}/editar/dados-basicos`,
     );
-    await esperarFicha();
+    expect(
+      screen.getByRole("button", { name: "Voltar para a ficha" }),
+    ).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByLabelText(/E-mail pessoal/)).toHaveFocus(),
+      expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id),
     );
-    // T179 (revisão final) — o foco pula o título da seção: o estado "Nenhum
-    // contato registrado" chega pela descrição do próprio campo focado.
-    expect(screen.getByLabelText(/E-mail pessoal/)).toHaveAccessibleDescription(
-      /Nenhum contato registrado/,
-    );
-    expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
 
-  it("T179 — sem nenhum contato: salva sem aviso, não envia o bloco e a ficha mostra 'Nenhum contato registrado'", async () => {
+  it("T179 — sem nenhum contato: salva sem aviso, não envia o bloco e a ficha mostra o contato vazio", async () => {
     vi.mocked(admitirColaborador).mockResolvedValue({
       ...resposta,
       contatos: null,
@@ -981,16 +981,16 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
       }),
     );
     const ficha = await esperarFicha();
-    const contatos = await within(ficha).findByRole("region", {
-      name: "Contatos",
+    await within(ficha).findByRole("heading", {
+      level: 1,
+      name: "Pessoa Sintética Fluxo",
     });
-    const estado = await within(contatos).findByText(
-      /Nenhum contato registrado/,
-    );
-    expect(estado).toHaveAttribute("role", "status");
-    expect(estado).toHaveTextContent(/^Nenhum contato registrado\./);
-    expect(contatos).toHaveAccessibleDescription(/Nenhum contato registrado/);
-    expect(within(contatos).queryByRole("alert")).not.toBeInTheDocument();
+    // T215 — sem contato registrado, o resumo da ficha mostra "—", sem erro.
+    const resumo = within(ficha).getByRole("list", {
+      name: "Resumo do colaborador",
+    });
+    expect(resumo).toHaveTextContent("E-mail—");
+    expect(within(ficha).queryByRole("alert")).not.toBeInTheDocument();
     expect(consultarContatosDoColaborador).toHaveBeenCalledWith(resposta.id);
   });
 
@@ -1017,7 +1017,7 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     fireEvent.click(itemColaboradoresNaBarra());
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
   });
 });
 

@@ -55,7 +55,8 @@ describe("T209 — rótulo 'Aprendiz' em todas as superfícies que exibem o tipo
   it.each([
     "src/screens/pessoas/ColaboradoresScreen.tsx",
     "src/screens/pessoas/NovaAdmissaoScreen.tsx",
-    "src/screens/pessoas/FichaColaboradorScreen.tsx",
+    // T215 — a ficha usa os rótulos da página de edição.
+    "src/screens/pessoas/edicao/dadosProfissionais.ts",
     "src/screens/pessoas/DadosContratuaisScreen.tsx",
     "src/screens/pessoas/HistoricoFuncionalScreen.tsx",
     "src/screens/pessoas/RegistrosPontoColaboradorSecao.tsx",

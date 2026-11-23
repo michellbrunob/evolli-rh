@@ -57,7 +57,7 @@ import {
 import { OPCOES_GENERO, OPCOES_NIVEL } from "./NovaAdmissaoScreen";
 import { diaDeHoje } from "./jornadaColaborador";
 import { PainelAdicionarColaborador } from "./PainelAdicionarColaborador";
-import { iniciaisDe } from "./FichaColaboradorScreen";
+import { iniciaisDe } from "./iniciais";
 import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
 import {
   IconeBaixarArquivo,

@@ -173,10 +173,10 @@ import {
   type RotaDaFicha,
   type SecaoDaEdicao,
   ESTADO_INICIAL_DA_LISTAGEM,
+  edicaoAPartirDe,
+  voltarDaEdicao,
   destinoDaRota,
   ehFragmentoDeRota,
-  competenciaDoMesAtual,
-  competenciaValida,
   fichaDaRota,
   listagemDaRota,
   rotaDaFicha,
@@ -480,8 +480,13 @@ function conteudoDoDestino(
     readonly onTrocarCompetencia: (competencia: string) => void;
     readonly onFechar: () => void;
     /** T215 — a página "Editar colaborador" e a troca de seção dela. */
-    readonly onAbrirEdicao: (colaboradorId: string) => void;
+    readonly onAbrirEdicao: (
+      colaboradorId: string,
+      secao?: SecaoDaEdicao,
+    ) => void;
     readonly onTrocarSecaoDaEdicao: (secao: SecaoDaEdicao) => void;
+    /** T215 — voltar da edição: à ficha de origem ou à lista. */
+    readonly onVoltarDaEdicao: () => void;
     /** T199 — o estado do dashboard de Colaboradores, guardado na URL. */
     readonly listagem: EstadoDaListagem;
     readonly onListagemChange: (
@@ -612,6 +617,7 @@ function conteudoDoDestino(
         onFecharFicha={fichaDoColaborador.onFechar}
         onAbrirEdicao={fichaDoColaborador.onAbrirEdicao}
         onTrocarSecaoDaEdicao={fichaDoColaborador.onTrocarSecaoDaEdicao}
+        onVoltarDaEdicao={fichaDoColaborador.onVoltarDaEdicao}
         listagem={fichaDoColaborador.listagem}
         onListagemChange={fichaDoColaborador.onListagemChange}
         {...(admissao.podeAdmitir
@@ -1234,13 +1240,28 @@ export function App({
     [irParaDireto],
   );
 
-  // T176/T198 — "Abrir ficha" e "Completar contatos" da Nova admissão abrem a
-  // ficha do admitido, na aba de dados.
-  const abrirAdmitido = useCallback((abertura: AberturaDoAdmitido) => {
-    setFicha({ colaboradorId: abertura.colaborador.id, aba: "dados" });
-    setFocarContatosNaFicha(abertura.foco === "contatos");
-    setDestinoAtivoId("pessoas");
-  }, []);
+  // T176/T198 — "Abrir ficha" da Nova admissão abre a ficha do admitido, na
+  // aba de dados. T215 — "Revisar contatos" abre a página Editar
+  // colaborador em Dados básicos (os contatos moram lá), voltando à ficha.
+  const abrirAdmitido = useCallback(
+    (abertura: AberturaDoAdmitido) => {
+      const ficha: RotaDaFicha = {
+        colaboradorId: abertura.colaborador.id,
+        aba: "dados",
+      };
+      setFicha(
+        abertura.foco === "contatos"
+          ? fichaParaOPapel(
+              edicaoAPartirDe(ficha, ficha.colaboradorId, "dados-basicos"),
+              papelDoAtor,
+            )
+          : ficha,
+      );
+      setFocarContatosNaFicha(false);
+      setDestinoAtivoId("pessoas");
+    },
+    [papelDoAtor],
+  );
   // T205 — trocar de ano no Dashboard é navegação: empilha uma entrada
   // (voltar e avançar percorrem os anos). Ano fora do intervalo não vira rota.
   const trocarAnoDoDashboard = useCallback((ano: number) => {
@@ -1275,46 +1296,17 @@ export function App({
   const abrirFicha = useCallback(
     (colaboradorId: string, aba: AbaDaFicha = "dados") => {
       setFocarContatosNaFicha(false);
-      setFicha(
-        fichaParaOPapel(
-          aba === "ponto"
-            ? { colaboradorId, aba, competencia: competenciaDoMesAtual() }
-            : { colaboradorId, aba },
-          papelDoAtor,
-        ),
-      );
+      setFicha(fichaParaOPapel({ colaboradorId, aba }, papelDoAtor));
     },
     [papelDoAtor],
   );
-  const trocarAbaDaFicha = useCallback(
-    (aba: AbaDaFicha) => {
-      // T203 — aba que o papel não lê não é oferecida; se pedida, é ignorada.
-      if (aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papelDoAtor)) {
-        return;
-      }
-      // T202 — a aba de ponto abre na última competência vista nesta ficha ou,
-      // na primeira vez, no mês corrente (P-4).
-      setFicha((atual) =>
-        atual
-          ? {
-              ...atual,
-              aba,
-              ...(aba === "ponto"
-                ? { competencia: atual.competencia ?? competenciaDoMesAtual() }
-                : {}),
-            }
-          : atual,
-      );
-    },
-    [papelDoAtor],
-  );
-  // T202 — trocar de mês é navegação: empilha uma entrada (voltar e avançar
-  // percorrem os meses). Competência fora do formato não vira rota.
-  const trocarCompetenciaDaFicha = useCallback((competencia: string) => {
-    if (!competenciaValida(competencia)) return;
-    setFicha((atual) =>
-      atual && atual.aba === "ponto" ? { ...atual, competencia } : atual,
-    );
+  // T215 — as abas da ficha da referência (sem ponto nem solicitações).
+  const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
+    setFicha((atual) => (atual ? { ...atual, aba } : atual));
+  }, []);
+  // T215 — sem a aba de ponto, não há competência na ficha.
+  const trocarCompetenciaDaFicha = useCallback((_competencia: string) => {
+    return undefined;
   }, []);
   const fecharFicha = useCallback(() => {
     setFocarContatosNaFicha(false);
@@ -1323,17 +1315,22 @@ export function App({
   // T215 — a página "Editar colaborador" (empilha a rota), começando em
   // Dados básicos; quem não edita cai na ficha (`fichaParaOPapel`).
   const abrirEdicao = useCallback(
-    (colaboradorId: string) => {
+    (colaboradorId: string, secao: SecaoDaEdicao = "dados-basicos") => {
       setFocarContatosNaFicha(false);
-      const pedida: RotaDaFicha = {
-        colaboradorId,
-        aba: "dados",
-        edicao: "dados-basicos",
-      };
-      setFicha(fichaParaOPapel(pedida, papelDoAtor));
+      // T215 — aberta pela ficha, a edição volta para ela.
+      setFicha((atual) =>
+        fichaParaOPapel(
+          edicaoAPartirDe(atual, colaboradorId, secao),
+          papelDoAtor,
+        ),
+      );
     },
     [papelDoAtor],
   );
+  const voltarDaPaginaDeEdicao = useCallback(() => {
+    setFocarContatosNaFicha(false);
+    setFicha((atual) => voltarDaEdicao(atual));
+  }, []);
   const trocarSecaoDaEdicao = useCallback((secao: SecaoDaEdicao) => {
     setFicha((atual) =>
       atual && atual.edicao !== undefined ? { ...atual, edicao: secao } : atual,
@@ -2039,6 +2036,7 @@ export function App({
                   onTrocarCompetencia: trocarCompetenciaDaFicha,
                   onFechar: fecharFicha,
                   onAbrirEdicao: abrirEdicao,
+                  onVoltarDaEdicao: voltarDaPaginaDeEdicao,
                   onTrocarSecaoDaEdicao: trocarSecaoDaEdicao,
                   listagem,
                   onListagemChange: mudarListagem,

@@ -33,9 +33,9 @@ import type {
   SecaoDaEdicao,
 } from "../../app/rotasDoShell";
 import {
-  FICHA_COLABORADOR_TITULO_ID,
-  FichaColaboradorScreen,
-} from "./FichaColaboradorScreen";
+  FICHA_DO_COLABORADOR_TITULO_ID,
+  FichaDoColaborador,
+} from "./ficha/FichaDoColaborador";
 import {
   AFASTAMENTOS_TITULO_ID,
   AfastamentosScreen,
@@ -198,8 +198,16 @@ export interface PessoasScreenProps {
   onTrocarCompetenciaDaFicha?: (competencia: string) => void;
   /** T198 — volta da ficha à listagem: o shell troca a rota. */
   onFecharFicha?: () => void;
-  /** T215 — "Editar colaborador" (⋯ da linha): o shell abre a página. */
-  onAbrirEdicao?: (colaboradorId: string) => void;
+  /**
+   * T215 — "Editar colaborador" (⋯ da linha e ficha): o shell abre a
+   * página, na seção pedida (sem seção, Dados básicos).
+   */
+  onAbrirEdicao?: (colaboradorId: string, secao?: SecaoDaEdicao) => void;
+  /**
+   * T215 — voltar da página de edição: à ficha, quando foi aberta por ela;
+   * senão, à lista.
+   */
+  onVoltarDaEdicao?: () => void;
   /** T215 — outra seção da página de edição: o shell troca a rota. */
   onTrocarSecaoDaEdicao?: (secao: SecaoDaEdicao) => void;
   /** T176 — "Completar contatos" da Nova admissão: foco nos contatos. */
@@ -241,17 +249,18 @@ export function PessoasScreen({
   ficha = null,
   onAbrirFicha,
   onTrocarAbaDaFicha,
-  onTrocarCompetenciaDaFicha,
+  onTrocarCompetenciaDaFicha: _onTrocarCompetenciaDaFicha,
   onFecharFicha,
   onAbrirEdicao,
   onTrocarSecaoDaEdicao,
-  focarContatosNaFicha = false,
+  onVoltarDaEdicao,
+  focarContatosNaFicha: _focarContatosNaFicha = false,
   onNovaAdmissao,
   onImportarPlanilha,
   onImportarArquivo,
   podeEditarFicha = false,
   podeOperarJornada = false,
-  podeVerSolicitacoes = false,
+  podeVerSolicitacoes: _podeVerSolicitacoes = false,
   onAbrirOrganograma,
   listagem,
   onListagemChange,
@@ -279,15 +288,6 @@ export function PessoasScreen({
     focarAbaHistoricoRef.current = false;
     document.getElementById("pessoas-tab-historico_funcional")?.focus();
   }, [abaAtiva]);
-
-  function abrirHistoricoFuncional(alvo: {
-    colaboradorId: string;
-    vinculoId: string;
-  }) {
-    setSelecaoHistorico(alvo);
-    focarAbaHistoricoRef.current = true;
-    setAbaAtiva("historico_funcional");
-  }
 
   const definicaoAtiva = abas.find((aba) => aba.id === abaAtiva) ?? abas[0]!;
 
@@ -338,22 +338,6 @@ export function PessoasScreen({
     else onAbrirFicha?.(colaboradorId, aba);
   }
 
-  /** T187 — o atalho da Vida funcional, agora a partir da ficha. */
-  function abrirHistoricoDaFicha(alvo: {
-    colaboradorId: string;
-    vinculoId: string;
-  }) {
-    // T200 — trocar de aba desmonta o painel de Pessoas que ficou por baixo.
-    guarda.solicitarSaida({
-      area: AREAS_DE_EDICAO.painelPessoas,
-      executar: () => {
-        pularRestauroRef.current = true;
-        abrirHistoricoFuncional(alvo);
-        onFecharFicha?.();
-      },
-    });
-  }
-
   /**
    * T200 — trocar a aba de Pessoas desmonta o painel atual: com edição
    * pendente nele, a guarda do shell pergunta antes. A mesma aba não
@@ -379,7 +363,7 @@ export function PessoasScreen({
       fichaAberta
         ? ficha?.edicao !== undefined
           ? EDITAR_COLABORADOR_TITULO_ID
-          : FICHA_COLABORADOR_TITULO_ID
+          : FICHA_DO_COLABORADOR_TITULO_ID
         : definicaoAtiva.tituloId,
     );
   }, [fichaAberta, ficha?.edicao, definicaoAtiva.tituloId, onTituloIdChange]);
@@ -406,33 +390,43 @@ export function PessoasScreen({
             colaboradorId={ficha.colaboradorId}
             secao={ficha.edicao}
             onTrocarSecao={(secao) => onTrocarSecaoDaEdicao?.(secao)}
+            rotuloVoltar={
+              ficha.voltarParaFicha
+                ? "Voltar para a ficha"
+                : "Voltar para Colaboradores"
+            }
             onVoltar={() =>
               guarda.solicitarSaida({
                 area: AREAS_DE_EDICAO.ficha,
-                executar: () => onFecharFicha?.(),
+                executar: () =>
+                  onVoltarDaEdicao ? onVoltarDaEdicao() : onFecharFicha?.(),
               })
             }
           />
         </AreaDeEdicao>
       ) : fichaAberta && ficha ? (
         // T200 — a ficha declara a própria área de edição (ver o componente).
-        <FichaColaboradorScreen
+        /* T215 — a ficha no desenho da referência. */
+        <FichaDoColaborador
           key={ficha.colaboradorId}
           colaboradorId={ficha.colaboradorId}
           aba={ficha.aba}
           onTrocarAba={(aba) => onTrocarAbaDaFicha?.(aba)}
-          {...(ficha.competencia !== undefined
-            ? { competencia: ficha.competencia }
-            : {})}
-          onTrocarCompetencia={(competencia) =>
-            onTrocarCompetenciaDaFicha?.(competencia)
+          onVoltar={() =>
+            guarda.solicitarSaida({
+              area: AREAS_DE_EDICAO.ficha,
+              executar: () => onFecharFicha?.(),
+            })
           }
-          onVoltar={() => onFecharFicha?.()}
-          podeEditarFicha={podeEditarFicha}
+          podeEditar={podeEditarFicha}
+          {...(onAbrirEdicao
+            ? {
+                onEditar: (secao: SecaoDaEdicao) =>
+                  onAbrirEdicao(ficha.colaboradorId, secao),
+              }
+            : {})}
           podeOperarJornada={podeOperarJornada}
-          podeVerSolicitacoes={podeVerSolicitacoes}
-          onAbrirHistoricoFuncional={abrirHistoricoDaFicha}
-          focarContatos={focarContatosNaFicha}
+          servicoDeAusencias={servicoDeAusenciasDoServidor}
         />
       ) : null}
       {listagemMontada || !fichaAberta ? (

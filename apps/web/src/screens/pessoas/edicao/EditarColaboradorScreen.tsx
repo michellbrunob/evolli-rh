@@ -282,8 +282,10 @@ export interface EditarColaboradorScreenProps {
   readonly secao: SecaoDaEdicao;
   /** Outra seção: o shell troca a rota. */
   readonly onTrocarSecao: (secao: SecaoDaEdicao) => void;
-  /** Voltar para Colaboradores. */
+  /** Voltar (à ficha de origem ou à lista: quem decide é o shell). */
   readonly onVoltar: () => void;
+  /** T215 — o nome do botão voltar ("Voltar para a ficha" vindo da ficha). */
+  readonly rotuloVoltar?: string;
 }
 
 type Carga =
@@ -296,6 +298,7 @@ export function EditarColaboradorScreen({
   secao,
   onTrocarSecao,
   onVoltar,
+  rotuloVoltar = "Voltar para Colaboradores",
 }: EditarColaboradorScreenProps) {
   const base = useId();
   const id = (campo: string) => `${base}-${campo}`;
@@ -812,7 +815,7 @@ export function EditarColaboradorScreen({
     <div className="cadastro-etapas editar-colaborador">
       <header className="editar-colaborador__cabecalho">
         <IconButton
-          label="Voltar para Colaboradores"
+          label={rotuloVoltar}
           variant="subtle"
           icon={<IconeVoltar />}
           onClick={onVoltar}

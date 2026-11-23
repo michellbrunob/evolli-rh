@@ -4238,7 +4238,7 @@ function ConfirmacaoDaAdmissao({
             variant="secondary"
             onClick={() => onAbrirAdmitido(colaborador, "contatos")}
           >
-            Revisar contatos na ficha
+            Revisar contatos
           </Button>
           <Button
             type="button"

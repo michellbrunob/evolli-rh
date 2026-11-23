@@ -11,7 +11,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button, FormActions } from "../../../components";
 import { Sheet } from "../../../ui";
 import { IconeCalendario } from "../../../ui/icones";
-import { formatarDiaCivil } from "../../../format/data";
+import { anoDoDiaCivil, formatarDiaCivil } from "../../../format/data";
 import {
   type AusenciaApi,
   type MotivoAfastamento,
@@ -199,7 +199,7 @@ export function RegistrarAusenciaGaveta({
 
   const alterado = pessoa !== null || tipo !== null || inicio !== "";
   const nome = pessoa ? primeiroNome(pessoa.nome) : "";
-  const ano = simulacao?.periodo ? simulacao.periodo.fim.slice(0, 4) : null;
+  const ano = simulacao?.periodo ? anoDoDiaCivil(simulacao.periodo.fim) : null;
 
   return (
     <Sheet

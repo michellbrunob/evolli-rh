@@ -104,14 +104,30 @@ export function rotaDoDestino(destinoId: string): string | null {
  */
 export const ABAS_DA_FICHA = [
   "dados",
-  "vida-funcional",
-  "contratuais",
-  "jornada",
+  "salarios",
+  "ferias",
+  "escala",
+  "beneficios",
+  "pesquisas",
   "documentos",
-  "ponto",
-  "solicitacoes",
+  "desenvolvimento",
+  "comentarios",
 ] as const;
 export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
+
+/**
+ * T215 — a ficha no desenho da referência (decisão de 2026-11-23): as abas
+ * acima. As que saíram da ficha (Vida funcional, Dados contratuais,
+ * Registros de ponto e Solicitações) levam a Dados; "jornada" virou Escala.
+ * Endereços salvos não quebram: a primeira exibição corrige a URL.
+ */
+const ABA_DA_FICHA_ANTIGA: Readonly<Record<string, AbaDaFicha>> = {
+  "vida-funcional": "dados",
+  contratuais: "dados",
+  ponto: "dados",
+  solicitacoes: "dados",
+  jornada: "escala",
+};
 
 /**
  * T198 — a ficha pedida pela URL: o colaborador e a aba.
@@ -128,6 +144,42 @@ export interface RotaDaFicha {
    * (`…/:id/editar/:secao`). Presente, ela ocupa o lugar da ficha.
    */
   readonly edicao?: SecaoDaEdicao;
+  /**
+   * T215 — a edição foi aberta pela ficha desta pessoa, nesta aba: voltar
+   * reabre a ficha nela. Não vai à URL (recarregar volta para a lista).
+   */
+  readonly voltarParaFicha?: AbaDaFicha;
+}
+
+/**
+ * T215 — a edição pedida a partir do que está aberto: se é a ficha da mesma
+ * pessoa (e não a própria edição), guarda a aba para a volta.
+ */
+export function edicaoAPartirDe(
+  atual: RotaDaFicha | null,
+  colaboradorId: string,
+  secao: SecaoDaEdicao,
+): RotaDaFicha {
+  const daFicha =
+    atual !== null &&
+    atual.colaboradorId === colaboradorId &&
+    atual.edicao === undefined;
+  return {
+    colaboradorId,
+    aba: "dados",
+    edicao: secao,
+    ...(daFicha
+      ? { voltarParaFicha: atual.aba }
+      : atual?.colaboradorId === colaboradorId && atual.voltarParaFicha
+        ? { voltarParaFicha: atual.voltarParaFicha }
+        : {}),
+  };
+}
+
+/** T215 — para onde a edição volta: a ficha de origem, ou a lista (`null`). */
+export function voltarDaEdicao(edicao: RotaDaFicha | null): RotaDaFicha | null {
+  if (!edicao?.voltarParaFicha) return null;
+  return { colaboradorId: edicao.colaboradorId, aba: edicao.voltarParaFicha };
 }
 
 /**
@@ -200,22 +252,16 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
       ? { colaboradorId, aba: "dados", edicao: secao }
       : null;
   }
+  const antiga = ABA_DA_FICHA_ANTIGA[aba];
+  if (antiga) {
+    // O antigo "…/ponto/AAAA-MM" também abre Dados.
+    if (competencia !== undefined && aba !== "ponto") return null;
+    return { colaboradorId, aba: antiga };
+  }
   if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
-  // T202 — o terceiro segmento é só da aba "ponto", e só no formato do
-  // servidor. Sem ele, vale o mês corrente (P-4): a URL é corrigida no lugar.
-  if (aba !== "ponto") {
-    return competencia === undefined
-      ? { colaboradorId, aba: aba as AbaDaFicha }
-      : null;
-  }
-  if (competencia !== undefined && !competenciaValida(competencia)) {
-    return null;
-  }
-  return {
-    colaboradorId,
-    aba: "ponto",
-    competencia: competencia ?? competenciaDoMesAtual(),
-  };
+  return competencia === undefined
+    ? { colaboradorId, aba: aba as AbaDaFicha }
+    : null;
 }
 
 /**
@@ -226,9 +272,7 @@ export function rotaDaFicha(ficha: RotaDaFicha): string {
   if (ficha.edicao !== undefined) {
     return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/editar/${ficha.edicao}`;
   }
-  const base = `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
-  if (ficha.aba !== "ponto") return base;
-  return `${base}/${ficha.competencia ?? competenciaDoMesAtual()}`;
+  return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
 }
 
 /**

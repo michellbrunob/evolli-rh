@@ -14,7 +14,6 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   obterUsuarioAtual,
@@ -802,39 +801,5 @@ describe("T201 — paginação", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
     expect(document.activeElement).not.toBe(document.body);
-  });
-});
-
-describe("T201 — largura (375 px e tabelas largas)", () => {
-  const css = readFileSync(
-    "src/screens/pessoas/FichaColaboradorScreen.css",
-    "utf8",
-  );
-  const corpo = (seletor: string) => {
-    const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const m = new RegExp(
-      String.raw`(?:^|\})\s*${escapado}\s*\{([^}]*)\}`,
-      "m",
-    ).exec(css);
-    return m ? (m[1] ?? "") : null;
-  };
-
-  it("as tabelas rolam no próprio quadro, que também contém o texto só para leitor (posicionado)", async () => {
-    render(<Secao />);
-    const docs = await tabelaDocumentos();
-    const solics = await tabelaSolicitacoes();
-    for (const tabela of [docs, solics]) {
-      expect(tabela.closest(".ficha-colaborador__quadro")).not.toBeNull();
-    }
-    // O texto extra do "Corrigir tipo" é absoluto (só para leitor): sem um
-    // quadro posicionado, ele escapa da rolagem do quadro e alarga a página.
-    expect(
-      within(docs)
-        .getAllByRole("button")[0]!
-        .querySelector(".ficha-colaborador__so-leitor"),
-    ).not.toBeNull();
-    const quadro = corpo(".ficha-colaborador__quadro");
-    expect(quadro).toMatch(/overflow-x:\s*auto/);
-    expect(quadro).toMatch(/position:\s*relative/);
   });
 });

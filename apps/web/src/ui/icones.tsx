@@ -60,6 +60,15 @@ import {
   UserAdd,
   Warning2,
   type Icon,
+  Briefcase,
+  Call,
+  Home2,
+  Location,
+  MessageText1,
+  Money2,
+  Sms,
+  Teacher,
+  Timer1,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -121,6 +130,18 @@ export const IconePermissoes = decorativo(KeySquare, "Bulk");
 /** T215 — busca e Filtrar da lista de Colaboradores. */
 export const IconeBuscar = decorativo(SearchNormal1, "Linear");
 export const IconeFiltrar = decorativo(Filter, "Bulk");
+/** T215 — ficha do colaborador (abas, cartões e faixa de resumo). */
+export const IconeMaleta = decorativo(Briefcase, "Bulk");
+export const IconeTelefone = decorativo(Call, "Bulk");
+export const IconeCasa = decorativo(Home2, "Bulk");
+export const IconeLocal = decorativo(Location, "Bulk");
+export const IconeComentario = decorativo(MessageText1, "Bulk");
+export const IconeDinheiro = decorativo(Money2, "Bulk");
+export const IconeEmail = decorativo(Sms, "Bulk");
+export const IconeFormacao = decorativo(Teacher, "Bulk");
+export const IconeTempo = decorativo(Timer1, "Bulk");
+export const IconeRelogio = decorativo(Clock, "Bulk");
+export const IconePresente = decorativo(Gift, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
 export const IconeAparencia = decorativo(ColorSwatch, "Bulk");
@@ -129,7 +150,6 @@ export const IconeAparencia = decorativo(ColorSwatch, "Bulk");
 export const IconeEditar = decorativo(Edit2, "Bulk");
 export const IconeAdicionarPessoa = decorativo(UserAdd, "Bulk");
 export const IconePlanilha = decorativo(DocumentText, "Bulk");
-export const IconeRelogio = decorativo(Clock, "Bulk");
 export const IconeSucesso = decorativo(TickCircle, "Bulk");
 /** T212 — baixar um modelo de arquivo. */
 export const IconeBaixarArquivo = decorativo(DocumentDownload, "Bulk");
