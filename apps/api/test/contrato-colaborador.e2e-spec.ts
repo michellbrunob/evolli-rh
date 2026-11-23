@@ -319,6 +319,9 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
         pensaoAlimenticiaPercentual: "12.50",
       },
       atualizadoEm: expect.any(String),
+      // T215 — o estado da desativação na empresa.
+      desativado: false,
+      desativadoEm: null,
     });
   });
 

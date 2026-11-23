@@ -135,6 +135,11 @@ export interface VigenciaDeJornadaListadaApi {
  */
 export interface ColaboradorListadoApi extends ColaboradorApi {
   vinculos: VinculoListadoApi[];
+  /**
+   * T215 — desativado na empresa (lixeira do "Editar colaborador"): a
+   * `situacao` vem "inativo" e a linha só aparece em Todos.
+   */
+  desativado?: boolean;
 }
 
 /**
@@ -152,6 +157,11 @@ export interface ContadoresColaboradoresApi {
   emAdmissao: number;
   desligados: number;
   total: number;
+  /**
+   * T215 — desativados na empresa, fora dos três grupos:
+   * `ativos + emAdmissao + desligados + desativados = total`.
+   */
+  desativados?: number;
   /** T199 — ativos pelo tipo do vínculo principal ativo; a soma é `ativos`. */
   ativosPorTipo: Record<TipoVinculo, number>;
 }

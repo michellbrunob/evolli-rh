@@ -166,6 +166,8 @@ model AccessUser {
   rascunhosAdmissao              RascunhoAdmissao[]           @relation("RascunhoAdmissaoAtor")
   // T209 — fotos de colaborador enviadas por esta conta (autoria).
   fotosColaboradorEnviadas       FotoColaborador[]            @relation("FotoColaboradorAutor")
+  desativacoesFeitas             DesativacaoColaborador[]     @relation("DesativacaoColaboradorAutor")
+  reativacoesFeitas              DesativacaoColaborador[]     @relation("ReativacaoColaboradorAutor")
   // T213 — documentos do colaborador: quem registrou, enviou ou removeu.
   documentosColaboradorCriados   DocumentoColaborador[]       @relation("DocumentoColaboradorAutor")
   documentosColaboradorRemovidos DocumentoColaborador[]       @relation("DocumentoColaboradorRemocao")
@@ -489,6 +491,11 @@ enum AuditAction {
   pessoas_foto_colaborador_enviada     @map("pessoas.foto_colaborador.enviada")
   pessoas_foto_colaborador_substituida @map("pessoas.foto_colaborador.substituida")
   pessoas_foto_colaborador_removida    @map("pessoas.foto_colaborador.removida")
+
+  // T215 — desativacao e reativacao do colaborador na empresa (lixeira do
+  // Editar colaborador). Sem conteudo: so o id do colaborador e a empresa.
+  pessoas_colaborador_desativado @map("pessoas.colaborador.desativado")
+  pessoas_colaborador_reativado  @map("pessoas.colaborador.reativado")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -819,6 +826,7 @@ model Empresa {
   rascunhosAdmissao           RascunhoAdmissao[]
   // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
   fotosColaborador            FotoColaborador[]
+  desativacoesColaborador     DesativacaoColaborador[]
   limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
   // T213 — documentos do colaborador.
   documentosColaborador       DocumentoColaborador[]
@@ -1166,6 +1174,8 @@ model Colaborador {
 
   // T209 — foto do colaborador, por empresa (ADR 0020).
   fotos      FotoColaborador[]
+  /// T215 — desativações NA EMPRESA (lixeira do Editar colaborador).
+  desativacoes DesativacaoColaborador[]
   // T213 — documentos do colaborador.
   documentos DocumentoColaborador[]
 
@@ -2622,6 +2632,33 @@ model RascunhoAdmissao {
   @@unique([atorUserId, empresaId])
   @@index([empresaId])
   @@map("rascunho_admissao")
+}
+
+/// T215 — desativação do colaborador NA EMPRESA (a lixeira do "Editar
+/// colaborador"; decisão da proprietária de 2026-11-23: desativar preserva
+/// todo o histórico e pode ser desfeito). Não é a situação derivada dos
+/// vínculos (`Colaborador.situacao`): é um ato próprio, por empresa, porque a
+/// mesma pessoa pode ter vínculo em mais de uma. Uma linha por desativação;
+/// reativar preenche `reativadoEm` e `reativadoPorId` (a linha fica). No
+/// máximo UMA vigente por pessoa e empresa (índice único parcial, na
+/// migration). Sem DELETE para a aplicação: o histórico é imutável.
+model DesativacaoColaborador {
+  id              String    @id @default(uuid())
+  colaboradorId   String    @map("colaborador_id")
+  empresaId       String    @map("empresa_id")
+  desativadoEm    DateTime  @default(now()) @map("desativado_em")
+  desativadoPorId String    @map("desativado_por_id")
+  reativadoEm     DateTime? @map("reativado_em")
+  reativadoPorId  String?   @map("reativado_por_id")
+
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  desativadoPor AccessUser  @relation("DesativacaoColaboradorAutor", fields: [desativadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reativadoPor  AccessUser? @relation("ReativacaoColaboradorAutor", fields: [reativadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, empresaId])
+  @@index([empresaId])
+  @@map("desativacao_colaborador")
 }
 
 /// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela

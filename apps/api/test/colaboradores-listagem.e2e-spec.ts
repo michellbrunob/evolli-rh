@@ -509,6 +509,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         [
           "atualizadoEm",
           "criadoEm",
+          // T215 — desativado na empresa (lixeira do Editar colaborador).
+          "desativado",
           // T209 — a foto anunciada (só a versão, ou `null`).
           "foto",
           "id",
@@ -867,6 +869,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(Object.keys(r.body.contadores).sort()).toEqual([
         "ativos",
         "ativosPorTipo",
+        // T215 — desativados na empresa.
+        "desativados",
         "desligados",
         "emAdmissao",
         "inativos",
@@ -1567,6 +1571,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         emAdmissao: 2,
         desligados: 2,
         total: 8,
+        // T215 — nenhum desativado.
+        desativados: 0,
         ativosPorTipo: {
           clt: 1,
           estagio: 1,

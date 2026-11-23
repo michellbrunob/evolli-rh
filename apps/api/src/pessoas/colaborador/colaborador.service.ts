@@ -65,6 +65,12 @@ import {
 } from "../contatos/contato-colaborador.service";
 import { escaparCuringas } from "../../common/busca.util";
 import {
+  comDesativacaoVigente,
+  grupoExcluiDesativados,
+  selecaoDaDesativacaoVigente,
+  semDesativacaoVigente,
+} from "./desativacao";
+import {
   type ContratoDaAdmissao,
   contratoConfere,
   contratoGravado,
@@ -220,6 +226,11 @@ export interface ColaboradorListado {
   vinculos: VinculoListado[];
   /** T209 — se há foto do colaborador NA EMPRESA ATIVA (ver `FotoAnunciada`). */
   foto: FotoAnunciada | null;
+  /**
+   * T215 — desativado na empresa (global: em alguma). A `situacao` vem
+   * "inativo"; a linha só aparece em Todos.
+   */
+  desativado: boolean;
 }
 
 /**
@@ -454,6 +465,7 @@ export function contadoresVazios(): ContadoresColaboradores {
     emAdmissao: 0,
     desligados: 0,
     total: 0,
+    desativados: 0,
     ativosPorTipo: distribuirAtivosPorTipo([]),
   };
 }
@@ -1345,14 +1357,24 @@ export class ColaboradorService {
     const base: Prisma.ColaboradorWhereInput =
       empresaId !== undefined ? { vinculos: { some: { empresaId } } } : {};
 
-    const ativoNoEscopo: Prisma.ColaboradorWhereInput =
-      empresaId !== undefined
-        ? { vinculos: { some: { empresaId, situacao: "ativo" } } }
-        : { situacao: "ativo" };
-    const inativoNoEscopo: Prisma.ColaboradorWhereInput =
-      empresaId !== undefined
-        ? { vinculos: { none: { empresaId, situacao: "ativo" } } }
-        : { situacao: "inativo" };
+    // T215 — o desativado na empresa não é ativo: sai do "ativo" e entra no
+    // "inativo", pela mesma regra dos grupos.
+    const ativoNoEscopo: Prisma.ColaboradorWhereInput = {
+      AND: [
+        empresaId !== undefined
+          ? { vinculos: { some: { empresaId, situacao: "ativo" } } }
+          : { situacao: "ativo" },
+        semDesativacaoVigente(empresaId),
+      ],
+    };
+    const inativoNoEscopo: Prisma.ColaboradorWhereInput = {
+      OR: [
+        empresaId !== undefined
+          ? { vinculos: { none: { empresaId, situacao: "ativo" } } }
+          : { situacao: "inativo" },
+        comDesativacaoVigente(empresaId),
+      ],
+    };
 
     const filtros: Prisma.ColaboradorWhereInput[] = [base];
     if (query.situacaoVinculo) {
@@ -1411,13 +1433,23 @@ export class ColaboradorService {
       tipos.length === 1 ? tipos[0] : tipos.length > 1 ? tipos : undefined,
     );
     if (porGrupo) filtros.push(porGrupo);
+    // T215 — o desativado fica só em Todos.
+    if (grupoExcluiDesativados(query.grupo)) {
+      filtros.push(semDesativacaoVigente(empresaId));
+    }
     const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 
     // T199 — contadores do escopo inteiro, sem busca, filtros nem aba; os
     // três grupos pela MESMA regra do filtro, para que somem o total.
     const contarGrupo = (grupo: GrupoColaborador) =>
       this.prisma.colaborador.count({
-        where: { AND: [base, filtroDeGrupo(noEscopo, grupo)!] },
+        where: {
+          AND: [
+            base,
+            filtroDeGrupo(noEscopo, grupo)!,
+            semDesativacaoVigente(empresaId),
+          ],
+        },
       });
 
     const [
@@ -1428,6 +1460,7 @@ export class ColaboradorService {
       emAdmissao,
       desligados,
       vinculosAtivos,
+      desativados,
     ] = await Promise.all([
       this.prisma.colaborador.findMany({
         where,
@@ -1441,6 +1474,8 @@ export class ColaboradorService {
           situacao: true,
           criadoEm: true,
           atualizadoEm: true,
+          // T215 — a desativação vigente na empresa, se houver.
+          desativacoes: selecaoDaDesativacaoVigente(empresaId),
           vinculos: {
             where: noEscopo,
             select: {
@@ -1475,13 +1510,21 @@ export class ColaboradorService {
       contarGrupo("em_admissao"),
       contarGrupo("desligados"),
       this.prisma.vinculoFuncional.findMany({
-        where: { ...noEscopo, situacao: "ativo" },
+        // T215 — o desativado não conta entre os ativos por tipo.
+        where: {
+          ...noEscopo,
+          situacao: "ativo",
+          colaborador: semDesativacaoVigente(empresaId),
+        },
         select: {
           colaboradorId: true,
           tipo: true,
           dataAdmissao: true,
           matricula: true,
         },
+      }),
+      this.prisma.colaborador.count({
+        where: { AND: [base, comDesativacaoVigente(empresaId)] },
       }),
     ]);
 
@@ -1512,11 +1555,13 @@ export class ColaboradorService {
       id: c.id,
       nome: c.nome,
       situacao:
-        empresaId !== undefined
-          ? c.vinculos.some((v) => v.situacao === "ativo")
-            ? "ativo"
-            : "inativo"
-          : c.situacao,
+        c.desativacoes.length > 0
+          ? "inativo"
+          : empresaId !== undefined
+            ? c.vinculos.some((v) => v.situacao === "ativo")
+              ? "ativo"
+              : "inativo"
+            : c.situacao,
       criadoEm: c.criadoEm,
       atualizadoEm: c.atualizadoEm,
       vinculos: ordenarVinculosListados(
@@ -1535,6 +1580,7 @@ export class ColaboradorService {
         })),
       ),
       foto: fotos.get(c.id) ?? null,
+      desativado: c.desativacoes.length > 0,
     }));
 
     return {
@@ -1547,6 +1593,7 @@ export class ColaboradorService {
         inativos: totalNoEscopo - ativos,
         emAdmissao,
         desligados,
+        desativados,
         total: totalNoEscopo,
         ativosPorTipo: distribuirAtivosPorTipo(vinculosAtivos),
       },

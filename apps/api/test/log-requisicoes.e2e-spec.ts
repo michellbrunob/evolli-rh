@@ -422,6 +422,8 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
         emAdmissao: 1,
         desligados: 0,
         total: 1,
+        // T215 — nenhum desativado.
+        desativados: 0,
         ativosPorTipo: {
           clt: 0,
           estagio: 0,

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type ContratoDoColaboradorApi,
   consultarContratoDoColaborador,
+  desativarColaborador,
+  reativarColaborador,
   registrarContratoDoColaborador,
 } from "./edicaoColaboradorClient";
 import { ApiError } from "./colaboradoresClient";
@@ -39,6 +41,8 @@ const CONTRATO: ContratoDoColaboradorApi = {
     pensaoAlimenticiaPercentual: null,
   },
   atualizadoEm: "2026-11-23T12:00:00.000Z",
+  desativado: false,
+  desativadoEm: null,
 };
 
 describe("edicaoColaboradorClient (T215)", () => {
@@ -103,5 +107,46 @@ describe("edicaoColaboradorClient (T215)", () => {
     expect(erro).toBeInstanceOf(ApiError);
     expect(erro.status).toBe(409);
     expect(erro.erros).toEqual([{ campo: "matricula", motivo: "em_uso" }]);
+  });
+
+  it.each([
+    ["desativar", desativarColaborador, true],
+    ["reativar", reativarColaborador, false],
+  ] as const)(
+    "%s: POST com o token CSRF, sem corpo; devolve o estado",
+    async (acao, chamar, desativado) => {
+      setCsrfToken("token-sintetico");
+      const estado = {
+        colaboradorId: ID,
+        empresaId: CONTRATO.empresaId,
+        desativado,
+        desativadoEm: desativado ? "2026-11-23T12:00:00.000Z" : null,
+      };
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, estado));
+      expect(await chamar(ID)).toEqual(estado);
+      const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+      expect(url).toBe(`/v1/colaboradores/${ID}/${acao}`);
+      expect(init).toMatchObject({
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      expect(init.headers).toMatchObject({ "x-csrf-token": "token-sintetico" });
+      expect(init.body).toBeUndefined();
+    },
+  );
+
+  it("desativar: recusa chega como ApiError com o status", async () => {
+    setCsrfToken("token-sintetico");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse(404, { message: "Não encontrado." }),
+    );
+    const erro = (await desativarColaborador(ID).catch(
+      (e: unknown) => e,
+    )) as ApiError;
+    expect(erro).toBeInstanceOf(ApiError);
+    expect(erro.status).toBe(404);
   });
 });

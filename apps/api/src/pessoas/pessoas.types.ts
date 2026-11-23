@@ -32,6 +32,13 @@ export interface ContadoresColaboradores {
   /** T199 — colaboradores com algum vínculo no escopo. */
   total: number;
   /**
+   * T215 — desativados na empresa (lixeira do "Editar colaborador"): fora de
+   * Ativos, Em admissão e Desligados; só em Todos. Com eles, a soma dos
+   * grupos volta a fechar: `ativos + emAdmissao + desligados + desativados =
+   * total`.
+   */
+  desativados: number;
+  /**
    * T199 — ativos pelo tipo do vínculo PRINCIPAL ativo (N-2): a soma é
    * `ativos`. Todos os tipos presentes, com zero quando não há ninguém.
    */

@@ -17,6 +17,7 @@ import {
 } from "./contrato-admissao";
 import { RegistrarContratoColaboradorDto } from "./contrato-colaborador.dto";
 import { escolherVinculoPrincipal } from "./vinculo-principal";
+import { DesativacaoColaboradorService } from "./desativacao-colaborador.service";
 
 /** O vínculo principal como a edição o mostra (só leitura, menos a matrícula). */
 export interface VinculoDoContrato {
@@ -37,6 +38,12 @@ export interface ContratoDoColaborador {
   contrato: ContratoDaAdmissao;
   /** Última gravação do contrato; `null` sem linha. */
   atualizadoEm: Date | null;
+  /**
+   * T215 — a pessoa está desativada NESTA empresa (lixeira do "Editar
+   * colaborador"), e desde quando. A tela mostra o Status sem outra leitura.
+   */
+  desativado: boolean;
+  desativadoEm: Date | null;
 }
 
 const PROJECAO_VINCULO = {
@@ -109,6 +116,7 @@ export class ContratoColaboradorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: PessoasAuditoriaService,
+    private readonly desativacao: DesativacaoColaboradorService,
   ) {}
 
   async consultar(
@@ -129,15 +137,19 @@ export class ContratoColaboradorService {
         principal.id,
       );
     }
-    const linha = await this.prisma.contratoVinculo.findUnique({
-      where: { vinculoId: principal.id },
-    });
+    const [linha, estado] = await Promise.all([
+      this.prisma.contratoVinculo.findUnique({
+        where: { vinculoId: principal.id },
+      }),
+      this.desativacao.estado(colaboradorId, empresaId),
+    ]);
     return {
       colaboradorId,
       empresaId,
       vinculo: vinculoDoContrato(principal),
       contrato: contratoGravado(linha) ?? CONTRATO_VAZIO,
       atualizadoEm: linha?.atualizadoEm ?? null,
+      ...estado,
     };
   }
 
@@ -187,6 +199,7 @@ export class ContratoColaboradorService {
     const novaMatricula =
       dto.matricula === undefined ? principal.matricula : dto.matricula;
 
+    const estado = await this.desativacao.estado(colaboradorId, empresaId);
     try {
       return await this.prisma.$transaction(async (tx) => {
         let vinculo = principal;
@@ -255,6 +268,7 @@ export class ContratoColaboradorService {
           vinculo: vinculoDoContrato(vinculo),
           contrato: contratoGravado(linha) ?? CONTRATO_VAZIO,
           atualizadoEm: linha?.atualizadoEm ?? null,
+          ...estado,
         };
       });
     } catch (erro) {

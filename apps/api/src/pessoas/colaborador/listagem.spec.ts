@@ -376,6 +376,8 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
       emAdmissao: 0,
       desligados: 0,
       total: 0,
+      // T215 — desativados na empresa.
+      desativados: 0,
       ativosPorTipo: {
         clt: 0,
         estagio: 0,

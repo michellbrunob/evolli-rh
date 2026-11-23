@@ -82,6 +82,10 @@ export const AUDIT_ACTIONS = [
   "pessoas_foto_colaborador_enviada",
   "pessoas_foto_colaborador_substituida",
   "pessoas_foto_colaborador_removida",
+  // T215 — desativacao e reativacao do colaborador na empresa (lixeira do
+  // Editar colaborador), sem conteudo.
+  "pessoas_colaborador_desativado",
+  "pessoas_colaborador_reativado",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",

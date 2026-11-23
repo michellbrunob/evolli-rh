@@ -6,6 +6,8 @@ import { ColaboradorController } from "./colaborador/colaborador.controller";
 import { ColaboradorService } from "./colaborador/colaborador.service";
 import { ContratoColaboradorController } from "./colaborador/contrato-colaborador.controller";
 import { ContratoColaboradorService } from "./colaborador/contrato-colaborador.service";
+import { DesativacaoColaboradorController } from "./colaborador/desativacao-colaborador.controller";
+import { DesativacaoColaboradorService } from "./colaborador/desativacao-colaborador.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
 import { VinculoService } from "./vinculo/vinculo.service";
 import { MovimentacaoController } from "./movimentacao/movimentacao.controller";
@@ -62,6 +64,7 @@ import {
     DocumentoColaboradorController,
     // T215 — contrato do vínculo na edição do colaborador.
     ContratoColaboradorController,
+    DesativacaoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -74,6 +77,7 @@ import {
     FotoColaboradorService,
     DocumentoColaboradorService,
     ContratoColaboradorService,
+    DesativacaoColaboradorService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,

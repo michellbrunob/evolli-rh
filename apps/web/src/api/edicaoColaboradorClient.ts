@@ -36,6 +36,21 @@ export interface ContratoDoColaboradorApi {
   vinculo: VinculoDoContratoApi;
   contrato: ContratoGravadoApi;
   atualizadoEm: string | null;
+  /**
+   * T215 — desativado NESTA empresa (lixeira do "Editar colaborador") e
+   * desde quando. O servidor sempre envia; opcionais aqui só para não
+   * quebrar quem monta a resposta à mão antes de ler o estado.
+   */
+  desativado?: boolean;
+  desativadoEm?: string | null;
+}
+
+/** T215 — o estado da desativação depois de desativar ou reativar. */
+export interface DesativacaoDoColaboradorApi {
+  colaboradorId: string;
+  empresaId: string;
+  desativado: boolean;
+  desativadoEm: string | null;
 }
 
 /**
@@ -107,4 +122,44 @@ export async function registrarContratoDoColaborador(
     throw new ApiError(res.status, "Erro na requisição.", corpo);
   }
   return res.json() as Promise<ContratoDoColaboradorApi>;
+}
+
+async function alterarDesativacao(
+  colaboradorId: string,
+  acao: "desativar" | "reativar",
+): Promise<DesativacaoDoColaboradorApi> {
+  const token = await tokenCsrfParaGravacao();
+  const res = await fetch(
+    `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/${acao}`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json", "x-csrf-token": token },
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const corpo: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", corpo);
+  }
+  return res.json() as Promise<DesativacaoDoColaboradorApi>;
+}
+
+/**
+ * T215 — a lixeira do "Editar colaborador": desativa a pessoa NA EMPRESA
+ * ATIVA (nada é apagado; reversível). Idempotente. Só RH e DP.
+ */
+export function desativarColaborador(
+  colaboradorId: string,
+): Promise<DesativacaoDoColaboradorApi> {
+  return alterarDesativacao(colaboradorId, "desativar");
+}
+
+/** T215 — desfaz a desativação na empresa ativa. Idempotente. */
+export function reativarColaborador(
+  colaboradorId: string,
+): Promise<DesativacaoDoColaboradorApi> {
+  return alterarDesativacao(colaboradorId, "reativar");
 }
