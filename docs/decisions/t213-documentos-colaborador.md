@@ -1,8 +1,11 @@
 # T213 — Documentos do colaborador
 
 - **Estado:** aberta em 2026-11-19; primeira fatia **implementada localmente** (API e tela),
-  aguardando a validação visual da proprietária. Branch local `codex/t213-documentos-colaborador`,
-  a partir do squash da T212 em `main` (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+  com a **validação visual aprovada pela proprietária em 2026-11-23**. Branch local
+  `codex/t213-documentos-colaborador`, a partir do squash da T212 em `main` (`9caf216`,
+  PR #205). Aguarda a autorização para publicar a PR; sem push, PR, Ready ou merge.
+- **Arquivos reais:** continuam **bloqueados** até o ClamAV estar configurado e a revisão de
+  segurança estar concluída. Até lá, só arquivos sintéticos.
 - **Pedido da proprietária:** RH e DP anexarem documentos reais do colaborador com rapidez e
   segurança, começando pela etapa 4 "Documentos" do fluxo "Novo colaborador".
 
@@ -146,10 +149,29 @@ A proprietária aprovou a primeira fatia com estas decisões, registradas na
 - A trava de ambiente (D19) não foi feita na tela: sem ClamAV, o arquivo sobe e fica "Em
   verificação", sem download.
 
-## 4. Limites conhecidos
+## 4. Validação visual (2026-11-23)
 
+Aprovada pela proprietária na prévia local, com arquivo sintético, o R2 privado configurado no
+ambiente local e o verificador falso de desenvolvimento. Cenários conferidos no navegador:
+
+- RH percorre as quatro etapas do Novo colaborador e escolhe um PDF sintético no RG: a linha
+  mostra o ícone, o nome, o tamanho, o botão de ver e o menu "⋯", e a seção conta "1 de 5
+  anexados.";
+- ao cadastrar, a admissão é registrada e a confirmação mostra o RG como "Aprovado";
+- na ficha, a seção "Arquivos do colaborador" mostra o RG "Aprovado" e as demais categorias
+  "Pendente";
+- o download como RH é entregue com o nome neutro `categoria-AAAA-MM-DD.ext` e sem cache;
+- o `master_tecnico` vê a lista e o estado, e o download dele é recusado (403);
+- a ficha em 375 px não tem rolagem horizontal.
+
+## 5. Limites conhecidos e pendências
+
+- **Arquivos reais bloqueados:** só depois de o ClamAV estar configurado no ambiente e de a
+  revisão de segurança do fluxo de envio (portão "Revisão humana" da seção 1.2) estar
+  concluída.
 - **ClamAV:** a integração existe, mas o serviço não está configurado no ambiente local
-  (`CLAMAV_HOST`, `CLAMAV_PORT`); a prévia usa o verificador falso, só de desenvolvimento.
+  (`CLAMAV_HOST`, `CLAMAV_PORT`); a prévia usa o verificador falso, só de desenvolvimento e
+  recusado em produção. Sem ele, o arquivo fica "Em verificação" e não é baixado.
 - **Retenção e descarte** (DP-2E-15), **MFA para baixar**, **obrigatoriedade** (DP-2E-10/11),
   **categorias configuráveis**, **outros formatos** e **acesso do próprio colaborador**
   (DP-2E-14) ficam para depois.

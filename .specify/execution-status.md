@@ -3405,11 +3405,14 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
 
-## Documentos do colaborador — T213 (implementada localmente; aguarda validação visual)
+## Documentos do colaborador — T213 (validação visual aprovada; aguarda publicação)
 
-| Tarefa | Estado                                                | Resultado principal                                                        |
-| ------ | ----------------------------------------------------- | -------------------------------------------------------------------------- |
-| T213   | **Implementada localmente; aguarda validação visual** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
+| Tarefa | Estado                                                          | Resultado principal                                                        |
+| ------ | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| T213   | **Validação visual aprovada em 23/11/2026; aguarda publicação** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
+
+**Arquivos reais:** bloqueados até o ClamAV estar configurado e a revisão de segurança estar
+concluída; até lá, só arquivos sintéticos.
 
 **Escopo:** primeira fatia da [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md)
 — API (migration, rotas, RBAC, auditoria, ClamAV com quarentena fail-closed, limpeza pendente) e

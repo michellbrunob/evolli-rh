@@ -1,6 +1,7 @@
 # ADR 0021 — Documentos do colaborador no Cloudflare R2 privado
 
-- Status: **Aceito** em 2026-11-19, por ordem da proprietária na T213.
+- Status: **Aceito** em 2026-11-19, por ordem da proprietária na T213. Validação visual da
+  primeira fatia aprovada pela proprietária em 2026-11-23.
 - Escopo: arquivos opcionais do **colaborador** — RG, CPF, Comprovante de endereço, Carteira de
   Trabalho, Certidões e Outros —, enviados na etapa 4 do Novo colaborador e na ficha. Emenda as
   ADRs 0011 e 0013 para este conteúdo; não trata os metadados da Etapa 2
@@ -12,7 +13,7 @@
 
 ## Portões resolvidos pela proprietária (2026-11-19)
 
-- Upload real via R2 liberado para este conteúdo.
+- Upload via R2 liberado para este conteúdo, com a condição abaixo para arquivos reais.
 - Finalidade e base legal validadas por Jurídico e DPO (registro só da confirmação).
 - Formatos, limites, matriz de acesso ao conteúdo e quarentena: decisões abaixo.
 - MFA para baixar **não** é exigido nesta primeira fase; fica como endurecimento futuro.
@@ -53,8 +54,26 @@
     no rascunho) e sobem um por vez depois de o colaborador ser criado. Falha de um nunca desfaz
     a admissão: fica "Não enviado"; só falha transitória oferece nova tentativa.
 
+## Validação visual (2026-11-23)
+
+A proprietária aprovou a primeira fatia na prévia local, com arquivo sintético, o R2
+privado configurado no ambiente local e o verificador falso de desenvolvimento (o ClamAV
+não está configurado nesse ambiente). Cenários conferidos no navegador:
+
+- RH percorre as quatro etapas do Novo colaborador e escolhe um PDF sintético no RG: a linha
+  mostra o ícone, o nome, o tamanho, o botão de ver e o menu "⋯", e a seção conta "1 de 5
+  anexados.";
+- ao cadastrar, a admissão é registrada e a confirmação mostra o RG como "Aprovado";
+- na ficha, a seção "Arquivos do colaborador" mostra o RG "Aprovado" e as demais categorias
+  "Pendente";
+- o download como RH é entregue com o nome neutro `categoria-AAAA-MM-DD.ext` e sem cache;
+- o `master_tecnico` vê a lista e o estado, e o download dele é recusado (403);
+- a ficha em 375 px não tem rolagem horizontal.
+
 ## Consequências
 
+- **Arquivos reais continuam bloqueados** até o ClamAV estar configurado no ambiente e a
+  revisão de segurança do fluxo de envio estar concluída. Até lá, só arquivos sintéticos.
 - Em ambiente sem ClamAV configurado, os arquivos ficam em verificação e não podem ser baixados.
 - O verificador falso (`EVOLLI_DOCUMENTOS_VERIFICADOR=falso`) e o armazenamento em memória
   (`EVOLLI_DOCUMENTOS_ARMAZENAMENTO=memoria`) existem só para testes e prévia local; ambos são

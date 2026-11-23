@@ -3594,9 +3594,12 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         das 8 do modelo; dependência nova; Documentos.
 
 110.  **T213 - Documentos do colaborador**
-      - **Estado:** **primeira fatia implementada localmente** (API e tela), aguardando a
-        validação visual da proprietária. Branch `codex/t213-documentos-colaborador`, a partir
-        do squash da T212 em `main` (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Estado:** **primeira fatia implementada localmente** (API e tela), com a **validação
+        visual aprovada pela proprietária em 23/11/2026**; aguarda a autorização para publicar
+        a PR. Branch `codex/t213-documentos-colaborador`, a partir do squash da T212 em `main`
+        (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Arquivos reais:** continuam bloqueados até o ClamAV estar configurado e a revisão de
+        segurança estar concluída; até lá, só arquivos sintéticos.
       - **Objetivo:** RH e DP anexarem documentos reais do colaborador com rapidez e segurança,
         pela etapa 4 "Documentos" do Novo colaborador e pela ficha, conforme a
         [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md) e o
