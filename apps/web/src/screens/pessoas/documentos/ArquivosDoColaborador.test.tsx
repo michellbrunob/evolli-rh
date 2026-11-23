@@ -9,9 +9,9 @@ import {
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  baixarDocumentoDoColaborador,
   enviarDocumentoDoColaborador,
   listarDocumentosDoColaborador,
+  obterArquivoDoDocumento,
   removerDocumentoDoColaborador,
   trocarDocumentoDoColaborador,
   verDocumentoDoColaborador,
@@ -59,6 +59,29 @@ const abrirMenu = (botao: HTMLElement) =>
     ctrlKey: false,
     pointerType: "mouse",
   });
+
+/**
+ * O jsdom não tem endereços temporários de Blob: um par falso, devolvido ao
+ * original só depois de o endereço ser revogado.
+ */
+function urlTemporaria() {
+  const original = {
+    criar: URL.createObjectURL,
+    revogar: URL.revokeObjectURL,
+  };
+  const criar = vi.fn(() => "blob:sintetico");
+  const revogar = vi.fn();
+  URL.createObjectURL = criar as unknown as typeof URL.createObjectURL;
+  URL.revokeObjectURL = revogar;
+  return {
+    criar,
+    revogar,
+    restaurar: () => {
+      URL.createObjectURL = original.criar;
+      URL.revokeObjectURL = original.revogar;
+    },
+  };
+}
 
 const linhaDe = (nome: string) =>
   screen.getByText(nome, { selector: ".documentos__nome" }).closest("li")!;
@@ -174,6 +197,12 @@ describe("ArquivosDoColaborador (T213) — permissões", () => {
 
 describe("ArquivosDoColaborador (T213) — ações", () => {
   it("Ver e Baixar usam a rota autenticada da API", async () => {
+    vi.mocked(obterArquivoDoDocumento).mockResolvedValue({
+      blob: new Blob(["%PDF"], { type: "application/pdf" }),
+      nome: "rg-2026-11-19.pdf",
+    });
+    const url = urlTemporaria();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     montar();
     await screen.findByText("Contrato sintético");
     fireEvent.click(
@@ -192,11 +221,51 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Baixar" }));
     await waitFor(() =>
-      expect(baixarDocumentoDoColaborador).toHaveBeenCalledWith(
-        COLABORADOR,
-        "d-rg",
-      ),
+      expect(obterArquivoDoDocumento).toHaveBeenCalledWith(COLABORADOR, "d-rg"),
     );
+    await waitFor(() => expect(url.revogar).toHaveBeenCalled());
+    url.restaurar();
+  });
+
+  it("Baixar: o link temporário entra no documento, leva o nome neutro e o endereço só é revogado depois do clique", async () => {
+    const blob = new Blob(["%PDF"], { type: "application/pdf" });
+    vi.mocked(obterArquivoDoDocumento).mockResolvedValue({
+      blob,
+      nome: "rg-2026-11-19.pdf",
+    });
+    const { criar, revogar, restaurar } = urlTemporaria();
+    const cliques: { conectado: boolean; nome: string; revogado: boolean }[] =
+      [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      cliques.push({
+        conectado: this.isConnected,
+        nome: this.download,
+        revogado: revogar.mock.calls.length > 0,
+      });
+    });
+    montar();
+    await screen.findByText("Contrato sintético");
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Baixar" }));
+    await waitFor(() => expect(cliques).toHaveLength(1));
+    // No clique, o link está no documento (Firefox e Safari exigem) e o
+    // endereço ainda vale.
+    expect(cliques[0]).toEqual({
+      conectado: true,
+      nome: "rg-2026-11-19.pdf",
+      revogado: false,
+    });
+    expect(criar).toHaveBeenCalledWith(expect.any(Blob));
+    // Depois, o link sai do documento e o endereço é revogado.
+    await waitFor(() => expect(revogar).toHaveBeenCalledWith("blob:sintetico"));
+    expect(
+      document.querySelector('a[download="rg-2026-11-19.pdf"]'),
+    ).toBeNull();
+    restaurar();
   });
 
   it("enviar numa categoria pendente: sobe com a categoria e uma chave nova, e recarrega", async () => {
@@ -359,6 +428,140 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
     fireEvent.change(campo, { target: { value: "contrato sintético" } });
     fireEvent.click(adicionar);
     expect(screen.getByRole("alert")).toHaveTextContent("Já existe");
+  });
+});
+
+describe("ArquivosDoColaborador (T213) — foco depois de cada ação (teclado)", () => {
+  const PDF = () =>
+    new File(["%PDF-1.4 %%EOF"], "sintetico.pdf", { type: "application/pdf" });
+  const escolher = async (arquivo: File) =>
+    act(async () => {
+      fireEvent.change(screen.getByLabelText("Arquivo do documento"), {
+        target: { files: [arquivo] },
+      });
+    });
+
+  it("enviar numa categoria pendente: o foco vai ao Ver do arquivo recebido", async () => {
+    const novo = doc("d-ctps", "carteira_trabalho", "aprovado");
+    vi.mocked(enviarDocumentoDoColaborador).mockResolvedValue(novo);
+    vi.mocked(listarDocumentosDoColaborador)
+      .mockResolvedValueOnce(LISTA)
+      .mockResolvedValueOnce([...LISTA, novo]);
+    montar();
+    await screen.findByText("Contrato sintético");
+    within(linhaDe("Carteira de Trabalho"))
+      .getByRole("button", { name: "Enviar arquivo de Carteira de Trabalho" })
+      .focus();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Enviar arquivo de Carteira de Trabalho",
+      }),
+    );
+    await escolher(PDF());
+    await waitFor(() =>
+      expect(
+        within(linhaDe("Carteira de Trabalho")).getByRole("button", {
+          name: "Ver o arquivo de Carteira de Trabalho",
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("antivírus indisponível: mensagem de que nada foi enviado e o foco volta ao Enviar arquivo", async () => {
+    vi.mocked(enviarDocumentoDoColaborador).mockRejectedValue(
+      Object.assign(new Error("indisponível"), {
+        status: 503,
+        codigo: "documento_verificacao_indisponivel",
+      }),
+    );
+    montar();
+    await screen.findByText("Contrato sintético");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Enviar arquivo de Carteira de Trabalho",
+      }),
+    );
+    await escolher(PDF());
+    expect(
+      await within(linhaDe("Carteira de Trabalho")).findByRole("alert"),
+    ).toHaveTextContent(
+      "A verificação antivírus está indisponível agora e o arquivo não foi enviado.",
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Enviar arquivo de Carteira de Trabalho",
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("trocar arquivo: o foco vai ao Ver do mesmo documento", async () => {
+    vi.mocked(trocarDocumentoDoColaborador).mockResolvedValue(
+      doc("d-rg", "rg", "aprovado"),
+    );
+    montar();
+    await screen.findByText("Contrato sintético");
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Trocar arquivo" }),
+    );
+    await escolher(PDF());
+    await waitFor(() =>
+      expect(
+        within(linhaDe("RG")).getByRole("button", {
+          name: "Ver o arquivo de RG",
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("remover um principal: o foco vai ao Enviar arquivo da categoria, que volta a Pendente", async () => {
+    vi.mocked(removerDocumentoDoColaborador).mockResolvedValue(undefined);
+    vi.mocked(listarDocumentosDoColaborador)
+      .mockResolvedValueOnce(LISTA)
+      .mockResolvedValueOnce(LISTA.filter((d) => d.id !== "d-rg"));
+    montar();
+    await screen.findByText("Contrato sintético");
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Remover documento?",
+    });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Remover" }));
+    await waitFor(() =>
+      expect(
+        within(linhaDe("RG")).getByRole("button", {
+          name: "Enviar arquivo de RG",
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("remover um Outro: a linha sai e o foco vai ao campo Novo documento", async () => {
+    vi.mocked(removerDocumentoDoColaborador).mockResolvedValue(undefined);
+    vi.mocked(listarDocumentosDoColaborador)
+      .mockResolvedValueOnce(LISTA)
+      .mockResolvedValueOnce(LISTA.filter((d) => d.id !== "d-outro"));
+    montar();
+    await screen.findByText("Contrato sintético");
+    abrirMenu(
+      within(linhaDe("Contrato sintético")).getByRole("button", {
+        name: "Mais ações: Contrato sintético",
+      }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Remover documento?",
+    });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Remover" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Novo documento")).toHaveFocus(),
+    );
   });
 });
 

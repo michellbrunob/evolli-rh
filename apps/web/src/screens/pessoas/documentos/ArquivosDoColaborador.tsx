@@ -4,9 +4,9 @@ import { formatarDiaCivil } from "../../../format/data";
 import { Button, Dialog, Input } from "../../../ui";
 import { IconeEnviarArquivo, IconeMais, IconeVer } from "../../../ui/icones";
 import {
-  baixarDocumentoDoColaborador,
   enviarDocumentoDoColaborador,
   listarDocumentosDoColaborador,
+  obterArquivoDoDocumento,
   removerDocumentoDoColaborador,
   trocarDocumentoDoColaborador,
   verDocumentoDoColaborador,
@@ -24,12 +24,15 @@ import {
   rotuloDoDocumento,
   tamanhoLegivel,
 } from "./documentosDoColaborador";
+import { baixarArquivo } from "../../dashboard/exportacao";
 import { motivoDaFalhaDoEnvio } from "./EnvioDosDocumentos";
 import {
   ArquivoDaLinha,
   EstadoDoDocumento,
   LinhaDoDocumento,
   MenuDoArquivo,
+  naLinha,
+  useFocoDepois,
   type AcaoDoMenu,
 } from "./PecasDosDocumentos";
 
@@ -76,6 +79,26 @@ export function ArquivosDoColaborador({
   const [erroDoNome, setErroDoNome] = useState<string | null>(null);
   const campo = useRef<HTMLInputElement>(null);
   const pedido = useRef<Pedido | null>(null);
+  const focar = useFocoDepois();
+
+  // Linhas da lista: um documento, ou a categoria ainda pendente.
+  const linhaDoArquivo = (documentoId: string) => `${prefixo}-${documentoId}`;
+  const linhaPendenteDe = (categoria: CategoriaDocumentoColaborador) =>
+    `${prefixo}-pendente-${categoria}`;
+  const campoNovo = () => document.getElementById(`${prefixo}-novo`);
+  /**
+   * Depois de remover: o "Enviar arquivo" da categoria, se ela voltou a
+   * Pendente; senão o próximo arquivo da mesma categoria; em "Outros", o
+   * campo Novo documento.
+   */
+  const depoisDeRemover =
+    (categoria: CategoriaDocumentoColaborador) => (): HTMLElement | null =>
+      categoria === "outros"
+        ? campoNovo()
+        : (naLinha(linhaPendenteDe(categoria), "enviar")() ??
+          document.querySelector<HTMLElement>(
+            `[data-categoria="${categoria}"] [data-foco]`,
+          ));
 
   const carregar = useCallback(async () => {
     try {
@@ -114,9 +137,21 @@ export function ArquivosDoColaborador({
         : atual.nome
           ? `outros-novo`
           : atual.categoria;
+    /** Sem arquivo novo: onde a pessoa estava (Enviar, ou Ver/⋯ na troca). */
+    const focarDeVolta = () =>
+      focar(
+        atual.tipo === "troca"
+          ? naLinha(linhaDoArquivo(atual.documento.id), "ver", "menu")
+          : atual.nome
+            ? campoNovo
+            : naLinha(linhaPendenteDe(atual.categoria), "enviar"),
+      );
     const erro = conferirArquivoEscolhido(arquivo);
     marcarErro(chave, erro);
-    if (erro) return;
+    if (erro) {
+      focarDeVolta();
+      return;
+    }
     setOcupado(chave);
     try {
       const gravado =
@@ -138,8 +173,11 @@ export function ArquivosDoColaborador({
       );
       if (atual.tipo === "novo" && atual.nome) setNovoNome("");
       await carregar();
+      // Arquivo recebido: "Ver" se aprovado; senão o "⋯" da linha.
+      focar(naLinha(linhaDoArquivo(gravado.id), "ver", "menu"));
     } catch (falha: unknown) {
       marcarErro(chave, motivoDaFalhaDoEnvio(falha));
+      focarDeVolta();
     } finally {
       setOcupado(null);
     }
@@ -149,6 +187,7 @@ export function ArquivosDoColaborador({
     documento: DocumentoColaboradorApi,
     acao: () => Promise<unknown>,
     sucesso?: string,
+    focoDepois?: () => HTMLElement | null,
   ) {
     setOcupado(documento.id);
     marcarErro(documento.id, null);
@@ -156,11 +195,13 @@ export function ArquivosDoColaborador({
       await acao();
       if (sucesso) setAviso(sucesso);
       await carregar();
+      if (focoDepois) focar(focoDepois);
     } catch {
       marcarErro(
         documento.id,
         "Não foi possível concluir agora. Tente de novo.",
       );
+      if (focoDepois) focar(naLinha(linhaDoArquivo(documento.id), "menu"));
     } finally {
       setOcupado(null);
     }
@@ -187,9 +228,17 @@ export function ArquivosDoColaborador({
                   id: "baixar",
                   rotulo: "Baixar",
                   aoEscolher: () =>
-                    void executar(documento, () =>
-                      baixarDocumentoDoColaborador(colaboradorId, documento.id),
-                    ),
+                    void executar(documento, async () => {
+                      const { blob, nome } = await obterArquivoDoDocumento(
+                        colaboradorId,
+                        documento.id,
+                      );
+                      baixarArquivo(
+                        blob,
+                        nome,
+                        blob.type || "application/octet-stream",
+                      );
+                    }),
                 },
               ]
             : []),
@@ -220,7 +269,8 @@ export function ArquivosDoColaborador({
     return (
       <LinhaDoDocumento
         key={documento.id}
-        id={`${prefixo}-${documento.id}`}
+        id={linhaDoArquivo(documento.id)}
+        categoria={documento.categoria}
         nome={nome}
         estado={
           <ArquivoDaLinha
@@ -244,6 +294,7 @@ export function ArquivosDoColaborador({
                   type="button"
                   className="documentos__botao-icone"
                   aria-label={`Ver o arquivo de ${nome}`}
+                  data-foco="ver"
                   onClick={() =>
                     void executar(documento, () =>
                       verDocumentoDoColaborador(colaboradorId, documento.id),
@@ -266,7 +317,8 @@ export function ArquivosDoColaborador({
     return (
       <LinhaDoDocumento
         key={`pendente-${categoria}`}
-        id={`${prefixo}-pendente-${categoria}`}
+        id={linhaPendenteDe(categoria)}
+        categoria={categoria}
         nome={nome}
         estado={
           ocupado === categoria ? (
@@ -282,6 +334,7 @@ export function ArquivosDoColaborador({
               type="button"
               variant="secondary"
               aria-label={`Enviar arquivo de ${nome}`}
+              data-foco="enviar"
               disabled={ocupado !== null}
               onClick={() => pedirArquivo({ tipo: "novo", categoria })}
             >
@@ -453,6 +506,7 @@ export function ArquivosDoColaborador({
                     alvo,
                     () => removerDocumentoDoColaborador(colaboradorId, alvo.id),
                     `${rotuloDoDocumento(alvo.categoria, alvo.nome)}: removido.`,
+                    depoisDeRemover(alvo.categoria),
                   );
                 }
               }}

@@ -72,7 +72,8 @@ export function nomeDoArquivo(
 
 /** Baixa o texto como arquivo, pelo próprio navegador. */
 export function baixarArquivo(
-  conteudo: string | Uint8Array,
+  // T213 — também o arquivo já baixado da API (documentos do colaborador).
+  conteudo: string | Uint8Array | Blob,
   nome: string,
   tipo = "text/csv;charset=utf-8",
 ): void {

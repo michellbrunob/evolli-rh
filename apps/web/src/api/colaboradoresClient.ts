@@ -812,27 +812,6 @@ export async function obterArquivoDoDocumento(
   return { blob: await res.blob(), nome };
 }
 
-/** Baixa o arquivo aprovado com o nome neutro (`categoria-AAAA-MM-DD.ext`). */
-export async function baixarDocumentoDoColaborador(
-  colaboradorId: string,
-  documentoId: string,
-): Promise<void> {
-  const { blob, nome } = await obterArquivoDoDocumento(
-    colaboradorId,
-    documentoId,
-  );
-  const url = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = nome;
-    link.rel = "noopener";
-    link.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 /** Abre o arquivo aprovado numa aba nova, a partir da memória do navegador. */
 export async function verDocumentoDoColaborador(
   colaboradorId: string,

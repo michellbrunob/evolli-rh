@@ -1,4 +1,10 @@
-import type { ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +57,67 @@ export function EstadoDoDocumento({
   );
 }
 
+/**
+ * T213 — para onde o foco vai depois de uma ação que troca os botões da
+ * linha (escolher, trocar ou remover arquivo): "ver" quando há arquivo,
+ * "menu" (o "⋯") quando há arquivo mas ele não pode ser visto, "enviar"
+ * quando não há arquivo.
+ */
+export type AlvoDoFoco = "ver" | "menu" | "enviar";
+
+/** O primeiro alvo que existir na linha, na ordem pedida. */
+export function naLinha(
+  linha: string,
+  ...alvos: readonly AlvoDoFoco[]
+): () => HTMLElement | null {
+  return () => {
+    // Ids de `useId` e UUIDs: só aspas e barra precisam de escape no seletor.
+    const elemento = document.querySelector(
+      `[data-linha="${linha.replace(/["\\]/g, "\\$&")}"]`,
+    );
+    if (!elemento) return null;
+    for (const alvo of alvos) {
+      const botao = elemento.querySelector<HTMLElement>(
+        `[data-foco="${alvo}"]`,
+      );
+      if (botao) return botao;
+    }
+    return null;
+  };
+}
+
+/** Onde a pessoa já está interagindo: um menu ou diálogo aberto. */
+const INTERACAO_ABERTA = '[role="menu"], [role="dialog"], [role="alertdialog"]';
+
+/**
+ * Pede o foco para depois do próximo desenho: os botões novos da linha já
+ * existem e o menu ("⋯") já devolveu o foco ao gatilho dele — que pode ter
+ * sumido. O pedido vale uma vez, e é descartado se, nesse meio-tempo, a
+ * pessoa já abriu um menu ou diálogo (o foco adiado nunca o fecha).
+ */
+export function useFocoDepois(): (achar: () => HTMLElement | null) => void {
+  const pedido = useRef<(() => HTMLElement | null) | null>(null);
+  const [vez, setVez] = useState(0);
+  useEffect(() => {
+    if (!pedido.current) return undefined;
+    const achar = pedido.current;
+    const relogio = window.setTimeout(() => {
+      if (pedido.current !== achar) return;
+      pedido.current = null;
+      const ativo = document.activeElement;
+      if (ativo instanceof HTMLElement && ativo.closest(INTERACAO_ABERTA)) {
+        return;
+      }
+      achar()?.focus();
+    }, 0);
+    return () => window.clearTimeout(relogio);
+  }, [vez]);
+  return useCallback((achar) => {
+    pedido.current = achar;
+    setVez((v) => v + 1);
+  }, []);
+}
+
 export function LinhaDoDocumento({
   id,
   nome,
@@ -58,6 +125,7 @@ export function LinhaDoDocumento({
   estado,
   acoes,
   erro,
+  categoria,
 }: {
   readonly id: string;
   readonly nome: string;
@@ -66,9 +134,15 @@ export function LinhaDoDocumento({
   readonly estado: ReactNode;
   readonly acoes?: ReactNode;
   readonly erro?: string | null;
+  /** A categoria da linha (para achar a próxima da mesma categoria). */
+  readonly categoria?: string;
 }) {
   return (
-    <li className="documentos__linha">
+    <li
+      className="documentos__linha"
+      data-linha={id}
+      {...(categoria ? { "data-categoria": categoria } : {})}
+    >
       <div className="documentos__identificacao">
         <span className="documentos__nome" id={`${id}-nome`}>
           {nome}
@@ -136,6 +210,7 @@ export function MenuDoArquivo({
       <DropdownMenuTrigger
         className="documentos__botao-icone"
         aria-label={`Mais ações: ${nome}`}
+        data-foco="menu"
       >
         <IconeMaisAcoes />
       </DropdownMenuTrigger>

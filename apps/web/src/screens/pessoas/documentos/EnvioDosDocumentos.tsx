@@ -63,6 +63,16 @@ const TRANSITORIA: FalhaDoEnvio = {
 };
 
 /**
+ * T213 — o antivírus não respondeu e o servidor recusou antes de gravar
+ * qualquer coisa: nada foi enviado, e tentar mais tarde pode dar certo.
+ */
+const VERIFICACAO_INDISPONIVEL: FalhaDoEnvio = {
+  motivo:
+    "A verificação antivírus está indisponível agora e o arquivo não foi enviado. Tente de novo em alguns minutos.",
+  transitoria: true,
+};
+
+/**
  * Por que o envio não aconteceu, em texto (nunca o conteúdo), e se tentar
  * de novo faz sentido. Lê `status` e `codigo` do erro da API.
  */
@@ -71,6 +81,9 @@ export function falhaDoEnvio(erro: unknown): FalhaDoEnvio {
     typeof erro === "object" && erro !== null
       ? (erro as { status?: unknown; codigo?: unknown })
       : {};
+  if (codigo === "documento_verificacao_indisponivel") {
+    return VERIFICACAO_INDISPONIVEL;
+  }
   if (typeof codigo === "string" && RECUSAS[codigo]) {
     return { motivo: RECUSAS[codigo]!, transitoria: false };
   }

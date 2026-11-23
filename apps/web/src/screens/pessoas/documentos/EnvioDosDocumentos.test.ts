@@ -68,6 +68,14 @@ describe("falhaDoEnvio (T213)", () => {
     expect(falha.transitoria).toBe(true);
     expect(falha.motivo).toMatch(/Tentar de novo é seguro/);
   });
+
+  it("antivírus indisponível (503 com código): transitória, diz que nada foi enviado e o que fazer", () => {
+    const falha = falhaDoEnvio(erro(503, "documento_verificacao_indisponivel"));
+    expect(falha.transitoria).toBe(true);
+    expect(falha.motivo).toBe(
+      "A verificação antivírus está indisponível agora e o arquivo não foi enviado. Tente de novo em alguns minutos.",
+    );
+  });
 });
 
 describe("algumEnviando (T213)", () => {

@@ -22,6 +22,8 @@ import {
   EstadoDoDocumento,
   LinhaDoDocumento,
   MenuDoArquivo,
+  naLinha,
+  useFocoDepois,
 } from "./PecasDosDocumentos";
 
 /** Abre o arquivo escolhido (ainda só no navegador) numa aba nova. */
@@ -80,6 +82,12 @@ export function EtapaDocumentos({
   const [novoNome, setNovoNome] = useState("");
   const [erroDoNome, setErroDoNome] = useState<string | null>(null);
   const campos = useRef(new Map<string, HTMLInputElement>());
+  const focar = useFocoDepois();
+  /** A linha de um documento (o mesmo id do `LinhaDoDocumento`). */
+  const idDaLinha = (id: string) => `${prefixo}-${id}`;
+  /** Depois de mexer no arquivo: "Ver" se há arquivo; senão "Enviar arquivo". */
+  const focarNaLinha = (id: string) =>
+    focar(naLinha(idDaLinha(id), "ver", "enviar"));
 
   const principais = documentos.filter((d) => d.categoria !== "outros");
   const outros = documentos.filter((d) => d.categoria === "outros");
@@ -94,7 +102,12 @@ export function EtapaDocumentos({
       return erro ? { ...resto, [id]: erro } : resto;
     });
     if (!erro) onEscolherArquivo(id, arquivo);
+    focarNaLinha(id);
   }
+
+  /** A linha de um Outro saiu: o foco vai ao campo "Novo documento". */
+  const focarNoNovo = () =>
+    focar(() => document.getElementById(`${prefixo}-novo`));
 
   function adicionar() {
     const erro = conferirNomeDeOutros(
@@ -113,7 +126,7 @@ export function EtapaDocumentos({
     return (
       <LinhaDoDocumento
         key={documento.id}
-        id={`${prefixo}-${documento.id}`}
+        id={idDaLinha(documento.id)}
         nome={nome}
         estado={
           documento.arquivo ? (
@@ -151,6 +164,7 @@ export function EtapaDocumentos({
                   type="button"
                   className="documentos__botao-icone"
                   aria-label={`Ver o arquivo de ${nome}`}
+                  data-foco="ver"
                   onClick={() => verArquivoLocal(documento.arquivo!)}
                 >
                   <IconeVer />
@@ -167,14 +181,20 @@ export function EtapaDocumentos({
                     {
                       id: "remover",
                       rotulo: "Remover arquivo",
-                      aoEscolher: () => onTirarArquivo(documento.id),
+                      aoEscolher: () => {
+                        onTirarArquivo(documento.id);
+                        focarNaLinha(documento.id);
+                      },
                     },
                     ...(documento.categoria === "outros"
                       ? [
                           {
                             id: "tirar-da-lista",
                             rotulo: "Tirar da lista",
-                            aoEscolher: () => onRemoverOutro(documento.id),
+                            aoEscolher: () => {
+                              onRemoverOutro(documento.id);
+                              focarNoNovo();
+                            },
                           },
                         ]
                       : []),
@@ -186,6 +206,7 @@ export function EtapaDocumentos({
                 type="button"
                 variant="secondary"
                 aria-label={`Enviar arquivo de ${nome}`}
+                data-foco="enviar"
                 onClick={() => campos.current.get(documento.id)?.click()}
               >
                 <IconeEnviarArquivo />
@@ -197,7 +218,10 @@ export function EtapaDocumentos({
                 type="button"
                 variant="subtle"
                 aria-label={`Remover ${nome} da lista`}
-                onClick={() => onRemoverOutro(documento.id)}
+                onClick={() => {
+                  onRemoverOutro(documento.id);
+                  focarNoNovo();
+                }}
               >
                 <IconeRemover />
                 Remover
