@@ -5153,6 +5153,39 @@ describe("T199 — dashboard de Colaboradores", () => {
     expect(celulas[indice("Matrícula")]).toHaveTextContent("MAT-0900");
   });
 
+  it("T215 — em Todos, quem foi desativado aparece como Inativo, mesmo com o vínculo ativo", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(
+      paginado([
+        {
+          ...listado(
+            {
+              id: "c-off",
+              nome: "Pessoa Desativada (teste)",
+              situacao: "ativo",
+            },
+            [vinculoListado("v-off", "MAT-0901", "ativo", "2025-01-02")],
+          ),
+          desativado: true,
+        },
+      ]),
+    );
+    render(
+      <ColaboradoresScreen
+        empresaAtiva={EMPRESA}
+        estado={{ ...ESTADO_ATIVOS, aba: "todos" }}
+        onEstadoChange={vi.fn()}
+      />,
+    );
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores — Todos",
+    });
+    const linha = within(tabela).getAllByRole("row")[1]!;
+    const celulas = within(linha).getAllByRole("cell");
+    expect(celulas[cabecalhos().indexOf("Situação")]).toHaveTextContent(
+      /Inativo$/,
+    );
+  });
+
   it("controlado pelo shell: aba, página e filtros sobem por onEstadoChange; a busca não sobe", async () => {
     const onEstadoChange = vi.fn();
     render(

@@ -61,20 +61,22 @@ import {
 import {
   type ContratoDoColaboradorApi,
   consultarContratoDoColaborador,
+  desativarColaborador,
+  reativarColaborador,
   registrarContratoDoColaborador,
 } from "../../../api/edicaoColaboradorClient";
 import type { SecaoDaEdicao } from "../../../app/rotasDoShell";
 import { SECOES_DA_EDICAO } from "../../../app/rotasDoShell";
 import { useEdicaoEmAndamento } from "../../../app/edicoesPendentes";
 import { useTrilhaComplementar } from "../../../app/trilhaComplementar";
-import { Button } from "../../../components";
+import { Button, FormActions } from "../../../components";
 import {
   LinhaDoCadastro,
   SecaoDoCadastro,
 } from "../../../components/cadastro/CadastroEmEtapas";
 import { formatarInstante } from "../../../format/data";
 import { exibirTelefone } from "../../../format/mascaras";
-import { IconButton } from "../../../ui";
+import { Dialog, IconButton } from "../../../ui";
 import { IconeRemover, IconeVoltar } from "../../../ui/icones";
 import {
   type ChaveEndereco,
@@ -303,6 +305,12 @@ export function EditarColaboradorScreen({
   const [contrato, setContrato] = useState<CargaDoContrato>({
     status: "carregando",
   });
+  /** Desativação feita nesta página (até lá, vale a do servidor). */
+  const [desativadoAgora, setDesativadoAgora] = useState<boolean | null>(null);
+  const [confirmacao, setConfirmacao] = useState<
+    "desativar" | "reativar" | null
+  >(null);
+  const [alternando, setAlternando] = useState(false);
   const [profissionais, setProfissionais] =
     useState<ValoresProfissionais | null>(null);
   const [erros, setErros] = useState<Erros>({});
@@ -715,13 +723,48 @@ export function EditarColaboradorScreen({
    * são a desativação e a reativação (ver `desativar`).
    */
   function escolherStatus(novo: Status) {
+    setFalha(null);
+    if (novo === "inativo") {
+      if (!desativado) setConfirmacao("desativar");
+      return;
+    }
+    if (novo === "ativo") {
+      if (desativado) setConfirmacao("reativar");
+      return;
+    }
     setAviso(
       novo === "ferias" || novo === "afastado"
         ? "Férias e afastamentos serão registrados em Férias e ausências, que chega na próxima versão."
-        : novo === "desligado"
-          ? "O desligamento é registrado no Histórico funcional, com a data e o motivo."
-          : "A desativação chega na próxima versão.",
+        : "O desligamento é registrado no Histórico funcional, com a data e o motivo.",
     );
+  }
+
+  /** Desativar (lixeira) ou reativar: nunca apaga; o histórico fica. */
+  async function alternarDesativacao(acao: "desativar" | "reativar") {
+    setConfirmacao(null);
+    setAlternando(true);
+    setAviso(null);
+    setFalha(null);
+    try {
+      const resposta =
+        acao === "desativar"
+          ? await desativarColaborador(colaboradorId)
+          : await reativarColaborador(colaboradorId);
+      setDesativadoAgora(resposta.desativado);
+      setAviso(
+        resposta.desativado
+          ? "Colaborador desativado."
+          : "Colaborador reativado.",
+      );
+    } catch {
+      setFalha(
+        acao === "desativar"
+          ? "Não foi possível desativar agora. Tente de novo."
+          : "Não foi possível reativar agora. Tente de novo.",
+      );
+    } finally {
+      setAlternando(false);
+    }
   }
 
   // ---- peças de campo -----------------------------------------------------
@@ -750,7 +793,12 @@ export function EditarColaboradorScreen({
   // ---- render -------------------------------------------------------------
 
   const nome = gravado?.colaborador.nome ?? "";
-  const status = gravado ? statusDe(gravado) : "ativo";
+  const desativado = desativadoAgora ?? contratoGravado?.desativado ?? false;
+  const status: Status = desativado
+    ? "inativo"
+    : gravado
+      ? statusDe(gravado)
+      : "ativo";
   const ultima = gravado
     ? [ultimaAlteracao(gravado), contratoGravado?.atualizadoEm ?? null]
         .filter((v): v is string => v !== null)
@@ -793,20 +841,63 @@ export function EditarColaboradorScreen({
         <div className="editar-colaborador__acoes-do-topo">
           <StatusDoColaborador
             valor={status}
-            desabilitado={!gravado}
+            desabilitado={!gravado || alternando || !contratoGravado}
             onEscolher={escolherStatus}
           />
-          <button
-            type="button"
-            className="editar-colaborador__lixeira"
-            aria-label="Desativar colaborador"
-            disabled={!gravado}
-            onClick={() => escolherStatus("inativo")}
-          >
-            <IconeRemover tamanho={20} />
-          </button>
+          {desativado ? null : (
+            <button
+              type="button"
+              className="editar-colaborador__lixeira"
+              aria-label="Desativar colaborador"
+              disabled={!gravado || alternando}
+              onClick={() => setConfirmacao("desativar")}
+            >
+              <IconeRemover tamanho={20} />
+            </button>
+          )}
         </div>
       </header>
+
+      <Dialog
+        aberto={confirmacao !== null}
+        titulo={
+          confirmacao === "reativar"
+            ? `Reativar ${nome}?`
+            : `Desativar ${nome}?`
+        }
+        descricao={
+          confirmacao === "reativar"
+            ? "A pessoa volta às listas de ativos, com os dados e o histórico de antes."
+            : "A pessoa sai das listas de ativos. Os dados e o histórico ficam guardados, e dá para reativar depois."
+        }
+        onFechar={() => setConfirmacao(null)}
+        rodape={
+          <FormActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setConfirmacao(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() =>
+                confirmacao && void alternarDesativacao(confirmacao)
+              }
+            >
+              {confirmacao === "reativar" ? "Reativar" : "Desativar"}
+            </Button>
+          </FormActions>
+        }
+      >
+        <p className="editar-colaborador__texto-janela">
+          {confirmacao === "reativar"
+            ? "Ela aparece de novo em Ativos."
+            : "Ela continua em Todos, marcada como Inativo."}
+        </p>
+      </Dialog>
 
       {carga.status === "erro" ? (
         <div className="editar-colaborador__falha" role="alert">

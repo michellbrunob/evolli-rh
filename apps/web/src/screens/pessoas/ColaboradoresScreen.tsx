@@ -1256,6 +1256,11 @@ export function ColaboradoresScreen({
       key: "situacao",
       header: "Situação",
       cell: (c) => {
+        // T215 — desativado nesta empresa (lixeira do Editar colaborador):
+        // Inativo, qualquer que seja o vínculo.
+        if (c.desativado) {
+          return <StatusBadge variant="neutral">Inativo</StatusBadge>;
+        }
         const situacao = situacaoNoEscopo(c);
         // Sem vínculo na resposta: a situação do próprio item.
         if (!situacao) {

@@ -21,6 +21,8 @@ import {
 } from "../../../api/colaboradoresClient";
 import {
   consultarContratoDoColaborador,
+  desativarColaborador,
+  reativarColaborador,
   registrarContratoDoColaborador,
 } from "../../../api/edicaoColaboradorClient";
 import { listarAlocacoesVinculo } from "../../../api/vinculoContratualClient";
@@ -60,6 +62,8 @@ vi.mock("../../../api/edicaoColaboradorClient", async () => {
     ...actual,
     consultarContratoDoColaborador: vi.fn(),
     registrarContratoDoColaborador: vi.fn(),
+    desativarColaborador: vi.fn(),
+    reativarColaborador: vi.fn(),
   };
 });
 vi.mock("../../../api/vinculoContratualClient", async () => {
@@ -182,6 +186,18 @@ function respostaDoContrato(
 }
 
 function prepararServidor() {
+  vi.mocked(desativarColaborador).mockResolvedValue({
+    colaboradorId: ID,
+    empresaId: EMPRESA,
+    desativado: true,
+    desativadoEm: "2026-11-23T18:00:00.000Z",
+  });
+  vi.mocked(reativarColaborador).mockResolvedValue({
+    colaboradorId: ID,
+    empresaId: EMPRESA,
+    desativado: false,
+    desativadoEm: null,
+  });
   vi.mocked(consultarContratoDoColaborador).mockResolvedValue(
     respostaDoContrato(),
   );
@@ -742,5 +758,98 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
       await screen.findByText("Informe de 1 a 80 horas por semana."),
     ).toBeInTheDocument();
     expect(registrarContratoDoColaborador).not.toHaveBeenCalled();
+  });
+});
+
+describe("T215 — Editar colaborador: desativar e reativar", () => {
+  async function abrirStatus() {
+    const botao = await screen.findByRole("button", { name: /^Status: / });
+    fireEvent.keyDown(botao, { key: "Enter" });
+    return screen.findByRole("menu");
+  }
+
+  it("lixeira: pede confirmação; Cancelar não desativa", async () => {
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    await screen.findByRole("button", { name: "Status: Ativo" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Desativar colaborador" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Desativar Pedro Teste?",
+    });
+    expect(
+      within(janela).getByText(
+        "A pessoa sai das listas de ativos. Os dados e o histórico ficam guardados, e dá para reativar depois.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(within(janela).getByRole("button", { name: "Cancelar" }));
+    expect(desativarColaborador).not.toHaveBeenCalled();
+  });
+
+  it("confirmar desativa: Status vira Inativo e a lixeira some", async () => {
+    montar();
+    await screen.findByRole("button", { name: "Status: Ativo" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Desativar colaborador" }),
+    );
+    const janela = await screen.findByRole("dialog");
+    fireEvent.click(within(janela).getByRole("button", { name: "Desativar" }));
+    await waitFor(() => expect(desativarColaborador).toHaveBeenCalledWith(ID));
+    expect(
+      await screen.findByRole("button", { name: "Status: Inativo" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Desativar colaborador" }),
+    ).toBeNull();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Colaborador desativado.",
+    );
+  });
+
+  it("Status Inativo pela lista também pede a confirmação da desativação", async () => {
+    montar();
+    const menu = await abrirStatus();
+    fireEvent.click(
+      within(menu).getByRole("menuitemradio", { name: "Inativo" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Desativar Pedro Teste?" }),
+    ).toBeInTheDocument();
+  });
+
+  it("já desativado: Status Inativo; escolher Ativo pede a reativação", async () => {
+    vi.mocked(consultarContratoDoColaborador).mockResolvedValue({
+      ...respostaDoContrato(),
+      desativado: true,
+      desativadoEm: "2026-11-20T12:00:00.000Z",
+    });
+    montar();
+    expect(
+      await screen.findByRole("button", { name: "Status: Inativo" }),
+    ).toBeInTheDocument();
+    const menu = await abrirStatus();
+    fireEvent.click(within(menu).getByRole("menuitemradio", { name: "Ativo" }));
+    const janela = await screen.findByRole("dialog", {
+      name: "Reativar Pedro Teste?",
+    });
+    fireEvent.click(within(janela).getByRole("button", { name: "Reativar" }));
+    await waitFor(() => expect(reativarColaborador).toHaveBeenCalledWith(ID));
+    expect(
+      await screen.findByRole("button", { name: "Status: Ativo" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Férias, Afastado e Desligado não mudam o status: dizem onde se registram", async () => {
+    montar();
+    const menu = await abrirStatus();
+    fireEvent.click(
+      within(menu).getByRole("menuitemradio", { name: "Férias" }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Férias e afastamentos serão registrados em Férias e ausências",
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(desativarColaborador).not.toHaveBeenCalled();
   });
 });
