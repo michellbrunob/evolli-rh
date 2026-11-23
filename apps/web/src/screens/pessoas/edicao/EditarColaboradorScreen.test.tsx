@@ -360,12 +360,9 @@ describe("T215 — Editar colaborador: moldura", () => {
       screen.getByRole("heading", { level: 1, name: "Editar colaborador" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Pedro Teste")).toBeInTheDocument();
-    expect(screen.getByLabelText("Status")).toHaveValue("ativo");
     expect(
-      within(screen.getByLabelText("Status"))
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]);
+      screen.getByRole("button", { name: "Status: Ativo" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Desativar colaborador" }),
     ).toBeInTheDocument();

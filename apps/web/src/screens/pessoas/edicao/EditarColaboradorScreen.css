@@ -65,7 +65,7 @@
 
 .editar-colaborador__acoes-do-topo {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--space-sm);
 }
 
@@ -241,4 +241,34 @@
     flex-direction: column;
     overflow: visible;
   }
+}
+
+/* T215 — lixeira: botão quadrado com contorno, ícone cinza. */
+.editar-colaborador__lixeira {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+}
+
+.editar-colaborador__lixeira:hover:not(:disabled) {
+  border-color: var(--status-danger-ink);
+  color: var(--status-danger-ink);
+}
+
+.editar-colaborador__lixeira:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.editar-colaborador__lixeira:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }

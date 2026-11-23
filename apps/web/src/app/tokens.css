@@ -100,6 +100,15 @@
   --status-info-surface: #e9f2fb;
   --status-info-border: #bcd8f2;
 
+  /* T215 — bolinhas do Status do colaborador (Editar colaborador): ativo,
+     férias, afastado, inativo e desligado. Só a bolinha; o texto segue nos
+     tokens de texto (o desligado, no de perigo). */
+  --status-ponto-ativo: #1f9d6b;
+  --status-ponto-ferias: #f0a33a;
+  --status-ponto-afastado: #86868b;
+  --status-ponto-inativo: #c7c7cc;
+  --status-ponto-desligado: #d64545;
+
   /* T207 — paleta Evolli (P-1). Aplicada só ao menu lateral, ao Dashboard e
      ao seletor de empresa; as demais telas seguem com os tokens acima.
      Contraste conferido por par (teste de contrato): texto branco sobre o

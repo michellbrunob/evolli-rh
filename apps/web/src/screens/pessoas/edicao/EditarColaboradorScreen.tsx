@@ -105,6 +105,10 @@ import {
   validarProfissionais,
 } from "./dadosProfissionais";
 import { SecaoDadosProfissionais } from "./SecaoDadosProfissionais";
+import {
+  type StatusDoColaboradorValor,
+  StatusDoColaborador,
+} from "./StatusDoColaborador";
 import "../../../components/cadastro/CadastroEmEtapas.css";
 import "./EditarColaboradorScreen.css";
 
@@ -121,15 +125,7 @@ const ROTULO_DA_SECAO: Readonly<Record<SecaoDaEdicao, string>> = {
   "campos-extras": "Campos extras",
 };
 
-/** Status do cabeçalho, na ordem da referência. */
-const OPCOES_STATUS = [
-  { valor: "ativo", rotulo: "Ativo" },
-  { valor: "ferias", rotulo: "Férias" },
-  { valor: "afastado", rotulo: "Afastado" },
-  { valor: "inativo", rotulo: "Inativo" },
-  { valor: "desligado", rotulo: "Desligado" },
-] as const;
-type Status = (typeof OPCOES_STATUS)[number]["valor"];
+type Status = StatusDoColaboradorValor;
 
 /** Nome completo: pelo menos 3 letras e até 150 caracteres. */
 const NOME_TRES_LETRAS = /^(?:[^\p{L}]*\p{L}){3}/u;
@@ -713,6 +709,21 @@ export function EditarColaboradorScreen({
     }
   }
 
+  /**
+   * Férias e Afastado chegam com o módulo de Férias e ausências; o
+   * desligamento é um ato com data, no Histórico funcional. Inativo e Ativo
+   * são a desativação e a reativação (ver `desativar`).
+   */
+  function escolherStatus(novo: Status) {
+    setAviso(
+      novo === "ferias" || novo === "afastado"
+        ? "Férias e afastamentos serão registrados em Férias e ausências, que chega na próxima versão."
+        : novo === "desligado"
+          ? "O desligamento é registrado no Histórico funcional, com a data e o motivo."
+          : "A desativação chega na próxima versão.",
+    );
+  }
+
   // ---- peças de campo -----------------------------------------------------
 
   function propsDoCampo(campo: CampoComErro) {
@@ -780,22 +791,20 @@ export function EditarColaboradorScreen({
           <p className="editar-colaborador__nome">{nome}</p>
         </div>
         <div className="editar-colaborador__acoes-do-topo">
-          <label className="editar-colaborador__status">
-            <span>Status</span>
-            <select value={status} disabled={!gravado} onChange={() => {}}>
-              {OPCOES_STATUS.map((o) => (
-                <option key={o.valor} value={o.valor}>
-                  {o.rotulo}
-                </option>
-              ))}
-            </select>
-          </label>
-          <IconButton
-            label="Desativar colaborador"
-            variant="subtle"
-            icon={<IconeRemover />}
-            disabled={!gravado}
+          <StatusDoColaborador
+            valor={status}
+            desabilitado={!gravado}
+            onEscolher={escolherStatus}
           />
+          <button
+            type="button"
+            className="editar-colaborador__lixeira"
+            aria-label="Desativar colaborador"
+            disabled={!gravado}
+            onClick={() => escolherStatus("inativo")}
+          >
+            <IconeRemover tamanho={20} />
+          </button>
         </div>
       </header>
 
