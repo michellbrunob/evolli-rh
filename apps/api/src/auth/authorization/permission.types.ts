@@ -145,6 +145,26 @@ export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
 export type DadosPessoaisResource = (typeof DADOS_PESSOAIS_RESOURCES)[number];
 
 /**
+ * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
+ * metadados da Etapa 2 (`documento_metadado`):
+ *
+ * - `documento_colaborador`: a lista e o estado (`read`), enviar (`create`) e
+ *   trocar, remover ou verificar de novo (`alter`);
+ * - `conteudo_documento_colaborador`: baixar o arquivo (`read`) — decisão
+ *   distinta da lista (DP-2E-13, conteúdo).
+ *
+ * `rh` e `dp` fazem tudo na empresa ativa; o `master_tecnico` só vê a lista
+ * e o estado, nunca o conteúdo; os demais papéis são negados.
+ */
+export const DOCUMENTOS_COLABORADOR_RESOURCES = [
+  "documento_colaborador",
+  "conteudo_documento_colaborador",
+] as const;
+
+export type DocumentosColaboradorResource =
+  (typeof DOCUMENTOS_COLABORADOR_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -166,7 +186,8 @@ export type AuthorizationResource =
   | SolicitacoesPessoasResource
   | GestorResource
   | ContatosResource
-  | DadosPessoaisResource;
+  | DadosPessoaisResource
+  | DocumentosColaboradorResource;
 
 export type AuthorizationAction =
   | "read"
@@ -245,6 +266,14 @@ export function isContatosResource(
   resource: AuthorizationResource,
 ): resource is ContatosResource {
   return (CONTATOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isDocumentosColaboradorResource(
+  resource: AuthorizationResource,
+): resource is DocumentosColaboradorResource {
+  return (DOCUMENTOS_COLABORADOR_RESOURCES as readonly string[]).includes(
+    resource,
+  );
 }
 
 export function isDadosPessoaisResource(

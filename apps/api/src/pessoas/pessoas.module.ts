@@ -31,6 +31,16 @@ import { FotoColaboradorController } from "./foto-colaborador/foto-colaborador.c
 import { FotoColaboradorService } from "./foto-colaborador/foto-colaborador.service";
 import { ARMAZENAMENTO_DE_FOTOS } from "./foto-colaborador/armazenamento-de-objetos";
 import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armazenamento";
+import { DocumentoColaboradorController } from "./documentos-colaborador/documento-colaborador.controller";
+import { DocumentoColaboradorService } from "./documentos-colaborador/documento-colaborador.service";
+import {
+  ARMAZENAMENTO_DE_DOCUMENTOS,
+  escolherArmazenamentoDeDocumentos,
+} from "./documentos-colaborador/armazenamento-de-documentos";
+import {
+  VERIFICADOR_DE_ARQUIVOS,
+  escolherVerificadorDeArquivos,
+} from "./documentos-colaborador/verificador-de-arquivos";
 
 @Module({
   imports: [AuthModule, AuditModule],
@@ -46,6 +56,8 @@ import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armaze
     RascunhoAdmissaoController,
     // T209 — foto do colaborador (ADR 0020).
     FotoColaboradorController,
+    // T213 — documentos do colaborador (ADR 0021).
+    DocumentoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -56,10 +68,21 @@ import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armaze
     DadosPessoaisColaboradorService,
     RascunhoAdmissaoService,
     FotoColaboradorService,
+    DocumentoColaboradorService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,
       useFactory: () => escolherArmazenamentoDeFotos(),
+    },
+    // T213 — R2 privado dos documentos e o antivírus (ClamAV). Sem ClamAV
+    // configurado, nada é aprovado (fail-closed).
+    {
+      provide: ARMAZENAMENTO_DE_DOCUMENTOS,
+      useFactory: () => escolherArmazenamentoDeDocumentos(),
+    },
+    {
+      provide: VERIFICADOR_DE_ARQUIVOS,
+      useFactory: () => escolherVerificadorDeArquivos(),
     },
   ],
 })

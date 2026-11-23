@@ -1,0 +1,243 @@
+/* T213 — documentos do colaborador (etapa 4 e ficha). Só tokens; larguras
+   fluidas (375 px sem rolagem horizontal); transições só sem movimento
+   reduzido. */
+
+.documentos {
+  display: grid;
+  gap: var(--space-lg);
+  min-width: 0;
+  max-width: 50rem;
+  /* O mesmo respiro do topo das seções das outras etapas. */
+  padding-top: var(--space-lg);
+}
+
+.documentos__secao {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.documentos__titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.documentos__texto {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.documentos__lista {
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Linha: nome | estado | ações, separadas por divisória. */
+.documentos__linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  min-width: 0;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.documentos__identificacao {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.documentos__nome {
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.documentos__detalhe {
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.documentos__estado-celula {
+  min-width: 0;
+}
+
+.documentos__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.documentos__erro {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-danger-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Selo do estado: ícone + texto, sempre. */
+.documentos__estado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.documentos__estado--pendente {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.documentos__estado--em_verificacao {
+  border-color: var(--status-info-border);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+.documentos__estado--aprovado {
+  border-color: var(--status-success-border);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.documentos__estado--reprovado,
+.documentos__estado--nao_enviado {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+/* O arquivo na linha: ícone, nome com reticências e tamanho. */
+.documentos__arquivo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.documentos__arquivo-icone {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-ink-muted);
+}
+
+.documentos__arquivo-texto {
+  display: grid;
+  min-width: 0;
+}
+
+.documentos__arquivo-nome {
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentos__arquivo-tamanho {
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Botão só de ícone (ver, mais ações): alvo de toque de 44 px. */
+.documentos__botao-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.documentos__botao-icone:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+/* "Outros documentos": nome e ajuda | campo | Adicionar. */
+.documentos__novo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.documentos__novo input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.documentos__campo-oculto {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .documentos__linha,
+  .documentos__novo {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .documentos__acoes,
+  .documentos__novo > :last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  /* Botões com texto ocupam a largura; os de ícone ficam juntos à direita. */
+  .documentos__acoes > :not(.documentos__botao-icone),
+  .documentos__novo > :last-child {
+    flex: 1 1 auto;
+  }
+
+  .documentos__novo > :nth-child(2) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .documentos__linha {
+    animation: documentos-entra 180ms ease-out both;
+  }
+
+  .documentos__estado {
+    transition:
+      background-color 180ms ease-out,
+      color 180ms ease-out,
+      border-color 180ms ease-out;
+  }
+}
+
+@keyframes documentos-entra {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

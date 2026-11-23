@@ -3376,11 +3376,16 @@ item direto de Pessoas; sem Operação e sem Demonstração no menu
 **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos; mudança
 funcional nas telas; Documentos.
 
-## Importação por `.xlsx` — T212 (aprovada visualmente; aguarda publicação)
+## Importação por `.xlsx` — T212 (integrada)
 
-| Tarefa | Estado                                                     | Resultado principal                                                                      |
-| ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| T212   | **Aprovada visualmente em 18/11/2026; aguarda publicação** | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+| Tarefa | Estado                                    | Resultado principal                                                                      |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| T212   | **Integrada** (PR #205, squash `9caf216`) | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+
+**Observação de relatório:** a integração funcional da T212 está concluída (PR #205, squash
+`9caf216c7f0912efa145781f35a59cad6a55c49a`, CI de push 3/3 verde, run 44527419288; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da tarefa seguinte.
 
 **Escopo:** modelo `.xlsx` (abas Colaboradores, Exemplos e Instruções) gerado da mesma definição
 de colunas do importador; leitura só no navegador, pela mesma conferência, idempotência e envio
@@ -3399,3 +3404,21 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
+
+## Documentos do colaborador — T213 (validação visual aprovada; aguarda publicação)
+
+| Tarefa | Estado                                                          | Resultado principal                                                        |
+| ------ | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| T213   | **Validação visual aprovada em 23/11/2026; aguarda publicação** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
+
+**Arquivos reais:** bloqueados até o ClamAV estar configurado e a revisão de segurança estar
+concluída; até lá, só arquivos sintéticos.
+
+**Escopo:** primeira fatia da [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md)
+— API (migration, rotas, RBAC, auditoria, ClamAV com quarentena fail-closed, limpeza pendente) e
+tela (etapa 4 "Documentos" do Novo colaborador, envio depois do cadastro, proteção de saída e
+seção da ficha) ([documento de decisão](../docs/decisions/t213-documentos-colaborador.md)).
+
+**Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
+configuráveis, OCR, assinatura, leitura automática, compartilhamento externo, vencimentos e
+envio pela importação.

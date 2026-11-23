@@ -667,3 +667,179 @@ export async function enviarFotoColaborador(
   }
   return jsonOrThrow<FotoColaboradorGravadaApi>(res);
 }
+
+// ---------------------------------------------------------------------------
+// T213 — documentos do colaborador com arquivo (ADR 0021). O navegador nunca
+// fala com o armazenamento: envio e download passam pela API autenticada. O
+// nome original do arquivo NUNCA é enviado — só a extensão e o tipo.
+
+export type CategoriaDocumentoColaborador =
+  | "rg"
+  | "cpf"
+  | "comprovante_endereco"
+  | "carteira_trabalho"
+  | "certidoes"
+  | "outros";
+
+export type EstadoDocumentoColaborador =
+  "em_verificacao" | "aprovado" | "reprovado";
+
+export interface DocumentoColaboradorApi {
+  readonly id: string;
+  readonly categoria: CategoriaDocumentoColaborador;
+  /** Nome curto de "outros" (nunca para o `master_tecnico`). */
+  readonly nome: string | null;
+  readonly estado: EstadoDocumentoColaborador;
+  readonly formato: "pdf" | "jpg" | "png";
+  readonly tamanhoBytes: number;
+  readonly versao: number;
+  readonly enviadoEm: string;
+  readonly verificadoEm: string | null;
+}
+
+const rotaDosDocumentos = (colaboradorId: string) =>
+  `/colaboradores/${encodeURIComponent(colaboradorId)}/documentos`;
+
+export async function listarDocumentosDoColaborador(
+  colaboradorId: string,
+): Promise<DocumentoColaboradorApi[]> {
+  const res = await apiFetch(rotaDosDocumentos(colaboradorId));
+  return jsonOrThrow<DocumentoColaboradorApi[]>(res);
+}
+
+/** Um envio em binário, com nova tentativa única se o token CSRF mudou. */
+async function enviarBinario(
+  caminho: string,
+  arquivo: File,
+  cabecalhos: Record<string, string>,
+): Promise<DocumentoColaboradorApi> {
+  const enviar = async () =>
+    apiFetch(caminho, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await getCsrf(),
+        "x-evolli-documento-tipo": arquivo.type,
+        "x-evolli-documento-extensao": extensaoDoArquivo(arquivo.name),
+        ...cabecalhos,
+      },
+      body: arquivo,
+    });
+  let res = await enviar();
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow<DocumentoColaboradorApi>(res);
+}
+
+/**
+ * Envia um documento novo (`POST /v1/colaboradores/:id/documentos`). A chave
+ * de idempotência é a do arquivo escolhido: a nova tentativa não duplica.
+ */
+export function enviarDocumentoDoColaborador(
+  colaboradorId: string,
+  pedido: {
+    readonly categoria: CategoriaDocumentoColaborador;
+    readonly nome?: string;
+    readonly arquivo: File;
+    readonly chaveIdempotencia: string;
+  },
+): Promise<DocumentoColaboradorApi> {
+  return enviarBinario(rotaDosDocumentos(colaboradorId), pedido.arquivo, {
+    "x-evolli-documento-categoria": pedido.categoria,
+    ...(pedido.nome
+      ? { "x-evolli-documento-nome": encodeURIComponent(pedido.nome) }
+      : {}),
+    "Idempotency-Key": pedido.chaveIdempotencia,
+  });
+}
+
+/** Troca o arquivo (versão nova; a anterior fica guardada). */
+export function trocarDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+  arquivo: File,
+  chaveIdempotencia: string,
+): Promise<DocumentoColaboradorApi> {
+  return enviarBinario(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/versoes`,
+    arquivo,
+    { "Idempotency-Key": chaveIdempotencia },
+  );
+}
+
+/** Nova tentativa do antivírus para o documento em verificação. */
+export async function verificarDocumentoDeNovo(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<DocumentoColaboradorApi> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/verificacao`,
+    { method: "POST", headers: { "x-csrf-token": await getCsrf() } },
+  );
+  return jsonOrThrow<DocumentoColaboradorApi>(res);
+}
+
+/** Remoção lógica do documento. */
+export async function removerDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<void> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}`,
+    { method: "DELETE", headers: { "x-csrf-token": await getCsrf() } },
+  );
+  if (!res.ok) await jsonOrThrow<unknown>(res);
+}
+
+/**
+ * Lê o arquivo aprovado pela rota autenticada (nunca uma URL do
+ * armazenamento): os bytes e o nome neutro do servidor.
+ */
+export async function obterArquivoDoDocumento(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<{ readonly blob: Blob; readonly nome: string }> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/arquivo`,
+    { headers: { Accept: "*/*" } },
+  );
+  if (!res.ok) await jsonOrThrow<unknown>(res);
+  const nome =
+    /filename="([^"]+)"/.exec(
+      res.headers.get("content-disposition") ?? "",
+    )?.[1] ?? "documento";
+  return { blob: await res.blob(), nome };
+}
+
+/** Baixa o arquivo aprovado com o nome neutro (`categoria-AAAA-MM-DD.ext`). */
+export async function baixarDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<void> {
+  const { blob, nome } = await obterArquivoDoDocumento(
+    colaboradorId,
+    documentoId,
+  );
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nome;
+    link.rel = "noopener";
+    link.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Abre o arquivo aprovado numa aba nova, a partir da memória do navegador. */
+export async function verDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<void> {
+  const { blob } = await obterArquivoDoDocumento(colaboradorId, documentoId);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

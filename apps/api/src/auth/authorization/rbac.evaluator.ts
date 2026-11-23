@@ -5,6 +5,7 @@ import {
   AuthorizationTarget,
   isContatosResource,
   isDadosPessoaisResource,
+  isDocumentosColaboradorResource,
   isDocumentosResource,
   isHorariosResource,
   isSolicitacoesPessoasResource,
@@ -65,6 +66,9 @@ export function evaluatePermission(
       }
       if (isDadosPessoaisResource(target.resource)) {
         return evaluateDadosPessoais(subject, target);
+      }
+      if (isDocumentosColaboradorResource(target.resource)) {
+        return evaluateDocumentosColaborador(subject, target);
       }
       return false;
   }
@@ -726,6 +730,53 @@ function evaluateDadosPessoais(
       }
       // Sem empresa ativa, global; com empresa ativa, so ela.
       return subject.companyId === null || isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * T213 — documentos do colaborador com arquivo (ADR 0021). Duas fases, como
+ * nos dados pessoais: sem empresa-alvo decide a CAPACIDADE; com ela, a
+ * FRONTEIRA.
+ *
+ * - `rh` e `dp`: lista, envio, troca, remoção e download, só na própria
+ *   empresa.
+ * - `master_tecnico`: só a lista e o estado (`documento_colaborador`/`read`),
+ *   com empresa ativa; nunca o conteúdo nem escrita.
+ * - Demais papéis: negados em tudo.
+ */
+function evaluateDocumentosColaborador(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const conteudo = target.resource === "conteudo_documento_colaborador";
+  const acoes: readonly AuthorizationAction[] = conteudo
+    ? ["read"]
+    : ["read", "create", "alter"];
+  if (!acoes.includes(target.action)) {
+    return false;
+  }
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      if (conteudo || target.action !== "read") {
+        return false;
+      }
+      if (!escopoResolvido) {
+        return true;
+      }
+      // Só com empresa ativa, e só nela.
+      return subject.companyId !== null && isSameCompany(subject, target);
 
     case "rh":
     case "dp":

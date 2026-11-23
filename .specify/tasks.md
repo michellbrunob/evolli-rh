@@ -3578,9 +3578,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         mudança funcional nas telas; Documentos.
 
 109.  **T212 - Importação de colaboradores por planilha `.xlsx`**
-      - **Estado:** **aprovada visualmente pela proprietária em 18/11/2026; aguarda a ordem de
-        publicação**. Branch `codex/t212-importacao-xlsx`, a partir do squash da T211 em
-        `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #205, squash
+        `9caf216c7f0912efa145781f35a59cad6a55c49a`, com a CI de push 3/3 verde (run
+        44527419288); branch remota `codex/t212-importacao-xlsx` preservada. Aprovação visual da
+        proprietária em 18/11/2026.
       - **Comprovado:** suíte web completa com 160 arquivos e 4436 testes verdes; E2E com
         PostgreSQL real 14 de 14; Excel real; navegador como RH e DP, desktop e 375 px (`.xlsx`,
         reenvio sem duplicar, CSV).
@@ -3591,6 +3592,24 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         passos, conforme o [documento de decisão](../docs/decisions/t212-importacao-xlsx.md).
       - **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; colunas além
         das 8 do modelo; dependência nova; Documentos.
+
+110.  **T213 - Documentos do colaborador**
+      - **Estado:** **primeira fatia implementada localmente** (API e tela), com a **validação
+        visual aprovada pela proprietária em 23/11/2026**; aguarda a autorização para publicar
+        a PR. Branch `codex/t213-documentos-colaborador`, a partir do squash da T212 em `main`
+        (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Arquivos reais:** continuam bloqueados até o ClamAV estar configurado e a revisão de
+        segurança estar concluída; até lá, só arquivos sintéticos.
+      - **Objetivo:** RH e DP anexarem documentos reais do colaborador com rapidez e segurança,
+        pela etapa 4 "Documentos" do Novo colaborador e pela ficha, conforme a
+        [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md) e o
+        [documento de decisão](../docs/decisions/t213-documentos-colaborador.md).
+      - **Feito:** migration, rotas, RBAC, auditoria, conferência do arquivo, ClamAV com
+        quarentena fail-closed e limpeza pendente (API); etapa 4, envio depois do cadastro,
+        proteção de saída e seção da ficha (tela).
+      - **Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
+        configuráveis, OCR, assinatura, leitura automática, compartilhamento externo,
+        vencimentos e envio de documentos pela importação.
 
 ## Regra obrigatória para as próximas tarefas
 

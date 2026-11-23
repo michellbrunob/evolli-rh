@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-18",
-  "lastIntegratedTask": 211,
-  "lastRecordedTask": 212,
+  "lastIntegratedTask": 212,
+  "lastRecordedTask": 213,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,15 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T212",
-    "status": "importacao_xlsx_aprovada_visualmente",
-    "reason": "T211 integrada em main pela PR #204 (squash 255a88627460bfed1ffc37f121d77ecb39da621f), com a CI de push 3/3 verde (run 44378071052); convergida no primeiro commit da T212. T212 implementada localmente e aprovada visualmente pela proprietaria em 18/11/2026: importacao de colaboradores por .xlsx, mantendo o CSV, com modelo gerado no navegador e painel em tres passos (docs/decisions/t212-importacao-xlsx.md), sem API, migration, RBAC, auditoria ou dependencia nova; limite conhecido: reenvio por outra conta admite de novo linhas sem matricula. Aguarda a ordem de publicacao; sem push, PR, Ready ou merge."
+    "id": "T213",
+    "status": "documentos_colaborador_aprovada_aguardando_publicacao",
+    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); convergida no primeiro commit da T213. T213 com a primeira fatia implementada localmente (API e tela) conforme a ADR 0021 e o dossie (docs/decisions/t213-documentos-colaborador.md); validacao visual aprovada pela proprietaria em 2026-11-23. Arquivos reais bloqueados ate o ClamAV estar configurado e a revisao de seguranca concluida. Aguarda autorizacao para publicar a PR; sem push, PR, Ready ou merge."
   },
   "openDeliveries": [
     {
-      "id": "T212",
+      "id": "T213",
       "pullRequest": null,
-      "status": "importacao_xlsx_aprovada_visualmente"
+      "status": "documentos_colaborador_aprovada_aguardando_publicacao"
     }
   ],
   "requiredArtifacts": [

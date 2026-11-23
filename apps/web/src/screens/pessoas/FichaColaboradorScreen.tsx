@@ -89,6 +89,7 @@ import { jornadaDeHoje, rotuloDaJornada } from "./jornadaColaborador";
 import { vinculoPrincipal } from "./vinculoPrincipal";
 import "./FichaColaboradorScreen.css";
 import { FotoDoColaborador } from "./FotoDoColaborador";
+import { ArquivosDoColaborador } from "./documentos/ArquivosDoColaborador";
 
 /** `id` do `h1` da ficha: o shell rotula o `<main>` por ele. */
 export const FICHA_COLABORADOR_TITULO_ID = "ficha-colaborador-titulo";
@@ -1128,12 +1129,19 @@ function FichaColaboradorConteudo({
                 onTrocarCompetencia={(c) => onTrocarCompetencia?.(c)}
               />
             ) : a === "documentos" ? (
-              <DocumentosColaboradorSecao
-                colaboradorId={colaboradorId}
-                nomeColaborador={nome}
-                onAlteradoChange={setDocumentosAlterados}
-                onSalvandoChange={setSalvandoDocumentos}
-              />
+              <>
+                {/* T213 — os arquivos (R2), acima do registro de metadados. */}
+                <ArquivosDoColaborador
+                  colaboradorId={colaboradorId}
+                  podeOperar={podeEditarFicha}
+                />
+                <DocumentosColaboradorSecao
+                  colaboradorId={colaboradorId}
+                  nomeColaborador={nome}
+                  onAlteradoChange={setDocumentosAlterados}
+                  onSalvandoChange={setSalvandoDocumentos}
+                />
+              </>
             ) : (
               <JornadaColaboradorSecao
                 colaboradorId={colaboradorId}

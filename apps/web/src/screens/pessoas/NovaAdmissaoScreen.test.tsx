@@ -39,6 +39,8 @@ import {
   type AdmissaoRegistradaApi,
   admitirColaborador,
   descartarRascunhoAdmissao,
+  type DocumentoColaboradorApi,
+  enviarDocumentoDoColaborador,
   enviarFotoColaborador,
   obterRascunhoAdmissao,
   salvarRascunhoAdmissao,
@@ -1944,7 +1946,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     }
     // Sem nada preenchido, a etapa avança.
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
   });
 
   it("o estado é uma das 27 siglas, em ordem alfabética do nome", async () => {
@@ -3456,7 +3458,7 @@ const botaoContinuar = () =>
 /** As etapas 1 e 2 válidas e a 3 vazia: chega à revisão. */
 async function ateARevisao() {
   await preencherValido();
-  irAteEtapa("Revisão e conclusão");
+  irAteEtapa("Documentos");
 }
 
 describe("T195 — quatro etapas: indicador e progresso", () => {
@@ -3489,7 +3491,7 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     for (const [titulo, pct] of [
       ["Etapa 2 de 4: Dados profissionais", "50"],
       ["Etapa 3 de 4: Endereço", "75"],
-      ["Etapa 4 de 4: Revisão e conclusão", "100"],
+      ["Etapa 4 de 4: Documentos", "100"],
     ] as const) {
       fireEvent.click(botaoContinuar());
       expect(tituloDaEtapa()).toHaveTextContent(titulo);
@@ -3596,10 +3598,10 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     // A revisão, já alcançada, continua ao alcance: o caminho é validado.
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 4: Revisão e conclusão, visitada",
+        name: "Etapa 4: Documentos, visitada",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     expect(progresso()).toHaveAttribute("value", "100");
   });
 
@@ -3615,7 +3617,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     fireEvent.change(data(), { target: { value: "" } });
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 4: Revisão e conclusão, visitada",
+        name: "Etapa 4: Documentos, visitada",
       }),
     );
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
@@ -3647,75 +3649,47 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
 });
 
 describe("T195 — revisão e conclusão", () => {
-  it("mostra o que foi digitado, sem opcional em branco, com Editar por bloco", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    irAteEtapa("Endereço");
-    fireEvent.change(cidade(), { target: { value: "Cidade Sintética" } });
-    irAteEtapa("Revisão e conclusão");
-    const bloco = (titulo: string) =>
-      screen
-        .getByRole("heading", { level: 3, name: titulo })
-        .closest("section")!;
-
-    const basicos = bloco("Dados básicos");
-    expect(basicos).toHaveTextContent("Nome completoPessoa Sintética Nova");
-    expect(basicos).toHaveTextContent("E-mail pessoalPessoa.Nova@Exemplo.TEST");
-    expect(basicos).toHaveTextContent("Data de nascimento20/05/1990");
-    expect(basicos).toHaveTextContent("Telefone pessoal(31) 99999-0000");
-    expect(basicos).toHaveTextContent("CPF529.982.247-25");
-    // Opcional em branco não aparece.
-    expect(basicos).not.toHaveTextContent("Saudação");
-    expect(basicos).not.toHaveTextContent("Sexo");
-
-    const profissionais = bloco("Dados profissionais");
-    expect(profissionais).toHaveTextContent("MatrículaMAT-0900");
-    expect(profissionais).toHaveTextContent("Tipo de contrataçãoCLT");
-    expect(profissionais).toHaveTextContent("Data de admissão03/11/2026");
-    // T209 — o cargo digitado aparece como texto; o salário, em reais.
-    expect(profissionais).toHaveTextContent(`Cargo${cargo.nome}`);
-    expect(profissionais).toHaveTextContent(
-      `Departamento${departamento.codigo} — ${departamento.nome}`,
-    );
-    expect(profissionais).toHaveTextContent(
-      `Unidade${unidade.codigo} — ${unidade.nome}`,
-    );
-    expect(profissionais).toHaveTextContent(/Salário brutoR\$\s/);
-    expect(profissionais).not.toHaveTextContent("Área");
-    expect(profissionais).not.toHaveTextContent("Nível");
-    expect(profissionais).not.toHaveTextContent("Jornada");
-
-    const endereco = bloco("Endereço");
-    // T209 — sem campo País na etapa 3, o país não aparece no resumo.
-    expect(endereco).not.toHaveTextContent("País");
-    expect(endereco).toHaveTextContent("CidadeCidade Sintética");
-    expect(endereco).not.toHaveTextContent("Logradouro");
-    expectSemIsoVisivel(document.body);
-
-    // Editar volta à etapa, com o foco no título e os dados no lugar.
-    fireEvent.click(
-      within(profissionais).getByRole("button", {
-        name: "Editar Dados profissionais",
-      }),
-    );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
-    await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
-    expect(matricula()).toHaveValue("MAT-0900");
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("T209 — sem bloco de documentos futuros na revisão; o único arquivo é a foto", async () => {
+  it("T213 — a etapa 4 é Documentos: cinco principais Pendente, Outros documentos, nada obrigatório", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
+    const principais = screen
+      .getByRole("heading", { level: 3, name: "Documentos principais" })
+      .closest("section")!;
+    for (const nome of [
+      "RG",
+      "CPF",
+      "Comprovante de endereço",
+      "Carteira de Trabalho",
+      "Certidões",
+    ]) {
+      expect(
+        within(principais).getByRole("button", {
+          name: `Enviar arquivo de ${nome}`,
+        }),
+      ).toBeInTheDocument();
+    }
+    expect(within(principais).getAllByText("Pendente")).toHaveLength(5);
+    expect(principais).toHaveTextContent("0 de 5 anexados.");
     expect(
-      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
-    ).toBeNull();
-    expect(document.body).not.toHaveTextContent(/Documentos serão liberados/);
-    const arquivos = document.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+      screen.getByRole("heading", { level: 3, name: "Outros documentos" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    ).toBeEnabled();
+  });
+
+  it("T213 — campos de arquivo: a foto e um por documento, nenhum obrigatório", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
   });
 
   it("Confirmar admissão abre a mesma confirmação e envia uma vez, com a chave", async () => {
@@ -3775,7 +3749,7 @@ describe("T195 — revisão e conclusão", () => {
       /Não foi possível confirmar se o cadastro foi gravado/,
     );
     await waitFor(() => expect(alerta).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
     expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
@@ -3844,7 +3818,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     // O mesmo botão já virou "Concluir" — é onde o 2º clique cai.
     expect(botao).toHaveTextContent("Cadastrar colaborador");
     fireEvent.click(botao, { detail: 2 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     expect(dialogoConfirmacao()).toBeNull();
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     // Um clique novo, deliberado, abre a confirmação de sempre.
@@ -3883,7 +3857,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     fireEvent.click(botaoContinuar(), { detail: 0 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     fireEvent.click(
       screen.getByRole("button", { name: "Cadastrar colaborador" }),
       {
@@ -4737,7 +4711,7 @@ const ETAPAS_REAIS = [
   "Dados básicos",
   "Dados profissionais",
   "Endereço",
-  "Revisão e conclusão",
+  "Documentos",
 ];
 
 const rodape = () =>
@@ -4805,29 +4779,38 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
       "Identificação e contatos",
       "Lotação e contrato",
       "CEP e endereço",
-      "Resumo final",
+      "Envio de arquivos",
     ]);
     expect(
       screen.getByRole("heading", { level: 2, name: /Dados básicos$/ }),
     ).toBeVisible();
   });
 
-  it("nada que o contrato não suporta: sem PIS nem upload de documento (CPF, RG, rascunho e foto existem, T209)", async () => {
+  it("nada que o contrato não suporta: sem PIS; documentos só como arquivo opcional na etapa 4 (T213)", async () => {
     montar();
     await aguardarEmpresa();
     const formulario = screen.getByRole("form", {
       name: "Formulário de nova admissão",
     });
-    // T209 — o único arquivo é a foto opcional (PNG ou JPEG).
-    const arquivos = formulario.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+    expect(formulario).toBeInTheDocument();
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
     // T209 — CPF e RG entraram na etapa 1; continua sem campo de documento.
     for (const proibido of [/\bPIS\b/, /Carteira de Trabalho/]) {
       expect(
         screen
           .queryAllByLabelText(proibido)
-          .filter((e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName)),
+          // T213 — o anexo da carteira (campo de arquivo) é permitido; o
+          // dado dela (número, série) continua fora.
+          .filter(
+            (e) =>
+              ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName) &&
+              e.getAttribute("type") !== "file",
+          ),
       ).toEqual([]);
     }
     expect(
@@ -5051,7 +5034,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
   });
 
-  it("sem aviso interno, explicação longa, documentos futuros, trilha repetida nem upload", async () => {
+  it("sem aviso interno, explicação longa, documentos futuros nem trilha repetida", async () => {
     montar();
     await aguardarEmpresa();
     const corpo = document.body.textContent ?? "";
@@ -5060,10 +5043,12 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     expect(corpo).not.toMatch(/Documentos serão liberados/);
     expect(corpo).not.toMatch(/T209|em desenvolvimento|branch/i);
     expect(screen.queryByRole("navigation", { name: /trilha/i })).toBeNull();
-    // T209 — o único arquivo é a foto opcional; nenhum upload de documento.
-    const arquivos = document.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
   });
 
   it("as quatro etapas, nos nomes pedidos", async () => {
@@ -5073,7 +5058,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     expect(etapas).toHaveTextContent("Dados básicos");
     expect(etapas).toHaveTextContent("Dados profissionais");
     expect(etapas).toHaveTextContent("Endereço");
-    expect(etapas).toHaveTextContent("Revisão e conclusão");
+    expect(etapas).toHaveTextContent("Documentos");
   });
 });
 
@@ -5750,5 +5735,284 @@ describe("T209 — etapa 1: dados básicos", () => {
     expect(
       screen.getByRole("button", { name: "Cadastrar colaborador" }),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T213 — documentos da etapa 4 (arquivos sintéticos).
+
+describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
+  const pdf = (nome = "rg-sintetico.pdf") =>
+    new File(["%PDF-1.4 sintetico %%EOF"], nome, { type: "application/pdf" });
+  const escolherDocumento = (nome: string, arquivo: File) =>
+    fireEvent.change(screen.getByLabelText(`Arquivo de ${nome}`), {
+      target: { files: [arquivo] },
+    });
+  const abrirMenu = (botao: HTMLElement) =>
+    fireEvent.pointerDown(botao, {
+      button: 0,
+      ctrlKey: false,
+      pointerType: "mouse",
+    });
+  const gravado = (
+    categoria: DocumentoColaboradorApi["categoria"],
+    estado: DocumentoColaboradorApi["estado"],
+  ): DocumentoColaboradorApi => ({
+    id: `doc-${categoria}`,
+    categoria,
+    nome: null,
+    estado,
+    formato: "pdf",
+    tamanhoBytes: 24,
+    versao: 1,
+    enviadoEm: "2026-11-19T12:00:00.000Z",
+    verificadoEm:
+      estado === "em_verificacao" ? null : "2026-11-19T12:00:01.000Z",
+  });
+  const linhaDe = (nome: string) =>
+    screen
+      .getAllByText(nome, { selector: ".documentos__nome" })
+      .at(-1)!
+      .closest("li")!;
+
+  async function cadastrar() {
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    );
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Confirmar cadastro" }),
+    );
+    await screen.findByText("Admissão registrada");
+  }
+
+  it("escolher o arquivo: a linha mostra nome e tamanho, Ver e o menu; nada sobe antes de cadastrar", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    const linha = linhaDe("RG");
+    expect(linha).toHaveTextContent("rg-sintetico.pdf");
+    expect(linha).toHaveTextContent("1 KB");
+    expect(
+      within(linha).getByRole("button", { name: "Ver o arquivo de RG" }),
+    ).toBeInTheDocument();
+    expect(
+      within(linha).getByRole("button", { name: "Mais ações: RG" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 de 5 anexados.")).toBeInTheDocument();
+    expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("arquivo fora de PDF, JPG ou PNG é recusado ali mesmo e a linha segue Pendente", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento(
+      "CPF",
+      new File(["x"], "cpf.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+    const linha = linhaDe("CPF");
+    expect(within(linha).getByRole("alert")).toHaveTextContent(
+      "Use um arquivo PDF, JPG ou PNG.",
+    );
+    expect(linha).toHaveTextContent("Pendente");
+  });
+
+  it("menu do arquivo: Remover arquivo volta a linha a Pendente", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Remover arquivo" }),
+    );
+    await waitFor(() => expect(linhaDe("RG")).toHaveTextContent("Pendente"));
+    expect(screen.getByText("0 de 5 anexados.")).toBeInTheDocument();
+  });
+
+  it("proteção de saída: arquivo escolhido conta como edição pendente", async () => {
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <NovaAdmissaoScreen
+          onSair={vi.fn()}
+          onAbrirAdmitido={vi.fn()}
+          papelDoAtor="rh"
+        />
+      </ProvedorDeEdicoes>,
+    );
+    await aguardarEmpresa();
+    await ateARevisao();
+    // Com o rascunho salvo, o formulário não tem pendência…
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-19T12:00:00.000Z",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() =>
+      expect(registro.obter().pendentes).not.toContain("Nova admissão"),
+    );
+    // …e o arquivo escolhido (que nunca vai ao rascunho) passa a ser uma.
+    escolherDocumento("Comprovante de endereço", pdf("comprovante.pdf"));
+    await waitFor(() =>
+      expect(registro.obter().pendentes).toContain("Nova admissão"),
+    );
+  });
+
+  it("cadastrar envia cada arquivo depois da admissão, com categoria e chave própria; Aprovado aparece com texto", async () => {
+    vi.mocked(enviarDocumentoDoColaborador).mockImplementation(
+      async (_id, pedido) => gravado(pedido.categoria, "aprovado"),
+    );
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    const arquivo = pdf();
+    escolherDocumento("RG", arquivo);
+    await cadastrar();
+    await waitFor(() =>
+      expect(enviarDocumentoDoColaborador).toHaveBeenCalledTimes(1),
+    );
+    const [colaboradorId, pedido] = vi.mocked(enviarDocumentoDoColaborador).mock
+      .calls[0]!;
+    expect(colaboradorId).toBe(resposta.id);
+    expect(pedido.categoria).toBe("rg");
+    expect(pedido.arquivo).toBe(arquivo);
+    expect(pedido.chaveIdempotencia).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    const envio = await screen.findByRole("heading", {
+      level: 3,
+      name: "Documentos",
+    });
+    await waitFor(() =>
+      expect(envio.closest("section")!).toHaveTextContent("Aprovado"),
+    );
+  });
+
+  it("falha transitória: Não enviado com Tentar de novo, que repete a mesma chave", async () => {
+    vi.mocked(enviarDocumentoDoColaborador)
+      .mockRejectedValueOnce(recusa(503))
+      .mockResolvedValueOnce(gravado("rg", "aprovado"));
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const tentar = await screen.findByRole("button", {
+      name: "Tentar de novo o envio de RG",
+    });
+    expect(tentar.closest("li")!).toHaveTextContent("Não enviado");
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(enviarDocumentoDoColaborador).toHaveBeenCalledTimes(2),
+    );
+    const chaves = vi
+      .mocked(enviarDocumentoDoColaborador)
+      .mock.calls.map(([, p]) => p.chaveIdempotencia);
+    expect(chaves[1]).toBe(chaves[0]);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Tentar de novo o envio de RG" }),
+      ).toBeNull(),
+    );
+  });
+
+  it.each([
+    [
+      "formato",
+      recusa(422, { codigo: "documento_formato_invalido" }),
+      /não é um PDF, JPG ou PNG válido/,
+    ],
+    [
+      "conteúdo corrompido",
+      recusa(422, { codigo: "documento_arquivo_malformado" }),
+      /corrompido ou incompleto/,
+    ],
+    ["tamanho", recusa(413), /passa de 10 MB/],
+    ["acesso recusado", recusa(403), /acesso não permite/],
+  ])(
+    "recusa definitiva (%s): mensagem acionável, sem Tentar de novo",
+    async (_, erro, mensagem) => {
+      vi.mocked(enviarDocumentoDoColaborador).mockRejectedValueOnce(erro);
+      montar();
+      await aguardarEmpresa();
+      await ateARevisao();
+      escolherDocumento("RG", pdf());
+      await cadastrar();
+      await waitFor(() =>
+        expect(screen.getByText(mensagem)).toBeInTheDocument(),
+      );
+      expect(screen.getByText(mensagem).closest("li")!).toHaveTextContent(
+        "Não enviado",
+      );
+      expect(
+        screen.queryByRole("button", { name: "Tentar de novo o envio de RG" }),
+      ).toBeNull();
+    },
+  );
+
+  it("arquivo reprovado pelo antivírus: Reprovado, explicado, sem nova tentativa", async () => {
+    vi.mocked(enviarDocumentoDoColaborador).mockResolvedValueOnce(
+      gravado("rg", "reprovado"),
+    );
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const detalhe = await screen.findByText(/antivírus recusou este arquivo/);
+    expect(detalhe.closest("li")!).toHaveTextContent("Reprovado");
+    expect(screen.queryByRole("button", { name: /Tentar de novo/ })).toBeNull();
+  });
+
+  it("durante o envio, Registrar outra admissão fica bloqueado, com aviso; a página conta como salvando", async () => {
+    let liberar: (v: DocumentoColaboradorApi) => void = () => undefined;
+    vi.mocked(enviarDocumentoDoColaborador).mockReturnValue(
+      new Promise((r) => {
+        liberar = r;
+      }),
+    );
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <NovaAdmissaoScreen
+          onSair={vi.fn()}
+          onAbrirAdmitido={vi.fn()}
+          papelDoAtor="rh"
+        />
+      </ProvedorDeEdicoes>,
+    );
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const outra = screen.getByRole("button", {
+      name: "Registrar outra admissão",
+    });
+    expect(outra).toBeDisabled();
+    expect(outra).toHaveAccessibleDescription(/Aguarde terminar/);
+    expect(registro.obter().salvando).toContain("Nova admissão");
+    await act(async () => liberar(gravado("rg", "aprovado")));
+    await waitFor(() => expect(outra).toBeEnabled());
+    expect(registro.obter().salvando).not.toContain("Nova admissão");
+  });
+
+  it("sem arquivo, cadastrar não envia documento e não mostra o bloco", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    await cadastrar();
+    expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
+    ).toBeNull();
   });
 });
