@@ -260,6 +260,8 @@ export function PessoasScreen({
   // o contêiner nunca abre numa aba que ele mesmo não lista.
   const abas = ABAS.filter((aba) => aba.estado === modo);
   const [abaAtiva, setAbaAtiva] = useState<AbaPessoas>(abas[0]!.id);
+  /** T215 — a faixa de seções some na página de Colaboradores. */
+  const mostrarFaixa = modo !== "funcional" || abaAtiva !== "colaboradores";
   const guarda = useGuardaDeSaida();
   /**
    * T187 — o atalho da "Vida funcional" da ficha: abre o Histórico funcional
@@ -434,41 +436,52 @@ export function PessoasScreen({
       ) : null}
       {listagemMontada || !fichaAberta ? (
         <div className="pessoas-screen__conteudo" hidden={fichaAberta}>
-          {/* T209 — a trilha fica só na barra superior (sem repetição). */}
-          <div
-            role="tablist"
-            aria-label="Seções de Pessoas"
-            className="pessoas-screen__tabs"
-          >
-            {abas.map((aba) => {
-              const selecionada = aba.id === abaAtiva;
-              return (
-                <button
-                  key={aba.id}
-                  type="button"
-                  role="tab"
-                  id={`pessoas-tab-${aba.id}`}
-                  aria-selected={selecionada}
-                  aria-controls={`pessoas-panel-${aba.id}`}
-                  className={
-                    selecionada
-                      ? "pessoas-screen__tab pessoas-screen__tab--ativa"
-                      : "pessoas-screen__tab"
-                  }
-                  onClick={() =>
-                    trocarAbaDePessoas(aba.id, () => setSelecaoHistorico(null))
-                  }
-                >
-                  {aba.rotulo}
-                </button>
-              );
-            })}
-          </div>
+          {/* T209 — a trilha fica só na barra superior (sem repetição).
+              T215 — na página de Colaboradores (como a referência), sem a
+              faixa: as outras visões abrem pela ficha e pela aba Escala de
+              trabalho, e mostram a faixa para voltar. */}
+          {mostrarFaixa ? (
+            <div
+              role="tablist"
+              aria-label="Seções de Pessoas"
+              className="pessoas-screen__tabs"
+            >
+              {abas.map((aba) => {
+                const selecionada = aba.id === abaAtiva;
+                return (
+                  <button
+                    key={aba.id}
+                    type="button"
+                    role="tab"
+                    id={`pessoas-tab-${aba.id}`}
+                    aria-selected={selecionada}
+                    aria-controls={`pessoas-panel-${aba.id}`}
+                    className={
+                      selecionada
+                        ? "pessoas-screen__tab pessoas-screen__tab--ativa"
+                        : "pessoas-screen__tab"
+                    }
+                    onClick={() =>
+                      trocarAbaDePessoas(aba.id, () =>
+                        setSelecaoHistorico(null),
+                      )
+                    }
+                  >
+                    {aba.rotulo}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           <div
-            role="tabpanel"
+            {...(mostrarFaixa
+              ? {
+                  role: "tabpanel",
+                  "aria-labelledby": `pessoas-tab-${definicaoAtiva.id}`,
+                }
+              : {})}
             id={`pessoas-panel-${definicaoAtiva.id}`}
-            aria-labelledby={`pessoas-tab-${definicaoAtiva.id}`}
             className="pessoas-screen__panel"
           >
             <AreaDeEdicao id={AREAS_DE_EDICAO.painelPessoas}>

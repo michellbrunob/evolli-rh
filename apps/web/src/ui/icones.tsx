@@ -30,6 +30,7 @@ import {
   Edit2,
   Element3,
   Eye,
+  Filter,
   EyeSlash,
   Gift,
   Hierarchy,
@@ -48,6 +49,7 @@ import {
   Receipt,
   Refresh2,
   Routing2,
+  SearchNormal1,
   SecurityUser,
   ShieldCross,
   ShieldSearch,
@@ -116,6 +118,9 @@ export const IconeSeguranca = decorativo(ShieldTick, "Bulk");
 /** T215 — Segurança › Sessões ativas e › Permissões de acesso. */
 export const IconeSessoes = decorativo(Devices, "Bulk");
 export const IconePermissoes = decorativo(KeySquare, "Bulk");
+/** T215 — busca e Filtrar da lista de Colaboradores. */
+export const IconeBuscar = decorativo(SearchNormal1, "Linear");
+export const IconeFiltrar = decorativo(Filter, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
 export const IconeAparencia = decorativo(ColorSwatch, "Bulk");

@@ -102,14 +102,17 @@ describe("T187 — atalho da ficha para o Histórico funcional", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Atalho da ficha (dublê)" }),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
+    // T215 — a faixa some na página de Colaboradores: sai por outra aba.
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
     fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
     expect(screen.getByText("Seleção recebida: nenhuma")).toBeInTheDocument();
   });
 
-  it("sem atalho, a aba abre como sempre abriu", () => {
+  it("T215 — sem atalho, a página de Colaboradores não mostra a faixa de seções", () => {
     render(<PessoasScreen />);
-    fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
-    expect(screen.getByText("Seleção recebida: nenhuma")).toBeInTheDocument();
+    expect(screen.getByText("Listagem (dublê)")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Histórico funcional" }),
+    ).toBeNull();
   });
 });

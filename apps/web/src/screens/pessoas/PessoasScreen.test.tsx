@@ -1,6 +1,70 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { PessoasScreen } from "./PessoasScreen";
+import { PessoasScreen, type PessoasScreenProps } from "./PessoasScreen";
+import type { RotaDaFicha } from "../../app/rotasDoShell";
+
+/**
+ * T215 — na página de Colaboradores (desenho da referência) a faixa de
+ * seções de Pessoas não aparece; as outras visões abrem pela ficha (o atalho
+ * da Vida funcional leva ao Histórico funcional) e ali a faixa volta. Aqui a
+ * ficha é um dublê que só expõe esse atalho.
+ */
+vi.mock("./FichaColaboradorScreen", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./FichaColaboradorScreen")>()),
+  FichaColaboradorScreen: ({
+    onAbrirHistoricoFuncional,
+  }: {
+    onAbrirHistoricoFuncional?: (alvo: {
+      colaboradorId: string;
+      vinculoId: string;
+    }) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onAbrirHistoricoFuncional?.({
+          colaboradorId: "colaborador-da-ficha",
+          vinculoId: "vinculo-principal",
+        })
+      }
+    >
+      Atalho da ficha (dublê)
+    </button>
+  ),
+}));
+
+function ComFichaAberta(props: Partial<PessoasScreenProps>) {
+  const [ficha, setFicha] = useState<RotaDaFicha | null>({
+    colaboradorId: "colaborador-da-ficha",
+    aba: "vida-funcional",
+  });
+  return (
+    <PessoasScreen
+      {...props}
+      ficha={ficha}
+      onAbrirFicha={(colaboradorId) =>
+        setFicha({ colaboradorId, aba: "dados" })
+      }
+      onTrocarAbaDaFicha={() => {}}
+      onFecharFicha={() => setFicha(null)}
+    />
+  );
+}
+
+/** Entra nas seções de Pessoas pelo atalho da ficha (abre o Histórico). */
+function entrarNasSecoes(props: Partial<PessoasScreenProps> = {}) {
+  render(<ComFichaAberta {...props} />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Atalho da ficha (dublê)" }),
+  );
+}
 
 /**
  * PessoasScreen — contêiner de abas (T072…T094, separado por modo na T159).
@@ -23,8 +87,15 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     ).toBeInTheDocument();
   });
 
-  it("expõe as seis abas funcionais, com aria-selected correto por padrão", () => {
+  it("T215 — na página de Colaboradores, sem a faixa de seções", () => {
     render(<PessoasScreen />);
+    expect(
+      screen.queryByRole("tablist", { name: "Seções de Pessoas" }),
+    ).toBeNull();
+  });
+
+  it("expõe as seis abas funcionais nas outras visões, com aria-selected correto", () => {
+    entrarNasSecoes();
 
     const tablist = screen.getByRole("tablist", { name: "Seções de Pessoas" });
     expect(tablist).toBeInTheDocument();
@@ -45,7 +116,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
       expect(aba.tagName).toBe("BUTTON");
       expect(aba).toHaveAttribute(
         "aria-selected",
-        aba.textContent === "Colaboradores" ? "true" : "false",
+        aba.textContent === "Histórico funcional" ? "true" : "false",
       );
     }
   });
@@ -61,9 +132,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T112)", () => {
     const onTituloIdChange = vi.fn();
-    render(
-      <PessoasScreen onTituloIdChange={onTituloIdChange} podeOperarJornada />,
-    );
+    entrarNasSecoes({ onTituloIdChange, podeOperarJornada: true });
 
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
 
@@ -85,7 +154,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Histórico funcional' ao clicar na aba — preservado sem regressão (T115)", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    entrarNasSecoes({ onTituloIdChange });
 
     fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
 
@@ -107,7 +176,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Dados contratuais' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    entrarNasSecoes({ onTituloIdChange });
 
     fireEvent.click(screen.getByRole("tab", { name: "Dados contratuais" }));
 
@@ -132,7 +201,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Documentos' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    entrarNasSecoes({ onTituloIdChange });
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
 
@@ -158,7 +227,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
 
   it("troca para 'Solicitações' ao clicar na aba, com h1 único e informa o titleId", () => {
     const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
+    entrarNasSecoes({ onTituloIdChange });
 
     fireEvent.click(screen.getByRole("tab", { name: "Solicitações" }));
 
@@ -272,8 +341,8 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     expect(onTituloIdChange).toHaveBeenCalledWith("afastamentos-titulo");
   });
 
-  it("volta para 'Colaboradores' ao clicar de novo na aba", () => {
-    render(<PessoasScreen />);
+  it("volta para 'Colaboradores' ao clicar de novo na aba (e a faixa some)", () => {
+    entrarNasSecoes();
 
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
@@ -281,10 +350,13 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tablist", { name: "Seções de Pessoas" }),
+    ).toBeNull();
   });
 
   it("passa por 'Histórico funcional' e volta para 'Colaboradores', preservando 'Horário de trabalho' sem regressão", () => {
-    render(<PessoasScreen podeOperarJornada />);
+    entrarNasSecoes({ podeOperarJornada: true });
 
     fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
     expect(
@@ -308,6 +380,7 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
 
     expect(onTituloIdChange).toHaveBeenCalledWith("colaboradores-titulo");
+    cleanupERenderNasSecoes(onTituloIdChange);
 
     fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
     expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-horario-titulo");
@@ -316,8 +389,8 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     expect(h1.id).toBe("pessoas-horario-titulo");
   });
 
-  it("não referencia autenticação, sessão, CPF, dinheiro ou dado real", () => {
-    render(<PessoasScreen />);
+  it("não referencia autenticação, sessão ou dado real", () => {
+    entrarNasSecoes();
     for (const aba of [
       "Horário de trabalho",
       "Histórico funcional",
@@ -343,6 +416,12 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     }
   });
 });
+
+/** Desmonta a página de Colaboradores e entra nas seções pelo atalho. */
+function cleanupERenderNasSecoes(onTituloIdChange: () => void) {
+  cleanup();
+  entrarNasSecoes({ onTituloIdChange });
+}
 
 describe("PessoasScreen — modo demonstrativo (T092/T093/T094)", () => {
   it("abre em 'Benefícios' e lista só as três abas de exemplo", () => {

@@ -1104,3 +1104,455 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* ==========================================================================
+   T215 — a página no desenho da referência (2026-11-23): cabeçalho com
+   Exportar e Novo colaborador; três cartões numa faixa só, com divisórias;
+   abas soltas na página, sublinhadas; busca com ícone e Filtrar ao lado;
+   tabela em cartão arredondado; N resultados no pé. Só tokens.
+   ========================================================================== */
+
+.colaboradores-screen__acoes-do-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.colaboradores-screen__exportar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.colaboradores-screen__exportar:hover:not(:disabled),
+.colaboradores-screen__exportar[data-state="open"] {
+  background: var(--surface-neutral);
+}
+
+.colaboradores-screen__exportar:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.colaboradores-screen__exportar:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.colaboradores-screen__menu-exportar {
+  min-width: 17rem;
+  padding: var(--space-xs);
+  border-color: var(--hairline);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.colaboradores-screen__opcao-exportar {
+  gap: var(--space-sm);
+  min-height: 3.25rem;
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__opcao-texto {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.colaboradores-screen__opcao-titulo {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.colaboradores-screen__opcao-descricao {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__nota-exportar {
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  border-top: var(--divisor);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__falha-exportar {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+/* ---- cartões -------------------------------------------------------------- */
+.colaboradores-screen__resumo {
+  min-width: 0;
+}
+
+.colaboradores-screen__cartoes-resumo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-lg);
+  background: var(--surface-pearl);
+}
+
+.colaboradores-screen__cartao-resumo {
+  display: grid;
+  align-content: start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  min-width: 0;
+}
+
+.colaboradores-screen__cartao-resumo + .colaboradores-screen__cartao-resumo {
+  border-top: var(--divisor-forte);
+}
+
+@media (min-width: 900px) {
+  .colaboradores-screen__cartoes-resumo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .colaboradores-screen__cartao-resumo + .colaboradores-screen__cartao-resumo {
+    border-top: 0;
+    border-left: var(--divisor-forte);
+  }
+}
+
+.colaboradores-screen__cartao-cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.colaboradores-screen__cartao-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--color-action) 12%,
+    var(--surface-canvas)
+  );
+  color: var(--color-action);
+}
+
+.colaboradores-screen__cartao-titulo {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__cartao-link {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.colaboradores-screen__cartao-link:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.colaboradores-screen__cartao-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.colaboradores-screen__cartao-numero {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: var(--weight-strong);
+  line-height: 1.1;
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__variacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.colaboradores-screen__minigrafico {
+  margin-left: auto;
+  color: var(--color-action);
+}
+
+.colaboradores-screen__cartao-rodape {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__barra-contratos {
+  display: flex;
+  gap: 3px;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-neutral);
+}
+
+.colaboradores-screen__barra-contrato {
+  flex-basis: 0;
+  min-width: 0.25rem;
+  border-radius: var(--radius-pill);
+}
+
+.colaboradores-screen__grupo-contrato--clt {
+  background: var(--color-action);
+}
+.colaboradores-screen__grupo-contrato--pj {
+  background: var(--cor-tipo-aprendiz);
+}
+.colaboradores-screen__grupo-contrato--estagio {
+  background: var(--status-ponto-ferias);
+}
+.colaboradores-screen__grupo-contrato--aprendiz {
+  background: var(--status-info-ink);
+}
+.colaboradores-screen__grupo-contrato--outros {
+  background: var(--status-ponto-inativo);
+}
+
+.colaboradores-screen__legenda-contratos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.colaboradores-screen__legenda-contratos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.colaboradores-screen__legenda-contratos strong {
+  color: var(--color-ink);
+}
+
+.colaboradores-screen__marcador-contrato {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 2px;
+}
+
+/* ---- abas soltas na página ------------------------------------------------ */
+.colaboradores-screen__painel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.colaboradores-screen__abas {
+  padding: 0;
+  gap: var(--space-md);
+}
+
+.colaboradores-screen__aba {
+  padding: var(--space-sm) 0;
+}
+
+.colaboradores-screen__aba:hover {
+  background: transparent;
+}
+
+.colaboradores-screen__painel-conteudo {
+  padding: var(--space-lg) 0 0;
+}
+
+/* ---- busca e Filtrar ------------------------------------------------------ */
+.colaboradores-screen__filtros {
+  gap: var(--space-sm);
+}
+
+.colaboradores-screen__busca {
+  position: relative;
+  flex: 0 1 24rem;
+  align-items: center;
+}
+
+.colaboradores-screen__busca-icone {
+  position: absolute;
+  left: var(--space-sm);
+  top: 50%;
+  display: inline-flex;
+  transform: translateY(-50%);
+  color: var(--color-ink-subtle);
+  pointer-events: none;
+}
+
+.colaboradores-screen__busca .colaboradores-screen__busca-campo {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+
+.colaboradores-screen__botao-filtrar {
+  align-self: center;
+}
+
+/* ---- tabela --------------------------------------------------------------- */
+.colaboradores-screen__coluna--selecao {
+  width: 2.75rem;
+}
+
+.colaboradores-screen__coluna--acoes {
+  width: 3.5rem;
+  text-align: right;
+}
+
+.colaboradores-screen__marcar {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  cursor: pointer;
+}
+
+.colaboradores-screen__marcar input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-action);
+  cursor: pointer;
+}
+
+.colaboradores-screen__linha--marcada {
+  background: color-mix(in srgb, var(--color-action) 6%, var(--surface-canvas));
+}
+
+.colaboradores-screen__pessoa-texto {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.colaboradores-screen__cargo {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__contatos {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.colaboradores-screen__telefone {
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__salario {
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.colaboradores-screen__contrato {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem var(--space-xs);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.colaboradores-screen__contrato-ponto {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
+.colaboradores-screen__contrato--vazio,
+.colaboradores-screen__contrato--estagio,
+.colaboradores-screen__contrato--pj {
+  color: var(--color-ink-subtle);
+}
+
+.colaboradores-screen__contrato--vazio .colaboradores-screen__contrato-ponto,
+.colaboradores-screen__contrato--estagio .colaboradores-screen__contrato-ponto,
+.colaboradores-screen__contrato--pj .colaboradores-screen__contrato-ponto {
+  background: var(--status-ponto-inativo);
+}
+
+.colaboradores-screen__resultados {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* ---- relatório para impressão (Exportar em PDF) --------------------------- */
+.colaboradores-screen__impressao {
+  display: none;
+}
+
+@media print {
+  .evolli-imprimindo-bloco
+    .colaboradores-screen__impressao[data-bloco-impresso] {
+    display: block;
+    color: var(--color-ink);
+    font-size: 10pt;
+  }
+
+  .colaboradores-screen__impressao h1 {
+    margin: 0 0 4pt;
+    font-size: 16pt;
+  }
+
+  .colaboradores-screen__impressao p {
+    margin: 0 0 10pt;
+  }
+
+  .colaboradores-screen__impressao table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .colaboradores-screen__impressao th,
+  .colaboradores-screen__impressao td {
+    padding: 3pt 4pt;
+    border-bottom: 0.5pt solid var(--hairline);
+    text-align: left;
+    vertical-align: top;
+  }
+}

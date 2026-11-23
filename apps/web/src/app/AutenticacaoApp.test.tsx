@@ -1135,7 +1135,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
 
     // Busca antiga digitada na empresa Alfa.
     const busca = (await screen.findByLabelText(
-      /Buscar por nome ou matrícula/,
+      /Buscar por nome, CPF, e-mail ou ID/,
     )) as HTMLInputElement;
     fireEvent.change(busca, { target: { value: "busca da empresa anterior" } });
 
@@ -1154,7 +1154,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(window.location.hash).toBe("#/pessoas/colaboradores");
     // Recriado: a busca da empresa anterior não sobrou.
     const buscaNova = (await screen.findByLabelText(
-      /Buscar por nome ou matrícula/,
+      /Buscar por nome, CPF, e-mail ou ID/,
     )) as HTMLInputElement;
     expect(buscaNova.value).toBe("");
     // Foco no título da tela de destino; anúncio da troca.

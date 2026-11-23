@@ -198,9 +198,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   it("não referencia autenticação, sessão real ou dado sensível no shell", () => {
     render(<App papelDoAtor="rh" />);
 
+    // T215 — "CPF" agora é coluna da lista de Colaboradores (desenho da
+    // referência); o dado só vem do servidor, com a permissão de quem lê.
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "cpf",
       "reserva fiscal",
       "secullum",
       "rwtech",
@@ -407,7 +408,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("RH e DP")).toBeInTheDocument();
+    // T215 — o aviso "RH e DP" saiu da página (desenho da referência).
+    expect(
+      screen.getByText("Gerencie contratos, dados e documentos do time."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
@@ -417,7 +421,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
-  it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T112)", () => {
+  it("Pessoas > o horário de trabalho continua acessível, pela aba Escala de trabalho (T112/T215)", async () => {
     render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
@@ -425,19 +429,17 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Colaboradores Consulta, ficha e vida funcional",
       }),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    // T215 — sem a faixa de seções na página: a visão de horários é a aba
+    // Escala de trabalho da lista.
+    fireEvent.click(screen.getByRole("tab", { name: /^Escala de trabalho/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Jornada de trabalho",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
-      "Horário de trabalho",
-    );
   });
 
   it("Pessoas volta para 'Colaboradores' ao sair e voltar ao destino (T072)", () => {
@@ -448,11 +450,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Colaboradores Consulta, ficha e vida funcional",
       }),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
-    ).toBeInTheDocument();
-
+    // T215 — sem a faixa de seções: sai direto do destino.
     fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     fireEvent.click(
       screen.getByRole("button", {

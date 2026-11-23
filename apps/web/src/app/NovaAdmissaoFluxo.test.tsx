@@ -258,8 +258,9 @@ async function abrirNovaAdmissaoPelaListagem() {
   await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
   // Com a lista vazia há dois botões (barra de ações e estado vazio); o da
   // barra vem primeiro, e os dois abrem o mesmo painel (T194).
+  // T215 — o botão se chama "Novo colaborador" (desenho da referência).
   const [daBarra] = await screen.findAllByRole("button", {
-    name: "Adicionar colaborador",
+    name: "Novo colaborador",
   });
   fireEvent.click(daBarra!);
   fireEvent.click(
@@ -399,7 +400,7 @@ describe("T178 — Gestão de Pessoas › Colaboradores na barra lateral", () =>
     ).not.toBeInTheDocument();
     // T194 — nem o botão novo, nem o painel.
     expect(
-      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+      screen.queryByRole("button", { name: "Novo colaborador" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(itemNovaAdmissaoNaBarra()).toBeNull();
@@ -413,7 +414,8 @@ describe("T178 — trilha de navegação", () => {
     expect(
       screen.queryByRole("navigation", { name: "Trilha de navegação" }),
     ).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    // T215 — a visão de horários é a aba Escala de trabalho da lista.
+    fireEvent.click(screen.getByRole("tab", { name: /^Escala de trabalho/ }));
     expect(
       screen.queryByRole("navigation", { name: "Trilha de navegação" }),
     ).toBeNull();
@@ -887,7 +889,10 @@ describe("T176/T178 — da página à listagem e à ficha do admitido", () => {
     expect(
       within(tabela).getByText("Pessoa Sintética Fluxo"),
     ).toBeInTheDocument();
-    expect(within(tabela).getByText("MAT-FLX1")).toBeInTheDocument();
+    // T215 — sem coluna de matrícula: a linha mostra o contrato (CLT).
+    expect(
+      within(tabela).getByText("Pessoa Sintética Fluxo").closest("tr"),
+    ).toHaveTextContent("CLT");
     expect(vi.mocked(listarColaboradores).mock.calls.length).toBeGreaterThan(
       chamadasAntes,
     );

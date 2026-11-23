@@ -75,7 +75,6 @@ async function filtrarPelaGaveta(...marcas: [string, string][]) {
 const filtrosCom = (
   parcial: Partial<FiltrosDaListagem>,
 ): FiltrosDaListagem => ({ ...FILTROS_VAZIOS, ...parcial });
-import { diaDeHoje, proximoDiaCivil } from "./jornadaColaborador";
 import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
 import {
@@ -465,13 +464,16 @@ function voltarDaFicha() {
 }
 
 describe("ColaboradoresScreen (T111 — funcional)", () => {
-  it("tem um único h1 e exibe o aviso RH e DP", async () => {
+  it("tem um único h1 e a descrição da página (T215: sem o aviso RH e DP)", async () => {
     render(<ComFicha />);
 
     expect(
       screen.getAllByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toHaveLength(1);
-    expect(screen.getByText("RH e DP")).toBeInTheDocument();
+    expect(
+      screen.getByText("Gerencie contratos, dados e documentos do time."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("RH e DP")).toBeNull();
 
     await waitFor(() => expect(listarColaboradores).toHaveBeenCalled());
   });
@@ -485,8 +487,9 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     const dentro = within(tabela);
     expect(dentro.getByText("Ana Colaboradora (teste)")).toBeInTheDocument();
     expect(dentro.getByText("Bruno Colaborador (teste)")).toBeInTheDocument();
-    expect(dentro.getByText("Ativo")).toBeInTheDocument();
-    expect(dentro.getByText("Inativo")).toBeInTheDocument();
+    // T215 — o cargo vigente embaixo do nome; sem lotação, "Sem cargo".
+    expect(dentro.getByText("Analista (teste)")).toBeInTheDocument();
+    expect(dentro.getByText("Sem cargo")).toBeInTheDocument();
   });
 
   it("mostra o estado de carregamento antes dos dados chegarem", async () => {
@@ -568,11 +571,22 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     );
   });
 
-  it("a aba Em admissão pede os previstos sem vínculo ativo", async () => {
-    render(<ComFicha />);
+  it("a aba Em admissão (só pela URL, T215) pede os previstos sem vínculo ativo", async () => {
+    render(
+      <ColaboradoresScreen
+        estado={{
+          aba: "em-admissao",
+          pagina: 1,
+          tamanho: 20,
+          filtros: FILTROS_VAZIOS,
+        }}
+        onEstadoChange={vi.fn()}
+      />,
+    );
     await screen.findByRole("table", { name: /^Colaboradores — / });
-
-    abrirAba("Em admissão");
+    expect(
+      screen.getByRole("tab", { name: /^Em admissão/, selected: true }),
+    ).toBeInTheDocument();
 
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
@@ -857,18 +871,14 @@ describe("ColaboradoresScreen (T111 — funcional)", () => {
     expect(screen.queryByText(/alterações não salvas/i)).toBeNull();
   });
 
-  it("não contém CPF, senha, sessão ou outro dado sensível na tela", async () => {
+  it("não contém senha, sessão ou dado que o servidor não mandou", async () => {
     render(<ComFicha />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
+    // T215 — CPF e salário são colunas (desenho da referência), mas só
+    // aparecem quando o servidor os manda; aqui não mandou.
     const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "cpf",
-      "senha",
-      "sessão",
-      "localstorage",
-      "r$",
-    ]) {
+    for (const termoProibido of ["senha", "sessão", "localstorage", "r$"]) {
       expect(texto).not.toContain(termoProibido);
     }
   });
@@ -906,7 +916,7 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     render(<ColaboradoresScreen onNovaAdmissao={onNovaAdmissao} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    const botao = screen.getByRole("button", { name: "Adicionar colaborador" });
+    const botao = screen.getByRole("button", { name: "Novo colaborador" });
     // Abre uma janela (o painel), não navega.
     expect(botao).toHaveAttribute("aria-haspopup", "dialog");
     fireEvent.click(botao);
@@ -933,7 +943,7 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     expect(
-      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+      screen.queryByRole("button", { name: "Novo colaborador" }),
     ).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -946,7 +956,7 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
       name: "Nenhum colaborador ativo no seu escopo",
     });
     expect(
-      screen.queryByRole("button", { name: "Adicionar colaborador" }),
+      screen.queryByRole("button", { name: "Novo colaborador" }),
     ).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(
@@ -967,11 +977,11 @@ describe("ColaboradoresScreen (T177 — Nova admissão leva à página de Nova a
     expect(vazio).not.toBeNull();
     // Um no cabeçalho e outro no estado vazio — os dois abrem o painel.
     const botoes = screen.getAllByRole("button", {
-      name: "Adicionar colaborador",
+      name: "Novo colaborador",
     });
     expect(botoes).toHaveLength(2);
     const doVazio = within(vazio as HTMLElement).getByRole("button", {
-      name: "Adicionar colaborador",
+      name: "Novo colaborador",
     });
 
     fireEvent.click(doVazio);
@@ -1020,14 +1030,14 @@ describe("ColaboradoresScreen (T147 — homologação da admissão)", () => {
       .mockResolvedValueOnce(paginado([colaborador1, colaborador2]))
       // 2ª: aba "Desligados" — fica PENDENTE de propósito.
       .mockImplementationOnce(() => atrasada.promessa)
-      // 3ª: aba "Em admissão" — resolve antes da anterior.
+      // 3ª: aba "Todos" — resolve antes da anterior.
       .mockResolvedValueOnce(paginado([colaborador2]));
 
     render(<ComFicha />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     abrirAba("Desligados");
-    abrirAba("Em admissão");
+    abrirAba("Todos");
 
     // A terceira chamada já respondeu: só Bruno está na tela.
     await waitFor(() =>
@@ -1362,10 +1372,8 @@ describe("T164 — total, data e contexto de empresa", () => {
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
     // Dois na tela, quarenta e cinco no conjunto. Exibir "2" como total faria
-    // o número mentir sobre o tamanho da empresa. T209 — com o intervalo.
-    expect(
-      await screen.findByText("Mostrando 1–2 de 45 colaboradores"),
-    ).toBeInTheDocument();
+    // o número mentir sobre o tamanho da empresa. T215 — "N resultados".
+    expect(await screen.findByText("45 resultados")).toBeInTheDocument();
   });
 
   it("concorda o singular quando há um só", async () => {
@@ -1375,12 +1383,10 @@ describe("T164 — total, data e contexto de empresa", () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    expect(
-      await screen.findByText("Mostrando 1–1 de 1 colaborador"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("1 resultado")).toBeInTheDocument();
   });
 
-  it("T178 — a admissão do vínculo principal aparece como dia brasileiro, nunca ISO", async () => {
+  it("T178 — nenhum dia em ISO na tabela (T215: a admissão saiu das colunas)", async () => {
     render(<ColaboradoresScreen />);
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
@@ -1390,39 +1396,34 @@ describe("T164 — total, data e contexto de empresa", () => {
     expect(
       screen.queryByRole("columnheader", { name: "Cadastrado em" }),
     ).toBeNull();
-    const linhaAna = within(tabela)
-      .getByText("Ana Colaboradora (teste)")
-      .closest("tr")!;
-    expect(linhaAna).toHaveTextContent("10/01/2025");
+    expect(screen.queryByRole("columnheader", { name: "Admissão" })).toBeNull();
     expectSemIsoVisivel(tabela);
   });
 
-  it("nomeia a empresa ativa quando o shell a informa", async () => {
+  // T215 — os cartões não repetem o nome da empresa; o escopo aparece nos
+  // estados vazios.
+  it('com empresa ativa, o vazio diz "nesta empresa"', async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     render(
       <ColaboradoresScreen
         empresaAtiva={{ nome: "Empresa Demo Alfa", codigo: "DEMOALFA" }}
       />,
     );
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-
     expect(
-      screen.getByRole("heading", {
-        name: "Totais de Empresa Demo Alfa, sem filtros",
+      await screen.findByRole("heading", {
+        name: "Nenhum colaborador ativo nesta empresa",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Total nesta empresa")).toBeInTheDocument();
   });
 
   it('sem empresa ativa (master global): "no seu escopo", nunca "nesta empresa" (D-6)', async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-
     expect(
-      screen.getByRole("heading", {
-        name: "Totais no seu escopo, sem filtros",
+      await screen.findByRole("heading", {
+        name: "Nenhum colaborador ativo no seu escopo",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Total no seu escopo")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/nesta empresa/);
   });
 });
@@ -1434,7 +1435,7 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
    * e Banco de Horas continuam fora: a lotação não é resolvida pela listagem,
    * e coluna vazia ou montada por N+1 é promessa falsa.
    */
-  it("colunas: Colaborador, Matrícula, Cargo, Departamento, Jornada de trabalho, Tipo, Situação e Admissão (T199)", async () => {
+  it("T215 — colunas da referência: seleção, Colaborador, CPF, Contatos, Salário e Contrato", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
@@ -1442,32 +1443,23 @@ describe("T164/T178 — o que a tabela promete, e a que custo", () => {
       .getAllByRole("columnheader")
       .map((c) => c.textContent?.trim() ?? "");
     expect(cabecalhos).toEqual([
+      "Selecionar todos desta página",
       "Colaborador",
-      "Matrícula",
-      "Cargo",
-      "Departamento",
-      "Jornada de trabalho",
-      "Tipo",
-      "Situação",
-      "Admissão",
+      "CPF",
+      "Contatos",
+      "Salário",
+      "Contrato",
     ]);
-    // Nada de CPF, salário ou contatos na visão coletiva.
-    for (const proibido of [
-      /CPF/i,
-      /sal[aá]rio/i,
-      /e-mail/i,
-      /telefone/i,
-      /celular/i,
-    ]) {
-      expect(cabecalhos.some((c) => proibido.test(c))).toBe(false);
-    }
   });
 
-  it("não há botões de importar, exportar ou pedir preenchimento", async () => {
+  it("T215 — Exportar no cabeçalho; nada de importar ou pedir preenchimento fora do painel", async () => {
     render(<ColaboradoresScreen onNovaAdmissao={() => {}} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    for (const termo of [/importar/i, /exportar/i, /preenchimento/i]) {
+    expect(
+      screen.getByRole("button", { name: "Exportar" }),
+    ).toBeInTheDocument();
+    for (const termo of [/importar/i, /preenchimento/i]) {
       expect(screen.queryByRole("button", { name: termo })).toBeNull();
     }
   });
@@ -2865,16 +2857,17 @@ function abrirAba(
   fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${rotulo}`) }));
 }
 
+// T215 — a busca da referência: um campo só, enviado com Enter.
 const campoBusca = () =>
-  screen.getByRole("searchbox", { name: "Buscar por nome ou matrícula" });
+  screen.getByRole("searchbox", { name: "Buscar por nome, CPF, e-mail ou ID" });
 
 function buscar(termo: string) {
   fireEvent.change(campoBusca(), { target: { value: termo } });
-  fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+  fireEvent.submit(campoBusca().closest("form")!);
 }
 
 describe("T178 — colunas e vínculo principal", () => {
-  it("T179 — matrícula nula aparece como 'Sem matrícula', na lista e na ficha", async () => {
+  it("T179 — matrícula nula aparece como 'Sem matrícula' na ficha (T215: a lista não tem a coluna)", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       paginado([
         {
@@ -2892,9 +2885,6 @@ describe("T178 — colunas e vínculo principal", () => {
       name: /^Colaboradores — /,
     });
     const ana = within(tabela).getByText(colaborador1.nome).closest("tr")!;
-    expect(within(ana).getAllByRole("cell")[1]).toHaveTextContent(
-      "Sem matrícula",
-    );
     expect(tabela).not.toHaveTextContent("null");
 
     fireEvent.click(within(ana).getByRole("button", { name: /Abrir ficha/ }));
@@ -2903,41 +2893,35 @@ describe("T178 — colunas e vínculo principal", () => {
     expect(ficha).not.toHaveTextContent("null");
   });
 
-  it("cada linha mostra nome, matrícula, situação e admissão do vínculo principal", async () => {
+  it("cada linha mostra nome e cargo, CPF, contatos, salário e contrato do vínculo principal (T215)", async () => {
     render(<ColaboradoresScreen />);
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
 
+    // [0] seleção, [1] colaborador, [2] CPF, [3] contatos, [4] salário,
+    // [5] contrato.
     const ana = within(tabela).getByText(colaborador1.nome).closest("tr")!;
     const celulasAna = within(ana).getAllByRole("cell");
-    expect(celulasAna[0]).toHaveTextContent(colaborador1.nome);
-    expect(celulasAna[1]).toHaveTextContent("MAT-0001");
-    // T184 — cargo e departamento da lotação vigente.
-    expect(celulasAna[2]).toHaveTextContent("Analista (teste)");
-    expect(celulasAna[3]).toHaveTextContent("Administrativo (teste)");
-    // T185 — jornada vigente: código e nome.
-    expect(celulasAna[4]).toHaveTextContent(
-      "COMERCIAL_44H — Comercial 44 horas (teste)",
-    );
+    expect(celulasAna[1]).toHaveTextContent(colaborador1.nome);
+    // T184 — o cargo da lotação vigente, embaixo do nome.
+    expect(celulasAna[1]).toHaveTextContent("Analista (teste)");
+    // Sem o dado do servidor: traço ou "Sem contato", nunca inventado.
+    expect(celulasAna[2]).toHaveTextContent("—");
+    expect(celulasAna[3]).toHaveTextContent("Sem contato");
+    expect(celulasAna[4]).toHaveTextContent("—");
     // T199 — tipo do vínculo da linha.
     expect(celulasAna[5]).toHaveTextContent("CLT");
-    expect(celulasAna[6]).toHaveTextContent("Ativo");
-    expect(celulasAna[7]).toHaveTextContent("10/01/2025");
 
     // Sem vínculo na empresa ativa: traço, nunca dado inventado.
     const bruno = within(tabela).getByText(colaborador2.nome).closest("tr")!;
     const celulasBruno = within(bruno).getAllByRole("cell");
-    expect(celulasBruno[1]).toHaveTextContent("—");
+    expect(celulasBruno[1]).toHaveTextContent("Sem cargo");
     expect(celulasBruno[2]).toHaveTextContent("—");
-    expect(celulasBruno[3]).toHaveTextContent("—");
-    expect(celulasBruno[4]).toHaveTextContent("—");
     expect(celulasBruno[5]).toHaveTextContent("—");
-    expect(celulasBruno[6]).toHaveTextContent("Inativo");
-    expect(celulasBruno[7]).toHaveTextContent("—");
   });
 
-  it("T184 — sem lotação vigente (previsto ou encerrado): texto neutro nas duas colunas", async () => {
+  it("T184 — sem lotação vigente (previsto ou encerrado): 'Sem cargo' (T215)", async () => {
     const previsto = listado(
       {
         id: "66666666-6666-4666-8666-666666666661",
@@ -2966,12 +2950,11 @@ describe("T178 — colunas e vínculo principal", () => {
       const celulas = within(
         within(tabela).getByText(nome).closest("tr")!,
       ).getAllByRole("cell");
-      expect(celulas[2]).toHaveTextContent("Sem lotação vigente");
-      expect(celulas[3]).toHaveTextContent("Sem lotação vigente");
+      expect(celulas[1]).toHaveTextContent("Sem cargo");
     }
   });
 
-  it("T184 — lotação vigente sem cargo: 'Não informado' só no cargo", async () => {
+  it("T184 — lotação vigente sem cargo: 'Sem cargo' (T215)", async () => {
     const semCargo = listado(
       {
         id: "66666666-6666-4666-8666-666666666663",
@@ -2995,8 +2978,7 @@ describe("T178 — colunas e vínculo principal", () => {
     const celulas = within(
       within(tabela).getByText("Pessoa Sem Cargo (teste)").closest("tr")!,
     ).getAllByRole("cell");
-    expect(celulas[2]).toHaveTextContent("Não informado");
-    expect(celulas[3]).toHaveTextContent("Administrativo (teste)");
+    expect(celulas[1]).toHaveTextContent("Sem cargo");
   });
 
   it("T184 — com mais de um vínculo, a lotação é a do vínculo principal", async () => {
@@ -3018,254 +3000,16 @@ describe("T178 — colunas e vínculo principal", () => {
     const celulas = within(
       within(tabela).getByText("Pessoa Dois Vínculos (teste)").closest("tr")!,
     ).getAllByRole("cell");
-    expect(celulas[2]).toHaveTextContent("Analista (teste)");
-    expect(celulas[3]).toHaveTextContent("Administrativo (teste)");
+    expect(celulas[1]).toHaveTextContent("Analista (teste)");
+    expect(celulas[5]).toHaveTextContent("CLT");
   });
 
-  /**
-   * T185 — a coluna "Jornada de trabalho": a vigência que contém o dia civil
-   * do navegador, do vínculo principal ativo. As datas da troca são
-   * calculadas a partir do mesmo `diaDeHoje` que a tela usa.
-   */
-  function comJornada(
-    nome: string,
-    sufixo: string,
-    vigencias: ColaboradorListadoApi["vinculos"][number]["vigenciasDeJornada"],
-    situacao: "previsto" | "ativo" | "encerrado" = "ativo",
-  ): ColaboradorListadoApi {
-    return listado(
-      { id: `66666666-6666-4666-8666-6666666667${sufixo}`, nome },
-      [
-        {
-          ...vinculoListado(
-            `v-j${sufixo}`,
-            `DEMO-J-00${sufixo}`,
-            situacao,
-            "2025-01-01",
-          ),
-          vigenciasDeJornada: vigencias,
-        },
-      ],
-    );
-  }
-
-  async function celulaDaJornadaDe(nome: string): Promise<HTMLElement> {
-    const tabela = await screen.findByRole("table", {
-      name: /^Colaboradores — /,
-    });
-    return within(within(tabela).getByText(nome).closest("tr")!).getAllByRole(
-      "cell",
-    )[4]!;
-  }
-
-  it("T185 — troca hoje: mostra a jornada que começa hoje, não a que terminou ontem", async () => {
-    const hoje = diaDeHoje();
-    const antiga = {
-      ...JORNADA_VIGENTE,
-      vigenciaFim: hoje,
-      jornada: { ...JORNADA_VIGENTE.jornada, id: "j-a", codigo: "ANTIGA" },
-    };
-    const nova = {
-      vigenciaInicio: hoje,
-      vigenciaFim: null,
-      jornada: { id: "j-n", codigo: "NOVA", nome: "Nova (teste)", ativo: true },
-    };
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([comJornada("Pessoa Troca (teste)", "01", [antiga, nova])]),
-    );
-    render(<ColaboradoresScreen />);
-    const celula = await celulaDaJornadaDe("Pessoa Troca (teste)");
-    expect(celula).toHaveTextContent("NOVA — Nova (teste)");
-    expect(celula).not.toHaveTextContent("ANTIGA");
-  });
-
-  it("T185 — sem jornada, só futura (começa amanhã) ou encerrada: 'Sem jornada vigente'", async () => {
-    const amanha = proximoDiaCivil(diaDeHoje());
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([
-        comJornada("Pessoa Sem Jornada (teste)", "02", []),
-        comJornada("Pessoa Futura (teste)", "03", [
-          { ...JORNADA_VIGENTE, vigenciaInicio: amanha },
-        ]),
-        comJornada("Pessoa Encerrada (teste)", "04", [
-          { ...JORNADA_VIGENTE, vigenciaFim: diaDeHoje() },
-        ]),
-      ]),
-    );
-    render(<ColaboradoresScreen />);
-    for (const nome of [
-      "Pessoa Sem Jornada (teste)",
-      "Pessoa Futura (teste)",
-      "Pessoa Encerrada (teste)",
-    ]) {
-      const celula = await celulaDaJornadaDe(nome);
-      expect(celula).toHaveTextContent("Sem jornada vigente");
-      expect(celula).not.toHaveTextContent("COMERCIAL_44H");
-    }
-  });
-
-  it("T185 — vínculo principal previsto ou encerrado: 'Sem jornada vigente', mesmo com vigência", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([
-        comJornada(
-          "Pessoa Prevista J (teste)",
-          "05",
-          [JORNADA_VIGENTE],
-          "previsto",
-        ),
-        comJornada(
-          "Pessoa Desligada J (teste)",
-          "06",
-          [JORNADA_VIGENTE],
-          "encerrado",
-        ),
-      ]),
-    );
-    render(<ColaboradoresScreen />);
-    for (const nome of [
-      "Pessoa Prevista J (teste)",
-      "Pessoa Desligada J (teste)",
-    ]) {
-      const celula = await celulaDaJornadaDe(nome);
-      expect(celula).toHaveTextContent("Sem jornada vigente");
-      expect(celula).not.toHaveTextContent("COMERCIAL_44H");
-    }
-  });
-
-  it("T185 — jornada inativada: nome com a indicação 'Jornada inativa'", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([
-        comJornada("Pessoa Jornada Inativa (teste)", "07", [
-          {
-            ...JORNADA_VIGENTE,
-            jornada: { ...JORNADA_VIGENTE.jornada, ativo: false },
-          },
-        ]),
-      ]),
-    );
-    render(<ColaboradoresScreen />);
-    const celula = await celulaDaJornadaDe("Pessoa Jornada Inativa (teste)");
-    expect(celula).toHaveTextContent(
-      "COMERCIAL_44H — Comercial 44 horas (teste)",
-    );
-    expect(within(celula).getByText("Jornada inativa")).toBeInTheDocument();
-  });
-
-  it("T185 — jornada sem código: só o nome", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      paginado([
-        comJornada("Pessoa Sem Codigo (teste)", "08", [
-          {
-            ...JORNADA_VIGENTE,
-            jornada: { ...JORNADA_VIGENTE.jornada, codigo: null },
-          },
-        ]),
-      ]),
-    );
-    render(<ColaboradoresScreen />);
-    const celula = await celulaDaJornadaDe("Pessoa Sem Codigo (teste)");
-    expect(celula.textContent?.trim()).toBe("Comercial 44 horas (teste)");
-  });
-
-  it("T185 — com mais de um vínculo, a jornada é a do vínculo principal", async () => {
-    const dois = listado(
-      {
-        id: "66666666-6666-4666-8666-666666666709",
-        nome: "Pessoa Principal Previsto (teste)",
-      },
-      [
-        vinculoListado("v-p9", "DEMO-P-0009", "previsto", "2026-03-01"),
-        vinculoListado("v-e9", "DEMO-E-0009", "encerrado", "2024-01-01"),
-      ],
-    );
-    vi.mocked(listarColaboradores).mockResolvedValue(paginado([dois]));
-    render(<ColaboradoresScreen />);
-    const celula = await celulaDaJornadaDe("Pessoa Principal Previsto (teste)");
-    expect(celula).toHaveTextContent("Sem jornada vigente");
-  });
-
-  it("com mais de um vínculo, mostra o principal e '+N' com frase acessível", async () => {
-    const carla = listado(
-      {
-        id: "55555555-5555-4555-8555-555555555555",
-        nome: "Carla Dois Vínculos",
-      },
-      [
-        vinculoListado(
-          "v-2",
-          "DEMO-A-0002",
-          "ativo",
-          "2026-03-02T00:00:00.000Z",
-        ),
-        vinculoListado(
-          "v-1",
-          "DEMO-A-0001",
-          "encerrado",
-          "2024-02-01T00:00:00.000Z",
-        ),
-      ],
-    );
-    const davi = listado(
-      {
-        id: "66666666-6666-4666-8666-666666666666",
-        nome: "Davi Três Vínculos",
-      },
-      [
-        vinculoListado(
-          "v-5",
-          "DEMO-B-0005",
-          "previsto",
-          "2026-11-01T00:00:00.000Z",
-        ),
-        vinculoListado(
-          "v-4",
-          "DEMO-B-0004",
-          "encerrado",
-          "2025-01-01T00:00:00.000Z",
-        ),
-        vinculoListado(
-          "v-3",
-          "DEMO-B-0003",
-          "encerrado",
-          "2023-01-01T00:00:00.000Z",
-        ),
-      ],
-    );
-    vi.mocked(listarColaboradores).mockResolvedValue(paginado([carla, davi]));
-    render(<ColaboradoresScreen />);
-    const tabela = await screen.findByRole("table", {
-      name: /^Colaboradores — /,
-    });
-
-    const linhaCarla = within(tabela)
-      .getByText("Carla Dois Vínculos")
-      .closest("tr")!;
-    const celulaCarla = within(linhaCarla).getAllByRole("cell")[1]!;
-    // O principal é o PRIMEIRO da resposta — o cliente não reordena.
-    expect(celulaCarla).toHaveTextContent("DEMO-A-0002");
-    expect(celulaCarla).not.toHaveTextContent("DEMO-A-0001");
-    expect(within(celulaCarla).getByText("+1")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
-    expect(within(celulaCarla).getByText("e mais 1 vínculo")).toHaveClass(
-      "colaboradores-screen__so-leitor",
-    );
-    // A admissão é a do vínculo principal.
-    expect(linhaCarla).toHaveTextContent("02/03/2026");
-
-    const linhaDavi = within(tabela)
-      .getByText("Davi Três Vínculos")
-      .closest("tr")!;
-    const celulaDavi = within(linhaDavi).getAllByRole("cell")[1]!;
-    expect(celulaDavi).toHaveTextContent("DEMO-B-0005");
-    expect(
-      within(celulaDavi).getByText("e mais 2 vínculos"),
-    ).toBeInTheDocument();
-  });
+  // T215 — as colunas "Jornada de trabalho" (T185) e "Matrícula" (com o
+  // "+N" dos vínculos a mais) saíram da lista, como na referência: a
+  // jornada e os vínculos ficam na ficha e na aba Escala de trabalho.
 });
 
-describe("T178 — busca por nome ou matrícula, no servidor", () => {
+describe("T178/T215 — busca por nome, CPF, e-mail ou ID, no servidor", () => {
   it("o campo é rotulado e fica num formulário de busca", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
@@ -3275,7 +3019,8 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     });
     expect(within(formulario).getByRole("searchbox")).toBe(campoBusca());
     expect(campoBusca()).toHaveAttribute("maxLength", "160");
-    // Sem termo, não há o que limpar.
+    // T215 — sem botões "Buscar" e "Limpar busca": Enter ou a pausa.
+    expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Limpar busca" })).toBeNull();
   });
 
@@ -3305,7 +3050,7 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     expect(screen.getByText(colaborador2.nome)).toBeInTheDocument();
   });
 
-  it("digitar não consulta: só enviar consulta", async () => {
+  it("T215 — digitar consulta só depois da pausa: uma leitura, com o termo final", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const antes = vi.mocked(listarColaboradores).mock.calls.length;
@@ -3313,7 +3058,15 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     fireEvent.change(campoBusca(), { target: { value: "an" } });
     fireEvent.change(campoBusca(), { target: { value: "ana" } });
 
+    // Na hora, nada; a cada tecla, nada.
     expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(antes);
+    await waitFor(() =>
+      expect(listarColaboradores).toHaveBeenLastCalledWith(
+        { busca: "ana", pagina: 1, tamanhoPagina: 20, grupo: "ativos" },
+        COM_SINAL,
+      ),
+    );
+    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(antes + 1);
   });
 
   it("convive com a aba e os filtros e, buscando na página 3, volta à página 1", async () => {
@@ -3386,7 +3139,7 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     );
   });
 
-  it("'Limpar busca' volta ao conjunto inteiro e devolve o foco ao campo", async () => {
+  it("apagar o termo volta ao conjunto inteiro, com o foco no campo (T215: sem 'Limpar busca')", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
@@ -3404,7 +3157,8 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
+    campoBusca().focus();
+    buscar("");
 
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
@@ -3418,7 +3172,6 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     );
     expect(campoBusca()).toHaveValue("");
     expect(campoBusca()).toHaveFocus();
-    expect(screen.queryByRole("button", { name: "Limpar busca" })).toBeNull();
   });
 
   it("resposta obsoleta de uma busca não sobrescreve a da busca atual", async () => {
@@ -3452,8 +3205,8 @@ describe("T178 — busca por nome ou matrícula, no servidor", () => {
     });
     expect(screen.queryByText(colaborador1.nome)).toBeNull();
     expect(screen.getByText(colaborador2.nome)).toBeInTheDocument();
-    const indicadores = screen.getByRole("region", {
-      name: "Totais no seu escopo, sem filtros",
+    const indicadores = screen.getByRole("group", {
+      name: "Colaboradores ativos",
     });
     expect(within(indicadores).getByText("7")).toBeInTheDocument();
     expect(within(indicadores).queryByText("99")).toBeNull();
@@ -3471,7 +3224,7 @@ describe("T178 — estados vazios distintos", () => {
     });
     const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
     fireEvent.click(
-      within(vazio).getByRole("button", { name: "Adicionar colaborador" }),
+      within(vazio).getByRole("button", { name: "Novo colaborador" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Iniciar cadastro" }));
     expect(onNovaAdmissao).toHaveBeenCalledTimes(1);
@@ -3503,7 +3256,7 @@ describe("T178 — estados vazios distintos", () => {
     const vazio = titulo.closest(".evolli-empty-state") as HTMLElement;
     expect(vazio).toHaveTextContent("zzz-inexistente");
     expect(
-      within(vazio).queryByRole("button", { name: "Adicionar colaborador" }),
+      within(vazio).queryByRole("button", { name: "Novo colaborador" }),
     ).toBeNull();
     expect(
       screen.queryByRole("heading", {
@@ -3563,7 +3316,7 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     render(<ComFicha onNovaAdmissao={onNovaAdmissao} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
 
-    const botao = screen.getByRole("button", { name: "Adicionar colaborador" });
+    const botao = screen.getByRole("button", { name: "Novo colaborador" });
     expect(botao.closest(".evolli-page-header")).not.toBeNull();
     expect(botao).toHaveClass("evolli-button--primary");
     fireEvent.click(botao);
@@ -3666,9 +3419,11 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
     )
       .getByText("Elisa Depois (teste)")
       .closest("tr")!;
+    // T215 — sem colunas de matrícula e situação: o vínculo encerrado segue
+    // na linha pelo contrato; só o nome mudou.
     const celulas = within(linha).getAllByRole("cell");
-    expect(celulas[1]).toHaveTextContent("MAT-0009");
-    expect(celulas[6]).toHaveTextContent("Desligado");
+    expect(celulas[1]).toHaveTextContent("Elisa Depois (teste)");
+    expect(celulas[5]).toHaveTextContent("CLT");
   });
 
   it("cada montagem relê o servidor: nada de lista guardada entre montagens", async () => {
@@ -4393,10 +4148,7 @@ describe("T215 — gaveta 'Filtrar' (substitui os filtros de Departamento, Cargo
 
   it("combina busca, aba e todos os grupos, numa só consulta", async () => {
     await montarPronto();
-    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
-      target: { value: "Ana" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    buscar("Ana");
     await waitFor(() => expect(ultimaLeituraDaLista().busca).toBe("Ana"));
     abrirAba("Todos");
     await waitFor(() => expect(ultimaLeituraDaLista().grupo).toBeUndefined());
@@ -4543,10 +4295,7 @@ describe("T215 — gaveta 'Filtrar' (substitui os filtros de Departamento, Cargo
 
   it("vazio com filtro e busca: “Limpar busca e filtros” tira tudo", async () => {
     await montarPronto();
-    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
-      target: { value: "Bruno" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    buscar("Bruno");
     await waitFor(() => expect(ultimaLeituraDaLista().busca).toBe("Bruno"));
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
     await filtrarPelaGaveta(["Departamento", "Operações (teste) (OPS)"]);
@@ -4672,7 +4421,7 @@ describe("T215 — gaveta 'Filtrar' (substitui os filtros de Departamento, Cargo
 
 describe("T194 — painel 'Adicionar colaborador' na listagem", () => {
   const botaoAdicionar = () =>
-    screen.getByRole("button", { name: "Adicionar colaborador" });
+    screen.getByRole("button", { name: "Novo colaborador" });
 
   async function montarComTabela(
     props: Partial<Parameters<typeof ColaboradoresScreen>[0]> = {},
@@ -4907,53 +4656,46 @@ describe("T199 — dashboard de Colaboradores", () => {
       .getAllByRole("columnheader")
       .map((c) => c.textContent ?? "");
 
-  /** O número de um cartão: o `dd` que segue o `dt` do rótulo. */
-  function cartao(regiao: HTMLElement, rotulo: string): string | null {
-    const termo = within(regiao)
-      .getAllByText(rotulo)
-      .find((n) => n.tagName === "DT");
-    return termo?.nextElementSibling?.textContent ?? null;
-  }
-
-  it("cartões com os números do servidor e a distribuição por tipo em texto (só tipos com gente)", async () => {
+  it("T215 — cartões com os números do servidor e a distribuição por tipo de contrato em texto", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([colaborador1]),
       contadores: CONTADORES,
     });
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
-    const regiao = await screen.findByRole("region", {
-      name: "Totais de Empresa Teste A, sem filtros",
+    const ativos = await screen.findByRole("group", {
+      name: "Colaboradores ativos",
     });
-    await waitFor(() => expect(cartao(regiao, "Ativos")).toBe("7"));
-    expect(cartao(regiao, "Em admissão")).toBe("2");
-    expect(cartao(regiao, "Desligados")).toBe("3");
-    expect(cartao(regiao, "Total nesta empresa")).toBe("12");
+    await waitFor(() => expect(within(ativos).getByText("7")).toBeVisible());
+    expect(within(ativos).getByText("12 cadastrados")).toBeInTheDocument();
 
-    const legenda = within(regiao).getByRole("list");
+    const tipos = screen.getByRole("group", { name: "Por tipo de contrato" });
     expect(
-      within(legenda)
+      within(tipos)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["CLT: 5", "PJ: 2"]);
+    ).toEqual(["CLT 5", "PJ 2", "Estágio 0", "Aprendiz 0", "Outros 0"]);
     // A barra é só visual: a legenda diz os mesmos números.
     expect(
-      regiao.querySelector(".colaboradores-screen__barra-tipos"),
+      tipos.querySelector(".colaboradores-screen__barra-contratos"),
     ).toHaveAttribute("aria-hidden", "true");
-    // As abas mostram o total de cada grupo; Férias e ausências e Escala
-    // de trabalho não têm número.
+    // As abas mostram o total de cada grupo; Escala de trabalho não tem
+    // número, e Férias e ausências fica em zero até o módulo.
     expect(aba(/^Ativos/)).toHaveAccessibleName("Ativos, 7");
-    expect(aba(/^Em admissão/)).toHaveAccessibleName("Em admissão, 2");
     expect(aba(/^Desligados/)).toHaveAccessibleName("Desligados, 3");
     expect(aba(/^Todos/)).toHaveAccessibleName("Todos, 12");
-    expect(aba(/^Férias e ausências/)).toHaveTextContent(
-      /^Férias e ausências$/,
+    expect(aba(/^Férias e ausências/)).toHaveAccessibleName(
+      "Férias e ausências, 0",
     );
     expect(aba(/^Escala de trabalho/)).toHaveTextContent(
       /^Escala de trabalho$/,
     );
+    // T215 — "Em admissão" saiu da faixa de abas.
+    expect(
+      within(tablist()).queryByRole("tab", { name: /^Em admissão/ }),
+    ).toBeNull();
   });
 
-  it("sem ativos: a distribuição diz isso em texto, sem barra", async () => {
+  it("sem ativos: o cartão diz zero, a legenda zera e a barra não tem faixa", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([]),
       contadores: {
@@ -4963,43 +4705,53 @@ describe("T199 — dashboard de Colaboradores", () => {
       },
     });
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
+    const ativos = await screen.findByRole("group", {
+      name: "Colaboradores ativos",
+    });
+    await waitFor(() => expect(within(ativos).getByText("0")).toBeVisible());
+    const tipos = screen.getByRole("group", { name: "Por tipo de contrato" });
     expect(
-      await screen.findByText("Nenhum colaborador ativo nesta empresa."),
-    ).toBeInTheDocument();
+      within(tipos)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["CLT 0", "PJ 0", "Estágio 0", "Aprendiz 0", "Outros 0"]);
     expect(
-      document.querySelector(".colaboradores-screen__barra-tipos"),
-    ).toBeNull();
+      tipos.querySelectorAll(".colaboradores-screen__barra-contrato"),
+    ).toHaveLength(0);
   });
 
   it("teclado nas abas: setas, Home e End movem o foco; só a aba selecionada fica na ordem de tabulação", async () => {
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    // T215 — cinco abas aqui: Ativos, Férias e ausências, Escala de
+    // trabalho, Desligados e Todos (sem "Em admissão"; sem destino, sem
+    // Organograma).
     const abas = within(tablist()).getAllByRole("tab");
-    expect(abas.map((a) => a.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
+    expect(abas.map((a) => a.tabIndex)).toEqual([0, -1, -1, -1, -1]);
 
     abas[0]!.focus();
     fireEvent.keyDown(abas[0]!, { key: "ArrowRight" });
     expect(abas[1]).toHaveFocus();
     fireEvent.keyDown(abas[1]!, { key: "End" });
-    expect(abas[5]).toHaveFocus();
-    fireEvent.keyDown(abas[5]!, { key: "ArrowRight" });
+    expect(abas[4]).toHaveFocus();
+    fireEvent.keyDown(abas[4]!, { key: "ArrowRight" });
     expect(abas[0]).toHaveFocus();
     fireEvent.keyDown(abas[0]!, { key: "ArrowLeft" });
-    expect(abas[5]).toHaveFocus();
-    fireEvent.keyDown(abas[5]!, { key: "Home" });
+    expect(abas[4]).toHaveFocus();
+    fireEvent.keyDown(abas[4]!, { key: "Home" });
     expect(abas[0]).toHaveFocus();
     // Mover o foco não troca de aba (ativação manual: Enter, Espaço ou clique).
     expect(abas[0]).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(abas[4]!);
+    fireEvent.click(abas[3]!);
     await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
     const depois = within(tablist()).getAllByRole("tab");
-    expect(depois[4]).toHaveAttribute("aria-selected", "true");
-    expect(depois.map((a) => a.tabIndex)).toEqual([-1, -1, -1, -1, 0, -1]);
+    expect(depois[3]).toHaveAttribute("aria-selected", "true");
+    expect(depois.map((a) => a.tabIndex)).toEqual([-1, -1, -1, 0, -1]);
     // O painel é rotulado pela aba selecionada.
     expect(screen.getByRole("tabpanel")).toHaveAttribute(
       "aria-labelledby",
-      depois[4]!.id,
+      depois[3]!.id,
     );
   });
 
@@ -5043,9 +4795,7 @@ describe("T199 — dashboard de Colaboradores", () => {
         expect(consulta).toEqual({ situacao: "ativo", tamanhoPagina: 1 });
       }
       expect(
-        screen.getByRole("region", {
-          name: "Totais de Empresa Teste A, sem filtros",
-        }),
+        screen.getByRole("group", { name: "Colaboradores ativos" }),
       ).toBeInTheDocument();
       // Um único h1 na página.
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -5079,7 +4829,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     }
   });
 
-  it("Desligamento só na aba Desligados; lotação só em Ativos e Todos; Tipo em todas", async () => {
+  it("lotação só em Ativos e Todos; Tipo em todas (T215: sem coluna Desligamento)", async () => {
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(cabecalhos()).not.toContain("Desligamento");
@@ -5097,18 +4847,10 @@ describe("T199 — dashboard de Colaboradores", () => {
     };
     expect(await gruposDaGaveta()).toContain("Departamento");
 
-    for (const rotulo of ["Em admissão", "Desligados"] as const) {
-      abrirAba(rotulo);
-      await screen.findByRole("table", {
-        name: `Colaboradores — ${rotulo}`,
-      });
-      expect(await gruposDaGaveta()).toEqual(["Tipo de contrato", "Gênero"]);
-      if (rotulo === "Desligados") {
-        expect(cabecalhos()).toContain("Desligamento");
-      } else {
-        expect(cabecalhos()).not.toContain("Desligamento");
-      }
-    }
+    abrirAba("Desligados");
+    await screen.findByRole("table", { name: "Colaboradores — Desligados" });
+    expect(await gruposDaGaveta()).toEqual(["Tipo de contrato", "Gênero"]);
+    expect(cabecalhos()).not.toContain("Desligamento");
 
     abrirAba("Todos");
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
@@ -5116,7 +4858,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     expect(await gruposDaGaveta()).toContain("Cargo");
   });
 
-  it("na aba Desligados, a linha mostra o vínculo encerrado: tipo, situação e data de desligamento", async () => {
+  it("na aba Desligados, a linha mostra o contrato do vínculo encerrado (T215)", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       paginado([
         listado(
@@ -5147,10 +4889,8 @@ describe("T199 — dashboard de Colaboradores", () => {
     const linha = within(tabela).getAllByRole("row")[1]!;
     const celulas = within(linha).getAllByRole("cell");
     const indice = (nome: string) => cabecalhos().indexOf(nome);
-    expect(celulas[indice("Tipo")]).toHaveTextContent("PJ");
-    expect(celulas[indice("Situação")]).toHaveTextContent("Desligado");
-    expect(celulas[indice("Desligamento")]).toHaveTextContent("31/12/2025");
-    expect(celulas[indice("Matrícula")]).toHaveTextContent("MAT-0900");
+    expect(celulas[indice("Contrato")]).toHaveTextContent("PJ");
+    expect(celulas[indice("Colaborador")]).toHaveTextContent("Sem cargo");
   });
 
   it("T215 — em Todos, quem foi desativado aparece como Inativo, mesmo com o vínculo ativo", async () => {
@@ -5181,7 +4921,8 @@ describe("T199 — dashboard de Colaboradores", () => {
     });
     const linha = within(tabela).getAllByRole("row")[1]!;
     const celulas = within(linha).getAllByRole("cell");
-    expect(celulas[cabecalhos().indexOf("Situação")]).toHaveTextContent(
+    // T215 — sem coluna Situação: a etiqueta "Inativo" fica junto do nome.
+    expect(celulas[cabecalhos().indexOf("Colaborador")]).toHaveTextContent(
       /Inativo$/,
     );
   });
@@ -5222,7 +4963,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     }
   });
 
-  it("o nome abre a ficha; nenhuma coluna de CPF, salário ou contatos em nenhuma aba", async () => {
+  it("o nome abre a ficha; as mesmas colunas da referência em todas as abas (T215)", async () => {
     const onAbrirFicha = vi.fn();
     render(
       <ColaboradoresScreen
@@ -5239,17 +4980,18 @@ describe("T199 — dashboard de Colaboradores", () => {
       }),
     );
     expect(onAbrirFicha).toHaveBeenCalledWith(colaborador1.id);
-    for (const rotulo of [
-      "Ativos",
-      "Em admissão",
-      "Desligados",
-      "Todos",
-    ] as const) {
+    for (const rotulo of ["Ativos", "Desligados", "Todos"] as const) {
       abrirAba(rotulo);
       await screen.findByRole("table", { name: `Colaboradores — ${rotulo}` });
-      expect(cabecalhos().join(" ")).not.toMatch(
-        /CPF|Salário|Salario|E-mail|Telefone|Celular|Contato/i,
-      );
+      expect(cabecalhos()).toEqual([
+        "Selecionar todos desta página",
+        "Colaborador",
+        "CPF",
+        "Contatos",
+        "Salário",
+        "Contrato",
+        "Ações",
+      ]);
     }
   });
 });
@@ -5841,8 +5583,9 @@ describe("T199 (revisão) — cartões que se recuperam de falha na aba Jornada"
     const falhar = { valor: true };
     dublê(falhar);
     render(<DashboardComEstado inicial={JORNADA} onMudanca={vi.fn()} />);
+    // T215 — os três cartões, numa seção "Resumo de colaboradores".
     const regiao = screen.getByRole("region", {
-      name: "Totais no seu escopo, sem filtros",
+      name: "Resumo de colaboradores",
     });
     expect(
       await within(regiao).findByText(
@@ -5869,8 +5612,8 @@ describe("T199 (revisão) — cartões que se recuperam de falha na aba Jornada"
     repetir.focus();
     fireEvent.click(repetir);
 
-    await waitFor(() => expect(cartaoDe(regiao, "Ativos")).toBe("30"));
-    expect(cartaoDe(regiao, "Total no seu escopo")).toBe("33");
+    await waitFor(() => expect(ativosDe(regiao)).toBe("30"));
+    expect(regiao).toHaveTextContent("33 cadastrados");
     // Só os contadores foram relidos; a Jornada é o mesmo nó, sem releitura.
     expect(
       vi
@@ -5888,7 +5631,7 @@ describe("T199 (revisão) — cartões que se recuperam de falha na aba Jornada"
     expect(
       screen.getByRole("heading", {
         level: 2,
-        name: "Totais no seu escopo, sem filtros",
+        name: "Resumo de colaboradores",
       }),
     ).toHaveFocus();
     expect(anuncio()).toHaveTextContent("Totais de colaboradores carregados.");
@@ -5914,12 +5657,15 @@ describe("T199 (revisão) — cartões que se recuperam de falha na aba Jornada"
     expect(repetir).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  /** O número de um cartão: o `dd` que segue o `dt` do rótulo. */
-  function cartaoDe(regiao: HTMLElement, rotulo: string): string | null {
-    const termo = within(regiao)
-      .queryAllByText(rotulo)
-      .find((n) => n.tagName === "DT");
-    return termo?.nextElementSibling?.textContent ?? null;
+  /** T215 — o número do cartão "Colaboradores ativos". */
+  function ativosDe(regiao: HTMLElement): string | null {
+    const cartao = within(regiao).queryByRole("group", {
+      name: "Colaboradores ativos",
+    });
+    return (
+      cartao?.querySelector(".colaboradores-screen__cartao-numero")
+        ?.textContent ?? null
+    );
   }
 });
 
@@ -6787,9 +6533,6 @@ function respostaDaPagina(
 const navegacaoDaPaginacao = () =>
   screen.getByRole("navigation", { name: "Paginação de colaboradores" });
 
-const seletorDoTamanho = () =>
-  screen.getByRole("combobox", { name: "Itens por página" });
-
 /** O sinal de cancelamento passado à leitura de número `n` (0 = primeira). */
 function sinalDaLeitura(n: number): AbortSignal {
   const chamada = vi.mocked(listarColaboradores).mock.calls[n];
@@ -6803,93 +6546,9 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
     vi.mocked(listarColaboradores).mockClear();
   });
 
-  it("oferece 20, 50 e 100, com 20 por padrão, e pede o tamanho escolhido na página 1", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      respostaDaPagina(pessoasSinteticas(20), 1, 120),
-    );
-    const onMudanca = vi.fn();
-    render(
-      <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, pagina: 1 }}
-        onMudanca={onMudanca}
-      />,
-    );
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-
-    expect(seletorDoTamanho()).toHaveValue("20");
-    expect(
-      within(seletorDoTamanho())
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["20", "50", "100"]);
-
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      respostaDaPagina(pessoasSinteticas(50), 1, 120, 50),
-    );
-    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
-
-    expect(onMudanca).toHaveBeenLastCalledWith({
-      ...ESTADO_PADRAO,
-      pagina: 1,
-      tamanho: 50,
-    });
-    await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith(
-        { pagina: 1, tamanhoPagina: 50, grupo: "ativos" },
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
-      ),
-    );
-    // O seletor fica montado durante a leitura: o foco não se perde.
-    expect(seletorDoTamanho()).toHaveValue("50");
-  });
-
-  it("trocar o tamanho volta à página 1, mantendo aba, filtros e busca", async () => {
-    vi.mocked(listarColaboradores).mockResolvedValue(
-      respostaDaPagina(pessoasSinteticas(20, 40), 3, 120),
-    );
-    const onMudanca = vi.fn();
-    render(
-      <DashboardComEstado
-        inicial={{
-          ...ESTADO_PADRAO,
-          aba: "todos",
-          pagina: 3,
-          filtros: soTipos("pj"),
-        }}
-        onMudanca={onMudanca}
-      />,
-    );
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    buscar("Pessoa");
-    await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith(
-        expect.objectContaining({ busca: "Pessoa", pagina: 1 }),
-        expect.anything(),
-      ),
-    );
-
-    fireEvent.change(seletorDoTamanho(), { target: { value: "100" } });
-
-    expect(onMudanca).toHaveBeenLastCalledWith({
-      ...ESTADO_PADRAO,
-      aba: "todos",
-      pagina: 1,
-      filtros: soTipos("pj"),
-      tamanho: 100,
-    });
-    await waitFor(() =>
-      expect(listarColaboradores).toHaveBeenLastCalledWith(
-        {
-          pagina: 1,
-          tamanhoPagina: 100,
-          tipos: ["pj"],
-          busca: "Pessoa",
-        },
-        expect.anything(),
-      ),
-    );
-  });
-
+  // T215 — o seletor "Itens por página" saiu da tela (desenho da
+  // referência): trocar o tamanho pela tela deixou de existir; o tamanho
+  // do estado (URL) continua valendo.
   it("o tamanho vindo do shell (URL) vale já na primeira leitura", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       respostaDaPagina(pessoasSinteticas(100), 1, 250, 100),
@@ -6906,7 +6565,9 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
       { pagina: 1, tamanhoPagina: 100, grupo: "ativos" },
       expect.anything(),
     );
-    expect(seletorDoTamanho()).toHaveValue("100");
+    expect(
+      screen.queryByRole("combobox", { name: "Itens por página" }),
+    ).toBeNull();
     expect(navegacaoDaPaginacao()).toHaveTextContent("Página 1 de 3");
   });
 
@@ -6924,12 +6585,12 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
   });
 });
 
-describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)", () => {
+describe("T209/T215 — Bloco A: paginação numerada e 'N resultados' (C-3)", () => {
   beforeEach(() => {
     vi.mocked(listarColaboradores).mockClear();
   });
 
-  it("mostra o intervalo exibido e o total da consulta", async () => {
+  it("mostra o total da consulta e a posição na paginação", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       respostaDaPagina(pessoasSinteticas(20, 20), 2, 45),
     );
@@ -6939,12 +6600,11 @@ describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)"
         onMudanca={vi.fn()}
       />,
     );
-    expect(
-      await screen.findByText("Mostrando 21–40 de 45 colaboradores"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("45 resultados")).toBeInTheDocument();
+    expect(navegacaoDaPaginacao()).toHaveTextContent("Página 2 de 3");
   });
 
-  it("na última página, o intervalo termina no total; um só item diz 'de 1 colaborador'", async () => {
+  it("na última página, a posição é a última; um só item diz '1 resultado'", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       respostaDaPagina(pessoasSinteticas(5, 40), 3, 45),
     );
@@ -6954,18 +6614,15 @@ describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)"
         onMudanca={vi.fn()}
       />,
     );
-    expect(
-      await screen.findByText("Mostrando 41–45 de 45 colaboradores"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("45 resultados")).toBeInTheDocument();
+    expect(navegacaoDaPaginacao()).toHaveTextContent("Página 3 de 3");
     unmount();
 
     vi.mocked(listarColaboradores).mockResolvedValue(
       respostaDaPagina(pessoasSinteticas(1), 1, 1),
     );
     render(<ColaboradoresScreen />);
-    expect(
-      await screen.findByText("Mostrando 1–1 de 1 colaborador"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("1 resultado")).toBeInTheDocument();
   });
 
   it("botões numerados, com a página atual marcada, e primeira e última página", async () => {
@@ -7162,7 +6819,7 @@ describe("T209 — Bloco A: leituras antigas canceladas", () => {
     vi.mocked(listarColaboradores).mockClear();
   });
 
-  it("trocar página, tamanho, aba, filtro ou busca cancela a leitura anterior", async () => {
+  it("trocar página, aba ou busca cancela a leitura anterior (T215: sem seletor de tamanho)", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(
       respostaDaPagina(pessoasSinteticas(20), 1, 100),
     );
@@ -7176,7 +6833,7 @@ describe("T209 — Bloco A: leituras antigas canceladas", () => {
     await waitFor(() =>
       expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(2),
     );
-    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    abrirAba("Desligados");
     await waitFor(() =>
       expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(3),
     );
@@ -7222,9 +6879,9 @@ describe("T209 — Bloco A: leituras antigas canceladas", () => {
       expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(2),
     );
     vi.mocked(listarColaboradores).mockResolvedValue(
-      respostaDaPagina(pessoasSinteticas(50), 1, 100, 50),
+      respostaDaPagina(pessoasSinteticas(20), 1, 100),
     );
-    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
+    abrirAba("Todos");
     await waitFor(() =>
       expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(3),
     );
@@ -7232,9 +6889,7 @@ describe("T209 — Bloco A: leituras antigas canceladas", () => {
     await act(async () => {
       rejeitar(new DOMException("Cancelada.", "AbortError"));
     });
-    expect(
-      await screen.findByText("Mostrando 1–50 de 100 colaboradores"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("100 resultados")).toBeInTheDocument();
     expect(
       screen.queryByText("Não foi possível carregar os colaboradores"),
     ).toBeNull();
@@ -7264,18 +6919,7 @@ describe("T209 — Bloco A: leituras antigas canceladas", () => {
   });
 });
 
-describe("T209 — Bloco A: aviso de auditoria fiel (C-6)", () => {
-  it("diz só o que é auditado: admissões, alterações e a leitura de contatos", async () => {
-    render(<ColaboradoresScreen />);
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    const aviso = document.getElementById("colaboradores-aviso-rh-titulo")!;
-    expect(aviso).toHaveTextContent(
-      "Admissões, alterações e a leitura de contatos geram trilha de auditoria; o suporte técnico apenas consulta.",
-    );
-    // A listagem não é auditada para RH e DP: o aviso não pode dizer isso.
-    expect(aviso.textContent).not.toMatch(/Consulta e altera/);
-  });
-});
+// T215 — o aviso "RH e DP" (C-6) saiu da página, como na referência.
 
 // ---------------------------------------------------------------------------
 // T209 — Bloco B: menu "Ações" por linha. T215 — o "⋯" da linha com "Ver
@@ -7566,7 +7210,7 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     },
   };
 
-  it("cabeçalho: título, descrição curta e só a ação que existe (sem exportar)", async () => {
+  it("T215 — cabeçalho: título, a descrição da referência, Exportar e Novo colaborador", async () => {
     render(<ColaboradoresScreen onNovaAdmissao={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const titulo = screen.getByRole("heading", {
@@ -7575,16 +7219,16 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     });
     const cabecalho = titulo.closest(".evolli-page-header") as HTMLElement;
     expect(cabecalho).toHaveTextContent(
-      "Quem está ativo, em admissão ou desligado, com a ficha de cada pessoa a um clique.",
+      "Gerencie contratos, dados e documentos do time.",
     );
     expect(
-      within(cabecalho).getByRole("button", { name: /Adicionar colaborador/ }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /export/i })).toBeNull();
-    expect(screen.queryByRole("link", { name: /export/i })).toBeNull();
+      within(cabecalho)
+        .getAllByRole("button")
+        .map((b) => b.textContent?.trim()),
+    ).toEqual(["Exportar", "Novo colaborador"]);
   });
 
-  it("faixa: 'Ativos' em destaque, os demais totais como fatos, e a distribuição ao lado", async () => {
+  it("T215 — três cartões, na ordem da referência", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([colaborador1]),
       contadores: CONTADORES_REAIS,
@@ -7595,34 +7239,25 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
       />,
     );
     const regiao = await screen.findByRole("region", {
-      name: "Totais de Empresa Teste A, sem filtros",
+      name: "Resumo de colaboradores",
     });
     await waitFor(() =>
       expect(
-        regiao.querySelector(".colaboradores-screen__cartao--destaque dd"),
+        within(regiao).getByRole("group", { name: "Colaboradores ativos" }),
       ).toHaveTextContent("7"),
     );
-    const faixa = regiao.querySelector(".colaboradores-screen__faixa")!;
-    expect(faixa).not.toBeNull();
-    // Dois painéis, na ordem: totais e distribuição.
-    expect([...faixa.children].map((p) => p.className.split(" ")[0])).toEqual([
-      "colaboradores-screen__painel-totais",
-      "colaboradores-screen__distribuicao",
-    ]);
-    const destaque = regiao.querySelector(
-      ".colaboradores-screen__cartao--destaque",
-    )!;
-    expect(destaque.querySelector("dt")).toHaveTextContent("Ativos");
     expect(
-      [
-        ...regiao.querySelectorAll(
-          ".colaboradores-screen__cartao:not(.colaboradores-screen__cartao--destaque) dt",
-        ),
-      ].map((dt) => dt.textContent),
-    ).toEqual(["Em admissão", "Desligados", "Total nesta empresa"]);
+      within(regiao)
+        .getAllByRole("group")
+        .map((g) => g.querySelector("h3")?.textContent),
+    ).toEqual([
+      "Colaboradores ativos",
+      "Por tipo de contrato",
+      "Ausentes hoje",
+    ]);
   });
 
-  it("nada de indicador, aba ou ação sem contrato: salário, CPF, contato, exportação, calendário; sem destino, sem Organograma", async () => {
+  it("T215 — o que a referência tem: Exportar e Ausentes hoje; sem destino, sem Organograma; sem 'Em admissão'", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([colaborador1]),
       contadores: CONTADORES_REAIS,
@@ -7632,25 +7267,15 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const visivel = document.body.textContent ?? "";
-    for (const proibido of [
-      /ausente/i,
-      /sal[aá]rio/i,
-      /\bCPF\b/,
-      /telefone/i,
-      /e-mail/i,
-      /exportar/i,
-      /organograma/i,
-      /calend[aá]rio/i,
-    ]) {
-      expect(visivel).not.toMatch(proibido);
-    }
+    expect(visivel).toMatch(/Ausentes hoje/);
+    expect(visivel).toMatch(/Exportar/);
+    expect(visivel).not.toMatch(/organograma/i);
     expect(
       within(screen.getByRole("tablist", { name: "Grupos de colaboradores" }))
         .getAllByRole("tab")
         .map((t) => t.textContent?.replace(/\d+$/, "")),
     ).toEqual([
       "Ativos",
-      "Em admissão",
       "Férias e ausências",
       "Escala de trabalho",
       "Desligados",
@@ -7658,19 +7283,22 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     ]);
   });
 
-  it("a barra de busca e filtros mantém rótulos, ordem e o botão de buscar", async () => {
+  it("T215 — a barra de busca e filtros: o campo com o nome da referência e só o botão Filtrar", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const barra = document.querySelector(".colaboradores-screen__filtros")!;
+    expect(barra.querySelectorAll("label")).toHaveLength(0);
     expect(
-      [...barra.querySelectorAll("label")].map((l) => l.textContent),
-    ).toEqual(["Buscar por nome ou matrícula"]);
+      within(barra as HTMLElement).getByRole("searchbox", {
+        name: "Buscar por nome, CPF, e-mail ou ID",
+      }),
+    ).toHaveAttribute("placeholder", "Buscar por nome, CPF, e-mail ou ID");
     // T215 — os filtros moram na gaveta: na barra, só o botão "Filtrar".
     expect(
       within(barra as HTMLElement)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["Buscar", "Filtrar"]);
+    ).toEqual(["Filtrar"]);
     expect(
       within(barra as HTMLElement).getByRole("button", { name: "Filtrar" }),
     ).toHaveAttribute("aria-haspopup", "dialog");
@@ -7819,7 +7447,7 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
     ).toBeInTheDocument();
   });
 
-  it("a coluna Tipo e a distribuição mostram 'Aprendiz', com a cor própria", async () => {
+  it("o contrato da linha e o cartão por tipo mostram 'Aprendiz', com a cor própria (T215)", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([APRENDIZ]),
       contadores: {
@@ -7843,37 +7471,32 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
     });
     const linha = within(tabela).getByText("Teste Aprendiz Um").closest("tr")!;
     expect(within(linha).getByText("Aprendiz")).toBeInTheDocument();
-    const legenda = document.querySelector(
-      ".colaboradores-screen__legenda-tipos",
-    )!;
+    const tipos = screen.getByRole("group", { name: "Por tipo de contrato" });
     expect(
-      [...legenda.querySelectorAll("li")].map((li) => li.textContent),
-    ).toEqual(["CLT: 2", "Estágio: 1", "Aprendiz: 3"]);
+      within(tipos)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["CLT 2", "PJ 0", "Estágio 1", "Aprendiz 3", "Outros 0"]);
     expect(
-      document.querySelector(
-        ".colaboradores-screen__barra-tipos .colaboradores-screen__barra-tipo--aprendiz",
+      tipos.querySelector(
+        ".colaboradores-screen__barra-contratos .colaboradores-screen__grupo-contrato--aprendiz",
       ),
     ).not.toBeNull();
   });
 });
 
 describe("T209 — Colaboradores sobre a camada de interface (src/ui)", () => {
-  it("busca, filtros e tamanho de página são os controles nativos da camada", async () => {
+  it("busca e filtros são os controles nativos da camada (T215: sem seletor de tamanho)", async () => {
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(
-      screen.getByRole("searchbox", { name: "Buscar por nome ou matrícula" }),
-    ).toHaveAttribute("data-ui", "input");
-    const controle = screen.getByLabelText("Itens por página");
-    expect(controle.tagName).toBe("SELECT");
-    expect(controle).toHaveAttribute("data-ui", "select");
+    expect(campoBusca()).toHaveAttribute("data-ui", "input");
     // T215 — a gaveta "Filtrar" é o Sheet da camada (role dialog, modal).
     const gaveta = await abrirGaveta();
     expect(gaveta).toHaveAttribute("aria-modal", "true");
     expect(gaveta).toHaveAttribute("data-lado", "direita");
   });
 
-  it("abas, indicadores e tabela vêm da camada, com as mesmas classes e semântica", async () => {
+  it("abas e tabela vêm da camada, com as mesmas classes e semântica", async () => {
     render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
@@ -7883,12 +7506,7 @@ describe("T209 — Colaboradores sobre a camada de interface (src/ui)", () => {
     ).getAllByRole("tab");
     expect(abas[0]).toHaveAttribute("data-state", "active");
     expect(abas[1]).toHaveAttribute("data-state", "inactive");
-    const indicadores = document.querySelector(
-      ".colaboradores-screen__indicadores",
-    )!;
-    expect(indicadores.className).toMatch(
-      /ev:border-\[var\(--divisor-cor-forte\)\]/,
-    );
+    // T215 — os cartões saíram do Card da camada: são a faixa da referência.
     expect(tabela.closest('[role="region"]')).toHaveClass("evolli-datatable");
     expect(within(tabela).getAllByRole("columnheader")[0]).toHaveAttribute(
       "scope",
@@ -7900,7 +7518,7 @@ describe("T209 — Colaboradores sobre a camada de interface (src/ui)", () => {
     render(<ColaboradoresScreen onNovaAdmissao={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     fireEvent.click(
-      screen.getAllByRole("button", { name: /Adicionar colaborador/ })[0]!,
+      screen.getAllByRole("button", { name: /Novo colaborador/ })[0]!,
     );
     const painel = await screen.findByRole("dialog", {
       name: "Adicionar colaborador",
@@ -8107,12 +7725,11 @@ describe("T215 — abas da listagem", () => {
       .getAllByRole("tab")
       .map((t) => t.textContent?.replace(/\d+$/, ""));
 
-  it("com destino para o Organograma: sete abas, na ordem", async () => {
+  it("com destino para o Organograma: seis abas, na ordem (T215: sem Em admissão)", async () => {
     render(<ColaboradoresScreen onAbrirOrganograma={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(nomesDasAbas()).toEqual([
       "Ativos",
-      "Em admissão",
       "Férias e ausências",
       "Escala de trabalho",
       "Organograma",

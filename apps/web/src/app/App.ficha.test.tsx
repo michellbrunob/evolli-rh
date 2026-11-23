@@ -630,7 +630,7 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
 });
 
 describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
-  it("Horário de trabalho: o nome na linha abre a ficha, na rota dela", async () => {
+  it("Horário de trabalho (aba Escala de trabalho): o nome na linha abre a ficha, na rota dela", async () => {
     vi.mocked(listarVinculosHorario).mockResolvedValue(
       paginado([
         {
@@ -655,7 +655,9 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
     );
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    // T215 — sem a faixa de seções na página: a visão de horários é a aba
+    // Escala de trabalho da lista.
+    fireEvent.click(screen.getByRole("tab", { name: /^Escala de trabalho/ }));
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -667,11 +669,11 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(rotaDe(ana));
 
-    // Voltar devolve à mesma aba de Pessoas de onde se veio.
+    // Voltar devolve à mesma aba de onde se veio.
     fireEvent.click(voltarPelaTrilha());
     expect(
       await screen.findByRole("tab", {
-        name: "Horário de trabalho",
+        name: /^Escala de trabalho/,
         selected: true,
       }),
     ).toBeInTheDocument();
@@ -727,10 +729,11 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     await waitFor(() =>
       expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`),
     );
-    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
-      target: { value: "Ana MAT-0001" },
+    const busca = screen.getByRole("searchbox", {
+      name: "Buscar por nome, CPF, e-mail ou ID",
     });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    fireEvent.change(busca, { target: { value: "Ana MAT-0001" } });
+    fireEvent.submit(busca.closest("form")!);
     await waitFor(() => expect(ultimaConsulta().busca).toBe("Ana MAT-0001"));
     expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`);
     expect(window.location.href).not.toMatch(/Ana|MAT-0001|busca/);
@@ -947,6 +950,21 @@ describe("T200 — guarda de saída no App", () => {
         <App papelDoAtor={papel} />
       </ComGuardaDeSaida>,
     );
+  }
+  /**
+   * T215 — a faixa de seções de Pessoas não aparece na página de
+   * Colaboradores: entra-se nela pelo atalho da Vida funcional da ficha
+   * (abre o Histórico funcional, onde a faixa aparece).
+   */
+  async function entrarNasSecoesDePessoas() {
+    window.history.replaceState(null, "", `/${rotaDe(ana, "vida-funcional")}`);
+    montarComGuarda();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Abrir no Histórico funcional",
+      }),
+    );
+    return screen.findByRole("tablist", { name: "Seções de Pessoas" });
   }
   const pergunta = () =>
     screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
@@ -1183,10 +1201,7 @@ describe("T200 — guarda de saída no App", () => {
         },
       ]) as never,
     );
-    window.history.replaceState(null, "", `/${LISTAGEM}`);
-    montarComGuarda();
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
+    const abas = await entrarNasSecoesDePessoas();
     fireEvent.click(
       within(abas).getByRole("tab", { name: "Horário de trabalho" }),
     );
@@ -1648,10 +1663,7 @@ describe("T200 — guarda de saída no App", () => {
 
     it("B5 — Pessoas › Horário de trabalho: o item já ativo não troca a aba, então não pergunta", async () => {
       comJornadaAtiva();
-      window.history.replaceState(null, "", `/${LISTAGEM}`);
-      montarComGuarda();
-      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
-      const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
+      const abas = await entrarNasSecoesDePessoas();
       fireEvent.click(
         within(abas).getByRole("tab", { name: "Horário de trabalho" }),
       );
@@ -2822,46 +2834,20 @@ function abrirMenuDaLinha(botao: HTMLElement) {
 }
 
 describe("T209 — tamanho da página e atalhos da linha no shell", () => {
-  const seletorDoTamanho = () =>
-    screen.getByRole("combobox", { name: "Itens por página" });
   const ultimaConsulta = () =>
     vi.mocked(listarColaboradores).mock.lastCall?.[0] ?? {};
 
-  it("trocar o tamanho empilha a URL canônica; recarregar mantém; 20 sai da URL", async () => {
-    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&pagina=2`);
-    const { unmount } = render(<App papelDoAtor="rh" />);
-    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
-    // Empilhar é `pushState` com a URL nova (o tamanho do histórico depende
-    // da ordem dos testes: entradas à frente são truncadas).
-    const empilhar = vi.spyOn(window.history, "pushState");
-
-    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
-    await waitFor(() =>
-      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`),
-    );
-    expect(empilhar).toHaveBeenCalledWith(
-      expect.anything(),
-      "",
-      expect.stringContaining(`${LISTAGEM}?aba=todos&tamanho=50`),
-    );
-    empilhar.mockRestore();
-    await waitFor(() =>
-      expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 }),
-    );
-    const url = window.location.hash;
-    unmount();
-
-    vi.mocked(listarColaboradores).mockClear();
-    window.history.replaceState(null, "", `/${url}`);
+  // T215 — o seletor "Itens por página" saiu da tela (desenho da
+  // referência); o tamanho continua valendo pela URL.
+  it("o tamanho da URL vale ao abrir e ao recarregar, sem seletor na tela", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&tamanho=50`);
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
-    expect(seletorDoTamanho()).toHaveValue("50");
-    expect(ultimaConsulta()).toMatchObject({ tamanhoPagina: 50 });
-
-    fireEvent.change(seletorDoTamanho(), { target: { value: "20" } });
-    await waitFor(() =>
-      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
-    );
+    expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 });
+    expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`);
+    expect(
+      screen.queryByRole("combobox", { name: "Itens por página" }),
+    ).toBeNull();
   });
 
   it("tamanho inválido na URL cai em 20 e é corrigido no lugar; nada inválido vira consulta", async () => {
