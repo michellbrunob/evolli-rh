@@ -109,6 +109,14 @@ import {
   TabsTrigger,
 } from "../../ui";
 import "./ColaboradoresScreen.css";
+import {
+  CartoesDeAusencias,
+  FeriasEAusenciasAba,
+} from "./ferias/FeriasEAusenciasAba";
+import type {
+  IndicadoresDeAusencias,
+  ServicoDeAusencias,
+} from "./ferias/tiposAusencia";
 import { FotoDoColaborador } from "./FotoDoColaborador";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
@@ -411,6 +419,14 @@ export interface ColaboradoresScreenProps {
   ) => void;
   /** T183/T199 — a aba de jornada opera só para o RH. */
   readonly podeOperarJornada?: boolean;
+  /**
+   * T215 — Férias e ausências: as chamadas ao servidor e quem registra e
+   * decide. Sem serviço, a aba só avisa que o módulo não está disponível.
+   */
+  readonly servicoDeAusencias?: ServicoDeAusencias;
+  readonly podeRegistrarAusencia?: boolean;
+  /** T215 — a engrenagem da aba leva às Políticas de férias. */
+  readonly onPoliticasDeFerias?: () => void;
 }
 
 /** T215 — os filtros da gaveta como a API os recebe (lista vazia: fora). */
@@ -603,7 +619,13 @@ export function ColaboradoresScreen({
   estado: estadoControlado,
   onEstadoChange,
   podeOperarJornada = false,
+  servicoDeAusencias,
+  podeRegistrarAusencia = false,
+  onPoliticasDeFerias,
 }: ColaboradoresScreenProps = {}) {
+  /** T215 — os números da aba Férias e ausências (cartões e aba). */
+  const [indicadoresDeAusencias, setIndicadoresDeAusencias] =
+    useState<IndicadoresDeAusencias | null>(null);
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
   const idDoPainel = `${prefixo}-painel`;
@@ -1652,7 +1674,9 @@ export function ColaboradoresScreen({
         >
           {anuncioTotais}
         </p>
-        {!temTabela && contadores === null && falhaContadores ? (
+        {aba === "ferias" && servicoDeAusencias ? (
+          <CartoesDeAusencias indicadores={indicadoresDeAusencias} />
+        ) : !temTabela && contadores === null && falhaContadores ? (
           <div className="colaboradores-screen__totais-falha">
             <p className="colaboradores-screen__totais-falha-texto">
               Não foi possível carregar os totais de colaboradores.
@@ -1715,7 +1739,12 @@ export function ColaboradoresScreen({
             (a) => a !== "em-admissao" || aba === "em-admissao",
           ).map((a) => {
             const selecionada = a === aba;
-            const numero = contadores ? totalDaAba(a, contadores) : null;
+            const numero =
+              a === "ferias" && indicadoresDeAusencias
+                ? indicadoresDeAusencias.pendentes
+                : contadores
+                  ? totalDaAba(a, contadores)
+                  : null;
             return (
               <Fragment key={a}>
                 <TabsTrigger
@@ -1770,9 +1799,18 @@ export function ColaboradoresScreen({
           labelledBy={idDaAba(aba)}
           className="colaboradores-screen__painel-conteudo"
         >
-          {aba === "ferias" ? (
-            /* T215 — o módulo de Férias e ausências chega na próxima
-               entrega; até lá, a aba só diz isso. */
+          {aba === "ferias" && servicoDeAusencias ? (
+            /* T215 — o módulo de Férias e ausências. */
+            <FeriasEAusenciasAba
+              servico={servicoDeAusencias}
+              podeRegistrar={podeRegistrarAusencia}
+              podeDecidir={podeRegistrarAusencia}
+              onIndicadores={setIndicadoresDeAusencias}
+              {...(onPoliticasDeFerias
+                ? { onPoliticas: onPoliticasDeFerias }
+                : {})}
+            />
+          ) : aba === "ferias" ? (
             <div className="colaboradores-screen__aba-em-breve">
               <h2>Férias e ausências</h2>
               <p>

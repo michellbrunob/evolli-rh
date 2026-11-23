@@ -63,6 +63,7 @@ import {
   PessoasHorarioScreen,
 } from "./PessoasHorarioScreen";
 import type { ColaboradoresScreenProps } from "./ColaboradoresScreen";
+import { servicoDeAusenciasDoServidor } from "./ferias/servicoDeAusenciasDoServidor";
 import {
   EDITAR_COLABORADOR_TITULO_ID,
   EditarColaboradorScreen,
@@ -510,6 +511,8 @@ export function PessoasScreen({
                     ? { estado: listagem, onEstadoChange: onListagemChange }
                     : {})}
                   podeOperarJornada={podeOperarJornada}
+                  servicoDeAusencias={servicoDeAusenciasDoServidor}
+                  podeRegistrarAusencia={podeEditarFicha}
                 />
               ) : abaAtiva === "horario" ? (
                 <PessoasHorarioScreen
