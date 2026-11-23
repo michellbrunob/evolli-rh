@@ -959,7 +959,7 @@ const TIPOS_DE_CONTRATACAO: readonly TipoVinculo[] = [
   "trainee",
 ];
 
-const OPCOES_NIVEL = [
+export const OPCOES_NIVEL = [
   { codigo: "sem_nivel", rotulo: "Sem nível" },
   { codigo: "primeiro_emprego", rotulo: "Primeiro emprego" },
   { codigo: "junior", rotulo: "Júnior" },
@@ -1196,7 +1196,7 @@ const CHAVES_IDENTIFICACAO = Object.keys(
 ) as ChaveIdentificacao[];
 
 /** Gênero em lista fechada (o código vai ao servidor). */
-const OPCOES_GENERO = [
+export const OPCOES_GENERO = [
   { codigo: "feminino", rotulo: "Feminino" },
   { codigo: "masculino", rotulo: "Masculino" },
   { codigo: "outro", rotulo: "Outro" },

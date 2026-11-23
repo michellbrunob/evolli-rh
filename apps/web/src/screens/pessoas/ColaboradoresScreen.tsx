@@ -27,24 +27,39 @@ import {
   listarColaboradores,
 } from "../../api/colaboradoresClient";
 import {
-  type DepartamentoApi,
+  listarAreas,
+  listarCentrosCusto,
   listarDepartamentos,
+  listarUnidades,
 } from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { listarCargos } from "../../api/cargoClient";
 import {
   type AbaDaFicha,
   type AbaDaListagem,
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type TipoDeVinculo,
+  type FiltrosDaListagem,
   ABAS_DA_LISTAGEM,
   ESTADO_INICIAL_DA_LISTAGEM,
+  FILTROS_VAZIOS,
   TAMANHOS_DE_PAGINA,
   TIPOS_DE_VINCULO,
   abaTemLotacao,
   abaTemTabela,
   normalizarEstadoDaListagem,
+  quantidadeDeFiltros,
 } from "../../app/rotasDoShell";
+import {
+  type CatalogosDaGaveta,
+  type GrupoDeCatalogo,
+  FALHA_DOS_CATALOGOS,
+  GRUPOS_DE_CATALOGO,
+  GavetaDeFiltros,
+  ROTULO_DO_GRUPO,
+  rotuloDaReferencia,
+} from "./GavetaDeFiltros";
+import { OPCOES_GENERO, OPCOES_NIVEL } from "./NovaAdmissaoScreen";
 import { formatarDiaCivil } from "../../format/data";
 import { exibirMatricula } from "../../format/matricula";
 import {
@@ -103,22 +118,15 @@ export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
  * Nada de CPF, salário ou contatos na visão coletiva.
  */
 
-/**
- * T190 — catálogos dos filtros de lotação: só departamentos e cargos ATIVOS
- * da empresa ativa (o servidor escopa pela sessão). Uma página de 100, o
- * limite já registrado para os catálogos organizacionais.
- */
-type CatalogosDeLotacao =
-  | { readonly status: "carregando" }
-  | { readonly status: "erro" }
-  | {
-      readonly status: "dados";
-      readonly departamentos: readonly DepartamentoApi[];
-      readonly cargos: readonly CargoApi[];
-    };
-
-function rotuloDaReferencia(ref: { nome: string; codigo: string }): string {
-  return `${ref.nome} (${ref.codigo})`;
+/** T215 — rótulos de nível e gênero: os mesmos do Novo colaborador. */
+function rotuloDoNivel(nivel: string): string {
+  return OPCOES_NIVEL.find((o) => o.codigo === nivel)?.rotulo ?? nivel;
+}
+function rotuloDoGenero(genero: string): string {
+  return OPCOES_GENERO.find((o) => o.codigo === genero)?.rotulo ?? genero;
+}
+function rotuloDoTipo(tipo: string): string {
+  return ROTULO_TIPO_DE_VINCULO[tipo as TipoDeVinculo] ?? tipo;
 }
 
 const ROTULO_DA_ABA: Readonly<Record<AbaDaListagem, string>> = {
@@ -206,14 +214,14 @@ const SITUACAO_DA_ABA: Readonly<
 function vinculoDaLinha(
   c: ColaboradorListadoApi,
   aba: AbaDaListagem,
-  tipo: TipoDeVinculo | null,
+  tipos: readonly TipoDeVinculo[],
 ): VinculoListadoApi | undefined {
   const situacao = SITUACAO_DA_ABA[aba];
   return (
     c.vinculos.find(
       (v) =>
         (situacao === undefined || v.situacao === situacao) &&
-        (tipo === null || v.tipo === tipo),
+        (tipos.length === 0 || tipos.includes(v.tipo)),
     ) ?? c.vinculos[0]
   );
 }
@@ -301,14 +309,18 @@ const ID_CAMPO_BUSCA = "colaboradores-busca";
 
 const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
 
-const FALHA_DOS_CATALOGOS = "Não foi possível carregar departamentos e cargos.";
+/** T215 — os grupos de lotação na gaveta: destino do foco na recarga. */
+const ID_GRUPOS_DE_LOTACAO = "colaboradores-gaveta-lotacao";
 
-/** A select de Departamento: destino do foco quando os catálogos voltam. */
-const ID_FILTRO_DEPARTAMENTO = "colaboradores-filtro-departamento";
+/** T215 — o botão "Filtrar": destino do foco quando o último chip sai. */
+const ID_BOTAO_FILTRAR = "colaboradores-filtrar";
 
-/** Os chips de filtro, na ordem em que aparecem. */
-const FILTROS_REMOVIVEIS = ["departamento", "cargo", "tipo"] as const;
-type FiltroRemovivel = (typeof FILTROS_REMOVIVEIS)[number];
+/** T215 — um valor de filtro aplicado: vira um chip removível. */
+interface FiltroAplicado {
+  readonly grupo: keyof FiltrosDaListagem;
+  readonly valor: string;
+  readonly texto: string;
+}
 
 const DESCRICAO_PAGINA_VAZIA =
   "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
@@ -339,9 +351,7 @@ function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
     a.aba === b.aba &&
     a.pagina === b.pagina &&
     a.tamanho === b.tamanho &&
-    a.departamentoId === b.departamentoId &&
-    a.cargoId === b.cargoId &&
-    a.tipo === b.tipo
+    JSON.stringify(a.filtros) === JSON.stringify(b.filtros)
   );
 }
 
@@ -466,6 +476,17 @@ function celulaDaJornada(
   );
 }
 
+/** T215 — os filtros da gaveta como a API os recebe (lista vazia: fora). */
+function consultaDosFiltros(
+  filtros: FiltrosDaListagem,
+): Partial<ListarColaboradoresQuery> {
+  const query: Partial<ListarColaboradoresQuery> = {};
+  for (const grupo of Object.keys(filtros) as (keyof FiltrosDaListagem)[]) {
+    if (filtros[grupo].length > 0) query[grupo] = filtros[grupo];
+  }
+  return query;
+}
+
 export function ColaboradoresScreen({
   empresaAtiva = null,
   onNovaAdmissao,
@@ -500,7 +521,11 @@ export function ColaboradoresScreen({
     },
     [onEstadoChange],
   );
-  const { aba, tipo, departamentoId, cargoId, tamanho } = estado;
+  const { aba, filtros, tamanho } = estado;
+  /** T215 — o mesmo conjunto de filtros dá sempre a mesma chave. */
+  const chaveDosFiltros = JSON.stringify(filtros);
+  /** T215 — a gaveta "Filtrar": só estado local. */
+  const [gavetaAberta, setGavetaAberta] = useState(false);
   const temTabela = abaTemTabela(aba);
 
   const [statusCarregamento, setStatusCarregamento] = useState<
@@ -517,7 +542,7 @@ export function ColaboradoresScreen({
    */
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
-  const [catalogos, setCatalogos] = useState<CatalogosDeLotacao>({
+  const [catalogos, setCatalogos] = useState<CatalogosDaGaveta>({
     status: "carregando",
   });
   const [tentativaCatalogos, setTentativaCatalogos] = useState(0);
@@ -528,6 +553,8 @@ export function ColaboradoresScreen({
    * falha é anunciada uma vez. A listagem não é relida por isso.
    */
   const [repetindoCatalogos, setRepetindoCatalogos] = useState(false);
+  /** T215 — a falha de uma recarga, anunciada dentro da gaveta. */
+  const [anuncioDosCatalogos, setAnuncioDosCatalogos] = useState("");
   const repetindoCatalogosRef = useRef(repetindoCatalogos);
   repetindoCatalogosRef.current = repetindoCatalogos;
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
@@ -616,11 +643,8 @@ export function ColaboradoresScreen({
         };
         const grupo = GRUPO_DA_ABA[consulta.aba];
         if (grupo) query.grupo = grupo;
-        if (consulta.tipo) query.tipoVinculo = consulta.tipo;
         if (busca) query.busca = busca;
-        if (consulta.departamentoId)
-          query.departamentoId = consulta.departamentoId;
-        if (consulta.cargoId) query.cargoId = consulta.cargoId;
+        Object.assign(query, consultaDosFiltros(consulta.filtros));
         const resp = await listarColaboradores(query, {
           signal: controle.signal,
         });
@@ -642,9 +666,7 @@ export function ColaboradoresScreen({
               anuncioDaPrimeiraPagina(
                 resp.total,
                 busca !== "",
-                consulta.tipo !== null ||
-                  consulta.departamentoId !== null ||
-                  consulta.cargoId !== null,
+                quantidadeDeFiltros(consulta.filtros) > 0,
               ),
             );
           }
@@ -688,33 +710,36 @@ export function ColaboradoresScreen({
    * servidor decide (o escopo dele nunca devolve outra empresa).
    */
   const comLotacaoNaAba = abaTemLotacao(aba);
+  const comIdsDeCatalogo =
+    comLotacaoNaAba && GRUPOS_DE_CATALOGO.some((g) => filtros[g].length > 0);
   // Só a primeira leitura dos catálogos segura a tabela: uma recarga depois
   // de falha não relê a listagem (o servidor já decidiu sem os catálogos).
   const aguardandoCatalogos =
     tentativaCatalogos === 0 &&
-    comLotacaoNaAba &&
-    (departamentoId !== null || cargoId !== null) &&
+    comIdsDeCatalogo &&
     catalogos.status === "carregando";
-  const departamentoDesconhecido =
-    comLotacaoNaAba &&
-    departamentoId !== null &&
-    catalogos.status === "dados" &&
-    !catalogos.departamentos.some((d) => d.id === departamentoId);
-  const cargoDesconhecido =
-    comLotacaoNaAba &&
-    cargoId !== null &&
-    catalogos.status === "dados" &&
-    !catalogos.cargos.some((c) => c.id === cargoId);
-  const lotacaoDesconhecida = departamentoDesconhecido || cargoDesconhecido;
+  // T215 — os filtros com os ids conferidos nos 5 catálogos.
+  const filtrosConferidos: FiltrosDaListagem | null =
+    comIdsDeCatalogo && catalogos.status === "dados"
+      ? GRUPOS_DE_CATALOGO.reduce<FiltrosDaListagem>(
+          (acc, g) => ({
+            ...acc,
+            [g]: filtros[g].filter((id) =>
+              catalogos[g].some((r) => r.id === id),
+            ),
+          }),
+          filtros,
+        )
+      : null;
+  const lotacaoDesconhecida =
+    filtrosConferidos !== null &&
+    GRUPOS_DE_CATALOGO.some(
+      (g) => filtrosConferidos[g].length !== filtros[g].length,
+    );
   useEffect(() => {
-    if (!lotacaoDesconhecida) return;
+    if (!lotacaoDesconhecida || filtrosConferidos === null) return;
     mudarEstado(
-      {
-        ...estado,
-        pagina: 1,
-        departamentoId: departamentoDesconhecido ? null : departamentoId,
-        cargoId: cargoDesconhecido ? null : cargoId,
-      },
+      { ...estado, pagina: 1, filtros: filtrosConferidos },
       { substituir: true },
     );
     // A cada estado novo vindo do shell, não só na primeira descoberta: se a
@@ -730,11 +755,14 @@ export function ColaboradoresScreen({
     const daAcaoDoVazio = cargaDaAcaoRef.current;
     cargaDaAcaoRef.current = false;
     void carregarDados(
-      { aba, pagina: estado.pagina, tamanho, departamentoId, cargoId, tipo },
+      { aba, pagina: estado.pagina, tamanho, filtros },
       buscaAplicada,
       false,
       daAcaoDoVazio,
     );
+    // `filtros` entra pela chave: um objeto novo com os mesmos valores não
+    // relê.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     temTabela,
     aguardandoCatalogos,
@@ -742,9 +770,7 @@ export function ColaboradoresScreen({
     aba,
     estado.pagina,
     tamanho,
-    departamentoId,
-    cargoId,
-    tipo,
+    chaveDosFiltros,
     buscaAplicada,
     carregarDados,
   ]);
@@ -812,26 +838,33 @@ export function ColaboradoresScreen({
   }, [atualizacao, carregarDados]);
 
   // T190 — catálogos dos filtros de lotação: uma leitura por montagem (e a
-  // cada "Recarregar"), só ativos.
+  // cada "Recarregar"), só ativos. T215 — os 5 catálogos da gaveta.
   useEffect(() => {
     let vigente = true;
     setCatalogos({ status: "carregando" });
+    const consulta = { status: "ativo", tamanhoPagina: 100 } as const;
+    const ativos = (itens: readonly { status: string }[] | undefined) =>
+      (itens ?? []).filter((r) => r.status === "ativo");
     Promise.all([
-      listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
-      listarCargos({ status: "ativo", tamanhoPagina: 100 }),
+      listarDepartamentos(consulta),
+      listarAreas(consulta),
+      listarCentrosCusto(consulta),
+      listarUnidades(consulta),
+      listarCargos(consulta),
     ])
-      .then(([departamentos, cargos]) => {
+      .then(([departamentos, areas, centrosCusto, unidades, cargos]) => {
         if (!vigente) return;
         setCatalogos({
           status: "dados",
-          departamentos: departamentos.itens.filter(
-            (d) => d.status === "ativo",
-          ),
-          cargos: cargos.itens.filter((c) => c.status === "ativo"),
+          departamentos: ativos(departamentos.itens) as never,
+          areas: ativos(areas.itens) as never,
+          centrosCusto: ativos(centrosCusto.itens) as never,
+          unidades: ativos(unidades.itens) as never,
+          cargos: ativos(cargos.itens) as never,
         });
         if (repetindoCatalogosRef.current) {
           setRepetindoCatalogos(false);
-          setFocoPendente(ID_FILTRO_DEPARTAMENTO);
+          setFocoPendente(ID_GRUPOS_DE_LOTACAO);
         }
       })
       .catch(() => {
@@ -839,7 +872,7 @@ export function ColaboradoresScreen({
         setCatalogos({ status: "erro" });
         if (repetindoCatalogosRef.current) {
           setRepetindoCatalogos(false);
-          setAnuncioDaLista(FALHA_DOS_CATALOGOS);
+          setAnuncioDosCatalogos(FALHA_DOS_CATALOGOS);
         }
       });
     return () => {
@@ -850,20 +883,69 @@ export function ColaboradoresScreen({
   const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
   const comLotacao = abaTemLotacao(aba);
-  const temFiltroDeLotacao =
-    comLotacao && (departamentoId !== null || cargoId !== null);
-  const temFiltro = temFiltroDeLotacao || tipo !== null;
+  const quantosFiltros = quantidadeDeFiltros(filtros);
+  const temFiltro = quantosFiltros > 0;
   const filtrando = temFiltro || buscaAplicada !== "";
   const onde = empresaAtiva ? "nesta empresa" : "no seu escopo";
 
-  const departamentoFiltrado =
-    catalogos.status === "dados"
-      ? catalogos.departamentos.find((d) => d.id === departamentoId)
-      : undefined;
-  const cargoFiltrado =
-    catalogos.status === "dados"
-      ? catalogos.cargos.find((c) => c.id === cargoId)
-      : undefined;
+  /** T215 — cada valor aplicado, na ordem dos grupos da gaveta. */
+  const nomeNoCatalogo = (grupo: GrupoDeCatalogo, id: string) => {
+    const ref =
+      catalogos.status === "dados"
+        ? catalogos[grupo].find((r) => r.id === id)
+        : undefined;
+    return ref ? rotuloDaReferencia(ref) : "selecionado";
+  };
+  const filtrosAplicados: FiltroAplicado[] = [
+    ...GRUPOS_DE_CATALOGO.flatMap((g) =>
+      filtros[g].map((id) => ({
+        grupo: g,
+        valor: id,
+        texto: `${ROTULO_DO_GRUPO[g]}: ${nomeNoCatalogo(g, id)}`,
+      })),
+    ),
+    ...filtros.niveis.map((n) => ({
+      grupo: "niveis" as const,
+      valor: n,
+      texto: `Nível: ${rotuloDoNivel(n)}`,
+    })),
+    ...filtros.tipos.map((t) => ({
+      grupo: "tipos" as const,
+      valor: t,
+      texto: `Tipo: ${rotuloDoTipo(t)}`,
+    })),
+    ...filtros.generos.map((g) => ({
+      grupo: "generos" as const,
+      valor: g,
+      texto: `Gênero: ${rotuloDoGenero(g)}`,
+    })),
+  ];
+
+  /** T215 — quantos o rascunho da gaveta traria (aba e busca aplicadas). */
+  const contarNaGaveta = useCallback(
+    async (rascunho: FiltrosDaListagem, sinal: AbortSignal) => {
+      const query: ListarColaboradoresQuery = {
+        pagina: 1,
+        tamanhoPagina: 1,
+        ...consultaDosFiltros(
+          normalizarEstadoDaListagem({ ...estado, filtros: rascunho }).filtros,
+        ),
+      };
+      const grupo = GRUPO_DA_ABA[aba];
+      if (grupo) query.grupo = grupo;
+      if (buscaAplicada) query.busca = buscaAplicada;
+      const resp = await listarColaboradores(query, { signal: sinal });
+      return resp.total;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aba, buscaAplicada, estado.tamanho],
+  );
+
+  /** T215 — "Ver N resultados": uma única mudança, na página 1. */
+  function aplicarFiltros(rascunho: FiltrosDaListagem) {
+    setGavetaAberta(false);
+    mudarEstado({ ...estado, pagina: 1, filtros: rascunho });
+  }
 
   /**
    * T199 — dispara a ação de um estado vazio: congela o estado vazio como
@@ -889,34 +971,33 @@ export function ColaboradoresScreen({
   function recarregarCatalogos() {
     if (repetindoCatalogos) return;
     // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
-    setAnuncioDaLista("");
+    setAnuncioDosCatalogos("");
     setRepetindoCatalogos(true);
     setTentativaCatalogos((n) => n + 1);
   }
 
-  const idDoChip = (filtro: FiltroRemovivel) => `${prefixo}-chip-${filtro}`;
+  const idDoChip = (f: Pick<FiltroAplicado, "grupo" | "valor">) =>
+    `${prefixo}-chip-${f.grupo}-${f.valor}`;
 
   /**
    * T199 — remove um filtro pelo chip (uma única mudança de estado). O chip
    * some: o foco vai ao chip seguinte, ou ao anterior, ou ao campo de busca.
+   * T215 — um chip por valor.
    */
-  function removerFiltro(filtro: FiltroRemovivel) {
-    const presentes = FILTROS_REMOVIVEIS.filter((f) =>
-      f === "tipo"
-        ? tipo !== null
-        : temFiltroDeLotacao &&
-          (f === "departamento" ? departamentoId : cargoId) !== null,
+  function removerFiltro(filtro: FiltroAplicado) {
+    const i = filtrosAplicados.findIndex(
+      (f) => f.grupo === filtro.grupo && f.valor === filtro.valor,
     );
-    const i = presentes.indexOf(filtro);
-    const destino = presentes[i + 1] ?? presentes[i - 1];
+    const destino = filtrosAplicados[i + 1] ?? filtrosAplicados[i - 1];
     mudarEstado({
       ...estado,
       pagina: 1,
-      ...(filtro === "departamento"
-        ? { departamentoId: null }
-        : filtro === "cargo"
-          ? { cargoId: null }
-          : { tipo: null }),
+      filtros: {
+        ...filtros,
+        [filtro.grupo]: (filtros[filtro.grupo] as readonly string[]).filter(
+          (v) => v !== filtro.valor,
+        ),
+      },
     });
     setFocoPendente(destino ? idDoChip(destino) : ID_CAMPO_BUSCA);
   }
@@ -1003,13 +1084,7 @@ export function ColaboradoresScreen({
    * devolveria os filtros que a primeira tirou.
    */
   function limparBuscaEFiltros() {
-    mudarEstado({
-      ...estado,
-      pagina: 1,
-      departamentoId: null,
-      cargoId: null,
-      tipo: null,
-    });
+    mudarEstado({ ...estado, pagina: 1, filtros: FILTROS_VAZIOS });
     setBuscaDigitada("");
     setBuscaAplicada("");
     campoBuscaRef.current?.focus();
@@ -1046,13 +1121,7 @@ export function ColaboradoresScreen({
                 rotulo: "Limpar filtros",
                 destinoDoFoco: ID_CAMPO_BUSCA,
               },
-              {
-                ...estado,
-                pagina: 1,
-                departamentoId: null,
-                cargoId: null,
-                tipo: null,
-              },
+              { ...estado, pagina: 1, filtros: FILTROS_VAZIOS },
             ),
         },
       };
@@ -1133,7 +1202,7 @@ export function ColaboradoresScreen({
       key: "matricula",
       header: "Matrícula",
       cell: (c) => {
-        const vinculo = vinculoDaLinha(c, aba, tipo);
+        const vinculo = vinculoDaLinha(c, aba, filtros.tipos);
         if (!vinculo) return "—";
         const aMais = c.vinculos.length - 1;
         return (
@@ -1161,24 +1230,25 @@ export function ColaboradoresScreen({
     {
       key: "cargo",
       header: "Cargo",
-      cell: (c) => celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "cargo"),
+      cell: (c) =>
+        celulaDaLotacao(vinculoDaLinha(c, aba, filtros.tipos), "cargo"),
     },
     {
       key: "departamento",
       header: "Departamento",
       cell: (c) =>
-        celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "departamento"),
+        celulaDaLotacao(vinculoDaLinha(c, aba, filtros.tipos), "departamento"),
     },
     {
       key: "jornada",
       header: "Jornada de trabalho",
-      cell: (c) => celulaDaJornada(vinculoDaLinha(c, aba, tipo), hoje),
+      cell: (c) => celulaDaJornada(vinculoDaLinha(c, aba, filtros.tipos), hoje),
     },
     {
       key: "tipo",
       header: "Tipo",
       cell: (c) => {
-        const vinculo = vinculoDaLinha(c, aba, tipo);
+        const vinculo = vinculoDaLinha(c, aba, filtros.tipos);
         return vinculo ? ROTULO_TIPO_DE_VINCULO[vinculo.tipo] : "—";
       },
     },
@@ -1204,7 +1274,8 @@ export function ColaboradoresScreen({
     {
       key: "admissao",
       header: "Admissão",
-      cell: (c) => formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataAdmissao),
+      cell: (c) =>
+        formatarDiaCivil(vinculoDaLinha(c, aba, filtros.tipos)?.dataAdmissao),
     },
     ...(aba === "desligados"
       ? [
@@ -1212,7 +1283,9 @@ export function ColaboradoresScreen({
             key: "desligamento",
             header: "Desligamento",
             cell: (c: ColaboradorListadoApi) =>
-              formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataDesligamento),
+              formatarDiaCivil(
+                vinculoDaLinha(c, aba, filtros.tipos)?.dataDesligamento,
+              ),
           },
         ]
       : []),
@@ -1535,119 +1608,51 @@ export function ColaboradoresScreen({
                   </div>
                 </form>
 
-                {/* T190 — lotação vigente: só existe em vínculo ativo, então
-                    só em Ativos e Todos. */}
-                {comLotacao ? (
-                  <>
-                    <FormField
-                      id="colaboradores-filtro-departamento"
-                      label="Departamento"
-                      {...(catalogos.status === "erro"
-                        ? {
-                            help: FALHA_DOS_CATALOGOS,
-                          }
-                        : {})}
-                    >
-                      {(control) => (
-                        <Select
-                          value={departamentoId ?? ""}
-                          onChange={(e) =>
-                            mudarEstado({
-                              ...estado,
-                              pagina: 1,
-                              departamentoId: e.target.value || null,
-                            })
-                          }
-                          disabled={catalogos.status !== "dados"}
-                          {...control}
-                        >
-                          <option value="">
-                            {catalogos.status === "carregando"
-                              ? "Carregando…"
-                              : "Todos os departamentos"}
-                          </option>
-                          {catalogos.status === "dados"
-                            ? catalogos.departamentos.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {rotuloDaReferencia(d)}
-                                </option>
-                              ))
-                            : null}
-                        </Select>
-                      )}
-                    </FormField>
-
-                    <FormField id="colaboradores-filtro-cargo" label="Cargo">
-                      {(control) => (
-                        <Select
-                          value={cargoId ?? ""}
-                          onChange={(e) =>
-                            mudarEstado({
-                              ...estado,
-                              pagina: 1,
-                              cargoId: e.target.value || null,
-                            })
-                          }
-                          disabled={catalogos.status !== "dados"}
-                          {...control}
-                        >
-                          <option value="">
-                            {catalogos.status === "carregando"
-                              ? "Carregando…"
-                              : "Todos os cargos"}
-                          </option>
-                          {catalogos.status === "dados"
-                            ? catalogos.cargos.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {rotuloDaReferencia(c)}
-                                </option>
-                              ))
-                            : null}
-                        </Select>
-                      )}
-                    </FormField>
-                  </>
-                ) : null}
-
-                <FormField
-                  id="colaboradores-filtro-tipo"
-                  label="Tipo de vínculo"
-                >
-                  {(control) => (
-                    <Select
-                      value={tipo ?? ""}
-                      onChange={(e) =>
-                        mudarEstado({
-                          ...estado,
-                          pagina: 1,
-                          tipo: (e.target.value ||
-                            null) as TipoDeVinculo | null,
-                        })
+                {/* T215 — os filtros moram na gaveta "Filtrar". */}
+                <Button
+                  id={ID_BOTAO_FILTRAR}
+                  variant="secondary"
+                  className="colaboradores-screen__botao-filtrar"
+                  aria-haspopup="dialog"
+                  {...(quantosFiltros > 0
+                    ? {
+                        "aria-label": `Filtrar, ${
+                          quantosFiltros === 1
+                            ? "1 filtro ativo"
+                            : `${quantosFiltros} filtros ativos`
+                        }`,
                       }
-                      {...control}
+                    : {})}
+                  onClick={() => setGavetaAberta(true)}
+                >
+                  Filtrar
+                  {quantosFiltros > 0 ? (
+                    <span
+                      className="colaboradores-screen__filtrar-total"
+                      aria-hidden="true"
                     >
-                      <option value="">Todos os tipos</option>
-                      {TIPOS_DE_VINCULO.map((t) => (
-                        <option key={t} value={t}>
-                          {ROTULO_TIPO_DE_VINCULO[t]}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </FormField>
-
-                {comLotacao &&
-                (catalogos.status === "erro" || repetindoCatalogos) ? (
-                  <Button
-                    variant="subtle"
-                    className="colaboradores-screen__filtros-retry"
-                    aria-disabled={repetindoCatalogos}
-                    onClick={recarregarCatalogos}
-                  >
-                    Recarregar departamentos e cargos
-                  </Button>
-                ) : null}
+                      {quantosFiltros}
+                    </span>
+                  ) : null}
+                </Button>
               </div>
+
+              <GavetaDeFiltros
+                aberta={gavetaAberta}
+                onFechar={() => setGavetaAberta(false)}
+                filtros={filtros}
+                comLotacao={comLotacao}
+                catalogos={catalogos}
+                repetindoCatalogos={repetindoCatalogos}
+                onRecarregarCatalogos={recarregarCatalogos}
+                anuncioDosCatalogos={anuncioDosCatalogos}
+                idDosGruposDeLotacao={ID_GRUPOS_DE_LOTACAO}
+                rotuloDoNivel={rotuloDoNivel}
+                rotuloDoTipo={rotuloDoTipo}
+                rotuloDoGenero={rotuloDoGenero}
+                contar={contarNaGaveta}
+                onAplicar={aplicarFiltros}
+              />
 
               {/* O que está filtrando, à vista, e como desfazer cada um. */}
               {temFiltro ? (
@@ -1656,56 +1661,18 @@ export function ColaboradoresScreen({
                   role="group"
                   aria-label="Filtros ativos"
                 >
-                  {temFiltroDeLotacao && departamentoId ? (
+                  {filtrosAplicados.map((f) => (
                     <Button
-                      id={idDoChip("departamento")}
+                      key={`${f.grupo}-${f.valor}`}
+                      id={idDoChip(f)}
                       variant="secondary"
                       className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de departamento: ${
-                        departamentoFiltrado
-                          ? rotuloDaReferencia(departamentoFiltrado)
-                          : "selecionado"
-                      }`}
-                      onClick={() => removerFiltro("departamento")}
+                      aria-label={`Remover filtro ${f.texto}`}
+                      onClick={() => removerFiltro(f)}
                     >
-                      Departamento:{" "}
-                      {departamentoFiltrado
-                        ? rotuloDaReferencia(departamentoFiltrado)
-                        : "selecionado"}{" "}
-                      <span aria-hidden="true">×</span>
+                      {f.texto} <span aria-hidden="true">×</span>
                     </Button>
-                  ) : null}
-                  {temFiltroDeLotacao && cargoId ? (
-                    <Button
-                      id={idDoChip("cargo")}
-                      variant="secondary"
-                      className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de cargo: ${
-                        cargoFiltrado
-                          ? rotuloDaReferencia(cargoFiltrado)
-                          : "selecionado"
-                      }`}
-                      onClick={() => removerFiltro("cargo")}
-                    >
-                      Cargo:{" "}
-                      {cargoFiltrado
-                        ? rotuloDaReferencia(cargoFiltrado)
-                        : "selecionado"}{" "}
-                      <span aria-hidden="true">×</span>
-                    </Button>
-                  ) : null}
-                  {tipo ? (
-                    <Button
-                      id={idDoChip("tipo")}
-                      variant="secondary"
-                      className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de tipo de vínculo: ${ROTULO_TIPO_DE_VINCULO[tipo]}`}
-                      onClick={() => removerFiltro("tipo")}
-                    >
-                      Tipo: {ROTULO_TIPO_DE_VINCULO[tipo]}{" "}
-                      <span aria-hidden="true">×</span>
-                    </Button>
-                  ) : null}
+                  ))}
                 </div>
               ) : null}
 

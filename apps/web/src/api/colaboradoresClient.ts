@@ -191,6 +191,20 @@ export interface ListarColaboradoresQuery {
   grupo?: GrupoColaboradores;
   /** T199 — tipo do vínculo que define o grupo (sem grupo: qualquer um). */
   tipoVinculo?: TipoVinculo;
+  /**
+   * T215 — os grupos da gaveta "Filtrar": dentro de um grupo vale qualquer
+   * valor; entre grupos, todos. Lotação e nível pela lotação vigente (vínculo
+   * ativo, regra da T190); tipo pelo vínculo do grupo; gênero pelo perfil.
+   * Lista vazia não vai à query.
+   */
+  departamentos?: readonly string[];
+  areas?: readonly string[];
+  centrosCusto?: readonly string[];
+  unidades?: readonly string[];
+  cargos?: readonly string[];
+  niveis?: readonly string[];
+  tipos?: readonly string[];
+  generos?: readonly string[];
   pagina?: number;
   tamanhoPagina?: number;
 }
@@ -457,6 +471,18 @@ export interface OpcoesDaLeitura {
   readonly signal?: AbortSignal;
 }
 
+/** T215 — os grupos da gaveta, com os nomes dos parâmetros da API. */
+const GRUPOS_DA_GAVETA = [
+  "departamentos",
+  "areas",
+  "centrosCusto",
+  "unidades",
+  "cargos",
+  "niveis",
+  "tipos",
+  "generos",
+] as const satisfies readonly (keyof ListarColaboradoresQuery)[];
+
 export async function listarColaboradores(
   query: ListarColaboradoresQuery = {},
   opcoes: OpcoesDaLeitura = {},
@@ -476,6 +502,10 @@ export async function listarColaboradores(
   if (query.cargoId) params.set("cargoId", query.cargoId);
   if (query.grupo) params.set("grupo", query.grupo);
   if (query.tipoVinculo) params.set("tipoVinculo", query.tipoVinculo);
+  for (const grupo of GRUPOS_DA_GAVETA) {
+    const lista = query[grupo];
+    if (lista && lista.length > 0) params.set(grupo, lista.join(","));
+  }
   if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));

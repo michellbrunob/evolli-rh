@@ -48,6 +48,7 @@ import {
   ABAS_DO_DASHBOARD,
   ANO_MINIMO_DO_DASHBOARD,
   ESTADO_INICIAL_DA_LISTAGEM,
+  FILTROS_VAZIOS,
   anoCorrente,
   rotaDaListagem,
   type AbaDoDashboard,
@@ -1242,7 +1243,7 @@ function DistribuicaoPorTipo({
                 {...linkDaListagem({
                   ...ESTADO_INICIAL_DA_LISTAGEM,
                   aba: "ativos",
-                  tipo: t,
+                  filtros: { ...FILTROS_VAZIOS, tipos: [t] },
                 })}
               >
                 <span

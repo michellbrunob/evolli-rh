@@ -20,11 +20,61 @@ import {
 } from "./ColaboradoresScreen";
 import { PessoasScreen } from "./PessoasScreen";
 import { FichaColaboradorScreen } from "./FichaColaboradorScreen";
-import type {
-  EstadoDaListagem,
-  OpcoesDaMudancaDaListagem,
-  RotaDaFicha,
+import {
+  type EstadoDaListagem,
+  type FiltrosDaListagem,
+  type OpcoesDaMudancaDaListagem,
+  type RotaDaFicha,
+  type TipoDeVinculo,
+  FILTROS_VAZIOS,
 } from "../../app/rotasDoShell";
+
+/** T215 — filtros da gaveta só com tipos de contrato. */
+const soTipos = (...tipos: TipoDeVinculo[]): FiltrosDaListagem => ({
+  ...FILTROS_VAZIOS,
+  tipos,
+});
+/** T215 — a última leitura da LISTA (a contagem da gaveta pede 1 linha). */
+function ultimaLeituraDaLista() {
+  const leituras = vi
+    .mocked(listarColaboradores)
+    .mock.calls.filter(([c]) => c?.tamanhoPagina !== 1);
+  return leituras.at(-1)?.[0] ?? {};
+}
+
+/** T215 — abre a gaveta "Filtrar" e devolve o diálogo. */
+async function abrirGaveta() {
+  fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
+  return screen.findByRole("dialog", { name: "Filtrar" });
+}
+
+/** T215 — "Ver N resultados" (ou "Ver resultados", contando). */
+function aplicarGaveta(gaveta: HTMLElement) {
+  fireEvent.click(
+    within(gaveta).getByRole("button", { name: /^Ver (d+ )?resultados?$/ }),
+  );
+}
+
+/** T215 — abre a gaveta, marca cada [grupo, opção] e aplica. */
+async function filtrarPelaGaveta(...marcas: [string, string][]) {
+  const gaveta = await abrirGaveta();
+  for (const [grupo, opcao] of marcas) {
+    const g = await within(gaveta).findByRole("group", { name: grupo });
+    const caixa = await within(g)
+      .findByRole("checkbox", { name: opcao }, { timeout: 200 })
+      .catch(() => null);
+    fireEvent.click(caixa ?? within(g).getByRole("button", { name: opcao }));
+  }
+  aplicarGaveta(gaveta);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull(),
+  );
+}
+
+/** T215 — filtros da gaveta com o que o caso pede. */
+const filtrosCom = (
+  parcial: Partial<FiltrosDaListagem>,
+): FiltrosDaListagem => ({ ...FILTROS_VAZIOS, ...parcial });
 import { diaDeHoje, proximoDiaCivil } from "./jornadaColaborador";
 import { listarVinculosHorario } from "../../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../../api/horariosClient";
@@ -66,7 +116,10 @@ import {
 import { AVISO_DE_RECUSA } from "../../format/mascaras";
 import {
   buscarDepartamento,
+  listarAreas,
+  listarCentrosCusto,
   listarDepartamentos,
+  listarUnidades,
 } from "../../api/organizacaoClient";
 import { buscarCargo, listarCargos } from "../../api/cargoClient";
 import {
@@ -297,6 +350,15 @@ beforeEach(() => {
     tamanhoPagina: 100,
     total: 0,
   });
+  // T215 — os outros catálogos da gaveta "Filtrar", vazios por padrão.
+  for (const listar of [listarAreas, listarCentrosCusto, listarUnidades]) {
+    vi.mocked(listar).mockResolvedValue({
+      itens: [],
+      pagina: 1,
+      tamanhoPagina: 100,
+      total: 0,
+    } as never);
+  }
 
   // T169 — por padrão, o colaborador aberto não tem contato registrado.
   vi.mocked(consultarContatosDoColaborador).mockImplementation(
@@ -3458,9 +3520,7 @@ describe("T178 — estados vazios distintos", () => {
       ...paginado([]),
       contadores: { ...contados([]), ativos: 3, inativos: 1, total: 4 },
     });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "pj" },
-    });
+    await filtrarPelaGaveta(["Tipo de contrato", "PJ"]);
     await screen.findByRole("heading", {
       name: "Nenhum colaborador com estes filtros",
     });
@@ -3492,7 +3552,7 @@ describe("T178 — estados vazios distintos", () => {
       ),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
     expect(campoBusca()).toHaveValue("");
   });
 });
@@ -4070,7 +4130,7 @@ describe("T187 — contrato de CSS da Vida funcional (375 px)", () => {
 // T190 — filtros por Departamento e Cargo, pela lotação vigente.
 // ---------------------------------------------------------------------------
 
-describe("T190 — filtros por Departamento e Cargo", () => {
+describe("T215 — gaveta 'Filtrar' (substitui os filtros de Departamento, Cargo e Tipo da T190)", () => {
   const EMPRESA = "44444444-4444-4444-4444-444444444444";
   function referencia(
     id: string,
@@ -4091,6 +4151,9 @@ describe("T190 — filtros por Departamento e Cargo", () => {
   const DEP_ADM = referencia("d-1", "ADM", "Administrativo (teste)");
   const DEP_OPS = referencia("d-2", "OPS", "Operações (teste)");
   const DEP_INATIVO = referencia("d-9", "OLD", "Antigo (teste)", "inativo");
+  const ARE_FIS = referencia("a-1", "FIS", "Fiscal (teste)");
+  const CEN_100 = referencia("cc-1", "CC100", "Centro 100 (teste)");
+  const UNI_SP = referencia("u-1", "SP", "Unidade SP (teste)");
   const CAR_ANA = referencia("c-1", "ANALISTA", "Analista (teste)");
   const CAR_TEC = referencia("c-2", "TECNICO", "Técnico (teste)");
 
@@ -4102,135 +4165,326 @@ describe("T190 — filtros por Departamento e Cargo", () => {
     vi.mocked(listarDepartamentos).mockResolvedValue(
       pagina([DEP_ADM, DEP_OPS, DEP_INATIVO]) as never,
     );
+    vi.mocked(listarAreas).mockResolvedValue(pagina([ARE_FIS]) as never);
+    vi.mocked(listarCentrosCusto).mockResolvedValue(pagina([CEN_100]) as never);
+    vi.mocked(listarUnidades).mockResolvedValue(pagina([UNI_SP]) as never);
     vi.mocked(listarCargos).mockResolvedValue(
       pagina([CAR_ANA, CAR_TEC]) as never,
     );
   });
 
-  const seletorDepartamento = () =>
-    screen.getByLabelText("Departamento") as HTMLSelectElement;
-  const seletorCargo = () =>
-    screen.getByLabelText("Cargo") as HTMLSelectElement;
-
   async function montarPronto() {
     render(<ColaboradoresScreen />);
     await screen.findByText(colaborador1.nome);
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
   }
 
-  function ultimaConsulta() {
-    return vi.mocked(listarColaboradores).mock.lastCall![0]!;
-  }
-
-  it("lê só referências ATIVAS, uma página de 100, e oferece “Todos”", async () => {
+  it("lê só referências ATIVAS dos 5 catálogos, uma página de 100; grupos na ordem", async () => {
     await montarPronto();
-    expect(listarDepartamentos).toHaveBeenCalledWith({
-      status: "ativo",
-      tamanhoPagina: 100,
+    for (const listar of [
+      listarDepartamentos,
+      listarAreas,
+      listarCentrosCusto,
+      listarUnidades,
+      listarCargos,
+    ]) {
+      expect(listar).toHaveBeenCalledWith({
+        status: "ativo",
+        tamanhoPagina: 100,
+      });
+    }
+    const gaveta = await abrirGaveta();
+    expect(gaveta).toHaveAttribute("aria-modal", "true");
+    await within(gaveta).findByRole("checkbox", {
+      name: "Administrativo (teste) (ADM)",
     });
-    expect(listarCargos).toHaveBeenCalledWith({
-      status: "ativo",
-      tamanhoPagina: 100,
-    });
-    const deps = [...seletorDepartamento().options].map((o) => o.textContent);
+    expect(
+      within(gaveta)
+        .getAllByRole("group")
+        .map((g) => g.querySelector("legend")?.textContent),
+    ).toEqual([
+      "Departamento",
+      "Área",
+      "Centro de custo",
+      "Unidade",
+      "Cargo",
+      "Nível",
+      "Tipo de contrato",
+      "Gênero",
+    ]);
+    const deps = within(
+      within(gaveta).getByRole("group", { name: "Departamento" }),
+    )
+      .getAllByRole("checkbox")
+      .map((c) => (c as HTMLInputElement).labels?.[0]?.textContent);
     expect(deps).toEqual([
-      "Todos os departamentos",
       "Administrativo (teste) (ADM)",
       "Operações (teste) (OPS)",
     ]);
-    expect(deps.join()).not.toContain("Antigo");
-    expect([...seletorCargo().options].map((o) => o.textContent)).toEqual([
-      "Todos os cargos",
-      "Analista (teste) (ANALISTA)",
-      "Técnico (teste) (TECNICO)",
+    expect(
+      within(within(gaveta).getByRole("group", { name: "Nível" }))
+        .getAllByRole("checkbox")
+        .map((c) => (c as HTMLInputElement).labels?.[0]?.textContent),
+    ).toEqual([
+      "Primeiro emprego",
+      "Júnior",
+      "Pleno",
+      "Sênior",
+      "Líder técnico",
+      "Coordenador",
+      "Gerente",
+      "Head",
+      "Diretor",
+      "VP",
+      "C-Level",
     ]);
+    expect(
+      within(within(gaveta).getByRole("group", { name: "Tipo de contrato" }))
+        .getAllByRole("button")
+        .map((b) => [b.textContent, b.getAttribute("aria-pressed")]),
+    ).toEqual(
+      [
+        "CLT",
+        "Estágio",
+        "Aprendiz",
+        "PJ",
+        "Temporário",
+        "Outro controlado",
+        "Part-time",
+        "Freelancer",
+        "Trainee",
+      ].map((t) => [t, "false"]),
+    );
+    expect(
+      within(within(gaveta).getByRole("group", { name: "Gênero" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Feminino", "Masculino", "Outro", "Prefiro não informar"]);
   });
 
-  it("departamento vai ao servidor, na página 1, e o filtro fica à vista", async () => {
+  it("departamento vai ao servidor só em 'Ver N resultados', na página 1, e o filtro fica à vista", async () => {
     await montarPronto();
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    const antes = vi.mocked(listarColaboradores).mock.calls.length;
+    const gaveta = await abrirGaveta();
+    fireEvent.click(
+      await within(gaveta).findByRole("checkbox", {
+        name: "Operações (teste) (OPS)",
+      }),
+    );
+    // Rascunho: a listagem não muda enquanto se marca.
+    expect(
+      vi
+        .mocked(listarColaboradores)
+        .mock.calls.slice(antes)
+        .filter(([c]) => c?.tamanhoPagina !== 1),
+    ).toHaveLength(0);
+    aplicarGaveta(gaveta);
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
         grupo: "ativos",
-        departamentoId: DEP_OPS.id,
+        departamentos: [DEP_OPS.id],
       }),
     );
+    expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull();
     const ativos = await screen.findByRole("group", {
       name: "Filtros ativos",
     });
     expect(
       within(ativos).getByRole("button", {
-        name: "Remover filtro de departamento: Operações (teste) (OPS)",
+        name: "Remover filtro Departamento: Operações (teste) (OPS)",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filtrar, 1 filtro ativo" }),
     ).toBeInTheDocument();
   });
 
-  it("combina com busca, aba e tipo de vínculo, numa só consulta", async () => {
+  it("'Ver N resultados': contagem ao vivo no servidor (aba, busca e rascunho, uma linha só)", async () => {
+    await montarPronto();
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) =>
+      consulta?.tamanhoPagina === 1
+        ? { ...paginado([colaborador1]), total: 7 }
+        : paginado([colaborador1, colaborador2]),
+    );
+    const gaveta = await abrirGaveta();
+    fireEvent.click(
+      await within(gaveta).findByRole("checkbox", { name: "Pleno" }),
+    );
+    fireEvent.click(within(gaveta).getByRole("button", { name: "Feminino" }));
+    expect(
+      await within(gaveta).findByRole("button", { name: "Ver 7 resultados" }),
+    ).toBeInTheDocument();
+    expect(listarColaboradores).toHaveBeenLastCalledWith(
+      {
+        pagina: 1,
+        tamanhoPagina: 1,
+        grupo: "ativos",
+        niveis: ["pleno"],
+        generos: ["feminino"],
+      },
+      COM_SINAL,
+    );
+    expect(
+      within(gaveta).getByRole("button", { name: "Feminino" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("contagem que falha: 'Ver resultados' ainda aplica", async () => {
+    await montarPronto();
+    vi.mocked(listarColaboradores).mockImplementation(async (consulta) => {
+      if (consulta?.tamanhoPagina === 1) throw new Error("rede");
+      return paginado([colaborador1]);
+    });
+    const gaveta = await abrirGaveta();
+    fireEvent.click(within(gaveta).getByRole("button", { name: "PJ" }));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(listarColaboradores)
+          .mock.calls.some(([c]) => c?.tamanhoPagina === 1),
+      ).toBe(true),
+    );
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Ver resultados" }),
+    );
+    await waitFor(() =>
+      expect(ultimaLeituraDaLista()).toMatchObject({ tipos: ["pj"] }),
+    );
+  });
+
+  it("fechar sem aplicar descarta o rascunho; 'Limpar filtros' zera o rascunho; Escape devolve o foco ao botão", async () => {
+    await montarPronto();
+    const botao = screen.getByRole("button", { name: /^Filtrar/ });
+    botao.focus();
+    let gaveta = await abrirGaveta();
+    fireEvent.click(within(gaveta).getByRole("button", { name: "CLT" }));
+    fireEvent.keyDown(gaveta, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull(),
+    );
+    expect(botao).toHaveFocus();
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
+
+    gaveta = await abrirGaveta();
+    expect(within(gaveta).getByRole("button", { name: "CLT" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    fireEvent.click(within(gaveta).getByRole("button", { name: "CLT" }));
+    fireEvent.click(
+      await within(gaveta).findByRole("checkbox", {
+        name: "Analista (teste) (ANALISTA)",
+      }),
+    );
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Limpar filtros" }),
+    );
+    expect(within(gaveta).getByRole("button", { name: "CLT" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(
+      within(gaveta).getByRole("checkbox", {
+        name: "Analista (teste) (ANALISTA)",
+      }),
+    ).not.toBeChecked();
+  });
+
+  it("combina busca, aba e todos os grupos, numa só consulta", async () => {
     await montarPronto();
     fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
       target: { value: "Ana" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
-    await waitFor(() => expect(ultimaConsulta().busca).toBe("Ana"));
+    await waitFor(() => expect(ultimaLeituraDaLista().busca).toBe("Ana"));
     abrirAba("Todos");
-    await waitFor(() => expect(ultimaConsulta().grupo).toBeUndefined());
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
-    await waitFor(() => expect(seletorCargo()).toBeEnabled());
-    fireEvent.change(seletorCargo(), { target: { value: CAR_TEC.id } });
-    await waitFor(() => expect(seletorCargo()).toBeEnabled());
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "clt" },
-    });
+    await waitFor(() => expect(ultimaLeituraDaLista().grupo).toBeUndefined());
+    await filtrarPelaGaveta(
+      ["Departamento", "Administrativo (teste) (ADM)"],
+      ["Área", "Fiscal (teste) (FIS)"],
+      ["Centro de custo", "Centro 100 (teste) (CC100)"],
+      ["Unidade", "Unidade SP (teste) (SP)"],
+      ["Cargo", "Técnico (teste) (TECNICO)"],
+      ["Nível", "Sênior"],
+      ["Tipo de contrato", "CLT"],
+      ["Tipo de contrato", "PJ"],
+      ["Gênero", "Outro"],
+    );
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
         busca: "Ana",
-        departamentoId: DEP_ADM.id,
-        cargoId: CAR_TEC.id,
-        tipoVinculo: "clt",
+        departamentos: [DEP_ADM.id],
+        areas: [ARE_FIS.id],
+        centrosCusto: [CEN_100.id],
+        unidades: [UNI_SP.id],
+        cargos: [CAR_TEC.id],
+        niveis: ["senior"],
+        tipos: ["clt", "pj"],
+        generos: ["outro"],
       }),
     );
+    expect(
+      within(screen.getByRole("group", { name: "Filtros ativos" }))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual([
+      "Remover filtro Departamento: Administrativo (teste) (ADM)",
+      "Remover filtro Área: Fiscal (teste) (FIS)",
+      "Remover filtro Centro de custo: Centro 100 (teste) (CC100)",
+      "Remover filtro Unidade: Unidade SP (teste) (SP)",
+      "Remover filtro Cargo: Técnico (teste) (TECNICO)",
+      "Remover filtro Nível: Sênior",
+      "Remover filtro Tipo: CLT",
+      "Remover filtro Tipo: PJ",
+      "Remover filtro Gênero: Outro",
+    ]);
+    expect(
+      screen.getByRole("button", { name: "Filtrar, 9 filtros ativos" }),
+    ).toBeInTheDocument();
   });
 
-  it("remover um filtro de lotação mantém o outro, a busca e a aba", async () => {
+  it("dois do mesmo grupo: qualquer um deles; remover um chip mantém o outro, a busca e a aba", async () => {
     await montarPronto();
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
-    await waitFor(() => expect(seletorCargo()).toBeEnabled());
-    fireEvent.change(seletorCargo(), { target: { value: CAR_ANA.id } });
-    await waitFor(() => expect(ultimaConsulta().cargoId).toBe(CAR_ANA.id));
-
+    await filtrarPelaGaveta(
+      ["Departamento", "Administrativo (teste) (ADM)"],
+      ["Departamento", "Operações (teste) (OPS)"],
+      ["Cargo", "Analista (teste) (ANALISTA)"],
+    );
+    await waitFor(() =>
+      expect(ultimaLeituraDaLista().departamentos).toEqual([
+        DEP_ADM.id,
+        DEP_OPS.id,
+      ]),
+    );
     fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Remover filtro de departamento: Administrativo (teste) (ADM)",
+      screen.getByRole("button", {
+        name: "Remover filtro Departamento: Administrativo (teste) (ADM)",
       }),
     );
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
         grupo: "ativos",
-        cargoId: CAR_ANA.id,
+        departamentos: [DEP_OPS.id],
+        cargos: [CAR_ANA.id],
       }),
     );
-    expect(seletorDepartamento().value).toBe("");
-    expect(seletorCargo().value).toBe(CAR_ANA.id);
-
-    // "Todos os cargos" desfaz só o cargo: o resumo some.
-    await waitFor(() => expect(seletorCargo()).toBeEnabled());
-    fireEvent.change(seletorCargo(), { target: { value: "" } });
-    await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
-        pagina: 1,
-        tamanhoPagina: 20,
-        grupo: "ativos",
+    // A gaveta abre com o que está aplicado.
+    const gaveta = await abrirGaveta();
+    expect(
+      await within(gaveta).findByRole("checkbox", {
+        name: "Operações (teste) (OPS)",
       }),
-    );
-    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
+    ).toBeChecked();
+    expect(
+      within(gaveta).getByRole("checkbox", {
+        name: "Administrativo (teste) (ADM)",
+      }),
+    ).not.toBeChecked();
   });
 
   it("os contadores seguem os do servidor, sem filtro: não mudam com a lotação", async () => {
@@ -4239,9 +4493,9 @@ describe("T190 — filtros por Departamento e Cargo", () => {
       contadores: { ...contados([]), ativos: 40, inativos: 7, total: 47 },
     });
     await montarPronto();
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    await filtrarPelaGaveta(["Departamento", "Operações (teste) (OPS)"]);
     await waitFor(() =>
-      expect(ultimaConsulta().departamentoId).toBe(DEP_OPS.id),
+      expect(ultimaLeituraDaLista().departamentos).toEqual([DEP_OPS.id]),
     );
     expect(
       await screen.findByRole("tab", { name: /^Ativos,\s*40/ }),
@@ -4251,7 +4505,7 @@ describe("T190 — filtros por Departamento e Cargo", () => {
     ).toBeInTheDocument();
   });
 
-  it("paginar mantém os filtros de lotação", async () => {
+  it("paginar mantém os filtros", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       itens: [colaborador1],
       pagina: 1,
@@ -4266,33 +4520,36 @@ describe("T190 — filtros por Departamento e Cargo", () => {
       },
     });
     await montarPronto();
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_ADM.id } });
+    await filtrarPelaGaveta(
+      ["Departamento", "Administrativo (teste) (ADM)"],
+      ["Gênero", "Masculino"],
+    );
     await waitFor(() =>
-      expect(ultimaConsulta().departamentoId).toBe(DEP_ADM.id),
+      expect(ultimaLeituraDaLista().departamentos).toEqual([DEP_ADM.id]),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Próxima página" }),
     );
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 2,
         tamanhoPagina: 20,
         grupo: "ativos",
-        departamentoId: DEP_ADM.id,
+        departamentos: [DEP_ADM.id],
+        generos: ["masculino"],
       }),
     );
   });
 
-  it("vazio com filtro de lotação: “Limpar filtros” tira lotação e situação, mantém a busca", async () => {
+  it("vazio com filtro e busca: “Limpar busca e filtros” tira tudo", async () => {
     await montarPronto();
     fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
       target: { value: "Bruno" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
-    await waitFor(() => expect(ultimaConsulta().busca).toBe("Bruno"));
+    await waitFor(() => expect(ultimaLeituraDaLista().busca).toBe("Bruno"));
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    await filtrarPelaGaveta(["Departamento", "Operações (teste) (OPS)"]);
     expect(
       await screen.findByText(
         "Nenhum colaborador encontrado com estes filtros",
@@ -4302,7 +4559,7 @@ describe("T190 — filtros por Departamento e Cargo", () => {
       screen.getByRole("button", { name: "Limpar busca e filtros" }),
     );
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
         grupo: "ativos",
@@ -4310,44 +4567,71 @@ describe("T190 — filtros por Departamento e Cargo", () => {
     );
   });
 
-  it("vazio só por lotação (sem busca): mensagem de filtros e “Limpar filtros”", async () => {
+  it("vazio só por filtro (sem busca): mensagem de filtros e “Limpar filtros”", async () => {
     await montarPronto();
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([]));
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
-    fireEvent.change(seletorDepartamento(), { target: { value: DEP_OPS.id } });
+    await filtrarPelaGaveta(["Nível", "Diretor"]);
     expect(
       await screen.findByText("Nenhum colaborador com estes filtros"),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
     await waitFor(() =>
-      expect(ultimaConsulta()).toEqual({
+      expect(ultimaLeituraDaLista()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
         grupo: "ativos",
       }),
     );
-    expect(seletorDepartamento().value).toBe("");
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
   });
 
-  it("catálogos indisponíveis: filtros desabilitados, aviso e nova tentativa", async () => {
+  it("abas sem lotação (Em admissão, Desligados): só Tipo de contrato e Gênero", async () => {
+    await montarPronto();
+    abrirAba("Desligados");
+    await screen.findByRole("table", { name: /^Colaboradores — Desligados/ });
+    const gaveta = await abrirGaveta();
+    expect(
+      within(gaveta)
+        .getAllByRole("group")
+        .map((g) => g.querySelector("legend")?.textContent),
+    ).toEqual(["Tipo de contrato", "Gênero"]);
+    fireEvent.click(within(gaveta).getByRole("button", { name: "Estágio" }));
+    aplicarGaveta(gaveta);
+    await waitFor(() =>
+      expect(ultimaLeituraDaLista()).toEqual({
+        pagina: 1,
+        tamanhoPagina: 20,
+        grupo: "desligados",
+        tipos: ["estagio"],
+      }),
+    );
+  });
+
+  it("catálogos indisponíveis: aviso e 'Recarregar' na gaveta; Tipo e Gênero seguem livres; a lista continua", async () => {
     vi.mocked(listarDepartamentos).mockRejectedValueOnce(new Error("rede"));
     render(<ColaboradoresScreen />);
     await screen.findByText(colaborador1.nome);
+    const gaveta = await abrirGaveta();
     expect(
-      await screen.findByText(
-        "Não foi possível carregar departamentos e cargos.",
+      await within(gaveta).findByText(
+        "Não foi possível carregar departamentos, áreas, centros de custo, unidades e cargos.",
       ),
     ).toBeInTheDocument();
-    expect(seletorDepartamento()).toBeDisabled();
-    expect(seletorCargo()).toBeDisabled();
-    // A lista continua funcionando sem os filtros de lotação.
+    expect(
+      within(gaveta).queryByRole("group", { name: "Departamento" }),
+    ).toBeNull();
+    expect(
+      within(gaveta).getByRole("group", { name: "Tipo de contrato" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(colaborador1.nome)).toBeInTheDocument();
 
     const leituras = vi.mocked(listarDepartamentos).mock.calls.length;
-    fireEvent.click(
-      screen.getByRole("button", { name: "Recarregar departamentos e cargos" }),
-    );
-    await waitFor(() => expect(seletorDepartamento()).toBeEnabled());
+    fireEvent.click(within(gaveta).getByRole("button", { name: "Recarregar" }));
+    expect(
+      await within(gaveta).findByRole("checkbox", {
+        name: "Administrativo (teste) (ADM)",
+      }),
+    ).toBeInTheDocument();
     expect(vi.mocked(listarDepartamentos).mock.calls.length).toBe(leituras + 1);
   });
 
@@ -4371,6 +4655,11 @@ describe("T190 — filtros por Departamento e Cargo", () => {
     );
     expect(bloco(".colaboradores-screen__filtro-ativo")).toMatch(
       /white-space: normal/,
+    );
+    // Os chips de Tipo e Gênero quebram linha; as opções longas também.
+    expect(bloco(".gaveta-filtros__chips")).toMatch(/flex-wrap: wrap/);
+    expect(bloco(".gaveta-filtros__opcoes li")).toMatch(
+      /overflow-wrap: anywhere/,
     );
   });
 });
@@ -4607,9 +4896,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     aba: "ativos" as const,
     pagina: 1,
     tamanho: 20 as const,
-    departamentoId: null,
-    cargoId: null,
-    tipo: null,
+    filtros: FILTROS_VAZIOS,
   };
   const tablist = () =>
     screen.getByRole("tablist", { name: "Grupos de colaboradores" });
@@ -4743,7 +5030,9 @@ describe("T199 — dashboard de Colaboradores", () => {
       expect(
         screen.queryByRole("table", { name: /^Colaboradores — / }),
       ).toBeNull();
-      expect(screen.queryByLabelText("Tipo de vínculo")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /^Filtrar($|,)/ }),
+      ).toBeNull();
       // A aba de jornada não relê a listagem (a visão de jornadas só confere,
       // como sempre, quantos ativos há); os indicadores continuam.
       const novas = vi
@@ -4794,17 +5083,26 @@ describe("T199 — dashboard de Colaboradores", () => {
     render(<ColaboradoresScreen empresaAtiva={EMPRESA} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(cabecalhos()).not.toContain("Desligamento");
-    expect(screen.getByLabelText("Departamento")).toBeInTheDocument();
-    expect(screen.getByLabelText("Cargo")).toBeInTheDocument();
+    // T215 — os grupos vivem na gaveta "Filtrar".
+    const gruposDaGaveta = async () => {
+      const gaveta = await abrirGaveta();
+      const nomes = within(gaveta)
+        .getAllByRole("group")
+        .map((g) => g.querySelector("legend")?.textContent);
+      fireEvent.keyDown(gaveta, { key: "Escape" });
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull(),
+      );
+      return nomes;
+    };
+    expect(await gruposDaGaveta()).toContain("Departamento");
 
     for (const rotulo of ["Em admissão", "Desligados"] as const) {
       abrirAba(rotulo);
       await screen.findByRole("table", {
         name: `Colaboradores — ${rotulo}`,
       });
-      expect(screen.queryByLabelText("Departamento")).toBeNull();
-      expect(screen.queryByLabelText("Cargo")).toBeNull();
-      expect(screen.getByLabelText("Tipo de vínculo")).toBeInTheDocument();
+      expect(await gruposDaGaveta()).toEqual(["Tipo de contrato", "Gênero"]);
       if (rotulo === "Desligados") {
         expect(cabecalhos()).toContain("Desligamento");
       } else {
@@ -4815,7 +5113,7 @@ describe("T199 — dashboard de Colaboradores", () => {
     abrirAba("Todos");
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
     expect(cabecalhos()).not.toContain("Desligamento");
-    expect(screen.getByLabelText("Departamento")).toBeInTheDocument();
+    expect(await gruposDaGaveta()).toContain("Cargo");
   });
 
   it("na aba Desligados, a linha mostra o vínculo encerrado: tipo, situação e data de desligamento", async () => {
@@ -4871,12 +5169,10 @@ describe("T199 — dashboard de Colaboradores", () => {
       ...ESTADO_ATIVOS,
       aba: "desligados",
     });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "estagio" },
-    });
+    await filtrarPelaGaveta(["Tipo de contrato", "Estágio"]);
     expect(onEstadoChange).toHaveBeenLastCalledWith({
       ...ESTADO_ATIVOS,
-      tipo: "estagio",
+      filtros: soTipos("estagio"),
     });
 
     const antes = onEstadoChange.mock.calls.length;
@@ -5003,26 +5299,35 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     tamanhoPagina: 100,
     total: itens.length,
   });
-  const ESTADO = {
-    aba: "ativos" as const,
+  const ARE = { ...DEP, id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" };
+  const ESTADO: EstadoDaListagem = {
+    aba: "ativos",
     pagina: 3,
-    tamanho: 20 as const,
-    departamentoId: null,
-    cargoId: null,
-    tipo: "clt" as const,
+    tamanho: 20,
+    filtros: soTipos("clt"),
   };
+  const comFiltros = (
+    parcial: Partial<FiltrosDaListagem>,
+  ): EstadoDaListagem => ({
+    ...ESTADO,
+    filtros: { ...ESTADO.filtros, ...parcial },
+  });
 
   beforeEach(() => {
     vi.mocked(listarDepartamentos).mockResolvedValue(
       pagina([DEP, DEP_INATIVO]) as never,
     );
     vi.mocked(listarCargos).mockResolvedValue(pagina([CAR]) as never);
+    vi.mocked(listarAreas).mockResolvedValue(pagina([ARE]) as never);
   });
 
-  const consultasCom = (campo: "departamentoId" | "cargoId", id: string) =>
+  const consultasCom = (
+    campo: "departamentos" | "cargos" | "areas",
+    id: string,
+  ) =>
     vi
       .mocked(listarColaboradores)
-      .mock.calls.filter(([consulta]) => consulta?.[campo] === id);
+      .mock.calls.filter(([consulta]) => consulta?.[campo]?.includes(id));
 
   it.each([
     ["de outra empresa", DE_OUTRA_EMPRESA],
@@ -5033,17 +5338,17 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
       const onEstadoChange = vi.fn();
       render(
         <ColaboradoresScreen
-          estado={{ ...ESTADO, departamentoId: id, cargoId: CAR.id }}
+          estado={comFiltros({ departamentos: [id], cargos: [CAR.id] })}
           onEstadoChange={onEstadoChange}
         />,
       );
       await waitFor(() =>
         expect(onEstadoChange).toHaveBeenCalledWith(
-          { ...ESTADO, pagina: 1, departamentoId: null, cargoId: CAR.id },
+          { ...comFiltros({ cargos: [CAR.id] }), pagina: 1 },
           { substituir: true },
         ),
       );
-      expect(consultasCom("departamentoId", id)).toHaveLength(0);
+      expect(consultasCom("departamentos", id)).toHaveLength(0);
     },
   );
 
@@ -5051,26 +5356,49 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     const onEstadoChange = vi.fn();
     render(
       <ColaboradoresScreen
-        estado={{
-          ...ESTADO,
-          departamentoId: DEP.id,
-          cargoId: DE_OUTRA_EMPRESA,
-        }}
+        estado={comFiltros({
+          departamentos: [DEP.id],
+          cargos: [DE_OUTRA_EMPRESA],
+        })}
         onEstadoChange={onEstadoChange}
       />,
     );
     await waitFor(() =>
       expect(onEstadoChange).toHaveBeenCalledWith(
-        { ...ESTADO, pagina: 1, departamentoId: DEP.id, cargoId: null },
+        { ...comFiltros({ departamentos: [DEP.id] }), pagina: 1 },
         { substituir: true },
       ),
     );
-    expect(consultasCom("cargoId", DE_OUTRA_EMPRESA)).toHaveLength(0);
+    expect(consultasCom("cargos", DE_OUTRA_EMPRESA)).toHaveLength(0);
+  });
+
+  it("T215 — na lista, só o id desconhecido sai; os conhecidos e os outros catálogos ficam", async () => {
+    const onEstadoChange = vi.fn();
+    render(
+      <ColaboradoresScreen
+        estado={comFiltros({
+          departamentos: [DEP.id, DE_OUTRA_EMPRESA],
+          areas: [DE_OUTRA_EMPRESA, ARE.id],
+        })}
+        onEstadoChange={onEstadoChange}
+      />,
+    );
+    await waitFor(() =>
+      expect(onEstadoChange).toHaveBeenCalledWith(
+        {
+          ...comFiltros({ departamentos: [DEP.id], areas: [ARE.id] }),
+          pagina: 1,
+        },
+        { substituir: true },
+      ),
+    );
+    expect(consultasCom("departamentos", DE_OUTRA_EMPRESA)).toHaveLength(0);
+    expect(consultasCom("areas", DE_OUTRA_EMPRESA)).toHaveLength(0);
   });
 
   it("a correção perdida (o shell reaplica a mesma URL inválida) é pedida de novo", async () => {
     const onEstadoChange = vi.fn();
-    const invalido = { ...ESTADO, departamentoId: DE_OUTRA_EMPRESA };
+    const invalido = comFiltros({ departamentos: [DE_OUTRA_EMPRESA] });
     const { rerender } = render(
       <ColaboradoresScreen estado={invalido} onEstadoChange={onEstadoChange} />,
     );
@@ -5089,7 +5417,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
       { ...ESTADO, pagina: 1 },
       { substituir: true },
     );
-    expect(consultasCom("departamentoId", DE_OUTRA_EMPRESA)).toHaveLength(0);
+    expect(consultasCom("departamentos", DE_OUTRA_EMPRESA)).toHaveLength(0);
   });
 
   it("enquanto os catálogos carregam, espera; id conhecido vira consulta depois", async () => {
@@ -5100,7 +5428,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     const antes = vi.mocked(listarColaboradores).mock.calls.length;
     render(
       <ColaboradoresScreen
-        estado={{ ...ESTADO, departamentoId: DEP.id }}
+        estado={comFiltros({ departamentos: [DEP.id] })}
         onEstadoChange={onEstadoChange}
       />,
     );
@@ -5112,7 +5440,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     departamentos.resolver(pagina([DEP]) as never);
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenCalledWith(
-        expect.objectContaining({ departamentoId: DEP.id, pagina: 3 }),
+        expect.objectContaining({ departamentos: [DEP.id], pagina: 3 }),
         COM_SINAL,
       ),
     );
@@ -5124,7 +5452,7 @@ describe("T199 — ids de lotação da URL conferidos nos catálogos", () => {
     render(<ColaboradoresScreen estado={ESTADO} onEstadoChange={vi.fn()} />);
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenCalledWith(
-        expect.objectContaining({ pagina: 3, tipoVinculo: "clt" }),
+        expect.objectContaining({ pagina: 3, tipos: ["clt"] }),
         COM_SINAL,
       ),
     );
@@ -5168,9 +5496,7 @@ const ESTADO_PADRAO: EstadoDaListagem = {
   aba: "ativos",
   pagina: 1,
   tamanho: 20,
-  departamentoId: null,
-  cargoId: null,
-  tipo: null,
+  filtros: FILTROS_VAZIOS,
 };
 
 const CONTADORES_CHEIOS: ContadoresColaboradoresApi = {
@@ -5197,7 +5523,12 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          filtros: soTipos("pj"),
+          pagina: 4,
+        }}
         onMudanca={onMudanca}
       />,
     );
@@ -5215,7 +5546,7 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
     // O filtro continua à vista e removível.
     expect(
       screen.getByRole("button", {
-        name: "Remover filtro de tipo de vínculo: PJ",
+        name: "Remover filtro Tipo: PJ",
       }),
     ).toBeInTheDocument();
 
@@ -5225,7 +5556,7 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
     expect(onMudanca).toHaveBeenLastCalledWith({
       ...ESTADO_PADRAO,
       aba: "todos",
-      tipo: "pj",
+      filtros: soTipos("pj"),
       pagina: 1,
     });
     await waitFor(() =>
@@ -5233,7 +5564,7 @@ describe("T199 (revisão) — B1: página fora do intervalo", () => {
         {
           pagina: 1,
           tamanhoPagina: 20,
-          tipoVinculo: "pj",
+          tipos: ["pj"],
         },
         COM_SINAL,
       ),
@@ -5361,9 +5692,11 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
     const onMudanca = vi.fn();
     const inicial: EstadoDaListagem = {
       ...ESTADO_PADRAO,
-      departamentoId: DEP.id,
-      cargoId: CAR.id,
-      tipo: "pj",
+      filtros: filtrosCom({
+        departamentos: [DEP.id],
+        cargos: [CAR.id],
+        tipos: ["pj"],
+      }),
     };
     const { rerender } = render(
       <DashboardComEstado inicial={inicial} onMudanca={onMudanca} />,
@@ -5378,10 +5711,10 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
           pagina: 2,
           tamanhoPagina: 20,
           grupo: "ativos",
-          tipoVinculo: "pj",
+          tipos: ["pj"],
           busca: "Ana",
-          departamentoId: DEP.id,
-          cargoId: CAR.id,
+          departamentos: [DEP.id],
+          cargos: [CAR.id],
         },
         COM_SINAL,
       ),
@@ -5435,9 +5768,7 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
     expect(campoBusca()).toHaveValue("");
     expect(campoBusca()).toHaveFocus();
-    expect(screen.getByLabelText("Departamento")).toHaveValue("");
-    expect(screen.getByLabelText("Cargo")).toHaveValue("");
-    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
     // Nenhuma atualização seguinte devolveu os filtros.
     await act(async () => {
@@ -5449,8 +5780,8 @@ describe("T199 (revisão) — B2: 'Limpar busca e filtros' numa única mudança"
       .mock.calls.slice(consultasAntes);
     expect(depois).toHaveLength(1);
     for (const [consulta] of depois) {
-      expect(consulta).not.toHaveProperty("tipoVinculo");
-      expect(consulta).not.toHaveProperty("departamentoId");
+      expect(consulta).not.toHaveProperty("tipos");
+      expect(consulta).not.toHaveProperty("departamentos");
       expect(consulta).not.toHaveProperty("busca");
     }
   });
@@ -5699,7 +6030,12 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     const srv = servidor(vazia(4, 3));
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          filtros: soTipos("pj"),
+          pagina: 4,
+        }}
         onMudanca={vi.fn()}
       />,
     );
@@ -5730,7 +6066,9 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     expect(anuncioDaLista()?.textContent).toBe(
       "Página 1 carregada: 1 colaborador nesta consulta, com os filtros mantidos.",
     );
-    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("pj");
+    expect(
+      screen.getByRole("button", { name: "Remover filtro Tipo: PJ" }),
+    ).toBeInTheDocument();
     // O h2 da seção continua, só para leitor de tela, acima dos h3.
     expect(tituloDaSecao("Todos")).toHaveClass(
       "colaboradores-screen__so-leitor",
@@ -5744,7 +6082,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     });
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj" }}
+        inicial={{ ...ESTADO_PADRAO, aba: "todos", filtros: soTipos("pj") }}
         onMudanca={vi.fn()}
       />,
     );
@@ -5764,7 +6102,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     expect(vi.mocked(listarColaboradores).mock.lastCall?.[0]).toEqual({
       pagina: 1,
       tamanhoPagina: 20,
-      tipoVinculo: "pj",
+      tipos: ["pj"],
       busca: "Ana",
     });
     await srv.responder(comAna());
@@ -5779,7 +6117,12 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     const srv = servidor(vazia(4, 3));
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          filtros: soTipos("pj"),
+          pagina: 4,
+        }}
         onMudanca={vi.fn()}
       />,
     );
@@ -5816,7 +6159,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, tipo: "pj" }}
+        inicial={{ ...ESTADO_PADRAO, filtros: soTipos("pj") }}
         onMudanca={onMudanca}
       />,
     );
@@ -5837,7 +6180,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     await srv.responder(comAna());
     await screen.findByRole("table", { name: "Colaboradores — Ativos" });
     await waitFor(() => expect(campoBusca()).toHaveFocus());
-    expect(screen.getByLabelText("Tipo de vínculo")).toHaveValue("");
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
   });
 
   it("'Limpar filtros' com nova falha: foco no botão e falha anunciada uma vez; repetir relê sem mudar o estado de novo", async () => {
@@ -5845,7 +6188,7 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, tipo: "pj" }}
+        inicial={{ ...ESTADO_PADRAO, filtros: soTipos("pj") }}
         onMudanca={onMudanca}
       />,
     );
@@ -5879,7 +6222,12 @@ describe("T199 (revisão B3) — ações do estado vazio e paginação fora do i
     vi.mocked(listarColaboradores).mockResolvedValue(vazia(4, 24));
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", tipo: "pj", pagina: 4 }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          filtros: soTipos("pj"),
+          pagina: 4,
+        }}
         onMudanca={vi.fn()}
       />,
     );
@@ -5974,14 +6322,14 @@ describe("T199 (revisão B4/B5) — falha sem 'Contando…' e repetição do err
       {
         ...ESTADO_PADRAO,
         aba: "todos" as const,
-        tipo: "pj" as const,
+        filtros: soTipos("pj"),
         pagina: 4,
       },
       { itens: [], pagina: 4, tamanhoPagina: 20, total: 3 },
     ],
     [
       "Limpar filtros",
-      { ...ESTADO_PADRAO, tipo: "pj" as const },
+      { ...ESTADO_PADRAO, filtros: soTipos("pj") },
       { itens: [], pagina: 1, tamanhoPagina: 20, total: 0 },
     ],
   ])(
@@ -6067,16 +6415,16 @@ describe("T199 (revisão B4/B5) — falha sem 'Contando…' e repetição do err
 });
 
 // ---------------------------------------------------------------------------
-// T199 (revisão B6/B7) — filtros que não perdem o foco: as selects não ficam
-// `disabled` durante a releitura da tabela (só Departamento e Cargo, quando o
-// catálogo não está disponível); remover um chip leva o foco ao próximo chip
-// ou ao campo de busca; "Recarregar departamentos e cargos" no padrão seguro.
+// T199 (revisão B6/B7) — filtros que não perdem o foco; remover um chip leva
+// o foco ao próximo chip ou ao campo de busca; a recarga dos catálogos no
+// padrão seguro. T215 — os filtros moram na gaveta "Filtrar": aplicar fecha a
+// gaveta e devolve o foco ao botão, que nunca fica indisponível na releitura.
 // ---------------------------------------------------------------------------
 describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos catálogos", () => {
   type Resposta = Awaited<ReturnType<typeof listarColaboradores>>;
   type Catalogo = Awaited<ReturnType<typeof listarDepartamentos>>;
-  const anuncioDaLista = () =>
-    document.querySelector(".colaboradores-screen__anuncio-lista");
+  const anuncioDaGaveta = () =>
+    document.querySelector(".gaveta-filtros__anuncio");
   const DEP = {
     id: "abababab-abab-4bab-8bab-abababababab",
     codigo: "ADM",
@@ -6089,8 +6437,7 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
   const CAR = { ...DEP, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" };
   const catalogo = <T,>(itens: T[]) =>
     ({ itens, pagina: 1, tamanhoPagina: 100, total: itens.length }) as never;
-  const seletor = (rotulo: string) =>
-    screen.getByLabelText(rotulo) as HTMLSelectElement;
+  const botaoFiltrar = () => screen.getByRole("button", { name: /^Filtrar/ });
   const comAna = (nome = colaborador1.nome): Resposta => ({
     itens: [{ ...colaborador1, nome }],
     pagina: 1,
@@ -6099,11 +6446,15 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     contadores: CONTADORES_CHEIOS,
   });
 
-  /** A primeira leitura responde; as seguintes ficam pendentes, uma a uma. */
+  /**
+   * A primeira leitura da lista responde; as seguintes ficam pendentes, uma
+   * a uma. A contagem da gaveta (uma linha) responde na hora e não conta.
+   */
   function listagem() {
     const pendentes: ((r: Resposta) => void)[] = [];
     let lidas = 0;
-    vi.mocked(listarColaboradores).mockImplementation(() => {
+    vi.mocked(listarColaboradores).mockImplementation((consulta) => {
+      if (consulta?.tamanhoPagina === 1) return Promise.resolve(comAna());
       lidas += 1;
       if (lidas === 1) return Promise.resolve(comAna());
       return new Promise<Resposta>((resolver) => pendentes.push(resolver));
@@ -6124,42 +6475,40 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
   });
 
   it.each([
-    ["Tipo de vínculo", "pj"],
-    ["Departamento", DEP.id],
-    ["Cargo", CAR.id],
+    ["Tipo de contrato", "PJ"],
+    ["Departamento", "Administrativo (teste) (ADM)"],
+    ["Cargo", "Administrativo (teste) (ADM)"],
   ])(
-    "B6 — trocar %s com a resposta pendente: a select segue habilitada e com o foco",
-    async (rotulo, valor) => {
+    "B6 — aplicar %s com a resposta pendente: o botão Filtrar segue habilitado e com o foco",
+    async (grupo, opcao) => {
       const srv = listagem();
       render(
         <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />,
       );
       await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
-      await waitFor(() => expect(seletor("Departamento")).toBeEnabled());
-      const select = seletor(rotulo);
-      select.focus();
-      fireEvent.change(select, { target: { value: valor } });
+      botaoFiltrar().focus();
+      await filtrarPelaGaveta([grupo, opcao]);
       await waitFor(() => expect(srv.leituras()).toBe(2));
-      expect(select).not.toBeDisabled();
-      expect(select).toHaveFocus();
-      expect(select).toHaveValue(valor);
+      expect(botaoFiltrar()).not.toBeDisabled();
+      expect(botaoFiltrar()).not.toHaveAttribute("aria-disabled", "true");
+      await waitFor(() => expect(botaoFiltrar()).toHaveFocus());
+      expect(botaoFiltrar()).toHaveAccessibleName("Filtrar, 1 filtro ativo");
     },
   );
 
-  it("B6 — duas trocas seguidas: a resposta antiga, que chega depois, não muda o resultado", async () => {
+  it("B6 — duas aplicações seguidas: a resposta antiga, que chega depois, não muda o resultado", async () => {
     const srv = listagem();
     render(<DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
-    const tipo = seletor("Tipo de vínculo");
-    tipo.focus();
-    fireEvent.change(tipo, { target: { value: "pj" } });
+    await filtrarPelaGaveta(["Tipo de contrato", "PJ"]);
     await waitFor(() => expect(srv.leituras()).toBe(2));
     // A segunda escolha é possível durante a leitura da primeira.
-    fireEvent.change(tipo, { target: { value: "clt" } });
+    await filtrarPelaGaveta(
+      ["Tipo de contrato", "PJ"],
+      ["Tipo de contrato", "CLT"],
+    );
     await waitFor(() => expect(srv.leituras()).toBe(3));
-    expect(vi.mocked(listarColaboradores).mock.lastCall?.[0]).toMatchObject({
-      tipoVinculo: "clt",
-    });
+    expect(ultimaLeituraDaLista()).toMatchObject({ tipos: ["clt"] });
 
     await srv.responder(1, comAna("Pessoa da escolha nova (teste)"));
     await srv.responder(0, comAna("Pessoa da escolha antiga (teste)"));
@@ -6167,18 +6516,35 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
       await screen.findByText("Pessoa da escolha nova (teste)"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Pessoa da escolha antiga (teste)")).toBeNull();
-    expect(tipo).toHaveValue("clt");
+    expect(
+      screen.getByRole("button", { name: "Remover filtro Tipo: CLT" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remover filtro Tipo: PJ" }),
+    ).toBeNull();
   });
 
-  it("B6 — catálogo em erro bloqueia só Departamento e Cargo; Tipo segue livre", async () => {
+  it("B6 — catálogo em erro bloqueia só os grupos de lotação; Tipo de contrato segue livre", async () => {
     vi.mocked(listarDepartamentos).mockRejectedValue(new Error("rede"));
     render(<ColaboradoresScreen />);
-    await screen.findByText(
-      "Não foi possível carregar departamentos e cargos.",
+    await screen.findByText(colaborador1.nome);
+    const gaveta = await abrirGaveta();
+    await within(gaveta).findByText(
+      "Não foi possível carregar departamentos, áreas, centros de custo, unidades e cargos.",
     );
-    expect(seletor("Departamento")).toBeDisabled();
-    expect(seletor("Cargo")).toBeDisabled();
-    expect(seletor("Tipo de vínculo")).toBeEnabled();
+    for (const grupo of [
+      "Departamento",
+      "Área",
+      "Centro de custo",
+      "Unidade",
+      "Cargo",
+    ]) {
+      expect(within(gaveta).queryByRole("group", { name: grupo })).toBeNull();
+    }
+    const pj = within(gaveta).getByRole("button", { name: "PJ" });
+    expect(pj).toBeEnabled();
+    fireEvent.click(pj);
+    expect(pj).toHaveAttribute("aria-pressed", "true");
   });
 
   it("B7 — remover chips: o foco vai ao próximo chip; sem nenhum, ao campo de busca; uma mudança por remoção", async () => {
@@ -6188,26 +6554,28 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
       <DashboardComEstado
         inicial={{
           ...ESTADO_PADRAO,
-          departamentoId: DEP.id,
-          cargoId: CAR.id,
-          tipo: "pj",
+          filtros: filtrosCom({
+            departamentos: [DEP.id],
+            cargos: [CAR.id],
+            tipos: ["pj"],
+          }),
         }}
         onMudanca={onMudanca}
       />,
     );
     const chipDep = await screen.findByRole("button", {
-      name: /^Remover filtro de departamento:/,
+      name: /^Remover filtro Departamento:/,
     });
     chipDep.focus();
     fireEvent.click(chipDep);
     const chipCargo = screen.getByRole("button", {
-      name: /^Remover filtro de cargo:/,
+      name: /^Remover filtro Cargo:/,
     });
     await waitFor(() => expect(chipCargo).toHaveFocus());
 
     fireEvent.click(chipCargo);
     const chipTipo = screen.getByRole("button", {
-      name: "Remover filtro de tipo de vínculo: PJ",
+      name: "Remover filtro Tipo: PJ",
     });
     await waitFor(() => expect(chipTipo).toHaveFocus());
 
@@ -6215,8 +6583,11 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     await waitFor(() => expect(campoBusca()).toHaveFocus());
     expect(document.activeElement).not.toBe(document.body);
     expect(onMudanca.mock.calls.map(([e]) => e)).toEqual([
-      { ...ESTADO_PADRAO, cargoId: CAR.id, tipo: "pj" },
-      { ...ESTADO_PADRAO, tipo: "pj" },
+      {
+        ...ESTADO_PADRAO,
+        filtros: filtrosCom({ cargos: [CAR.id], tipos: ["pj"] }),
+      },
+      { ...ESTADO_PADRAO, filtros: soTipos("pj") },
       ESTADO_PADRAO,
     ]);
   });
@@ -6225,19 +6596,22 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, departamentoId: DEP.id, tipo: "pj" }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          filtros: filtrosCom({ departamentos: [DEP.id], tipos: ["pj"] }),
+        }}
         onMudanca={vi.fn()}
       />,
     );
     const chipTipo = await screen.findByRole("button", {
-      name: "Remover filtro de tipo de vínculo: PJ",
+      name: "Remover filtro Tipo: PJ",
     });
     chipTipo.focus();
     fireEvent.click(chipTipo);
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: /^Remover filtro de departamento:/,
+          name: /^Remover filtro Departamento:/,
         }),
       ).toHaveFocus(),
     );
@@ -6272,14 +6646,18 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     };
   }
 
-  it("B7 — 'Recarregar departamentos e cargos': botão montado, focado e indisponível; clique repetido ignorado; no sucesso, foco em Departamento; a listagem não é relida", async () => {
+  it("B7 — 'Recarregar' na gaveta: botão montado, focado e indisponível; clique repetido ignorado; no sucesso, foco nos grupos de lotação; a listagem não é relida", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
     const deps = catalogoDeDepartamentos();
     render(<ColaboradoresScreen />);
-    const recarregar = await screen.findByRole("button", {
-      name: "Recarregar departamentos e cargos",
+    await screen.findByText(colaborador1.nome);
+    const gaveta = await abrirGaveta();
+    const recarregar = await within(gaveta).findByRole("button", {
+      name: "Recarregar",
     });
-    const leiturasDaLista = vi.mocked(listarColaboradores).mock.calls.length;
+    const leiturasDaLista = vi
+      .mocked(listarColaboradores)
+      .mock.calls.filter(([c]) => c?.tamanhoPagina !== 1).length;
     recarregar.focus();
     fireEvent.click(recarregar);
     await waitFor(() => expect(deps.leituras()).toBe(2));
@@ -6292,19 +6670,28 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     expect(deps.leituras()).toBe(2);
 
     await deps.responder();
-    await waitFor(() => expect(seletor("Departamento")).toHaveFocus());
-    expect(seletor("Departamento")).toBeEnabled();
-    expect(vi.mocked(listarColaboradores).mock.calls.length).toBe(
-      leiturasDaLista,
-    );
+    const grupos = gaveta.querySelector(".gaveta-filtros__lotacao")!;
+    await waitFor(() => expect(grupos).toHaveFocus());
+    expect(
+      within(
+        within(gaveta).getByRole("group", { name: "Departamento" }),
+      ).getByRole("checkbox", { name: "Administrativo (teste) (ADM)" }),
+    ).toBeInTheDocument();
+    expect(
+      vi
+        .mocked(listarColaboradores)
+        .mock.calls.filter(([c]) => c?.tamanhoPagina !== 1).length,
+    ).toBe(leiturasDaLista);
   });
 
-  it("B7 — recarga com nova falha: foco no botão e falha anunciada uma vez", async () => {
+  it("B7 — recarga com nova falha: foco no botão e falha anunciada uma vez, dentro da gaveta", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue(paginado([colaborador1]));
     const deps = catalogoDeDepartamentos();
     render(<ColaboradoresScreen />);
-    const recarregar = await screen.findByRole("button", {
-      name: "Recarregar departamentos e cargos",
+    await screen.findByText(colaborador1.nome);
+    const gaveta = await abrirGaveta();
+    const recarregar = await within(gaveta).findByRole("button", {
+      name: "Recarregar",
     });
     recarregar.focus();
     fireEvent.click(recarregar);
@@ -6313,11 +6700,12 @@ describe("T199 (revisão B6/B7) — foco nos filtros, nos chips e na recarga dos
     expect(recarregar).toBeInTheDocument();
     expect(recarregar).toHaveFocus();
     expect(recarregar).not.toHaveAttribute("aria-disabled", "true");
-    expect(anuncioDaLista()?.textContent).toBe(
-      "Não foi possível carregar departamentos e cargos.",
+    expect(anuncioDaGaveta()?.textContent).toBe(
+      "Não foi possível carregar departamentos, áreas, centros de custo, unidades e cargos.",
     );
+    expect(anuncioDaGaveta()).toHaveAttribute("role", "status");
     fireEvent.click(recarregar);
-    expect(anuncioDaLista()?.textContent).toBe("");
+    expect(anuncioDaGaveta()?.textContent).toBe("");
   });
 });
 
@@ -6429,7 +6817,12 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", pagina: 3, tipo: "pj" }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          pagina: 3,
+          filtros: soTipos("pj"),
+        }}
         onMudanca={onMudanca}
       />,
     );
@@ -6448,7 +6841,7 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
       ...ESTADO_PADRAO,
       aba: "todos",
       pagina: 1,
-      tipo: "pj",
+      filtros: soTipos("pj"),
       tamanho: 100,
     });
     await waitFor(() =>
@@ -6456,7 +6849,7 @@ describe("T209 — Bloco A: tamanho da página (C-2)", () => {
         {
           pagina: 1,
           tamanhoPagina: 100,
-          tipoVinculo: "pj",
+          tipos: ["pj"],
           busca: "Pessoa",
         },
         expect.anything(),
@@ -6583,7 +6976,12 @@ describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)"
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado
-        inicial={{ ...ESTADO_PADRAO, aba: "todos", pagina: 4, tipo: "clt" }}
+        inicial={{
+          ...ESTADO_PADRAO,
+          aba: "todos",
+          pagina: 4,
+          filtros: soTipos("clt"),
+        }}
         onMudanca={onMudanca}
       />,
     );
@@ -6606,7 +7004,7 @@ describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)"
         {
           pagina: 3,
           tamanhoPagina: 20,
-          tipoVinculo: "clt",
+          tipos: ["clt"],
           busca: "sintética",
         },
         expect.anything(),
@@ -6616,7 +7014,7 @@ describe("T209 — Bloco A: paginação numerada e 'Mostrando X–Y de Z' (C-3)"
       ...ESTADO_PADRAO,
       aba: "todos",
       pagina: 3,
-      tipo: "clt",
+      filtros: soTipos("clt"),
     });
 
     await waitFor(() =>
@@ -7233,15 +7631,16 @@ describe("T209 — refinamento: cabeçalho, faixa de indicadores e filtros", () 
     const barra = document.querySelector(".colaboradores-screen__filtros")!;
     expect(
       [...barra.querySelectorAll("label")].map((l) => l.textContent),
-    ).toEqual([
-      "Buscar por nome ou matrícula",
-      "Departamento",
-      "Cargo",
-      "Tipo de vínculo",
-    ]);
+    ).toEqual(["Buscar por nome ou matrícula"]);
+    // T215 — os filtros moram na gaveta: na barra, só o botão "Filtrar".
     expect(
-      within(barra as HTMLElement).getByRole("button", { name: "Buscar" }),
-    ).toBeInTheDocument();
+      within(barra as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Buscar", "Filtrar"]);
+    expect(
+      within(barra as HTMLElement).getByRole("button", { name: "Filtrar" }),
+    ).toHaveAttribute("aria-haspopup", "dialog");
   });
 });
 
@@ -7341,50 +7740,48 @@ describe("T209 — Aprendiz na listagem de Colaboradores", () => {
     ],
   );
 
-  it("o filtro 'Tipo de vínculo' oferece Aprendiz depois de Estágio", async () => {
+  it("o filtro 'Tipo de contrato' da gaveta oferece Aprendiz depois de Estágio", async () => {
     render(<ColaboradoresScreen />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
+    const gaveta = await abrirGaveta();
     expect(
-      within(screen.getByLabelText("Tipo de vínculo"))
-        .getAllByRole("option")
-        .map((o) => [(o as HTMLOptionElement).value, o.textContent]),
+      within(within(gaveta).getByRole("group", { name: "Tipo de contrato" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
     ).toEqual([
-      ["", "Todos os tipos"],
-      ["clt", "CLT"],
-      ["estagio", "Estágio"],
-      ["aprendiz", "Aprendiz"],
-      ["pj", "PJ"],
-      ["temporario", "Temporário"],
-      ["outro_controlado", "Outro controlado"],
+      "CLT",
+      "Estágio",
+      "Aprendiz",
+      "PJ",
+      "Temporário",
+      "Outro controlado",
       // T209 — etapa 2 do Novo colaborador.
-      ["part_time", "Part-time"],
-      ["freelancer", "Freelancer"],
-      ["trainee", "Trainee"],
+      "Part-time",
+      "Freelancer",
+      "Trainee",
     ]);
   });
 
-  it("filtrar por Aprendiz sobe na URL e vai ao servidor como tipoVinculo", async () => {
+  it("filtrar por Aprendiz sobe na URL e vai ao servidor em tipos", async () => {
     const onMudanca = vi.fn();
     render(
       <DashboardComEstado inicial={ESTADO_PADRAO} onMudanca={onMudanca} />,
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "aprendiz" },
-    });
+    await filtrarPelaGaveta(["Tipo de contrato", "Aprendiz"]);
     expect(onMudanca).toHaveBeenLastCalledWith({
       ...ESTADO_PADRAO,
-      tipo: "aprendiz",
+      filtros: soTipos("aprendiz"),
     });
     await waitFor(() =>
       expect(listarColaboradores).toHaveBeenLastCalledWith(
-        expect.objectContaining({ tipoVinculo: "aprendiz" }),
+        expect.objectContaining({ tipos: ["aprendiz"] }),
         expect.anything(),
       ),
     );
     expect(
       await screen.findByRole("button", {
-        name: "Remover filtro de tipo de vínculo: Aprendiz",
+        name: "Remover filtro Tipo: Aprendiz",
       }),
     ).toBeInTheDocument();
   });
@@ -7434,16 +7831,13 @@ describe("T209 — Colaboradores sobre a camada de interface (src/ui)", () => {
     expect(
       screen.getByRole("searchbox", { name: "Buscar por nome ou matrícula" }),
     ).toHaveAttribute("data-ui", "input");
-    for (const rotulo of [
-      "Departamento",
-      "Cargo",
-      "Tipo de vínculo",
-      "Itens por página",
-    ]) {
-      const controle = screen.getByLabelText(rotulo);
-      expect(controle.tagName).toBe("SELECT");
-      expect(controle).toHaveAttribute("data-ui", "select");
-    }
+    const controle = screen.getByLabelText("Itens por página");
+    expect(controle.tagName).toBe("SELECT");
+    expect(controle).toHaveAttribute("data-ui", "select");
+    // T215 — a gaveta "Filtrar" é o Sheet da camada (role dialog, modal).
+    const gaveta = await abrirGaveta();
+    expect(gaveta).toHaveAttribute("aria-modal", "true");
+    expect(gaveta).toHaveAttribute("data-lado", "direita");
   });
 
   it("abas, indicadores e tabela vêm da camada, com as mesmas classes e semântica", async () => {

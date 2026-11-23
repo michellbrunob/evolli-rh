@@ -1573,9 +1573,11 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(
       await screen.findByRole("tab", { name: /^Ativos/, selected: true }),
     ).toBeInTheDocument();
+    // T215 — sem filtros: nenhum chip e o botão "Filtrar" sem contagem.
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
     expect(
-      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
-    ).toBe("");
+      screen.getByRole("button", { name: /^Filtrar/ }),
+    ).toHaveAccessibleName("Filtrar");
     await waitFor(() =>
       expect(document.activeElement?.id).toBe("colaboradores-titulo"),
     );

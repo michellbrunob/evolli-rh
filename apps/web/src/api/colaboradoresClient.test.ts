@@ -285,6 +285,56 @@ describe("T190 — listarColaboradores com filtros de lotação", () => {
   });
 });
 
+describe("T215 — listarColaboradores com os grupos da gaveta Filtrar", () => {
+  it("cada grupo vai em um parâmetro, valores separados por vírgula", async () => {
+    await listarColaboradores({
+      departamentos: ["d1", "d2"],
+      areas: ["a1"],
+      centrosCusto: ["c1"],
+      unidades: ["u1"],
+      cargos: ["k1", "k2"],
+      niveis: ["pleno", "senior"],
+      tipos: ["clt", "pj"],
+      generos: ["feminino", "outro"],
+    });
+    const q = queryEnviada();
+    expect(q.get("departamentos")).toBe("d1,d2");
+    expect(q.get("areas")).toBe("a1");
+    expect(q.get("centrosCusto")).toBe("c1");
+    expect(q.get("unidades")).toBe("u1");
+    expect(q.get("cargos")).toBe("k1,k2");
+    expect(q.get("niveis")).toBe("pleno,senior");
+    expect(q.get("tipos")).toBe("clt,pj");
+    expect(q.get("generos")).toBe("feminino,outro");
+  });
+
+  it("lista vazia não vai à query", async () => {
+    await listarColaboradores({
+      departamentos: [],
+      areas: [],
+      centrosCusto: [],
+      unidades: [],
+      cargos: [],
+      niveis: [],
+      tipos: [],
+      generos: [],
+    });
+    const q = queryEnviada();
+    for (const nome of [
+      "departamentos",
+      "areas",
+      "centrosCusto",
+      "unidades",
+      "cargos",
+      "niveis",
+      "tipos",
+      "generos",
+    ]) {
+      expect(q.has(nome)).toBe(false);
+    }
+  });
+});
+
 describe("T209 (Bloco C) — enviarAdmissao diz se foi reenvio", () => {
   function resposta(cabecalhos: Record<string, string>): Response {
     return {

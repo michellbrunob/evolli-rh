@@ -37,12 +37,17 @@ describe("T209 — Aprendiz na URL e na ordem dos tipos", () => {
   });
 
   it("tipo=aprendiz é lido e escrito na URL da listagem", () => {
-    expect(listagemDaRota(`${ROTA}?tipo=aprendiz`)?.tipo).toBe("aprendiz");
+    expect(listagemDaRota(`${ROTA}?tipo=aprendiz`)?.filtros.tipos).toEqual([
+      "aprendiz",
+    ]);
     expect(
-      rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, tipo: "aprendiz" }),
+      rotaDaListagem({
+        ...ESTADO_INICIAL_DA_LISTAGEM,
+        filtros: { ...ESTADO_INICIAL_DA_LISTAGEM.filtros, tipos: ["aprendiz"] },
+      }),
     ).toBe(`${ROTA}?tipo=aprendiz`);
     // Variações não são tipo controlado: caem no padrão.
-    expect(listagemDaRota(`${ROTA}?tipo=Aprendiz`)?.tipo).toBeNull();
+    expect(listagemDaRota(`${ROTA}?tipo=Aprendiz`)?.filtros.tipos).toEqual([]);
   });
 });
 

@@ -705,12 +705,25 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     await waitFor(() => expect(ultimaConsulta().grupo).toBe("desligados"));
   });
 
+  /** T215 — o tipo de contrato pela gaveta "Filtrar". */
+  async function filtrarPorTipo(rotulo: string) {
+    fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
+    const gaveta = await screen.findByRole("dialog", { name: "Filtrar" });
+    fireEvent.click(within(gaveta).getByRole("button", { name: rotulo }));
+    fireEvent.click(
+      within(gaveta).getByRole("button", {
+        name: /^Ver (\d+ )?resultados?$/,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull(),
+    );
+  }
+
   it("a busca nunca vai para a URL", async () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "pj" },
-    });
+    await filtrarPorTipo("PJ");
     await waitFor(() =>
       expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`),
     );
@@ -735,7 +748,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     );
     expect(ultimaConsulta()).toMatchObject({
       grupo: "em_admissao",
-      tipoVinculo: "estagio",
+      tipos: ["estagio"],
       pagina: 1,
     });
     expect(window.location.hash).toBe(rota);
@@ -755,8 +768,8 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     expect(window.history.length).toBe(entradas);
     for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
       expect(consulta).not.toHaveProperty("busca");
-      expect(consulta).not.toHaveProperty("tipoVinculo");
-      expect(consulta).not.toHaveProperty("departamentoId");
+      expect(consulta).not.toHaveProperty("tipos");
+      expect(consulta).not.toHaveProperty("departamentos");
       expect(consulta?.pagina).toBe(1);
     }
   });
@@ -779,7 +792,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     );
     expect(window.history.length).toBe(entradas);
     for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
-      expect(consulta?.departamentoId).toBeUndefined();
+      expect(consulta?.departamentos).toBeUndefined();
     }
   });
 
@@ -828,7 +841,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
       expect(ultimaConsulta()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
-        tipoVinculo: "pj",
+        tipos: ["pj"],
       }),
     );
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
@@ -838,9 +851,8 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     const { unmount } = render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     fireEvent.click(abaDoDashboard(/^Todos/));
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "temporario" },
-    });
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    await filtrarPorTipo("Temporário");
     await waitFor(() =>
       expect(window.location.hash).toBe(
         `${LISTAGEM}?aba=todos&tipo=temporario`,
@@ -854,9 +866,9 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
     expect(
-      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
-    ).toBe("temporario");
-    expect(ultimaConsulta()).toMatchObject({ tipoVinculo: "temporario" });
+      screen.getByRole("button", { name: "Remover filtro Tipo: Temporário" }),
+    ).toBeInTheDocument();
+    expect(ultimaConsulta()).toMatchObject({ tipos: ["temporario"] });
     expect(ultimaConsulta()).not.toHaveProperty("grupo");
   });
 

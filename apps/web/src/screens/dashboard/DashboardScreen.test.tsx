@@ -492,14 +492,14 @@ describe("T205 — atalhos (D-5)", () => {
     expect(onAbrirListagem).toHaveBeenLastCalledWith({
       ...ESTADO_INICIAL_DA_LISTAGEM,
       aba: "ativos",
-      tipo: "estagio",
+      filtros: { ...ESTADO_INICIAL_DA_LISTAGEM.filtros, tipos: ["estagio"] },
     });
     expect(links[1]).toHaveAttribute(
       "href",
       rotaDaListagem({
         ...ESTADO_INICIAL_DA_LISTAGEM,
         aba: "ativos",
-        tipo: "estagio",
+        filtros: { ...ESTADO_INICIAL_DA_LISTAGEM.filtros, tipos: ["estagio"] },
       }),
     );
 
@@ -1348,7 +1348,7 @@ describe("T207 — abas Pessoas e Movimentação", () => {
     expect(onAbrirListagem).toHaveBeenLastCalledWith({
       ...ESTADO_INICIAL_DA_LISTAGEM,
       aba: "ativos",
-      tipo: "aprendiz",
+      filtros: { ...ESTADO_INICIAL_DA_LISTAGEM.filtros, tipos: ["aprendiz"] },
     });
     const tabela = within(painel).getByRole("table", {
       name: "Pessoas ativas hoje por tipo de vínculo",
