@@ -6838,17 +6838,10 @@ describe("T209 — Bloco A: aviso de auditoria fiel (C-6)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T209 — Bloco B: menu "Ações" por linha, só com atalhos às abas da ficha que
-// o papel vê (C-4). Nenhuma edição, desligamento ou ação em lote.
+// T209 — Bloco B: menu "Ações" por linha. T215 — o "⋯" da linha com "Ver
+// ficha" e, para quem edita, "Editar colaborador". Nada de desligar, excluir
+// ou agir em lote.
 // ---------------------------------------------------------------------------
-const ATALHOS_SEM_SOLICITACOES = [
-  "Dados do colaborador",
-  "Vida funcional",
-  "Dados contratuais",
-  "Jornada de trabalho",
-  "Documentos",
-  "Registros de ponto",
-];
 
 function botaoDeAcoes(nome: string): HTMLElement {
   return screen.getByRole("button", { name: `Ações: ${nome}` });
@@ -6895,34 +6888,44 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
   });
 
-  it("só atalhos às abas da ficha; Solicitações só para quem as vê", async () => {
+  it("T215 — Ver ficha e, só para quem edita, Editar colaborador; o gatilho é o ⋯", async () => {
     const { unmount } = render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    await abrirMenu(botaoDeAcoes(colaborador1.nome));
-    expect(itensDoMenu()).toEqual(ATALHOS_SEM_SOLICITACOES);
+    const botao = botaoDeAcoes(colaborador1.nome);
+    // O "⋯": só o ícone à vista; o nome vem do rótulo.
+    expect(botao.textContent).toBe("");
+    await abrirMenu(botao);
+    expect(itensDoMenu()).toEqual(["Ver ficha"]);
     unmount();
 
-    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} podeVerSolicitacoes />);
+    render(
+      <ColaboradoresScreen
+        onAbrirFicha={vi.fn()}
+        onEditarColaborador={vi.fn()}
+      />,
+    );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     await abrirMenu(botaoDeAcoes(colaborador1.nome));
-    expect(itensDoMenu()).toEqual([
-      ...ATALHOS_SEM_SOLICITACOES,
-      "Solicitações",
-    ]);
-    // Nada que edite, desligue ou aja em lote.
-    for (const proibido of [
-      /editar/i,
-      /deslig/i,
-      /exclu/i,
-      /lote/i,
-      /export/i,
-    ]) {
+    expect(itensDoMenu()).toEqual(["Ver ficha", "Editar colaborador"]);
+    // Nada que desligue, exclua, aja em lote ou exporte.
+    for (const proibido of [/deslig/i, /exclu/i, /lote/i, /export/i]) {
       expect(itensDoMenu().some((t) => proibido.test(t))).toBe(false);
+    }
+    // Cada item com o seu ícone, decorativo.
+    for (const item of within(screen.getByRole("menu")).getAllByRole(
+      "menuitem",
+    )) {
+      expect(item.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     }
   });
 
   it("teclado abre no primeiro atalho; setas com volta, Home e End; Escape devolve o foco", async () => {
-    render(<ColaboradoresScreen onAbrirFicha={vi.fn()} />);
+    render(
+      <ColaboradoresScreen
+        onAbrirFicha={vi.fn()}
+        onEditarColaborador={vi.fn()}
+      />,
+    );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const botao = botaoDeAcoes(colaborador1.nome);
     botao.focus();
@@ -6982,42 +6985,47 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     );
   });
 
-  it("escolher um atalho fecha o menu, devolve o foco ao botão e abre a ficha naquela aba", async () => {
+  it("Ver ficha abre a ficha; Editar colaborador pede a edição; o foco volta ao ⋯", async () => {
     const onAbrirFicha = vi.fn();
+    const onEditarColaborador = vi.fn();
     render(
-      <ColaboradoresScreen onAbrirFicha={onAbrirFicha} podeVerSolicitacoes />,
+      <ColaboradoresScreen
+        onAbrirFicha={onAbrirFicha}
+        onEditarColaborador={onEditarColaborador}
+      />,
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const botao = botaoDeAcoes(colaborador1.nome);
-    const esperado: [string, string][] = [
-      ["Dados do colaborador", "dados"],
-      ["Vida funcional", "vida-funcional"],
-      ["Dados contratuais", "contratuais"],
-      ["Jornada de trabalho", "jornada"],
-      ["Documentos", "documentos"],
-      ["Registros de ponto", "ponto"],
-      ["Solicitações", "solicitacoes"],
-    ];
-    for (const [rotulo, aba] of esperado) {
-      await abrirMenu(botao);
-      fireEvent.click(screen.getByRole("menuitem", { name: rotulo }));
-      expect(botao).toHaveFocus();
-      expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador1.id, aba);
-      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    }
-    expect(onAbrirFicha).toHaveBeenCalledTimes(esperado.length);
+    await abrirMenu(botao);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Ver ficha" }));
+    expect(botao).toHaveFocus();
+    expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador1.id);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+
+    await abrirMenu(botao);
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Editar colaborador" }),
+    );
+    expect(botao).toHaveFocus();
+    expect(onEditarColaborador).toHaveBeenLastCalledWith(colaborador1.id);
+    expect(onAbrirFicha).toHaveBeenCalledTimes(1);
   });
 
   it("Enter num atalho escolhe pelo teclado", async () => {
-    const onAbrirFicha = vi.fn();
-    render(<ColaboradoresScreen onAbrirFicha={onAbrirFicha} />);
+    const onEditarColaborador = vi.fn();
+    render(
+      <ColaboradoresScreen
+        onAbrirFicha={vi.fn()}
+        onEditarColaborador={onEditarColaborador}
+      />,
+    );
     await screen.findByRole("table", { name: /^Colaboradores — / });
     const botao = botaoDeAcoes(colaborador2.nome);
     botao.focus();
     fireEvent.keyDown(botao, { key: "ArrowDown" });
     const menu = await screen.findByRole("menu");
     const ultimo = within(menu).getByRole("menuitem", {
-      name: "Registros de ponto",
+      name: "Editar colaborador",
     });
     await waitFor(() =>
       expect(within(menu).getAllByRole("menuitem")[0]).toHaveFocus(),
@@ -7026,18 +7034,18 @@ describe("T209 — Bloco B: menu 'Ações' por linha (C-4)", () => {
     await waitFor(() => expect(ultimo).toHaveFocus());
     fireEvent.keyDown(ultimo, { key: "Enter" });
     await waitFor(() =>
-      expect(onAbrirFicha).toHaveBeenLastCalledWith(colaborador2.id, "ponto"),
+      expect(onEditarColaborador).toHaveBeenLastCalledWith(colaborador2.id),
     );
   });
 
-  it("no contêiner de Pessoas, o atalho abre a ficha já na aba escolhida", async () => {
+  it("no contêiner de Pessoas, Ver ficha abre a ficha nos dados", async () => {
     render(<ComFicha />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     await abrirMenu(botaoDeAcoes(colaborador1.nome));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Documentos" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Ver ficha" }));
     const ficha = await esperarFicha();
     expect(
-      within(ficha).getByRole("tab", { name: /Documentos/ }),
+      within(ficha).getByRole("tab", { name: /Dados do colaborador/ }),
     ).toHaveAttribute("aria-selected", "true");
   });
 

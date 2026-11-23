@@ -30,7 +30,6 @@ import {
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type TipoDeVinculo,
-  ABAS_DA_FICHA,
   ABAS_DA_LISTAGEM,
   ESTADO_INICIAL_DA_LISTAGEM,
   TAMANHOS_DE_PAGINA,
@@ -49,11 +48,9 @@ import {
   IconeAdicionarPessoa,
   PainelAdicionarColaborador,
 } from "./PainelAdicionarColaborador";
-import {
-  ROTULO_DA_ABA as ROTULO_DA_ABA_DA_FICHA,
-  iniciaisDe,
-} from "./FichaColaboradorScreen";
+import { iniciaisDe } from "./FichaColaboradorScreen";
 import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
+import { IconeEditar, IconeVer } from "../../ui/icones";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
@@ -361,11 +358,8 @@ export interface ColaboradoresScreenProps {
    * prop, não há menu.
    */
   readonly onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
-  /**
-   * T209 — a aba "Solicitações" da ficha só existe para quem a lê (T203): o
-   * menu "Ações" só oferece o atalho a esses papéis.
-   */
-  readonly podeVerSolicitacoes?: boolean;
+  /** T215 — "Editar colaborador" no ⋯ da linha: só para quem edita. */
+  readonly onEditarColaborador?: (colaboradorId: string) => void;
   /**
    * T198 — muda quando a pessoa volta da ficha: o dashboard (que ficou
    * montado, com busca, filtros e página) relê a página atual.
@@ -464,11 +458,11 @@ export function ColaboradoresScreen({
   onImportarPlanilha,
   onImportarArquivo,
   onAbrirFicha,
+  onEditarColaborador,
   atualizacao = 0,
   estado: estadoControlado,
   onEstadoChange,
   podeOperarJornada = false,
-  podeVerSolicitacoes = false,
 }: ColaboradoresScreenProps = {}) {
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
@@ -946,9 +940,6 @@ export function ColaboradoresScreen({
   }
 
   /** T209 — as abas da ficha que o papel vê, na ordem da ficha (C-4). */
-  const abasDosAtalhos = ABAS_DA_FICHA.filter(
-    (a) => a !== "solicitacoes" || podeVerSolicitacoes,
-  );
 
   function trocarAba(nova: AbaDaListagem) {
     if (nova === aba) return;
@@ -1210,7 +1201,8 @@ export function ColaboradoresScreen({
           },
         ]
       : []),
-    // T209 — só atalhos às abas da ficha (C-4); sem ficha, sem menu.
+    // T215 — o ⋯ da linha: Ver ficha e, para quem edita, Editar
+    // colaborador. Sem ficha, sem menu.
     ...(onAbrirFicha
       ? [
           {
@@ -1219,11 +1211,24 @@ export function ColaboradoresScreen({
             cell: (c: ColaboradorListadoApi) => (
               <MenuAcoesDaPessoa
                 nome={c.nome}
-                atalhos={abasDosAtalhos.map((abaDaFicha) => ({
-                  id: abaDaFicha,
-                  rotulo: ROTULO_DA_ABA_DA_FICHA[abaDaFicha],
-                  aoEscolher: () => onAbrirFicha(c.id, abaDaFicha),
-                }))}
+                atalhos={[
+                  {
+                    id: "ver-ficha",
+                    rotulo: "Ver ficha",
+                    icone: IconeVer,
+                    aoEscolher: () => onAbrirFicha(c.id),
+                  },
+                  ...(onEditarColaborador
+                    ? [
+                        {
+                          id: "editar",
+                          rotulo: "Editar colaborador",
+                          icone: IconeEditar,
+                          aoEscolher: () => onEditarColaborador(c.id),
+                        },
+                      ]
+                    : []),
+                ]}
               />
             ),
           },

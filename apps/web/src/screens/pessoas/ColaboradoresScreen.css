@@ -808,23 +808,27 @@
   display: inline-block;
 }
 
+/* T215 — o "⋯" da linha: botão quadrado só com o ícone (o nome vem do
+   rótulo "Ações: <nome>"), sem borda até o ponteiro ou o menu aberto. */
 .colaboradores-screen__botao-acoes {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--touch-target);
   min-height: var(--touch-target);
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  background: var(--surface-canvas);
-  color: var(--color-ink);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-muted);
   font: inherit;
-  white-space: nowrap;
   cursor: pointer;
 }
 
+.colaboradores-screen__botao-acoes:hover,
 .colaboradores-screen__botao-acoes[aria-expanded="true"] {
-  border-color: var(--color-action);
+  border-color: var(--hairline);
+  background: var(--surface-neutral);
+  color: var(--color-ink);
 }
 
 /* O menu "Ações" é o DropdownMenu da camada `src/ui` (Radix, em portal):

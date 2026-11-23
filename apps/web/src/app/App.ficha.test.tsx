@@ -2868,12 +2868,12 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
   });
 
   it.each([
-    ["rh", true],
-    ["dp", false],
-    ["master_tecnico", true],
+    ["rh", ["Ver ficha", "Editar colaborador"]],
+    ["dp", ["Ver ficha", "Editar colaborador"]],
+    ["master_tecnico", ["Ver ficha"]],
   ] as const)(
-    "%s: atalhos às abas que o papel vê; Solicitações só para quem as lê (%s)",
-    async (papel, comSolicitacoes) => {
+    "T215 — %s: o ⋯ da linha traz %j (Editar só para quem edita a ficha)",
+    async (papel, esperados) => {
       render(<App papelDoAtor={papel} />);
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
@@ -2884,53 +2884,34 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       const rotulos = within(await screen.findByRole("menu"))
         .getAllByRole("menuitem")
         .map((item) => item.textContent);
-      expect(rotulos.includes("Solicitações")).toBe(comSolicitacoes);
-      expect(rotulos).toContain("Documentos");
-      expect(rotulos).toHaveLength(comSolicitacoes ? 7 : 6);
+      expect(rotulos).toEqual(esperados);
     },
   );
 
-  it("o atalho empilha a rota da ficha na aba; ponto no mês corrente; a trilha devolve o foco ao botão", async () => {
+  it("T215 — Ver ficha e Editar colaborador empilham a ficha nos dados; a trilha devolve o foco ao ⋯", async () => {
     render(<App papelDoAtor="rh" />);
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
-    const empilhar = vi.spyOn(window.history, "pushState");
     const botao = within(tabela).getByRole("button", {
       name: `Ações: ${ana.nome}`,
     });
-    abrirMenuDaLinha(botao);
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Documentos" }),
-    );
-    await esperarFicha(ana.nome);
-    expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
-    expect(empilhar).toHaveBeenCalledWith(
-      expect.anything(),
-      "",
-      expect.stringContaining(rotaDe(ana, "documentos")),
-    );
-    empilhar.mockRestore();
-    expect(abaSelecionada()).toHaveTextContent("Documentos");
-
-    fireEvent.click(voltarPelaTrilha());
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    await waitFor(() =>
-      expect(
+    for (const item of ["Ver ficha", "Editar colaborador"]) {
+      abrirMenuDaLinha(
         screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
-      ).toHaveFocus(),
-    );
-
-    abrirMenuDaLinha(
-      screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
-    );
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Registros de ponto" }),
-    );
-    await esperarFicha(ana.nome);
-    expect(window.location.hash).toBe(
-      `${rotaDe(ana, "ponto")}/${competenciaDoMesAtual()}`,
-    );
+      );
+      fireEvent.click(await screen.findByRole("menuitem", { name: item }));
+      await esperarFicha(ana.nome);
+      expect(window.location.hash).toBe(rotaDe(ana, "dados"));
+      fireEvent.click(voltarPelaTrilha());
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+        ).toHaveFocus(),
+      );
+    }
+    expect(botao).toBeDefined();
   });
 
   it("perfis sem Colaboradores não veem menu nenhum (a rota é recusada)", async () => {

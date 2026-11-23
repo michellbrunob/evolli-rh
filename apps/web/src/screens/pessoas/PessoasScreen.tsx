@@ -445,12 +445,19 @@ export function PessoasScreen({
                   {...(onImportarPlanilha ? { onImportarPlanilha } : {})}
                   {...(onImportarArquivo ? { onImportarArquivo } : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
+                  {...(onAbrirFicha && podeEditarFicha
+                    ? {
+                        // T215 — até a tela "Editar colaborador" chegar, a
+                        // edição é a da ficha, nos dados.
+                        onEditarColaborador: (colaboradorId: string) =>
+                          abrirFicha(colaboradorId, "dados"),
+                      }
+                    : {})}
                   atualizacao={atualizacaoDaListagem}
                   {...(listagem && onListagemChange
                     ? { estado: listagem, onEstadoChange: onListagemChange }
                     : {})}
                   podeOperarJornada={podeOperarJornada}
-                  podeVerSolicitacoes={podeVerSolicitacoes}
                 />
               ) : abaAtiva === "horario" ? (
                 <PessoasHorarioScreen
