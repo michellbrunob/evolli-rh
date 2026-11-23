@@ -303,9 +303,18 @@ export function filtroDeLotacaoVigente(
 export function filtroDeGrupo(
   noEscopo: Prisma.VinculoFuncionalWhereInput,
   grupo: GrupoColaborador | undefined,
-  tipo?: TipoVinculo,
+  /** T215 — um tipo, ou vários (qualquer um deles). */
+  tipo?: TipoVinculo | readonly TipoVinculo[],
 ): Prisma.ColaboradorWhereInput | null {
-  const doTipo = tipo ? { tipo } : {};
+  const doTipo: Prisma.VinculoFuncionalWhereInput =
+    tipo === undefined
+      ? {}
+      : typeof tipo === "string"
+        ? { tipo }
+        : tipo.length > 0
+          ? { tipo: { in: [...tipo] } }
+          : {};
+  const temTipo = Object.keys(doTipo).length > 0;
   const com = (situacao: SituacaoVinculo): Prisma.ColaboradorWhereInput => ({
     vinculos: { some: { ...noEscopo, situacao, ...doTipo } },
   });
@@ -320,8 +329,78 @@ export function filtroDeGrupo(
     case "desligados":
       return { AND: [sem("ativo"), sem("previsto"), com("encerrado")] };
     default:
-      return tipo ? { vinculos: { some: { ...noEscopo, tipo } } } : null;
+      return temTipo
+        ? { vinculos: { some: { ...noEscopo, ...doTipo } } }
+        : null;
   }
+}
+
+/** T215 — o que a gaveta "Filtrar" manda (cada grupo, uma lista). */
+export interface FiltrosDaGaveta {
+  readonly departamentos?: readonly string[] | undefined;
+  readonly areas?: readonly string[] | undefined;
+  readonly centrosCusto?: readonly string[] | undefined;
+  readonly unidades?: readonly string[] | undefined;
+  readonly cargos?: readonly string[] | undefined;
+  readonly niveis?: readonly string[] | undefined;
+  readonly generos?: readonly string[] | undefined;
+}
+
+/**
+ * T215 — a gaveta "Filtrar" no `where`. Dentro de um grupo, qualquer um dos
+ * valores; entre os grupos, todos. Lotação e nível valem no MESMO vínculo
+ * ATIVO do escopo, na alocação ABERTA (a regra da T190); o gênero, no perfil
+ * pessoal do escopo. Nada marcado: lista vazia (nenhum filtro na consulta).
+ */
+export function filtrosDaGaveta(
+  noEscopo: Prisma.VinculoFuncionalWhereInput,
+  filtros: FiltrosDaGaveta,
+): Prisma.ColaboradorWhereInput[] {
+  const em = (lista: readonly string[] | undefined) =>
+    lista && lista.length > 0 ? { in: [...lista] } : undefined;
+  const alocacao: Prisma.AlocacaoOrganizacionalWhereInput = {};
+  const departamentos = em(filtros.departamentos);
+  const areas = em(filtros.areas);
+  const centros = em(filtros.centrosCusto);
+  const unidades = em(filtros.unidades);
+  const cargos = em(filtros.cargos);
+  if (departamentos) alocacao.departamentoId = departamentos;
+  if (areas) alocacao.areaId = areas;
+  if (centros) alocacao.centroCustoId = centros;
+  if (unidades) alocacao.unidadeOrganizacionalId = unidades;
+  if (cargos) alocacao.cargoId = cargos;
+  const niveis = em(filtros.niveis);
+  const temLotacao = Object.keys(alocacao).length > 0;
+
+  const resultado: Prisma.ColaboradorWhereInput[] = [];
+  if (temLotacao || niveis) {
+    resultado.push({
+      vinculos: {
+        some: {
+          ...noEscopo,
+          situacao: "ativo",
+          ...(temLotacao
+            ? { alocacoes: { some: { vigenteAte: null, ...alocacao } } }
+            : {}),
+          ...(niveis ? { contrato: { is: { nivel: niveis } } } : {}),
+        },
+      },
+    });
+  }
+  const generos = em(filtros.generos);
+  if (generos) {
+    resultado.push({
+      perfisPessoais: {
+        some: {
+          ...(typeof noEscopo.empresaId === "string"
+            ? { empresaId: noEscopo.empresaId }
+            : {}),
+          genero: generos,
+        },
+      },
+    });
+  }
+  return resultado;
 }
 
 /** Um vínculo ativo, só com o que decide o principal e o tipo. */
@@ -1308,8 +1387,29 @@ export class ColaboradorService {
       query.cargoId,
     );
     if (porLotacao) filtros.push(porLotacao);
+    // T215 — a gaveta "Filtrar" (listas; grupos combinados).
+    filtros.push(
+      ...filtrosDaGaveta(noEscopo, {
+        departamentos: query.departamentos,
+        areas: query.areas,
+        centrosCusto: query.centrosCusto,
+        unidades: query.unidades,
+        cargos: query.cargos,
+        niveis: query.niveis,
+        generos: query.generos,
+      }),
+    );
     // T199 — grupo da aba e tipo de vínculo, no banco e antes da paginação.
-    const porGrupo = filtroDeGrupo(noEscopo, query.grupo, query.tipoVinculo);
+    // T215 — o tipo único (antigo) e a lista da gaveta valem juntos.
+    const tipos = [
+      ...(query.tipoVinculo ? [query.tipoVinculo] : []),
+      ...(query.tipos ?? []),
+    ];
+    const porGrupo = filtroDeGrupo(
+      noEscopo,
+      query.grupo,
+      tipos.length === 1 ? tipos[0] : tipos.length > 1 ? tipos : undefined,
+    );
     if (porGrupo) filtros.push(porGrupo);
     const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 

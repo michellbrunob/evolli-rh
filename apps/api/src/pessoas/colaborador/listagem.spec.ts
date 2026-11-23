@@ -13,6 +13,7 @@ import {
   escaparCuringas,
   filtroDeGrupo,
   filtroDeLotacaoVigente,
+  filtrosDaGaveta,
   ordenarVinculosListados,
 } from "./colaborador.service";
 
@@ -385,6 +386,129 @@ describe("T199 — ativos por tipo, pelo vínculo principal", () => {
         part_time: 0,
         freelancer: 0,
         trainee: 0,
+      },
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T215 — gaveta "Filtrar": vários valores por grupo (qualquer um deles) e os
+// grupos combinados (todos eles). Lotação e nível no MESMO vínculo ativo, na
+// alocação aberta (a regra da T190); gênero no perfil pessoal do escopo.
+// ---------------------------------------------------------------------------
+describe("T215 — filtros da gaveta", () => {
+  const EMPRESA = "33333333-3333-4333-8333-333333333333";
+  const A = "11111111-1111-4111-8111-111111111111";
+  const B = "22222222-2222-4222-8222-222222222222";
+  const C = "44444444-4444-4444-8444-444444444444";
+
+  it("lê listas separadas por vírgula ou repetidas, e confere cada valor", async () => {
+    const dto = plainToInstance(ListarColaboradoresQueryDto, {
+      departamentos: `${A},${B}`,
+      areas: [A],
+      centrosCusto: B,
+      unidades: `${C}`,
+      cargos: `${A}, ${C}`,
+      niveis: "pleno,senior",
+      tipos: "clt,estagio",
+      generos: ["feminino", "prefiro_nao_informar"],
+    });
+    expect(await validate(dto, OPCOES)).toEqual([]);
+    expect(dto.departamentos).toEqual([A, B]);
+    expect(dto.areas).toEqual([A]);
+    expect(dto.centrosCusto).toEqual([B]);
+    expect(dto.unidades).toEqual([C]);
+    expect(dto.cargos).toEqual([A, C]);
+    expect(dto.niveis).toEqual(["pleno", "senior"]);
+    expect(dto.tipos).toEqual(["clt", "estagio"]);
+    expect(dto.generos).toEqual(["feminino", "prefiro_nao_informar"]);
+  });
+
+  it("recusa valor fora da forma: UUID, tipo, gênero, nível fora da lista ou lista longa demais", async () => {
+    expect(await erros({ departamentos: `${A},abc` })).toEqual([
+      "departamentos",
+    ]);
+    expect(await erros({ tipos: "clt,folguista" })).toEqual(["tipos"]);
+    expect(await erros({ generos: "nenhum" })).toEqual(["generos"]);
+    expect(await erros({ niveis: "estagiario" })).toEqual(["niveis"]);
+    expect(
+      await erros({
+        cargos: Array.from({ length: 51 }, () => A).join(","),
+      }),
+    ).toEqual(["cargos"]);
+  });
+
+  it("nada marcado: nenhum filtro entra na consulta", () => {
+    expect(filtrosDaGaveta({ empresaId: EMPRESA }, {})).toEqual([]);
+    expect(
+      filtrosDaGaveta(
+        { empresaId: EMPRESA },
+        { departamentos: [], generos: [] },
+      ),
+    ).toEqual([]);
+  });
+
+  it("lotação e nível: o MESMO vínculo ativo, na alocação aberta, com qualquer um dos valores de cada grupo", () => {
+    expect(
+      filtrosDaGaveta(
+        { empresaId: EMPRESA },
+        {
+          departamentos: [A, B],
+          areas: [C],
+          centrosCusto: [A],
+          unidades: [B],
+          cargos: [C],
+          niveis: ["pleno"],
+        },
+      ),
+    ).toEqual([
+      {
+        vinculos: {
+          some: {
+            empresaId: EMPRESA,
+            situacao: "ativo",
+            alocacoes: {
+              some: {
+                vigenteAte: null,
+                departamentoId: { in: [A, B] },
+                areaId: { in: [C] },
+                centroCustoId: { in: [A] },
+                unidadeOrganizacionalId: { in: [B] },
+                cargoId: { in: [C] },
+              },
+            },
+            contrato: { is: { nivel: { in: ["pleno"] } } },
+          },
+        },
+      },
+    ]);
+  });
+
+  it("gênero: no perfil pessoal do escopo; master sem empresa, sem empresa no filtro", () => {
+    expect(
+      filtrosDaGaveta({ empresaId: EMPRESA }, { generos: ["feminino"] }),
+    ).toEqual([
+      {
+        perfisPessoais: {
+          some: { empresaId: EMPRESA, genero: { in: ["feminino"] } },
+        },
+      },
+    ]);
+    expect(filtrosDaGaveta({}, { generos: ["outro"] })).toEqual([
+      { perfisPessoais: { some: { genero: { in: ["outro"] } } } },
+    ]);
+  });
+
+  it("vários tipos de contrato no vínculo do grupo", () => {
+    expect(
+      filtroDeGrupo({ empresaId: EMPRESA }, "ativos", ["clt", "pj"]),
+    ).toEqual({
+      vinculos: {
+        some: {
+          empresaId: EMPRESA,
+          situacao: "ativo",
+          tipo: { in: ["clt", "pj"] },
+        },
       },
     });
   });
