@@ -25,8 +25,9 @@
  * ## T211 — organização
  *
  * Colaboradores reúne Escala de trabalho e Organograma (destinos do grupo
- * Gestão de Pessoas); Liderança é item direto de Pessoas; Equipe e
- * permissões vive em Configurações. Ponto, Administração da liderança e as
+ * Gestão de Pessoas); Liderança é item direto de Pessoas. T215 — Segurança
+ * (Sessões ativas e Permissões de acesso) é módulo próprio no rodapé, logo
+ * acima de Roadmap. Ponto, Administração da liderança e as
  * telas de Demonstração não estão no menu: as duas primeiras abrem pela URL
  * própria.
  *
@@ -232,6 +233,8 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         rotulo: "Suporte",
         icone: IconeSuporte,
       },
+      // T215 — Segurança, logo acima de Roadmap.
+      { tipo: "modulo", grupo: "Segurança" },
       {
         tipo: "em-desenvolvimento",
         id: "roadmap",

@@ -1,0 +1,244 @@
+/*
+ * T215 — página "Editar colaborador": cabeçalho com voltar, foto, título,
+ * nome, Status e lixeira; menu lateral das seções (fixo ao rolar, quando a
+ * página tem largura); conteúdo em linhas do cadastro; rodapé fixo. Só
+ * tokens; as linhas e o rodapé vêm do padrão do cadastro em etapas.
+ */
+
+.editar-colaborador {
+  max-width: 72rem;
+}
+
+.editar-colaborador__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
+}
+
+.editar-colaborador__identidade {
+  display: grid;
+  gap: var(--space-xxs);
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.editar-colaborador__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.editar-colaborador__nome {
+  margin: 0;
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.editar-colaborador__avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-canvas);
+  border: 1px solid var(--hairline);
+  color: var(--color-ink-muted);
+  font-weight: var(--weight-strong);
+}
+
+.editar-colaborador__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.editar-colaborador__avatar--grande {
+  width: 4rem;
+  height: 4rem;
+}
+
+.editar-colaborador__acoes-do-topo {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.editar-colaborador__status {
+  display: grid;
+  gap: var(--space-xxs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.editar-colaborador__status select {
+  min-height: var(--touch-target);
+  min-width: 10rem;
+  padding: var(--space-xs) var(--space-sm);
+  font: inherit;
+  font-weight: normal;
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+}
+
+.editar-colaborador__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.editar-colaborador__menu ul {
+  display: flex;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  list-style: none;
+  overflow-x: auto;
+}
+
+.editar-colaborador__item {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.editar-colaborador__item:hover {
+  background: var(--surface-canvas);
+}
+
+.editar-colaborador__item--atual {
+  background: var(--surface-canvas);
+  font-weight: var(--weight-strong);
+  box-shadow: inset 3px 0 0 var(--color-action);
+}
+
+.editar-colaborador__item:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.editar-colaborador__conteudo {
+  min-width: 0;
+}
+
+.editar-colaborador__secao {
+  display: grid;
+  min-width: 0;
+}
+
+.editar-colaborador__par {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.editar-colaborador__foto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.editar-colaborador__rodape {
+  grid-column: 1 / -1;
+}
+
+.editar-colaborador__estado {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.editar-colaborador__aviso,
+.editar-colaborador__carregando {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.editar-colaborador__falha-texto {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+.editar-colaborador__falha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.editar-colaborador__vazio {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xl) var(--space-md);
+  margin-top: var(--space-lg);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.editar-colaborador__vazio-acao {
+  justify-self: end;
+}
+
+.editar-colaborador__vazio-titulo {
+  margin: 0;
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.editar-colaborador__vazio-texto,
+.editar-colaborador__vazio-motivo {
+  margin: 0;
+  max-width: 32rem;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.editar-colaborador__documentos {
+  padding-top: var(--space-md);
+}
+
+@container (min-width: 40rem) {
+  .editar-colaborador__par {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .editar-colaborador__par--largo {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+@container (min-width: 52rem) {
+  .editar-colaborador__corpo {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    column-gap: var(--space-xl);
+  }
+
+  .editar-colaborador__menu {
+    position: sticky;
+    top: var(--space-lg);
+    align-self: start;
+  }
+
+  .editar-colaborador__menu ul {
+    flex-direction: column;
+    overflow: visible;
+  }
+}

@@ -44,6 +44,10 @@
  * aba deixou de ser válida; o `AutenticacaoApp` reage limpando o estado em
  * memória e voltando ao login — mesmo caminho do logout explícito.
  *
+ * T215 — "Sessões ativas", no menu da conta, leva à página Segurança ›
+ * Sessões ativas (o mesmo `SessoesAtivasPanel`, sem "Fechar"), em vez de
+ * abrir o painel sobre a tela.
+ *
  * "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
  * "Relatórios" são os destinos cujo `h1` pode mudar sem trocar de destino
  * (cada um troca de aba local entre telas com `h1` próprio).
@@ -73,11 +77,14 @@ import { MarcaEvolli } from "./marca/MarcaEvolli";
 import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
 import { ProvedorDeTrilhaComplementar } from "./trilhaComplementar";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
+import {
+  PaginaDeSeguranca,
+  SEGURANCA_TITULO_ID,
+} from "../screens/seguranca/PaginaDeSeguranca";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
   ADMINISTRACAO_LIDERANCA_TITULO_ID,
   AdministracaoLiderancaScreen,
-  CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
 } from "../screens/administracao";
 import {
@@ -164,6 +171,7 @@ import {
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type RotaDaFicha,
+  type SecaoDaEdicao,
   ESTADO_INICIAL_DA_LISTAGEM,
   destinoDaRota,
   ehFragmentoDeRota,
@@ -287,7 +295,9 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   dashboard: DASHBOARD_TITULO_ID,
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
-  "contas-acesso": CONTAS_ACESSO_TITULO_ID,
+  // T215 — Segurança: o `h1` é o do módulo, nas duas telas.
+  seguranca: SEGURANCA_TITULO_ID,
+  "contas-acesso": SEGURANCA_TITULO_ID,
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
@@ -469,6 +479,9 @@ function conteudoDoDestino(
     /** T202 — outra competência da aba de ponto: o shell troca a rota. */
     readonly onTrocarCompetencia: (competencia: string) => void;
     readonly onFechar: () => void;
+    /** T215 — a página "Editar colaborador" e a troca de seção dela. */
+    readonly onAbrirEdicao: (colaboradorId: string) => void;
+    readonly onTrocarSecaoDaEdicao: (secao: SecaoDaEdicao) => void;
     /** T199 — o estado do dashboard de Colaboradores, guardado na URL. */
     readonly listagem: EstadoDaListagem;
     readonly onListagemChange: (
@@ -497,7 +510,7 @@ function conteudoDoDestino(
   empresas: {
     readonly podeVer: boolean;
     readonly podeAdicionar: boolean;
-    /** T211 — Configurações › Equipe e permissões (Contas de acesso). */
+    /** T215 — Segurança › Permissões de acesso (Contas de acesso). */
     readonly podeVerEquipe: boolean;
     readonly aviso: string | undefined;
     readonly onCriadaSemAbrir: (nome: string) => void;
@@ -513,7 +526,6 @@ function conteudoDoDestino(
         conta={contaDoAtor}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -523,7 +535,6 @@ function conteudoDoDestino(
         temaAtual={contaDoAtor?.temaAparencia}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -534,7 +545,6 @@ function conteudoDoDestino(
         podeEditar={empresas.podeAdicionar}
         onAdicionar={() => onNavegar("nova-empresa")}
         aviso={empresas.aviso}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -600,6 +610,8 @@ function conteudoDoDestino(
         onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
         onTrocarCompetenciaDaFicha={fichaDoColaborador.onTrocarCompetencia}
         onFecharFicha={fichaDoColaborador.onFechar}
+        onAbrirEdicao={fichaDoColaborador.onAbrirEdicao}
+        onTrocarSecaoDaEdicao={fichaDoColaborador.onTrocarSecaoDaEdicao}
         listagem={fichaDoColaborador.listagem}
         onListagemChange={fichaDoColaborador.onListagemChange}
         {...(admissao.podeAdmitir
@@ -676,9 +688,30 @@ function conteudoDoDestino(
   if (destinoId === "relatorios") {
     return <RelatoriosScreen onTituloIdChange={onRelatoriosTituloIdChange} />;
   }
-  if (destinoId === "contas-acesso") {
+  if (destinoId === "seguranca") {
+    // T215 — Segurança › Sessões ativas: as sessões da própria conta.
     return (
-      <ContasAcessoScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />
+      <PaginaDeSeguranca
+        atual="sessoes-ativas"
+        mostrarPermissoes={empresas.podeVerEquipe}
+      >
+        <SessoesAtivasPanel
+          aberto
+          onSessaoAtualEncerrada={onSessaoAtualEncerrada}
+        />
+      </PaginaDeSeguranca>
+    );
+  }
+  if (destinoId === "contas-acesso") {
+    // T215 — Segurança › Permissões de acesso (as Contas de acesso).
+    return (
+      <PaginaDeSeguranca atual="permissoes-de-acesso" mostrarPermissoes>
+        <ContasAcessoScreen
+          onSessaoAtualEncerrada={onSessaoAtualEncerrada}
+          nivelDoTitulo={2}
+          titulo="Permissões de acesso"
+        />
+      </PaginaDeSeguranca>
     );
   }
   if (destinoId === "equipe") {
@@ -1050,7 +1083,6 @@ export function App({
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
-  const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
@@ -1288,6 +1320,25 @@ export function App({
     setFocarContatosNaFicha(false);
     setFicha(null);
   }, []);
+  // T215 — a página "Editar colaborador" (empilha a rota), começando em
+  // Dados básicos; quem não edita cai na ficha (`fichaParaOPapel`).
+  const abrirEdicao = useCallback(
+    (colaboradorId: string) => {
+      setFocarContatosNaFicha(false);
+      const pedida: RotaDaFicha = {
+        colaboradorId,
+        aba: "dados",
+        edicao: "dados-basicos",
+      };
+      setFicha(fichaParaOPapel(pedida, papelDoAtor));
+    },
+    [papelDoAtor],
+  );
+  const trocarSecaoDaEdicao = useCallback((secao: SecaoDaEdicao) => {
+    setFicha((atual) =>
+      atual && atual.edicao !== undefined ? { ...atual, edicao: secao } : atual,
+    );
+  }, []);
   // T177 — "Nova admissão" (T178; era "Novo colaborador"), na listagem, leva
   // à página de Nova admissão e só aparece para
   // quem pode abri-la: a mesma validação de capacidade da entrada e da rota.
@@ -1300,7 +1351,7 @@ export function App({
     "configuracoes-empresas";
   const podeAdicionarEmpresa =
     resolverEntrada("nova-empresa", papelDoAtor) === "nova-empresa";
-  // T211 — Configurações › Equipe e permissões, pela mesma regra.
+  // T215 — Segurança › Permissões de acesso, pela mesma regra.
   const podeVerEquipe =
     resolverEntrada("contas-acesso", papelDoAtor) === "contas-acesso";
   /** T209 — "Empresa X criada." ao voltar da Nova empresa sem abri-la. */
@@ -1924,11 +1975,11 @@ export function App({
               onMeuPerfil={() => irPara("configuracoes")}
               onSeguranca={() => {
                 setSegurancaAberto(true);
-                setSessoesAtivasAberto(false);
               }}
               onSessoesAtivas={() => {
-                setSessoesAtivasAberto(true);
+                // T215 — leva à página Segurança › Sessões ativas.
                 setSegurancaAberto(false);
+                irPara("seguranca");
               }}
               onSair={() => {
                 if (onLogout) {
@@ -1945,19 +1996,6 @@ export function App({
                 <SegurancaMfaPanel
                   aberto={segurancaAberto}
                   onFechar={() => setSegurancaAberto(false)}
-                  onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
-                />
-              </div>
-            ) : null}
-
-            {onLogout && sessoesAtivasAberto ? (
-              <div
-                className="app-shell__sessoes-ativas-wrapper"
-                {...(gavetaModal ? FUNDO_INERTE : {})}
-              >
-                <SessoesAtivasPanel
-                  aberto={sessoesAtivasAberto}
-                  onFechar={() => setSessoesAtivasAberto(false)}
                   onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
                 />
               </div>
@@ -2000,6 +2038,8 @@ export function App({
                   onTrocarAba: trocarAbaDaFicha,
                   onTrocarCompetencia: trocarCompetenciaDaFicha,
                   onFechar: fecharFicha,
+                  onAbrirEdicao: abrirEdicao,
+                  onTrocarSecaoDaEdicao: trocarSecaoDaEdicao,
                   listagem,
                   onListagemChange: mudarListagem,
                 },

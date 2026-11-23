@@ -224,17 +224,13 @@ describe("T208 — menu, histórico e foco", () => {
     const links = within(interna).getAllByRole("link");
     // T209 — o RH vê também "Empresas", no grupo Empresa; T210 — e
     // "Aparência", em Sua conta.
-    // T211 — e "Equipe e permissões", no grupo Empresa, depois de Empresas.
-    expect(links).toHaveLength(4);
+    // T211 — "Equipe e permissões" entrou no grupo Empresa; T215 — saiu
+    // para o módulo Segurança (Permissões de acesso).
+    expect(links).toHaveLength(3);
     expect(links[1]).toHaveAccessibleName("Aparência");
     expect(links[1]).toHaveAttribute("href", "#/configuracoes/aparencia");
     expect(links[2]).toHaveAccessibleName("Empresas");
     expect(links[2]).not.toHaveAttribute("aria-current");
-    expect(links[3]).toHaveAccessibleName("Equipe e permissões");
-    expect(links[3]).toHaveAttribute(
-      "href",
-      "#/configuracoes/equipe-e-permissoes",
-    );
     expect(links[0]).toHaveAccessibleName("Meu perfil");
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveAttribute("href", ROTA);

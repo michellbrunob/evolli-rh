@@ -25,6 +25,8 @@ export interface ItemDaTrilha {
  */
 const TELA_DO_DESTINO: Readonly<Record<string, string>> = {
   configuracoes: "Meu perfil",
+  // T215 — o módulo Segurança abre em Sessões ativas.
+  seguranca: "Sessões ativas",
 };
 
 /** O ícone do módulo da tela (o mesmo do menu lateral), ou `null`. */

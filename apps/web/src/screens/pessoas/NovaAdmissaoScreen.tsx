@@ -975,7 +975,7 @@ export const OPCOES_NIVEL = [
 ] as const;
 
 /** Escalas: nome e descrição (dias de trabalho no mês). */
-const OPCOES_ESCALA = [
+export const OPCOES_ESCALA = [
   { codigo: "nao_informada", nome: "Não informada", descricao: "" },
   {
     codigo: "5x2",
@@ -1126,7 +1126,7 @@ const OPCOES_ESCALA = [
   },
 ] as const;
 
-const OPCOES_CONSELHO = [
+export const OPCOES_CONSELHO = [
   { codigo: "nenhum", rotulo: "Nenhum" },
   ...(
     [
@@ -1154,7 +1154,7 @@ const DICA_DA_MATRICULA =
   "Código da pessoa na folha ou na contabilidade (matrícula, registro ou chapa). Serve para achar a pessoa quando um documento não traz o CPF.";
 
 /** "500000" → "5.000,00", conforme se digita (centavos à direita). */
-function mascararReais(texto: string): string {
+export function mascararReais(texto: string): string {
   const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, 12);
   if (digitos === "") return "";
   const completo = digitos.padStart(3, "0");
@@ -1204,7 +1204,7 @@ export const OPCOES_GENERO = [
 ] as const;
 
 /** Estado civil: o texto da opção é o que fica gravado. */
-const OPCOES_ESTADO_CIVIL = [
+export const OPCOES_ESTADO_CIVIL = [
   "Solteiro(a)",
   "Casado(a)",
   "Divorciado(a)",
@@ -1218,7 +1218,7 @@ function rotuloDoGenero(codigo: string | null | undefined): string | null {
 }
 
 /** `00000000000` → `000.000.000-00`, conforme se digita. */
-function mascararCpf(valor: string): string {
+export function mascararCpf(valor: string): string {
   const d = valor.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
@@ -1232,7 +1232,7 @@ function exibirCpf(cpf: string | null | undefined): string | null {
 }
 
 /** Dígitos verificadores do CPF (a mesma regra do servidor). */
-function cpfValido(digitos: string): boolean {
+export function cpfValido(digitos: string): boolean {
   if (!/^\d{11}$/.test(digitos) || /^(\d)\1{10}$/.test(digitos)) return false;
   const n = [...digitos].map(Number);
   const dv = (quantos: number) => {

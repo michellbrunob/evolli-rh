@@ -56,8 +56,10 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T209 — Configurações › Empresas e a Nova empresa.
   "configuracoes-empresas": "#/configuracoes/empresas",
   "nova-empresa": "#/configuracoes/empresas/nova",
-  // T211 — Contas de acesso como Configurações › Equipe e permissões.
-  "contas-acesso": "#/configuracoes/equipe-e-permissoes",
+  // T215 — o módulo Segurança: Sessões ativas e Permissões de acesso (as
+  // Contas de acesso, que até a T215 moravam em Configurações).
+  seguranca: "#/seguranca/sessoes-ativas",
+  "contas-acesso": "#/seguranca/permissoes-de-acesso",
   // T211 — fora do menu lateral: abrem pela URL própria.
   ponto: "#/jornada/ponto",
   "administracao-lideranca": "#/lideranca/administracao",
@@ -69,6 +71,17 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
  * caminho (`#/configuracoes/seguranca`) não é rota: não há tela atrás dele.
  */
 const ROTA_DO_MODULO_CONFIGURACOES = "#/configuracoes";
+
+/**
+ * T215 — endereços que levam a um destino sem serem a forma canônica dele:
+ * `#/seguranca` sozinho (o módulo abre em Sessões ativas) e o endereço
+ * salvo das permissões quando moravam em Configurações. A primeira exibição
+ * escreve a forma canônica no lugar.
+ */
+const ROTAS_ALTERNATIVAS: Readonly<Record<string, string>> = {
+  "#/seguranca": "seguranca",
+  "#/configuracoes/equipe-e-permissoes": "contas-acesso",
+};
 
 /** O fragmento da URL do destino, ou `null` se ele não tem rota própria. */
 export function rotaDoDestino(destinoId: string): string | null {
@@ -110,6 +123,30 @@ export interface RotaDaFicha {
   readonly colaboradorId: string;
   readonly aba: AbaDaFicha;
   readonly competencia?: string;
+  /**
+   * T215 — a página "Editar colaborador", na seção pedida
+   * (`…/:id/editar/:secao`). Presente, ela ocupa o lugar da ficha.
+   */
+  readonly edicao?: SecaoDaEdicao;
+}
+
+/**
+ * T215 — as seções da página "Editar colaborador", na ordem do menu lateral.
+ */
+export const SECOES_DA_EDICAO = [
+  "dados-basicos",
+  "dados-profissionais",
+  "endereco",
+  "dependentes",
+  "documentos",
+  "dados-bancarios",
+  "formacao-academica",
+  "campos-extras",
+] as const;
+export type SecaoDaEdicao = (typeof SECOES_DA_EDICAO)[number];
+
+function ehSecaoDaEdicao(valor: string): valor is SecaoDaEdicao {
+  return (SECOES_DA_EDICAO as readonly string[]).includes(valor);
 }
 
 /**
@@ -156,6 +193,13 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
   if (partes.length > 3) return null;
   const [colaboradorId = "", aba = "dados", competencia] = partes;
   if (!UUID.test(colaboradorId)) return null;
+  // T215 — `…/:id/editar` e `…/:id/editar/:secao`: a página de edição.
+  if (aba === "editar") {
+    const secao = competencia ?? "dados-basicos";
+    return ehSecaoDaEdicao(secao)
+      ? { colaboradorId, aba: "dados", edicao: secao }
+      : null;
+  }
   if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
   // T202 — o terceiro segmento é só da aba "ponto", e só no formato do
   // servidor. Sem ele, vale o mês corrente (P-4): a URL é corrigida no lugar.
@@ -179,6 +223,9 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
  * "ponto", sempre com a competência (a do mês corrente, se não houver).
  */
 export function rotaDaFicha(ficha: RotaDaFicha): string {
+  if (ficha.edicao !== undefined) {
+    return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/editar/${ficha.edicao}`;
+  }
   const base = `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
   if (ficha.aba !== "ponto") return base;
   return `${base}/${ficha.competencia ?? competenciaDoMesAtual()}`;
@@ -604,6 +651,8 @@ export function rotaDoDashboard(
 export function destinoDaRota(fragmento: string): string | null {
   if (dashboardDaRota(fragmento) !== null) return "dashboard";
   if (fragmento === ROTA_DO_MODULO_CONFIGURACOES) return "configuracoes";
+  const alternativa = ROTAS_ALTERNATIVAS[fragmento];
+  if (alternativa) return alternativa;
   if (fichaDaRota(fragmento) !== null) return "pessoas";
   if (listagemDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(

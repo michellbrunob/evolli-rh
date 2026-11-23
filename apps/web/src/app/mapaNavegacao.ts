@@ -168,11 +168,17 @@ export function podeLerSolicitacoesPessoas(papel: string | null): boolean {
  * "Solicitações" pedida por quem não a lê (o DP) vira "Dados do colaborador".
  * O shell escreve a URL corrigida no lugar, sem consulta nenhuma.
  */
-export function fichaParaOPapel<T extends { readonly aba: string } | null>(
-  ficha: T,
-  papel: string | null,
-): T {
+export function fichaParaOPapel<
+  T extends { readonly aba: string; readonly edicao?: string } | null,
+>(ficha: T, papel: string | null): T {
   if (ficha === null) return ficha;
+  // T215 — a página "Editar colaborador" é de quem edita a ficha (RH e DP);
+  // os demais caem na ficha, em Dados.
+  if (ficha.edicao !== undefined && !podeEditarFicha(papel)) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { edicao: _edicao, ...semEdicao } = ficha;
+    return { ...semEdicao, aba: "dados" } as T;
+  }
   if (ficha.aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papel)) {
     return { ...ficha, aba: "dados" };
   }
@@ -354,6 +360,31 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
     ],
   },
   {
+    // T215 — Segurança: módulo próprio, no rodapé do menu, no desenho de
+    // Configurações. Abre em Sessões ativas (de toda conta: `GET
+    // /v1/auth/sessions` só devolve as da própria conta); as Contas de acesso
+    // saem de Configurações e viram "Permissões de acesso", com a capacidade
+    // de sempre. Auditoria continua sem item: a API existe, mas não há tela.
+    titulo: "Segurança",
+    icone: "seguranca",
+    daConta: true,
+    destinos: [
+      {
+        id: "seguranca",
+        label: "Segurança",
+        subRotulo: "Sessões ativas",
+        estado: "funcional",
+      },
+      {
+        id: "contas-acesso",
+        label: "Permissões de acesso",
+        subRotulo: "Contas de acesso e papéis",
+        estado: "funcional",
+        agrupadoEm: "seguranca",
+      },
+    ],
+  },
+  {
     // T208 — Configurações: a própria conta. Por ora, um só submódulo com
     // tela (Meu perfil, só leitura, com o que `GET /v1/users/me` já trouxe).
     // Segurança, Empresas e Equipe e permissões não aparecem até existirem.
@@ -384,17 +415,6 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         subRotulo: "Empresas da conta",
         estado: "funcional",
         papeis: PAPEIS_EMPRESAS_DA_CONTA,
-        agrupadoEm: "configuracoes",
-      },
-      {
-        // T211 — Contas de acesso, como "Equipe e permissões" na navegação
-        // interna de Configurações (grupo Empresa), com URL própria. A tela é
-        // a mesma; quem a vê segue a capacidade de sempre (`contas-acesso`).
-        // Auditoria continua sem item: a API existe, mas não há tela.
-        id: "contas-acesso",
-        label: "Equipe e permissões",
-        subRotulo: "Contas de acesso e papéis",
-        estado: "funcional",
         agrupadoEm: "configuracoes",
       },
       {
@@ -607,6 +627,7 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `contas-acesso`           | `other_account` read    | `rh`, `dp`, `master_tecnico`     |
  * | `configuracoes` (T208)    | `own_account` read      | todos os papéis                  |
  * | `configuracoes-aparencia` | `own_account` manage    | todos os papéis (T210)           |
+ * | `seguranca` (T215)        | sessões da própria conta| todos os papéis                  |
  *
  * Os dois casos que surpreendem, e por isso valem dito:
  *
@@ -653,6 +674,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
     "nova-empresa",
   ],
@@ -667,6 +689,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
   ],
   master_tecnico: [
@@ -678,15 +701,16 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
     "nova-empresa",
   ],
-  gestor: ["equipe", "configuracoes", "configuracoes-aparencia"],
-  financeiro: ["configuracoes", "configuracoes-aparencia"],
-  colaborador: ["configuracoes", "configuracoes-aparencia"],
-  auditor: ["configuracoes", "configuracoes-aparencia"],
-  dpo: ["configuracoes", "configuracoes-aparencia"],
-  admin_tecnico: ["configuracoes", "configuracoes-aparencia"],
+  gestor: ["equipe", "configuracoes", "configuracoes-aparencia", "seguranca"],
+  financeiro: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  colaborador: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  auditor: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  dpo: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  admin_tecnico: ["configuracoes", "configuracoes-aparencia", "seguranca"],
 };
 
 /**

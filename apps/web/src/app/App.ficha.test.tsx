@@ -2900,21 +2900,30 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
     },
   );
 
-  it("T215 — Ver ficha e Editar colaborador empilham a ficha nos dados; a trilha devolve o foco ao ⋯", async () => {
+  it("T215 — Ver ficha empilha a ficha nos dados; Editar colaborador, a página de edição; a trilha devolve o foco ao ⋯", async () => {
     render(<App papelDoAtor="rh" />);
-    const tabela = await screen.findByRole("table", {
-      name: /^Colaboradores — /,
-    });
-    const botao = within(tabela).getByRole("button", {
-      name: `Ações: ${ana.nome}`,
-    });
-    for (const item of ["Ver ficha", "Editar colaborador"]) {
+    await screen.findByRole("table", { name: /^Colaboradores — / });
+    const destinos = [
+      ["Ver ficha", rotaDe(ana, "dados")],
+      [
+        "Editar colaborador",
+        `#/pessoas/colaboradores/${ana.id}/editar/dados-basicos`,
+      ],
+    ] as const;
+    for (const [item, rota] of destinos) {
       abrirMenuDaLinha(
         screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
       );
       fireEvent.click(await screen.findByRole("menuitem", { name: item }));
-      await esperarFicha(ana.nome);
-      expect(window.location.hash).toBe(rotaDe(ana, "dados"));
+      if (item === "Ver ficha") await esperarFicha(ana.nome);
+      else
+        expect(
+          await screen.findByRole("heading", {
+            level: 1,
+            name: "Editar colaborador",
+          }),
+        ).toBeInTheDocument();
+      expect(window.location.hash).toBe(rota);
       fireEvent.click(voltarPelaTrilha());
       await screen.findByRole("table", { name: /^Colaboradores — / });
       await waitFor(() =>
@@ -2923,8 +2932,34 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
         ).toHaveFocus(),
       );
     }
-    expect(botao).toBeDefined();
   });
+
+  it.each([
+    ["rh", true],
+    ["dp", true],
+    ["master_tecnico", false],
+  ] as const)(
+    "T215 — %s pela URL da edição: abre a página = %s (quem não edita cai na ficha)",
+    async (papel, abre) => {
+      const rota = `#/pessoas/colaboradores/${ana.id}/editar/endereco`;
+      window.history.replaceState(null, "", `/${rota}`);
+      render(<App papelDoAtor={papel} />);
+      if (abre) {
+        expect(
+          await screen.findByRole("heading", {
+            level: 1,
+            name: "Editar colaborador",
+          }),
+        ).toBeInTheDocument();
+        expect(window.location.hash).toBe(rota);
+      } else {
+        await esperarFicha(ana.nome);
+        await waitFor(() =>
+          expect(window.location.hash).toBe(rotaDe(ana, "dados")),
+        );
+      }
+    },
+  );
 
   it("perfis sem Colaboradores não veem menu nenhum (a rota é recusada)", async () => {
     window.history.replaceState(null, "", `/${LISTAGEM}`);

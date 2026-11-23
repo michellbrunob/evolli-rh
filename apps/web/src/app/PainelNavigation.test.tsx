@@ -59,17 +59,30 @@ describe("estrutura dos grupos", () => {
       "Gestão de Pessoas",
       "Jornada",
       "Liderança",
+      // T215 — Segurança (Sessões ativas e Permissões de acesso).
+      "Segurança",
       "Configurações",
       "Demonstração",
     ]);
   });
 
-  it("T208 — só Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas", () => {
+  it("T208 — Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas; T215: Segurança também é da conta", () => {
     const daConta = GRUPOS.filter((g) => g.daConta);
-    expect(daConta.map((g) => g.titulo)).toEqual(["Configurações"]);
-    expect(daConta[0]!.secundario).toBeFalsy();
+    expect(daConta.map((g) => g.titulo)).toEqual([
+      "Segurança",
+      "Configurações",
+    ]);
+    expect(daConta.every((g) => !g.secundario)).toBe(true);
+    // T215 — Segurança abre em Sessões ativas; as Contas de acesso viram
+    // Permissões de acesso, sub-página do módulo.
     expect(
-      daConta[0]!.destinos.map((d) => [
+      daConta[0]!.destinos.map((d) => [d.id, d.label, d.papeis, d.agrupadoEm]),
+    ).toEqual([
+      ["seguranca", "Segurança", undefined, undefined],
+      ["contas-acesso", "Permissões de acesso", undefined, "seguranca"],
+    ]);
+    expect(
+      daConta[1]!.destinos.map((d) => [
         d.id,
         d.label,
         d.estado,
@@ -90,14 +103,6 @@ describe("estrutura dos grupos", () => {
         "Empresas",
         "funcional",
         ["rh", "dp", "master_tecnico"],
-        "configuracoes",
-      ],
-      // T211 — Contas de acesso como Equipe e permissões.
-      [
-        "contas-acesso",
-        "Equipe e permissões",
-        "funcional",
-        undefined,
         "configuracoes",
       ],
       [
@@ -170,6 +175,8 @@ describe("o estado declarado bate com o código", () => {
     "administracao-lideranca":
       "src/screens/administracao/AdministracaoLiderancaScreen.tsx",
     "contas-acesso": "src/screens/administracao/ContasAcessoScreen.tsx",
+    // T215 — Segurança › Sessões ativas (`GET /v1/auth/sessions`).
+    seguranca: "src/app/SessoesAtivasPanel.tsx",
     inicio: "src/screens/inicio/InicioVisaoGeralScreen.tsx",
     "pessoas-demonstracao": "src/screens/pessoas/BeneficiosScreen.tsx",
     "cadastros-demonstracao":
@@ -651,11 +658,12 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     // T209 — um por módulo do menu e um por item em desenvolvimento de
     // primeiro nível (Portal, Recrutamento, Pesquisas, Calendário, Folha,
     // Benefícios, Hub de Benefícios, Suporte e Roadmap). T211 — módulos no
-    // menu: Dashboard, Colaboradores, Liderança e Configurações.
+    // menu: Dashboard, Colaboradores, Liderança e Configurações. T215 — e
+    // Segurança.
     const modulosNoMenu = MENU_LATERAL.flatMap((secao) =>
       secao.entradas.filter((e) => e.tipo === "modulo"),
     ).length;
-    expect(modulosNoMenu).toBe(4);
+    expect(modulosNoMenu).toBe(5);
     expect(icones.length).toBe(modulosNoMenu + 9);
     for (const icone of icones) {
       expect(icone).toHaveAttribute("aria-hidden", "true");

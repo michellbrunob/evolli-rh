@@ -130,11 +130,13 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Jornada",
         "Minha equipe",
         "Administração da liderança",
+        // T215 — Segurança (Sessões ativas) e Permissões de acesso (as
+        // Contas de acesso, que saíram de Configurações).
+        "Segurança",
+        "Permissões de acesso",
         "Configurações",
         // T209 — Empresas e Nova empresa.
         "Empresas",
-        // T211 — Contas de acesso como Equipe e permissões.
-        "Equipe e permissões",
         "Nova empresa",
       ],
     ],
@@ -152,10 +154,11 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
         "Jornada",
+        "Segurança",
+        "Permissões de acesso",
         "Configurações",
         // T209 — Configurações › Empresas (o DP vê a própria).
         "Empresas",
-        "Equipe e permissões",
       ],
     ],
     [
@@ -167,21 +170,23 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Escala de trabalho",
         "Organograma",
         "Jornada",
+        "Segurança",
+        "Permissões de acesso",
         "Configurações",
         // T209 — Empresas e Nova empresa (quem cria).
         "Empresas",
-        "Equipe e permissões",
         "Nova empresa",
       ],
     ],
     // T208 — Configurações (Meu perfil) é de toda conta: `own_account` vale
     // para qualquer papel, e a tela só mostra o que `/users/me` já trouxe.
-    ["gestor", ["Minha equipe", "Configurações"]],
-    ["financeiro", ["Configurações"]],
-    ["colaborador", ["Configurações"]],
-    ["auditor", ["Configurações"]],
-    ["dpo", ["Configurações"]],
-    ["admin_tecnico", ["Configurações"]],
+    // T215 — Segurança (Sessões ativas da própria conta) também é de toda conta.
+    ["gestor", ["Minha equipe", "Segurança", "Configurações"]],
+    ["financeiro", ["Segurança", "Configurações"]],
+    ["colaborador", ["Segurança", "Configurações"]],
+    ["auditor", ["Segurança", "Configurações"]],
+    ["dpo", ["Segurança", "Configurações"]],
+    ["admin_tecnico", ["Segurança", "Configurações"]],
   ];
 
   it.each(ESPERADO)(
@@ -216,10 +221,17 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
       podeTrocarEmpresa: false,
       onAbrirDestino: abrir,
     });
-    await waitFor(() => expect(cartoesVisiveis()).toEqual(["Configurações"]));
+    // T215 — Segurança vem antes, também de toda conta.
+    await waitFor(() =>
+      expect(cartoesVisiveis()).toEqual(["Segurança", "Configurações"]),
+    );
     const cartao = screen
       .getAllByRole("button")
-      .find((b) => b.classList.contains("hub__cartao"))!;
+      .find(
+        (b) =>
+          b.classList.contains("hub__cartao") &&
+          /Configurações/.test(b.textContent ?? ""),
+      )!;
     expect(cartao.querySelector(".hub__cartao-descricao")).toHaveTextContent(
       /^Meu perfil: a sua foto, o seu nome de exibição e os dados da sua conta de acesso\.$/,
     );
@@ -527,8 +539,8 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    // T209 — 13 com Empresas e Nova empresa.
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(13));
+    // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(14));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",

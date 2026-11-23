@@ -26,6 +26,7 @@ import {
   DocumentDownload,
   DocumentText,
   DocumentUpload,
+  Devices,
   Edit2,
   Element3,
   Eye,
@@ -33,6 +34,7 @@ import {
   Gift,
   Hierarchy,
   InfoCircle,
+  KeySquare,
   Lock,
   MessageQuestion,
   Messages1,
@@ -111,6 +113,9 @@ export const IconeRoadmap = decorativo(Routing2, "Bulk");
 export const IconePerfil = decorativo(Profile, "Bulk");
 export const IconeConta = decorativo(ProfileCircle, "Bulk");
 export const IconeSeguranca = decorativo(ShieldTick, "Bulk");
+/** T215 — Segurança › Sessões ativas e › Permissões de acesso. */
+export const IconeSessoes = decorativo(Devices, "Bulk");
+export const IconePermissoes = decorativo(KeySquare, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
 export const IconeAparencia = decorativo(ColorSwatch, "Bulk");

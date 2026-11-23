@@ -545,21 +545,23 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza Contas de acesso com h1 próprio (T121) — sem 'Módulo em preparação'", async () => {
-    // T211 — Equipe e permissões, pela URL de Configurações.
+    // T215 — as Contas de acesso são Segurança › Permissões de acesso: o h1
+    // é o do módulo, e a tela vira o painel com h2.
     render(<App papelDoAtor="rh" destinoInicial="contas-acesso" />);
-    expect(window.location.hash).toBe("#/configuracoes/equipe-e-permissoes");
+    expect(window.location.hash).toBe("#/seguranca/permissoes-de-acesso");
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Contas de acesso" }),
+      screen.getByRole("heading", { level: 1, name: "Segurança" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Permissões de acesso" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
-      "Contas de acesso",
-    );
+    expect(document.getElementById(rotuloId!)).toHaveTextContent("Segurança");
 
     // Este arquivo testa só o shell, sem mockar rede: GET /v1/users/me real
     // falha (sem servidor), e a tela cai no próprio estado de erro — nunca
@@ -621,7 +623,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout informado, abre o painel 'Sessões ativas' pelo menu da conta, e fecha ao clicar em Fechar (T117/T209)", async () => {
+  it("com onLogout informado, 'Sessões ativas' no menu da conta leva a Segurança › Sessões ativas (T117/T209/T215)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} />);
 
     expect(
@@ -630,15 +632,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     fireEvent.click(await itemDaConta("Sessões ativas"));
 
+    // T215 — é a página do módulo Segurança, não um painel com "Fechar".
+    expect(window.location.hash).toBe("#/seguranca/sessoes-ativas");
     expect(
-      screen.getByRole("heading", { name: "Sessões ativas" }),
+      within(screen.getByRole("main")).getByRole("heading", {
+        level: 2,
+        name: "Sessões ativas",
+      }),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-
-    expect(
-      screen.queryByRole("heading", { name: "Sessões ativas" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fechar" })).toBeNull();
   });
 
   it("sem onLogout: não mostra o botão 'Segurança' (T126)", () => {
@@ -671,21 +673,20 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", async () => {
+  it("'Sessões ativas' fecha o painel 'Segurança da conta' e leva à página (T126/T131/T215)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
-
-    fireEvent.click(await itemDaConta("Sessões ativas"));
-    expect(
-      screen.getByRole("heading", { name: "Sessões ativas" }),
-    ).toBeInTheDocument();
 
     fireEvent.click(await itemDaConta("Segurança"));
     expect(
       screen.getByRole("heading", { name: "Segurança da conta" }),
     ).toBeInTheDocument();
+
+    // T215 — Sessões ativas virou página: abri-la fecha o painel do MFA.
+    fireEvent.click(await itemDaConta("Sessões ativas"));
     expect(
-      screen.queryByRole("heading", { name: "Sessões ativas" }),
+      screen.queryByRole("heading", { name: "Segurança da conta" }),
     ).not.toBeInTheDocument();
+    expect(window.location.hash).toBe("#/seguranca/sessoes-ativas");
   });
 
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
@@ -710,7 +711,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // (cabeçalho + 2), Dashboard, Portal, Pesquisas, Calendário, Liderança,
     // Folha, Benefícios, Hub, Suporte, Roadmap e Configurações: 19. Sem
     // Operação, Estrutura, Jornada, Administração e Demonstração.
-    expect(botoes).toHaveLength(19);
+    // T215 — + Segurança (item único, no rodapé): 20.
+    expect(botoes).toHaveLength(20);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))

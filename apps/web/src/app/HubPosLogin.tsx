@@ -128,6 +128,9 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
   "administracao-lideranca":
     "Atribuição de gestores a equipes, com vigência e histórico.",
   "contas-acesso": "Contas de acesso, papéis e redefinição de segundo fator.",
+  // T215 — Segurança abre em Sessões ativas (de toda conta).
+  seguranca:
+    "Sessões ativas da sua conta e, para quem gerencia acessos, as permissões de acesso.",
   // T208 — Meu perfil: a foto, o nome de exibição e os dados da conta.
   configuracoes:
     "Meu perfil: a sua foto, o seu nome de exibição e os dados da sua conta de acesso.",

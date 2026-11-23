@@ -1,7 +1,8 @@
 /**
  * T211 — organização do menu (decisões M1 a M8 do dossiê da T211): só a
  * navegação muda. Colaboradores reúne Escala de trabalho e Organograma;
- * Equipe e permissões vai para Configurações; Ponto e Administração da
+ * Equipe e permissões vai para Configurações (T215: e de lá para o módulo
+ * Segurança, como Permissões de acesso); Ponto e Administração da
  * liderança saem do menu com URL própria; Liderança vira item direto de
  * Pessoas; sem Operação e sem Demonstração no menu.
  */
@@ -82,12 +83,14 @@ function titulosDeSecao(): string[] {
 }
 
 describe("T211 — menu por papel (correção final)", () => {
-  it("gestor: só Liderança (Minha equipe) entre os destinos, além de Portal, Suporte, Roadmap e Configurações", () => {
+  it("gestor: só Liderança (Minha equipe) entre os destinos, além de Portal, Suporte, Segurança, Roadmap e Configurações", () => {
     montarMenu("gestor", "equipe");
+    // T215 — Segurança (Sessões ativas) é de toda conta.
     expect(primeiroNivel()).toEqual([
       "Portal",
       "Liderança",
       "Suporte",
+      "Segurança",
       "Roadmap",
       "Configurações",
     ]);
@@ -107,6 +110,7 @@ describe("T211 — menu por papel (correção final)", () => {
       "Hub de Benefícios",
       "Empresas",
       "Equipe e permissões",
+      "Permissões de acesso",
       "Dashboard",
     ]) {
       expect(texto, ausente).not.toContain(ausente);
@@ -131,6 +135,8 @@ describe("T211 — menu por papel (correção final)", () => {
         "Benefícios",
         "Hub de Benefícios",
         "Suporte",
+        // T215 — Segurança, logo acima de Roadmap.
+        "Segurança",
         "Roadmap",
         "Configurações",
       ]);
@@ -206,6 +212,8 @@ describe("T211 — árvore do menu", () => {
       "Benefícios",
       "Hub de Benefícios",
       "Suporte",
+      // T215 — Segurança, logo acima de Roadmap.
+      "Segurança",
       "Roadmap",
       "Configurações",
     ]);
@@ -276,6 +284,8 @@ describe("T211 — árvore do menu", () => {
       "Dashboard",
       "Gestão de Pessoas",
       "Liderança",
+      // T215 — Segurança (Sessões ativas e Permissões de acesso).
+      "Segurança",
       "Configurações",
     ]);
     // "Jornada" (Ponto) também não é item.
@@ -313,7 +323,8 @@ describe("T211 — árvore do menu", () => {
 
 describe("T211 — rotas", () => {
   it.each([
-    ["contas-acesso", "#/configuracoes/equipe-e-permissoes"],
+    // T215 — as permissões de acesso moram em Segurança.
+    ["contas-acesso", "#/seguranca/permissoes-de-acesso"],
     ["ponto", "#/jornada/ponto"],
     ["administracao-lideranca", "#/lideranca/administracao"],
   ])("%s ganha a URL %s, de ida e volta", (destino, rota) => {
@@ -338,67 +349,42 @@ describe("T211 — trilha", () => {
     ["jornadas-trabalho", ["Pessoas", "Colaboradores", "Escala de trabalho"]],
     ["cadastros", ["Pessoas", "Colaboradores", "Organograma"]],
     ["equipe", ["Pessoas", "Liderança", "Minha equipe"]],
-    ["contas-acesso", ["Configurações", "Equipe e permissões"]],
+    // T215 — em Segurança.
+    ["contas-acesso", ["Segurança", "Permissões de acesso"]],
   ])("%s: %j", (destino, esperado) => {
     expect(trilhaDoDestino(destino).map((i) => i.rotulo)).toEqual(esperado);
   });
 });
 
-describe("T211 — Equipe e permissões em Configurações", () => {
-  it("item do grupo Empresa, depois de Empresas, com a URL própria", () => {
-    render(
-      <NavegacaoConfiguracoes
-        atual="equipe-e-permissoes"
-        mostrarEmpresas
-        mostrarEquipe
-      />,
-    );
+describe("T211/T215 — Equipe e permissões saiu de Configurações (agora em Segurança)", () => {
+  it("Configurações › Empresa tem só Empresas", () => {
+    render(<NavegacaoConfiguracoes atual="empresas" mostrarEmpresas />);
     const nav = screen.getByRole("navigation", { name: "Configurações" });
     const empresa = within(nav).getByRole("list", { name: "Empresa" });
-    const links = within(empresa).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual([
-      "Empresas",
-      "Equipe e permissões",
-    ]);
-    expect(links[1]).toHaveAttribute(
-      "href",
-      "#/configuracoes/equipe-e-permissoes",
-    );
-    expect(links[1]).toHaveAttribute("aria-current", "page");
-  });
-
-  it("sem a capacidade, o item não aparece; o grupo Empresa aparece só com algum item", () => {
-    const { rerender } = render(<NavegacaoConfiguracoes atual="meu-perfil" />);
-    const nav = () => screen.getByRole("navigation", { name: "Configurações" });
-    expect(within(nav()).queryByText("Empresa")).toBeNull();
-    rerender(<NavegacaoConfiguracoes atual="meu-perfil" mostrarEquipe />);
     expect(
-      within(nav()).getByRole("link", { name: "Equipe e permissões" }),
-    ).toBeInTheDocument();
-    expect(within(nav()).queryByRole("link", { name: "Empresas" })).toBeNull();
+      within(empresa)
+        .getAllByRole("link")
+        .map((l) => l.textContent),
+    ).toEqual(["Empresas"]);
   });
 
-  it.each([
-    ["rh", true],
-    ["dp", true],
-    ["master_tecnico", true],
-    ["gestor", false],
-  ])("App em Meu perfil — %s vê Equipe e permissões: %s", (papel, ve) => {
-    window.history.replaceState(null, "", "/#/configuracoes/meu-perfil");
-    render(<App papelDoAtor={papel} destinoInicial="configuracoes" />);
+  it("sem Empresas, o grupo Empresa não aparece", () => {
+    render(<NavegacaoConfiguracoes atual="meu-perfil" />);
     const nav = screen.getByRole("navigation", { name: "Configurações" });
-    const link = within(nav).queryByRole("link", {
-      name: "Equipe e permissões",
-    });
-    if (ve)
-      expect(link).toHaveAttribute(
-        "href",
-        "#/configuracoes/equipe-e-permissoes",
-      );
-    else expect(link).toBeNull();
+    expect(within(nav).queryByText("Empresa")).toBeNull();
   });
 
-  it("a URL abre Contas de acesso (a mesma tela), com Configurações marcado no menu", () => {
+  it.each(["rh", "dp", "master_tecnico", "gestor"])(
+    "App em Meu perfil — %s não vê permissões em Configurações",
+    (papel) => {
+      window.history.replaceState(null, "", "/#/configuracoes/meu-perfil");
+      render(<App papelDoAtor={papel} destinoInicial="configuracoes" />);
+      const nav = screen.getByRole("navigation", { name: "Configurações" });
+      expect(within(nav).queryByRole("link", { name: /permiss/i })).toBeNull();
+    },
+  );
+
+  it("o endereço antigo abre Permissões de acesso, com Segurança marcado no menu", () => {
     window.history.replaceState(
       null,
       "",
@@ -406,11 +392,14 @@ describe("T211 — Equipe e permissões em Configurações", () => {
     );
     render(<App papelDoAtor="rh" destinoInicial="contas-acesso" />);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Contas de acesso" }),
+      screen.getByRole("heading", { level: 2, name: "Permissões de acesso" }),
     ).toBeInTheDocument();
     expect(
-      within(navegacao()).getByRole("button", { name: /^Configurações/ }),
+      within(navegacao()).getByRole("button", { name: /^Segurança/ }),
     ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(navegacao()).getByRole("button", { name: /^Configurações/ }),
+    ).not.toHaveAttribute("aria-current");
   });
 });
 

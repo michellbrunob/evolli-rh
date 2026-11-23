@@ -30,6 +30,7 @@ import type {
   EstadoDaListagem,
   OpcoesDaMudancaDaListagem,
   RotaDaFicha,
+  SecaoDaEdicao,
 } from "../../app/rotasDoShell";
 import {
   FICHA_COLABORADOR_TITULO_ID,
@@ -62,6 +63,10 @@ import {
   PessoasHorarioScreen,
 } from "./PessoasHorarioScreen";
 import type { ColaboradoresScreenProps } from "./ColaboradoresScreen";
+import {
+  EDITAR_COLABORADOR_TITULO_ID,
+  EditarColaboradorScreen,
+} from "./edicao/EditarColaboradorScreen";
 import "./PessoasScreen.css";
 import {
   SOLICITACOES_TITULO_ID,
@@ -192,6 +197,10 @@ export interface PessoasScreenProps {
   onTrocarCompetenciaDaFicha?: (competencia: string) => void;
   /** T198 — volta da ficha à listagem: o shell troca a rota. */
   onFecharFicha?: () => void;
+  /** T215 — "Editar colaborador" (⋯ da linha): o shell abre a página. */
+  onAbrirEdicao?: (colaboradorId: string) => void;
+  /** T215 — outra seção da página de edição: o shell troca a rota. */
+  onTrocarSecaoDaEdicao?: (secao: SecaoDaEdicao) => void;
   /** T176 — "Completar contatos" da Nova admissão: foco nos contatos. */
   focarContatosNaFicha?: boolean;
   /** T177 — leva "Novo colaborador" à página de Nova admissão. */
@@ -233,6 +242,8 @@ export function PessoasScreen({
   onTrocarAbaDaFicha,
   onTrocarCompetenciaDaFicha,
   onFecharFicha,
+  onAbrirEdicao,
+  onTrocarSecaoDaEdicao,
   focarContatosNaFicha = false,
   onNovaAdmissao,
   onImportarPlanilha,
@@ -362,9 +373,13 @@ export function PessoasScreen({
 
   useEffect(() => {
     onTituloIdChange?.(
-      fichaAberta ? FICHA_COLABORADOR_TITULO_ID : definicaoAtiva.tituloId,
+      fichaAberta
+        ? ficha?.edicao !== undefined
+          ? EDITAR_COLABORADOR_TITULO_ID
+          : FICHA_COLABORADOR_TITULO_ID
+        : definicaoAtiva.tituloId,
     );
-  }, [fichaAberta, definicaoAtiva.tituloId, onTituloIdChange]);
+  }, [fichaAberta, ficha?.edicao, definicaoAtiva.tituloId, onTituloIdChange]);
 
   /**
    * T178 — voltar a Colaboradores pela trilha. O botão acionado vira texto (a
@@ -380,7 +395,23 @@ export function PessoasScreen({
 
   return (
     <div className="pessoas-screen">
-      {fichaAberta && ficha ? (
+      {fichaAberta && ficha && ficha.edicao !== undefined ? (
+        // T215 — a página "Editar colaborador", no lugar da ficha.
+        <AreaDeEdicao id={AREAS_DE_EDICAO.ficha}>
+          <EditarColaboradorScreen
+            key={ficha.colaboradorId}
+            colaboradorId={ficha.colaboradorId}
+            secao={ficha.edicao}
+            onTrocarSecao={(secao) => onTrocarSecaoDaEdicao?.(secao)}
+            onVoltar={() =>
+              guarda.solicitarSaida({
+                area: AREAS_DE_EDICAO.ficha,
+                executar: () => onFecharFicha?.(),
+              })
+            }
+          />
+        </AreaDeEdicao>
+      ) : fichaAberta && ficha ? (
         // T200 — a ficha declara a própria área de edição (ver o componente).
         <FichaColaboradorScreen
           key={ficha.colaboradorId}
@@ -449,12 +480,16 @@ export function PessoasScreen({
                   {...(onImportarArquivo ? { onImportarArquivo } : {})}
                   {...(onAbrirOrganograma ? { onAbrirOrganograma } : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
-                  {...(onAbrirFicha && podeEditarFicha
+                  {...(onAbrirEdicao && podeEditarFicha
                     ? {
-                        // T215 — até a tela "Editar colaborador" chegar, a
-                        // edição é a da ficha, nos dados.
-                        onEditarColaborador: (colaboradorId: string) =>
-                          abrirFicha(colaboradorId, "dados"),
+                        // T215 — a página "Editar colaborador".
+                        onEditarColaborador: (colaboradorId: string) => {
+                          gatilhoDaFichaRef.current =
+                            document.activeElement instanceof HTMLElement
+                              ? document.activeElement
+                              : null;
+                          onAbrirEdicao(colaboradorId);
+                        },
                       }
                     : {})}
                   atualizacao={atualizacaoDaListagem}
