@@ -79,19 +79,25 @@
 }
 
 /* ---- Abas + período ---------------------------------------------------- */
+/* T214 — abas à esquerda; período, atualizar e exportar à direita, na mesma
+   linha (quebram para baixo em tela estreita). */
 .dashboard__navegacao {
-  display: grid;
-  gap: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
   min-width: 0;
+  border-bottom: 1px solid var(--hairline);
 }
 
 /* As abas rolam dentro da própria faixa no celular (sem rolar a página). */
 .dashboard__abas {
   display: flex;
+  flex: 1 1 auto;
   gap: var(--space-xs);
   min-width: 0;
   overflow-x: auto;
-  border-bottom: 1px solid var(--hairline);
   scrollbar-width: thin;
 }
 
@@ -129,9 +135,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm) var(--space-md);
+  justify-content: flex-end;
+  gap: var(--space-xs) var(--space-sm);
   min-width: 0;
+  padding-bottom: var(--space-xs);
 }
 
 .dashboard__periodo,
@@ -143,14 +150,197 @@
   min-width: 0;
 }
 
-.dashboard__ano select {
+/* ---- T214 — período: botão e janela dos anos -------------------------- */
+.dashboard__periodo {
+  position: relative;
+}
+
+.dashboard__periodo-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
   min-height: var(--touch-target);
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--borda-controle);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface-canvas);
   color: var(--color-ink);
   font: inherit;
+  cursor: pointer;
+}
+
+.dashboard__periodo-botao:hover,
+.dashboard__periodo-botao[aria-expanded="true"] {
+  border-color: var(--borda-controle);
+}
+
+.dashboard__periodo-icone,
+.dashboard__periodo-seta {
+  flex: none;
+  color: var(--color-ink-muted);
+}
+
+.dashboard__periodo-botao[aria-expanded="true"] .dashboard__periodo-seta {
+  rotate: 180deg;
+}
+
+.dashboard__periodo-ano {
+  font-weight: var(--weight-bold);
+}
+
+.dashboard__periodo-meses {
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+/* Janela abaixo do botão, alinhada à direita dele, sem passar da tela. */
+.dashboard__periodo-janela {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  z-index: 6;
+  display: grid;
+  width: min(26rem, calc(100vw - 2 * var(--space-md)));
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-canvas);
+  box-shadow: var(--sombra-cartao);
+  overflow: hidden;
+}
+
+.dashboard__periodo-janela[hidden] {
+  display: none;
+}
+
+.dashboard__escala {
+  display: flex;
+  margin: var(--space-md) var(--space-md) 0;
+  padding: var(--space-xxs);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.dashboard__escala-item {
+  flex: 1;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  text-align: center;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+
+.dashboard__periodo-lendo {
+  margin: var(--space-sm) var(--space-md) 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.dashboard__periodo-anos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Linhas na altura do conteúdo: a rolagem não espreme os anos. */
+  grid-auto-rows: max-content;
+  gap: var(--space-xs);
+  max-height: 15rem;
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.dashboard__periodo-ano-opcao {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: var(--touch-target);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dashboard__periodo-ano-opcao:hover {
+  border-color: var(--borda-controle);
+}
+
+.dashboard__periodo-ano-opcao[aria-pressed="true"] {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.dashboard__periodo-ano-numero {
+  font-size: var(--text-lead, var(--text-body));
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__periodo-ano-detalhe {
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+.dashboard__periodo-ano-opcao[aria-pressed="true"]
+  .dashboard__periodo-ano-detalhe {
+  color: var(--color-on-action);
+}
+
+.dashboard__periodo-explicacao {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+
+.dashboard__periodo-explicacao p {
+  margin: 0;
+}
+
+.dashboard__periodo-resumo {
+  color: var(--color-ink);
+  font-size: var(--text-ui, var(--text-body));
+  font-weight: var(--weight-strong);
+}
+
+/* Atualizar e Exportar: botões quadrados só com ícone (nome pelo rótulo). */
+.dashboard__botao-icone,
+.dashboard__exportar .dashboard__botao-acoes {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.dashboard__botao-icone:hover,
+.dashboard__exportar .dashboard__botao-acoes:hover,
+.dashboard__exportar .dashboard__botao-acoes[aria-expanded="true"] {
+  border-color: var(--borda-controle);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+}
+
+.dashboard__botao-icone[aria-disabled="true"] {
+  cursor: progress;
+  color: var(--color-ink-subtle);
+}
+
+.dashboard__botao-icone:focus-visible,
+.dashboard__periodo-botao:focus-visible,
+.dashboard__periodo-ano-opcao:focus-visible {
+  outline: var(--focus-width) solid var(--evolli-azul);
+  outline-offset: var(--focus-offset);
 }
 
 .dashboard__painel {
@@ -165,13 +355,54 @@
 }
 
 /* ---- Resumo (faixa de destaque) --------------------------------------- */
+/* ---- T214 — card principal ------------------------------------------- */
+/* Degradê suave, sempre derivado da cor do tema (decisão da proprietária,
+   2026-11-23, só neste card). O texto fica sobre a mistura clara. */
 .dashboard__resumo {
   display: grid;
-  gap: var(--space-sm);
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-  background: var(--evolli-azul-suave);
+  gap: var(--space-lg);
+  padding: var(--space-xl) clamp(var(--space-md), 3vw, var(--space-xl));
+  border-radius: calc(var(--radius-lg) * 1.5);
+  background:
+    radial-gradient(
+      55% 90% at 78% 20%,
+      color-mix(in srgb, var(--color-action) 8%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--color-action) 13%, var(--surface-canvas)) 0%,
+      color-mix(in srgb, var(--color-action) 5%, var(--surface-canvas)) 55%,
+      color-mix(in srgb, var(--color-action) 9%, var(--surface-canvas)) 100%
+    );
   min-width: 0;
+}
+
+.dashboard__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xxs) var(--space-md);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--color-action),
+    var(--color-action-hover)
+  );
+  color: var(--color-on-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__chip-titulo {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.dashboard__chip-titulo:focus-visible {
+  outline: var(--focus-width) solid var(--color-on-action);
+  outline-offset: 2px;
 }
 
 .dashboard__resumo-topo {
@@ -183,10 +414,17 @@
 }
 
 .dashboard__frase {
+  max-width: 52rem;
   margin: 0;
-  font-size: var(--text-lead, var(--text-body));
-  color: var(--evolli-marinho);
+  color: var(--color-ink);
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+  line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.dashboard__frase-destaque {
+  color: var(--color-action);
+  font-weight: inherit;
 }
 
 /* Selos: estado em TEXTO (nunca só cor). */
@@ -227,7 +465,7 @@
 /* ---- Indicadores ------------------------------------------------------- */
 .dashboard__indicadores {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
   gap: var(--space-md);
   margin: 0;
   padding: 0;
@@ -241,21 +479,22 @@
 }
 
 .dashboard__indicador {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-xs);
+  min-height: 7.5rem;
   padding: var(--space-md) var(--space-lg);
-  border: 1px solid var(--hairline);
-  border-top: 4px solid var(--evolli-azul);
+  border: 1px solid color-mix(in srgb, var(--color-action) 8%, var(--hairline));
   border-radius: var(--radius-lg);
   background: var(--surface-canvas);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.dashboard__indicador--sem-dado {
-  border-top-color: var(--status-neutral-border);
+.dashboard__indicador--sem-dado .dashboard__indicador-nota--motivo {
+  color: var(--status-warning-ink);
 }
 
 .dashboard__indicador-rotulo {
@@ -267,10 +506,71 @@
 
 .dashboard__indicador-valor {
   margin: 0;
-  color: var(--evolli-marinho);
-  font-size: var(--text-title);
+  color: var(--color-ink);
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
+}
+
+/* Saldo do período: selo em texto (sinal + número), a cor só reforça. */
+.dashboard__variacao {
+  display: inline-block;
+  padding: 1px var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-strong);
+}
+
+.dashboard__variacao--alta {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.dashboard__variacao--baixa {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+.dashboard__variacao--neutra {
+  background: var(--status-neutral-surface);
+  color: var(--status-neutral-ink);
+}
+
+/* Rodapé do card de ativos: o saldo e a minilinha lado a lado. */
+.dashboard__indicador-rodape {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.dashboard__indicador-rodape .dashboard__indicador-nota {
+  white-space: nowrap;
+}
+
+/* Minilinha do saldo acumulado: decorativa, encolhe antes do texto. */
+.dashboard__minilinha {
+  flex: 0 1 6rem;
+  width: 6rem;
+  min-width: 3rem;
+  height: auto;
+  overflow: visible;
+}
+
+.dashboard__minilinha-area {
+  fill: color-mix(in srgb, var(--color-action) 14%, transparent);
+}
+
+.dashboard__minilinha-linha {
+  fill: none;
+  stroke: var(--color-action);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dashboard__minilinha-ponto {
+  fill: var(--color-action);
 }
 
 .dashboard__indicador--sem-dado .dashboard__indicador-valor {
@@ -425,46 +725,6 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   border: 1px solid var(--status-warning-border, var(--hairline));
   border-radius: var(--radius-md);
   background: var(--status-warning-surface, var(--surface-pearl));
-}
-
-/* ---- "Como calculamos" ------------------------------------------------- */
-.dashboard__como {
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.dashboard__como-botao {
-  color: var(--evolli-azul-escuro);
-  justify-self: start;
-  min-height: var(--touch-target);
-  padding: 0;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.dashboard__como-texto {
-  display: grid;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-left: 3px solid var(--evolli-verde-agua);
-  border-radius: var(--radius-sm);
-  background: var(--evolli-fundo);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--leading-body);
-}
-
-.dashboard__como-texto[hidden] {
-  display: none;
-}
-
-.dashboard__como-texto p {
-  margin: 0;
 }
 
 /* ---- Aba sem dado ------------------------------------------------------ */
@@ -709,8 +969,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
 .dashboard h2:focus-visible,
 .dashboard__link:focus-visible,
 .dashboard__tipo:focus-visible,
-.dashboard__situacao:focus-visible,
-.dashboard__como-botao:focus-visible {
+.dashboard__situacao:focus-visible {
   outline: var(--focus-width) solid var(--evolli-azul);
   outline-offset: var(--focus-offset);
 }
@@ -1082,6 +1341,12 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   min-width: 0;
 }
 
+/* Fora do cabeçalho com menu, a própria linha do título ancora a janela de
+   "Como calculamos": ela abre logo abaixo, sem passar da borda do bloco. */
+.dashboard__ancora-info {
+  position: relative;
+}
+
 /* Botão de informação: alvo de 32 px no traço, 44 px de área útil. */
 .dashboard__info-botao {
   position: relative;
@@ -1279,7 +1544,6 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   }
 
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__sem-impressao,
-  .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__como,
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__vaga-do-painel,
   .evolli-imprimindo-bloco [data-bloco-impresso] .dashboard__dica-mes {
     display: none !important;

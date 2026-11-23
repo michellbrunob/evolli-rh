@@ -1,50 +1,177 @@
 /**
- * Login web (T116; composição institucional na T160).
+ * Login web (T116; composição institucional na T160; recomposta em
+ * 2026-11-23 a pedido da proprietária).
  *
- * Só tokens de `tokens.css`: nenhum hexadecimal novo além do branco já
- * previsto como `--color-on-action`, **sem gradiente**, sem sombra, sem fonte
- * ou imagem externa, sem `@import`. Nada aqui foi amostrado de produto de
- * terceiro — a regra está registrada em
- * `docs/decisions/t159-direcao-visual-navegacao.md` e vale igual para a porta
- * de entrada.
+ * Só tokens de `tokens.css`, **sem gradiente**, sem fonte ou imagem externa,
+ * sem `@import`. Nada aqui foi amostrado de produto de terceiro.
  *
  * ## A composição
  *
- * Duas faixas. À esquerda, no desktop, o **painel institucional**: superfície
- * na cor de ação, marca, uma frase e o aviso de ambiente interno, sobre um
- * fundo abstrato desenhado em SVG. À direita, o **cartão** de credenciais,
- * sobre a superfície neutra de sempre. Abaixo de 900px as duas viram uma
- * coluna só: o painel encolhe para uma faixa de topo e o cartão ocupa a
- * largura, sem nunca passar da tela.
+ * Duas faixas no desktop. À esquerda, sobre o branco, a **área do
+ * formulário**: a marca no alto, o formulário no meio e o aviso de acesso
+ * restrito no pé. À direita, o **painel marinho** da paleta Evolli, com
+ * cantos arredondados e uma margem em volta: o símbolo, uma frase e as três
+ * frentes que o produto já cobre. Abaixo de 900px o painel sai e fica só o
+ * formulário — no celular, quem abre o login quer entrar.
  *
  * ## Contraste
  *
- * Todo texto do painel é branco puro sobre `--color-action` (#0066cc),
- * ≈5,6:1 — AA com folga. Nenhum texto usa branco esmaecido ali: a hierarquia
- * vem de tamanho e peso, não de opacidade, justamente porque opacidade sobre
- * essa cor cairia abaixo de 4,5:1.
+ * Texto do painel em branco puro sobre o marinho (#0b2d5b, ≈13:1) e sobre o
+ * realce do marinho (#16407a, ≈10:1). Nada usa transparência: a hierarquia
+ * vem de tamanho e peso.
  */
 
 .login-screen {
   min-height: 100vh;
   min-height: 100svh;
   display: grid;
-  grid-template-rows: auto 1fr;
-  background: var(--surface-neutral);
+  background: var(--surface-canvas);
 }
 
-/* ---------------------------------------------------------- painel esquerdo */
+/* ------------------------------------------------- área do formulário */
+
+.login-screen__area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+  padding: clamp(var(--space-md), 4vw, var(--space-xl));
+}
+
+.login-screen__topo {
+  display: flex;
+  align-items: center;
+}
+
+.login-screen__card {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+.login-screen__title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+}
+
+.login-screen__subtitle {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-ink-subtle);
+}
+
+.login-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.login-screen__form > .evolli-button {
+  align-self: stretch;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  border-radius: var(--radius-md);
+}
+
+/* Senha com o botão de mostrar dentro do campo, à direita. */
+.login-screen__senha {
+  position: relative;
+}
+
+.login-screen__senha > input {
+  padding-right: calc(var(--touch-target) + var(--space-xs));
+}
+
+.login-screen__olho {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: var(--touch-target);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.login-screen__olho:hover,
+.login-screen__olho[aria-pressed="true"] {
+  color: var(--color-action);
+}
+
+.login-screen__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+/* Como conseguir acesso: um quadro discreto abaixo do botão. */
+.login-screen__acesso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+
+.login-screen__acesso > svg {
+  flex: 0 0 auto;
+  color: var(--color-action);
+}
+
+.login-screen__acesso strong {
+  display: block;
+  color: var(--color-ink);
+}
+
+.login-screen__rodape {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+/* Ações da 2ª etapa (T126): "Voltar" e "Verificar" lado a lado, empilhando
+   no mobile. */
+.login-screen__mfa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.login-screen__mfa-acoes > .evolli-button {
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------------- painel marinho */
 
 .login-screen__painel {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: var(--space-lg) clamp(var(--space-md), 5vw, var(--space-2xl));
-  background: var(--color-action);
-  color: var(--color-on-action);
+  display: none;
+  margin: var(--space-md);
+  padding: var(--space-2xl) clamp(var(--space-xl), 4vw, var(--space-2xl));
+  border-radius: var(--radius-lg);
+  background: var(--evolli-marinho);
+  color: var(--color-on-dark);
 }
 
 /* Decoração: fica atrás do conteúdo do painel e nunca escapa dele (o
@@ -60,131 +187,70 @@
 .login-screen__painel-conteudo {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  max-width: 30rem;
+  gap: var(--space-xl);
+  height: 100%;
 }
 
-.login-screen__marca {
+.login-screen__simbolo {
   display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
+  align-self: flex-end;
 }
 
 .login-screen__lema {
-  margin: var(--space-xs) 0 0;
-  font-size: var(--text-lead);
-  font-weight: var(--weight-regular);
+  max-width: 14ch;
+  margin: auto 0 0;
+  font-size: clamp(2rem, 1.2rem + 2vw, 2.75rem);
+  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   text-wrap: balance;
 }
 
-.login-screen__nota {
-  margin: 0;
-  font-size: var(--text-caption);
-  /* Branco puro, não esmaecido: ver a nota de contraste no topo. */
-  color: var(--color-on-action);
+.login-screen__frentes {
+  display: grid;
+  gap: var(--space-md);
+  max-width: 26rem;
+  margin: 0 0 auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--evolli-marinho-divisa);
+  border-radius: var(--radius-lg);
+  background: var(--evolli-marinho-realce);
+  list-style: none;
 }
 
-/* ----------------------------------------------------------- cartão direito */
-
-.login-screen__area {
+.login-screen__frente {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: clamp(var(--space-lg), 5vw, var(--space-2xl))
-    clamp(var(--space-md), 4vw, var(--space-xl));
-}
-
-.login-screen__card {
-  width: 100%;
-  max-width: 26rem;
-  padding: var(--space-xl);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: var(--surface-canvas);
-}
-
-.login-screen__title {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--text-title);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  font-weight: var(--weight-bold);
-  color: var(--color-ink);
-}
-
-.login-screen__subtitle {
-  margin: 0 0 var(--space-lg);
-  color: var(--color-ink-subtle);
-}
-
-.login-screen__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-}
-
-.login-screen__form > .evolli-button {
-  align-self: stretch;
-}
-
-.login-screen__erro {
-  margin: 0;
-  color: var(--status-danger-ink);
-}
-
-/* Ações da 2ª etapa (T126): "Voltar" e "Verificar" lado a lado, empilhando
-   no mobile. */
-.login-screen__mfa-acoes {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-sm);
+  font-weight: var(--weight-strong);
 }
 
-.login-screen__mfa-acoes > .evolli-button {
-  flex: 1 1 auto;
+.login-screen__frente-icone {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--evolli-marinho-divisa);
+  border-radius: var(--radius-md);
+  background: var(--evolli-marinho);
 }
 
 /* ----------------------------------------------------------------- desktop */
 
 @media (min-width: 900px) {
   .login-screen {
-    grid-template-rows: none;
-    /* O cartão manda na largura; o painel fica com o resto, sem espremer o
-       formulário em tela estreita de notebook. */
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .login-screen__painel {
-    justify-content: center;
-    padding: var(--space-3xl) clamp(var(--space-xl), 6vw, var(--space-3xl));
-  }
-
-  .login-screen__lema {
-    font-size: var(--text-display);
-  }
-
-  .login-screen__nota {
-    margin-top: var(--space-sm);
+    display: block;
   }
 }
 
 /* ---------------------------------------------------------------- estreito */
 
 @media (max-width: 480px) {
-  .login-screen__painel {
-    padding: var(--space-md);
-  }
-
-  .login-screen__area {
-    padding: var(--space-md);
-  }
-
-  .login-screen__card {
-    padding: var(--space-lg);
-  }
-
   .login-screen__mfa-acoes {
     flex-direction: column-reverse;
   }
@@ -192,36 +258,15 @@
 
 /* --------------------------------------------------------------- movimento
  *
- * Uma entrada curta do painel: a marca aparece primeiro, a frase logo atrás,
- * o aviso por último. É a única animação do produto inteiro, e existe por um
- * motivo estreito — a porta de entrada é o primeiro contato, e a marca
- * chegando antes do resto diz de quem é a casa.
+ * Uma entrada curta do painel: o símbolo primeiro, a frase logo atrás, as
+ * frentes por último. Quatro regras que a mantêm honesta:
  *
- * Quatro regras que a mantêm honesta:
- *
- * 1. **Dispara uma vez.** Nada de laço: conteúdo em movimento perpétuo por
- *    mais de cinco segundos cairia na WCAG 2.2.2, que exigiria um controle de
- *    pausa — controle que esta tela não tem e não deveria ter.
- * 2. **Mora inteira atrás de `prefers-reduced-motion: no-preference`.** Quem
- *    pediu menos movimento vê o painel pronto, sem atraso e sem deslocamento.
- * 3. **Nunca mexe em `opacity` nem em `visibility`.** Esta é a regra que
- *    custou uma medição: com `opacity: 0` no quadro inicial e
- *    `animation-fill-mode: both`, uma animação que NÃO avança deixa o
- *    conteúdo preso em transparente. Medi isso no navegador — documento sem
- *    pintar, animação em `running` e marca invisível por tempo indefinido.
- *    Animando só o deslocamento, o pior caso vira "o texto ficou 10px mais
- *    baixo", e não "a marca sumiu".
- * 4. **Deslocamento só na vertical**, de 10px. `translateX` está proibido por
- *    teste neste arquivo: é a origem clássica de rolagem horizontal no mobile.
- *
- * Fora daqui a tela não tem movimento nenhum. A tentativa de animar a borda
- * do cartão em `:focus-within` foi descartada: a regra casava
- * (`matches(':focus-within')` verdadeiro, documento com foco, regra no
- * CSSOM) e mesmo assim a borda não mudava no navegador — nem com
- * `!important` —, enquanto `:focus-within` aplicado ao formulário funcionava
- * na mesma página. Sem explicação verificada, saiu. O sinal de foco que
- * importa é o anel do próprio campo, `2px solid #0066cc`, vindo do
- * `:focus-visible` global de `tokens.css`, e não depende deste arquivo.
+ * 1. **Dispara uma vez.** Nada de laço (WCAG 2.2.2).
+ * 2. **Mora inteira atrás de `prefers-reduced-motion: no-preference`.**
+ * 3. **Nunca mexe em `opacity` nem em `visibility`**: uma animação que não
+ *    avança não pode deixar conteúdo preso em transparente.
+ * 4. **Deslocamento só na vertical**, de 10px — sem rolagem lateral no
+ *    celular.
  */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -235,9 +280,9 @@
     }
   }
 
-  .login-screen__marca,
+  .login-screen__simbolo,
   .login-screen__lema,
-  .login-screen__nota {
+  .login-screen__frentes {
     animation: login-entrada 420ms ease-out both;
   }
 
@@ -245,25 +290,12 @@
     animation-delay: 90ms;
   }
 
-  .login-screen__nota {
+  .login-screen__frentes {
     animation-delay: 180ms;
   }
 
-  /* Profundidade do fundo.
-   *
-   * As seis formas abstratas sobem alguns pixels ao entrar, cada uma no seu
-   * tempo. A diferença entre as durações é o que cria a sensação de camadas:
-   * a forma grande acomoda devagar, o ponto pequeno chega rápido. Não é
-   * paralaxe — nada reage ao ponteiro, ao scroll ou ao relógio.
-   *
-   * Mesmas restrições do bloco acima, pelos mesmos motivos: uma execução,
-   * só deslocamento vertical, nenhum `opacity`/`visibility`. O deslocamento
-   * é em unidades do `viewBox` (600×900), que com o recorte deste painel dá
-   * aproximadamente o mesmo número em pixels.
-   *
-   * Se a animação não avançar, as formas ficam alguns pixels fora do lugar —
-   * e ninguém percebe, porque são decoração sem contorno de referência. Era
-   * exatamente o risco que o `opacity` trazia e que esta escolha evita. */
+  /* Profundidade do fundo: as seis formas sobem alguns pixels ao entrar,
+     cada uma no seu tempo. Uma execução, só deslocamento vertical. */
   @keyframes login-fundo {
     from {
       transform: translateY(16px);

@@ -160,10 +160,17 @@ describe("T207 — paleta Evolli (P-1): só no menu, no Dashboard e no seletor",
     );
   });
 
+  // A porta de entrada também usa a paleta: o painel marinho ao lado do
+  // formulário (pedido da proprietária, 2026-11-23).
+  it("o login usa o marinho da paleta no painel", () => {
+    expect(readFileSync("src/app/LoginScreen.css", "utf8")).toMatch(
+      /\.login-screen__painel \{[^}]*background: var\(--evolli-marinho\)/,
+    );
+  });
+
   it("nenhuma outra tela do produto usa os tokens Evolli", () => {
     for (const arquivo of [
       "src/app/HubPosLogin.css",
-      "src/app/LoginScreen.css",
       "src/app/guardaDeSaida.css",
       "src/components/Modal.css",
     ]) {

@@ -58,7 +58,8 @@ import {
   TETO_DE_PAGINAS_POR_SERIE,
   TAMANHO_PAGINA_MOVIMENTACOES,
   TIPOS_DE_MOVIMENTACAO,
-  fraseResumo,
+  anosDoFiltro,
+  lerPrimeiroAnoComDados,
   lerSerieMensal,
   nomeDoMes,
   periodoDoAno,
@@ -70,14 +71,24 @@ import {
 } from "./dashboardDados";
 import {
   BlocoSemDado,
-  CartaoSemDado,
-  ComoCalculamos,
   EstadoIndisponivel,
+  InfoComoCalculamos,
   type BlocoComVista,
   type VistaDoBloco,
 } from "./componentesDoDashboard";
 import { QuadroDeColaboradores } from "./QuadroDeColaboradores";
-import { limparImpressao } from "./exportacao";
+import {
+  baixarArquivo,
+  imprimirSomente,
+  limparImpressao,
+  montarCsv,
+  nomeDoArquivo,
+  type CelulaDoCsv,
+} from "./exportacao";
+import { CartaoPrincipal } from "./CartaoPrincipal";
+import { SeletorDePeriodo } from "./SeletorDePeriodo";
+import { MenuDeAcoes, type AcaoDoMenu } from "./MenuDeAcoes";
+import { IconeBaixarArquivo, IconeTentarDeNovo } from "../../ui/icones";
 import { DistribuicaoDoTimeBloco, TempoDeCasaBloco } from "./BlocosDoTime";
 import { GraficoMensal } from "./GraficoMensal";
 import "./DashboardScreen.css";
@@ -234,6 +245,42 @@ export function DashboardScreen({
     if (onTrocarVista) onTrocarVista(bloco, vista);
     else setVistasLocais((atuais) => ({ ...atuais, [bloco]: vista }));
   };
+
+  /**
+   * T214 — o primeiro ano com cadastro (admissão efetivada mais antiga):
+   * `undefined` antes de ler, "lendo", `null` sem cadastro, "falha" se a
+   * leitura falhou.
+   */
+  const [primeiroAno, setPrimeiroAno] = useState<
+    number | null | "lendo" | "falha" | undefined
+  >(undefined);
+  /** Só a leitura mais recente do primeiro ano vale (outra empresa, outra tela). */
+  const leituraDoPrimeiroAnoRef = useRef(0);
+  // Outra empresa: o primeiro ano lido não vale mais.
+  const nomeDaEmpresa = empresaAtiva?.nome ?? null;
+  useEffect(() => {
+    leituraDoPrimeiroAnoRef.current += 1;
+    setPrimeiroAno(undefined);
+  }, [nomeDaEmpresa]);
+  /**
+   * Lido só quando o filtro é aberto (uma vez por empresa): nenhuma consulta
+   * a mais para quem não usa o filtro, nem nas abas sem dado.
+   */
+  function garantirPrimeiroAno() {
+    if (primeiroAno !== undefined && primeiroAno !== "falha") return;
+    setPrimeiroAno("lendo");
+    const leitura = ++leituraDoPrimeiroAnoRef.current;
+    const vale = () =>
+      vivaRef.current && leitura === leituraDoPrimeiroAnoRef.current;
+    lerPrimeiroAnoComDados(listarMovimentacoes).then(
+      (lido) => {
+        if (vale()) setPrimeiroAno(lido);
+      },
+      () => {
+        if (vale()) setPrimeiroAno("falha");
+      },
+    );
+  }
 
   const vivaRef = useRef(true);
   useEffect(() => {
@@ -557,8 +604,18 @@ export function DashboardScreen({
     },
   });
 
-  const anos: number[] = [];
-  for (let a = corrente; a >= ANO_MINIMO_DO_DASHBOARD; a -= 1) anos.push(a);
+  // T214 — só os anos com cadastro; lendo, o corrente (e o aberto); com
+  // falha na leitura, a faixa completa (ninguém fica preso a um ano).
+  const anos = anosDoFiltro({
+    corrente,
+    primeiro:
+      primeiroAno === "falha"
+        ? ANO_MINIMO_DO_DASHBOARD
+        : primeiroAno === undefined || primeiroAno === "lendo"
+          ? corrente
+          : primeiroAno,
+    aberto: ano,
+  });
   const dadosContadores = contadores.tipo === "dados" ? contadores.dados : null;
   // Só a série (ou a falha) do ano exibido conta; a de outro ano é tratada
   // como "carregando" até a leitura deste ano terminar.
@@ -673,136 +730,18 @@ export function DashboardScreen({
   // ---- Visão Geral --------------------------------------------------------
   const visaoGeral = (
     <>
-      <section className="dashboard__resumo" aria-labelledby={ids.pessoas}>
-        <div className="dashboard__resumo-topo">
-          <h2 id={ids.pessoas} tabIndex={-1} className="dashboard__subtitulo">
-            Resumo
-          </h2>
-          {/* A hora da leitura, uma vez só: na Visão Geral fica aqui, no
-              card do Resumo; nas outras abas, junto de "Atualizar". */}
-          <span className="dashboard__selo dashboard__selo--leitura">
-            {lidoEm ? `Dados lidos em ${lidoEm}` : "Ainda não lido"}
-          </span>
-        </div>
-        {dadosContadores && admissoes && desligamentos ? (
-          <p className="dashboard__frase">
-            {fraseResumo(
-              dadosContadores.ativos,
-              dadosContadores.emAdmissao,
-              admissoes.total,
-              desligamentos.total,
-              periodo,
-            )}
-          </p>
-        ) : null}
-        {falhaDosContadores}
-      </section>
-
-      <section aria-labelledby={ids.indicadores}>
-        <h2 id={ids.indicadores} className="dashboard__so-leitor">
-          Indicadores
-        </h2>
-        <ul className="dashboard__indicadores">
-          <li>
-            <article
-              className="dashboard__indicador"
-              aria-labelledby={`${prefixo}-ind-ativos`}
-            >
-              <h3
-                id={`${prefixo}-ind-ativos`}
-                className="dashboard__indicador-rotulo"
-              >
-                Colaboradores ativos
-              </h3>
-              {dadosContadores ? (
-                <>
-                  <p className="dashboard__indicador-valor">
-                    {String(dadosContadores.ativos)}
-                    <span className="dashboard__indicador-unidade">
-                      {dadosContadores.ativos === 1 ? " pessoa" : " pessoas"}
-                    </span>
-                  </p>
-                  <p className="dashboard__indicador-nota">
-                    Com vínculo ativo hoje
-                    {admissoes && desligamentos ? (
-                      <>
-                        {" · "}
-                        <span className="dashboard__saldo">
-                          {sinal(admissoes.total - desligamentos.total)}
-                        </span>{" "}
-                        vínculos {quando}
-                      </>
-                    ) : null}
-                  </p>
-                  <a
-                    className="dashboard__link"
-                    {...linkDaListagem({
-                      ...ESTADO_INICIAL_DA_LISTAGEM,
-                      aba: "ativos",
-                    })}
-                  >
-                    Abrir na listagem
-                    <span className="dashboard__so-leitor">
-                      {" "}
-                      de Colaboradores: pessoas ativas
-                    </span>
-                  </a>
-                  <ComoCalculamos assunto="colaboradores ativos">
-                    <p>
-                      Pessoas com vínculo principal ativo hoje, no cadastro de
-                      Colaboradores da empresa ativa. Cada pessoa conta uma vez.
-                    </p>
-                    <p>
-                      O saldo do ano é a diferença entre admissões e
-                      desligamentos efetivados no ano escolhido, contados em
-                      vínculos (uma pessoa pode ter mais de um vínculo).
-                    </p>
-                  </ComoCalculamos>
-                </>
-              ) : contadores.tipo === "erro" ? (
-                <p className="dashboard__indicador-nota">
-                  Totais de pessoas indisponíveis no momento.
-                </p>
-              ) : (
-                <p className="dashboard__nota" aria-hidden="true">
-                  Carregando…
-                </p>
-              )}
-            </article>
-          </li>
-          <li>
-            <CartaoSemDado
-              id={`${prefixo}-ind-turnover`}
-              rotulo="Turnover no ano"
-              selo="Requer definição"
-            >
-              Para calcular a rotatividade, o Evolli precisa de uma regra
-              aprovada e do histórico de pessoas ativas mês a mês, que ainda não
-              é guardado.
-            </CartaoSemDado>
-          </li>
-          <li>
-            <CartaoSemDado
-              id={`${prefixo}-ind-absenteismo`}
-              rotulo="Absenteísmo"
-              selo="Indisponível no Evolli"
-            >
-              Depende de horas previstas, faltas e afastamentos apurados. Hoje o
-              ponto do Evolli guarda só as marcações, sem apuração.
-            </CartaoSemDado>
-          </li>
-          <li>
-            <CartaoSemDado
-              id={`${prefixo}-ind-custo`}
-              rotulo="Custo por pessoa"
-              selo="Indisponível no Evolli"
-            >
-              Depende de folha e salários, que não fazem parte do Evolli. A
-              folha oficial é processada fora dele.
-            </CartaoSemDado>
-          </li>
-        </ul>
-      </section>
+      <CartaoPrincipal
+        idTitulo={ids.pessoas}
+        prefixo={prefixo}
+        lidoEm={lidoEm}
+        ativos={dadosContadores ? dadosContadores.ativos : null}
+        emAdmissao={dadosContadores ? dadosContadores.emAdmissao : null}
+        falhouAoLer={contadores.tipo === "erro"}
+        entradas={admissoes}
+        saidas={desligamentos}
+        periodo={periodo}
+        falha={falhaDosContadores}
+      />
 
       <QuadroDeColaboradores
         idTitulo={ids.serie}
@@ -872,9 +811,21 @@ export function DashboardScreen({
 
       <div className="dashboard__duas-colunas">
         <section className="dashboard__bloco" aria-labelledby={ids.hoje}>
-          <h2 id={ids.hoje} className="dashboard__subtitulo">
-            Pessoas hoje
-          </h2>
+          <div className="dashboard__titulo-com-info dashboard__ancora-info">
+            <h2 id={ids.hoje} className="dashboard__subtitulo">
+              Pessoas hoje
+            </h2>
+            {dadosContadores ? (
+              <InfoComoCalculamos assunto="pessoas hoje">
+                <p>
+                  Situação de cada pessoa hoje, pelo vínculo principal: ativa,
+                  em admissão (vínculo previsto) ou desligada (vínculo
+                  encerrado). Inativas soma em admissão e desligadas; não é um
+                  terceiro grupo.
+                </p>
+              </InfoComoCalculamos>
+            ) : null}
+          </div>
           {dadosContadores ? (
             <>
               <ul className="dashboard__situacoes">
@@ -938,14 +889,6 @@ export function DashboardScreen({
                   </div>
                 </li>
               </ul>
-              <ComoCalculamos assunto="pessoas hoje">
-                <p>
-                  Situação de cada pessoa hoje, pelo vínculo principal: ativa,
-                  em admissão (vínculo previsto) ou desligada (vínculo
-                  encerrado). Inativas soma em admissão e desligadas; não é um
-                  terceiro grupo.
-                </p>
-              </ComoCalculamos>
             </>
           ) : contadores.tipo === "erro" ? (
             <p className="dashboard__nota">Indisponível no momento.</p>
@@ -980,25 +923,27 @@ export function DashboardScreen({
   // ---- Pessoas ------------------------------------------------------------
   const pessoas = (
     <section className="dashboard__bloco" aria-labelledby={ids.pessoas}>
-      <h2 id={ids.pessoas} tabIndex={-1} className="dashboard__subtitulo">
-        Pessoas ativas por tipo de vínculo
-      </h2>
-      {falhaDosContadores}
-      {dadosContadores ? (
-        <>
-          <DistribuicaoPorTipo
-            contadores={dadosContadores}
-            linkDaListagem={linkDaListagem}
-            comTabela
-          />
-          <ComoCalculamos assunto="tipo de vínculo">
+      <div className="dashboard__titulo-com-info dashboard__ancora-info">
+        <h2 id={ids.pessoas} tabIndex={-1} className="dashboard__subtitulo">
+          Pessoas ativas por tipo de vínculo
+        </h2>
+        {dadosContadores ? (
+          <InfoComoCalculamos assunto="tipo de vínculo">
             <p>
               Pessoas ativas hoje, pelo tipo do vínculo principal ativo. A soma
               dos tipos é o total de pessoas ativas; o percentual é a parte de
               cada tipo nesse total.
             </p>
-          </ComoCalculamos>
-        </>
+          </InfoComoCalculamos>
+        ) : null}
+      </div>
+      {falhaDosContadores}
+      {dadosContadores ? (
+        <DistribuicaoPorTipo
+          contadores={dadosContadores}
+          linkDaListagem={linkDaListagem}
+          comTabela
+        />
       ) : contadores.tipo === "erro" ? null : (
         <p className="dashboard__nota" aria-hidden="true">
           Carregando…
@@ -1010,9 +955,12 @@ export function DashboardScreen({
   // ---- Movimentação -------------------------------------------------------
   const movimentacao = (
     <section className="dashboard__bloco" aria-labelledby={ids.serie}>
-      <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
-        Movimentações efetivadas por mês
-      </h2>
+      <div className="dashboard__titulo-com-info dashboard__ancora-info">
+        <h2 id={ids.serie} tabIndex={-1} className="dashboard__subtitulo">
+          Movimentações efetivadas por mês
+        </h2>
+        {dadosSeries ? <ComoCalculamosMovimentacao /> : null}
+      </div>
       <p className="dashboard__explicacao">
         Admissões, desligamentos, transferências e mudanças de cargo efetivadas
         em cada mês do ano escolhido. São eventos do período, contados em
@@ -1044,7 +992,6 @@ export function DashboardScreen({
           />
         </>
       ))}
-      {dadosSeries ? <ComoCalculamosMovimentacao /> : null}
     </section>
   );
 
@@ -1065,6 +1012,53 @@ export function DashboardScreen({
       />
     ),
   };
+
+  // T214 — exportar: o CSV com os indicadores do período e a impressão só
+  // da aba aberta (no destino, "Salvar como PDF").
+  const saldoDoPeriodo =
+    admissoes && desligamentos ? admissoes.total - desligamentos.total : null;
+  const linhasDoCsv: (readonly CelulaDoCsv[])[] = [
+    ["Colaboradores ativos (hoje)", dadosContadores?.ativos ?? null, "pessoas"],
+    ["Em admissão (hoje)", dadosContadores?.emAdmissao ?? null, "pessoas"],
+    [`Entradas ${quando}`, admissoes?.total ?? null, "vínculos efetivados"],
+    [`Saídas ${quando}`, desligamentos?.total ?? null, "vínculos efetivados"],
+    [`Saldo ${quando}`, saldoDoPeriodo, "entradas menos saídas"],
+    ["Turnover no ano", null, "aguarda a regra de cálculo"],
+    ["Absenteísmo", null, "depende da apuração do ponto"],
+    ["Custo por pessoa", null, "a folha é feita fora do Evolli"],
+  ];
+  const acoesDeExportar: AcaoDoMenu[] = [
+    {
+      id: "csv",
+      rotulo: "Baixar CSV",
+      descricao: `Indicadores de ${ano}, para planilha`,
+      aoEscolher: () => {
+        const nome = nomeDoArquivo(
+          ["dashboard", empresaAtiva.nome, ano],
+          "csv",
+        );
+        baixarArquivo(
+          montarCsv(["Indicador", "Valor", "Observação"], linhasDoCsv),
+          nome,
+        );
+        anunciar(`Arquivo ${nome} baixado.`);
+      },
+    },
+    {
+      id: "pdf",
+      rotulo: "Imprimir ou salvar em PDF",
+      descricao: "Só esta aba; no destino, escolha Salvar como PDF",
+      aoEscolher: () => {
+        anunciar(
+          `Impressão aberta com a aba ${ROTULO_DA_ABA[aba]}. No destino, escolha Salvar como PDF.`,
+        );
+        window.setTimeout(() => {
+          const painel = document.getElementById(idDoPainel(aba));
+          if (painel) imprimirSomente(painel);
+        }, 0);
+      },
+    },
+  ];
 
   return (
     <section className="dashboard" aria-labelledby={DASHBOARD_TITULO_ID}>
@@ -1117,46 +1111,14 @@ export function DashboardScreen({
         </div>
 
         <div className="dashboard__barra">
-          <div
-            className="dashboard__periodo"
-            role="group"
-            aria-label="Ano consultado"
-          >
-            <Button
-              type="button"
-              variant="secondary"
-              aria-disabled={ano <= ANO_MINIMO_DO_DASHBOARD}
-              onClick={() => {
-                if (ano > ANO_MINIMO_DO_DASHBOARD) onTrocarAno(ano - 1);
-              }}
-            >
-              Ano anterior
-            </Button>
-            <label className="dashboard__ano" htmlFor={ids.seletorAno}>
-              <span className="dashboard__so-leitor">Ano</span>
-              <select
-                id={ids.seletorAno}
-                value={ano}
-                onChange={(e) => onTrocarAno(Number(e.target.value))}
-              >
-                {anos.map((a) => (
-                  <option key={a} value={a}>
-                    {a === corrente ? `${a} (até hoje)` : String(a)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              type="button"
-              variant="secondary"
-              aria-disabled={ano >= corrente}
-              onClick={() => {
-                if (ano < corrente) onTrocarAno(ano + 1);
-              }}
-            >
-              Próximo ano
-            </Button>
-          </div>
+          <SeletorDePeriodo
+            ano={ano}
+            anos={anos}
+            corrente={corrente}
+            onTrocarAno={onTrocarAno}
+            onAbrir={garantirPrimeiroAno}
+            lendoAnos={primeiroAno === "lendo"}
+          />
           {abaLeDados(aba) ? (
             <div className="dashboard__leitura">
               {aba !== "visao-geral" ? (
@@ -1164,14 +1126,23 @@ export function DashboardScreen({
                   {lidoEm ? `Lido em ${lidoEm}` : "Ainda não lido"}
                 </span>
               ) : null}
-              <Button
+              <button
                 type="button"
-                variant="secondary"
+                className="dashboard__botao-icone"
+                aria-label={lendo ? "Atualizando…" : "Atualizar"}
+                title={lendo ? "Atualizando…" : "Atualizar"}
                 aria-disabled={lendo}
                 onClick={atualizar}
               >
-                {lendo ? "Atualizando…" : "Atualizar"}
-              </Button>
+                <IconeTentarDeNovo tamanho={18} />
+              </button>
+              <MenuDeAcoes
+                assunto="Dashboard"
+                nome="Exportar"
+                icone={<IconeBaixarArquivo tamanho={20} />}
+                classe="dashboard__exportar"
+                acoes={acoesDeExportar}
+              />
             </div>
           ) : null}
         </div>
@@ -1218,7 +1189,7 @@ function sinal(n: number): string {
 
 function ComoCalculamosMovimentacao() {
   return (
-    <ComoCalculamos assunto="movimentação mensal">
+    <InfoComoCalculamos assunto="movimentação mensal">
       <p>
         Movimentações com status efetivada e vigência no ano escolhido (até
         hoje, no ano corrente), agrupadas pelo mês da vigência. Programadas,
@@ -1229,7 +1200,7 @@ function ComoCalculamosMovimentacao() {
         A contagem é em vínculos. Cada tipo é lido até {LIMITE_DA_SERIE_TEXTO}{" "}
         movimentações no ano; acima disso, o total não é exibido.
       </p>
-    </ComoCalculamos>
+    </InfoComoCalculamos>
   );
 }
 

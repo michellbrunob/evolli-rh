@@ -366,14 +366,81 @@ describe("LoginScreen (T116)", () => {
 describe("LoginScreen — composição institucional (T160)", () => {
   const css = readFileSync("src/app/LoginScreen.css", "utf8");
 
-  it("T210 — a marca oficial em versão branca sobre o painel na cor de ação", () => {
+  it("a marca azul abre a área do formulário; no painel marinho, só o símbolo branco, decorativo", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
     const marca = screen.getByRole("img", { name: "Evolli" });
-    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal-branco\.svg$/);
-    expect(marca.closest(".login-screen__painel")).not.toBeNull();
+    expect(marca.getAttribute("src")).toMatch(/evolli-horizontal\.svg$/);
+    expect(screen.getByRole("main")).toContainElement(marca);
+    const painel = document.querySelector(".login-screen__painel")!;
+    const simbolo = painel.querySelector("img")!;
+    expect(simbolo.getAttribute("src")).toMatch(/evolli-symbol-branco\.svg$/);
+    expect(simbolo).toHaveAttribute("alt", "");
     expect(document.body.textContent).not.toContain("Evolli RH");
-    // Só o arquivo local da marca, nenhuma outra imagem.
-    expect(document.querySelectorAll("img")).toHaveLength(1);
+    // Só os arquivos locais da marca, nenhuma outra imagem.
+    expect(document.querySelectorAll("img")).toHaveLength(2);
+  });
+
+  it("pouco texto, e com sentido: a frase do painel, três frentes reais, como pedir acesso e o aviso de acesso restrito", () => {
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const painel = document.querySelector<HTMLElement>(
+      ".login-screen__painel",
+    )!;
+    expect(painel).toHaveTextContent("Tudo sobre a sua equipe, num lugar só.");
+    expect(
+      within(painel)
+        .getAllByRole("listitem")
+        .map((i) => i.textContent),
+    ).toEqual([
+      "Admissão de quem chega",
+      "Documentos de cada pessoa",
+      "Jornada e horários da equipe",
+    ]);
+    // O painel não é região nem título: é apresentação, fora da leitura
+    // principal da tela.
+    expect(within(painel).queryAllByRole("heading")).toHaveLength(0);
+    const principal = screen.getByRole("main");
+    expect(principal).toHaveTextContent("Use o e-mail e a senha da sua conta.");
+    expect(principal).toHaveTextContent(
+      "Ainda não tem acesso? Peça a quem administra o Evolli na sua empresa.",
+    );
+    expect(principal).toHaveTextContent(
+      "Acesso restrito a contas autorizadas.",
+    );
+  });
+
+  it("mostrar a senha: alterna o tipo do campo, diz o estado e volta a esconder ao entrar", async () => {
+    vi.mocked(login).mockRejectedValueOnce(new ApiError(401, "nao importa"));
+    render(<LoginScreen onLoginSuccess={vi.fn()} />);
+    const campo = screen.getByLabelText(/^Senha\b/i);
+    const olho = screen.getByRole("button", { name: "Mostrar senha" });
+    expect(olho).toHaveAttribute("type", "button");
+    expect(olho).toHaveAttribute("aria-pressed", "false");
+    expect(olho).toHaveAttribute("aria-controls", campo.id);
+
+    fireEvent.click(olho);
+    expect(campo).toHaveAttribute("type", "text");
+    expect(campo).toHaveAttribute("autoComplete", "current-password");
+    // Botão de alternância: o nome fica, o estado vem de aria-pressed.
+    expect(olho).toHaveAttribute("aria-pressed", "true");
+    expect(olho).toHaveAccessibleName("Mostrar senha");
+    fireEvent.click(olho);
+    expect(campo).toHaveAttribute("type", "password");
+
+    fireEvent.click(olho);
+    fireEvent.change(screen.getByLabelText(/^E-mail\b/i), {
+      target: { value: EMAIL_SINTETICO },
+    });
+    fireEvent.change(campo, { target: { value: SENHA_SINTETICA } });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    await screen.findByRole("alert");
+    // Nunca fica à mostra depois de uma tentativa.
+    expect(screen.getByLabelText(/^Senha\b/i)).toHaveAttribute(
+      "type",
+      "password",
+    );
+    expect(
+      screen.getByRole("button", { name: "Mostrar senha" }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   it("o fundo é geometria própria: nada de imagem, uso externo ou referência", () => {
@@ -429,23 +496,26 @@ describe("LoginScreen — composição institucional (T160)", () => {
     expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
-  it("a única ação da etapa de credenciais é Entrar", () => {
+  it("na etapa de credenciais, só mostrar a senha e Entrar", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Entrar",
-    ]);
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent),
+    ).toEqual(["Mostrar senha", "Entrar"]);
   });
 
-  it("a ordem de foco é e-mail, senha, Entrar", () => {
+  it("a ordem de foco é e-mail, senha, mostrar a senha, Entrar", () => {
     render(<LoginScreen onLoginSuccess={vi.fn()} />);
     const formulario = screen.getByRole("form", { name: /login/i });
     const focaveis = [
       ...formulario.querySelectorAll<HTMLElement>("input, button"),
     ];
-    expect(focaveis).toHaveLength(3);
+    expect(focaveis).toHaveLength(4);
     expect(focaveis[0]).toHaveAttribute("type", "email");
     expect(focaveis[1]).toHaveAttribute("type", "password");
-    expect(focaveis[2]).toHaveTextContent("Entrar");
+    expect(focaveis[2]).toHaveAccessibleName("Mostrar senha");
+    expect(focaveis[3]).toHaveTextContent("Entrar");
     for (const elemento of focaveis) {
       expect(elemento.getAttribute("tabindex")).not.toBe("-1");
     }

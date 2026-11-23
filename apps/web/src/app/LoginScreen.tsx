@@ -36,6 +36,16 @@
 import { useId, useState } from "react";
 import { Button, FormField } from "../components";
 import { ApiError, login, verifyMfa } from "../api/authClient";
+import {
+  IconeAdicionarPessoa,
+  IconeCadeado,
+  IconeEntrar,
+  IconeInformacao,
+  IconeMostrarSenha,
+  IconeOcultarSenha,
+  IconePlanilha,
+  IconeRelogio,
+} from "../ui/icones";
 import { MarcaEvolli } from "./marca/MarcaEvolli";
 import "./LoginScreen.css";
 
@@ -128,26 +138,40 @@ function FundoInstitucional() {
 }
 
 /**
- * Painel institucional. Diz o que o produto é, não o que ele promete ser:
- * os três módulos citados — pessoas, estrutura e jornada — são exatamente os
- * que têm capacidade real, como a T159 fixou. Sem métrica, sem depoimento,
- * sem link para fora.
+ * Painel institucional, à direita no desktop: uma frase e as três frentes
+ * que o Evolli já cobre de verdade (admissão, documentos e jornada). Pouco
+ * texto de propósito. Sem métrica, sem depoimento, sem link para fora.
+ * É apresentação: nenhum título, nada que o leitor de tela precise para
+ * entrar — o símbolo é decorativo, porque a marca com nome já abre a área
+ * do formulário.
  */
+const FRENTES = [
+  { texto: "Admissão de quem chega", Icone: IconeAdicionarPessoa },
+  { texto: "Documentos de cada pessoa", Icone: IconePlanilha },
+  { texto: "Jornada e horários da equipe", Icone: IconeRelogio },
+] as const;
+
 function PainelInstitucional() {
   return (
     <div className="login-screen__painel">
       <FundoInstitucional />
       <div className="login-screen__painel-conteudo">
-        <span className="login-screen__marca">
-          {/* T210 — sobre a cor de ação, a versão branca oficial. */}
-          <MarcaEvolli tom="branco" altura={40} />
+        <span className="login-screen__simbolo">
+          <MarcaEvolli variante="simbolo" tom="branco" altura={36} decorativa />
         </span>
         <p className="login-screen__lema">
-          Pessoas, estrutura e jornada no mesmo lugar.
+          Tudo sobre a sua equipe, num lugar só.
         </p>
-        <p className="login-screen__nota">
-          Ambiente interno · acesso restrito a contas autorizadas
-        </p>
+        <ul className="login-screen__frentes">
+          {FRENTES.map(({ texto, Icone }) => (
+            <li key={texto} className="login-screen__frente">
+              <span className="login-screen__frente-icone">
+                <Icone tamanho={20} />
+              </span>
+              {texto}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -195,6 +219,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const emailId = useId();
   const senhaId = useId();
   const codigoId = useId();
@@ -205,6 +230,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
     setEnviando(true);
     setErro(null);
+    // A senha nunca fica à mostra depois de uma tentativa.
+    setMostrarSenha(false);
     try {
       const resultado = await login({ email, password: senha });
       // A senha não é mais necessária após a tentativa — some do estado em
@@ -255,9 +282,11 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
   return (
     <div className="login-screen">
-      <PainelInstitucional />
-
       <main className="login-screen__area">
+        <div className="login-screen__topo">
+          <MarcaEvolli altura={32} />
+        </div>
+
         <div className="login-screen__card">
           <h1 id={LOGIN_TITULO_ID} className="login-screen__title">
             {fase === "credenciais" ? "Entrar" : "Verificação em duas etapas"}
@@ -266,7 +295,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {fase === "credenciais" ? (
             <>
               <p className="login-screen__subtitle">
-                Entre com seu e-mail e senha.
+                Use o e-mail e a senha da sua conta.
               </p>
 
               <form
@@ -279,6 +308,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     <input
                       type="email"
                       autoComplete="username"
+                      placeholder="nome@empresa.com.br"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
@@ -291,16 +321,33 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
                 <FormField id={senhaId} label="Senha" required>
                   {(control) => (
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={senha}
-                      onChange={(e) => {
-                        setSenha(e.target.value);
-                        setErro(null);
-                      }}
-                      {...control}
-                    />
+                    <div className="login-screen__senha">
+                      <input
+                        type={mostrarSenha ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={senha}
+                        onChange={(e) => {
+                          setSenha(e.target.value);
+                          setErro(null);
+                        }}
+                        {...control}
+                      />
+                      {/* Alternância: o nome fica, o estado é aria-pressed. */}
+                      <button
+                        type="button"
+                        className="login-screen__olho"
+                        aria-label="Mostrar senha"
+                        aria-pressed={mostrarSenha}
+                        aria-controls={senhaId}
+                        onClick={() => setMostrarSenha((m) => !m)}
+                      >
+                        {mostrarSenha ? (
+                          <IconeOcultarSenha tamanho={20} />
+                        ) : (
+                          <IconeMostrarSenha tamanho={20} />
+                        )}
+                      </button>
+                    </div>
                   )}
                 </FormField>
 
@@ -312,8 +359,17 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
                 <Button type="submit" variant="primary" disabled={enviando}>
                   {enviando ? "Entrando…" : "Entrar"}
+                  {enviando ? null : <IconeEntrar tamanho={18} />}
                 </Button>
               </form>
+
+              <p className="login-screen__acesso">
+                <IconeInformacao tamanho={20} />
+                <span>
+                  <strong>Ainda não tem acesso?</strong> Peça a quem administra
+                  o Evolli na sua empresa.
+                </span>
+              </p>
             </>
           ) : (
             <>
@@ -370,7 +426,14 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             </>
           )}
         </div>
+
+        <p className="login-screen__rodape">
+          <IconeCadeado tamanho={16} />
+          Acesso restrito a contas autorizadas.
+        </p>
       </main>
+
+      <PainelInstitucional />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   Add,
   ArrowDown2,
   ArrowLeft2,
+  ArrowRight,
   ArrowRight2,
   Building,
   Calendar,
@@ -28,9 +29,11 @@ import {
   Edit2,
   Element3,
   Eye,
+  EyeSlash,
   Gift,
   Hierarchy,
   InfoCircle,
+  Lock,
   MessageQuestion,
   Messages1,
   More,
@@ -145,3 +148,8 @@ export const IconeAbrir = decorativo(ArrowDown2, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");
+/** Login: mostrar e esconder a senha, entrar e o aviso de acesso restrito. */
+export const IconeMostrarSenha = decorativo(Eye, "Linear");
+export const IconeOcultarSenha = decorativo(EyeSlash, "Linear");
+export const IconeEntrar = decorativo(ArrowRight, "Linear");
+export const IconeCadeado = decorativo(Lock, "Linear");

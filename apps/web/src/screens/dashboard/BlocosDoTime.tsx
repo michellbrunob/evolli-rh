@@ -10,7 +10,10 @@
  * Sem dado (carregando, falha, teto ou menos de 3 pessoas), nenhum menu.
  */
 import { useRef, type ReactNode } from "react";
-import { ComoCalculamos, type VistaDoBloco } from "./componentesDoDashboard";
+import {
+  InfoComoCalculamos,
+  type VistaDoBloco,
+} from "./componentesDoDashboard";
 import {
   MINIMO_DO_GRUPO,
   calcularTempoDeCasa,
@@ -199,24 +202,32 @@ function TabelaDoTime({
   );
 }
 
-/** Cabeçalho do bloco: título, subtítulo e (com dado) o menu. */
+/**
+ * Cabeçalho do bloco: título (com o "i" de Como calculamos, quando há dado),
+ * subtítulo e (com dado) o menu.
+ */
 function Cabecalho({
   idTitulo,
   titulo,
   subtitulo,
   acoes,
+  info,
 }: {
   readonly idTitulo: string;
   readonly titulo: string;
   readonly subtitulo: string;
   readonly acoes: readonly AcaoDoMenu[] | null;
+  readonly info: ReactNode;
 }) {
   return (
     <div className="dashboard__bloco-cabeca">
       <div className="dashboard__bloco-topo">
-        <h2 id={idTitulo} tabIndex={-1} className="dashboard__subtitulo">
-          {titulo}
-        </h2>
+        <div className="dashboard__titulo-com-info">
+          <h2 id={idTitulo} tabIndex={-1} className="dashboard__subtitulo">
+            {titulo}
+          </h2>
+          {info}
+        </div>
         <p className="dashboard__explicacao">{subtitulo}</p>
       </div>
       {acoes ? <MenuDeAcoes assunto={titulo} acoes={acoes} /> : null}
@@ -237,6 +248,7 @@ export function DistribuicaoDoTimeBloco({
   const blocoRef = useRef<HTMLElement | null>(null);
   let conteudo: ReactNode;
   let acoes: AcaoDoMenu[] | null = null;
+  let info: ReactNode = null;
   if (falha) {
     conteudo = falha;
   } else if (time === null) {
@@ -334,18 +346,20 @@ export function DistribuicaoDoTimeBloco({
             com 1 ou 2 pessoas, o menor departamento entra nele. Assim nenhum
             número permite identificar alguém.
           </p>
-          <ComoCalculamos assunto="distribuição do time">
-            <p>
-              Pessoas ativas hoje, pelo departamento da lotação vigente do
-              vínculo principal, no cadastro de Colaboradores da empresa ativa.
-              Cada pessoa conta uma vez.
-            </p>
-            <p>
-              Centro de custo, área e unidade ainda não fazem parte do cadastro
-              listado; por isso, só departamento por enquanto.
-            </p>
-          </ComoCalculamos>
         </>
+      );
+      info = (
+        <InfoComoCalculamos assunto="distribuição do time">
+          <p>
+            Pessoas ativas hoje, pelo departamento da lotação vigente do vínculo
+            principal, no cadastro de Colaboradores da empresa ativa. Cada
+            pessoa conta uma vez.
+          </p>
+          <p>
+            Centro de custo, área e unidade ainda não fazem parte do cadastro
+            listado; por isso, só departamento por enquanto.
+          </p>
+        </InfoComoCalculamos>
       );
     }
   }
@@ -365,6 +379,7 @@ export function DistribuicaoDoTimeBloco({
         titulo={titulo}
         subtitulo="Pessoas ativas hoje por departamento."
         acoes={acoes}
+        info={info}
       />
       {conteudo}
     </section>
@@ -384,6 +399,7 @@ export function TempoDeCasaBloco({
   const blocoRef = useRef<HTMLElement | null>(null);
   let conteudo: ReactNode;
   let acoes: AcaoDoMenu[] | null = null;
+  let info: ReactNode = null;
   if (falha) {
     conteudo = falha;
   } else if (time === null) {
@@ -470,19 +486,21 @@ export function TempoDeCasaBloco({
             Faixa com menos de {MINIMO_DO_GRUPO} pessoas se junta à faixa
             vizinha, para não identificar ninguém.
           </p>
-          <ComoCalculamos assunto="tempo de casa">
-            <p>
-              Meses completos entre a admissão do vínculo principal de cada
-              pessoa ativa e o dia de hoje (pelo relógio deste navegador). Uma
-              readmissão conta a partir do vínculo atual.
-            </p>
-            <p>
-              A mediana é o tempo do meio: metade do time está há menos tempo e
-              metade há mais. Não usamos média para que poucos vínculos muito
-              antigos não distorçam o número.
-            </p>
-          </ComoCalculamos>
         </>
+      );
+      info = (
+        <InfoComoCalculamos assunto="tempo de casa">
+          <p>
+            Meses completos entre a admissão do vínculo principal de cada pessoa
+            ativa e o dia de hoje (pelo relógio deste navegador). Uma readmissão
+            conta a partir do vínculo atual.
+          </p>
+          <p>
+            A mediana é o tempo do meio: metade do time está há menos tempo e
+            metade há mais. Não usamos média para que poucos vínculos muito
+            antigos não distorçam o número.
+          </p>
+        </InfoComoCalculamos>
       );
     }
   }
@@ -502,6 +520,7 @@ export function TempoDeCasaBloco({
         titulo={titulo}
         subtitulo="Há quanto tempo as pessoas ativas estão no vínculo atual."
         acoes={acoes}
+        info={info}
       />
       {conteudo}
     </section>

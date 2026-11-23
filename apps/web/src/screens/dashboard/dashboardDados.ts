@@ -16,6 +16,7 @@
  * cria outra movimentação, que só conta quando efetivada; `programada`,
  * `solicitada` e `cancelada` não produziram estado.
  */
+import { ANO_MINIMO_DO_DASHBOARD } from "../../app/rotasDoShell";
 import type {
   ListarMovimentacoesQuery,
   MovimentacaoApi,
@@ -216,29 +217,139 @@ export function plural(
   return `${String(n)} ${n === 1 ? singular : pluralizado}`;
 }
 
+/** Um pedaço da frase do card principal; `destaque` vai na cor do tema. */
+export interface TrechoDaFrase {
+  readonly texto: string;
+  readonly destaque?: boolean;
+}
+
 /**
- * A frase-resumo (E-2): os mesmos números dos cartões, numa linha. Pessoas
- * para os ativos e em admissão; vínculos para admissões e desligamentos.
+ * T214 — a frase do card principal: as pessoas de hoje e, quando as
+ * movimentações do ano foram lidas, quem entrou e quem saiu no período.
+ * Pessoas para os ativos e em admissão; vínculos efetivados para entradas e
+ * saídas (o "Como calculamos" do card de ativos diz isso). Sem as
+ * movimentações, só a parte de hoje: nenhum número inventado.
  */
-export function fraseResumo(
-  ativos: number,
-  emAdmissao: number,
-  admissoes: number,
-  desligamentos: number,
-  periodo: PeriodoDoDashboard,
-): string {
+export function fraseDoTime({
+  ativos,
+  emAdmissao,
+  entradas,
+  saidas,
+  periodo,
+}: {
+  readonly ativos: number;
+  readonly emAdmissao: number;
+  readonly entradas: number | null;
+  readonly saidas: number | null;
+  readonly periodo: PeriodoDoDashboard;
+}): TrechoDaFrase[] {
+  const t: TrechoDaFrase[] = [
+    { texto: "Seu time tem " },
+    {
+      texto: plural(ativos, "pessoa ativa", "pessoas ativas"),
+      destaque: true,
+    },
+    { texto: " hoje" },
+  ];
+  if (emAdmissao > 0) {
+    t.push(
+      { texto: " e " },
+      { texto: `${String(emAdmissao)} em admissão`, destaque: true },
+    );
+  }
+  t.push({ texto: "." });
+  if (entradas === null || saidas === null) return t;
   const quando = periodo.ateHoje
     ? `Em ${periodo.ano}, até hoje,`
     : `Em ${periodo.ano},`;
-  return `Hoje há ${plural(ativos, "pessoa ativa", "pessoas ativas")} e ${plural(
-    emAdmissao,
-    "pessoa em admissão",
-    "pessoas em admissão",
-  )}. ${quando} houve ${plural(admissoes, "admissão", "admissões")} e ${plural(
-    desligamentos,
-    "desligamento",
-    "desligamentos",
-  )} de vínculos efetivados.`;
+  t.push({ texto: ` ${quando} ` });
+  if (entradas === 0 && saidas === 0) {
+    t.push({ texto: "ninguém entrou nem saiu." });
+    return t;
+  }
+  t.push(
+    entradas === 0
+      ? { texto: "ninguém entrou" }
+      : {
+          texto: entradas === 1 ? "entrou 1" : `entraram ${String(entradas)}`,
+          destaque: true,
+        },
+    { texto: " e " },
+    saidas === 0
+      ? { texto: "ninguém saiu" }
+      : {
+          texto: saidas === 1 ? "saiu 1" : `saíram ${String(saidas)}`,
+          destaque: true,
+        },
+    { texto: "." },
+  );
+  return t;
+}
+
+/** T214 — "jan a nov" (ano corrente, até o mês de hoje) ou "jan a dez". */
+export function rotuloDoPeriodo(periodo: PeriodoDoDashboard): string {
+  const primeiro = mesAbreviado(0).toLowerCase();
+  if (periodo.meses <= 1) return primeiro;
+  return `${primeiro} a ${mesAbreviado(periodo.meses - 1).toLowerCase()}`;
+}
+
+/**
+ * T214 — o primeiro ano com cadastro: o da admissão efetivada mais antiga da
+ * empresa ativa. O servidor lista da vigência mais nova para a mais antiga,
+ * então a última página de um item é a mais antiga: uma leitura para saber o
+ * total e outra para a última página (uma só, se houver uma admissão).
+ * Sem admissão efetivada, `null`.
+ */
+export async function lerPrimeiroAnoComDados(
+  listar: ListarMovimentacoes,
+): Promise<number | null> {
+  const base = {
+    tipo: "admissao",
+    status: "efetivada",
+    tamanhoPagina: 1,
+  } as const;
+  const primeira = await listar({ ...base, pagina: 1 });
+  if (primeira.total === 0) return null;
+  const ultima =
+    primeira.total === 1
+      ? primeira
+      : await listar({ ...base, pagina: primeira.total });
+  const item = ultima.itens[0];
+  const dia = item ? diaCivilDe(item.vigenciaInicio) : null;
+  return dia ? Number(dia.slice(0, 4)) : null;
+}
+
+/**
+ * T214 — os anos do filtro: do corrente ao primeiro com cadastro (nunca antes
+ * do mínimo do Dashboard). Sem cadastro, só o corrente. O ano aberto (vindo
+ * da URL) continua na lista, para a escolha aparecer marcada.
+ */
+export function anosDoFiltro({
+  corrente,
+  primeiro,
+  aberto,
+}: {
+  readonly corrente: number;
+  readonly primeiro: number | null;
+  readonly aberto: number;
+}): number[] {
+  const inicio = Math.max(primeiro ?? corrente, ANO_MINIMO_DO_DASHBOARD);
+  const anos: number[] = [];
+  for (let a = corrente; a >= Math.min(inicio, corrente); a -= 1) anos.push(a);
+  if (!anos.includes(aberto)) anos.push(aberto);
+  return anos;
+}
+
+/** T214 — o saldo acumulado mês a mês (entradas menos saídas). */
+export function saldoAcumulado(
+  entradas: readonly number[],
+  saidas: readonly number[],
+): number[] {
+  let soma = 0;
+  return entradas.map((e, i) => {
+    soma += e - (saidas[i] ?? 0);
+    return soma;
+  });
 }
 
 // ---------------------------------------------------------------------------
