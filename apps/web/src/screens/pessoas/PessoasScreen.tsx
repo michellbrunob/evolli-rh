@@ -226,6 +226,10 @@ export interface PessoasScreenProps {
    * consulta.
    */
   podeOperarJornada?: boolean;
+  /** T215 — RH e DP definem, alteram e encerram a escala na ficha. */
+  podeOperarEscala?: boolean;
+  /** T215 — a aba Escala leva a Jornadas de trabalho. */
+  onAbrirJornadas?: () => void;
   /** T203 — a aba Solicitações da ficha existe para este papel (não o DP). */
   podeVerSolicitacoes?: boolean;
   /** T215 — a aba "Organograma" da listagem leva à estrutura. */
@@ -260,6 +264,8 @@ export function PessoasScreen({
   onImportarArquivo,
   podeEditarFicha = false,
   podeOperarJornada = false,
+  podeOperarEscala = false,
+  onAbrirJornadas,
   podeVerSolicitacoes: _podeVerSolicitacoes = false,
   onAbrirOrganograma,
   listagem,
@@ -425,7 +431,8 @@ export function PessoasScreen({
                   onAbrirEdicao(ficha.colaboradorId, secao),
               }
             : {})}
-          podeOperarJornada={podeOperarJornada}
+          podeOperarEscala={podeOperarEscala}
+          {...(onAbrirJornadas ? { onAbrirJornadas } : {})}
           servicoDeAusencias={servicoDeAusenciasDoServidor}
         />
       ) : null}

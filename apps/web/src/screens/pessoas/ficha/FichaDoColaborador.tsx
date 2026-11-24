@@ -83,7 +83,7 @@ import { ROTULO_DO_TIPO_DE_VINCULO } from "../edicao/dadosProfissionais";
 import { RegistrarAusenciaGaveta } from "../ferias/RegistrarAusenciaGaveta";
 import { servicoDeAusenciasDoServidor } from "../ferias/servicoDeAusenciasDoServidor";
 import type { ServicoDeAusencias } from "../ferias/tiposAusencia";
-import { JornadaColaboradorSecao } from "../JornadaColaboradorSecao";
+import { AbaEscala } from "./escala/AbaEscala";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
 import { AbaSalarios } from "./salarios/AbaSalarios";
@@ -302,8 +302,10 @@ export interface FichaDoColaboradorProps {
   readonly podeEditar?: boolean;
   /** Abre a página "Editar colaborador" na seção pedida. */
   readonly onEditar?: (secao: SecaoDeEdicaoDaFicha) => void;
-  /** Só o RH opera jornadas (aba Escala). */
-  readonly podeOperarJornada?: boolean;
+  /** RH e DP definem, alteram e encerram a escala (aba Escala). */
+  readonly podeOperarEscala?: boolean;
+  /** Abre Jornadas de trabalho (criar ou ajustar a jornada). */
+  readonly onAbrirJornadas?: () => void;
   readonly servicoDeAusencias?: ServicoDeAusencias;
   /** Dia civil de hoje (testes). */
   readonly hoje?: string;
@@ -326,7 +328,8 @@ export function FichaDoColaborador({
   onVoltar,
   podeEditar = false,
   onEditar,
-  podeOperarJornada = false,
+  podeOperarEscala = false,
+  onAbrirJornadas,
   servicoDeAusencias = servicoDeAusenciasDoServidor,
   hoje = diaDeHoje(),
 }: FichaDoColaboradorProps) {
@@ -985,12 +988,17 @@ export function FichaDoColaborador({
               />
             ) : null
           ) : aba === "escala" ? (
-            <JornadaColaboradorSecao
-              colaboradorId={colaboradorId}
-              podeOperar={podeOperarJornada}
-              onAlteradoChange={() => undefined}
-              onSalvandoChange={() => undefined}
-            />
+            // Só com o colaborador confirmado na empresa ativa.
+            dados ? (
+              <AbaEscala
+                colaboradorId={colaboradorId}
+                doNome={trato.doNome}
+                dataAdmissao={vinculo?.dataAdmissao ?? null}
+                podeOperar={podeOperarEscala}
+                {...(onAbrirJornadas ? { onAbrirJornadas } : {})}
+                hoje={hoje}
+              />
+            ) : null
           ) : aba === "documentos" ? (
             // Os arquivos só são lidos com o colaborador confirmado na
             // empresa ativa (fora dela, a ficha diz "não encontrado").

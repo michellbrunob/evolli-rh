@@ -3,7 +3,11 @@ import {
   descartarTokenSeDesatualizado,
   tokenCsrfParaGravacao,
 } from "./csrfClient";
-import { ApiError, type ResultadoPaginado } from "./horariosClient";
+import {
+  ApiError,
+  type PeriodoApi,
+  type ResultadoPaginado,
+} from "./horariosClient";
 
 export { ApiError };
 export type { ResultadoPaginado };
@@ -19,6 +23,12 @@ export interface JornadaDoVinculoApi {
   codigo: string | null;
   nome: string;
   ativo: boolean;
+  /**
+   * T215 — a grade semanal da jornada (dias e horários), para o resumo da
+   * aba Escala. Opcional só para um servidor anterior: sem ela, o resumo
+   * mostra “—”.
+   */
+  periodos?: PeriodoApi[];
 }
 
 export interface VinculoHorarioApi {

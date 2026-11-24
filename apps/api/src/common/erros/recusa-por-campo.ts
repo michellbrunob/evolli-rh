@@ -32,6 +32,8 @@ export type MotivoDoCampo =
   | "invalido"
   | "indisponivel"
   | "igual_a_vigente"
+  // T215 — vigência de escala antes da admissão do colaborador.
+  | "antes_da_admissao"
   | "fora_de_ordem"
   | "ja_encerrada"
   | "sobreposta"

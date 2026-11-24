@@ -209,6 +209,19 @@ export function podeOperarJornadas(papel: string | null): boolean {
 }
 
 /**
+ * T215 — papéis que definem, alteram e encerram a ESCALA do colaborador (o
+ * vínculo de horário, na aba Escala da ficha): `rh` e `dp`, na empresa
+ * ativa. Espelha `evaluateHorarios` (`vinculo_horario` create/alter). O
+ * catálogo de jornadas segue com `PAPEIS_OPERACAO_JORNADAS`. Só ORIENTA a
+ * tela: quem recusa é o servidor.
+ */
+export const PAPEIS_OPERACAO_ESCALA: readonly string[] = ["rh", "dp"];
+
+export function podeOperarEscala(papel: string | null): boolean {
+  return papel !== null && PAPEIS_OPERACAO_ESCALA.includes(papel);
+}
+
+/**
  * T182 — papéis que OPERAM a Estrutura organizacional, os cargos e os centros
  * de custo (criar, editar, inativar e reativar): `rh` na própria empresa e
  * `master_tecnico`. Espelha `evaluateOrganizacao` em `rbac.evaluator.ts`, em

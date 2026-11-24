@@ -17,10 +17,14 @@ import {
   deslocamento,
   filtroEmpresaLeituraHorarios,
   podeConsultarHorarios,
-  resolverEscopoHorarios,
   resolverEscopoLeituraTabelas,
+  resolverEscopoVinculoHorario,
 } from "../escopo-horarios.util";
-import { traduzirErroHorario } from "../validacao-horarios.util";
+import {
+  formatarHora,
+  numeroParaDia,
+  traduzirErroHorario,
+} from "../validacao-horarios.util";
 import {
   AtribuirJornadaDto,
   CriarVinculoHorarioDto,
@@ -38,9 +42,24 @@ import {
  * próprio vínculo, na mesma consulta e no mesmo escopo: só acompanha um
  * vínculo que o papel já pode ler (RH, DP e master — os mesmos que leem
  * colaboradores). Nada além do nome: nenhum outro dado pessoal.
+ *
+ * T215 — e a grade da jornada (dias e horários), para o resumo da aba Escala
+ * da ficha: carga semanal, dias de trabalho, horários e intervalos, sem a tela
+ * buscar cada jornada.
  */
 const COM_JORNADA = {
-  tabela: { select: { id: true, codigo: true, nome: true, ativo: true } },
+  tabela: {
+    select: {
+      id: true,
+      codigo: true,
+      nome: true,
+      ativo: true,
+      periodos: {
+        select: { diaSemana: true, inicioMinuto: true, fimMinuto: true },
+        orderBy: [{ diaSemana: "asc" }, { inicioMinuto: "asc" }],
+      },
+    },
+  },
   colaborador: { select: { id: true, nome: true } },
 } satisfies Prisma.VinculoHorarioInclude;
 
@@ -60,6 +79,8 @@ export interface VinculoProjetado {
     codigo: string | null;
     nome: string;
     ativo: boolean;
+    /** T215 — a grade semanal da jornada (hoje). */
+    periodos: { dia: string; inicio: string; fim: string }[];
   };
   /** T191 — o colaborador do vínculo: só `id` e `nome`. */
   colaborador: {
@@ -135,7 +156,7 @@ export class VinculoHorarioService {
     dto: CriarVinculoHorarioDto,
     ctx: HorariosAuditContext,
   ): Promise<VinculoProjetado> {
-    const escopo = resolverEscopoHorarios(ctx.actor);
+    const escopo = resolverEscopoVinculoHorario(ctx.actor);
 
     // O colaborador precisa ter vínculo funcional na empresa do ator. Sem isso,
     // 404 anti-enumeração (não confirma se o colaborador existe em outra
@@ -223,8 +244,8 @@ export class VinculoHorarioService {
     dto: AtribuirJornadaDto,
     ctx: HorariosAuditContext,
   ): Promise<VinculoProjetado> {
-    const escopo = resolverEscopoHorarios(ctx.actor);
-    await this.exigirColaboradorNaEmpresa(
+    const escopo = resolverEscopoVinculoHorario(ctx.actor);
+    const admissao = await this.exigirColaboradorNaEmpresa(
       dto.colaboradorId,
       escopo.empresaId,
       ctx,
@@ -243,6 +264,10 @@ export class VinculoHorarioService {
     }
 
     const inicio = dataDe(dto.vigenciaInicio);
+    // T215 — a escala não vale antes da admissão (sem o valor na recusa).
+    if (inicio < admissao) {
+      throw recusar("vigenciaInicio", "antes_da_admissao");
+    }
 
     try {
       const criado = await this.prisma.$transaction(async (tx) => {
@@ -369,14 +394,14 @@ export class VinculoHorarioService {
   /**
    * Encerra a vigência de um vínculo aberto — preserva o histórico (a
    * definição do período já decorrido não muda). `vigenciaFim` é o PRIMEIRO
-   * dia sem a jornada. Só RH, só na própria empresa.
+   * dia sem a jornada. RH e DP (T215), só na própria empresa.
    */
   async encerrar(
     vinculoId: string,
     dto: EncerrarVinculoHorarioDto,
     ctx: HorariosAuditContext,
   ): Promise<VinculoProjetado> {
-    const escopo = resolverEscopoHorarios(ctx.actor);
+    const escopo = resolverEscopoVinculoHorario(ctx.actor);
 
     const vinculo = await this.prisma.vinculoHorario.findFirst({
       where: { id: vinculoId, empresaId: escopo.empresaId },
@@ -435,25 +460,28 @@ export class VinculoHorarioService {
   /**
    * O colaborador precisa ter vínculo funcional na empresa do ator. Sem isso,
    * 404 anti-enumeração (não confirma se ele existe em outra empresa), com a
-   * negação na trilha.
+   * negação na trilha. T215 — devolve a admissão mais antiga na empresa (o
+   * piso da vigência na atribuição).
    */
   private async exigirColaboradorNaEmpresa(
     colaboradorId: string,
     empresaId: string,
     ctx: HorariosAuditContext,
-  ): Promise<void> {
+  ): Promise<Date> {
     const vinculoFuncional = await this.prisma.vinculoFuncional.findFirst({
       where: { colaboradorId, empresaId },
-      select: { id: true },
+      select: { dataAdmissao: true },
+      orderBy: { dataAdmissao: "asc" },
     });
     if (vinculoFuncional === null) {
-      await this.auditoria.negarAcesso(
+      return this.auditoria.negarAcesso(
         ctx,
         "vinculo_horario",
         colaboradorId,
         empresaId,
       );
     }
+    return vinculoFuncional.dataAdmissao;
   }
 
   /**
@@ -503,6 +531,11 @@ export class VinculoHorarioService {
         codigo: vinculo.tabela.codigo,
         nome: vinculo.tabela.nome,
         ativo: vinculo.tabela.ativo,
+        periodos: vinculo.tabela.periodos.map((p) => ({
+          dia: numeroParaDia(p.diaSemana),
+          inicio: formatarHora(p.inicioMinuto),
+          fim: formatarHora(p.fimMinuto),
+        })),
       },
       colaborador: {
         id: vinculo.colaborador.id,
