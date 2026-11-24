@@ -393,7 +393,7 @@ describe("T215 — página inicial de Colaboradores (e2e)", () => {
       await get("/v1/colaboradores", gestorA).expect(403);
     });
 
-    it("a leitura de CPF e contatos da página deixa a trilha de cada pessoa, sem valores", async () => {
+    it("a leitura de CPF e contatos da página: trilha por pessoa na categoria e um evento de auditoria por consulta, sem valores", async () => {
       const antes = new Date();
       await listar(rhA, { grupo: "ativos" });
       const contatos = await prisma.contatoColaboradorEvento.findMany({
@@ -426,10 +426,11 @@ describe("T215 — página inicial de Colaboradores (e2e)", () => {
         resultado: "valores_devolvidos",
         campos: ["cpf"],
       });
+      // Uma consulta da lista = um `audit_event` por categoria (não um por
+      // pessoa), correlacionado às linhas da categoria pelo `request_id`.
       const auditoria = await prisma.auditEvent.findMany({
         where: {
-          resourceId: ativo.id,
-          occurredAt: { gte: antes },
+          requestId: contatos[0]!.requestId,
           action: {
             in: [
               "pessoas_contato_consultado",
@@ -442,6 +443,19 @@ describe("T215 — página inicial de Colaboradores (e2e)", () => {
         "pessoas_contato_consultado",
         "pessoas_dados_pessoais_consultados",
       ]);
+      for (const evento of auditoria) {
+        expect(evento).toMatchObject({
+          resourceId: null,
+          companyId: empresaA,
+          result: "success",
+        });
+      }
+      expect(dados[0]!.requestId).toBe(contatos[0]!.requestId);
+      // Toda pessoa da página com valor devolvido tem a sua linha na categoria.
+      const linhasDaConsulta = await prisma.contatoColaboradorEvento.count({
+        where: { requestId: contatos[0]!.requestId, acao: "leitura" },
+      });
+      expect(linhasDaConsulta).toBeGreaterThan(1);
       // A trilha nunca guarda o valor.
       expect(JSON.stringify(auditoria)).not.toContain(CPF_ATIVO);
     });

@@ -69,7 +69,8 @@ export class PessoasAuditoriaService {
     evento: {
       action: AuditAction;
       resource: AuditResource;
-      resourceId: string;
+      /** `null` na leitura em lote: as pessoas ficam na tabela da categoria. */
+      resourceId: string | null;
       empresaId: string | null;
       result: AuditResult;
     },

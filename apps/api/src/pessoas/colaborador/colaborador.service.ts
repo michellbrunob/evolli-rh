@@ -1665,9 +1665,15 @@ export class ColaboradorService {
    *   "vazio".
    * - CPF e contatos de quem não está em uso operacional na empresa
    *   (desligado) vêm `null`: o dado é bloqueado, como na ficha.
-   * - Toda leitura que devolve valor deixa a trilha de sempre, na mesma
-   *   transação (fail-safe): o evento da categoria (leitura, valores
-   *   devolvidos, só os NOMES dos campos) e o `audit_event` da consulta.
+   * - Toda leitura que devolve valor deixa trilha, na mesma transação
+   *   (fail-safe), sem nenhum valor:
+   *   - na categoria, UMA linha por pessoa (leitura, valores devolvidos, só
+   *     os NOMES dos campos), num `createMany` só — é o que responde "quem
+   *     viu os meus dados" ao titular (LGPD art. 18);
+   *   - no `audit_event`, UM evento por categoria por consulta (o acesso em
+   *     lote é um ato só), sem `resourceId`, ligado às linhas da categoria
+   *     pelo `request_id`. Nunca um evento por pessoa: a página de 100
+   *     viraria 200 escritas por abertura de tela.
    */
   private async dadosDasLinhas(
     ctx: PessoasAuditContext,
@@ -1795,15 +1801,13 @@ export class ColaboradorService {
             requestId: ctx.metadata.requestId,
           })),
         });
-        for (const p of cpfsLidos) {
-          await this.auditoria.registrarNaTransacao(tx, ctx, {
-            action: "pessoas_dados_pessoais_consultados",
-            resource: "dados_pessoais_colaborador",
-            resourceId: p.colaboradorId,
-            empresaId,
-            result: "success",
-          });
-        }
+        await this.auditoria.registrarNaTransacao(tx, ctx, {
+          action: "pessoas_dados_pessoais_consultados",
+          resource: "dados_pessoais_colaborador",
+          resourceId: null,
+          empresaId,
+          result: "success",
+        });
       }
       // A leitura alcança o registro de contato inteiro (a regra do banco
       // para a leitura com valores: os três campos), como na ficha — mesmo
@@ -1825,15 +1829,13 @@ export class ColaboradorService {
             requestId: ctx.metadata.requestId,
           })),
         });
-        for (const { contato } of contatosLidos) {
-          await this.auditoria.registrarNaTransacao(tx, ctx, {
-            action: "pessoas_contato_consultado",
-            resource: "contato_colaborador",
-            resourceId: contato.colaboradorId,
-            empresaId,
-            result: "success",
-          });
-        }
+        await this.auditoria.registrarNaTransacao(tx, ctx, {
+          action: "pessoas_contato_consultado",
+          resource: "contato_colaborador",
+          resourceId: null,
+          empresaId,
+          result: "success",
+        });
       }
     });
     return resultado;
