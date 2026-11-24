@@ -100,9 +100,10 @@ Regra, igual à da referência e já aplicada em `trilhaDoShell.ts`:
 - **Página intermediária** (o pai de uma sub-página): link para ela.
 - **Último item**: a tela atual, só texto (`aria-current="page"`).
 - Nome igual ao anterior não se repete; destino sem rota não ganha caminho.
-- Toda tela com trilha tem rota própria em `rotasDoShell.ts` (recarregar e
-  voltar funcionam). Corrigido nesta data: Organograma
-  (`#/estrutura/organograma`) e Minha equipe (`#/lideranca/minha-equipe`).
+- Toda tela nova ganha rota própria em `rotasDoShell.ts` (recarregar e
+  voltar funcionam). Organograma e Minha equipe ainda não têm rota: a trilha
+  leva a elas, mas o endereço não muda; ganham rota quando forem revistas
+  (sugestão: `#/estrutura/organograma` e `#/lideranca/minha-equipe`).
 
 Trilhas previstas para os módulos ainda em desenvolvimento (aplicar ao criar
 cada um; links nos itens do meio, só texto no último):

@@ -63,10 +63,6 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T211 — fora do menu lateral: abrem pela URL própria.
   ponto: "#/jornada/ponto",
   "administracao-lideranca": "#/lideranca/administracao",
-  // T215 — a trilha e o recarregar também funcionam no Organograma e na
-  // Minha equipe (antes ficavam sem URL e a página voltava ao início).
-  cadastros: "#/estrutura/organograma",
-  equipe: "#/lideranca/minha-equipe",
 };
 
 /**
