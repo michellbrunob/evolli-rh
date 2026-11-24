@@ -117,6 +117,8 @@ interface Props {
   readonly jornadaContratoHoras?: number | null;
   /** T215 — a unidade da lotação, mostrada como "local". */
   readonly local?: string | null;
+  /** T215 — avisa a ficha que o padrão mudou (cabeçalho "Carga horária"). */
+  readonly onMudou?: () => void;
   /** Dia civil de hoje (testes). */
   readonly hoje?: string;
   readonly servico?: ServicoDeEscala;
@@ -295,6 +297,7 @@ export function AbaEscala({
   onAbrirQuadro,
   jornadaContratoHoras = null,
   local = null,
+  onMudou,
   hoje = diaDeHoje(),
   servico = servicoDeEscalaDoServidor,
 }: Props) {
@@ -362,6 +365,7 @@ export function AbaEscala({
     focarTitulo.current = true;
     setGaveta(null);
     setAviso({ id: Date.now(), titulo, texto });
+    onMudou?.();
     void carregar(true);
   };
 

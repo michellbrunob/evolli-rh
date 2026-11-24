@@ -32,6 +32,7 @@ import {
   listarCentrosCusto,
   listarUnidades,
 } from "../../../api/organizacaoClient";
+import { consultarEscalas } from "../../../api/escalaClient";
 import {
   efetivarMovimentacao,
   registrarMovimentacao,
@@ -64,6 +65,7 @@ vi.mock("../../../api/vinculoContratualClient");
 vi.mock("../../../api/cargoClient");
 vi.mock("../../../api/organizacaoClient");
 vi.mock("../../../api/movimentacaoClient");
+vi.mock("../../../api/escalaClient");
 
 const ID = "8f0c2a4e-1b2c-4d3e-8f4a-5b6c7d8e9f01";
 const GESTORA = "3c2b1a09-8f7e-4d6c-9b5a-4e3d2c1b0a99";
@@ -470,5 +472,54 @@ describe("T215 — ficha: Mais ações", () => {
     expect(
       await screen.findByText("Inativo", { selector: "span" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("T215 — cabeçalho com a escala da ficha", () => {
+  it("a escala vigente definida na ficha vale no lugar da do contrato", async () => {
+    vi.mocked(consultarEscalas).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      vinculo: { dataAdmissao: "2024-01-01", situacao: "ativo" },
+      escalaDoCadastro: "5x2",
+      escalas: [
+        {
+          id: "e1",
+          modelo: "6x1",
+          turno: null,
+          turnoNoite: null,
+          folgaSemanal: 7,
+          diasTrabalho: [],
+          inicioCiclo: null,
+          vigenciaInicio: "2024-02-01",
+          vigenciaFim: null,
+          definidaEm: "2024-02-01T12:00:00.000Z",
+          definidaPor: null,
+        },
+      ],
+    });
+    montar();
+    const faixa = await screen.findByRole("list", {
+      name: "Resumo do colaborador",
+    });
+    await waitFor(() =>
+      expect(faixa).toHaveTextContent(
+        "Carga horária e escala44h semanais · 6x1",
+      ),
+    );
+    expect(consultarEscalas).toHaveBeenCalledWith(ID);
+  });
+
+  it("sem escala na ficha (ou sem acesso a ela), fica a do contrato", async () => {
+    vi.mocked(consultarEscalas).mockRejectedValue(new Error("403"));
+    montar();
+    const faixa = await screen.findByRole("list", {
+      name: "Resumo do colaborador",
+    });
+    await waitFor(() =>
+      expect(faixa).toHaveTextContent(
+        "Carga horária e escala44h semanais · 5x2",
+      ),
+    );
   });
 });

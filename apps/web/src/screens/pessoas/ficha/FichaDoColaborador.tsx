@@ -113,6 +113,8 @@ import {
 } from "./iconesDaFicha";
 import "./FichaDoColaborador.css";
 import { plural } from "../../../format/plural";
+import { consultarEscalas } from "../../../api/escalaClient";
+import { modeloDe } from "./escala/modelosDeEscala";
 
 export const FICHA_DO_COLABORADOR_TITULO_ID = "ficha-do-colaborador-titulo";
 
@@ -377,6 +379,31 @@ export function FichaDoColaborador({
     void carregar();
   }, [carregar]);
 
+  // T215 — a escala vigente definida na aba Escala vale no cabeçalho; sem
+  // ela (ou sem acesso a ela), fica a escala do contrato. Relida quando a aba
+  // grava um padrão novo.
+  const [escalaDaFicha, setEscalaDaFicha] = useState<string | null>(null);
+  const [versaoDaEscala, setVersaoDaEscala] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const d = await consultarEscalas(colaboradorId);
+        const vigente = (d?.escalas ?? []).find(
+          (e) =>
+            e.vigenciaInicio <= hoje &&
+            (e.vigenciaFim === null || e.vigenciaFim > hoje),
+        );
+        if (vivo) setEscalaDaFicha(vigente?.modelo ?? null);
+      } catch {
+        if (vivo) setEscalaDaFicha(null);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [colaboradorId, hoje, versaoDaEscala]);
+
   // Abrir a ficha leva o foco ao título (a página trocou; o leitor anuncia).
   useEffect(() => {
     document.getElementById(FICHA_DO_COLABORADOR_TITULO_ID)?.focus();
@@ -433,7 +460,9 @@ export function FichaDoColaborador({
           : "ativo";
   const email = dados?.contatos?.emailPessoal ?? null;
   const telefone = dados?.contatos?.celular ?? null;
-  const escala = contrato?.escala ?? null;
+  const escala = escalaDaFicha
+    ? (modeloDe(escalaDaFicha)?.nome ?? escalaDaFicha)
+    : (contrato?.escala ?? null);
   const horas = contrato?.jornadaSemanalHoras ?? null;
   const cargaHoraria =
     horas !== null && escala
@@ -1009,6 +1038,7 @@ export function FichaDoColaborador({
                   .join(" · ")}
                 {...(onAbrirJornadas ? { onAbrirQuadro: onAbrirJornadas } : {})}
                 jornadaContratoHoras={horas}
+                onMudou={() => setVersaoDaEscala((v) => v + 1)}
                 local={lotacao.unidade || null}
                 hoje={hoje}
               />
