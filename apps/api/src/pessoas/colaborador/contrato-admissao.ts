@@ -271,6 +271,8 @@ export async function gravarContratoNaAdmissao(
     /** T215 — a linha da admissão na linha do tempo salarial. */
     dataAdmissao: Date;
     registradaPorUserId: string;
+    /** O cargo da contratação, que a linha da admissão guarda pelo nome. */
+    cargoId: string | null;
   },
   dto: ContratoAdmissaoDto | undefined,
 ): Promise<ContratoDaAdmissao | null> {
@@ -306,6 +308,18 @@ export async function gravarContratoNaAdmissao(
     },
   });
   // T215 — o salário da admissão abre a linha do tempo salarial.
-  await registrarSalarioDaAdmissao(tx, alvo, enviado.salarioBruto);
+  const cargo =
+    alvo.cargoId === null
+      ? null
+      : await tx.cargo.findFirst({
+          where: { id: alvo.cargoId, empresaId: alvo.empresaId },
+          select: { nome: true },
+        });
+  await registrarSalarioDaAdmissao(
+    tx,
+    alvo,
+    enviado.salarioBruto,
+    cargo?.nome ?? null,
+  );
   return contratoGravado(linha);
 }

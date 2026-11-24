@@ -1606,9 +1606,19 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           .send()
           .expect(201);
 
-        // Ordem que satisfaz as FKs: alocacoes -> movimentacoes -> vinculo.
+        // Ordem que satisfaz as FKs: linha salarial e contrato (T215) ->
+        // alocacoes -> movimentacoes -> vinculo. So o trigger deferido do
+        // COMMIT pode recusar.
         await expect(
           migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.alteracao_salarial WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.contrato_vinculo WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
             migrator.$executeRawUnsafe(
               `DELETE FROM app.alocacao_organizacional WHERE vinculo_id = $1`,
               vinculoId,

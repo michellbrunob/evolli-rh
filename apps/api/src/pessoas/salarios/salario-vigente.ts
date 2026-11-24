@@ -49,6 +49,8 @@ export async function registrarSalarioDaAdmissao(
     registradaPorUserId: string;
   },
   salarioBruto: string | null,
+  /** O cargo da contratação, pelo nome (ausente: o da 1ª lotação, na leitura). */
+  cargo: string | null = null,
 ): Promise<string | null> {
   if (salarioBruto === null) return null;
   const linha = await tx.alteracaoSalarial.create({
@@ -58,6 +60,7 @@ export async function registrarSalarioDaAdmissao(
       origem: "admissao",
       vigenciaInicio: alvo.dataAdmissao,
       salarioBruto,
+      cargo,
       registradaPorUserId: alvo.registradaPorUserId,
     },
     select: { id: true },

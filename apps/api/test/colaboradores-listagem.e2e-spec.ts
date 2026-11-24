@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter
 import { requestIdMiddleware } from "../src/common/request-id";
 import {
   camposObrigatoriosAdmissao,
+  contratoDaAdmissao,
   lotacaoMinima,
 } from "./admissao-obrigatoria";
 
@@ -1831,7 +1832,7 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
           ...(dados.centroCustoId
             ? { centroCustoId: dados.centroCustoId }
             : {}),
-          contrato: { nivel: dados.nivel },
+          contrato: contratoDaAdmissao({ nivel: dados.nivel }),
         })
         .expect(201);
       if (dados.efetivar) {

@@ -26,6 +26,7 @@ import {
 } from "../src/cep/cep.types";
 import {
   camposObrigatoriosAdmissao,
+  contratoDaAdmissao,
   lotacaoMinima,
 } from "./admissao-obrigatoria";
 
@@ -307,6 +308,8 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
       dataAdmissao: "2026-02-02",
       motivoCodigo: "admissao_inicial",
       departamentoId,
+      // T215 — o primeiro salário é obrigatório na admissão.
+      contrato: contratoDaAdmissao(),
     };
     colaboradorId = (
       await post("/v1/colaboradores", rh)

@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter
 import { requestIdMiddleware } from "../src/common/request-id";
 import { dataLocalDe } from "../src/ponto/competencia.util";
 import {
+  SALARIO_DA_ADMISSAO,
   camposObrigatoriosAdmissao,
   lotacaoMinima,
 } from "./admissao-obrigatoria";
@@ -365,8 +366,11 @@ describe("T215 — página inicial de Colaboradores (e2e)", () => {
           contatos: { emailPessoal: ativo.email, celular: "+5511900000000" },
           salarioBruto: "5000.00",
         });
-        // Sem contrato gravado: o campo vem, vazio.
-        expect(item(l, previsto.id)).toHaveProperty("salarioBruto", null);
+        // T215 — o salário da admissão é obrigatório: sempre vem.
+        expect(item(l, previsto.id)).toHaveProperty(
+          "salarioBruto",
+          SALARIO_DA_ADMISSAO,
+        );
         // Sem CPF no perfil: vem, vazio.
         expect(item(l, previsto.id)).toHaveProperty("cpf", null);
       },

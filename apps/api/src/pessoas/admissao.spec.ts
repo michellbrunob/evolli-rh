@@ -156,7 +156,23 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
   function servico() {
     const tx = {
       departamento: { count: jest.fn().mockResolvedValue(1) },
-      cargo: { count: jest.fn().mockResolvedValue(1) },
+      // T215 — o salário obrigatório da admissão: contrato e linha salarial.
+      cargo: {
+        count: jest.fn().mockResolvedValue(1),
+        findFirst: jest.fn().mockResolvedValue({ nome: "Cargo Sintetico" }),
+      },
+      contratoVinculo: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
+          ...data,
+          salarioBruto: { toFixed: () => "1621.00" },
+          pensaoAlimenticiaPercentual: null,
+          atualizadoEm: AGORA,
+          colunaFutura: "NAO_PODE_VAZAR",
+        })),
+      },
+      alteracaoSalarial: {
+        create: jest.fn().mockResolvedValue({ id: "alt-1" }),
+      },
       unidadeOrganizacional: { count: jest.fn().mockResolvedValue(1) },
       colaborador: {
         create: jest.fn().mockResolvedValue({
@@ -250,6 +266,7 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
         cargoId: CARGO,
         unidadeOrganizacionalId: UNIDADE,
         perfilPessoal: { dataNascimento: "1990-05-20" },
+        contrato: { salarioBruto: "1621.00" },
         contatos: {
           emailPessoal: "pessoa@exemplo.test",
           celular: "+5511999990000",
@@ -266,7 +283,8 @@ describe("Admissão — a resposta é projeção explícita, campo a campo", () 
       [
         "atualizadoEm",
         "contatos",
-        // T209 — o contrato da admissão (etapa 2), `null` sem valores.
+        // T209 — o contrato da admissão (etapa 2); T215 — sempre com o
+        // salário, que é obrigatório.
         "contrato",
         "criadoEm",
         "endereco",

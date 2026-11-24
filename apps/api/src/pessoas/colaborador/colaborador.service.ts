@@ -890,6 +890,14 @@ export class ColaboradorService {
     const destino = extrairDestino(dto);
     assertDestinoCoerente("admissao", destino);
 
+    // T215 — ninguém é admitido sem o primeiro salário: ele abre a linha do
+    // tempo salarial (aba Salários da ficha), com a tag Admissão.
+    if (!dto.contrato?.salarioBruto) {
+      throw new CamposRecusadosException([
+        { campo: "contrato.salarioBruto", motivo: "obrigatorio" },
+      ]);
+    }
+
     const dataAdmissao = dataUtc(new Date(dto.dataAdmissao));
     const status: StatusMovimentacao =
       dataAdmissao > dataUtc(new Date()) ? "programada" : "solicitada";
@@ -1016,6 +1024,7 @@ export class ColaboradorService {
             empresaId: escopo.empresaId,
             dataAdmissao: vinculo.dataAdmissao,
             registradaPorUserId: ctx.actor.id,
+            cargoId: destino.cargoId,
           },
           dto.contrato,
         );

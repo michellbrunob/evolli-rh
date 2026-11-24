@@ -13,7 +13,11 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { lotacaoMinima } from "./admissao-obrigatoria";
+import {
+  SALARIO_DA_ADMISSAO,
+  contratoDaAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T209 — Novo colaborador, etapa 2 (dados profissionais). PostgreSQL real e
@@ -149,6 +153,7 @@ describe("T209 — Novo colaborador, etapa 2 (e2e)", () => {
         .unidadeOrganizacionalId,
       perfilPessoal: {},
       ...extra,
+      contrato: contratoDaAdmissao(extra["contrato"]),
     };
   }
 
@@ -308,7 +313,12 @@ describe("T209 — Novo colaborador, etapa 2 (e2e)", () => {
       cargoId: null,
       unidadeOrganizacionalId: expect.any(String),
     });
-    expect(r.body.contrato).toBeNull();
+    // T215 — o primeiro salário é obrigatório: o contrato nasce com ele.
+    expect(r.body.contrato).toMatchObject({
+      salarioBruto: SALARIO_DA_ADMISSAO,
+      nivel: null,
+      gestorDiretoId: null,
+    });
   });
 
   it.each([

@@ -59,6 +59,8 @@ export type CampoPublico =
   | "cnpj"
   // T209 — gestor direto sem vínculo na empresa.
   | "contrato.gestorDiretoId"
+  // T215 — o primeiro salário é obrigatório na admissão.
+  | "contrato.salarioBruto"
   // T215 — o mesmo campo na edição do contrato (corpo sem o bloco).
   | "gestorDiretoId"
   // T182 — código de jornada repetido na empresa.

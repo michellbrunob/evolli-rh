@@ -131,14 +131,28 @@ export class HistoricoSalarialService {
       colaboradorId,
       ctx,
     );
-    this.conferirData(dto.vigenciaInicio, principal);
+    // Sem nenhum período (admitido antes da regra do salário obrigatório),
+    // o primeiro salário é o da ADMISSÃO, na data de admissão.
+    const primeiro =
+      (await this.prisma.alteracaoSalarial.count({
+        where: { vinculoId: principal.id, removidaEm: null },
+      })) === 0;
+    if (primeiro) {
+      if (dto.vigenciaInicio !== diaCivil(principal.dataAdmissao)) {
+        throw new CamposRecusadosException([
+          { campo: "vigenciaInicio", motivo: "nao_se_aplica" },
+        ]);
+      }
+    } else {
+      this.conferirData(dto.vigenciaInicio, principal);
+    }
     return this.gravar(async (tx) => {
       await this.conferirDataLivre(tx, principal.id, dto.vigenciaInicio, null);
       const linha = await tx.alteracaoSalarial.create({
         data: {
           vinculoId: principal.id,
           empresaId,
-          origem: "alteracao",
+          origem: primeiro ? "admissao" : "alteracao",
           vigenciaInicio: dataDoDia(dto.vigenciaInicio),
           salarioBruto: dto.salarioBruto,
           cargo: dto.cargo ?? null,
@@ -264,7 +278,7 @@ export class HistoricoSalarialService {
     empresaId: string,
     principal: VinculoProjetado,
   ): Promise<HistoricoSalarial> {
-    const [linhas, contrato] = await Promise.all([
+    const [gravadas, contrato, primeiraLotacao] = await Promise.all([
       db.alteracaoSalarial.findMany({
         where: { vinculoId: principal.id, removidaEm: null },
         select: PROJECAO_ALTERACAO,
@@ -273,7 +287,20 @@ export class HistoricoSalarialService {
         where: { vinculoId: principal.id },
         select: { dependentesIrrf: true, pensaoAlimenticiaPercentual: true },
       }),
+      db.alocacaoOrganizacional.findFirst({
+        where: { vinculoId: principal.id, cargoId: { not: null } },
+        orderBy: { vigenteDe: "asc" },
+        select: { cargo: { select: { nome: true } } },
+      }),
     ]);
+    // A linha da admissão sem cargo gravado (carga inicial) mostra o cargo
+    // da primeira lotação — o da contratação.
+    const cargoDaContratacao = primeiraLotacao?.cargo?.nome ?? null;
+    const linhas = gravadas.map((l) =>
+      l.origem === "admissao" && l.cargo === null
+        ? { ...l, cargo: cargoDaContratacao }
+        : l,
+    );
     return {
       colaboradorId,
       empresaId,

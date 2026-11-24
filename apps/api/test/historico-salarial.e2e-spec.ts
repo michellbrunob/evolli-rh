@@ -124,6 +124,8 @@ describe("T215 — histórico salarial (e2e)", () => {
   let container: StartedTestContainer;
   let app: INestApplication;
   let prisma: PrismaClient;
+  /** Papel do migrador: simula quem foi admitido antes da regra do salário. */
+  let migrador: PrismaClient;
   let appUrl: string;
 
   let master: Credencial;
@@ -185,28 +187,46 @@ describe("T215 — histórico salarial (e2e)", () => {
   }
 
   let sequencia = 0;
-  /** Admite pela API (ativo), com salário opcional na admissão. */
+  /** Admite pela API (ativo), com o salário da admissão. */
   async function admitir(
-    salario?: string,
-  ): Promise<{ id: string; vinculoId: string }> {
+    salario = "2000.00",
+  ): Promise<{ id: string; vinculoId: string; cargoId: string }> {
     sequencia += 1;
     const obrigatorios = camposObrigatoriosAdmissao();
+    const lotacao = await lotacaoMinima(appUrl, empresaA);
     const r = await post("/v1/colaboradores", rhA)
       .send({
         ...obrigatorios,
-        ...(await lotacaoMinima(appUrl, empresaA)),
+        ...lotacao,
         nome: `Pessoa Salario ${sequencia}`,
         empresaId: empresaA,
         tipo: "clt",
         dataAdmissao: ADMISSAO,
         motivoCodigo: "admissao_inicial",
-        ...(salario ? { contrato: { salarioBruto: salario } } : {}),
+        contrato: { salarioBruto: salario },
       })
       .expect(201);
     await post(`/v1/movimentacoes/${r.body.movimentacao.id}/efetivar`, rhA)
       .send()
       .expect(201);
-    return { id: r.body.id as string, vinculoId: r.body.vinculo.id as string };
+    return {
+      id: r.body.id as string,
+      vinculoId: r.body.vinculo.id as string,
+      cargoId: lotacao.cargoId,
+    };
+  }
+
+  /** Quem foi admitido antes da regra: sem salário e sem linha do tempo. */
+  async function admitirSemSalario() {
+    const p = await admitir();
+    await migrador.alteracaoSalarial.deleteMany({
+      where: { vinculoId: p.vinculoId },
+    });
+    await migrador.contratoVinculo.update({
+      where: { vinculoId: p.vinculoId },
+      data: { salarioBruto: null },
+    });
+    return p;
   }
 
   const rota = (id: string) => `/v1/colaboradores/${id}/salarios`;
@@ -266,6 +286,7 @@ describe("T215 — histórico salarial (e2e)", () => {
       },
     );
     process.env.DATABASE_URL = appUrl;
+    migrador = new PrismaClient({ datasources: { db: { url: migratorUrl } } });
     prisma = new PrismaClient({ datasources: { db: { url: appUrl } } });
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -317,12 +338,16 @@ describe("T215 — histórico salarial (e2e)", () => {
   afterAll(async () => {
     await app?.close();
     await prisma?.$disconnect();
+    await migrador?.$disconnect();
     await container?.stop();
   });
 
   describe("admissão", () => {
     it("o salário da admissão vira a linha da admissão, vigente", async () => {
       const p = await admitir("1621.00");
+      const cargo = await prisma.cargo.findUniqueOrThrow({
+        where: { id: p.cargoId },
+      });
       const h = await historico(p.id);
       expect(h.vinculo).toMatchObject({ tipo: "clt", dataAdmissao: ADMISSAO });
       expect(h.alteracoes).toEqual([
@@ -331,15 +356,42 @@ describe("T215 — histórico salarial (e2e)", () => {
           vigenciaInicio: ADMISSAO,
           vigenciaFim: null,
           salarioBruto: "1621.00",
-          cargo: null,
+          cargo: cargo.nome,
           modeloContrato: null,
           vigente: true,
         }),
       ]);
     });
 
-    it("sem salário na admissão, a linha do tempo vem vazia", async () => {
-      const p = await admitir();
+    it("admissão sem salário é recusada (422 contrato.salarioBruto obrigatorio)", async () => {
+      const lotacao = await lotacaoMinima(appUrl, empresaA);
+      const semContrato: Record<string, unknown> = {
+        ...camposObrigatoriosAdmissao(),
+      };
+      delete semContrato["contrato"];
+      const r = await post("/v1/colaboradores", rhA)
+        .send({
+          ...semContrato,
+          ...lotacao,
+          nome: "Pessoa Sem Salario",
+          empresaId: empresaA,
+          tipo: "clt",
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+        })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "contrato.salarioBruto", motivo: "obrigatorio" },
+      ]);
+      expect(
+        await prisma.colaborador.count({
+          where: { nome: "Pessoa Sem Salario" },
+        }),
+      ).toBe(0);
+    });
+
+    it("admitido antes da regra (sem salário): a linha do tempo vem vazia", async () => {
+      const p = await admitirSemSalario();
       expect((await historico(p.id)).alteracoes).toEqual([]);
     });
   });
@@ -392,15 +444,22 @@ describe("T215 — histórico salarial (e2e)", () => {
         .expect(201);
     });
 
-    it("sem histórico: a primeira alteração vira o vigente e o contrato acompanha", async () => {
-      const p = await admitir();
+    it("sem histórico: o primeiro salário é o da admissão, na data de admissão", async () => {
+      const p = await admitirSemSalario();
+      const r = await post(rota(p.id), rhA)
+        .send({ vigenciaInicio: ANO_PASSADO, salarioBruto: "1800.00" })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "vigenciaInicio", motivo: "nao_se_aplica" },
+      ]);
       const h = await registrar(p.id, {
-        vigenciaInicio: ANO_PASSADO,
+        vigenciaInicio: ADMISSAO,
         salarioBruto: "1800.00",
       });
       expect(h.alteracoes).toHaveLength(1);
       expect(h.alteracoes[0]).toMatchObject({
-        origem: "alteracao",
+        origem: "admissao",
+        vigenciaInicio: ADMISSAO,
         vigente: true,
         salarioBruto: "1800.00",
       });
@@ -567,7 +626,7 @@ describe("T215 — histórico salarial (e2e)", () => {
         ["admissao", "2200.00"],
       ]);
 
-      const semSalario = await admitir();
+      const semSalario = await admitirSemSalario();
       await put(`/v1/colaboradores/${semSalario.id}/contrato`, rhA)
         .send({ salarioBruto: "1900.00" })
         .expect(200);

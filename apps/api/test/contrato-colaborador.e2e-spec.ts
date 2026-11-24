@@ -13,7 +13,11 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { lotacaoMinima } from "./admissao-obrigatoria";
+import {
+  SALARIO_DA_ADMISSAO,
+  contratoDaAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T215 — contrato do colaborador na edição (`GET`/`PUT
@@ -176,6 +180,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
           .unidadeOrganizacionalId,
         perfilPessoal: {},
         ...extra,
+        contrato: contratoDaAdmissao(extra["contrato"]),
       })
       .expect(201);
     return { id: r.body.id as string, vinculoId: r.body.vinculo.id as string };
@@ -325,11 +330,13 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     });
   });
 
-  it("GET sem contrato gravado: todos os campos nulos e atualizadoEm nulo", async () => {
+  it("GET só com o salário da admissão: os demais campos nulos", async () => {
     const { id } = await admitir(rhA, empresaA);
     const r = await get(rota(id), rhA).expect(200);
-    expect(r.body.contrato).toEqual(CONTRATO_VAZIO);
-    expect(r.body.atualizadoEm).toBeNull();
+    expect(r.body.contrato).toEqual({
+      ...CONTRATO_VAZIO,
+      salarioBruto: SALARIO_DA_ADMISSAO,
+    });
   });
 
   it("PUT cria a linha quando falta, devolve o gravado e a trilha não leva valores", async () => {
@@ -391,12 +398,21 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     expect(lido.body.contrato).toEqual(r.body.contrato);
   });
 
-  it("PUT vazio limpa o contrato existente", async () => {
+  it("PUT só com o salário limpa os demais campos; sem o salário, é recusado", async () => {
     const { id } = await admitir(rhA, empresaA, {
       contrato: { nivel: "junior" },
     });
-    const r = await put(rota(id), rhA).send({}).expect(200);
-    expect(r.body.contrato).toEqual(CONTRATO_VAZIO);
+    const r = await put(rota(id), rhA)
+      .send({ salarioBruto: SALARIO_DA_ADMISSAO })
+      .expect(200);
+    expect(r.body.contrato).toEqual({
+      ...CONTRATO_VAZIO,
+      salarioBruto: SALARIO_DA_ADMISSAO,
+    });
+    const recusa = await put(rota(id), rhA).send({}).expect(422);
+    expect(recusa.body.erros).toEqual([
+      { campo: "salarioBruto", motivo: "obrigatorio" },
+    ]);
   });
 
   it("matrícula: ausente mantém, nova grava, null apaga; em uso na empresa é 409 por campo sem o valor", async () => {
@@ -404,7 +420,9 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     const { id, vinculoId } = await admitir(rhA, empresaA, {
       matricula: "CT-ORIGINAL",
     });
-    await put(rota(id), rhA).send({ nivel: "pleno" }).expect(200);
+    await put(rota(id), rhA)
+      .send({ nivel: "pleno", salarioBruto: SALARIO_DA_ADMISSAO })
+      .expect(200);
     expect(
       (
         await prisma.vinculoFuncional.findUniqueOrThrow({
@@ -414,12 +432,12 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     ).toBe("CT-ORIGINAL");
 
     const nova = await put(rota(id), rhA)
-      .send({ matricula: "CT-NOVA" })
+      .send({ matricula: "CT-NOVA", salarioBruto: SALARIO_DA_ADMISSAO })
       .expect(200);
     expect(nova.body.vinculo.matricula).toBe("CT-NOVA");
 
     const recusa = await put(rota(id), rhA)
-      .send({ matricula: "CT-OCUPADA" })
+      .send({ matricula: "CT-OCUPADA", salarioBruto: SALARIO_DA_ADMISSAO })
       .expect(409);
     expect(recusa.body.erros).toEqual([
       { campo: "matricula", motivo: "em_uso" },
@@ -434,10 +452,12 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     ).toBe("CT-NOVA");
 
     // A mesma matrícula do próprio vínculo não conflita com ele mesmo.
-    await put(rota(id), rhA).send({ matricula: "CT-NOVA" }).expect(200);
+    await put(rota(id), rhA)
+      .send({ matricula: "CT-NOVA", salarioBruto: SALARIO_DA_ADMISSAO })
+      .expect(200);
 
     const apagada = await put(rota(id), rhA)
-      .send({ matricula: null })
+      .send({ matricula: null, salarioBruto: SALARIO_DA_ADMISSAO })
       .expect(200);
     expect(apagada.body.vinculo.matricula).toBeNull();
   });
@@ -446,7 +466,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     await admitir(rhB, empresaB, { matricula: "CT-OUTRA" });
     const { id } = await admitir(rhA, empresaA);
     const r = await put(rota(id), rhA)
-      .send({ matricula: "CT-OUTRA" })
+      .send({ matricula: "CT-OUTRA", salarioBruto: SALARIO_DA_ADMISSAO })
       .expect(200);
     expect(r.body.vinculo.matricula).toBe("CT-OUTRA");
   });
@@ -523,7 +543,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     await put(rota(id), rhB).send({ nivel: "pleno" }).expect(404);
     expect(
       await prisma.contratoVinculo.findUnique({ where: { vinculoId } }),
-    ).toBeNull();
+    ).toMatchObject({ nivel: null });
   });
 
   it("colaborador inexistente: 404", async () => {
@@ -539,7 +559,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
       .expect(403);
     expect(
       await prisma.contratoVinculo.findUnique({ where: { vinculoId } }),
-    ).toBeNull();
+    ).toMatchObject({ nivel: null });
   });
 
   it("vínculo encerrado: a edição é recusada (409) e nada muda", async () => {
