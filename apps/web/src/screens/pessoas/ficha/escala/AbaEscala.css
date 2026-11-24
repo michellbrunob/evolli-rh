@@ -608,7 +608,8 @@
 }
 
 .seletor-rico__lista {
-  z-index: 60;
+  /* Acima da gaveta (camada 100), onde o seletor vive. */
+  z-index: 110;
   width: var(--radix-dropdown-menu-trigger-width);
   max-width: calc(100vw - 1rem);
   max-height: min(24rem, var(--radix-dropdown-menu-content-available-height));

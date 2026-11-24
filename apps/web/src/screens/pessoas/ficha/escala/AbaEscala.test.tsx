@@ -569,5 +569,9 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     expect(css).toMatch(/@container \(min-width: \d+rem\)/);
     expect(css).not.toMatch(/\bwidth:\s*\d{3,}px/);
     expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);
+    // A lista do seletor fica ACIMA da gaveta (camada 100): por trás dela,
+    // o clique não chega nas opções e não dá para trocar o padrão.
+    const camada = /\.seletor-rico__lista\s*\{[^}]*z-index:\s*(\d+)/.exec(css);
+    expect(Number(camada?.[1])).toBeGreaterThan(100);
   });
 });

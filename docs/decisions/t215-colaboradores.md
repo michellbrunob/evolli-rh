@@ -89,3 +89,40 @@ cálculo** — a tela diz isso no histórico.
 
 Portal do colaborador, fluxo do gestor, férias coletivas, políticas de férias, mudança
 automática de status e o calendário de feriados móveis e regionais.
+
+## Trilhas da barra superior (padrão do sistema, 2026-11-25)
+
+Regra, igual à da referência e já aplicada em `trilhaDoShell.ts`:
+
+- **Seção** (cabeçalho do menu: Pessoas, Remuneração…): só texto.
+- **Módulo** (item do menu: Colaboradores, Liderança, Configurações…): link
+  para a página principal do módulo sempre que ela não é a tela atual.
+- **Página intermediária** (o pai de uma sub-página): link para ela.
+- **Último item**: a tela atual, só texto (`aria-current="page"`).
+- Nome igual ao anterior não se repete; destino sem rota não ganha caminho.
+- Toda tela com trilha tem rota própria em `rotasDoShell.ts` (recarregar e
+  voltar funcionam). Corrigido nesta data: Organograma
+  (`#/estrutura/organograma`) e Minha equipe (`#/lideranca/minha-equipe`).
+
+Trilhas previstas para os módulos ainda em desenvolvimento (aplicar ao criar
+cada um; links nos itens do meio, só texto no último):
+
+| Módulo / tela futura                     | Trilha                                                          | Rota sugerida                                 |
+| ---------------------------------------- | --------------------------------------------------------------- | --------------------------------------------- |
+| Quadro da escala                         | Pessoas / [Colaboradores] / Escala de trabalho                  | `#/pessoas/escala`                            |
+| Turnos                                   | Pessoas / [Colaboradores] / [Escala de trabalho] / Turnos       | `#/pessoas/escala/turnos`                     |
+| Novo/Editar turno                        | … / [Escala de trabalho] / [Turnos] / Novo turno · Editar turno | `#/pessoas/escala/turnos/novo` · `/:id`       |
+| Regras da escala                         | … / [Escala de trabalho] / Regras da escala                     | `#/pessoas/escala/regras`                     |
+| Aplicar modelo                           | … / [Escala de trabalho] / Aplicar modelo                       | `#/pessoas/escala/modelo`                     |
+| Desenvolvimento                          | Pessoas / [Colaboradores] / Desenvolvimento                     | `#/pessoas/desenvolvimento`                   |
+| Recrutamento › Vagas · Banco de talentos | Pessoas / [Recrutamento] / Vagas · Banco de talentos            | `#/recrutamento/vagas` · `/banco-de-talentos` |
+| Pesquisas                                | Pessoas / Pesquisas                                             | `#/pessoas/pesquisas`                         |
+| Calendário                               | Pessoas / Calendário                                            | `#/pessoas/calendario`                        |
+| Folha de Pagamento                       | Remuneração / Folha de Pagamento                                | `#/remuneracao/folha`                         |
+| Benefícios                               | Remuneração / Benefícios                                        | `#/remuneracao/beneficios`                    |
+| Hub de Benefícios                        | Remuneração / Hub de Benefícios                                 | `#/remuneracao/hub-de-beneficios`             |
+| Portal                                   | Portal                                                          | `#/portal`                                    |
+| Suporte · Roadmap                        | Suporte · Roadmap                                               | `#/suporte` · `#/roadmap`                     |
+
+Quando o quadro existir, "Escala de trabalho" deixa de abrir os Turnos e
+passa a abrir o quadro; os Turnos viram sub-página dele (tabela acima).

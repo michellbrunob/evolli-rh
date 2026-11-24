@@ -52,6 +52,37 @@ describe("trilha da barra superior", () => {
     expect(trilhaDoDestino("pessoas").every((i) => !i.destinoId)).toBe(true);
   });
 
+  it("T215 — o módulo leva à página principal dele, quando não é a tela atual; a seção é só texto", () => {
+    expect(trilhaDoDestino("jornadas-trabalho")).toEqual([
+      { rotulo: "Pessoas" },
+      { rotulo: "Colaboradores", destinoId: "pessoas" },
+      { rotulo: "Escala de trabalho" },
+    ]);
+    expect(trilhaDoDestino("cadastros")[1]).toEqual({
+      rotulo: "Colaboradores",
+      destinoId: "pessoas",
+    });
+    expect(trilhaDoDestino("administracao-lideranca")[1]).toEqual({
+      rotulo: "Liderança",
+      destinoId: "equipe",
+    });
+    expect(trilhaDoDestino("contas-acesso")[0]).toEqual({
+      rotulo: "Segurança",
+      destinoId: "seguranca",
+    });
+    // Todo item que não é o último e tem destino leva a um destino existente.
+    for (const destino of DESTINOS) {
+      const trilha = trilhaDoDestino(destino.id);
+      expect(trilha[trilha.length - 1]!.destinoId).toBeUndefined();
+      for (const item of trilha) {
+        if (item.destinoId) {
+          expect(DESTINOS.some((d) => d.id === item.destinoId)).toBe(true);
+          expect(item.destinoId).not.toBe(destino.id);
+        }
+      }
+    }
+  });
+
   it("destino desconhecido não inventa caminho", () => {
     expect(trilhaDoDestino("hub")).toEqual([]);
   });
