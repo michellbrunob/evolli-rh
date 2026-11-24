@@ -178,6 +178,9 @@
   --radius-md: 11px;
   --radius-lg: 18px;
   --radius-pill: 9999px;
+  /* T215 — padrão do Evolli (2026-11-25): botões quadrados, cantos
+     levemente arredondados, em todo o sistema. Pílula só em selos e chips. */
+  --radius-botao: var(--radius-md);
 
   /* Espaçamento (escala). */
   --space-xxs: 4px;

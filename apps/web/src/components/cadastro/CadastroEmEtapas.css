@@ -265,7 +265,7 @@ button.cadastro-etapas__etapa-passo:focus-visible {
 
 .cadastro-etapas__voltar {
   flex: 0 0 auto;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
 }
 
 .cadastro-etapas__corpo {

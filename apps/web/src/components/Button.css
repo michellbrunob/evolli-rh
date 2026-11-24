@@ -12,7 +12,7 @@
   min-width: var(--touch-target);
   padding: 0 var(--space-lg);
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-botao);
   font: inherit;
   font-weight: var(--weight-strong);
   line-height: 1;

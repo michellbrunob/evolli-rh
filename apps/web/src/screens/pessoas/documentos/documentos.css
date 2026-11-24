@@ -163,7 +163,7 @@
   min-height: var(--touch-target);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--color-ink-muted);
   cursor: pointer;

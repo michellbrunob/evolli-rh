@@ -162,7 +162,7 @@
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
   background: var(--surface-canvas);
   color: var(--color-ink);
   font: inherit;
@@ -317,7 +317,7 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
   background: var(--surface-canvas);
   color: var(--color-ink-muted);
   cursor: pointer;
@@ -1433,7 +1433,7 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
   margin: calc(var(--space-xs) * -1) calc(var(--space-xs) * -1) 0 0;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--evolli-marinho);
   cursor: pointer;

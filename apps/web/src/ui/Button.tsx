@@ -13,7 +13,7 @@ import { cn } from "./cn";
 export type ButtonVariant = "primary" | "secondary" | "subtle" | "danger";
 
 const BASE =
-  "ev:inline-flex ev:items-center ev:justify-center ev:gap-2 ev:min-h-[var(--touch-target)] ev:rounded-[var(--radius-pill)] ev:border ev:font-[inherit] ev:font-semibold ev:leading-none ev:cursor-pointer ev:disabled:cursor-not-allowed ev:disabled:opacity-50 ev:aria-disabled:cursor-not-allowed";
+  "ev:inline-flex ev:items-center ev:justify-center ev:gap-2 ev:min-h-[var(--touch-target)] ev:rounded-[var(--radius-botao)] ev:border ev:font-[inherit] ev:font-semibold ev:leading-none ev:cursor-pointer ev:disabled:cursor-not-allowed ev:disabled:opacity-50 ev:aria-disabled:cursor-not-allowed";
 
 const VARIANTS: Readonly<Record<ButtonVariant, string>> = {
   primary:

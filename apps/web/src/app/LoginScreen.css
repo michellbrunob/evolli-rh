@@ -77,7 +77,7 @@
   align-self: stretch;
   justify-content: space-between;
   margin-top: var(--space-xs);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-botao);
 }
 
 /* Senha com o botão de mostrar dentro do campo, à direita. */
