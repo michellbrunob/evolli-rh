@@ -169,7 +169,7 @@ describe("o estado declarado bate com o código", () => {
     "importar-colaboradores":
       "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
-    "jornadas-trabalho": "src/screens/horarios/JornadasTrabalhoScreen.tsx",
+    "jornadas-trabalho": "src/screens/horarios/turnos/TurnosScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":

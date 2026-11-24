@@ -88,6 +88,19 @@
   --status-neutral-surface: #f5f5f7;
   --status-neutral-border: #d2d2d7;
   --status-success-ink: #1f6b3b;
+  /* T215 — as 12 cores de turno da escala (ponto, sigla e célula). */
+  --turno-azul: #3d6fd6;
+  --turno-laranja: #d9822b;
+  --turno-cinza: #8a8f98;
+  --turno-verde: #2e9e5b;
+  --turno-verde-agua: #1f9e93;
+  --turno-roxo: #8653c7;
+  --turno-indigo: #4f52c9;
+  --turno-tangerina: #e0612a;
+  --turno-ciano: #1b93c2;
+  --turno-oliva: #6f8f2a;
+  --turno-mostarda: #b08a18;
+  --turno-violeta: #b24fc9;
   --status-success-surface: #eaf6ee;
   --status-success-border: #b7dfc5;
   --status-warning-ink: #8a5a00;

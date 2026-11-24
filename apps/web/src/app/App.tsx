@@ -95,8 +95,8 @@ import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import {
   CadastrosScreen,
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
-  JORNADAS_TRABALHO_TITULO_ID,
-  JornadasTrabalhoScreen,
+  TURNOS_TITULO_ID,
+  TurnosScreen,
 } from "../screens/horarios";
 import {
   CONFIGURACOES_TITULO_ID,
@@ -303,7 +303,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
-  "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
+  "jornadas-trabalho": TURNOS_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
   "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
@@ -592,9 +592,7 @@ function conteudoDoDestino(
   if (destinoId === "jornadas-trabalho") {
     // T182 — só o RH opera; DP e `master_tecnico` consultam.
     return (
-      <JornadasTrabalhoScreen
-        podeOperar={podeOperarJornadas(admissao.papelDoAtor)}
-      />
+      <TurnosScreen podeOperar={podeOperarJornadas(admissao.papelDoAtor)} />
     );
   }
   if (destinoId === "cadastros-demonstracao") {

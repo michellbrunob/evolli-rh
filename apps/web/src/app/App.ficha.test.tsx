@@ -1646,10 +1646,13 @@ describe("T200 — guarda de saída no App", () => {
       const jornadas = () =>
         within(barra()).getByRole("button", { name: /^Escala de trabalho/ });
       fireEvent.click(jornadas());
-      const nova = await screen.findAllByRole("button", {
-        name: "Nova jornada",
-      });
-      fireEvent.click(nova[0]!);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Novo turno" }),
+      );
+      fireEvent.change(
+        await screen.findByRole("textbox", { name: /^Nome do turno/ }),
+        { target: { value: "Turno sintético" } },
+      );
       fireEvent.click(jornadas());
       expect(screen.queryByRole("alertdialog")).toBeNull();
       // Outro destino desmonta: pergunta.
@@ -1658,7 +1661,7 @@ describe("T200 — guarda de saída no App", () => {
           name: /^Colaboradores Consulta/,
         }),
       );
-      expect(telasDaPergunta()).toEqual(["Jornadas de trabalho"]);
+      expect(telasDaPergunta()).toEqual(["Turnos"]);
       sairSemSalvar();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
     });

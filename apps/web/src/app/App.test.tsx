@@ -90,7 +90,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(rotulo).toHaveTextContent("Colaboradores");
   });
 
-  it("renderiza Estrutura > Jornadas de trabalho dentro do <main> (T182)", () => {
+  it("renderiza Escala de trabalho > Turnos dentro do <main> (T215)", () => {
     render(<App papelDoAtor="rh" />);
     fireEvent.click(
       screen.getByRole("button", { name: /^Escala de trabalho/ }),
@@ -98,12 +98,11 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     const main = screen.getByRole("main");
     expect(main).toContainElement(
-      screen.getByRole("heading", { level: 1, name: "Jornadas de trabalho" }),
+      screen.getByRole("heading", { level: 1, name: "Turnos" }),
     );
-    expect(main).toContainElement(screen.getByText("Operação do RH"));
     expect(
       document.getElementById(main.getAttribute("aria-labelledby")!),
-    ).toHaveTextContent("Jornadas de trabalho");
+    ).toHaveTextContent("Turnos");
   });
 
   it("Estrutura não tem mais a aba Horários: ela virou Jornadas de trabalho (T182)", () => {
@@ -1300,14 +1299,14 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     );
   });
 
-  it("T182 — dp entra em Jornadas de trabalho, só para consultar", () => {
+  it("T182/T215 — dp entra em Turnos, só para consultar", () => {
     render(<App papelDoAtor="dp" destinoInicial="jornadas-trabalho" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Jornadas de trabalho",
+      "Turnos",
     );
     expect(screen.getByText("Somente consulta")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Nova jornada" }),
+      screen.queryByRole("button", { name: "Novo turno" }),
     ).not.toBeInTheDocument();
   });
 
@@ -1346,7 +1345,7 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     // `master_tecnico`). Montar ali seria 403.
     render(<App papelDoAtor="financeiro" destinoInicial="jornadas-trabalho" />);
     expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
-      "Jornadas de trabalho",
+      "Turnos",
     );
   });
 

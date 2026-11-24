@@ -1,7 +1,4 @@
-export {
-  JORNADAS_TRABALHO_TITULO_ID,
-  JornadasTrabalhoScreen,
-} from "./JornadasTrabalhoScreen";
+export { TURNOS_TITULO_ID, TurnosScreen } from "./turnos/TurnosScreen";
 export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
