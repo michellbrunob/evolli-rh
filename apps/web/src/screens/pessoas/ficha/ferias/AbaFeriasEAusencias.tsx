@@ -62,6 +62,13 @@ import {
   ROTULO_DO_STATUS,
   ROTULO_DO_TIPO,
 } from "../../ferias/tiposAusencia";
+import {
+  AvisoAnimado,
+  Esqueleto,
+  NumeroSuave,
+  Revelar,
+  ehAvisoDeFalha,
+} from "../../../../ui/movimento";
 import "./AbaFeriasEAusencias.css";
 
 interface Props {
@@ -78,6 +85,17 @@ interface Props {
   ) => Promise<FeriasDoColaboradorApi>;
   /** Dia civil de hoje; padrão, o de São Paulo. */
   readonly hoje?: string;
+}
+
+/** O que já foi lido, por função de leitura e pessoa (cada dublê, o seu). */
+const memorias = new WeakMap<object, Map<string, FeriasDoColaboradorApi>>();
+function memoriaDe(consultar: object): Map<string, FeriasDoColaboradorApi> {
+  let m = memorias.get(consultar);
+  if (!m) {
+    m = new Map();
+    memorias.set(consultar, m);
+  }
+  return m;
 }
 
 type Carga =
@@ -165,7 +183,20 @@ export function AbaFeriasEAusencias({
   hoje: hojeInformado,
 }: Props) {
   const hoje = hojeInformado ?? diaCivilDeHoje();
-  const [carga, setCarga] = useState<Carga>({ estado: "carregando" });
+  // Voltar à aba mostra na hora o que já foi lido, e atualiza em silêncio.
+  const [carga, setCargaInterna] = useState<Carga>(() => {
+    const lido = memoriaDe(consultar).get(pessoa.id);
+    return lido ? { estado: "pronto", dados: lido } : { estado: "carregando" };
+  });
+  const setCarga = useCallback(
+    (nova: Carga) => {
+      if (nova.estado === "pronto") {
+        memoriaDe(consultar).set(pessoa.id, nova.dados);
+      }
+      setCargaInterna(nova);
+    },
+    [consultar, pessoa.id],
+  );
   const [gaveta, setGaveta] = useState(false);
   const [janela, setJanela] = useState<Janela>(null);
   const [motivo, setMotivo] = useState("");
@@ -176,7 +207,9 @@ export function AbaFeriasEAusencias({
 
   const carregar = useCallback(
     (silencioso = false) => {
-      if (!silencioso) setCarga({ estado: "carregando" });
+      if (!silencioso && !memoriaDe(consultar).has(pessoa.id)) {
+        setCarga({ estado: "carregando" });
+      }
       consultar(pessoa.id).then(
         (dados) => setCarga({ estado: "pronto", dados }),
         (erro: unknown) =>
@@ -186,7 +219,7 @@ export function AbaFeriasEAusencias({
           }),
       );
     },
-    [consultar, pessoa.id],
+    [consultar, pessoa.id, setCarga],
   );
 
   useEffect(() => {
@@ -244,9 +277,7 @@ export function AbaFeriasEAusencias({
   }
 
   if (carga.estado === "carregando") {
-    return (
-      <p className="ferias-ficha__aviso">Carregando férias e ausências…</p>
-    );
+    return <Esqueleto rotulo="Carregando férias e ausências…" linhas={5} />;
   }
   if (carga.estado === "erro") {
     return (
@@ -272,197 +303,201 @@ export function AbaFeriasEAusencias({
     ] ?? dados.vinculo.tipo;
 
   return (
-    <div className="ferias-ficha">
-      <div className="ferias-ficha__topo">
-        <Saldo dados={dados} tipoDoVinculo={tipoDoVinculo} />
-        <ProximaAusencia dados={dados} hoje={hoje} quem={quem} />
+    <Revelar>
+      <div className="ferias-ficha">
+        <div className="ferias-ficha__topo">
+          <Saldo dados={dados} tipoDoVinculo={tipoDoVinculo} />
+          <ProximaAusencia dados={dados} hoje={hoje} quem={quem} />
+        </div>
+
+        <Historico
+          dados={dados}
+          deQuem={deQuem}
+          podeEditar={podeEditar}
+          servico={servico}
+          onRegistrar={() => setGaveta(true)}
+          onAprovar={(a) =>
+            void executar(
+              () => servico.aprovar(a.id),
+              "Ausência aprovada.",
+              "Não foi possível aprovar. Tente de novo.",
+            )
+          }
+          onRecusar={(a) => {
+            setMotivo("");
+            setJanela({ tipo: "recusar", ausencia: a });
+          }}
+          onCancelar={(a) => setJanela({ tipo: "cancelar", ausencia: a })}
+          onAnexar={pedirArquivo}
+          onBaixar={(a) => void baixar(a)}
+          onRemoverAnexo={(a) =>
+            setJanela({ tipo: "remover-anexo", ausencia: a })
+          }
+        />
+
+        <input
+          ref={campoArquivo}
+          type="file"
+          hidden
+          accept={FORMATOS_DO_ANEXO}
+          aria-label="Arquivo do anexo da ausência"
+          onChange={(e) => {
+            const arquivo = e.target.files?.[0];
+            e.target.value = "";
+            if (arquivo) void anexar(arquivo);
+          }}
+        />
+
+        <AvisoAnimado
+          className="ferias-ficha__status"
+          mensagem={aviso}
+          tipo={ehAvisoDeFalha(aviso) ? "neutro" : "sucesso"}
+        />
+
+        <RegistrarAusenciaGaveta
+          aberta={gaveta}
+          servico={servico}
+          pessoaInicial={pessoa}
+          regraDeFerias={dados.regraDeFerias}
+          onFechar={() => setGaveta(false)}
+          onRegistrada={(_nova, avisoDoAnexo) => {
+            setGaveta(false);
+            setAviso(avisoDoAnexo ?? "Ausência registrada.");
+            carregar(true);
+          }}
+        />
+
+        <Dialog
+          aberto={janela?.tipo === "recusar"}
+          titulo="Recusar ausência?"
+          descricao={
+            janela
+              ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica recusada e sai do calendário.`
+              : ""
+          }
+          onFechar={() => setJanela(null)}
+          bloqueado={trabalhando}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setJanela(null)}
+              >
+                Voltar
+              </Button>
+              <Button
+                type="button"
+                className="ficha-ref__botao-perigo"
+                disabled={trabalhando}
+                onClick={() => {
+                  const alvo = janela?.ausencia;
+                  if (!alvo) return;
+                  void executar(
+                    () => servico.recusar(alvo.id, motivo.trim() || undefined),
+                    "Ausência recusada.",
+                    "Não foi possível recusar. Tente de novo.",
+                  );
+                }}
+              >
+                Recusar
+              </Button>
+            </FormActions>
+          }
+        >
+          <label className="ferias-ficha__campo">
+            <span>Motivo (opcional)</span>
+            <textarea
+              maxLength={500}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+            />
+          </label>
+        </Dialog>
+
+        <Dialog
+          aberto={janela?.tipo === "cancelar"}
+          titulo="Cancelar ausência?"
+          descricao={
+            janela
+              ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica cancelada. O registro continua no histórico.`
+              : ""
+          }
+          onFechar={() => setJanela(null)}
+          bloqueado={trabalhando}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setJanela(null)}
+              >
+                Voltar
+              </Button>
+              <Button
+                type="button"
+                className="ficha-ref__botao-perigo"
+                disabled={trabalhando}
+                onClick={() => {
+                  const alvo = janela?.ausencia;
+                  if (!alvo) return;
+                  void executar(
+                    () => servico.cancelar(alvo.id),
+                    "Ausência cancelada.",
+                    "Não foi possível cancelar. Tente de novo.",
+                  );
+                }}
+              >
+                Cancelar ausência
+              </Button>
+            </FormActions>
+          }
+        >
+          <p className="ficha-ref__janela-texto">
+            Se ainda descontava do saldo de férias, os dias voltam ao saldo.
+          </p>
+        </Dialog>
+
+        <Dialog
+          aberto={janela?.tipo === "remover-anexo"}
+          titulo="Remover o anexo?"
+          descricao="O arquivo sai do histórico desta ausência. O registro da remoção fica na trilha de auditoria."
+          onFechar={() => setJanela(null)}
+          bloqueado={trabalhando}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setJanela(null)}
+              >
+                Voltar
+              </Button>
+              <Button
+                type="button"
+                className="ficha-ref__botao-perigo"
+                disabled={trabalhando}
+                onClick={() => {
+                  const alvo = janela?.ausencia;
+                  if (!alvo || !servico.removerAnexo) return;
+                  void executar(
+                    () => servico.removerAnexo!(alvo.id),
+                    "Anexo removido.",
+                    "Não foi possível remover o anexo. Tente de novo.",
+                  );
+                }}
+              >
+                Remover
+              </Button>
+            </FormActions>
+          }
+        >
+          <p className="ficha-ref__janela-texto">
+            Depois, dá para anexar outro arquivo.
+          </p>
+        </Dialog>
       </div>
-
-      <Historico
-        dados={dados}
-        deQuem={deQuem}
-        podeEditar={podeEditar}
-        servico={servico}
-        onRegistrar={() => setGaveta(true)}
-        onAprovar={(a) =>
-          void executar(
-            () => servico.aprovar(a.id),
-            "Ausência aprovada.",
-            "Não foi possível aprovar. Tente de novo.",
-          )
-        }
-        onRecusar={(a) => {
-          setMotivo("");
-          setJanela({ tipo: "recusar", ausencia: a });
-        }}
-        onCancelar={(a) => setJanela({ tipo: "cancelar", ausencia: a })}
-        onAnexar={pedirArquivo}
-        onBaixar={(a) => void baixar(a)}
-        onRemoverAnexo={(a) =>
-          setJanela({ tipo: "remover-anexo", ausencia: a })
-        }
-      />
-
-      <input
-        ref={campoArquivo}
-        type="file"
-        hidden
-        accept={FORMATOS_DO_ANEXO}
-        aria-label="Arquivo do anexo da ausência"
-        onChange={(e) => {
-          const arquivo = e.target.files?.[0];
-          e.target.value = "";
-          if (arquivo) void anexar(arquivo);
-        }}
-      />
-
-      <p className="ferias-ficha__status" role="status" aria-live="polite">
-        {aviso}
-      </p>
-
-      <RegistrarAusenciaGaveta
-        aberta={gaveta}
-        servico={servico}
-        pessoaInicial={pessoa}
-        regraDeFerias={dados.regraDeFerias}
-        onFechar={() => setGaveta(false)}
-        onRegistrada={(_nova, avisoDoAnexo) => {
-          setGaveta(false);
-          setAviso(avisoDoAnexo ?? "Ausência registrada.");
-          carregar(true);
-        }}
-      />
-
-      <Dialog
-        aberto={janela?.tipo === "recusar"}
-        titulo="Recusar ausência?"
-        descricao={
-          janela
-            ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica recusada e sai do calendário.`
-            : ""
-        }
-        onFechar={() => setJanela(null)}
-        bloqueado={trabalhando}
-        rodape={
-          <FormActions>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setJanela(null)}
-            >
-              Voltar
-            </Button>
-            <Button
-              type="button"
-              className="ficha-ref__botao-perigo"
-              disabled={trabalhando}
-              onClick={() => {
-                const alvo = janela?.ausencia;
-                if (!alvo) return;
-                void executar(
-                  () => servico.recusar(alvo.id, motivo.trim() || undefined),
-                  "Ausência recusada.",
-                  "Não foi possível recusar. Tente de novo.",
-                );
-              }}
-            >
-              Recusar
-            </Button>
-          </FormActions>
-        }
-      >
-        <label className="ferias-ficha__campo">
-          <span>Motivo (opcional)</span>
-          <textarea
-            maxLength={500}
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-          />
-        </label>
-      </Dialog>
-
-      <Dialog
-        aberto={janela?.tipo === "cancelar"}
-        titulo="Cancelar ausência?"
-        descricao={
-          janela
-            ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica cancelada. O registro continua no histórico.`
-            : ""
-        }
-        onFechar={() => setJanela(null)}
-        bloqueado={trabalhando}
-        rodape={
-          <FormActions>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setJanela(null)}
-            >
-              Voltar
-            </Button>
-            <Button
-              type="button"
-              className="ficha-ref__botao-perigo"
-              disabled={trabalhando}
-              onClick={() => {
-                const alvo = janela?.ausencia;
-                if (!alvo) return;
-                void executar(
-                  () => servico.cancelar(alvo.id),
-                  "Ausência cancelada.",
-                  "Não foi possível cancelar. Tente de novo.",
-                );
-              }}
-            >
-              Cancelar ausência
-            </Button>
-          </FormActions>
-        }
-      >
-        <p className="ficha-ref__janela-texto">
-          Se ainda descontava do saldo de férias, os dias voltam ao saldo.
-        </p>
-      </Dialog>
-
-      <Dialog
-        aberto={janela?.tipo === "remover-anexo"}
-        titulo="Remover o anexo?"
-        descricao="O arquivo sai do histórico desta ausência. O registro da remoção fica na trilha de auditoria."
-        onFechar={() => setJanela(null)}
-        bloqueado={trabalhando}
-        rodape={
-          <FormActions>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setJanela(null)}
-            >
-              Voltar
-            </Button>
-            <Button
-              type="button"
-              className="ficha-ref__botao-perigo"
-              disabled={trabalhando}
-              onClick={() => {
-                const alvo = janela?.ausencia;
-                if (!alvo || !servico.removerAnexo) return;
-                void executar(
-                  () => servico.removerAnexo!(alvo.id),
-                  "Anexo removido.",
-                  "Não foi possível remover o anexo. Tente de novo.",
-                );
-              }}
-            >
-              Remover
-            </Button>
-          </FormActions>
-        }
-      >
-        <p className="ficha-ref__janela-texto">
-          Depois, dá para anexar outro arquivo.
-        </p>
-      </Dialog>
-    </div>
+    </Revelar>
   );
 }
 
@@ -548,7 +583,11 @@ function Saldo({
             <p className="ferias-ficha__saldo-valor">
               {/* Em aquisição, os dias ainda não podem ser tirados. */}
               <span className="ferias-ficha__saldo-numero">
-                {atual.situacao === "em_aquisicao" ? 0 : atual.disponiveis}
+                <NumeroSuave
+                  valor={
+                    atual.situacao === "em_aquisicao" ? 0 : atual.disponiveis
+                  }
+                />
               </span>
               <span className="ferias-ficha__suave">dias disponíveis</span>
               <StatusBadge variant={VARIANTE_DA_SITUACAO[atual.situacao]}>

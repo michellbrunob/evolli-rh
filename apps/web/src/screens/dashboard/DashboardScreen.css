@@ -1564,3 +1564,8 @@ a.dashboard__situacao .dashboard__situacao-rotulo {
     min-width: 0;
   }
 }
+
+/* T215 — o sublinhado que desliza mantém a cor desta tela. */
+.dashboard__navegacao {
+  --aba-cor: var(--evolli-azul);
+}

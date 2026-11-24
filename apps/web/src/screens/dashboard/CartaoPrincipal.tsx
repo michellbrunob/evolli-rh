@@ -7,6 +7,7 @@
  * período; turnover, absenteísmo e custo por pessoa aparecem como "—" com o
  * motivo numa linha, nunca como zero.
  */
+import { NumeroSuave } from "../../ui/movimento";
 import { Fragment, type ReactNode } from "react";
 import { InfoComoCalculamos } from "./componentesDoDashboard";
 import {
@@ -204,7 +205,7 @@ export function CartaoPrincipal({
             {ativos !== null ? (
               <>
                 <p className="dashboard__indicador-valor">
-                  {String(ativos)}
+                  <NumeroSuave valor={ativos} />
                   <span className="dashboard__so-leitor">
                     {ativos === 1 ? " pessoa" : " pessoas"}
                   </span>

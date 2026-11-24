@@ -38,7 +38,8 @@ export function Tooltip({
           sideOffset={6}
           collisionPadding={8}
           className={cn(
-            "ev:z-20 ev:max-w-[min(20rem,calc(100vw-2*var(--space-md)))] ev:rounded-[var(--radius-sm)] ev:bg-[var(--surface-dark)] ev:px-[var(--space-sm)] ev:py-1 ev:text-[length:var(--text-caption)] ev:text-[var(--color-on-dark)]",
+            // T215 — "ev-dica": aparece rápido (ui/movimento.css).
+            "ev-dica ev:z-20 ev:max-w-[min(20rem,calc(100vw-2*var(--space-md)))] ev:rounded-[var(--radius-sm)] ev:bg-[var(--surface-dark)] ev:px-[var(--space-sm)] ev:py-1 ev:text-[length:var(--text-caption)] ev:text-[var(--color-on-dark)]",
             className,
           )}
         >

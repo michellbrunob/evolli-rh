@@ -407,6 +407,7 @@
 
 /* ---- abas ---------------------------------------------------------------- */
 .ficha-ref__abas {
+  position: relative;
   display: flex;
   gap: var(--space-lg);
   overflow-x: auto;
@@ -438,7 +439,6 @@
 }
 
 .ficha-ref__aba--atual {
-  border-bottom-color: var(--color-action);
   color: var(--color-ink);
   font-weight: var(--weight-strong);
 }

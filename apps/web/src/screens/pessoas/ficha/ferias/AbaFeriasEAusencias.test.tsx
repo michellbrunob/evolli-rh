@@ -5,6 +5,7 @@
  * Dados sintéticos.
  */
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -489,5 +490,27 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     });
     expect(within(gaveta).getByText("Ana Teste Lima")).toBeInTheDocument();
     expect(consultar).toHaveBeenCalledTimes(1);
+  });
+
+  it("voltar à aba mostra na hora o que já foi lido, e relê em silêncio", async () => {
+    const primeira = montar();
+    await screen.findByRole("region", { name: "Saldo de férias" });
+    const consultar = primeira.consultar;
+    cleanup();
+    render(
+      <AbaFeriasEAusencias
+        pessoa={PESSOA}
+        quem="a Ana"
+        deQuem="da Ana"
+        podeEditar
+        servico={servico()}
+        consultar={consultar}
+        hoje="2026-11-24"
+      />,
+    );
+    expect(
+      screen.getByRole("region", { name: "Saldo de férias" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(consultar).toHaveBeenCalledTimes(2));
   });
 });

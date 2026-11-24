@@ -1,3 +1,4 @@
+import { NumeroSuave } from "../../ui/movimento";
 import {
   Fragment,
   useCallback,
@@ -512,7 +513,7 @@ function CartaoAtivos({
       </div>
       <div className="colaboradores-screen__cartao-linha">
         <p className="colaboradores-screen__cartao-numero">
-          {c ? c.ativos : "…"}
+          {c ? <NumeroSuave valor={c.ativos} /> : "…"}
         </p>
         {c && (c.admitidosNoMes ?? 0) > 0 ? (
           <span className="colaboradores-screen__variacao">

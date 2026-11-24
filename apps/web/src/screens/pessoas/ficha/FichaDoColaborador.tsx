@@ -88,6 +88,8 @@ import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
 import { AbaSalarios } from "./salarios/AbaSalarios";
 import { AbaFeriasEAusencias } from "./ferias/AbaFeriasEAusencias";
+import { tratamentoDe } from "../tratamento";
+import { AvisoAnimado, ehAvisoDeFalha } from "../../../ui/movimento";
 import {
   IconeAbaBeneficios,
   IconeAbaComentarios,
@@ -171,10 +173,6 @@ function iniciais(nome: string): string {
   return `${p[0]?.[0] ?? ""}${p.length > 1 ? (p[p.length - 1]?.[0] ?? "") : ""}`.toUpperCase();
 }
 
-function primeiroNome(nome: string): string {
-  return nome.trim().split(/\s+/)[0] ?? nome;
-}
-
 /** Diferença em anos e meses entre dois dias civis (`AAAA-MM-DD`). */
 function anosEMeses(de: string, ate: string): { anos: number; meses: number } {
   const [a1, m1, d1] = de.slice(0, 10).split("-").map(Number) as [
@@ -224,16 +222,8 @@ const ROTULO_DO_STATUS: Readonly<
   em_admissao: { rotulo: "Em admissão", variante: "info" },
 };
 
-/** Ela/ele, convidada/convidado, pelo gênero informado. */
-function tratamento(genero: string | null | undefined) {
-  if (genero === "feminino") {
-    return { pronome: "Ela", artigo: "A", convidado: "convidada" };
-  }
-  if (genero === "masculino") {
-    return { pronome: "Ele", artigo: "O", convidado: "convidado" };
-  }
-  return { pronome: "A pessoa", artigo: "", convidado: "convidada(o)" };
-}
+/* O tratamento (o/a, ele/ela, convidado/convidada) vem do gênero do
+   cadastro: `tratamentoDe` (screens/pessoas/tratamento.ts). */
 
 // ---- peças --------------------------------------------------------------------
 
@@ -420,7 +410,7 @@ export function FichaDoColaborador({
 
   const perfil = dados?.pessoais?.perfilPessoal ?? null;
   const endereco = dados?.pessoais?.endereco ?? null;
-  const trato = tratamento(perfil?.genero);
+  const trato = tratamentoDe(perfil?.genero, nome);
   const vinculo = dados?.vinculo ?? null;
   const contrato = dados?.contrato?.contrato ?? null;
   const desativado = dados?.contrato?.desativado ?? false;
@@ -794,13 +784,7 @@ export function FichaDoColaborador({
               </span>
               <span className="ficha-ref__portal-texto">
                 {email
-                  ? `${trato.artigo ? `${trato.artigo} ` : ""}${primeiroNome(nome)} ainda não tem acesso. Envie o convite para ${
-                      trato.pronome === "Ela"
-                        ? "ela"
-                        : trato.pronome === "Ele"
-                          ? "ele"
-                          : "a pessoa"
-                    } criar a conta.`
+                  ? `${trato.oNome} ainda não tem acesso. Envie o convite para ${trato.pronomeNaFrase} criar a conta.`
                   : "Cadastre um e-mail para poder enviar o convite do portal."}
               </span>
             </span>
@@ -828,9 +812,11 @@ export function FichaDoColaborador({
         </section>
 
         {aviso ? (
-          <p className="ficha-ref__aviso" role="status">
-            {aviso}
-          </p>
+          <AvisoAnimado
+            className="ficha-ref__aviso"
+            mensagem={aviso}
+            tipo={ehAvisoDeFalha(aviso) ? "neutro" : "sucesso"}
+          />
         ) : null}
 
         <div
@@ -982,18 +968,8 @@ export function FichaDoColaborador({
               <AbaFeriasEAusencias
                 key={versaoDasAusencias}
                 pessoa={pessoaDaGaveta}
-                quem={
-                  trato.artigo
-                    ? `${trato.artigo.toLowerCase()} ${primeiroNome(nome)}`
-                    : primeiroNome(nome)
-                }
-                deQuem={`${
-                  trato.artigo === "A"
-                    ? "da"
-                    : trato.artigo === "O"
-                      ? "do"
-                      : "de"
-                } ${primeiroNome(nome)}`}
+                quem={trato.oNomeNaFrase}
+                deQuem={trato.doNome}
                 podeEditar={podeEditar}
                 servico={servicoDeAusencias}
               />
@@ -1004,13 +980,7 @@ export function FichaDoColaborador({
             dados ? (
               <AbaSalarios
                 colaboradorId={colaboradorId}
-                deQuem={`${
-                  trato.artigo === "A"
-                    ? "da"
-                    : trato.artigo === "O"
-                      ? "do"
-                      : "de"
-                } ${primeiroNome(nome)}`}
+                deQuem={trato.doNome}
                 podeEditar={podeEditar}
               />
             ) : null

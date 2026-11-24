@@ -259,9 +259,9 @@
   outline-offset: calc(-1 * var(--focus-width));
 }
 
-/* Aba ativa: nunca só cor — `aria-selected`, peso e barra inferior sólida. */
+/* Aba ativa: nunca só cor — `aria-selected`, peso e barra inferior sólida.
+   T215 — a barra é o indicador que desliza entre as abas (ui/movimento). */
 .colaboradores-screen__aba--ativa {
-  border-bottom-color: var(--color-action);
   color: var(--color-ink);
   font-weight: var(--weight-strong);
 }
@@ -383,6 +383,11 @@
 
   .colaboradores-screen__aba--ativa {
     background: var(--status-info-surface);
+  }
+
+  /* Empilhadas, as abas marcam a escolhida pelo fundo, sem o sublinhado. */
+  .colaboradores-screen__abas::after {
+    display: none;
   }
 
   .colaboradores-screen__cartoes {

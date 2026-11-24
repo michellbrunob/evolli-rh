@@ -4,6 +4,7 @@
  * a busca, os filtros Período, Tipo e Status, a engrenagem das políticas,
  * "Registrar ausência", a tabela com as ações por status e o estado vazio.
  */
+import { NumeroSuave } from "../../../ui/movimento";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Button, EmptyState, StatusBadge } from "../../../components";
@@ -92,7 +93,7 @@ export function CartoesDeAusencias({
           </h3>
           <p className="ausencias-cartoes__linha">
             <span className="ausencias-cartoes__numero">
-              {numero === undefined ? "…" : numero}
+              {numero === undefined ? "…" : <NumeroSuave valor={numero} />}
             </span>
             <span className="ausencias-cartoes__sufixo">{sufixo}</span>
           </p>

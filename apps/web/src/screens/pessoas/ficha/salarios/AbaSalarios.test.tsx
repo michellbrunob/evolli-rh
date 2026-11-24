@@ -452,4 +452,17 @@ describe("T215 — aba Salários", () => {
     ).toBeTruthy();
     expect(consultar).toHaveBeenCalledTimes(2);
   });
+
+  it("voltar à aba mostra na hora o que já foi lido, e relê em silêncio", async () => {
+    const s = servico(SO_ADMISSAO);
+    const primeira = montar(s);
+    await screen.findByRole("region", { name: "Salário atual" });
+    primeira.unmount();
+    montar(s);
+    // Sem esperar: a memória já tem a linha do tempo.
+    expect(
+      screen.getByRole("region", { name: "Salário atual" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(s.consultar).toHaveBeenCalledTimes(2));
+  });
 });

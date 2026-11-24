@@ -12,6 +12,7 @@
  * Quem não edita o contrato (`contrato_vinculo`) só lê. Gravar devolve a
  * linha do tempo inteira, já reorganizada pelo servidor.
  */
+import { Esqueleto, NumeroSuave, Revelar } from "../../../../ui/movimento";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { ApiError } from "../../../../api/colaboradoresClient";
@@ -61,6 +62,17 @@ import {
   tempoCurto,
 } from "./resumoSalarial";
 import "./AbaSalarios.css";
+
+/** O que já foi lido, por serviço e pessoa (cada dublê de teste tem o seu). */
+const memorias = new WeakMap<object, Map<string, HistoricoSalarialApi>>();
+function memoriaDe(servico: object): Map<string, HistoricoSalarialApi> {
+  let m = memorias.get(servico);
+  if (!m) {
+    m = new Map();
+    memorias.set(servico, m);
+  }
+  return m;
+}
 
 /** As operações da aba (o servidor, ou um dublê nos testes). */
 export interface ServicoDeSalarios {
@@ -128,14 +140,31 @@ export function AbaSalarios({
   servico = servicoDeSalariosDoServidor,
 }: Props) {
   const hoje = hojeInformado ?? diaCivilDeHoje();
-  const [carga, setCarga] = useState<Carga>({ estado: "carregando" });
+  // Voltar à aba mostra na hora o que já foi lido, e atualiza em silêncio.
+  const [carga, setCargaInterna] = useState<Carga>(() => {
+    const lido = memoriaDe(servico).get(colaboradorId);
+    return lido
+      ? { estado: "pronto", historico: lido }
+      : { estado: "carregando" };
+  });
+  const setCarga = useCallback(
+    (nova: Carga) => {
+      if (nova.estado === "pronto") {
+        memoriaDe(servico).set(colaboradorId, nova.historico);
+      }
+      setCargaInterna(nova);
+    },
+    [servico, colaboradorId],
+  );
   const [gaveta, setGaveta] = useState<Gaveta>(null);
   const [excluindo, setExcluindo] = useState<AlteracaoSalarialApi | null>(null);
   const [removendo, setRemovendo] = useState(false);
   const [erroAoRemover, setErroAoRemover] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
-    setCarga({ estado: "carregando" });
+    if (!memoriaDe(servico).has(colaboradorId)) {
+      setCarga({ estado: "carregando" });
+    }
     servico.consultar(colaboradorId).then(
       (historico) => setCarga({ estado: "pronto", historico }),
       (erro: unknown) =>
@@ -144,7 +173,7 @@ export function AbaSalarios({
           status: erro instanceof ApiError ? erro.status : null,
         }),
     );
-  }, [colaboradorId, servico]);
+  }, [colaboradorId, servico, setCarga]);
 
   useEffect(() => {
     carregar();
@@ -166,7 +195,7 @@ export function AbaSalarios({
   }
 
   if (carga.estado === "carregando") {
-    return <p className="salarios__aviso">Carregando salários…</p>;
+    return <Esqueleto rotulo="Carregando salários…" linhas={5} />;
   }
   if (carga.estado === "erro") {
     return (
@@ -192,107 +221,113 @@ export function AbaSalarios({
     ] ?? "";
 
   return (
-    <div className="salarios">
-      {historico.alteracoes.length === 0 ? (
-        <section className="ficha-ref__cartao salarios__vazio">
-          <span className="ficha-ref__cartao-icone" aria-hidden="true">
-            <IconeDinheiro tamanho={18} />
-          </span>
-          <h3 className="salarios__vazio-titulo">Nenhum salário registrado</h3>
-          <p className="salarios__vazio-texto">
-            {`Registre o salário para acompanhar a evolução ${deQuem}.`}
-          </p>
-          {podeEditar ? (
-            <button
-              type="button"
-              className="ficha-ref__editar"
-              onClick={() => setGaveta({ modo: "nova" })}
-            >
-              <IconeMais tamanho={14} />
-              Nova alteração
-            </button>
-          ) : null}
-        </section>
-      ) : (
-        <>
-          <div className="salarios__topo">
-            <SalarioAtual historico={historico} hoje={hoje} />
-            <Resumo alteracoes={historico.alteracoes} hoje={hoje} />
-          </div>
-          <LinhaDoTempo
-            historico={historico}
-            hoje={hoje}
-            deQuem={deQuem}
-            modeloPadrao={modeloPadrao}
-            podeEditar={podeEditar}
-            onNova={() => setGaveta({ modo: "nova" })}
-            onEditar={(alteracao) => setGaveta({ modo: "editar", alteracao })}
-            onExcluir={(alteracao) => {
-              setErroAoRemover(null);
-              setExcluindo(alteracao);
+    <Revelar>
+      <div className="salarios">
+        {historico.alteracoes.length === 0 ? (
+          <section className="ficha-ref__cartao salarios__vazio">
+            <span className="ficha-ref__cartao-icone" aria-hidden="true">
+              <IconeDinheiro tamanho={18} />
+            </span>
+            <h3 className="salarios__vazio-titulo">
+              Nenhum salário registrado
+            </h3>
+            <p className="salarios__vazio-texto">
+              {`Registre o salário para acompanhar a evolução ${deQuem}.`}
+            </p>
+            {podeEditar ? (
+              <button
+                type="button"
+                className="ficha-ref__editar"
+                onClick={() => setGaveta({ modo: "nova" })}
+              >
+                <IconeMais tamanho={14} />
+                Nova alteração
+              </button>
+            ) : null}
+          </section>
+        ) : (
+          <>
+            <div className="salarios__topo">
+              <SalarioAtual historico={historico} hoje={hoje} />
+              <Resumo alteracoes={historico.alteracoes} hoje={hoje} />
+            </div>
+            <LinhaDoTempo
+              historico={historico}
+              hoje={hoje}
+              deQuem={deQuem}
+              modeloPadrao={modeloPadrao}
+              podeEditar={podeEditar}
+              onNova={() => setGaveta({ modo: "nova" })}
+              onEditar={(alteracao) => setGaveta({ modo: "editar", alteracao })}
+              onExcluir={(alteracao) => {
+                setErroAoRemover(null);
+                setExcluindo(alteracao);
+              }}
+            />
+          </>
+        )}
+
+        {gaveta ? (
+          <GavetaDeAlteracao
+            key={gaveta.modo === "editar" ? gaveta.alteracao.id : "nova"}
+            gaveta={gaveta}
+            colaboradorId={colaboradorId}
+            dataAdmissao={historico.vinculo.dataAdmissao}
+            primeiroSalario={historico.alteracoes.length === 0}
+            modeloPadrao={
+              historico.alteracoes[0]?.modeloContrato ?? modeloPadrao
+            }
+            servico={servico}
+            onFechar={() => setGaveta(null)}
+            onGravado={(novo) => {
+              setCarga({ estado: "pronto", historico: novo });
+              setGaveta(null);
             }}
           />
-        </>
-      )}
+        ) : null}
 
-      {gaveta ? (
-        <GavetaDeAlteracao
-          key={gaveta.modo === "editar" ? gaveta.alteracao.id : "nova"}
-          gaveta={gaveta}
-          colaboradorId={colaboradorId}
-          dataAdmissao={historico.vinculo.dataAdmissao}
-          primeiroSalario={historico.alteracoes.length === 0}
-          modeloPadrao={historico.alteracoes[0]?.modeloContrato ?? modeloPadrao}
-          servico={servico}
-          onFechar={() => setGaveta(null)}
-          onGravado={(novo) => {
-            setCarga({ estado: "pronto", historico: novo });
-            setGaveta(null);
-          }}
-        />
-      ) : null}
-
-      <Dialog
-        aberto={excluindo !== null}
-        titulo="Excluir alteração salarial?"
-        descricao={
-          excluindo
-            ? `O período que começa em ${formatarDiaCivil(excluindo.vigenciaInicio)} sai da linha do tempo, e os demais se reorganizam.`
-            : ""
-        }
-        onFechar={() => setExcluindo(null)}
-        bloqueado={removendo}
-        rodape={
-          <FormActions>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setExcluindo(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              className="ficha-ref__botao-perigo"
-              disabled={removendo}
-              onClick={() => void excluir()}
-            >
-              Excluir
-            </Button>
-          </FormActions>
-        }
-      >
-        {erroAoRemover ? (
-          <p className="salarios__erro" role="alert">
-            {erroAoRemover}
-          </p>
-        ) : (
-          <p className="ficha-ref__janela-texto">
-            O registro fica guardado no histórico de auditoria.
-          </p>
-        )}
-      </Dialog>
-    </div>
+        <Dialog
+          aberto={excluindo !== null}
+          titulo="Excluir alteração salarial?"
+          descricao={
+            excluindo
+              ? `O período que começa em ${formatarDiaCivil(excluindo.vigenciaInicio)} sai da linha do tempo, e os demais se reorganizam.`
+              : ""
+          }
+          onFechar={() => setExcluindo(null)}
+          bloqueado={removendo}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setExcluindo(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="ficha-ref__botao-perigo"
+                disabled={removendo}
+                onClick={() => void excluir()}
+              >
+                Excluir
+              </Button>
+            </FormActions>
+          }
+        >
+          {erroAoRemover ? (
+            <p className="salarios__erro" role="alert">
+              {erroAoRemover}
+            </p>
+          ) : (
+            <p className="ficha-ref__janela-texto">
+              O registro fica guardado no histórico de auditoria.
+            </p>
+          )}
+        </Dialog>
+      </div>
+    </Revelar>
   );
 }
 
@@ -358,7 +393,11 @@ function SalarioAtual({
         <div className="salarios__atual-valores">
           <p className="salarios__valor">
             <span className="salarios__moeda">R$</span>
-            <span className="salarios__numero">{formatarReais(bruto)}</span>
+            <NumeroSuave
+              className="salarios__numero"
+              valor={bruto}
+              formatar={formatarReais}
+            />
             <span className="salarios__periodo">/mês</span>
           </p>
           <p className="salarios__origem">
@@ -556,7 +595,9 @@ function Resumo({
         </div>
         <div className="salarios__resumo-item">
           <dt>Reajustes</dt>
-          <dd>{resumo.reajustes}</dd>
+          <dd>
+            <NumeroSuave valor={resumo.reajustes} />
+          </dd>
         </div>
         <div className="salarios__resumo-item">
           <dt>Tempo no salário atual</dt>
