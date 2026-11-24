@@ -1269,7 +1269,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
     });
 
     it.each([
-      ["períodos", { periodos: [] }],
+      ["períodos vazios", { periodos: [] }],
       ["empresa", { empresaId: "11111111-1111-4111-8111-111111111111" }],
       ["corpo vazio", {}],
       ["nome só com espaços", { nome: "   " }],
@@ -2545,10 +2545,32 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       await patch(`/v1/horarios/${r.body.id}`, dpA)
         .send({ cor: "roxo" })
         .expect(403);
-      // Os períodos seguem imutáveis.
+      // T215 — os horários também mudam (modo, períodos e intervalo).
+      const h = await patch(`/v1/horarios/${r.body.id}`, rhA)
+        .send({
+          modo: "por_dia",
+          intervaloMinutos: 0,
+          periodos: [
+            { dia: "terca", inicio: "07:00", fim: "11:00" },
+            { dia: "terca", inicio: "12:00", fim: "16:00" },
+          ],
+        })
+        .expect(200);
+      expect(h.body).toMatchObject({
+        modo: "por_dia",
+        intervaloMinutos: 0,
+        periodos: [
+          { dia: "terca", inicio: "07:00", fim: "11:00" },
+          { dia: "terca", inicio: "12:00", fim: "16:00" },
+        ],
+      });
+      // Mesmo horário só com os períodos de segunda.
       await patch(`/v1/horarios/${r.body.id}`, rhA)
+        .send({ modo: "mesmo_horario" })
+        .expect(422);
+      await patch(`/v1/horarios/${r.body.id}`, dpA)
         .send({ periodos: UM_PERIODO })
-        .expect(400);
+        .expect(403);
     });
   });
 });

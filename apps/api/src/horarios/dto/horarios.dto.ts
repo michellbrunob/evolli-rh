@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -166,6 +167,27 @@ export class EditarTabelaHorarioDto extends CamposDeTurno {
   @MinLength(1)
   @MaxLength(120)
   nome?: string;
+
+  /**
+   * T215 — os horários do turno também mudam (como no quadro da referência):
+   * valem para o rascunho a partir de hoje; o que já foi publicado guarda o
+   * próprio horário. Com eles, ao menos um período.
+   */
+  @ValidateIf((_, valor) => valor !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => PeriodoHorarioInputDto)
+  periodos?: PeriodoHorarioInputDto[];
+
+  @IsOptional()
+  @IsIn(MODOS_DE_TURNO)
+  modo?: (typeof MODOS_DE_TURNO)[number];
+
+  @IsOptional()
+  @IsIn(INTERVALOS_DE_TURNO)
+  intervaloMinutos?: number;
 }
 
 /** Vincula uma tabela a um colaborador com vigência (início e fim opcional). */

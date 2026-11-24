@@ -11,8 +11,8 @@
  *   da CLT); marcação e cobertura (tolerância e mínimo por dia).
  *
  * Os turnos são as jornadas da empresa. Só o RH cria, edita, arquiva e
- * reativa; DP e master consultam. Os horários de um turno não mudam depois
- * de criado (para outro horário, Duplicar).
+ * reativa; DP e master consultam. Mudar o horário vale para o rascunho a
+ * partir de hoje; o que já foi publicado não muda.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -557,7 +557,11 @@ function FormularioDeTurno({
   const [enviando, setEnviando] = useState(false);
   const focoRef = useRef<string | null>(null);
 
-  const horariosFixos = editando !== null;
+  const horariosMudaram =
+    modo !== horarios.modo ||
+    intervalo !== horarios.intervalo ||
+    JSON.stringify(todoDia) !== JSON.stringify(horarios.todoDia) ||
+    JSON.stringify([...porDia]) !== JSON.stringify([...horarios.porDia]);
   const siglaEfetiva = (siglaTocada ? sigla : siglaDoNome(nome)).toUpperCase();
   const alterado =
     nome !== inicial.nome ||
@@ -566,11 +570,7 @@ function FormularioDeTurno({
     (siglaTocada && sigla !== inicial.sigla) ||
     tolerancia !== inicial.tolerancia ||
     minimo !== inicial.minimo ||
-    (!horariosFixos &&
-      (modo !== horarios.modo ||
-        intervalo !== horarios.intervalo ||
-        JSON.stringify(todoDia) !== JSON.stringify(horarios.todoDia) ||
-        JSON.stringify([...porDia]) !== JSON.stringify([...horarios.porDia])));
+    horariosMudaram;
 
   useEdicaoEmAndamento("Turnos", {
     pendente: alterado,
@@ -610,7 +610,7 @@ function FormularioDeTurno({
     if (!/^[A-Za-zÀ-ÿ0-9]{1,2}$/.test(siglaEfetiva)) {
       e.sigla = "Use 1 ou 2 letras.";
     }
-    if (!horariosFixos) {
+    {
       const todos = modo === "mesmo_horario" ? [todoDia] : [...porDia.values()];
       if (todos.every((l) => l.length === 0)) {
         e.horarios = "Marque ao menos um dia de trabalho.";
@@ -647,20 +647,26 @@ function FormularioDeTurno({
       toleranciaMinutos: tolerancia === "" ? null : Number(tolerancia),
       minimoPorDia: minimo === "" ? null : Number(minimo),
     };
+    const periodos =
+      modo === "mesmo_horario"
+        ? todoDia.map((p) => ({ dia: "segunda" as DiaSemana, ...p }))
+        : DIAS.flatMap((d) =>
+            (porDia.get(d.dia) ?? []).map((p) => ({
+              dia: d.dia as DiaSemana,
+              ...p,
+            })),
+          );
     try {
       if (editando) {
-        await servico.editar(editando.id, { nome: nome.trim(), ...comuns });
+        await servico.editar(editando.id, {
+          nome: nome.trim(),
+          ...comuns,
+          ...(horariosMudaram
+            ? { periodos, modo, intervaloMinutos: intervalo }
+            : {}),
+        });
         onGravado(`Turno ${nome.trim()} salvo.`);
       } else {
-        const periodos =
-          modo === "mesmo_horario"
-            ? todoDia.map((p) => ({ dia: "segunda" as DiaSemana, ...p }))
-            : DIAS.flatMap((d) =>
-                (porDia.get(d.dia) ?? []).map((p) => ({
-                  dia: d.dia as DiaSemana,
-                  ...p,
-                })),
-              );
         await servico.criar({
           nome: nome.trim(),
           periodos,
@@ -861,12 +867,6 @@ function FormularioDeTurno({
           <p className="turno-form__ajuda">
             Cada dia pode ter até 3 períodos. A pausa entre eles é calculada.
           </p>
-          {horariosFixos ? (
-            <p className="turno-form__nota">
-              Os horários de um turno não mudam depois de criado: o que já foi
-              escalado continua com eles. Para outro horário, use Duplicar.
-            </p>
-          ) : null}
           <div
             className="turno-form__abas"
             role="tablist"
@@ -884,7 +884,7 @@ function FormularioDeTurno({
                 role="tab"
                 aria-selected={modo === valor}
                 className="turno-form__aba"
-                disabled={horariosFixos || enviando}
+                disabled={enviando}
                 onClick={() => setModo(valor)}
               >
                 {rotulo}
@@ -910,7 +910,7 @@ function FormularioDeTurno({
                 rotulo="Todo dia de trabalho"
                 periodos={todoDia}
                 intervalo={intervalo}
-                desabilitado={horariosFixos || enviando}
+                desabilitado={enviando}
                 onMudar={setTodoDia}
               />
             ) : (
@@ -920,7 +920,7 @@ function FormularioDeTurno({
                   rotulo={d.nome}
                   periodos={porDia.get(d.dia) ?? []}
                   intervalo={intervalo}
-                  desabilitado={horariosFixos || enviando}
+                  desabilitado={enviando}
                   comLiga
                   onMudar={(lista) =>
                     setPorDia((atual) => new Map(atual).set(d.dia, lista))
@@ -940,7 +940,7 @@ function FormularioDeTurno({
             <select
               id={`${base}-intervalo`}
               value={intervalo}
-              disabled={horariosFixos || enviando}
+              disabled={enviando}
               onChange={(e) => setIntervalo(Number(e.target.value))}
             >
               {INTERVALOS.map((i) => (
@@ -1031,8 +1031,8 @@ function FormularioDeTurno({
 
         <footer className="turno-form__rodape">
           <p className="turno-form__ajuda">
-            {uso > 0 && editando
-              ? `Usado por ${rotuloDeUso(uso)}.`
+            {editando
+              ? "Mudar o horário vale para o rascunho a partir de hoje. O que já foi publicado não muda."
               : "Nenhuma pessoa usa este turno ainda."}
           </p>
           <div className="turno-form__botoes">

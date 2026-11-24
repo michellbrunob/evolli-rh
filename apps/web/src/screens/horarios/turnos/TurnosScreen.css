@@ -658,3 +658,46 @@
   color: var(--status-neutral-ink);
   font-size: var(--text-caption);
 }
+
+/* Campos do formulário: a mesma fonte, borda e altura dos demais
+   formulários (horas, números e datas incluídos). */
+.turno-form input:not([type="radio"]):not([type="checkbox"]),
+.turno-form select,
+.turnos__filtro select {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.turnos__filtro select {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+}
+
+.turno-form input::-webkit-datetime-edit,
+.turno-form input::-webkit-date-and-time-value {
+  font: inherit;
+}
+
+.turno-form input:not([type="radio"]):not([type="checkbox"]):focus-visible,
+.turno-form select:focus-visible,
+.turnos__filtro select:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.turno-form input:disabled,
+.turno-form select:disabled {
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+}
+
+.turno-form__periodo input {
+  width: 7.5rem;
+}

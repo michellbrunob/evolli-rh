@@ -222,6 +222,9 @@ export class TabelaHorarioService {
       "unidadeOrganizacionalId",
       "toleranciaMinutos",
       "minimoPorDia",
+      "periodos",
+      "modo",
+      "intervaloMinutos",
     ] as const;
     if (campos.every((c) => dto[c] === undefined)) {
       throw new BadRequestException();
@@ -274,7 +277,50 @@ export class TabelaHorarioService {
     ) {
       mudancas.minimoPorDia = dto.minimoPorDia;
     }
-    if (Object.keys(mudancas).length === 0) {
+    if (dto.modo !== undefined && dto.modo !== tabela.modo) {
+      mudancas.modo = dto.modo;
+    }
+    if (
+      dto.intervaloMinutos !== undefined &&
+      dto.intervaloMinutos !== tabela.intervaloMinutos
+    ) {
+      mudancas.intervaloMinutos = dto.intervaloMinutos;
+    }
+    // T215 — horários novos: validados como na criação, no modo final.
+    const novosPeriodos =
+      dto.periodos !== undefined
+        ? normalizarPeriodos(
+            dto.periodos.map((p) => ({
+              dia: p.dia,
+              inicio: p.inicio,
+              fim: p.fim,
+            })),
+          )
+        : null;
+    if (novosPeriodos !== null || mudancas.modo !== undefined) {
+      conferirPeriodosDoTurno(
+        novosPeriodos ??
+          tabela.periodos.map((p) => ({
+            diaSemana: p.diaSemana,
+            inicioMinuto: p.inicioMinuto,
+            fimMinuto: p.fimMinuto,
+          })),
+        dto.modo ?? tabela.modo,
+      );
+    }
+    const periodosMudaram =
+      novosPeriodos !== null &&
+      JSON.stringify(
+        novosPeriodos
+          .map((p) => [p.diaSemana, p.inicioMinuto, p.fimMinuto])
+          .sort(),
+      ) !==
+        JSON.stringify(
+          tabela.periodos
+            .map((p) => [p.diaSemana, p.inicioMinuto, p.fimMinuto])
+            .sort(),
+        );
+    if (Object.keys(mudancas).length === 0 && !periodosMudaram) {
       return this.projetar(tabela, tabela.periodos);
     }
 
@@ -287,6 +333,19 @@ export class TabelaHorarioService {
             mudancas.codigo,
             tabela.id,
           );
+        }
+        if (periodosMudaram && novosPeriodos !== null) {
+          await tx.periodoHorario.deleteMany({
+            where: { tabelaHorarioId: tabela.id },
+          });
+          await tx.periodoHorario.createMany({
+            data: novosPeriodos.map((p) => ({
+              tabelaHorarioId: tabela.id,
+              diaSemana: p.diaSemana,
+              inicioMinuto: p.inicioMinuto,
+              fimMinuto: p.fimMinuto,
+            })),
+          });
         }
         const tabelaAtualizada = await tx.tabelaHorario.update({
           where: { id: tabela.id },

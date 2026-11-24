@@ -333,7 +333,7 @@ describe("T215 — Turnos (tela)", () => {
     });
   });
 
-  it("editar: horários fixos, salva identificação e marcação", async () => {
+  it("editar: salva identificação e marcação sem reenviar horários iguais", async () => {
     const s = servico();
     render(<TurnosScreen podeOperar servico={s} />);
     fireEvent.keyDown(
@@ -346,14 +346,13 @@ describe("T215 — Turnos (tela)", () => {
       screen.getByText("Comercial · usado por 2 pessoas"),
     ).toBeInTheDocument();
     expect(
+      screen.getByText(
+        "Mudar o horário vale para o rascunho a partir de hoje. O que já foi publicado não muda.",
+      ),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("button", { name: "Salvar alterações" }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole("tab", { name: "Mesmo horário todo dia" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByText(/Os horários de um turno não mudam depois de criado/),
-    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "Laranja" }));
     fireEvent.change(
       screen.getByRole("spinbutton", { name: "Mínimo de pessoas por dia" }),
@@ -370,6 +369,31 @@ describe("T215 — Turnos (tela)", () => {
         minimoPorDia: 2,
       }),
     );
+  });
+
+  it("editar horário: envia os períodos, o modo e o intervalo novos", async () => {
+    const s = servico();
+    render(<TurnosScreen podeOperar servico={s} />);
+    fireEvent.keyDown(
+      await screen.findByRole("button", { name: "Ações do turno Comercial" }),
+      { key: "Enter" },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await screen.findByRole("heading", { name: "Editar turno" });
+    fireEvent.click(
+      screen.getByRole("tab", { name: "Mesmo horário todo dia" }),
+    );
+    fireEvent.change(
+      screen.getByLabelText("Todo dia de trabalho, 1º período: fim"),
+      { target: { value: "17:00" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(s.editar).toHaveBeenCalledTimes(1));
+    expect(s.editar.mock.calls[0]![1]).toMatchObject({
+      modo: "mesmo_horario",
+      intervaloMinutos: 60,
+      periodos: [{ dia: "segunda", inicio: "09:00", fim: "17:00" }],
+    });
   });
 
   it("CSS: tabela vira cartões em 375 px; só tokens", () => {
