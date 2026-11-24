@@ -111,29 +111,29 @@ describe("FechamentoEspelhoScreen (T079 — tela visual estática)", () => {
       dentroDoResumo.getByText("Pendências bloqueadoras"),
     ).toBeInTheDocument();
     expect(
-      dentroDoResumo.getByText("4 pendência(s) bloqueadora(s) (exemplo)"),
+      dentroDoResumo.getByText("4 pendências bloqueadoras (exemplo)"),
     ).toBeInTheDocument();
     expect(
       dentroDoResumo.getByText("Alertas informativos"),
     ).toBeInTheDocument();
     expect(
-      dentroDoResumo.getByText("5 alerta(s) informativo(s) (exemplo)"),
+      dentroDoResumo.getByText("5 alertas informativos (exemplo)"),
     ).toBeInTheDocument();
     expect(
       dentroDoResumo.getByText("Ajustes manuais em revisão"),
     ).toBeInTheDocument();
     expect(
-      dentroDoResumo.getByText("4 ajuste(s) manual(is) em revisão (exemplo)"),
+      dentroDoResumo.getByText("4 ajustes manuais em revisão (exemplo)"),
     ).toBeInTheDocument();
     expect(dentroDoResumo.getByText("Validação do gestor")).toBeInTheDocument();
     expect(
       dentroDoResumo.getByText(
-        "5 validação(ões)/recomendação(ões) de gestor (exemplo)",
+        "5 validações ou recomendações de gestor (exemplo)",
       ),
     ).toBeInTheDocument();
     expect(dentroDoResumo.getByText("Situação do espelho")).toBeInTheDocument();
     expect(
-      dentroDoResumo.getByText("2 espelho(s) disponibilizado(s) (exemplo)"),
+      dentroDoResumo.getByText("2 espelhos disponibilizados (exemplo)"),
     ).toBeInTheDocument();
     expect(
       dentroDoResumo.getByText(
@@ -162,11 +162,9 @@ describe("FechamentoEspelhoScreen (T079 — tela visual estática)", () => {
       dentroDaLinha.getByText("Aguardando validação (exemplo)"),
     ).toBeInTheDocument();
     expect(
-      dentroDaLinha.getByText("1 pendência(s) (exemplo)"),
+      dentroDaLinha.getByText("1 pendência (exemplo)"),
     ).toBeInTheDocument();
-    expect(
-      dentroDaLinha.getByText("1 alerta(s) (exemplo)"),
-    ).toBeInTheDocument();
+    expect(dentroDaLinha.getByText("1 alerta (exemplo)")).toBeInTheDocument();
     expect(
       dentroDaLinha.getByText("RT-Fechamento-03 (exemplo)"),
     ).toBeInTheDocument();

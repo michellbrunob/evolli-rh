@@ -217,6 +217,7 @@ import { novaChaveDeEnvio } from "./documentos/documentosDoColaborador";
 import "./NovaAdmissaoScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
+import { plural } from "../../format/plural";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
 
@@ -4135,7 +4136,7 @@ function ConfirmacaoDaAdmissao({
               [
                 "Jornada de trabalho",
                 admissao.contrato.jornadaSemanalHoras
-                  ? `${admissao.contrato.jornadaSemanalHoras} horas por semana`
+                  ? `${plural(admissao.contrato.jornadaSemanalHoras, "hora", "horas")} por semana`
                   : null,
               ],
               [

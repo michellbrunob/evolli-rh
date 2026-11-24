@@ -119,6 +119,7 @@ import type {
   ServicoDeAusencias,
 } from "./ferias/tiposAusencia";
 import { FotoDoColaborador } from "./FotoDoColaborador";
+import { plural } from "../../format/plural";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
@@ -2235,7 +2236,9 @@ export function ColaboradoresScreen({
             {empresaAtiva ? empresaAtiva.nome : "Seu escopo"} —{" "}
             {ROTULO_DA_ABA[aba]}
             {buscaAplicada ? ` · busca “${buscaAplicada}”` : ""}
-            {quantosFiltros > 0 ? ` · ${quantosFiltros} filtro(s)` : ""}
+            {quantosFiltros > 0
+              ? ` · ${plural(quantosFiltros, "filtro", "filtros")}`
+              : ""}
           </p>
           <table>
             <thead>

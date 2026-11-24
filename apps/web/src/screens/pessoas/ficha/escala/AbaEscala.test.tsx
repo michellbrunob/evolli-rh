@@ -732,4 +732,11 @@ describe("T215 — legenda dos feriados no plural certo", () => {
     await waitFor(() => expect(legenda()).toHaveTextContent("1 feriado"));
     expect(legenda()).not.toHaveTextContent("1 feriados");
   });
+
+  it('um só dia de trabalho no mês: "1 dia de trabalho"', async () => {
+    montar(servicoCom([escala("e1", "5x2", "2026-11-30", null)]));
+    expect(
+      await screen.findByText(/^1 dia de trabalho · /),
+    ).toBeInTheDocument();
+  });
 });

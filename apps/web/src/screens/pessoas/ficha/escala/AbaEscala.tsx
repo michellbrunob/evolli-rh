@@ -78,6 +78,7 @@ import {
 import { formatarDuracao, gradeDaSemana } from "./resumoDaEscala";
 import { SeletorRico, type GrupoRico } from "./SeletorRico";
 import "./AbaEscala.css";
+import { plural } from "../../../../format/plural";
 
 /** As operações da aba (o servidor, ou um dublê nos testes). */
 export interface ServicoDeEscala {
@@ -646,10 +647,10 @@ function Resumo({
       },
     ],
     [
-      `${beneficio} dias`,
+      plural(beneficio, "dia", "dias"),
       `de benefício em ${mesCurto(base)}`,
       {
-        titulo: `${beneficio} dias de benefício em ${NOMES_DOS_MESES[Number(base.slice(5, 7)) - 1]}`,
+        titulo: `${plural(beneficio, "dia", "dias")} de benefício em ${NOMES_DOS_MESES[Number(base.slice(5, 7)) - 1]}`,
         texto: beneficioPelosDiasUteis(e.modelo)
           ? "Pelos dias úteis do mês (sem escala no catálogo)."
           : `Pelo catálogo (${nomeDoModelo}).`,
@@ -843,7 +844,7 @@ function CalendarioDoMes({
     <Cartao
       icone={<IconeCalendario tamanho={18} />}
       titulo={titulo}
-      subtitulo={`${trabalhados} dias de trabalho · ${formatarHoras(minutos)} previstas · ainda não publicada`}
+      subtitulo={`${plural(trabalhados, "dia", "dias")} de trabalho · ${formatarHoras(minutos)} ${minutos === 60 ? "prevista" : "previstas"} · ainda não publicada`}
       acoes={
         <div className="escala-ficha__navegar">
           <button
@@ -1385,8 +1386,8 @@ function GavetaDoPadrao({
     ],
     [
       `Benefício em ${mesCurto(dataBase)}`,
-      `${diasNoMes(modeloAntes, mesDe(dataBase))} dias`,
-      `${diasNoMes(modelo, mesDe(dataBase))} dias`,
+      plural(diasNoMes(modeloAntes, mesDe(dataBase)), "dia", "dias"),
+      plural(diasNoMes(modelo, mesDe(dataBase)), "dia", "dias"),
     ],
   ];
   // Como na referência: a escala sai do quadro quando não muda.

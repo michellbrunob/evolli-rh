@@ -112,6 +112,7 @@ import {
   IconePortal,
 } from "./iconesDaFicha";
 import "./FichaDoColaborador.css";
+import { plural } from "../../../format/plural";
 
 export const FICHA_DO_COLABORADOR_TITULO_ID = "ficha-do-colaborador-titulo";
 
@@ -900,7 +901,11 @@ export function FichaDoColaborador({
                     <>
                       {formatarDiaCivil(perfil.dataNascimento)}
                       <span className="ficha-ref__detalhe">
-                        {`${idade(perfil.dataNascimento, hoje)} anos`}
+                        {plural(
+                          idade(perfil.dataNascimento, hoje),
+                          "ano",
+                          "anos",
+                        )}
                       </span>
                     </>
                   ) : (

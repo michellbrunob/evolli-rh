@@ -29,6 +29,7 @@ import {
   TIPO_NA_FRASE,
 } from "./tiposAusencia";
 import "./FeriasEAusencias.css";
+import { plural } from "../../../format/plural";
 
 function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? nome;
@@ -550,7 +551,7 @@ export function RegistrarAusenciaGaveta({
               <p className="ausencias-gaveta__ajuda">
                 {`Volta ao trabalho em ${formatarDiaCivil(simulacao.volta ?? "")}${
                   ferias && simulacao.saldoDepois !== null
-                    ? ` · restam ${simulacao.saldoDepois} dias de saldo`
+                    ? ` · ${simulacao.saldoDepois === 1 ? "resta" : "restam"} ${plural(simulacao.saldoDepois, "dia", "dias")} de saldo`
                     : ""
                 }`}
               </p>
