@@ -39,23 +39,6 @@ export function resolverEscopoHorarios(actor: AccessUser): EscopoHorarios {
 }
 
 /**
- * T215 — escopo de mutação do **vínculo** de horário (a escala do
- * colaborador): RH e DP, só na própria empresa. O catálogo de jornadas
- * (`tabela_horario`) continua com `resolverEscopoHorarios` (só RH).
- */
-export function resolverEscopoVinculoHorario(
-  actor: AccessUser,
-): EscopoHorarios {
-  if (actor.role !== "rh" && actor.role !== "dp") {
-    throw new ForbiddenException();
-  }
-  if (actor.companyId === null) {
-    throw new ForbiddenException();
-  }
-  return { empresaId: actor.companyId };
-}
-
-/**
  * Escopo de **LEITURA** de horários. Variante global exclusiva do
  * `master_tecnico` (T030); RH continua preso à própria empresa. A leitura é
  * auditada por si (`horarios.consultado`), inclusive a global do Master.

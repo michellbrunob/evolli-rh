@@ -188,48 +188,9 @@ describe("evaluateHorarios — matriz de Cadastros/Horarios (T038)", () => {
     });
 
     // T183 — o DP também CONSULTA os vínculos de horário (a jornada de cada
-    // colaborador e o histórico) da própria empresa. T215 — e, na aba Escala
-    // da ficha, atribui, troca e encerra (`create`/`alter`), só na própria
-    // empresa. O catálogo de jornadas (`tabela_horario`) segue só do RH.
-    it("T215: atribui (create) e encerra (alter) vinculo_horario so na propria empresa", () => {
-      for (const acao of ["create", "alter"] as const) {
-        expect(
-          evaluatePermission(sujeito("dp"), {
-            resource: "vinculo_horario",
-            action: acao,
-          }),
-        ).toBe(true);
-        expect(
-          evaluatePermission(sujeito("dp"), {
-            resource: "vinculo_horario",
-            action: acao,
-            targetCompanyId: EMPRESA_A,
-          }),
-        ).toBe(true);
-        expect(
-          evaluatePermission(sujeito("dp"), {
-            resource: "vinculo_horario",
-            action: acao,
-            targetCompanyId: "99999999-9999-4999-8999-999999999999",
-          }),
-        ).toBe(false);
-        expect(
-          evaluatePermission(
-            { userId: "u-dp", role: "dp", companyId: null },
-            { resource: "vinculo_horario", action: acao },
-          ),
-        ).toBe(false);
-      }
-      expect(
-        evaluatePermission(sujeito("dp"), {
-          resource: "vinculo_horario",
-          action: "manage",
-          targetCompanyId: EMPRESA_A,
-        }),
-      ).toBe(false);
-    });
-
-    it("consulta vinculo_horario so na propria empresa", () => {
+    // colaborador e o histórico) da própria empresa; não atribui, não troca,
+    // não encerra.
+    it("consulta vinculo_horario so na propria empresa, e nao o altera", () => {
       expect(
         evaluatePermission(sujeito("dp"), {
           resource: "vinculo_horario",
@@ -250,6 +211,15 @@ describe("evaluateHorarios — matriz de Cadastros/Horarios (T038)", () => {
           targetCompanyId: "99999999-9999-4999-8999-999999999999",
         }),
       ).toBe(false);
+      for (const acao of ACOES.filter((a) => a !== "read")) {
+        expect(
+          evaluatePermission(sujeito("dp"), {
+            resource: "vinculo_horario",
+            action: acao,
+            targetCompanyId: EMPRESA_A,
+          }),
+        ).toBe(false);
+      }
     });
 
     for (const recurso of HORARIOS_RESOURCES.filter(

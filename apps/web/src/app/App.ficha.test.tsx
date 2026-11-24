@@ -600,27 +600,8 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
       await esperarFicha(ana.nome);
       const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
       await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
-      // T215 — RH e DP alteram e encerram a escala na própria empresa.
-      expect(
-        within(ficha).getByRole("button", { name: "Alterar escala" }),
-      ).toBeInTheDocument();
-      expect(
-        within(ficha).getByRole("button", { name: "Encerrar escala" }),
-      ).toBeInTheDocument();
       unmount();
     }
-    // T215 — o master só consulta a escala.
-    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
-    render(<App papelDoAtor="master_tecnico" />);
-    await esperarFicha(ana.nome);
-    const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
-    await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
-    expect(
-      within(ficha).queryByRole("button", {
-        name: /Alterar escala|Encerrar escala|Definir escala/,
-      }),
-    ).toBeNull();
-    expect(ficha).toHaveTextContent("Somente consulta");
   });
 
   it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(

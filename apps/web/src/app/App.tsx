@@ -165,7 +165,6 @@ import {
   podeLerSolicitacoesPessoas,
   podeOperarEstrutura,
   podeOperarJornadas,
-  podeOperarEscala,
 } from "./mapaNavegacao";
 import {
   type AbaDaFicha,
@@ -632,9 +631,6 @@ function conteudoDoDestino(
         podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
         // T183 — atribuir, trocar e encerrar jornada é só do RH.
         podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
-        // T215 — a escala (aba da ficha) é de RH e DP.
-        podeOperarEscala={podeOperarEscala(admissao.papelDoAtor)}
-        onAbrirJornadas={() => onNavegar("jornadas-trabalho")}
         // T203 — a aba Solicitações só existe para quem a lê (não o DP).
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
         // T215 — a aba Organograma da listagem abre a estrutura.

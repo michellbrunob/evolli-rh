@@ -21,8 +21,7 @@ provado por teste; o que depende de decisão fica listado como pendente.
 | Ficha nova com a aba Dados                           | `04239be`                                  |
 | Auditoria da lista: um evento por consulta           | `204633a`                                  |
 | Aba Salários e salário obrigatório na admissão       | `cdfa0ff`, `08198fc`, `26431f4`, `786ca7a` |
-| Aba Férias e ausências da ficha                      | `cc3456f`, `3e775e0`, `0fa8831`            |
-| Aba Escala da ficha                                  | esta fatia                                 |
+| Aba Férias e ausências da ficha                      | esta fatia                                 |
 
 ## Aba Férias e ausências da ficha (24/11/2026)
 
@@ -90,56 +89,3 @@ cálculo** — a tela diz isso no histórico.
 
 Portal do colaborador, fluxo do gestor, férias coletivas, políticas de férias, mudança
 automática de status e o calendário de feriados móveis e regionais.
-
-## Aba Escala da ficha (24/11/2026)
-
-### Permissões
-
-- **RH e DP** definem, alteram e encerram a escala (o vínculo de horário) na empresa ativa
-  (`vinculo_horario` `create`/`alter` no avaliador; `resolverEscopoVinculoHorario` no
-  serviço). Antes, o DP só consultava (decisão de 26/10/2026, revista nesta fatia).
-- O catálogo de jornadas (`tabela_horario`: criar, editar, inativar, reativar) segue **só do
-  RH**. A aba leva a Jornadas de trabalho para criar ou ajustar uma jornada.
-- `master_tecnico` só consulta; gestor, colaborador, financeiro, auditor e DPO não atribuem nem
-  encerram (a ficha nem é montada para eles). Outra empresa: 404, com a negação na trilha.
-- Efeito colateral coerente: a Nova admissão aceita jornada também quando o DP admite (a mesma
-  permissão). A tela da Nova admissão não mudou nesta fatia.
-
-### Regras
-
-- A vigência é `[início, fim)`: a tela pergunta o último dia e envia o seguinte.
-- Definir e alterar são uma operação só (`POST /v1/horarios/vinculos/atribuicoes`): com escala
-  aberta, ela termina no novo início e a nova começa ali, numa transação.
-- **Nova:** a escala não começa antes da admissão (422 `vigenciaInicio`/`antes_da_admissao`,
-  sem o valor). Vale só para a atribuição; o cadastro direto de vínculo (Horário de trabalho,
-  T038) ficou como estava.
-- Sobreposição: o banco recusa (EXCLUSION + índice da vigência aberta → 409 `sobreposta`); a
-  troca precisa começar depois do início da atual e trocar de jornada (422). Na tela, a data
-  padrão é o primeiro dia livre depois das escalas já encerradas, e a validação local avisa
-  antes de enviar.
-- A trilha registra só ids (`horarios_vinculo_criado`/`encerrado`); a leitura do histórico é
-  auditada como antes.
-
-### Tela
-
-- Vazio: título, explicação, "Ver jornadas de trabalho" e "Definir escala" (quem opera).
-- Escala atual: jornada, situação, carga semanal, dias de trabalho, horário, intervalo, vale
-  desde e término; a programada aparece à parte; sem vigente hoje, a tela diz isso.
-- Semana de trabalho: os 7 dias com os períodos ou "Folga" e o total do dia.
-- Histórico de escalas: da mais nova à mais antiga, com Vigente, Programada, Encerrada e
-  "Jornada inativa".
-- Gaveta "Definir/Alterar escala": jornada (só ativas, com a carga semanal), "Vale a partir de"
-  e o quadro "O que muda" (antes → depois). Gaveta "Encerrar escala": último dia.
-- Foco: abre no título da gaveta, volta a quem abriu; depois de gravar, vai ao título do cartão.
-  Escape fecha (com confirmação se algo foi preenchido). Coluna única em 375 px, sem rolagem
-  horizontal.
-- O resumo vem da grade da jornada, que agora acompanha cada vínculo (`tabela.periodos`).
-
-### Limites e fora de escopo
-
-- Sem modelos de escala por ciclo (12x36, revezamentos, embarque), turno noturno, início de
-  ciclo, quadro mensal coletivo, publicação, efeito em benefícios, ponto, banco de horas, troca
-  de turno pelo colaborador, aprovação do gestor, notificações e adicionais.
-- O cabeçalho da ficha (Carga horária) continua lendo o contrato, não a escala.
-- A grade mostrada é a da jornada hoje: se a jornada for editada, o histórico mostra a grade
-  nova (as jornadas não guardam versões).
