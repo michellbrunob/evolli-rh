@@ -48,7 +48,7 @@ export class AnexoAusenciaController {
 
   @Post()
   @UseGuards(CsrfGuard, AuthorizationGuard)
-  @RequirePermission("ausencia", "alter")
+  @RequirePermission("anexo_ausencia", "create")
   @Header("Cache-Control", "no-store")
   @ApiOperation({ summary: "Anexa atestado ou documento a uma ausencia" })
   async enviar(
@@ -77,7 +77,7 @@ export class AnexoAusenciaController {
 
   @Get("arquivo")
   @UseGuards(AuthorizationGuard)
-  @RequirePermission("ausencia", "read")
+  @RequirePermission("anexo_ausencia", "read")
   @ApiOperation({ summary: "Baixa o anexo da ausencia (privado)" })
   async baixar(
     @Param("ausenciaId", ParseUUIDPipe) ausenciaId: string,
@@ -104,7 +104,7 @@ export class AnexoAusenciaController {
   @Delete()
   @HttpCode(200)
   @UseGuards(CsrfGuard, AuthorizationGuard)
-  @RequirePermission("ausencia", "alter")
+  @RequirePermission("anexo_ausencia", "alter")
   @Header("Cache-Control", "no-store")
   @ApiOperation({ summary: "Remove (logicamente) o anexo da ausencia" })
   async remover(

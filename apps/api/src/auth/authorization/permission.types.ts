@@ -164,7 +164,9 @@ export type ContratoResource = (typeof CONTRATO_RESOURCES)[number];
  * só lê, com empresa ativa; os demais papéis são negados (gestor e portal
  * entram numa fatia futura).
  */
-export const AUSENCIA_RESOURCES = ["ausencia"] as const;
+// T215 — `anexo_ausencia`: o arquivo (atestado ou documento) da ausência,
+// com a proteção reforçada dos documentos sensíveis (só RH e DP).
+export const AUSENCIA_RESOURCES = ["ausencia", "anexo_ausencia"] as const;
 
 export type AusenciaResource = (typeof AUSENCIA_RESOURCES)[number];
 

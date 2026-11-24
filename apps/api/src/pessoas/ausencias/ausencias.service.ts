@@ -251,7 +251,7 @@ export class AusenciasService {
       linhas.map((l) => l.colaboradorId),
     );
     return {
-      itens: linhas.map((l) => paraApi(l, fotos)),
+      itens: linhas.map((l) => paraApi(l, fotos, veAnexo(ctx))),
       pagina: query.pagina,
       tamanhoPagina: query.tamanhoPagina,
       total,
@@ -417,7 +417,7 @@ export class AusenciasService {
       return criada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
-    return paraApi(linha, fotos);
+    return paraApi(linha, fotos, veAnexo(ctx));
   }
 
   // ---- decisões ------------------------------------------------------------
@@ -470,7 +470,7 @@ export class AusenciasService {
       return atualizada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
-    return paraApi(linha, fotos);
+    return paraApi(linha, fotos, veAnexo(ctx));
   }
 
   // ---- simulação -----------------------------------------------------------
@@ -603,8 +603,8 @@ export class AusenciasService {
       },
       periodos,
       periodoAtual,
-      proximaAusencia: proxima ? paraApi(proxima, fotos) : null,
-      historico: linhas.map((l) => paraApi(l, fotos)),
+      proximaAusencia: proxima ? paraApi(proxima, fotos, veAnexo(ctx)) : null,
+      historico: linhas.map((l) => paraApi(l, fotos, veAnexo(ctx))),
     };
   }
 
@@ -779,9 +779,18 @@ export function validarForma(dto: RegistrarAusenciaDto): ErroDeCampo[] {
   return erros;
 }
 
+/**
+ * T215 — o anexo (atestado) só aparece para quem pode baixá-lo: `rh` e `dp`.
+ * O `master_tecnico` vê o registro e o estado da ausência, sem o anexo.
+ */
+function veAnexo(ctx: PessoasAuditContext): boolean {
+  return ctx.actor.role === "rh" || ctx.actor.role === "dp";
+}
+
 function paraApi(
   linha: LinhaDeAusencia,
   fotos: Map<string, { versao: number }>,
+  comAnexo: boolean,
 ): AusenciaApi {
   const inicio = diaDe(linha.inicio);
   const fim = linha.fim ? diaDe(linha.fim) : null;
@@ -810,12 +819,13 @@ function paraApi(
     observacao: linha.observacao,
     registradoEm: linha.criadoEm.toISOString(),
     decididoEm: linha.decididoEm ? linha.decididoEm.toISOString() : null,
-    anexo: linha.anexos[0]
-      ? {
-          formato: linha.anexos[0].formato,
-          tamanhoBytes: linha.anexos[0].tamanhoBytes,
-          enviadoEm: linha.anexos[0].criadoEm.toISOString(),
-        }
-      : null,
+    anexo:
+      comAnexo && linha.anexos[0]
+        ? {
+            formato: linha.anexos[0].formato,
+            tamanhoBytes: linha.anexos[0].tamanhoBytes,
+            enviadoEm: linha.anexos[0].criadoEm.toISOString(),
+          }
+        : null,
   };
 }

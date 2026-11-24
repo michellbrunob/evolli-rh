@@ -820,6 +820,8 @@ function evaluateAusencia(
 
   switch (subject.role) {
     case "master_tecnico":
+      // O arquivo anexado (atestado) nunca: o master vê só o registro.
+      if (target.resource === "anexo_ausencia") return false;
       if (target.action !== "read" || subject.companyId === null) {
         return false;
       }

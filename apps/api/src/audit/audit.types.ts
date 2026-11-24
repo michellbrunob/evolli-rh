@@ -322,7 +322,10 @@ export type AuditResource =
   | "ausencia"
   // T215 — Salários: o `resourceId` é o id da ALTERAÇÃO salarial. Nunca
   // valor, cargo ou modelo de contrato.
-  | "alteracao_salarial";
+  | "alteracao_salarial"
+  // T215 — o arquivo anexado à ausência (negações do guard). O `resourceId` é
+  // o id da ausência.
+  | "anexo_ausencia";
 
 export type RecordAuditEventInput =
   | {

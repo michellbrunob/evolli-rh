@@ -82,7 +82,7 @@ export class AnexoAusenciaService {
     arquivo: ArquivoDoAnexo,
     ctx: PessoasAuditContext,
   ): Promise<{ anexo: AnexoDaAusenciaApi }> {
-    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const empresaId = this.empresaDaSessao(ctx);
     const ausencia = await this.ausenciaDaEmpresa(ausenciaId, empresaId, ctx);
     if (STATUS_ENCERRADOS.has(ausencia.status)) throw new ConflictException();
 
@@ -176,7 +176,7 @@ export class AnexoAusenciaService {
     ausenciaId: string,
     ctx: PessoasAuditContext,
   ): Promise<AnexoBaixado> {
-    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const empresaId = this.empresaDaSessao(ctx);
     await this.ausenciaDaEmpresa(ausenciaId, empresaId, ctx);
     const anexo = await this.anexoVivo(ausenciaId);
     if (!anexo) throw new NotFoundException();
@@ -206,7 +206,7 @@ export class AnexoAusenciaService {
     ausenciaId: string,
     ctx: PessoasAuditContext,
   ): Promise<{ anexo: null }> {
-    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const empresaId = this.empresaDaSessao(ctx);
     await this.ausenciaDaEmpresa(ausenciaId, empresaId, ctx);
     const anexo = await this.anexoVivo(ausenciaId);
     if (!anexo) throw new NotFoundException();
@@ -250,17 +250,14 @@ export class AnexoAusenciaService {
     return ausencia;
   }
 
-  /** Escrita: `rh` e `dp`. Leitura: também o `master_tecnico` com empresa. */
-  private empresaDaSessao(
-    ctx: PessoasAuditContext,
-    uso: "leitura" | "escrita",
-  ): string {
+  /**
+   * Só `rh` e `dp`, na empresa ativa, leem e gravam o arquivo — nem o
+   * `master_tecnico` (proteção reforçada dos documentos sensíveis). Defesa
+   * em profundidade: o guard (`anexo_ausencia`) já nega os demais.
+   */
+  private empresaDaSessao(ctx: PessoasAuditContext): string {
     const papel = ctx.actor.role;
-    const permitido =
-      papel === "rh" ||
-      papel === "dp" ||
-      (papel === "master_tecnico" && uso === "leitura");
-    if (!permitido || ctx.actor.companyId === null) {
+    if ((papel !== "rh" && papel !== "dp") || ctx.actor.companyId === null) {
       throw new ForbiddenException();
     }
     return ctx.actor.companyId;

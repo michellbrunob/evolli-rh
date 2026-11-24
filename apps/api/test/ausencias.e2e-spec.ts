@@ -154,6 +154,25 @@ describe("T215 — Férias e ausências (e2e)", () => {
     return login(email);
   }
 
+  async function criarUsuarioDireto(
+    email: string,
+    role: string,
+    companyId: string,
+  ): Promise<Credencial> {
+    const { PasswordHashService } =
+      await import("../src/auth/password/password-hash.service");
+    await prisma.accessUser.create({
+      data: {
+        email,
+        passwordHash: await new PasswordHashService().hash(SENHA_PADRAO),
+        role: role as never,
+        companyId,
+        status: "active",
+      },
+    });
+    return login(email);
+  }
+
   async function criarMaster(email: string): Promise<Credencial> {
     const { PasswordHashService } =
       await import("../src/auth/password/password-hash.service");
@@ -280,10 +299,18 @@ describe("T215 — Férias e ausências (e2e)", () => {
     rhA = await criarUsuario("rh.ausa@example.test", "rh", empresaA);
     dpA = await criarUsuario("dp.ausa@example.test", "dp", empresaA);
     rhB = await criarUsuario("rh.ausb@example.test", "rh", empresaB);
-    for (const papel of ["gestor", "financeiro", "colaborador"]) {
+    for (const papel of [
+      "gestor",
+      "financeiro",
+      "colaborador",
+      "auditor",
+      "dpo",
+      "admin_tecnico",
+    ]) {
       outrosPapeis.push([
         papel,
-        await criarUsuario(`${papel}.ausa@example.test`, papel, empresaA),
+        // Direto no banco: a API não deixa criar alguns destes papéis.
+        await criarUsuarioDireto(`${papel}.ausa@example.test`, papel, empresaA),
       ]);
     }
     masterA = await criarMaster("master.ausencias.a@example.test");
@@ -1091,14 +1118,126 @@ describe("T215 — Férias e ausências (e2e)", () => {
       await enviarAnexo(a.id, pdf()).expect(409);
     });
 
-    it("outra empresa: envio e download respondem 404; gestor, 403", async () => {
+    const removerAnexo = (ausenciaId: string, cred: Credencial) =>
+      agent()
+        .delete(`/v1/ausencias/${ausenciaId}/anexo`)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+
+    const baixados = (ausenciaId: string) =>
+      prisma.auditEvent.count({
+        where: {
+          resourceId: ausenciaId,
+          action: "pessoas_ausencia_anexo_baixado",
+        },
+      });
+
+    it("outra empresa: enviar, baixar e remover respondem 404, sem revelar e sem trilha de download", async () => {
       const a = await licenca();
       await enviarAnexo(a.id, pdf()).expect(201);
-      await enviarAnexo(a.id, pdf(), rhB).expect(404);
-      await baixar(a.id, rhB).expect(404);
-      for (const [, cred] of outrosPapeis) {
+      const envio = await enviarAnexo(a.id, pdf(), rhB).expect(404);
+      const download = await baixar(a.id, rhB).expect(404);
+      const remocao = await removerAnexo(a.id, rhB).expect(404);
+      // A mesma resposta de "não existe".
+      const inexistente = await baixar(
+        "00000000-0000-4000-8000-000000000000",
+        rhB,
+      ).expect(404);
+      // Sem o id da requisição e o instante, que mudam a cada chamada.
+      const semId = (corpo: unknown) => {
+        const texto = Buffer.isBuffer(corpo)
+          ? corpo.toString()
+          : JSON.stringify(corpo);
+        const resto = JSON.parse(texto) as Record<string, unknown>;
+        delete resto["request_id"];
+        delete resto["timestamp"];
+        return resto;
+      };
+      expect(semId(download.body)).toEqual(semId(inexistente.body));
+      expect(semId(envio.body)).toEqual(semId(remocao.body));
+      expect(await baixados(a.id)).toBe(0);
+      expect((await anexos(a.id))[0]!.removidoEm).toBeNull();
+    });
+
+    it.each([
+      "gestor",
+      "financeiro",
+      "colaborador",
+      "auditor",
+      "dpo",
+      "admin_tecnico",
+    ])(
+      "%s: não envia, não baixa e não remove (403), sem trilha de download",
+      async (papel) => {
+        const cred = outrosPapeis.find(([p]) => p === papel)![1];
+        const a = await licenca();
+        await enviarAnexo(a.id, pdf()).expect(201);
+        await enviarAnexo(a.id, pdf(), cred).expect(403);
         await baixar(a.id, cred).expect(403);
+        await removerAnexo(a.id, cred).expect(403);
+        expect(await baixados(a.id)).toBe(0);
+        expect((await anexos(a.id))[0]!.removidoEm).toBeNull();
+      },
+    );
+
+    it("master técnico: vê a ausência, mas não o anexo — sem metadado, sem download, sem envio nem remoção", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf()).expect(201);
+      await baixar(a.id, masterA).expect(403);
+      await enviarAnexo(a.id, pdf(), masterA).expect(403);
+      await removerAnexo(a.id, masterA).expect(403);
+      expect(await baixados(a.id)).toBe(0);
+      const ficha = await get(
+        `/v1/colaboradores/${a.colaboradorId}/ferias`,
+        masterA,
+      ).expect(200);
+      const item = ficha.body.historico.find(
+        (h: { id: string }) => h.id === a.id,
+      );
+      expect(item).toMatchObject({ id: a.id, status: "aprovada" });
+      expect(item.anexo).toBeNull();
+      const lista = await get("/v1/ausencias", masterA)
+        .query({ tamanhoPagina: 100 })
+        .expect(200);
+      const naLista = lista.body.itens.find(
+        (i: { id: string }) => i.id === a.id,
+      );
+      expect(naLista.anexo).toBeNull();
+      // RH vê o anexo.
+      const daRh = await get(
+        `/v1/colaboradores/${a.colaboradorId}/ferias`,
+        rhA,
+      ).expect(200);
+      expect(
+        daRh.body.historico.find((h: { id: string }) => h.id === a.id).anexo,
+      ).toMatchObject({ formato: "pdf" });
+    });
+
+    it("DP também envia, baixa e remove", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf(), dpA).expect(201);
+      await baixar(a.id, dpA).expect(200);
+      await removerAnexo(a.id, dpA).expect(200);
+    });
+
+    it("trilha de download só quando o arquivo sai: falha do armazenamento e anexo removido não contam", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf()).expect(201);
+      const [linha] = await anexos(a.id);
+      const original = armazenamento.falhar;
+      armazenamento.falhar = (operacao, chave) =>
+        operacao === "ler" && chave === linha!.chaveObjeto;
+      try {
+        await baixar(a.id).expect(503);
+      } finally {
+        armazenamento.falhar = original;
       }
+      expect(await baixados(a.id)).toBe(0);
+      await baixar(a.id).expect(200);
+      expect(await baixados(a.id)).toBe(1);
+      await removerAnexo(a.id, rhA).expect(200);
+      await baixar(a.id).expect(404);
+      expect(await baixados(a.id)).toBe(1);
     });
 
     it("histórico preservado: a aplicação não apaga anexo", async () => {
