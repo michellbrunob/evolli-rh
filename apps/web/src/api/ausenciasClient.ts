@@ -73,7 +73,22 @@ export interface AusenciaApi {
   observacao: string | null;
   registradoEm: string;
   decididoEm: string | null;
+  /** T215 — o atestado ou documento anexado, sem nome nem chave. */
+  anexo: AnexoDaAusenciaApi | null;
 }
+
+/** T215 — formatos do anexo (os da referência). */
+export type FormatoAnexoAusencia =
+  "pdf" | "jpg" | "png" | "webp" | "heic" | "heif" | "doc" | "docx";
+
+export interface AnexoDaAusenciaApi {
+  formato: FormatoAnexoAusencia;
+  tamanhoBytes: number;
+  enviadoEm: string;
+}
+
+/** T215 — a regra de férias pelo tipo do vínculo. */
+export type RegraDeFerias = "calculada" | "sem_ferias" | "sem_regra";
 
 export interface IndicadoresDeAusenciasApi {
   emFeriasAgora: number;
@@ -138,6 +153,8 @@ export interface SimulacaoDeAusenciaApi {
   maxVendaveis: number | null;
   /** Último dia para pedir o abono sem a empresa poder negar. */
   prazoAbono: string | null;
+  /** T215 — a regra de férias do vínculo da pessoa. */
+  regraDeFerias?: RegraDeFerias;
 }
 
 export type SituacaoDoPeriodoAquisitivo =
@@ -154,6 +171,10 @@ export interface PeriodoAquisitivoApi {
 }
 
 export interface FeriasDoColaboradorApi {
+  /** T215 — calculada (CLT, Estágio), sem_ferias (PJ, Freelancer), sem_regra. */
+  regraDeFerias: RegraDeFerias;
+  vinculo: { tipo: string; dataAdmissao: string };
+  /** Só na regra calculada; nas demais, vazio. */
   periodos: PeriodoAquisitivoApi[];
   /** Índice do período que a ficha mostra, ou `null` sem período. */
   periodoAtual: number | null;
@@ -273,4 +294,90 @@ export function consultarFeriasDoColaborador(
   return ler(
     `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/ferias`,
   );
+}
+
+/** T215 — "x.PDF" → "pdf"; sem extensão, vazio. */
+function extensaoDoNome(nome: string): string {
+  const ponto = nome.lastIndexOf(".");
+  return ponto < 0 ? "" : nome.slice(ponto + 1).toLowerCase();
+}
+
+/**
+ * T215 — anexa o atestado ou documento à ausência: o arquivo vai em binário,
+ * com tipo e extensão nos cabeçalhos; o nome do arquivo não vai.
+ */
+export async function enviarAnexoDaAusencia(
+  ausenciaId: string,
+  arquivo: File,
+): Promise<{ anexo: AnexoDaAusenciaApi }> {
+  const enviar = async () =>
+    fetch(`${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/anexo`, {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await tokenCsrfParaGravacao(),
+        "x-evolli-anexo-tipo": arquivo.type || "application/octet-stream",
+        "x-evolli-anexo-extensao": extensaoDoNome(arquivo.name),
+      },
+      body: arquivo,
+    });
+  const res = await enviar();
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
+  return res.json() as Promise<{ anexo: AnexoDaAusenciaApi }>;
+}
+
+/** T215 — remove (logicamente) o anexo da ausência. */
+export async function removerAnexoDaAusencia(
+  ausenciaId: string,
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/anexo`,
+    {
+      method: "DELETE",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "x-csrf-token": await tokenCsrfParaGravacao(),
+      },
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
+}
+
+/** T215 — o arquivo anexado, em memória do navegador (download seguro). */
+export async function obterAnexoDaAusencia(
+  ausenciaId: string,
+): Promise<{ readonly blob: Blob; readonly nome: string }> {
+  const res = await fetch(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/anexo/arquivo`,
+    {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "*/*" },
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
+  const nome =
+    /filename="([^"]+)"/.exec(
+      res.headers.get("content-disposition") ?? "",
+    )?.[1] ?? "atestado";
+  return { blob: await res.blob(), nome };
 }

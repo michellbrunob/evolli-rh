@@ -15,3 +15,11 @@ describe("T215 — datas da aba Salários", () => {
     expect(formatarMesAbreviado(null)).toBe("—");
   });
 });
+
+describe("T215 — datas da aba Férias e ausências", () => {
+  it("dia e mês abreviado; inválida vira null", async () => {
+    const { diaEMesAbreviado } = await import("./data");
+    expect(diaEMesAbreviado("2026-12-07")).toEqual({ dia: "07", mes: "dez" });
+    expect(diaEMesAbreviado("2026-02-30")).toBeNull();
+  });
+});

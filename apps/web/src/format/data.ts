@@ -361,3 +361,18 @@ export function formatarMesAbreviado(valor: string | null | undefined): string {
   const mes = Number(valor.slice(5, 7));
   return `${MESES_ABREVIADOS[mes - 1]}/${ano.slice(2)}`;
 }
+
+/**
+ * T215 — data civil → dia (`07`) e mês abreviado (`dez`), para o calendário
+ * da "Próxima ausência". Recusa devolve `null`.
+ */
+export function diaEMesAbreviado(
+  valor: string | null | undefined,
+): { readonly dia: string; readonly mes: string } | null {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return null;
+  return {
+    dia: valor.slice(8, 10),
+    mes: MESES_ABREVIADOS[Number(valor.slice(5, 7)) - 1]!,
+  };
+}

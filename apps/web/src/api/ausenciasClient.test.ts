@@ -4,7 +4,10 @@ import {
   aprovarAusencia,
   cancelarAusencia,
   consultarFeriasDoColaborador,
+  enviarAnexoDaAusencia,
   listarAusencias,
+  obterAnexoDaAusencia,
+  removerAnexoDaAusencia,
   recusarAusencia,
   registrarAusencia,
   simularAusencia,
@@ -42,6 +45,7 @@ const ITEM: AusenciaApi = {
   observacao: null,
   registradoEm: "2026-11-23T12:00:00.000Z",
   decididoEm: "2026-11-23T12:00:00.000Z",
+  anexo: null,
 };
 
 describe("ausenciasClient (T215)", () => {
@@ -196,5 +200,76 @@ describe("ausenciasClient (T215)", () => {
     expect(await consultarFeriasDoColaborador(COLABORADOR)).toEqual(ferias);
     const [url] = fetchMock.mock.calls[0]! as [string, RequestInit];
     expect(url).toBe(`/v1/colaboradores/${COLABORADOR}/ferias`);
+  });
+
+  it("anexo: POST binário com CSRF, tipo e extensão — o nome do arquivo não vai", async () => {
+    setCsrfToken("token-sintetico");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(201, {
+        anexo: {
+          formato: "pdf",
+          tamanhoBytes: 3,
+          enviadoEm: "2026-11-24T12:00:00.000Z",
+        },
+      }),
+    );
+    const arquivo = new File(["abc"], "Atestado Medico Fulano.PDF", {
+      type: "application/pdf",
+    });
+    const r = await enviarAnexoDaAusencia(AUSENCIA, arquivo);
+    expect(r.anexo.formato).toBe("pdf");
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(`/v1/ausencias/${AUSENCIA}/anexo`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(arquivo);
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/octet-stream",
+      "x-csrf-token": "token-sintetico",
+      "x-evolli-anexo-tipo": "application/pdf",
+      "x-evolli-anexo-extensao": "pdf",
+    });
+    expect(JSON.stringify(init.headers)).not.toContain("Fulano");
+  });
+
+  it("anexo: recusa com código vira ApiError", async () => {
+    setCsrfToken("token-sintetico");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(422, { codigo: "anexo_formato_invalido" }),
+    );
+    const erro = await enviarAnexoDaAusencia(
+      AUSENCIA,
+      new File(["x"], "a.txt", { type: "text/plain" }),
+    ).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ApiError);
+    expect((erro as ApiError).status).toBe(422);
+    expect((erro as ApiError).codigo).toBe("anexo_formato_invalido");
+  });
+
+  it("anexo: DELETE com CSRF; download devolve blob e o nome do servidor", async () => {
+    setCsrfToken("token-sintetico");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { anexo: null }))
+      .mockResolvedValueOnce(
+        new Response("pdf", {
+          status: 200,
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="atestado.pdf"',
+          },
+        }),
+      );
+    await removerAnexoDaAusencia(AUSENCIA);
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(`/v1/ausencias/${AUSENCIA}/anexo`);
+    expect(init.method).toBe("DELETE");
+    expect(init.headers).toMatchObject({ "x-csrf-token": "token-sintetico" });
+    const baixado = await obterAnexoDaAusencia(AUSENCIA);
+    expect(baixado.nome).toBe("atestado.pdf");
+    expect(baixado.blob.size).toBe(3);
+    expect(fetchMock.mock.calls[1]![0]).toBe(
+      `/v1/ausencias/${AUSENCIA}/anexo/arquivo`,
+    );
+    expect(getCsrfToken()).toBe("token-sintetico");
   });
 });

@@ -87,6 +87,7 @@ import { JornadaColaboradorSecao } from "../JornadaColaboradorSecao";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
 import { AbaSalarios } from "./salarios/AbaSalarios";
+import { AbaFeriasEAusencias } from "./ferias/AbaFeriasEAusencias";
 import {
   IconeAbaBeneficios,
   IconeAbaComentarios,
@@ -402,6 +403,8 @@ export function FichaDoColaborador({
   const lotacao = useLotacaoVigente(dados?.vinculo?.id ?? null);
   const nome = dados?.colaborador.nome ?? "";
   // A gaveta recomeça quando a pessoa muda: o objeto não pode mudar a cada desenho.
+  // A aba Férias relê quando a gaveta do ⋯ registra uma ausência.
+  const [versaoDasAusencias, setVersaoDasAusencias] = useState(0);
   const pessoaDaGaveta = useMemo(
     () =>
       dados ? { id: colaboradorId, nome, cargo: lotacao.cargo || null } : null,
@@ -973,6 +976,28 @@ export function FichaDoColaborador({
                 </Campo>
               </Cartao>
             </div>
+          ) : aba === "ferias" ? (
+            // Só com o colaborador confirmado na empresa ativa.
+            pessoaDaGaveta ? (
+              <AbaFeriasEAusencias
+                key={versaoDasAusencias}
+                pessoa={pessoaDaGaveta}
+                quem={
+                  trato.artigo
+                    ? `${trato.artigo.toLowerCase()} ${primeiroNome(nome)}`
+                    : primeiroNome(nome)
+                }
+                deQuem={`${
+                  trato.artigo === "A"
+                    ? "da"
+                    : trato.artigo === "O"
+                      ? "do"
+                      : "de"
+                } ${primeiroNome(nome)}`}
+                podeEditar={podeEditar}
+                servico={servicoDeAusencias}
+              />
+            ) : null
           ) : aba === "salarios" ? (
             // Os salários só são lidos com o colaborador confirmado na
             // empresa ativa (fora dela, a ficha diz "não encontrado").
@@ -1102,9 +1127,10 @@ export function FichaDoColaborador({
           aberta={registrarAberto}
           servico={servicoDeAusencias}
           onFechar={() => setRegistrarAberto(false)}
-          onRegistrada={() => {
+          onRegistrada={(_nova, avisoDoAnexo) => {
             setRegistrarAberto(false);
-            setAviso("Ausência registrada.");
+            setAviso(avisoDoAnexo ?? "Ausência registrada.");
+            setVersaoDasAusencias((v) => v + 1);
           }}
           {...(pessoaDaGaveta ? { pessoaInicial: pessoaDaGaveta } : {})}
         />

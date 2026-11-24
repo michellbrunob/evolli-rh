@@ -10,7 +10,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button, FormActions } from "../../../components";
 import { Sheet } from "../../../ui";
-import { IconeCalendario } from "../../../ui/icones";
+import {
+  IconeCalendario,
+  IconeEnviarArquivo,
+  IconeFechar,
+} from "../../../ui/icones";
 import { anoDoDiaCivil, formatarDiaCivil } from "../../../format/data";
 import {
   type AusenciaApi,
@@ -56,19 +60,72 @@ function mensagemDaRecusa(erro: unknown, nome: string): string {
   }
 }
 
+/** T215 — o anexo (atestado ou documento): os formatos da referência. */
+export const FORMATOS_DO_ANEXO =
+  ".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.heic,.heif";
+const EXTENSOES_DO_ANEXO = new Set(
+  FORMATOS_DO_ANEXO.split(",").map((e) => e.slice(1)),
+);
+export const LIMITE_DO_ANEXO_BYTES = 10 * 1024 * 1024;
+
+/** Conferência na hora da escolha (o servidor confere de novo, a fundo). */
+export function recusaDoArquivo(arquivo: File): string | null {
+  const ponto = arquivo.name.lastIndexOf(".");
+  const extensao = ponto < 0 ? "" : arquivo.name.slice(ponto + 1).toLowerCase();
+  if (!EXTENSOES_DO_ANEXO.has(extensao)) {
+    return "Use PDF, JPG, PNG, WEBP, HEIC, DOC ou DOCX.";
+  }
+  if (arquivo.size === 0) return "O arquivo está vazio.";
+  if (arquivo.size > LIMITE_DO_ANEXO_BYTES) return "O arquivo passa de 10 MB.";
+  return null;
+}
+
+/** A recusa do anexo pelo servidor, na voz da tela. */
+export function motivoDoAnexo(erro: unknown): string {
+  const codigo = (erro as { codigo?: string }).codigo;
+  switch (codigo) {
+    case "anexo_reprovado_antivirus":
+      return "o antivírus recusou o arquivo";
+    case "anexo_com_macro":
+      return "documentos com macro não são aceitos";
+    case "anexo_formato_invalido":
+    case "anexo_arquivo_malformado":
+      return "o arquivo não é um PDF, imagem ou documento válido";
+    case "anexo_arquivo_grande_demais":
+      return "o arquivo passa de 10 MB";
+    case "anexo_verificacao_indisponivel":
+    case "anexo_armazenamento_indisponivel":
+      return "o serviço de arquivos está indisponível agora";
+    default:
+      return "não foi possível enviar o arquivo";
+  }
+}
+
+/** "1,2 MB" / "350 KB". */
+export function tamanhoLegivel(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 export function RegistrarAusenciaGaveta({
   aberta,
   servico,
   onFechar,
   onRegistrada,
   pessoaInicial,
+  regraDeFerias: regraDaFicha,
 }: {
   readonly aberta: boolean;
   readonly servico: ServicoDeAusencias;
   readonly onFechar: () => void;
-  readonly onRegistrada: (ausencia: AusenciaApi) => void;
+  /** O segundo argumento é o aviso quando o anexo não pôde ir. */
+  readonly onRegistrada: (ausencia: AusenciaApi, aviso?: string) => void;
   /** Da ficha: a pessoa já vem escolhida. */
   readonly pessoaInicial?: PessoaParaAusencia;
+  /** Da ficha: a regra de férias do vínculo já é conhecida. */
+  readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
 }) {
   const base = useId();
   const [pessoa, setPessoa] = useState<PessoaParaAusencia | null>(
@@ -89,7 +146,10 @@ export function RegistrarAusenciaGaveta({
   const [simulacao, setSimulacao] = useState<SimulacaoDeAusencia | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [recusaDoAnexo, setRecusaDoAnexo] = useState<string | null>(null);
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
+  const campoArquivoRef = useRef<HTMLInputElement | null>(null);
 
   // Abrir de novo começa do zero.
   useEffect(() => {
@@ -108,6 +168,8 @@ export function RegistrarAusenciaGaveta({
     setObservacao("");
     setSimulacao(null);
     setFalha(null);
+    setArquivo(null);
+    setRecusaDoAnexo(null);
   }, [aberta, pessoaInicial]);
 
   // A lista de pessoas, pela busca.
@@ -132,6 +194,10 @@ export function RegistrarAusenciaGaveta({
 
   const afastamento = tipo === "afastamento";
   const ferias = tipo === "ferias";
+  // A regra de férias: da ficha, ou a que o servidor disse na simulação.
+  const regra = regraDaFicha ?? simulacao?.regraDeFerias ?? null;
+  const semFerias = regra === "sem_ferias";
+  const semRegra = regra === "sem_regra";
   const fimEfetivo = afastamento && !comVolta ? "" : fim;
   const vendidos = ferias && vender ? Number(diasVendidos) || 0 : 0;
 
@@ -166,6 +232,7 @@ export function RegistrarAusenciaGaveta({
   const completo =
     pessoa !== null &&
     tipo !== null &&
+    !(ferias && semFerias) &&
     inicio !== "" &&
     (afastamento
       ? motivo !== null && (!comVolta || (fim !== "" && fim >= inicio))
@@ -189,7 +256,18 @@ export function RegistrarAusenciaGaveta({
         aprovada: afastamento ? true : aprovada,
         ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
       });
-      onRegistrada(nova);
+      // O anexo vai depois do registro; se falhar, a ausência fica.
+      let aviso: string | undefined;
+      if (arquivo && servico.enviarAnexo) {
+        try {
+          await servico.enviarAnexo(nova.id, arquivo);
+        } catch (erro) {
+          aviso = `Ausência registrada, mas o anexo não foi enviado: ${motivoDoAnexo(
+            erro,
+          )}. Anexe outro arquivo pelo histórico.`;
+        }
+      }
+      onRegistrada(nova, aviso);
     } catch (erro) {
       setFalha(mensagemDaRecusa(erro, primeiroNome(pessoa.nome)));
     } finally {
@@ -335,8 +413,10 @@ export function RegistrarAusenciaGaveta({
                 type="button"
                 role="radio"
                 aria-checked={tipo === t}
+                aria-disabled={t === "ferias" && semFerias ? true : undefined}
                 className="ausencias-gaveta__tipo"
                 onClick={() => {
+                  if (t === "ferias" && semFerias) return;
                   setTipo(t);
                   if (t !== "ferias") setVender(false);
                 }}
@@ -345,6 +425,11 @@ export function RegistrarAusenciaGaveta({
               </button>
             ))}
           </div>
+          {semFerias ? (
+            <p className="ausencias-gaveta__ajuda" role="note">
+              Este contrato não tem férias (PJ e Freelancer).
+            </p>
+          ) : null}
         </li>
 
         {/* 3 — motivo (afastamento) */}
@@ -458,7 +543,7 @@ export function RegistrarAusenciaGaveta({
           simulacao.volta !== null ? (
             <div className="ausencias-gaveta__resumo" role="status">
               <p className="ausencias-gaveta__resumo-titulo">
-                {`${simulacao.dias} dias de ${TIPO_NA_FRASE[tipo]} (${simulacao.diasUteis} dias úteis)${
+                {`${simulacao.dias === 1 ? "1 dia" : `${simulacao.dias} dias`} de ${TIPO_NA_FRASE[tipo]} (${simulacao.diasUteis === 1 ? "1 dia útil" : `${simulacao.diasUteis} dias úteis`})${
                   vendidos > 0 ? ` + ${vendidos} vendidos` : ""
                 }`}
               </p>
@@ -477,7 +562,14 @@ export function RegistrarAusenciaGaveta({
             </div>
           ) : null}
 
-          {ferias ? (
+          {ferias && semRegra ? (
+            <p className="ausencias-gaveta__ajuda" role="note">
+              Contrato sem regra automática de férias: o saldo não é calculado.
+              Confira os dias antes de registrar.
+            </p>
+          ) : null}
+
+          {ferias && !semRegra && !semFerias ? (
             <div className="ausencias-gaveta__venda">
               <div className="ausencias-gaveta__venda-cabeca">
                 <span className="ausencias-gaveta__venda-texto">
@@ -592,6 +684,57 @@ export function RegistrarAusenciaGaveta({
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
           />
+          {servico.enviarAnexo ? (
+            <div className="ausencias-gaveta__anexo">
+              <input
+                ref={campoArquivoRef}
+                type="file"
+                hidden
+                accept={FORMATOS_DO_ANEXO}
+                aria-label="Arquivo do atestado ou documento"
+                onChange={(e) => {
+                  const escolhido = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (!escolhido) return;
+                  const recusa = recusaDoArquivo(escolhido);
+                  setRecusaDoAnexo(recusa);
+                  setArquivo(recusa ? null : escolhido);
+                }}
+              />
+              {arquivo ? (
+                <span className="ausencias-gaveta__arquivo">
+                  <span className="ausencias-gaveta__arquivo-nome">
+                    {arquivo.name}
+                  </span>
+                  <span className="ausencias-gaveta__ajuda">
+                    {tamanhoLegivel(arquivo.size)}
+                  </span>
+                  <button
+                    type="button"
+                    className="ausencias-gaveta__arquivo-tirar"
+                    aria-label={`Tirar o arquivo ${arquivo.name}`}
+                    onClick={() => setArquivo(null)}
+                  >
+                    <IconeFechar tamanho={14} />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="ausencias-gaveta__anexar"
+                  onClick={() => campoArquivoRef.current?.click()}
+                >
+                  <IconeEnviarArquivo tamanho={16} />
+                  Anexar atestado ou documento
+                </button>
+              )}
+              {recusaDoAnexo ? (
+                <p className="ausencias-gaveta__falha" role="alert">
+                  {recusaDoAnexo}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </li>
       </ol>
       {falha ? (

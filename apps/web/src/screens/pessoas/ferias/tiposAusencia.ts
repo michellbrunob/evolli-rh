@@ -68,6 +68,12 @@ export interface AusenciaApi {
   readonly observacao: string | null;
   readonly registradoEm: string;
   readonly decididoEm: string | null;
+  /** T215 — o atestado ou documento anexado (ausente em dados antigos). */
+  readonly anexo?: {
+    readonly formato: string;
+    readonly tamanhoBytes: number;
+    readonly enviadoEm: string;
+  } | null;
 }
 
 export interface IndicadoresDeAusencias {
@@ -116,6 +122,11 @@ export interface SimulacaoDeAusencia {
   readonly saldoDepois: number | null;
   readonly maxVendaveis: number | null;
   readonly prazoAbono: string | null;
+  /**
+   * T215 — a regra de férias do vínculo: calculada (CLT, Estágio),
+   * sem_ferias (PJ, Freelancer) ou sem_regra (Aprendiz e demais).
+   */
+  readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
 }
 
 export interface ConsultaDeSimulacao {
@@ -152,6 +163,12 @@ export interface ServicoDeAusencias {
     termo: string,
     opcoes?: { readonly signal?: AbortSignal },
   ) => Promise<readonly PessoaParaAusencia[]>;
+  /** T215 — anexo (atestado ou documento) da ausência. */
+  readonly enviarAnexo?: (ausenciaId: string, arquivo: File) => Promise<void>;
+  readonly removerAnexo?: (ausenciaId: string) => Promise<void>;
+  readonly baixarAnexo?: (
+    ausenciaId: string,
+  ) => Promise<{ readonly blob: Blob; readonly nome: string }>;
 }
 
 export const ROTULO_DO_TIPO: Readonly<Record<TipoAusencia, string>> = {

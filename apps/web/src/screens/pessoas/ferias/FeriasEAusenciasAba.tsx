@@ -49,7 +49,9 @@ import "./FeriasEAusencias.css";
 
 const TAMANHO_DA_PAGINA = 20;
 
-const VARIANTE_DO_STATUS: Readonly<Record<StatusAusencia, StatusVariant>> = {
+export const VARIANTE_DO_STATUS: Readonly<
+  Record<StatusAusencia, StatusVariant>
+> = {
   aguardando_gestor: "warning",
   aguardando_rh: "warning",
   aprovada: "success",
@@ -479,9 +481,9 @@ export function FeriasEAusenciasAba({
         aberta={gavetaAberta}
         servico={servico}
         onFechar={() => setGavetaAberta(false)}
-        onRegistrada={() => {
+        onRegistrada={(_nova, avisoDoAnexo) => {
           setGavetaAberta(false);
-          setAviso("Ausência registrada.");
+          setAviso(avisoDoAnexo ?? "Ausência registrada.");
           reler();
         }}
       />

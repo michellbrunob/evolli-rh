@@ -438,3 +438,216 @@ describe("T215 — Registrar ausência (gaveta)", () => {
     expect(onRegistrada).not.toHaveBeenCalled();
   });
 });
+
+describe("T215 — Registrar ausência: anexo e regra de férias do vínculo", () => {
+  const PESSOA = { id: MARIA.id, nome: MARIA.nome, cargo: MARIA.cargo };
+
+  function montar(
+    extra: Partial<{
+      regraDeFerias: "calculada" | "sem_ferias" | "sem_regra";
+    }> = {},
+  ) {
+    const onRegistrada = vi.fn();
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={onRegistrada}
+        pessoaInicial={PESSOA}
+        {...(extra.regraDeFerias ? { regraDeFerias: extra.regraDeFerias } : {})}
+      />,
+    );
+    return { onRegistrada };
+  }
+
+  function preencherLicenca() {
+    fireEvent.click(screen.getByRole("radio", { name: "Licença médica" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-07" },
+    });
+  }
+
+  const arquivo = (
+    nome = "atestado.pdf",
+    tamanho = 3,
+    tipo = "application/pdf",
+  ) => new File([new Uint8Array(tamanho)], nome, { type: tipo });
+
+  it("anexar: o arquivo escolhido aparece, e vai depois do registro", async () => {
+    const enviarAnexo = vi.fn(async () => undefined);
+    servico = { ...servico, enviarAnexo };
+    const { onRegistrada } = montar();
+    preencherLicenca();
+    expect(
+      screen.getByRole("button", { name: "Anexar atestado ou documento" }),
+    ).toBeInTheDocument();
+    const campo = screen.getByLabelText("Arquivo do atestado ou documento");
+    expect(campo.getAttribute("accept")).toBe(
+      ".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.heic,.heif",
+    );
+    const escolhido = arquivo();
+    fireEvent.change(campo, { target: { files: [escolhido] } });
+    expect(screen.getByText("atestado.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar ausência" }));
+    await waitFor(() =>
+      expect(enviarAnexo).toHaveBeenCalledWith("a-nova", escolhido),
+    );
+    await waitFor(() => expect(onRegistrada).toHaveBeenCalled());
+    expect(onRegistrada.mock.calls[0]![1]).toBeUndefined();
+  });
+
+  it("tirar o arquivo antes de registrar: nada é anexado", async () => {
+    const enviarAnexo = vi.fn(async () => undefined);
+    servico = { ...servico, enviarAnexo };
+    montar();
+    preencherLicenca();
+    fireEvent.change(
+      screen.getByLabelText("Arquivo do atestado ou documento"),
+      {
+        target: { files: [arquivo()] },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tirar o arquivo atestado.pdf" }),
+    );
+    expect(screen.queryByText("atestado.pdf")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar ausência" }));
+    await waitFor(() => expect(servico.registrar).toHaveBeenCalled());
+    expect(enviarAnexo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "formato fora da lista",
+      arquivo("foto.gif", 3, "image/gif"),
+      "Use PDF, JPG, PNG, WEBP, HEIC, DOC ou DOCX.",
+    ],
+    [
+      "maior que 10 MB",
+      arquivo("grande.pdf", 10 * 1024 * 1024 + 1),
+      "O arquivo passa de 10 MB.",
+    ],
+  ])("%s: recusado na hora, sem anexar", (_r, escolhido, texto) => {
+    servico = { ...servico, enviarAnexo: vi.fn(async () => undefined) };
+    montar();
+    preencherLicenca();
+    fireEvent.change(
+      screen.getByLabelText("Arquivo do atestado ou documento"),
+      {
+        target: { files: [escolhido] },
+      },
+    );
+    expect(screen.getByText(texto)).toBeInTheDocument();
+    expect(screen.queryByText(escolhido.name)).not.toBeInTheDocument();
+  });
+
+  it("o anexo falha depois do registro: a ausência fica, e o aviso diz o que fazer", async () => {
+    servico = {
+      ...servico,
+      enviarAnexo: vi.fn(async () => {
+        throw Object.assign(new Error("x"), {
+          status: 422,
+          codigo: "anexo_reprovado_antivirus",
+        });
+      }),
+    };
+    const { onRegistrada } = montar();
+    preencherLicenca();
+    fireEvent.change(
+      screen.getByLabelText("Arquivo do atestado ou documento"),
+      {
+        target: { files: [arquivo()] },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Registrar ausência" }));
+    await waitFor(() => expect(onRegistrada).toHaveBeenCalled());
+    expect(onRegistrada.mock.calls[0]![1]).toBe(
+      "Ausência registrada, mas o anexo não foi enviado: o antivírus recusou o arquivo. Anexe outro arquivo pelo histórico.",
+    );
+  });
+
+  it("PJ e Freelancer (sem férias): a opção Férias fica indisponível", () => {
+    montar({ regraDeFerias: "sem_ferias" });
+    const ferias = screen.getByRole("radio", { name: "Férias" });
+    expect(ferias).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(ferias);
+    expect(ferias).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.getByText("Este contrato não tem férias (PJ e Freelancer)."),
+    ).toBeInTheDocument();
+  });
+
+  it("sem regra automática (Aprendiz): avisa que o saldo não é calculado e não oferece venda", async () => {
+    servico = {
+      ...servico,
+      simular: vi.fn(async () => ({
+        dias: 20,
+        diasUteis: 14,
+        volta: "2027-01-25",
+        periodo: null,
+        saldoAntes: null,
+        saldoDepois: null,
+        maxVendaveis: null,
+        prazoAbono: null,
+        regraDeFerias: "sem_regra" as const,
+      })),
+    };
+    montar();
+    fireEvent.click(screen.getByRole("radio", { name: "Férias" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-24" },
+    });
+    expect(
+      await screen.findByText(
+        "Contrato sem regra automática de férias: o saldo não é calculado. Confira os dias antes de registrar.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Vender dias destas férias?" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("T215 — resumo da gaveta no singular", () => {
+  it("1 dia de day off (1 dia útil)", async () => {
+    servico = {
+      ...servicoFalso(),
+      simular: vi.fn(async () => ({
+        dias: 1,
+        diasUteis: 1,
+        volta: "2026-12-16",
+        periodo: null,
+        saldoAntes: null,
+        saldoDepois: null,
+        maxVendaveis: null,
+        prazoAbono: null,
+      })),
+    };
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={{ id: MARIA.id, nome: MARIA.nome, cargo: MARIA.cargo }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Day off" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2026-12-15" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2026-12-15" },
+    });
+    expect(
+      await screen.findByText("1 dia de day off (1 dia útil)"),
+    ).toBeInTheDocument();
+  });
+});
