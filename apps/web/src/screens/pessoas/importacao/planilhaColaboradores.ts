@@ -27,6 +27,8 @@ export const COLUNAS_OBRIGATORIAS = [
   "data_nascimento",
   "departamento_codigo",
   "cargo_codigo",
+  // T215 — o primeiro salário é obrigatório na admissão.
+  "salario",
 ] as const;
 
 export const COLUNAS_OPCIONAIS = ["matricula", "unidade_codigo"] as const;
@@ -53,6 +55,7 @@ export const ROTULO_DA_COLUNA: Readonly<Record<Coluna, string>> = {
   data_nascimento: "Data de nascimento",
   departamento_codigo: "Departamento",
   cargo_codigo: "Cargo",
+  salario: "Salário",
   matricula: "Matrícula",
   unidade_codigo: "Unidade",
 };
@@ -116,6 +119,7 @@ export const LINHA_DE_EXEMPLO: readonly string[] = [
   "15/05/1990",
   "CODIGO-DO-DEPARTAMENTO",
   "CODIGO-DO-CARGO",
+  "1.621,00",
   "",
   "",
 ];
@@ -308,6 +312,8 @@ export interface AdmissaoDaLinha {
   readonly dataNascimento: string;
   readonly departamentoId: string;
   readonly cargoId: string;
+  /** T215 — salário bruto da admissão, em reais com ponto: "1621.00". */
+  readonly salarioBruto: string;
   readonly unidadeId?: string;
   readonly matricula?: string;
 }
@@ -338,6 +344,28 @@ function dataIso(texto: string): string | null {
     return null;
   }
   return `${ano}-${mes}-${dia}`;
+}
+
+/**
+ * T215 — o salário da planilha: "1.621,00", "1621,00", "1621.00", "1621" ou
+ * "R$ 1.621,00" (célula numérica do .xlsx chega como "1621" ou "1621.5").
+ * Devolve "1621.00", ou `null` se não for um valor em reais.
+ */
+export function lerSalarioDaPlanilha(texto: string): string | null {
+  const limpo = texto.replace(/^R\$\s*/i, "").replace(/\s/g, "");
+  let normal: string;
+  if (/^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(limpo) || /^\d+,\d{1,2}$/.test(limpo)) {
+    normal = limpo.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(limpo)) {
+    normal = limpo.replace(/\./g, "");
+  } else if (/^\d+(\.\d{1,2})?$/.test(limpo)) {
+    normal = limpo;
+  } else {
+    return null;
+  }
+  const valor = Number(normal);
+  if (!(valor > 0) || normal.split(".")[0]!.length > 10) return null;
+  return valor.toFixed(2);
 }
 
 function porCodigo(
@@ -453,6 +481,14 @@ export function conferirPlanilha(
       "não há unidade ativa com esse código na empresa",
     );
 
+    // Salário (obrigatório): o primeiro salário da linha do tempo salarial.
+    const textoSalario = v("salario");
+    const salarioBruto =
+      textoSalario === "" ? null : lerSalarioDaPlanilha(textoSalario);
+    if (textoSalario === "") erro("salario", "obrigatório");
+    else if (salarioBruto === null)
+      erro("salario", "não é um valor em reais (use, por exemplo, 1.621,00)");
+
     // Matrícula (opcional; única no arquivo)
     const matricula = v("matricula").toUpperCase();
     if (matricula !== "") {
@@ -477,6 +513,7 @@ export function conferirPlanilha(
       dataNascimento ?? v("data_nascimento"),
       v("departamento_codigo").toUpperCase(),
       v("cargo_codigo").toUpperCase(),
+      salarioBruto ?? textoSalario,
       matricula,
       v("unidade_codigo").toUpperCase(),
     ].join("\u0000");
@@ -490,7 +527,8 @@ export function conferirPlanilha(
       dataAdmissao === null ||
       dataNascimento === null ||
       departamentoId === undefined ||
-      cargoId === undefined
+      cargoId === undefined ||
+      salarioBruto === null
     ) {
       return { numero: lida.numero, erros, admissao: null };
     }
@@ -504,6 +542,7 @@ export function conferirPlanilha(
         dataNascimento,
         departamentoId,
         cargoId,
+        salarioBruto,
         ...(unidadeId ? { unidadeId } : {}),
         ...(matricula ? { matricula } : {}),
       },
@@ -572,6 +611,8 @@ export function montarAdmissao(
       ...PERFIL_VAZIO,
       dataNascimento: linha.dataNascimento,
     }),
+    // T215 — o primeiro salário abre a linha do tempo salarial.
+    contrato: { salarioBruto: linha.salarioBruto },
   };
 }
 

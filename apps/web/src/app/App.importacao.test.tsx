@@ -199,7 +199,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
       {
         nome: ABA_COLABORADORES,
         linhas: [
-          "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo".split(
+          "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;salario;matricula;unidade_codigo".split(
             ";",
           ),
           [
@@ -209,6 +209,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
             "15/05/1990",
             "ADM",
             "ANALISTA",
+            "1.621,00",
           ],
         ],
       },
