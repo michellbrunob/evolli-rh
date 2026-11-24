@@ -912,6 +912,18 @@ function CalendarioDoMes({
                 </li>
               );
             })}
+            {/* Como na referência: a última semana fica completa, com as
+                células depois do fim do mês vazias. */}
+            {Array.from(
+              { length: (7 - ((deslocamento + totalDias) % 7)) % 7 },
+              (_, i) => (
+                <li
+                  key={`f${i}`}
+                  aria-hidden="true"
+                  className="escala-ficha__celula escala-ficha__celula--vazia"
+                />
+              ),
+            )}
           </ol>
         </div>
       </div>

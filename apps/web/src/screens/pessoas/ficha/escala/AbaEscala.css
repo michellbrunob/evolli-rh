@@ -430,10 +430,10 @@
 .escala-ficha__celula {
   display: grid;
   align-content: start;
-  gap: var(--space-xxs);
+  gap: var(--space-xs);
   min-width: 0;
   min-height: 3.5rem;
-  padding: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
   border-top: var(--divisor);
   border-left: var(--divisor);
   font-size: var(--text-caption);
@@ -443,10 +443,15 @@
   border-left: 0;
 }
 
+/* Antes do dia 1 e depois do último dia: células vazias, sombreadas. */
+.escala-ficha__celula--vazia {
+  background: var(--surface-neutral);
+}
+
 .escala-ficha__celula-topo {
   display: flex;
   align-items: baseline;
-  gap: var(--space-xxs);
+  gap: var(--space-xs);
   min-width: 0;
 }
 
@@ -481,8 +486,8 @@
 .escala-ficha__celula-turno {
   display: none;
   align-items: center;
-  gap: var(--space-xxs);
-  color: var(--color-ink-subtle);
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
 }
 
 .escala-ficha__celula .escala-ficha__folga {
@@ -494,8 +499,10 @@
   place-items: center;
   min-width: 1.25rem;
   height: 1.25rem;
-  border: 1px solid var(--color-ink-muted);
-  border-radius: var(--radius-sm, 0.25rem);
+  padding: 0 0.25rem;
+  border: var(--divisor);
+  border-radius: 0.3125rem;
+  background: var(--surface-canvas);
   color: var(--color-ink);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
@@ -503,7 +510,8 @@
 
 @container (min-width: 40rem) {
   .escala-ficha__celula {
-    min-height: 4.25rem;
+    min-height: 5.25rem;
+    padding: var(--space-sm);
   }
 
   .escala-ficha__feriado,
@@ -516,11 +524,14 @@
   }
 }
 
-/* Em telas estreitas, a sigla do dia marca o trabalho no lugar do horário. */
-.escala-ficha__celula:has(.escala-ficha__celula-turno) .escala-ficha__numero {
-  text-decoration: underline;
-  text-decoration-color: var(--color-action);
-  text-underline-offset: 0.2em;
+/* Só em telas estreitas (sem espaço para o horário), o número sublinhado
+   marca o dia de trabalho. */
+@container (max-width: 39.99rem) {
+  .escala-ficha__celula:has(.escala-ficha__celula-turno) .escala-ficha__numero {
+    text-decoration: underline;
+    text-decoration-color: var(--color-action);
+    text-underline-offset: 0.2em;
+  }
 }
 
 .escala-ficha__legenda {

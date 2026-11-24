@@ -686,3 +686,38 @@ describe("T215 — aviso de legislação na gaveta", () => {
     await waitFor(() => expect(servico.definir).toHaveBeenCalled());
   });
 });
+
+describe("T215 — calendário do mês como o da referência", () => {
+  it("semanas completas: as células depois do último dia ficam vazias", async () => {
+    montar(servicoCom([escala("e1", "6x1", "2026-02-02", null)]));
+    const grade = await screen.findByRole("list", {
+      name: "Dias de Novembro de 2026",
+    });
+    const celulas = grade.querySelectorAll("li");
+    expect(celulas.length % 7).toBe(0);
+    // Novembro de 2026 começa no domingo e tem 30 dias: 5 vazias no fim.
+    const vazias = grade.querySelectorAll("li.escala-ficha__celula--vazia");
+    expect(vazias).toHaveLength(5);
+    expect(celulas[celulas.length - 1]).toHaveClass(
+      "escala-ficha__celula--vazia",
+    );
+  });
+
+  it("CSS: sigla quadrada, horário apagado e o sublinhado só na tela estreita", () => {
+    const css = readFileSync(resolve(__dirname, "AbaEscala.css"), "utf8");
+    const regra = (seletor: string) => {
+      const inicio = css.indexOf(`${seletor} {`);
+      return inicio < 0 ? "" : css.slice(inicio, css.indexOf("}", inicio));
+    };
+    expect(regra(".escala-ficha__sigla")).not.toMatch(/radius-sm|radius-pill/);
+    expect(regra(".escala-ficha__celula-turno")).toMatch(/color-ink-muted/);
+    expect(regra(".escala-ficha__celula--vazia")).toMatch(/background/);
+    // O sublinhado do número só existe dentro de @container (max-width).
+    const sublinhado = css.indexOf("text-decoration: underline");
+    expect(sublinhado).toBeGreaterThan(0);
+    const consulta = css.lastIndexOf("@container", sublinhado);
+    expect(
+      css.slice(consulta, sublinhado).startsWith("@container (max-width:"),
+    ).toBe(true);
+  });
+});
