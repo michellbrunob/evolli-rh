@@ -323,3 +323,41 @@ export function formatarInstante(valor: string | null | undefined): string {
   // prometido (`DD/MM/AAAA`) quebra justamente onde ninguém olha.
   return `${dia}/${mes}/${ano.padStart(4, "0")} às ${hora}:${minuto}`;
 }
+
+/**
+ * T215 — o dia civil de hoje (`AAAA-MM-DD`) no fuso de negócio.
+ */
+export function diaCivilDeHoje(agora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_DE_NEGOCIO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(agora);
+}
+
+const MESES_ABREVIADOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+] as const;
+
+/**
+ * T215 — data civil → mês abreviado com o ano em dois dígitos (`nov/26`),
+ * com a validação de `formatarDiaCivil`; recusa devolve `AUSENTE`.
+ */
+export function formatarMesAbreviado(valor: string | null | undefined): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  return `${MESES_ABREVIADOS[mes - 1]}/${ano.slice(2)}`;
+}

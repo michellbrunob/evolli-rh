@@ -86,6 +86,7 @@ import type { ServicoDeAusencias } from "../ferias/tiposAusencia";
 import { JornadaColaboradorSecao } from "../JornadaColaboradorSecao";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
+import { AbaSalarios } from "./salarios/AbaSalarios";
 import {
   IconeAbaBeneficios,
   IconeAbaComentarios,
@@ -972,6 +973,22 @@ export function FichaDoColaborador({
                 </Campo>
               </Cartao>
             </div>
+          ) : aba === "salarios" ? (
+            // Os salários só são lidos com o colaborador confirmado na
+            // empresa ativa (fora dela, a ficha diz "não encontrado").
+            dados ? (
+              <AbaSalarios
+                colaboradorId={colaboradorId}
+                deQuem={`${
+                  trato.artigo === "A"
+                    ? "da"
+                    : trato.artigo === "O"
+                      ? "do"
+                      : "de"
+                } ${primeiroNome(nome)}`}
+                podeEditar={podeEditar}
+              />
+            ) : null
           ) : aba === "escala" ? (
             <JornadaColaboradorSecao
               colaboradorId={colaboradorId}
