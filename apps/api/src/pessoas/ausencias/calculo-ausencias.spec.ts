@@ -3,6 +3,7 @@ import {
   diasCorridos,
   diasUteis,
   direitoDoTipo,
+  regraDeFeriasDoTipo,
   ehDiaUtil,
   hojeEmSaoPaulo,
   maxVendaveis,
@@ -121,12 +122,26 @@ describe("T215 — cálculos de ausências", () => {
       expect(p[0]!.situacao).toBe("disponivel");
     });
 
-    it("contrato sem direito pela lei (PJ e outros): 0 até haver política", () => {
+    it("só CLT e Estágio têm saldo automático (30 dias); os demais, 0", () => {
       expect(direitoDoTipo("clt")).toBe(30);
       expect(direitoDoTipo("estagio")).toBe(30);
-      expect(direitoDoTipo("aprendiz")).toBe(30);
+      expect(direitoDoTipo("aprendiz")).toBe(0);
       expect(direitoDoTipo("pj")).toBe(0);
       expect(direitoDoTipo("freelancer")).toBe(0);
+    });
+
+    it.each([
+      ["clt", "calculada"],
+      ["estagio", "calculada"],
+      ["pj", "sem_ferias"],
+      ["freelancer", "sem_ferias"],
+      ["aprendiz", "sem_regra"],
+      ["temporario", "sem_regra"],
+      ["part_time", "sem_regra"],
+      ["trainee", "sem_regra"],
+      ["outro_controlado", "sem_regra"],
+    ] as const)("regra de férias de %s: %s", (tipo, regra) => {
+      expect(regraDeFeriasDoTipo(tipo)).toBe(regra);
     });
 
     it("de que período as férias descontam: o mais antigo completo e ainda no prazo, com saldo", () => {

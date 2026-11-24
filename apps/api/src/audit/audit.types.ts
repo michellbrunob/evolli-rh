@@ -91,6 +91,11 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_aprovada",
   "pessoas_ausencia_recusada",
   "pessoas_ausencia_cancelada",
+  // T215 — ficha: leitura (dados de saúde) e anexo, sem conteúdo.
+  "pessoas_ausencia_consultada",
+  "pessoas_ausencia_anexo_enviado",
+  "pessoas_ausencia_anexo_baixado",
+  "pessoas_ausencia_anexo_removido",
 
   // T215 — Salários (linha do tempo salarial): sem valor, cargo ou contrato.
   "pessoas_salario_registrado",

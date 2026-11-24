@@ -171,6 +171,9 @@ model AccessUser {
   // T215 — Férias e ausências: quem registrou e quem decidiu.
   ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
   ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
+  // T215 — anexos de ausência: quem enviou e quem removeu.
+  anexosAusenciaEnviados         AnexoAusencia[]              @relation("AnexoAusenciaEnviadoPor")
+  anexosAusenciaRemovidos        AnexoAusencia[]              @relation("AnexoAusenciaRemovidoPor")
   // T215 — Salários: quem registrou e quem removeu uma alteração salarial.
   alteracoesSalariaisRegistradas AlteracaoSalarial[]          @relation("AlteracaoSalarialRegistradaPor")
   alteracoesSalariaisRemovidas   AlteracaoSalarial[]          @relation("AlteracaoSalarialRemovidaPor")
@@ -505,10 +508,16 @@ enum AuditAction {
 
   // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
   // ausência e a empresa (nunca tipo, datas, motivo ou observação).
-  pessoas_ausencia_registrada @map("pessoas.ausencia.registrada")
-  pessoas_ausencia_aprovada   @map("pessoas.ausencia.aprovada")
-  pessoas_ausencia_recusada   @map("pessoas.ausencia.recusada")
-  pessoas_ausencia_cancelada  @map("pessoas.ausencia.cancelada")
+  pessoas_ausencia_registrada     @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada       @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada       @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada      @map("pessoas.ausencia.cancelada")
+  // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
+  // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
+  pessoas_ausencia_consultada     @map("pessoas.ausencia.consultada")
+  pessoas_ausencia_anexo_enviado  @map("pessoas.ausencia.anexo_enviado")
+  pessoas_ausencia_anexo_baixado  @map("pessoas.ausencia.anexo_baixado")
+  pessoas_ausencia_anexo_removido @map("pessoas.ausencia.anexo_removido")
 
   // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
   // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
@@ -2754,6 +2763,9 @@ model Ausencia {
   registradoPor AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   decididoPor   AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  /// T215 — o atestado ou documento da ausência (um vivo por vez).
+  anexos AnexoAusencia[]
+
   @@index([empresaId, inicio])
   @@index([empresaId, status])
   @@index([colaboradorId, empresaId])
@@ -2986,4 +2998,46 @@ model AlteracaoSalarial {
   @@index([vinculoId, empresaId])
   @@index([empresaId])
   @@map("alteracao_salarial")
+}
+
+/// T215 — formatos do anexo de ausência (os da referência).
+enum FormatoAnexoAusencia {
+  pdf
+  jpg
+  png
+  webp
+  heic
+  heif
+  doc
+  docx
+}
+
+/// T215 — anexo da ausência (atestado ou documento). Os bytes ficam no
+/// armazenamento privado dos documentos (R2, ADR 0021), numa chave só com
+/// ids; aqui, só os metadados. O antivírus roda ANTES de gravar: só arquivo
+/// aprovado existe. Um anexo vivo por ausência (índice parcial na
+/// migration). Remoção só lógica; DELETE revogado do papel da aplicação.
+/// O nome original do arquivo nunca é guardado.
+model AnexoAusencia {
+  id            String               @id @default(uuid())
+  empresaId     String               @map("empresa_id")
+  colaboradorId String               @map("colaborador_id")
+  ausenciaId    String               @map("ausencia_id")
+  formato       FormatoAnexoAusencia
+  tamanhoBytes  Int                  @map("tamanho_bytes")
+  hashSha256    String               @map("hash_sha256")
+  chaveObjeto   String               @map("chave_objeto")
+  enviadoPorId  String               @map("enviado_por_id")
+  verificadoEm  DateTime             @map("verificado_em")
+  criadoEm      DateTime             @default(now()) @map("criado_em")
+  removidoEm    DateTime?            @map("removido_em")
+  removidoPorId String?              @map("removido_por_id")
+
+  ausencia    Ausencia    @relation(fields: [ausenciaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadoPor  AccessUser  @relation("AnexoAusenciaEnviadoPor", fields: [enviadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor AccessUser? @relation("AnexoAusenciaRemovidoPor", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([ausenciaId])
+  @@index([empresaId])
+  @@map("anexo_ausencia")
 }

@@ -11,6 +11,13 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
+import { ArmazenamentoEmMemoria } from "../src/pessoas/foto-colaborador/armazenamento-de-objetos";
+import { ARMAZENAMENTO_DE_DOCUMENTOS } from "../src/pessoas/documentos-colaborador/armazenamento-de-documentos";
+import {
+  ASSINATURA_DE_TESTE_ANTIVIRUS,
+  VERIFICADOR_DE_ARQUIVOS,
+  VerificadorFalso,
+} from "../src/pessoas/documentos-colaborador/verificador-de-arquivos";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
 import {
@@ -161,12 +168,16 @@ describe("T215 — Férias e ausências (e2e)", () => {
     return login(email);
   }
 
+  /** O R2 dos testes: em memória, nenhum teste fala com o bucket. */
+  const armazenamento = new ArmazenamentoEmMemoria();
+
   let sequencia = 0;
   /** Admite pela API (18 meses atrás); `ativo` efetiva a admissão. */
   async function admitir(
     cred: Credencial,
     empresaId: string,
     estado: "ativo" | "previsto" = "ativo",
+    tipo = "clt",
   ): Promise<{ id: string; nome: string }> {
     sequencia += 1;
     const nome = `Pessoa Ausencia ${String.fromCharCode(65 + (sequencia % 26))}${sequencia}`;
@@ -176,7 +187,7 @@ describe("T215 — Férias e ausências (e2e)", () => {
         ...(await lotacaoMinima(appUrl, empresaId)),
         nome,
         empresaId,
-        tipo: "clt",
+        tipo,
         dataAdmissao: ADMISSAO,
         motivoCodigo: "admissao_inicial",
       })
@@ -237,7 +248,12 @@ describe("T215 — Férias e ausências (e2e)", () => {
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(ARMAZENAMENTO_DE_DOCUMENTOS)
+      .useValue(armazenamento)
+      .overrideProvider(VERIFICADOR_DE_ARQUIVOS)
+      .useValue(new VerificadorFalso())
+      .compile();
     app = moduleRef.createNestApplication();
     app.use(requestIdMiddleware);
     app.use(cookieParser());
@@ -748,6 +764,347 @@ describe("T215 — Férias e ausências (e2e)", () => {
       await post(`/v1/ausencias/${feriasDaBia}/cancelar`, masterA)
         .send()
         .expect(403);
+    });
+  });
+
+  describe("regras de férias por vínculo e a ficha", () => {
+    const ficha = async (id: string) =>
+      (await get(`/v1/colaboradores/${id}/ferias`, rhA).expect(200)).body;
+
+    it("CLT: saldo automático (regra calculada) e o tipo do vínculo", async () => {
+      const p = await admitir(rhA, empresaA);
+      const f = await ficha(p.id);
+      expect(f.regraDeFerias).toBe("calculada");
+      expect(f.vinculo).toMatchObject({ tipo: "clt", dataAdmissao: ADMISSAO });
+      expect(f.periodos[0]).toMatchObject({ direito: 30 });
+    });
+
+    it("Estágio: saldo automático como o CLT", async () => {
+      const p = await admitir(rhA, empresaA, "ativo", "estagio");
+      const f = await ficha(p.id);
+      expect(f.regraDeFerias).toBe("calculada");
+      expect(f.periodos[0]).toMatchObject({ direito: 30 });
+    });
+
+    it.each(["pj", "freelancer"])(
+      "%s: sem férias — a ficha não tem períodos, registrar férias é 422; outras ausências seguem",
+      async (tipo) => {
+        const p = await admitir(rhA, empresaA, "ativo", tipo);
+        const f = await ficha(p.id);
+        expect(f).toMatchObject({
+          regraDeFerias: "sem_ferias",
+          periodos: [],
+          periodoAtual: null,
+        });
+        const inicio = somarDias(HOJE, 60);
+        const recusa = await post("/v1/ausencias", rhA)
+          .send({
+            colaboradorId: p.id,
+            tipo: "ferias",
+            inicio,
+            fim: somarDias(inicio, 9),
+            aprovada: true,
+          })
+          .expect(422);
+        expect(recusa.body.erros).toEqual([
+          { campo: "tipo", motivo: "nao_se_aplica" },
+        ]);
+        await post("/v1/ausencias", rhA)
+          .send({
+            colaboradorId: p.id,
+            tipo: "falta_justificada",
+            inicio,
+            fim: inicio,
+            aprovada: true,
+          })
+          .expect(201);
+        const sim = await get("/v1/ausencias/simulacao", rhA)
+          .query({
+            colaboradorId: p.id,
+            tipo: "ferias",
+            inicio,
+            fim: somarDias(inicio, 9),
+          })
+          .expect(200);
+        expect(sim.body).toMatchObject({
+          regraDeFerias: "sem_ferias",
+          saldoAntes: null,
+          periodo: null,
+        });
+      },
+    );
+
+    it("Aprendiz: sem regra automática — sem períodos; férias entram sem conferir saldo, sem período e sem venda", async () => {
+      const p = await admitir(rhA, empresaA, "ativo", "aprendiz");
+      const f = await ficha(p.id);
+      expect(f).toMatchObject({
+        regraDeFerias: "sem_regra",
+        periodos: [],
+        periodoAtual: null,
+      });
+      const inicio = somarDias(HOJE, 40);
+      const fim = somarDias(inicio, 29);
+      const venda = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: p.id,
+          tipo: "ferias",
+          inicio,
+          fim,
+          diasVendidos: 5,
+          aprovada: true,
+        })
+        .expect(422);
+      expect(venda.body.erros).toEqual([
+        { campo: "diasVendidos", motivo: "nao_se_aplica" },
+      ]);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: p.id,
+          tipo: "ferias",
+          inicio,
+          fim,
+          aprovada: true,
+        })
+        .expect(201);
+      expect(r.body).toMatchObject({ periodoAquisitivo: null, dias: 30 });
+      const sim = await get("/v1/ausencias/simulacao", rhA)
+        .query({
+          colaboradorId: p.id,
+          tipo: "ferias",
+          inicio: somarDias(fim, 30),
+          fim: somarDias(fim, 39),
+        })
+        .expect(200);
+      expect(sim.body).toMatchObject({
+        regraDeFerias: "sem_regra",
+        saldoAntes: null,
+        maxVendaveis: null,
+      });
+    });
+
+    it("a consulta da ficha deixa um evento de leitura, sem valores", async () => {
+      const p = await admitir(rhA, empresaA);
+      const inicio = somarDias(HOJE, 70);
+      await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: p.id,
+          tipo: "licenca_medica",
+          inicio,
+          fim: somarDias(inicio, 2),
+          aprovada: true,
+          observacao: "Observacao Sigilosa Do Teste",
+        })
+        .expect(201);
+      const antes = new Date();
+      await ficha(p.id);
+      const eventos = await prisma.auditEvent.findMany({
+        where: {
+          action: "pessoas_ausencia_consultada",
+          resourceId: p.id,
+          occurredAt: { gte: antes },
+        },
+      });
+      expect(eventos).toHaveLength(1);
+      expect(eventos[0]).toMatchObject({
+        resource: "ausencia",
+        companyId: empresaA,
+        result: "success",
+      });
+      expect(JSON.stringify(eventos)).not.toContain("Sigilosa");
+    });
+
+    it("outra empresa: a ficha de férias responde 404, sem revelar a pessoa", async () => {
+      const p = await admitir(rhA, empresaA);
+      await get(`/v1/colaboradores/${p.id}/ferias`, rhB).expect(404);
+    });
+  });
+
+  describe("anexo da ausência (atestado ou documento)", () => {
+    /** PDF sintético mínimo, com o fim de arquivo. */
+    const pdf = (conteudo = "documento sintetico") =>
+      Buffer.from(
+        `%PDF-1.4\n% ${conteudo}\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n`,
+      );
+
+    function enviarAnexo(
+      ausenciaId: string,
+      bytes: Buffer,
+      cred: Credencial = rhA,
+      opcoes: { tipo?: string; extensao?: string; conteudo?: string } = {},
+    ) {
+      return agent()
+        .post(`/v1/ausencias/${ausenciaId}/anexo`)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken)
+        .set("Content-Type", opcoes.conteudo ?? "application/octet-stream")
+        .set("x-evolli-anexo-tipo", opcoes.tipo ?? "application/pdf")
+        .set("x-evolli-anexo-extensao", opcoes.extensao ?? "pdf")
+        .send(bytes);
+    }
+
+    const baixar = (ausenciaId: string, cred: Credencial = rhA) =>
+      agent()
+        .get(`/v1/ausencias/${ausenciaId}/anexo/arquivo`)
+        .set("Cookie", cred.cookie)
+        .buffer(true)
+        .parse((res, cb) => {
+          const partes: Buffer[] = [];
+          res.on("data", (c: Buffer) => partes.push(c));
+          res.on("end", () => cb(null, Buffer.concat(partes)));
+        });
+
+    async function licenca(): Promise<{ colaboradorId: string; id: string }> {
+      const p = await admitir(rhA, empresaA);
+      const inicio = somarDias(HOJE, 80);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: p.id,
+          tipo: "licenca_medica",
+          inicio,
+          fim: somarDias(inicio, 2),
+          aprovada: true,
+        })
+        .expect(201);
+      return { colaboradorId: p.id, id: r.body.id as string };
+    }
+
+    const anexos = (ausenciaId: string) =>
+      prisma.anexoAusencia.findMany({ where: { ausenciaId } });
+
+    it("envio: 201 com formato e tamanho; aparece na ficha; trilha sem nome nem conteúdo", async () => {
+      const a = await licenca();
+      const bytes = pdf();
+      const r = await enviarAnexo(a.id, bytes).expect(201);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body.anexo).toMatchObject({
+        formato: "pdf",
+        tamanhoBytes: bytes.length,
+      });
+      const ficha = await get(
+        `/v1/colaboradores/${a.colaboradorId}/ferias`,
+        rhA,
+      ).expect(200);
+      const item = ficha.body.historico.find(
+        (h: { id: string }) => h.id === a.id,
+      );
+      expect(item.anexo).toMatchObject({
+        formato: "pdf",
+        tamanhoBytes: bytes.length,
+      });
+      const linhas = await anexos(a.id);
+      expect(linhas).toHaveLength(1);
+      expect(armazenamento.objetos.has(linhas[0]!.chaveObjeto)).toBe(true);
+      // A chave só tem ids internos.
+      expect(linhas[0]!.chaveObjeto).toMatch(
+        /^v1\/empresas\/[0-9a-f-]+\/colaboradores\/[0-9a-f-]+\/ausencias\/[0-9a-f-]+\/anexos\/[0-9a-f-]+$/,
+      );
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: a.id, action: "pessoas_ausencia_anexo_enviado" },
+      });
+      expect(eventos).toHaveLength(1);
+      expect(JSON.stringify(eventos)).not.toContain("sintetico");
+      // Um anexo por ausência.
+      await enviarAnexo(a.id, pdf("outro")).expect(409);
+    });
+
+    it("download: o mesmo arquivo, privado, sem cache, com trilha", async () => {
+      const a = await licenca();
+      const bytes = pdf("para baixar");
+      await enviarAnexo(a.id, bytes).expect(201);
+      const r = await baixar(a.id).expect(200);
+      expect(Buffer.compare(r.body as Buffer, bytes)).toBe(0);
+      expect(r.headers["content-type"]).toBe("application/pdf");
+      expect(r.headers["cache-control"]).toBe("private, no-store");
+      expect(r.headers["x-content-type-options"]).toBe("nosniff");
+      expect(r.headers["content-disposition"]).toBe(
+        'attachment; filename="atestado.pdf"',
+      );
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: a.id, action: "pessoas_ausencia_anexo_baixado" },
+      });
+      expect(eventos).toHaveLength(1);
+    });
+
+    it("o antivírus reprova: 422 e nada é guardado", async () => {
+      const a = await licenca();
+      const antes = armazenamento.objetos.size;
+      const r = await enviarAnexo(
+        a.id,
+        pdf(ASSINATURA_DE_TESTE_ANTIVIRUS),
+      ).expect(422);
+      expect(r.body.codigo).toBe("anexo_reprovado_antivirus");
+      expect(armazenamento.objetos.size).toBe(antes);
+      expect(await anexos(a.id)).toHaveLength(0);
+    });
+
+    it.each([
+      ["texto com extensão de pdf", Buffer.from("isto nao e pdf"), {}],
+      ["pdf declarado como png", pdf(), { tipo: "image/png", extensao: "png" }],
+      [
+        "formato fora da lista",
+        Buffer.from("GIF89a"),
+        { tipo: "image/gif", extensao: "gif" },
+      ],
+    ])("%s: 422 formato inválido, nada guardado", async (_r, bytes, opcoes) => {
+      const a = await licenca();
+      const r = await enviarAnexo(a.id, bytes, rhA, opcoes).expect(422);
+      expect(r.body.codigo).toBe("anexo_formato_invalido");
+      expect(await anexos(a.id)).toHaveLength(0);
+    });
+
+    it("corpo que não é arquivo binário: 415", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf(), rhA, {
+        conteudo: "application/json",
+      }).expect(415);
+    });
+
+    it("remover: some da ficha e do download, fica no banco; depois pode enviar outro", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf()).expect(201);
+      await agent()
+        .delete(`/v1/ausencias/${a.id}/anexo`)
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", rhA.csrfToken)
+        .expect(200);
+      const ficha = await get(
+        `/v1/colaboradores/${a.colaboradorId}/ferias`,
+        rhA,
+      ).expect(200);
+      expect(
+        ficha.body.historico.find((h: { id: string }) => h.id === a.id).anexo,
+      ).toBeNull();
+      await baixar(a.id).expect(404);
+      const linhas = await anexos(a.id);
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]!.removidoEm).not.toBeNull();
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: a.id, action: "pessoas_ausencia_anexo_removido" },
+      });
+      expect(eventos).toHaveLength(1);
+      await enviarAnexo(a.id, pdf("segundo")).expect(201);
+    });
+
+    it("ausência cancelada não recebe anexo (409)", async () => {
+      const a = await licenca();
+      await post(`/v1/ausencias/${a.id}/cancelar`, rhA).send().expect(200);
+      await enviarAnexo(a.id, pdf()).expect(409);
+    });
+
+    it("outra empresa: envio e download respondem 404; gestor, 403", async () => {
+      const a = await licenca();
+      await enviarAnexo(a.id, pdf()).expect(201);
+      await enviarAnexo(a.id, pdf(), rhB).expect(404);
+      await baixar(a.id, rhB).expect(404);
+      for (const [, cred] of outrosPapeis) {
+        await baixar(a.id, cred).expect(403);
+      }
+    });
+
+    it("histórico preservado: a aplicação não apaga anexo", async () => {
+      const linhas = await prisma.$queryRaw<{ pode: boolean }[]>`
+        SELECT has_table_privilege('evolli_app', 'app.anexo_ausencia', 'DELETE') AS pode`;
+      expect(linhas[0]!.pode).toBe(false);
     });
   });
 });

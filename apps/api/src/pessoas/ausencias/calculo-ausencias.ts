@@ -112,11 +112,24 @@ export function diaDaVolta(fim: Dia): Dia {
 }
 
 /**
- * Direito anual pela lei: 30 dias para CLT, estágio (recesso, Lei 11.788) e
- * aprendiz. Os demais contratos ficam em 0 até haver política de férias.
+ * T215 — a regra de férias pelo tipo do vínculo (decisão da empresa,
+ * 2026-11-23/24):
+ * - `calculada`: CLT e Estágio — saldo automático (períodos aquisitivos);
+ * - `sem_ferias`: PJ e Freelancer — não entram em férias;
+ * - `sem_regra`: Aprendiz e os tipos ainda não decididos — sem cálculo
+ *   automático; férias entram sem conferir saldo, sem período e sem venda.
  */
+export type RegraDeFerias = "calculada" | "sem_ferias" | "sem_regra";
+
+export function regraDeFeriasDoTipo(tipo: TipoVinculo): RegraDeFerias {
+  if (tipo === "clt" || tipo === "estagio") return "calculada";
+  if (tipo === "pj" || tipo === "freelancer") return "sem_ferias";
+  return "sem_regra";
+}
+
+/** Direito anual: 30 dias só onde a regra é calculada; os demais, 0. */
 export function direitoDoTipo(tipo: TipoVinculo): number {
-  return tipo === "clt" || tipo === "estagio" || tipo === "aprendiz" ? 30 : 0;
+  return regraDeFeriasDoTipo(tipo) === "calculada" ? 30 : 0;
 }
 
 /** Status em que a ausência ocupa a agenda (e, nas férias, o saldo). */

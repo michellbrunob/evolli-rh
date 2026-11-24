@@ -35,6 +35,8 @@ import {
   periodoParaFerias,
   periodosAquisitivos,
   prazoDoAbono,
+  type RegraDeFerias,
+  regraDeFeriasDoTipo,
   seSobrepoem,
   somarDias,
   somarMeses,
@@ -68,6 +70,8 @@ export interface AusenciaApi {
   observacao: string | null;
   registradoEm: string;
   decididoEm: string | null;
+  /** T215 — o atestado ou documento anexado (vivo), sem nome nem chave. */
+  anexo: { formato: string; tamanhoBytes: number; enviadoEm: string } | null;
 }
 
 export interface IndicadoresDeAusencias {
@@ -95,9 +99,15 @@ export interface SimulacaoDeAusencia {
   saldoDepois: number | null;
   maxVendaveis: number | null;
   prazoAbono: Dia | null;
+  /** T215 — a regra de férias do vínculo da pessoa. */
+  regraDeFerias: RegraDeFerias;
 }
 
 export interface FeriasDoColaborador {
+  /** T215 — calculada (CLT, Estágio), sem_ferias (PJ, Freelancer), sem_regra. */
+  regraDeFerias: RegraDeFerias;
+  vinculo: { tipo: TipoVinculo; dataAdmissao: Dia };
+  /** Só na regra calculada; nas demais, vazio. */
   periodos: PeriodoAquisitivo[];
   periodoAtual: number | null;
   proximaAusencia: AusenciaApi | null;
@@ -132,6 +142,11 @@ const INCLUSAO = {
         take: 1,
       },
     },
+  },
+  anexos: {
+    where: { removidoEm: null },
+    select: { formato: true, tamanhoBytes: true, criadoEm: true },
+    take: 1,
   },
 } as const satisfies Prisma.AusenciaInclude;
 
@@ -288,6 +303,17 @@ export class AusenciasService {
     if (principal.situacao !== "ativo") {
       erros.push({ campo: "colaboradorId", motivo: "indisponivel" });
     }
+    const regra = regraDeFeriasDoTipo(principal.tipo);
+    if (dto.tipo === "ferias" && regra === "sem_ferias") {
+      erros.push({ campo: "tipo", motivo: "nao_se_aplica" });
+    }
+    if (
+      dto.tipo === "ferias" &&
+      regra === "sem_regra" &&
+      (dto.diasVendidos ?? 0) > 0
+    ) {
+      erros.push({ campo: "diasVendidos", motivo: "nao_se_aplica" });
+    }
     if (erros.length > 0) throw new CamposRecusadosException(erros);
 
     const aprovada = dto.tipo === "afastamento" || dto.aprovada;
@@ -317,7 +343,7 @@ export class AusenciasService {
       }
 
       let periodoInicio: Dia | null = null;
-      if (dto.tipo === "ferias") {
+      if (dto.tipo === "ferias" && regra === "calculada") {
         const hoje = hojeEmSaoPaulo();
         const periodos = this.periodosDoVinculo(
           principal,
@@ -465,12 +491,14 @@ export class AusenciasService {
       ]);
     }
     const fim = query.fim ?? null;
+    const regraDeFerias = regraDeFeriasDoTipo(principal.tipo);
     const base = {
       dias: fim ? diasCorridos(query.inicio, fim) : null,
       diasUteis: fim ? diasUteis(query.inicio, fim) : null,
       volta: fim ? diaDaVolta(fim) : null,
+      regraDeFerias,
     };
-    if (query.tipo !== "ferias" || !fim) {
+    if (query.tipo !== "ferias" || !fim || regraDeFerias !== "calculada") {
       return {
         ...base,
         periodo: null,
@@ -538,11 +566,19 @@ export class AusenciasService {
       orderBy: [{ inicio: "desc" }, { criadoEm: "desc" }],
     });
     const hoje = hojeEmSaoPaulo();
-    const periodos = this.periodosDoVinculo(
-      principal,
-      linhas.map(paraSaldo),
-      hoje,
-      hoje,
+    const regraDeFerias = regraDeFeriasDoTipo(principal.tipo);
+    const periodos =
+      regraDeFerias === "calculada"
+        ? this.periodosDoVinculo(principal, linhas.map(paraSaldo), hoje, hoje)
+        : [];
+    // A leitura da ficha alcança dados de saúde (licenças): fica na trilha,
+    // só com o id do colaborador — nunca tipo, datas ou observação.
+    await this.auditoria.registrarLeitura(
+      ctx,
+      "pessoas_ausencia_consultada",
+      "ausencia",
+      colaboradorId,
+      empresaId,
     );
     const disponivel = periodos.findIndex(
       (p) => p.situacao === "disponivel" && p.disponiveis > 0,
@@ -560,6 +596,11 @@ export class AusenciasService {
       )
       .sort((a, b) => a.inicio.getTime() - b.inicio.getTime())[0];
     return {
+      regraDeFerias,
+      vinculo: {
+        tipo: principal.tipo,
+        dataAdmissao: diaDe(principal.dataAdmissao),
+      },
       periodos,
       periodoAtual,
       proximaAusencia: proxima ? paraApi(proxima, fotos) : null,
@@ -769,5 +810,12 @@ function paraApi(
     observacao: linha.observacao,
     registradoEm: linha.criadoEm.toISOString(),
     decididoEm: linha.decididoEm ? linha.decididoEm.toISOString() : null,
+    anexo: linha.anexos[0]
+      ? {
+          formato: linha.anexos[0].formato,
+          tamanhoBytes: linha.anexos[0].tamanhoBytes,
+          enviadoEm: linha.anexos[0].criadoEm.toISOString(),
+        }
+      : null,
   };
 }

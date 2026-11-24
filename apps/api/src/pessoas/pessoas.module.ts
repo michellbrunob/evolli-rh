@@ -13,6 +13,8 @@ import {
   FeriasDoColaboradorController,
 } from "./ausencias/ausencias.controller";
 import { AusenciasService } from "./ausencias/ausencias.service";
+import { AnexoAusenciaController } from "./ausencias/anexo-ausencia.controller";
+import { AnexoAusenciaService } from "./ausencias/anexo-ausencia.service";
 import { HistoricoSalarialController } from "./salarios/historico-salarial.controller";
 import { HistoricoSalarialService } from "./salarios/historico-salarial.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
@@ -74,6 +76,7 @@ import {
     DesativacaoColaboradorController,
     // T215 — Férias e ausências.
     AusenciasController,
+    AnexoAusenciaController,
     HistoricoSalarialController,
     FeriasDoColaboradorController,
   ],
@@ -90,6 +93,7 @@ import {
     ContratoColaboradorService,
     DesativacaoColaboradorService,
     AusenciasService,
+    AnexoAusenciaService,
     HistoricoSalarialService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {

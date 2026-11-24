@@ -77,7 +77,9 @@ export type CampoPublico =
   | "diasVendidos"
   | "periodoAquisitivoInicio"
   // T215 — Salários: o salário do contrato com linha do tempo.
-  | "salarioBruto";
+  | "salarioBruto"
+  // T215 — férias para quem não tem férias (PJ e Freelancer).
+  | "tipo";
 
 export interface ErroDeCampo {
   campo: CampoPublico;
@@ -126,7 +128,14 @@ export type CodigoDeRecusa =
   | "documento_nome_nao_permitido"
   | "documento_limite_categoria"
   | "documento_limite_colaborador"
-  | "documento_nao_disponivel";
+  | "documento_nao_disponivel"
+  // T215 — anexo da ausência (atestado ou documento).
+  | "anexo_arquivo_vazio"
+  | "anexo_arquivo_grande_demais"
+  | "anexo_formato_invalido"
+  | "anexo_arquivo_malformado"
+  | "anexo_com_macro"
+  | "anexo_reprovado_antivirus";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência
@@ -143,7 +152,11 @@ export class RecusaDeNegocioException extends UnprocessableEntityException {
  * leva só um código de uma lista fechada, para a tela dizer o que fazer;
  * nunca host, porta, nome do serviço ou mensagem interna.
  */
-export type CodigoDeIndisponibilidade = "documento_verificacao_indisponivel";
+export type CodigoDeIndisponibilidade =
+  | "documento_verificacao_indisponivel"
+  // T215 — anexo da ausência.
+  | "anexo_verificacao_indisponivel"
+  | "anexo_armazenamento_indisponivel";
 
 export class IndisponibilidadeException extends ServiceUnavailableException {
   constructor(readonly codigo: CodigoDeIndisponibilidade) {
