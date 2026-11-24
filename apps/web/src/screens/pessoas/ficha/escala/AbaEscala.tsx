@@ -59,6 +59,7 @@ import {
   diaDaSemana,
   diasNoMes,
   feriadoDe,
+  avisosDaJornada,
   beneficioPelosDiasUteis,
   formatarHoras,
   horasPorSemana,
@@ -458,6 +459,7 @@ export function AbaEscala({
             aberta={aberta}
             turnos={turnos}
             hoje={hoje}
+            jornadaContratoHoras={jornadaContratoHoras}
             servico={servico}
             onFechar={() => setGaveta(null)}
             onEncerrar={() => setGaveta("encerrar")}
@@ -1128,6 +1130,7 @@ function GavetaDoPadrao({
   aberta,
   turnos,
   hoje,
+  jornadaContratoHoras,
   servico,
   onFechar,
   onEncerrar,
@@ -1141,6 +1144,7 @@ function GavetaDoPadrao({
   readonly aberta: EscalaApi | null;
   readonly turnos: TabelaHorarioApi[] | "erro";
   readonly hoje: string;
+  readonly jornadaContratoHoras: number | null;
   readonly servico: ServicoDeEscala;
   readonly onFechar: () => void;
   readonly onEncerrar: () => void;
@@ -1243,6 +1247,12 @@ function GavetaDoPadrao({
     vigenciaInicio: vale || hoje,
   };
   const dataBase = vale || hoje;
+  // T215 — CLT e EC 141/2026: avisos na própria gaveta, sem impedir salvar.
+  const avisosLegais = avisosDaJornada(
+    novo,
+    jornadaPorSemana(jornadaContratoHoras, dataBase) / 60,
+    dataBase,
+  );
   const antes = aberta;
   const modeloAntes = antes?.modelo ?? dados.escalaDoCadastro;
 
@@ -1654,6 +1664,25 @@ function GavetaDoPadrao({
             ))}
           </dl>
         </section>
+        {avisosLegais.length > 0 ? (
+          <div
+            role="note"
+            aria-labelledby={`${base}-legislacao`}
+            className="escala-gaveta__legislacao"
+          >
+            <p
+              id={`${base}-legislacao`}
+              className="escala-gaveta__legislacao-titulo"
+            >
+              Atenção à legislação
+            </p>
+            <ul>
+              {avisosLegais.map((aviso) => (
+                <li key={aviso}>{aviso}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <p className="escala-ficha__ajuda">
           Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam
           quando a escala for publicada.

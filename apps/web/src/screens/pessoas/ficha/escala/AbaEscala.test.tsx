@@ -668,3 +668,21 @@ describe("T215 — Escala atual e gaveta como na referência (regras e explicaç
     );
   });
 });
+
+describe("T215 — aviso de legislação na gaveta", () => {
+  it("6x1 com turno de 8 h: avisa na gaveta que passa do limite semanal, sem impedir salvar", async () => {
+    const servico = servicoCom([escala("e1", "5x2", "2026-02-02", null)]);
+    montar(servico, { jornadaContratoHoras: 44 });
+    const g = await abrirGaveta("Alterar padrão");
+    expect(
+      within(g).queryByRole("note", { name: "Atenção à legislação" }),
+    ).toBeNull();
+    await escolher(g, "Escala", /^6x1/);
+    const nota = within(g).getByRole("note", { name: "Atenção à legislação" });
+    expect(nota).toHaveTextContent(
+      "Este padrão soma 48 h por semana, acima do limite de 44 h",
+    );
+    fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
+    await waitFor(() => expect(servico.definir).toHaveBeenCalled());
+  });
+});

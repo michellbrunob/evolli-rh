@@ -336,3 +336,91 @@ export function proximosDias(
     };
   });
 }
+
+/**
+ * T215 — avisos de legislação mostrados na gaveta do padrão (não impedem
+ * salvar; o RH decide com acordo, convenção ou banco de horas):
+ *
+ * - limite semanal: a soma do padrão acima do menor entre a jornada do
+ *   contrato e o limite legal da data (EC 141/2026) — o excedente é extra;
+ * - mais de 10 h num dia (8 h normais + até 2 h extras, CLT, art. 59);
+ * - intervalo (CLT, art. 71): acima de 6 h de trabalho, de 1 h a 2 h; de 4 h
+ *   a 6 h, 15 min; acima de 2 h só com acordo escrito ou convenção;
+ * - descanso de 11 h entre um dia de trabalho e o seguinte (CLT, art. 66).
+ *
+ * O 12x36 segue o art. 59-A (12 h com 36 h de descanso, intervalos
+ * observados ou indenizados): nenhum desses avisos se aplica a ele.
+ */
+export function avisosDaJornada(
+  p: PadraoDeEscala,
+  limiteSemanalHoras: number,
+  base: string,
+): string[] {
+  if (p.modelo === "12x36" || !p.turno || p.turno.length === 0) return [];
+  const avisos: string[] = [];
+  const semanal = horasPorSemana(p, base);
+  if (semanal > limiteSemanalHoras * 60) {
+    avisos.push(
+      `Este padrão soma ${formatarHoras(semanal)} por semana, acima do limite de ${limiteSemanalHoras} h (jornada do contrato e EC 141/2026). O que passar disso é hora extra.`,
+    );
+  }
+  let maiorDia = 0;
+  let semIntervaloLongo = false;
+  let semPausaCurta = false;
+  let intervaloLongo = false;
+  let descansoCurto = false;
+  const turnos: [readonly PeriodoDoTurno[] | null, number][] = [
+    [p.turno, p.intervaloTurno ?? 0],
+    [p.turnoNoite, p.intervaloTurnoNoite ?? 0],
+  ];
+  for (const [turno, intervalo] of turnos) {
+    if (!turno) continue;
+    for (const dia of new Set(turno.map((x) => x.dia))) {
+      const periodos = turno
+        .filter((x) => x.dia === dia)
+        .map((x) => [minutos(x.inicio), minutos(x.fim)] as const)
+        .sort((a, b) => a[0] - b[0]);
+      const bruto = periodos.reduce((t, [i, f]) => t + f - i, 0);
+      let pausa = 0;
+      for (let k = 1; k < periodos.length; k += 1) {
+        pausa += periodos[k]![0] - periodos[k - 1]![1];
+      }
+      if (periodos.length === 1) pausa = intervalo;
+      const trabalho = periodos.length === 1 ? bruto - intervalo : bruto;
+      const extensao = periodos[periodos.length - 1]![1] - periodos[0]![0];
+      maiorDia = Math.max(maiorDia, trabalho);
+      if (trabalho > 360 && pausa < 60) semIntervaloLongo = true;
+      else if (trabalho > 240 && trabalho <= 360 && pausa < 15) {
+        semPausaCurta = true;
+      }
+      if (pausa > 120) intervaloLongo = true;
+      if (24 * 60 - extensao < 11 * 60) descansoCurto = true;
+    }
+  }
+  if (semIntervaloLongo) {
+    avisos.push(
+      "Turno com mais de 6 h de trabalho precisa de intervalo de 1 h a 2 h (CLT, art. 71).",
+    );
+  }
+  if (semPausaCurta) {
+    avisos.push(
+      "Turno de 4 h a 6 h precisa de pausa de 15 min (CLT, art. 71, § 1º).",
+    );
+  }
+  if (intervaloLongo) {
+    avisos.push(
+      "Intervalo acima de 2 h só vale com acordo escrito ou convenção coletiva (CLT, art. 71).",
+    );
+  }
+  if (maiorDia > 600) {
+    avisos.push(
+      `Há dia com ${formatarHoras(maiorDia)} de trabalho: acima de 10 h por dia (8 h normais + 2 h extras, CLT, art. 59).`,
+    );
+  }
+  if (descansoCurto) {
+    avisos.push(
+      "Fica menos de 11 h de descanso entre um dia de trabalho e o seguinte (CLT, art. 66).",
+    );
+  }
+  return avisos;
+}

@@ -10,6 +10,7 @@ import {
   trabalhoNoDia,
   jornadaPorSemana,
   limiteLegalSemanal,
+  avisosDaJornada,
 } from "./calendarioDaEscala";
 import { MODELOS_DE_ESCALA, modeloDe } from "./modelosDeEscala";
 
@@ -234,5 +235,114 @@ describe("T215 — EC 141/2026 e intervalo do turno", () => {
       { dia: "segunda", inicio: "13:00", fim: "17:00" },
     ];
     expect(minutosDoTurno(dois, "2026-11-23", 60)).toBe(480);
+  });
+});
+
+describe("T215 — avisos de legislação da jornada (gaveta)", () => {
+  const SEG_SEX = ["segunda", "terca", "quarta", "quinta", "sexta"];
+  const grade = (inicio: string, fim: string, pausa?: [string, string]) =>
+    SEG_SEX.flatMap((dia) =>
+      pausa
+        ? [
+            { dia, inicio, fim: pausa[0] },
+            { dia, inicio: pausa[1], fim },
+          ]
+        : [{ dia, inicio, fim }],
+    );
+  const padrao = (
+    modelo: string,
+    turno: ReturnType<typeof grade>,
+    intervaloTurno = 0,
+  ) => ({
+    modelo,
+    turno,
+    turnoNoite: null,
+    intervaloTurno,
+    folgaSemanal: modelo === "6x1" ? 7 : null,
+    diasTrabalho: [],
+    inicioCiclo: modelo === "12x36" ? "2026-11-02" : null,
+    vigenciaInicio: "2026-11-02",
+  });
+
+  it("5x2 comercial de 8 h com 1 h de almoço: nenhum aviso", () => {
+    expect(
+      avisosDaJornada(
+        padrao("5x2", grade("08:00", "17:00", ["12:00", "13:00"])),
+        44,
+        "2026-11-02",
+      ),
+    ).toEqual([]);
+  });
+
+  it("6x1 de 8 h: soma 48 h, acima do limite", () => {
+    expect(
+      avisosDaJornada(
+        padrao("6x1", grade("08:00", "17:00", ["12:00", "13:00"])),
+        44,
+        "2026-11-02",
+      ),
+    ).toEqual([
+      "Este padrão soma 48 h por semana, acima do limite de 44 h (jornada do contrato e EC 141/2026). O que passar disso é hora extra.",
+    ]);
+  });
+
+  it("9 h corridas sem intervalo: pede 1 h de intervalo e passa do limite semanal", () => {
+    const avisos = avisosDaJornada(
+      padrao("5x2", grade("08:00", "17:00")),
+      44,
+      "2026-11-02",
+    );
+    expect(avisos).toContain(
+      "Turno com mais de 6 h de trabalho precisa de intervalo de 1 h a 2 h (CLT, art. 71).",
+    );
+    expect(avisos).toContain(
+      "Este padrão soma 45 h por semana, acima do limite de 44 h (jornada do contrato e EC 141/2026). O que passar disso é hora extra.",
+    );
+  });
+
+  it("5 h corridas sem pausa: pede 15 min (art. 71, § 1º)", () => {
+    expect(
+      avisosDaJornada(padrao("5x2", grade("08:00", "13:00")), 44, "2026-11-02"),
+    ).toEqual([
+      "Turno de 4 h a 6 h precisa de pausa de 15 min (CLT, art. 71, § 1º).",
+    ]);
+  });
+
+  it("intervalo acima de 2 h e dia acima de 10 h e descanso curto entre jornadas", () => {
+    const avisos = avisosDaJornada(
+      padrao("5x2", grade("06:00", "20:00", ["10:00", "13:00"])),
+      44,
+      "2026-11-02",
+    );
+    expect(avisos).toContain(
+      "Intervalo acima de 2 h só vale com acordo escrito ou convenção coletiva (CLT, art. 71).",
+    );
+    expect(avisos).toContain(
+      "Há dia com 11 h de trabalho: acima de 10 h por dia (8 h normais + 2 h extras, CLT, art. 59).",
+    );
+    expect(avisos).toContain(
+      "Fica menos de 11 h de descanso entre um dia de trabalho e o seguinte (CLT, art. 66).",
+    );
+  });
+
+  it("12x36 segue o art. 59-A: sem aviso de 12 h nem de limite semanal", () => {
+    const doze = [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta",
+      "sabado",
+      "domingo",
+    ].flatMap((dia) => [{ dia, inicio: "07:00", fim: "19:00" }]);
+    expect(
+      avisosDaJornada(padrao("12x36", doze, 60), 44, "2026-11-02"),
+    ).toEqual([]);
+  });
+
+  it("sem turno fixo: nada a avisar", () => {
+    expect(
+      avisosDaJornada({ ...padrao("5x2", []), turno: null }, 44, "2026-11-02"),
+    ).toEqual([]);
   });
 });

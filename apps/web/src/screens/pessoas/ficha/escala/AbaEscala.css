@@ -922,3 +922,28 @@
 .escala-gaveta__campo input[aria-invalid="true"] {
   border-color: var(--status-danger-ink);
 }
+
+/* T215 — avisos de legislação na gaveta (CLT e EC 141/2026). */
+.escala-gaveta__legislacao {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+}
+
+.escala-gaveta__legislacao-titulo {
+  margin: 0 0 var(--space-xs);
+  font-weight: var(--weight-strong);
+}
+
+.escala-gaveta__legislacao ul {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+
+.escala-gaveta__legislacao li + li {
+  margin-top: var(--space-xs);
+}
