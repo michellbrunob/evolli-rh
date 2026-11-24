@@ -91,6 +91,11 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_aprovada",
   "pessoas_ausencia_recusada",
   "pessoas_ausencia_cancelada",
+
+  // T215 — Salários (linha do tempo salarial): sem valor, cargo ou contrato.
+  "pessoas_salario_registrado",
+  "pessoas_salario_atualizado",
+  "pessoas_salario_removido",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",
@@ -309,7 +314,10 @@ export type AuditResource =
   // T215 — Férias e ausências: o `resourceId` é o id da AUSÊNCIA (no
   // registro e nas decisões) ou do COLABORADOR (consultas negadas). Nunca
   // tipo, datas, motivo ou observação.
-  | "ausencia";
+  | "ausencia"
+  // T215 — Salários: o `resourceId` é o id da ALTERAÇÃO salarial. Nunca
+  // valor, cargo ou modelo de contrato.
+  | "alteracao_salarial";
 
 export type RecordAuditEventInput =
   | {

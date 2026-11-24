@@ -41,7 +41,9 @@ export type MotivoDoCampo =
   | "fim_antes_do_inicio"
   | "sobreposicao"
   | "saldo_insuficiente"
-  | "venda_acima_do_limite";
+  | "venda_acima_do_limite"
+  // T215 — Salários: data de vigência depois de hoje.
+  | "futura";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -71,7 +73,9 @@ export type CampoPublico =
   | "inicio"
   | "fim"
   | "diasVendidos"
-  | "periodoAquisitivoInicio";
+  | "periodoAquisitivoInicio"
+  // T215 — Salários: o salário do contrato com linha do tempo.
+  | "salarioBruto";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

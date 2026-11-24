@@ -171,6 +171,9 @@ model AccessUser {
   // T215 — Férias e ausências: quem registrou e quem decidiu.
   ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
   ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
+  // T215 — Salários: quem registrou e quem removeu uma alteração salarial.
+  alteracoesSalariaisRegistradas AlteracaoSalarial[]          @relation("AlteracaoSalarialRegistradaPor")
+  alteracoesSalariaisRemovidas   AlteracaoSalarial[]          @relation("AlteracaoSalarialRemovidaPor")
   // T213 — documentos do colaborador: quem registrou, enviou ou removeu.
   documentosColaboradorCriados   DocumentoColaborador[]       @relation("DocumentoColaboradorAutor")
   documentosColaboradorRemovidos DocumentoColaborador[]       @relation("DocumentoColaboradorRemocao")
@@ -506,6 +509,12 @@ enum AuditAction {
   pessoas_ausencia_aprovada   @map("pessoas.ausencia.aprovada")
   pessoas_ausencia_recusada   @map("pessoas.ausencia.recusada")
   pessoas_ausencia_cancelada  @map("pessoas.ausencia.cancelada")
+
+  // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
+  // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
+  pessoas_salario_registrado @map("pessoas.salario.registrado")
+  pessoas_salario_atualizado @map("pessoas.salario.atualizado")
+  pessoas_salario_removido   @map("pessoas.salario.removido")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -1245,6 +1254,9 @@ model VinculoFuncional {
 
   /// T215 — ausências registradas com este vínculo como o principal.
   ausencias Ausencia[]
+
+  /// T215 — a linha do tempo salarial do vínculo (aba Salários da ficha).
+  alteracoesSalariais AlteracaoSalarial[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -2932,4 +2944,46 @@ model LimpezaDocumentoColaboradorPendente {
 
   @@index([empresaId])
   @@map("limpeza_documento_colaborador_pendente")
+}
+
+/// T215 — origem da alteração salarial: a da admissão (vigência = data de
+/// admissão, não se remove) ou uma alteração registrada depois.
+enum OrigemAlteracaoSalarial {
+  admissao
+  alteracao
+}
+
+/// T215 — linha do tempo salarial do vínculo (aba Salários da ficha). Cada
+/// linha é um período que começa em `vigencia_inicio` e vai até a véspera da
+/// próxima. O salário VIGENTE (a linha de maior vigência) é espelhado em
+/// `contrato_vinculo.salario_bruto`, que a lista e a edição já leem.
+///
+/// Remoção só lógica (`removida_em`): a linha sai da tela, fica no banco.
+/// Uma data por vínculo entre as linhas não removidas (índice parcial na
+/// migration). Nenhum valor vai à trilha de auditoria.
+model AlteracaoSalarial {
+  id                  String                  @id @default(uuid())
+  empresaId           String                  @map("empresa_id")
+  vinculoId           String                  @map("vinculo_id")
+  origem              OrigemAlteracaoSalarial
+  vigenciaInicio      DateTime                @map("vigencia_inicio") @db.Date
+  salarioBruto        Decimal                 @map("salario_bruto") @db.Decimal(12, 2)
+  /// Texto livre: o cargo NESSE período (pode ser anterior ao catálogo).
+  cargo               String?
+  /// Texto livre ("CLT, PJ, Estágio..."); vazio, a tela mostra o tipo do vínculo.
+  modeloContrato      String?                 @map("modelo_contrato")
+  /// `null` só na carga inicial da migration (sem ator).
+  registradaPorUserId String?                 @map("registrada_por_user_id")
+  removidaEm          DateTime?               @map("removida_em")
+  removidaPorUserId   String?                 @map("removida_por_user_id")
+  criadoEm            DateTime                @default(now()) @map("criado_em")
+  atualizadoEm        DateTime                @updatedAt @map("atualizado_em")
+
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradaPor AccessUser?      @relation("AlteracaoSalarialRegistradaPor", fields: [registradaPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidaPor   AccessUser?      @relation("AlteracaoSalarialRemovidaPor", fields: [removidaPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([vinculoId, empresaId])
+  @@index([empresaId])
+  @@map("alteracao_salarial")
 }

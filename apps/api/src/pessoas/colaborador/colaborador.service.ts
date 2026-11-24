@@ -1011,7 +1011,12 @@ export class ColaboradorService {
         // T209 — contrato da admissão (etapa 2), na MESMA transação.
         const contrato = await gravarContratoNaAdmissao(
           tx,
-          { vinculoId: vinculo.id, empresaId: escopo.empresaId },
+          {
+            vinculoId: vinculo.id,
+            empresaId: escopo.empresaId,
+            dataAdmissao: vinculo.dataAdmissao,
+            registradaPorUserId: ctx.actor.id,
+          },
           dto.contrato,
         );
 
