@@ -365,7 +365,7 @@ existe como base e redireciona o esforço seguinte para módulos funcionais.
 - **Não altera** `apps/api`, Prisma, migrations, contratos HTTP, regras, RBAC
   ou dados.
 - **Não altera** nenhuma tela funcional de `apps/web`.
-- **Não altera** `DESIGN-apple.md`, que segue intacto por decisão da T032.
+- **Não altera** o arquivo de referência visual da T032 (removido em 2026-11-25; a fonte oficial passou a ser [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md)).
 - **Não habilita** dado real, produção ou homologação.
 - **Não reabre** a decisão de plataforma da ADR 0014.
 - **Não reabre** a fundação visual aprovada acima: só correção necessária de

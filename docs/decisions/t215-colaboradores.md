@@ -127,3 +127,13 @@ cada um; links nos itens do meio, só texto no último):
 
 Quando o quadro existir, "Escala de trabalho" deixa de abrir os Turnos e
 passa a abrir o quadro; os Turnos viram sub-página dele (tabela acima).
+
+## Botões quadrados e design próprio (2026-11-25)
+
+- Decisão da proprietária: todos os botões do sistema seguem o padrão
+  "quadrado" — cantos levemente arredondados, pelo token `--radius-botao`
+  (`app/tokens.css`). A pílula (`--radius-pill`) fica só para selos, chips,
+  barras e marcadores.
+- O Evolli tem design próprio: o arquivo de referência visual externa da
+  T032 foi removido do repositório e a fonte oficial passou a ser
+  [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md).

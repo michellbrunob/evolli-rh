@@ -1,18 +1,18 @@
 /**
- * Fundação de tokens visuais (UI-F01) — inspirada em DESIGN-apple.md.
+ * Tokens visuais do Evolli (UI-F01) — a única origem de cor, espaço, raio,
+ * sombra, tipografia e movimento. Guia oficial: docs/DESIGN-SYSTEM-EVOLLI.md.
  *
- * Princípios adotados (adaptados para um sistema INTERNO de RH, onde dados,
- * tabelas, formulários, erros e acessibilidade prevalecem sobre estética de
- * marketing):
- *  - Cor de ação ÚNICA: Action Blue #0066cc.
- *  - Superfícies claras/neutras; superfície escura usada de forma pontual.
- *  - Tipografia SÓ do sistema (system-ui + fallback seguro) — nenhuma fonte
- *    proprietária é baixada ou embutida.
- *  - Espaçamento por escala, bordas sutis (hairline), botões pill.
- *  - SEM gradientes decorativos; SEM sombras em cards, botões ou texto.
+ * Princípios (sistema INTERNO de RH, onde dados, tabelas, formulários, erros
+ * e acessibilidade prevalecem sobre estética): funcional, leve, corporativo,
+ * claro e consistente.
+ *  - Uma cor de ação por tema; superfícies claras/neutras, superfície escura
+ *    só de forma pontual.
+ *  - Fonte Parkinsans, servida pela aplicação, com as do sistema de reserva.
+ *  - Espaçamento por escala, bordas sutis (hairline), botões quadrados
+ *    (--radius-botao); pílula só em selos e chips.
+ *  - SEM gradientes decorativos; sombra só em camadas flutuantes.
  *
- * Estes tokens são a base reutilizável para futuras telas; não contêm dado de
- * domínio, marca proprietária, imagem nem ativo de terceiros.
+ * Estes tokens não contêm dado de domínio, imagem nem ativo de terceiros.
  */
 
 :root {

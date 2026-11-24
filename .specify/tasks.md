@@ -569,9 +569,9 @@ decisões e bloqueios, está no ledger versionado
       contido) havia sido reprovado por não ser proposta, e não foi propagado. **Integrada em
       `main`** pela PR #134 (squash `8c3d8c3`), com a ADR 0014 da T143; a expansão para as demais
       telas está **liberada e ainda não iniciada**.
-    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
-      NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
-      (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
+    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. O arquivo de
+      referência externa da T032 NÃO foi editado na época (removido em 2026-11-25; fonte oficial atual:
+      `docs/DESIGN-SYSTEM-EVOLLI.md`); as decisões próprias ficam no documento acima e nos tokens/componentes.
     - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
       visual, conteúdo fora dos quadros e aparência inconsistente.
     - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
@@ -595,7 +595,8 @@ decisões e bloqueios, está no ledger versionado
       instalador oficial (`npx ui-ux-pro-max-cli init`) **não** foi executado, para não rodar código
       de terceiros nem sobrescrever configuração. Nenhuma dependência da aplicação foi alterada e
       nenhuma skill existente foi substituída. Requisito próprio: Python 3 (presente, 3.14.7).
-    - **Fonte de verdade de design continua sendo o projeto:** `DESIGN-apple.md`, `app/tokens.css` e
+    - **Fonte de verdade de design continua sendo o projeto:** na época, o arquivo de referência da
+      T032 (removido em 2026-11-25; hoje `docs/DESIGN-SYSTEM-EVOLLI.md`), `app/tokens.css` e
       `src/components/`. A skill foi usada como checklist consultivo; cada sugestão foi avaliada
       contra esses documentos, e nada dela foi copiado como regra. Nenhuma fonte, biblioteca, efeito
       ou framework externo entrou.
@@ -621,7 +622,7 @@ decisões e bloqueios, está no ledger versionado
       **estáticos**, sem API e sem gravação, servidos em porta própria.
     - **Diretrizes de design:** nenhuma alteração proposta ainda. Os protótipos usam apenas os
       tokens já existentes, copiados de `tokens.css`. Se a alternativa B for escolhida, a navegação
-      em coluna lateral é a única convenção nova a registrar em `DESIGN-apple.md`.
+      em coluna lateral é a única convenção nova a registrar no guia de design (hoje `docs/DESIGN-SYSTEM-EVOLLI.md`).
     - **Implementação do piloto (em validação):** componente `Modal` novo (UI-F04) concentrando
       acessibilidade e comportamento de janela — `role="dialog"`, `aria-modal`, foco inicial, foco
       preso, devolução do foco, Escape seguro, fundo sem rolagem, confirmação de descarte dentro da
@@ -789,7 +790,7 @@ decisões e bloqueios, está no ledger versionado
       HTML, CSS, componente, texto, ícone, imagem ou ativo copiado; nenhuma dependência; a decisão
       de plataforma não foi reaberta.
     - **Padrão visual:** tokens, padrão B e regras de modal do Evolli preservados;
-      `DESIGN-apple.md` intocado; nenhuma paleta, fonte, raio ou escala nova; nenhuma dependência,
+      guia de design intocado; nenhuma paleta, fonte, raio ou escala nova; nenhuma dependência,
       framework, CDN ou fonte externa.
     - **Fora de escopo:** expansão do padrão para outro módulo; folha, eSocial, férias, benefícios
       e clima; `apps/api`, Prisma, migrations, contratos, RBAC e dados; telas funcionais de
