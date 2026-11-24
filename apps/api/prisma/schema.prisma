@@ -126,8 +126,10 @@ model AccessUser {
   // T038 — Cadastros: Horarios. Quem cadastrou uma tabela de horario e quem
   // criou um vinculo horario<->colaborador. Mesma natureza das relacoes acima:
   // identifica o ATOR da operacao, nunca a pessoa cujo horario foi vinculado.
-  tabelasHorarioCriadas  TabelaHorario[]  @relation("HorarioTabelaCriadaPor")
-  vinculosHorarioCriados VinculoHorario[] @relation("HorarioVinculoCriadoPor")
+  tabelasHorarioCriadas     TabelaHorario[]     @relation("HorarioTabelaCriadaPor")
+  vinculosHorarioCriados    VinculoHorario[]    @relation("HorarioVinculoCriadoPor")
+  /// T215 — escalas de colaborador definidas por esta conta.
+  escalasColaboradorCriadas EscalaColaborador[] @relation("EscalaColaboradorCriadaPor")
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -525,6 +527,11 @@ enum AuditAction {
   pessoas_salario_atualizado @map("pessoas.salario.atualizado")
   pessoas_salario_removido   @map("pessoas.salario.removido")
 
+  // T215 — escala do colaborador (aba Escala da ficha). Sem conteúdo: só o
+  // id da escala e a empresa (nunca modelo, turno ou datas).
+  pessoas_escala_definida  @map("pessoas.escala.definida")
+  pessoas_escala_encerrada @map("pessoas.escala.encerrada")
+
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
   // categoria, tamanho, hash ou chave do objeto.
@@ -819,8 +826,10 @@ model Empresa {
   // (fronteira `empresa_id`); o vinculo horario<->colaborador carrega
   // `empresa_id` redundante por desenho, para que a FK COMPOSTA garanta, no
   // banco, que o vinculo nunca aponte para tabela de outra empresa.
-  tabelasHorario  TabelaHorario[]
-  vinculosHorario VinculoHorario[]
+  tabelasHorario     TabelaHorario[]
+  vinculosHorario    VinculoHorario[]
+  /// T215 — padrões de escala (aba Escala da ficha).
+  escalasColaborador EscalaColaborador[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -1176,7 +1185,9 @@ model Colaborador {
   // `empresa_id` proprio, a coerencia empresa<->colaborador (o colaborador
   // precisa ter vinculo funcional na empresa do horario) e garantida por
   // CONSTRAINT TRIGGER na migration, alem da checagem na aplicacao.
-  vinculosHorario VinculoHorario[]
+  vinculosHorario    VinculoHorario[]
+  /// T215 — padrões de escala (aba Escala da ficha).
+  escalasColaborador EscalaColaborador[]
 
   // T151 — Gestor consultivo. `contasDeAcesso` e o elo DP-23 (quem acessa o
   // sistema como esta pessoa); `equipesQueGerencia` e `excecoesDeAcesso`
@@ -1747,10 +1758,13 @@ model TabelaHorario {
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  empresa   Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  criadoPor AccessUser       @relation("HorarioTabelaCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  periodos  PeriodoHorario[]
-  vinculos  VinculoHorario[]
+  empresa               Empresa             @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor             AccessUser          @relation("HorarioTabelaCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  periodos              PeriodoHorario[]
+  vinculos              VinculoHorario[]
+  /// T215 — escalas que usam esta jornada como turno (ou turno da noite).
+  escalasComoTurno      EscalaColaborador[] @relation("EscalaTurno")
+  escalasComoTurnoNoite EscalaColaborador[] @relation("EscalaTurnoNoite")
 
   /// Alvo da FK COMPOSTA de `vinculo_horario` — garante, no banco, que um
   /// vinculo so referencie tabela da MESMA empresa.
@@ -3040,4 +3054,40 @@ model AnexoAusencia {
   @@index([ausenciaId])
   @@index([empresaId])
   @@map("anexo_ausencia")
+}
+
+/// T215 — padrão de escala do colaborador (aba Escala da ficha), com
+/// vigência `[início, fim)`. O modelo usa os mesmos códigos do contrato
+/// (`contrato_vinculo.escala`). O turno é uma jornada da empresa (nulo = sem
+/// turno fixo); o turno da noite só no 12x36; a folga semanal só no 6x1
+/// (1 = segunda … 7 = domingo); os dias de trabalho só em "outra"; o início
+/// do ciclo em revezamento, plantão e embarque. Sem sobreposição de
+/// vigências por colaborador e empresa (EXCLUSION na migration). Sem
+/// exclusão física: a troca encerra a vigente.
+model EscalaColaborador {
+  id              String    @id @default(uuid())
+  colaboradorId   String    @map("colaborador_id")
+  empresaId       String    @map("empresa_id")
+  modelo          String
+  tabelaHorarioId String?   @map("tabela_horario_id")
+  turnoNoiteId    String?   @map("turno_noite_id")
+  folgaSemanal    Int?      @map("folga_semanal")
+  diasTrabalho    Int[]     @default([]) @map("dias_trabalho")
+  inicioCiclo     DateTime? @map("inicio_ciclo") @db.Date
+  vigenciaInicio  DateTime  @map("vigencia_inicio") @db.Date
+  vigenciaFim     DateTime? @map("vigencia_fim") @db.Date
+  criadoPorUserId String    @map("criado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador    @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turno       TabelaHorario? @relation("EscalaTurno", fields: [tabelaHorarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turnoNoite  TabelaHorario? @relation("EscalaTurnoNoite", fields: [turnoNoiteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser     @relation("EscalaColaboradorCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, empresaId, vigenciaInicio])
+  @@index([empresaId])
+  @@map("escala_colaborador")
 }

@@ -171,6 +171,16 @@ export const AUSENCIA_RESOURCES = ["ausencia", "anexo_ausencia"] as const;
 export type AusenciaResource = (typeof AUSENCIA_RESOURCES)[number];
 
 /**
+ * T215 — escala do colaborador (aba Escala da ficha): o padrão de escala com
+ * vigência. Mesma matriz das ausências: `rh` e `dp` leem (`read`), definem
+ * (`create`) e encerram (`alter`) na empresa ativa; o `master_tecnico` só
+ * lê, com empresa ativa; os demais papéis são negados.
+ */
+export const ESCALA_RESOURCES = ["escala_colaborador"] as const;
+
+export type EscalaResource = (typeof ESCALA_RESOURCES)[number];
+
+/**
  * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
  * metadados da Etapa 2 (`documento_metadado`):
  *
@@ -215,7 +225,8 @@ export type AuthorizationResource =
   | DadosPessoaisResource
   | DocumentosColaboradorResource
   | ContratoResource
-  | AusenciaResource;
+  | AusenciaResource
+  | EscalaResource;
 
 export type AuthorizationAction =
   | "read"
@@ -302,6 +313,12 @@ export function isDocumentosColaboradorResource(
   return (DOCUMENTOS_COLABORADOR_RESOURCES as readonly string[]).includes(
     resource,
   );
+}
+
+export function isEscalaResource(
+  resource: AuthorizationResource,
+): resource is EscalaResource {
+  return (ESCALA_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isAusenciaResource(

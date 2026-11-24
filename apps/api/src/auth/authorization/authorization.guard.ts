@@ -21,6 +21,7 @@ import {
   isDadosPessoaisResource,
   isContratoResource,
   isAusenciaResource,
+  isEscalaResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -81,6 +82,10 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   }
   // T215 — Férias e ausências.
   if (isAusenciaResource(resource)) {
+    return resource;
+  }
+  // T215 — a escala do colaborador.
+  if (isEscalaResource(resource)) {
     return resource;
   }
   return "access_user";

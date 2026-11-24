@@ -43,7 +43,9 @@ export type MotivoDoCampo =
   | "saldo_insuficiente"
   | "venda_acima_do_limite"
   // T215 — Salários: data de vigência depois de hoje.
-  | "futura";
+  | "futura"
+  // T215 — Escala: vigência antes da admissão do colaborador.
+  | "antes_da_admissao";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -79,7 +81,13 @@ export type CampoPublico =
   // T215 — Salários: o salário do contrato com linha do tempo.
   | "salarioBruto"
   // T215 — férias para quem não tem férias (PJ e Freelancer).
-  | "tipo";
+  | "tipo"
+  // T215 — Escala: o padrão de escala do colaborador.
+  | "modelo"
+  | "turnoNoiteId"
+  | "folgaSemanal"
+  | "diasTrabalho"
+  | "inicioCiclo";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

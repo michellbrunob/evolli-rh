@@ -50,6 +50,7 @@ import {
 import { listarAlocacoesVinculo } from "../api/vinculoContratualClient";
 import { listarVinculosHorario } from "../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../api/horariosClient";
+import { consultarEscalas } from "../api/escalaClient";
 import { consultarContatosDoColaborador } from "../api/contatosColaboradorClient";
 import { consultarDadosPessoaisDoColaborador } from "../api/dadosPessoaisClient";
 import {
@@ -74,6 +75,7 @@ vi.mock("../api/organizacaoClient");
 vi.mock("../api/vinculoContratualClient");
 vi.mock("../api/vinculoHorarioClient");
 vi.mock("../api/horariosClient");
+vi.mock("../api/escalaClient");
 vi.mock("../api/contatosColaboradorClient");
 vi.mock("../api/dadosPessoaisClient");
 vi.mock("../api/movimentacaoClient");
@@ -237,6 +239,13 @@ beforeEach(() => {
   vi.mocked(buscarDepartamento).mockRejectedValue(new Error("não usado"));
   vi.mocked(listarVinculosHorario).mockResolvedValue(paginado([]));
   vi.mocked(listarTabelasHorario).mockResolvedValue(paginado([]));
+  vi.mocked(consultarEscalas).mockImplementation(async (colaboradorId) => ({
+    colaboradorId,
+    empresaId: EMPRESA,
+    vinculo: { dataAdmissao: "2025-01-10", situacao: "ativo" },
+    escalaDoCadastro: null,
+    escalas: [],
+  }));
   vi.mocked(buscarLinhaDoTempo).mockResolvedValue([]);
   vi.mocked(listarMovimentacoes).mockResolvedValue(paginado([]) as never);
   for (const catalogo of [
@@ -568,40 +577,57 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
     }
   });
 
-  it("pós-revisão (C1): rh e dp seguem vendo a jornada vigente da própria empresa no cabeçalho", async () => {
-    // Escopados, rh e dp só recebem vínculos de horário da empresa ativa — a
-    // mesma do vínculo principal: o filtro por empresa não muda nada para eles.
-    vi.mocked(listarVinculosHorario).mockResolvedValue(
-      paginado([
+  it("T215: rh e dp operam a escala da própria empresa; o master só consulta", async () => {
+    vi.mocked(consultarEscalas).mockResolvedValue({
+      colaboradorId: ana.id,
+      empresaId: EMPRESA,
+      vinculo: { dataAdmissao: "2025-01-10", situacao: "ativo" },
+      escalaDoCadastro: null,
+      escalas: [
         {
-          id: "h-1",
-          colaboradorId: ana.id,
-          empresaId: EMPRESA,
-          tabelaHorarioId: "t-1",
-          tabela: {
+          id: "e-1",
+          modelo: "5x2",
+          turno: {
             id: "t-1",
             codigo: "JOR44",
             nome: "Comercial (teste)",
             ativo: true,
+            periodos: [{ dia: "segunda", inicio: "08:00", fim: "12:00" }],
           },
-          colaborador: { id: ana.id, nome: ana.nome },
+          turnoNoite: null,
+          folgaSemanal: null,
+          diasTrabalho: [],
+          inicioCiclo: null,
           vigenciaInicio: "2025-01-10",
           vigenciaFim: null,
-          criadoPorUserId: "u-1",
-          criadoEm: "2025-01-10T12:00:00.000Z",
-          atualizadoEm: "2025-01-10T12:00:00.000Z",
         },
-      ]),
-    );
+      ],
+    });
     for (const papel of ["rh", "dp"] as const) {
-      // T215 — a jornada vigente fica na aba Escala da ficha.
       window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
       const { unmount } = render(<App papelDoAtor={papel} />);
       await esperarFicha(ana.nome);
       const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
       await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
+      expect(
+        within(ficha).getByRole("button", { name: "Alterar escala" }),
+      ).toBeInTheDocument();
+      expect(
+        within(ficha).getByRole("button", { name: "Encerrar escala" }),
+      ).toBeInTheDocument();
       unmount();
     }
+    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
+    render(<App papelDoAtor="master_tecnico" />);
+    await esperarFicha(ana.nome);
+    const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
+    await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
+    expect(
+      within(ficha).queryByRole("button", {
+        name: /Alterar escala|Encerrar escala|Definir escala/,
+      }),
+    ).toBeNull();
+    expect(ficha).toHaveTextContent("Somente consulta");
   });
 
   it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(

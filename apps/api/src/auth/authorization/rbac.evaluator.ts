@@ -4,6 +4,7 @@ import {
   AuthorizationSubject,
   AuthorizationTarget,
   isAusenciaResource,
+  isEscalaResource,
   isContatosResource,
   isContratoResource,
   isDadosPessoaisResource,
@@ -78,6 +79,11 @@ export function evaluatePermission(
         return evaluateDocumentosColaborador(subject, target);
       }
       if (isAusenciaResource(target.resource)) {
+        return evaluateAusencia(subject, target);
+      }
+      if (isEscalaResource(target.resource)) {
+        // T215 — mesma matriz das ausências (rh e dp operam na empresa
+        // ativa; master_tecnico só lê; os demais, negados).
         return evaluateAusencia(subject, target);
       }
       return false;

@@ -1,0 +1,486 @@
+/*
+ * T215 — aba Escala da ficha. Só tokens; os cartões reaproveitam
+ * `.ficha-ref__cartao` (FichaDoColaborador.css). Começa numa coluna (375 px)
+ * e abre colunas só quando o contêiner da ficha tem espaço.
+ */
+
+.escala-ficha {
+  display: grid;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.escala-ficha__aviso {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-ink-subtle);
+}
+
+.escala-ficha__titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+.escala-ficha__corpo {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.escala-ficha__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.escala-ficha__nota,
+.escala-ficha__ajuda {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.escala-ficha__erro {
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}
+
+/* ------------------------------------------------------------------ Vazio */
+
+.escala-ficha__vazio {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.escala-ficha__vazio .escala-ficha__acoes {
+  justify-content: center;
+}
+
+.escala-ficha__vazio-titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+.escala-ficha__vazio-texto {
+  max-width: 36rem;
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+/* ----------------------------------------------------------- Escala atual */
+
+.escala-ficha__jornada,
+.escala-ficha__linha-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.escala-ficha__sem-vigente {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.escala-ficha__programada {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-md);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+.escala-ficha__metricas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm) var(--space-lg);
+  margin: 0;
+}
+
+.escala-ficha__metrica {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-sm);
+  border-bottom: var(--divisor);
+}
+
+.escala-ficha__metrica dt {
+  color: var(--color-ink-muted);
+}
+
+.escala-ficha__metrica dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+@container (min-width: 40rem) {
+  .escala-ficha__metricas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 60rem) {
+  .escala-ficha__metricas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.escala-ficha__modelo {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.escala-ficha__modelo-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.escala-ficha__sub {
+  display: block;
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-weight: normal;
+}
+
+.escala-ficha__opcional {
+  margin-left: var(--space-xxs);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-weight: normal;
+}
+
+/* ---------------------------------------------------------------- Selos */
+
+.escala-ficha__selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--status-neutral-border);
+  border-radius: var(--radius-pill);
+  background: var(--status-neutral-surface);
+  color: var(--status-neutral-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.escala-ficha__selo--vigente {
+  border-color: var(--status-success-border);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.escala-ficha__selo--programada {
+  border-color: var(--status-info-border);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+.escala-ficha__selo--alerta {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+/* --------------------------------------------------------- Próximos dias */
+
+.escala-ficha__dias {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-lg);
+  list-style: none;
+}
+
+.escala-ficha__dia {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+}
+
+.escala-ficha__dia--folga {
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+}
+
+.escala-ficha__dia-data {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xxs);
+  font-variant-numeric: tabular-nums;
+}
+
+.escala-ficha__dia-data > span {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.escala-ficha__dia-estado {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@container (min-width: 48rem) {
+  .escala-ficha__dias {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 72rem) {
+  .escala-ficha__dias {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .escala-ficha__dia {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-height: 5.5rem;
+  }
+}
+
+/* ------------------------------------------------------------- Histórico */
+
+.escala-ficha__linhas {
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
+  list-style: none;
+}
+
+.escala-ficha__linha {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+.escala-ficha__linha + .escala-ficha__linha::before {
+  position: absolute;
+  top: calc(-1 * var(--space-sm));
+  left: calc(0.5rem - 1px);
+  height: calc(var(--space-sm) * 2 + 0.25rem);
+  border-left: 2px solid var(--divisor-cor);
+  content: "";
+}
+
+.escala-ficha__marca {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: 0.3rem;
+  border: 2px solid var(--divisor-cor-forte);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+}
+
+.escala-ficha__linha--vigente .escala-ficha__marca {
+  border-color: var(--color-action);
+  background: var(--color-action);
+}
+
+.escala-ficha__linha--programada .escala-ficha__marca {
+  border-color: var(--status-info-ink);
+  border-style: dashed;
+}
+
+.escala-ficha__linha-corpo {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.escala-ficha__linha-detalhe {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.escala-ficha__status:empty {
+  display: none;
+}
+
+/* ----------------------------------------------------------------- Gaveta */
+
+.escala-gaveta__campos {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.escala-gaveta__campo {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.escala-gaveta__campo label {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.escala-gaveta__campo select,
+.escala-gaveta__campo input {
+  min-height: var(--touch-target);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.escala-gaveta__link {
+  justify-self: start;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.escala-gaveta__link:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.escala-gaveta__muda {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.escala-gaveta__muda-titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+.escala-gaveta__muda-lista {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.escala-gaveta__muda-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xxs);
+}
+
+.escala-gaveta__muda-linha dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.escala-gaveta__muda-linha dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.escala-gaveta__antes {
+  color: var(--color-ink-subtle);
+}
+
+@container (min-width: 28rem) {
+  .escala-gaveta__muda-linha {
+    grid-template-columns: 9rem minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+
+.escala-gaveta__dias {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.escala-gaveta__dias legend {
+  margin-bottom: var(--space-xxs);
+  padding: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.escala-gaveta__dias-lista {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-xxs);
+}
+
+.escala-gaveta__dia {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: var(--touch-target);
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.escala-gaveta__dia input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.escala-gaveta__dia:has(input:checked) {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--surface-canvas);
+}
+
+.escala-gaveta__dia:has(input:focus-visible) {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.escala-gaveta__dia:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.escala-gaveta__rotulo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}

@@ -101,6 +101,9 @@ export const AUDIT_ACTIONS = [
   "pessoas_salario_registrado",
   "pessoas_salario_atualizado",
   "pessoas_salario_removido",
+  // T215 — escala do colaborador: só o id da escala e a empresa.
+  "pessoas_escala_definida",
+  "pessoas_escala_encerrada",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",
@@ -325,7 +328,10 @@ export type AuditResource =
   | "alteracao_salarial"
   // T215 — o arquivo anexado à ausência (negações do guard). O `resourceId` é
   // o id da ausência.
-  | "anexo_ausencia";
+  | "anexo_ausencia"
+  // T215 — escala do colaborador: o `resourceId` é o id da ESCALA (ou do
+  // COLABORADOR nas negações). Nunca modelo, turno ou datas.
+  | "escala_colaborador";
 
 export type RecordAuditEventInput =
   | {
