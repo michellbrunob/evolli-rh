@@ -556,7 +556,7 @@ describe("Nova admissão — página própria", () => {
       /Informe o telefone com DDD, no formato \(00\) 00000-0000/,
     ],
     // T209 — CPF com dígito verificador errado.
-    [/^CPF$/, "529.982.247-26", /Informe um CPF válido/],
+    [/^CPF$/, "529.982.247-26", /CPF inválido. Confira os números digitados/],
     // T179 — opcionais, mas o formato ainda vale quando preenchidos.
     [/^Matrícula/, "M", /Use apenas letras maiúsculas/],
     [/^Matrícula/, "MAT 01", /Use apenas letras maiúsculas/],
@@ -1164,7 +1164,7 @@ describe("T179 — confirmação antes de gravar", () => {
     expect(campoPeloRotulo(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
-    ).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    ).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
@@ -1918,7 +1918,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await abrirEndereco();
     const secao = screen.getByRole("region", { name: "Endereço residencial" });
     expect(secao).toHaveTextContent(
-      "Digite o CEP e o Evolli completa o endereço.",
+      "Preenchemos o restante automaticamente a partir do CEP.",
     );
     expect(screen.queryByLabelText(/^País/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Buscar CEP/ })).toBeNull();
@@ -1987,7 +1987,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect((estado() as HTMLSelectElement).options[0]).toHaveTextContent("UF");
   });
 
-  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço localizado pelo CEP'", async () => {
+  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço encontrado'", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
@@ -2007,7 +2007,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect(numero()).toHaveValue("100");
     expect(complemento()).toHaveValue("Sala 2");
     expect(statusCep()).toHaveAttribute("role", "status");
-    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
     expect(statusCep()).toHaveClass("nova-admissao__cep-status--encontrado");
 
     // Sair do campo com o mesmo CEP não repergunta.
@@ -2045,7 +2045,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     fireEvent.blur(campoCep());
     expect(consultarCep).toHaveBeenCalledTimes(1);
     await act(async () => concluir(RESPOSTA_CEP));
-    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("resposta obsoleta (o CEP mudou durante a busca) é descartada", async () => {
@@ -2068,7 +2068,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await act(async () => concluir(RESPOSTA_CEP));
     expect(logradouro()).toHaveValue("");
     expect(cidade()).toHaveValue("");
-    expect(statusCep()).not.toHaveTextContent("Endereço localizado pelo CEP");
+    expect(statusCep()).not.toHaveTextContent("Endereço encontrado");
   });
 
   it("sem sigla, o estado por extenso vira a sigla do seletor", async () => {
@@ -2145,7 +2145,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
   });
 
   it.each([
-    [404, "CEP não encontrado. Preencha o endereço manualmente.", false],
+    [404, "CEP não encontrado. Preencha o endereço abaixo.", false],
     [
       503,
       "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.",
@@ -2177,9 +2177,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
         fireEvent.click(botaoConsultarDeNovo()!);
         await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(2));
         await waitFor(() =>
-          expect(statusCep()).toHaveTextContent(
-            /^Endereço localizado pelo CEP$/,
-          ),
+          expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/),
         );
         expect(botaoConsultarDeNovo()).toBeNull();
       } else {
@@ -3653,7 +3651,7 @@ describe("T195 — revisão e conclusão", () => {
     await ateARevisao();
     expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     const principais = screen
-      .getByRole("heading", { level: 3, name: "Documentos principais" })
+      .getByRole("heading", { level: 3, name: "Documentos obrigatórios" })
       .closest("section")!;
     for (const nome of [
       "RG",
@@ -3669,7 +3667,7 @@ describe("T195 — revisão e conclusão", () => {
       ).toBeInTheDocument();
     }
     expect(within(principais).getAllByText("Pendente")).toHaveLength(5);
-    expect(principais).toHaveTextContent("0 de 5 anexados.");
+    expect(principais).toHaveTextContent("0 de 5 enviados.");
     expect(
       screen.getByRole("heading", { level: 3, name: "Outros documentos" }),
     ).toBeInTheDocument();
@@ -4122,7 +4120,7 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
     await waitFor(() => expect(salarioBruto()).toHaveFocus());
     expect(salarioBruto()).toHaveAttribute("aria-invalid", "true");
     expect(salarioBruto()).toHaveAccessibleDescription(
-      "Informe o salário bruto.",
+      "Informe o salário bruto. Ele é usado na folha de pagamento.",
     );
     expect(cargoSel()).not.toHaveAttribute("aria-invalid");
     fireEvent.change(salarioBruto(), { target: { value: "500000" } });
@@ -4735,7 +4733,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
       }),
     ).toBeInTheDocument();
     expect(cabecalho).toHaveTextContent(
-      "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+      "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
     );
     fireEvent.click(
       within(cabecalho).getByRole("button", {
@@ -4774,9 +4772,9 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
         (e) => e.textContent,
       ),
     ).toEqual([
-      "Identificação e contatos",
-      "Lotação e contrato",
-      "CEP e endereço",
+      "Informações pessoais",
+      "Cargo e contrato",
+      "Residência",
       "Envio de arquivos",
     ]);
     expect(
@@ -5016,7 +5014,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+        "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -5510,7 +5508,9 @@ describe("T209 — etapa 1: dados básicos", () => {
     montar();
     await aguardarEmpresa();
     const painel = etapa1();
-    expect(painel).toHaveTextContent("Quem é a pessoa e como falar com ela.");
+    expect(painel).toHaveTextContent(
+      "Informações pessoais e de contato do novo colaborador.",
+    );
     expect(
       painel.querySelector(".cadastro-etapas__etapa-selo"),
     ).toHaveTextContent("Etapa 1 de 4");
@@ -5524,9 +5524,9 @@ describe("T209 — etapa 1: dados básicos", () => {
       h.nextElementSibling?.textContent,
     ]);
     expect(secoes).toEqual([
-      ["Identificação", "Dados que identificam a pessoa no Evolli."],
-      ["Contato", "Como a empresa fala com a pessoa."],
-      ["Contato de emergência", "Quem avisar se algo acontecer."],
+      ["Identificação", "Aparecem no perfil, nos documentos e no eSocial."],
+      ["Contato", "Canais pessoais para falar com o colaborador."],
+      ["Contato de emergência", "Acionado apenas em situações de urgência."],
     ]);
   });
 
@@ -5537,12 +5537,12 @@ describe("T209 — etapa 1: dados básicos", () => {
       ...etapa1().querySelectorAll(".cadastro-etapas__linha-rotulo"),
     ].map((l) => [...l.children].map((c) => c.textContent));
     expect(linhas).toEqual([
-      ["Foto", "Mostrada na lista e na ficha."],
-      ["Nome completo", "Igual ao documento de identidade."],
-      ["CPF e RG", "Documentos de identificação da pessoa."],
+      ["Foto", "Aparece na lista de colaboradores e no perfil."],
+      ["Nome completo", "Como está nos documentos oficiais."],
+      ["CPF e RG", "Usados na folha e no eSocial."],
       ["Data de nascimento"],
       ["Gênero e estado civil"],
-      ["E-mail pessoal", "O e-mail particular, não o da empresa."],
+      ["E-mail pessoal", "Diferente do e-mail corporativo."],
       ["Telefone pessoal", "Com DDD."],
       ["Nome do contato"],
       ["Telefone do contato"],
@@ -5638,7 +5638,9 @@ describe("T209 — etapa 1: dados básicos", () => {
     fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     await waitFor(() => expect(cpf()).toHaveFocus());
-    expect(cpf()).toHaveAccessibleDescription("Informe um CPF válido.");
+    expect(cpf()).toHaveAccessibleDescription(
+      "CPF inválido. Confira os números digitados.",
+    );
     expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
   });
 
@@ -5800,7 +5802,7 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
     expect(
       within(linha).getByRole("button", { name: "Mais ações: RG" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 de 5 anexados.")).toBeInTheDocument();
+    expect(screen.getByText("1 de 5 enviados.")).toBeInTheDocument();
     expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
   });
 
@@ -5833,7 +5835,7 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
       await screen.findByRole("menuitem", { name: "Remover arquivo" }),
     );
     await waitFor(() => expect(linhaDe("RG")).toHaveTextContent("Pendente"));
-    expect(screen.getByText("0 de 5 anexados.")).toBeInTheDocument();
+    expect(screen.getByText("0 de 5 enviados.")).toBeInTheDocument();
   });
 
   it("proteção de saída: arquivo escolhido conta como edição pendente", async () => {
@@ -6099,5 +6101,68 @@ describe("T215 — CPF já cadastrado, conferido ao digitar", () => {
     await waitFor(() =>
       expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/),
     );
+  });
+});
+
+describe("T215 — textos das etapas 2 a 4 iguais aos da referência", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+  });
+
+  const etapa = (titulo: RegExp) =>
+    screen
+      .getByRole("heading", { level: 2, name: titulo })
+      .closest("section") as HTMLElement;
+  const secoes = (el: HTMLElement) =>
+    [...el.querySelectorAll("h3")].map((h) => [
+      h.textContent,
+      h.nextElementSibling?.textContent,
+    ]);
+  const linhas = (el: HTMLElement) =>
+    [...el.querySelectorAll(".cadastro-etapas__linha-rotulo")].map((l) =>
+      [...l.children].map((c) => c.textContent),
+    );
+
+  it("etapa 2: seções, linhas e ajudas", async () => {
+    montar();
+    await aguardarEmpresa();
+    abrirLotacao();
+    const el = etapa(/Dados profissionais$/);
+    expect(el).toHaveTextContent(
+      "Cargo, contrato e remuneração do novo colaborador.",
+    );
+    expect(secoes(el)).toEqual([
+      ["Cargo e estrutura", "Onde o colaborador está na organização."],
+      ["Contrato", "Tipo de vínculo, admissão, jornada, escala e matrícula."],
+      ["Remuneração", "Valores mensais usados na folha."],
+      ["Informações adicionais", "Registro profissional e deduções."],
+    ]);
+    const ajudas = Object.fromEntries(
+      linhas(el).map(([rotulo, ajuda]) => [rotulo, ajuda]),
+    );
+    expect(ajudas).toMatchObject({
+      Unidade: "Filial, loja ou local de trabalho.",
+      "Gestor direto": "Recebe as solicitações do colaborador.",
+      "Escala de trabalho":
+        "Sem escala, os benefícios usam os dias úteis do mês.",
+      "Salário líquido": "Calculado a partir do bruto.",
+      "Conselho e registro": "Obrigatório para algumas profissões.",
+    });
+  });
+
+  it("etapa 3: descrição e a seção do endereço", async () => {
+    montar();
+    await aguardarEmpresa();
+    await abrirEndereco();
+    const el = etapa(/Endereço$/);
+    expect(el).toHaveTextContent(
+      "Residência usada em correspondências e no eSocial.",
+    );
+    expect(secoes(el)).toEqual([
+      [
+        "Endereço residencial",
+        "Preenchemos o restante automaticamente a partir do CEP.",
+      ],
+    ]);
   });
 });

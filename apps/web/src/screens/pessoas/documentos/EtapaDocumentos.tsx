@@ -240,10 +240,10 @@ export function EtapaDocumentos({
         aria-labelledby={`${prefixo}-principais`}
       >
         <h3 className="documentos__titulo" id={`${prefixo}-principais`}>
-          Documentos principais
+          Documentos obrigatórios
         </h3>
         <p className="documentos__texto" role="status">
-          {escolhidos} de {principais.length} anexados.
+          {escolhidos} de {principais.length} enviados.
         </p>
         <ul className="documentos__lista">{principais.map(linha)}</ul>
       </section>
@@ -256,7 +256,7 @@ export function EtapaDocumentos({
           Outros documentos
         </h3>
         <p className="documentos__texto">
-          Contratos, declarações e demais arquivos.
+          Contratos, laudos, atestados e demais arquivos.
         </p>
         {outros.length > 0 ? (
           <ul className="documentos__lista">{outros.map(linha)}</ul>
@@ -267,7 +267,7 @@ export function EtapaDocumentos({
               Novo documento
             </label>
             <span className="documentos__detalhe" id={`${prefixo}-novo-ajuda`}>
-              Dê um nome e escolha o arquivo.
+              Dê um nome e envie o arquivo.
             </span>
           </div>
           <Input
@@ -275,7 +275,7 @@ export function EtapaDocumentos({
             type="text"
             value={novoNome}
             maxLength={NOME_DE_OUTROS_MAXIMO}
-            placeholder="Ex.: Contrato de experiência"
+            placeholder="Ex.: Atestado médico"
             aria-describedby={`${prefixo}-novo-ajuda${erroDoNome ? ` ${prefixo}-novo-erro` : ""}`}
             aria-invalid={erroDoNome ? true : undefined}
             onChange={(e) => {
