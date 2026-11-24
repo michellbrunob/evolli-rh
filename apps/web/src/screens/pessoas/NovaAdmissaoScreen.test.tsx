@@ -20,6 +20,7 @@
  * obrigatório. Os testes do comportamento genérico dos seletores usam a
  * Unidade (que tem "+" e «Criar»).
  */
+import { campoPeloRotulo } from "../../test/campoPeloRotulo";
 import {
   act,
   fireEvent,
@@ -245,20 +246,20 @@ async function aguardarEmpresa() {
   await screen.findByText("Empresa Sintética (teste)");
 }
 
-const nome = () => screen.getByLabelText(/Nome completo/);
-const dataNascimento = () => screen.getByLabelText(/^Data de nascimento/);
-const matricula = () => screen.getByLabelText(/^Matrícula/);
-const tipo = () => screen.getByLabelText(/Tipo de contratação/);
-const data = () => screen.getByLabelText(/Data de admissão/);
+const nome = () => campoPeloRotulo(/Nome completo/);
+const dataNascimento = () => campoPeloRotulo(/^Data de nascimento/);
+const matricula = () => campoPeloRotulo(/^Matrícula/);
+const tipo = () => campoPeloRotulo(/Tipo de contratação/);
+const data = () => campoPeloRotulo(/Data de admissão/);
 // T179 — um seletor por referência da lotação.
 // T209 — etapa 2: as linhas "Cargo e nível" e "Departamento e área" também
 // têm nome; os campos são procurados pelo nome exato. O cargo é texto.
-const departamentoSel = () => screen.getByLabelText(/^Departamento$/);
-const cargoSel = () => screen.getByLabelText(/^Cargo$/);
-const unidadeSel = () => screen.getByLabelText(/^Unidade$/);
-const salarioBruto = () => screen.getByLabelText(/^Salário bruto/);
-const areaSel = () => screen.getByLabelText(/^Área/);
-const centroSel = () => screen.getByLabelText(/^Centro de custo$/);
+const departamentoSel = () => campoPeloRotulo(/^Departamento$/);
+const cargoSel = () => campoPeloRotulo(/^Cargo$/);
+const unidadeSel = () => campoPeloRotulo(/^Unidade$/);
+const salarioBruto = () => campoPeloRotulo(/^Salário bruto/);
+const areaSel = () => campoPeloRotulo(/^Área/);
+const centroSel = () => campoPeloRotulo(/^Centro de custo$/);
 
 /** T196 — a linha "Escolha atual" de um seletor pesquisável. */
 const escolhaDe = (campo: HTMLElement) =>
@@ -343,14 +344,14 @@ async function salvarEConfirmar() {
   fireEvent.click(botaoConfirmar());
 }
 
-const emailPessoal = () => screen.getByLabelText(/E-mail pessoal/);
-const celular = () => screen.getByLabelText(/^Telefone pessoal/);
+const emailPessoal = () => campoPeloRotulo(/E-mail pessoal/);
+const celular = () => campoPeloRotulo(/^Telefone pessoal/);
 // T209 — o telefone fixo saiu da etapa 1; quem o usava passa ao do contato
 // de emergência, o segundo telefone da etapa.
-const telefone = () => screen.getByLabelText(/^Telefone do contato/);
+const telefone = () => campoPeloRotulo(/^Telefone do contato/);
 /** T209 — CPF sintético com dígitos verificadores válidos. */
 const CPF_VALIDO = "529.982.247-25";
-const cpf = () => screen.getByLabelText(/^CPF$/);
+const cpf = () => campoPeloRotulo(/^CPF$/);
 /**
  * T209 — sair da Nova admissão: "Cancelar" na etapa 1; nas demais (como no
  * novo rodapé), o voltar do cabeçalho — o mesmo caminho, com a guarda.
@@ -1050,13 +1051,13 @@ describe("T179 — confirmação antes de gravar", () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
+    fireEvent.change(campoPeloRotulo(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.change(screen.getByLabelText(/^Cidade$/), {
+    fireEvent.change(campoPeloRotulo(/^Cidade$/), {
       target: { value: "Cidade Resumo Sintética" },
     });
-    fireEvent.change(screen.getByLabelText(/^Logradouro$/), {
+    fireEvent.change(campoPeloRotulo(/^Logradouro$/), {
       target: { value: "Rua Resumo Sintética" },
     });
     fireEvent.click(salvar());
@@ -1131,14 +1132,12 @@ describe("T179 — confirmação antes de gravar", () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
+    fireEvent.change(campoPeloRotulo(/^CEP/), {
       target: { value: "30140071" },
     });
     // T209 — completar o CEP consulta sozinho.
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Logradouro$/)).toHaveValue(
-        "Avenida Sintética",
-      ),
+      expect(campoPeloRotulo(/^Logradouro$/)).toHaveValue("Avenida Sintética"),
     );
     salvar().focus();
     fireEvent.click(salvar());
@@ -1161,7 +1160,7 @@ describe("T179 — confirmação antes de gravar", () => {
       `${unidade.codigo} — ${unidade.nome}`,
     );
     expect(celular()).toHaveValue("(31) 99999-0000");
-    expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
+    expect(campoPeloRotulo(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
     ).toHaveTextContent(/^Endereço localizado pelo CEP$/);
@@ -1592,7 +1591,7 @@ describe("T179 — máscaras na Nova admissão", () => {
   it("CEP: máscara 00000-000 (T209: o endereço é sempre do Brasil)", async () => {
     montar();
     await aguardarEmpresa();
-    const cep = () => screen.getByLabelText(/^CEP/);
+    const cep = () => campoPeloRotulo(/^CEP/);
     expect(cep()).toHaveAttribute("inputmode", "numeric");
     expect(cep()).toHaveAttribute("placeholder", "00000-000");
     fireEvent.change(cep(), { target: { value: "301400" } });
@@ -1800,9 +1799,7 @@ describe("Nova admissão — sucesso", () => {
 
   it("revisar contatos na ficha é uma ação separada", async () => {
     const { onAbrirAdmitido } = await admitirComSucesso();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Revisar contatos" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Revisar contatos" }));
     expect(onAbrirAdmitido).toHaveBeenCalledWith(
       expect.objectContaining({ id: resposta.id }),
       "contatos",
@@ -1876,16 +1873,16 @@ describe("Nova admissão — contrato de CSS da confirmação", () => {
 // alternativa). O cliente de CEP é automockado: nenhum teste sai da página.
 // ---------------------------------------------------------------------------
 
-const campoCep = () => screen.getByLabelText(/^CEP/);
+const campoCep = () => campoPeloRotulo(/^CEP/);
 // T209 — etapa 3: "Logradouro e número" e "Cidade e estado" são grupos;
 // cada campo tem o próprio nome.
-const logradouro = () => screen.getByLabelText(/^Logradouro$/);
+const logradouro = () => campoPeloRotulo(/^Logradouro$/);
 // T209 — "Número do registro" (etapa 2) também começa por "Número".
-const numero = () => screen.getByLabelText(/^Número(?! do registro)/);
-const complemento = () => screen.getByLabelText(/^Complemento/);
-const bairro = () => screen.getByLabelText(/^Bairro/);
-const cidade = () => screen.getByLabelText(/^Cidade$/);
-const estado = () => screen.getByLabelText(/^Estado$/);
+const numero = () => campoPeloRotulo(/^Número(?! do registro)/);
+const complemento = () => campoPeloRotulo(/^Complemento/);
+const bairro = () => campoPeloRotulo(/^Bairro/);
+const cidade = () => campoPeloRotulo(/^Cidade$/);
+const estado = () => campoPeloRotulo(/^Estado$/);
 const botaoConsultarDeNovo = () =>
   screen.queryByRole("button", { name: "Consultar de novo" });
 const statusCep = () => document.getElementById("nova-admissao-cep-status");
@@ -3890,7 +3887,7 @@ describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e E
     // T209 — o último campo da etapa (Pensão alimentícia) e, logo depois, as
     // ações — nesta ordem.
     const depois = ordem.slice(
-      ordem.indexOf(screen.getByLabelText(/^Pensão alimentícia/)) + 1,
+      ordem.indexOf(campoPeloRotulo(/^Pensão alimentícia/)) + 1,
     );
     expect(
       depois.map((e) => e.getAttribute("aria-label") ?? e.textContent),
