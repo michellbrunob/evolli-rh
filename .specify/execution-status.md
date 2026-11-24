@@ -3427,3 +3427,30 @@ seção da ficha) ([documento de decisão](../docs/decisions/t213-documentos-col
 **Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
 configuráveis, OCR, assinatura, leitura automática, compartilhamento externo, vencimentos e
 envio pela importação.
+
+## Dashboard e login — T214 (implementada localmente; aguarda separação)
+
+| Tarefa | Estado                                             | Resultado principal                                  |
+| ------ | -------------------------------------------------- | ---------------------------------------------------- |
+| T214   | **Implementada localmente (`515b7e0`), só a tela** | Card principal do Dashboard, "i" do cálculo e login. |
+
+**Situação:** empilhada na branch da T215; sem PR. A separação em entrega própria aguarda
+autorização.
+
+## Colaboradores — T215 (em andamento local; sem PR)
+
+| Tarefa | Estado                     | Resultado principal                                                       |
+| ------ | -------------------------- | ------------------------------------------------------------------------- |
+| T215   | **Em andamento, só local** | Lista, edição, ficha nova e as abas Dados, Salários e Férias e ausências. |
+
+**Aba Férias e ausências da ficha (24/11/2026):** regra de férias por vínculo (CLT e Estágio
+com saldo; PJ e Freelancer sem férias; Aprendiz e os tipos não decididos sem cálculo
+automático), leitura da ficha auditada sem valores, anexo (atestado ou documento) com
+antivírus antes de gravar e remoção só lógica, e o aviso de que feriados móveis, estaduais e
+municipais ainda não entram nos dias úteis
+([documento de decisão](../docs/decisions/t215-colaboradores.md)).
+
+**Dependência:** o anexo usa o armazenamento privado e o antivírus da T213 (PR #206 em Draft).
+
+**Fora de escopo:** Portal do colaborador, fluxo do gestor, férias coletivas, políticas de
+férias e mudança automática de status.

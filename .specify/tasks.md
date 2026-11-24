@@ -3615,6 +3615,33 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         configuráveis, OCR, assinatura, leitura automática, compartilhamento externo,
         vencimentos e envio de documentos pela importação.
 
+111.  **T214 - Card principal do Dashboard e login novo**
+      - **Estado:** implementada localmente (commit `515b7e0`, só tela), empilhada na branch da
+        T215. Sem push próprio, PR, Ready ou merge; a separação em entrega própria aguarda
+        autorização.
+      - **Feito:** card único do Dashboard com o resumo do time, período por anos com admissão
+        efetivada, exportação (CSV e impressão), "Como calculamos" com o botão "i", e a tela de
+        login com o formulário à esquerda e o painel à direita.
+
+112.  **T215 - Colaboradores: lista, edição, ficha e abas**
+      - **Estado:** em andamento localmente na branch `codex/t215-colaboradores-lista`; a branch
+        foi enviada ao GitHub em 24/11/2026 até `204633a`, e os commits seguintes ficaram só
+        locais. Sem PR, Ready ou merge. A separação em entregas revisáveis (T213, T214 e a
+        T215 em partes) aguarda autorização.
+      - **Feito (comprovado por testes):** lista com filtros e ações; Segurança e Editar
+        colaborador; desativar e reativar; página inicial com busca, CPF, contatos, salário e
+        indicadores; auditoria da lista com um evento por consulta; Férias e ausências na API
+        e na lista; ficha nova com a aba Dados; aba Salários com a linha do tempo salarial e o
+        salário obrigatório na admissão (inclusive na planilha); aba Férias e ausências da
+        ficha com a regra de férias por vínculo, a leitura auditada e o anexo (atestado ou
+        documento), conforme o [documento de decisão](../docs/decisions/t215-colaboradores.md).
+      - **Pendente de decisão:** salário obrigatório por tipo de vínculo, regularização de quem
+        não tem salário, permissão própria e auditoria de leitura do salário, regra de férias
+        do Aprendiz e dos tipos não decididos (temporário, part-time, trainee e outro).
+      - **Fora de escopo nesta fatia:** Portal do colaborador, fluxo do gestor, férias
+        coletivas, políticas de férias, mudança automática de status e feriados móveis,
+        estaduais e municipais no cálculo de dias úteis.
+
 ## Regra obrigatória para as próximas tarefas
 
 1. Criar ou atualizar a entrada da tarefa neste arquivo antes da implementação.

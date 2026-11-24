@@ -3,7 +3,7 @@
   "constitutionVersion": "1.4.0",
   "lastConvergedAt": "2026-11-18",
   "lastIntegratedTask": 212,
-  "lastRecordedTask": 213,
+  "lastRecordedTask": 215,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -20,6 +20,16 @@
       "id": "T213",
       "pullRequest": 206,
       "status": "documentos_colaborador_correcoes_pos_revisao_aguardando_validacao"
+    },
+    {
+      "id": "T214",
+      "pullRequest": null,
+      "status": "dashboard_login_implementada_localmente_aguarda_separacao"
+    },
+    {
+      "id": "T215",
+      "pullRequest": null,
+      "status": "colaboradores_em_andamento_local_aba_ferias_aguarda_validacao_visual"
     }
   ],
   "requiredArtifacts": [
