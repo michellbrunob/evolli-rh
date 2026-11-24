@@ -50,6 +50,7 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+import { ConsultarCpfEmUsoDto } from "../dados-pessoais/dados-pessoais.dto";
 import {
   DadosPessoaisColaboradorService,
   ValoresEndereco,
@@ -784,6 +785,39 @@ export class ColaboradorService {
    * O vínculo nasce `previsto`, nunca `ativo`: ativar exige efetivar a
    * movimentação, que é ato explícito e auditado (spec §8).
    */
+  /**
+   * T215 — o CPF já está cadastrado na empresa ativa? Responde enquanto o RH
+   * digita, antes de qualquer gravação; quem pode admitir é quem pode
+   * perguntar. Só `emUso` volta — nunca quem é a pessoa.
+   */
+  async cpfEmUso(
+    dto: ConsultarCpfEmUsoDto,
+    ctx: PessoasAuditContext,
+  ): Promise<{ emUso: boolean }> {
+    const escopo = resolverEscopoPessoas(ctx.actor);
+    if (
+      !podeAcessarPessoas(ctx.actor, "colaborador", "create", escopo.empresaId)
+    ) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "colaborador",
+        null,
+        escopo.empresaId,
+      );
+    }
+    const achado = await this.prisma.perfilPessoalColaborador.findFirst({
+      where: {
+        empresaId: escopo.empresaId,
+        cpf: dto.cpf,
+        ...(dto.ignorarColaboradorId
+          ? { colaboradorId: { not: dto.ignorarColaboradorId } }
+          : {}),
+      },
+      select: { id: true },
+    });
+    return { emUso: achado !== null };
+  }
+
   async admitir(
     dto: AdmitirColaboradorDto,
     ctx: PessoasAuditContext,

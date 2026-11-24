@@ -39,6 +39,7 @@ import {
   ApiError,
   type AdmissaoRegistradaApi,
   admitirColaborador,
+  consultarCpfEmUso,
   descartarRascunhoAdmissao,
   type DocumentoColaboradorApi,
   enviarDocumentoDoColaborador,
@@ -6011,5 +6012,92 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
     expect(
       screen.queryByRole("heading", { level: 3, name: "Documentos" }),
     ).toBeNull();
+  });
+});
+
+describe("T215 — CPF já cadastrado, conferido ao digitar", () => {
+  const AVISO = "Este CPF já está cadastrado nesta empresa.";
+  const proxima = () => screen.getByRole("button", { name: "Próxima etapa" });
+  const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it("CPF completo e válido: consulta só os dígitos e avisa no campo; não avança", async () => {
+    vi.mocked(consultarCpfEmUso).mockResolvedValue(true);
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(cpf()).toHaveAccessibleDescription(AVISO));
+    expect(cpf()).toHaveAttribute("aria-invalid", "true");
+    expect(consultarCpfEmUso).toHaveBeenCalledTimes(1);
+    expect(consultarCpfEmUso).toHaveBeenCalledWith("52998224725");
+    fireEvent.click(proxima());
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
+    expect(cpf()).toHaveAccessibleDescription(AVISO);
+  });
+
+  it("incompleto ou inválido não consulta; trocar o CPF tira o aviso; o livre não acusa", async () => {
+    vi.mocked(consultarCpfEmUso).mockImplementation(
+      async (c) => c === "52998224725",
+    );
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: "529.982.247" } });
+    fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
+    await esperar(700);
+    expect(consultarCpfEmUso).not.toHaveBeenCalled();
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(cpf()).toHaveAccessibleDescription(AVISO));
+    fireEvent.change(cpf(), { target: { value: "111.444.777-35" } });
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+    await waitFor(() =>
+      expect(consultarCpfEmUso).toHaveBeenLastCalledWith("11144477735"),
+    );
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("digitação rápida: uma consulta só, a do CPF que ficou; resposta velha não acusa", async () => {
+    let responderVelho: (v: boolean) => void = () => {};
+    vi.mocked(consultarCpfEmUso).mockImplementation((c) =>
+      c === "52998224725"
+        ? new Promise<boolean>((r) => {
+            responderVelho = r;
+          })
+        : Promise.resolve(false),
+    );
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(1));
+    fireEvent.change(cpf(), { target: { value: "111.444.777-35" } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(2));
+    responderVelho(true);
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+
+    vi.mocked(consultarCpfEmUso).mockClear();
+    fireEvent.change(cpf(), { target: { value: "390.533.447" } });
+    fireEvent.change(cpf(), { target: { value: "390.533.447-05" } });
+    await esperar(700);
+    expect(consultarCpfEmUso).toHaveBeenCalledTimes(1);
+    expect(consultarCpfEmUso).toHaveBeenCalledWith("39053344705");
+  });
+
+  it("falha na conferência não trava: a etapa avança e o servidor confere ao gravar", async () => {
+    vi.mocked(consultarCpfEmUso).mockRejectedValue(new Error("rede"));
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(1));
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+    fireEvent.click(proxima());
+    await waitFor(() =>
+      expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/),
+    );
   });
 });

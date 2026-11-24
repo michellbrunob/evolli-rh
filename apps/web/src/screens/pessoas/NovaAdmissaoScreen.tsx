@@ -201,6 +201,7 @@ import {
   SeletorDeReferencia,
   TAMANHO_DA_PAGINA_DE_REFERENCIAS,
 } from "./SeletorDeReferencia";
+import { MENSAGEM_CPF_EM_USO, useCpfEmUso } from "./useCpfEmUso";
 import {
   EtapaDocumentos,
   documentosIniciais,
@@ -600,7 +601,7 @@ const CAMPO_DO_CONFLITO: Readonly<
   // T209 — CPF único na empresa.
   "perfilPessoal.cpf": {
     campo: "cpf",
-    mensagem: "Este CPF já está cadastrado nesta empresa.",
+    mensagem: MENSAGEM_CPF_EM_USO,
   },
   // T209 — gestor direto sem vínculo na empresa.
   "contrato.gestorDiretoId": {
@@ -1290,6 +1291,16 @@ export function NovaAdmissaoScreen({
   const [identificacao, setIdentificacao] =
     useState<ValoresIdentificacao>(IDENTIFICACAO_VAZIA);
   const [erros, setErros] = useState<Erros>({});
+  // T215 — o CPF repetido aparece enquanto se digita, não só ao gravar.
+  const cpfEmUso = useCpfEmUso(identificacao.cpf, cpfValido);
+  useEffect(() => {
+    if (!cpfEmUso) return;
+    setErros((prev) =>
+      prev.cpf === MENSAGEM_CPF_EM_USO
+        ? prev
+        : { ...prev, cpf: MENSAGEM_CPF_EM_USO },
+    );
+  }, [cpfEmUso]);
   /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
   /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
   const [confirmando, setConfirmando] = useState(false);
@@ -1952,6 +1963,8 @@ export function NovaAdmissaoScreen({
       novos.cpf = "Informe o CPF.";
     } else if (!cpfValido(cpf)) {
       novos.cpf = "Informe um CPF válido.";
+    } else if (cpfEmUso) {
+      novos.cpf = MENSAGEM_CPF_EM_USO;
     }
     if (identificacao.rg.trim().length > 20) {
       novos.rg = "O RG deve ter no máximo 20 caracteres.";

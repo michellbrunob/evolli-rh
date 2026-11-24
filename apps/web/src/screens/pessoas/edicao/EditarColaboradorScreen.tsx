@@ -98,6 +98,7 @@ import {
   mascararCpf,
 } from "../NovaAdmissaoScreen";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
+import { MENSAGEM_CPF_EM_USO, useCpfEmUso } from "../useCpfEmUso";
 import {
   type CampoProfissional,
   type ValoresProfissionais,
@@ -375,6 +376,25 @@ export function EditarColaboradorScreen({
     () => (gravado ? dadosBasicosDe(gravado) : null),
     [gravado],
   );
+
+  // T215 — CPF trocado: o repetido na empresa aparece enquanto se digita
+  // (a própria pessoa não conta). O gravado não é consultado.
+  const soDigitos = (v: string | undefined) => (v ?? "").replace(/D/g, "");
+  const cpfEmUso = useCpfEmUso(
+    basicos && soDigitos(basicos.cpf) !== soDigitos(basicosGravados?.cpf)
+      ? basicos.cpf
+      : "",
+    cpfValido,
+    colaboradorId,
+  );
+  useEffect(() => {
+    if (!cpfEmUso) return;
+    setErros((prev) =>
+      prev.cpf === MENSAGEM_CPF_EM_USO
+        ? prev
+        : { ...prev, cpf: MENSAGEM_CPF_EM_USO },
+    );
+  }, [cpfEmUso]);
   const enderecoGravado = useMemo(
     () => (gravado ? enderecoParaEdicao(gravado.endereco) : null),
     [gravado],
@@ -516,6 +536,7 @@ export function EditarColaboradorScreen({
       const digitos = basicos.cpf.replace(/\D/g, "");
       if (digitos === "") novos.cpf = "Informe o CPF.";
       else if (!cpfValido(digitos)) novos.cpf = "Informe um CPF válido.";
+      else if (cpfEmUso) novos.cpf = MENSAGEM_CPF_EM_USO;
       const telefone = basicos.contatoEmergenciaTelefone.trim();
       if (
         telefone !== "" &&

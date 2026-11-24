@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsIn,
   IsOptional,
+  IsUUID,
   IsString,
   Matches,
   MaxLength,
@@ -285,4 +286,21 @@ export class RegistrarDadosPessoaisDto {
   @ValidateNested()
   @Type(() => EnderecoDto)
   endereco?: EnderecoDto;
+}
+
+/**
+ * T215 — conferência do CPF enquanto o RH digita no Novo colaborador (e na
+ * edição da ficha): o CPF vai no CORPO, nunca na URL. `ignorarColaboradorId`
+ * tira da conta a própria pessoa (edição da ficha).
+ */
+export class ConsultarCpfEmUsoDto {
+  @Transform(({ value }) => normalizarCpf(value))
+  @IsString()
+  @Matches(CPF_GRAVADO)
+  @Validate(CpfValido)
+  cpf!: string;
+
+  @IsOptional()
+  @IsUUID()
+  ignorarColaboradorId?: string;
 }

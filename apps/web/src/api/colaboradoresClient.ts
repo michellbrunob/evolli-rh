@@ -612,6 +612,26 @@ export async function enviarAdmissao(
   };
 }
 
+/**
+ * T215 — o CPF já está cadastrado na empresa ativa? Conferido enquanto o RH
+ * digita. O CPF vai no corpo, nunca na URL.
+ */
+export async function consultarCpfEmUso(
+  cpf: string,
+  ignorarColaboradorId?: string,
+): Promise<boolean> {
+  const token = await getCsrf();
+  const res = await apiFetch("/colaboradores/cpf-em-uso", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify({
+      cpf,
+      ...(ignorarColaboradorId ? { ignorarColaboradorId } : {}),
+    }),
+  });
+  return (await jsonOrThrow<{ emUso: boolean }>(res)).emUso;
+}
+
 export async function retificarColaborador(
   id: string,
   dto: RetificarColaboradorDto,

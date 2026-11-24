@@ -18,6 +18,7 @@ import {
   listarColaboradores,
   listarVinculosDoColaborador,
   retificarColaborador,
+  consultarCpfEmUso,
 } from "../../../api/colaboradoresClient";
 import {
   consultarContratoDoColaborador,
@@ -49,6 +50,7 @@ vi.mock("../../../api/colaboradoresClient", async () => {
   return {
     ...actual,
     buscarColaborador: vi.fn(),
+    consultarCpfEmUso: vi.fn(),
     listarColaboradores: vi.fn(),
     listarVinculosDoColaborador: vi.fn(),
     retificarColaborador: vi.fn(),
@@ -851,5 +853,27 @@ describe("T215 — Editar colaborador: desativar e reativar", () => {
     );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(desativarColaborador).not.toHaveBeenCalled();
+  });
+});
+
+describe("T215 — Editar colaborador: CPF já cadastrado, ao digitar", () => {
+  it("o CPF gravado não consulta; outro já usado avisa no campo e não salva", async () => {
+    vi.mocked(consultarCpfEmUso).mockResolvedValue(true);
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    await new Promise((r) => setTimeout(r, 600));
+    expect(consultarCpfEmUso).not.toHaveBeenCalled();
+    fireEvent.change(campo("CPF"), { target: { value: "111.444.777-35" } });
+    await waitFor(() =>
+      expect(campo("CPF")).toHaveAccessibleDescription(
+        "Este CPF já está cadastrado nesta empresa.",
+      ),
+    );
+    expect(consultarCpfEmUso).toHaveBeenCalledWith("11144477735", ID);
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    await waitFor(() => expect(campo("CPF")).toHaveFocus());
+    expect(registrarDadosPessoaisDoColaborador).not.toHaveBeenCalled();
   });
 });
