@@ -822,9 +822,9 @@ function CalendarioDoMes({
   let trabalhados = 0;
   let minutos = 0;
   const turnosUsados = new Map<string, Turno>();
-  let temFeriado = false;
+  let feriados = 0;
   for (const dia of dias) {
-    if (feriadoDe(dia)) temFeriado = true;
+    if (feriadoDe(dia)) feriados += 1;
     const e = escalaDoDia(escalas, dia);
     if (!e) continue;
     const r = resolverDia(escalas, dia);
@@ -934,10 +934,10 @@ function CalendarioDoMes({
             {curtoDoTurno(t)}
           </span>
         ))}
-        {temFeriado ? (
+        {feriados > 0 ? (
           <span className="escala-ficha__legenda-item">
-            <span className="escala-ficha__legenda-feriado">2</span>
-            Feriado
+            <span className="escala-ficha__legenda-feriado">{feriados}</span>{" "}
+            {feriados === 1 ? "feriado" : "feriados"}
           </span>
         ) : null}
       </p>

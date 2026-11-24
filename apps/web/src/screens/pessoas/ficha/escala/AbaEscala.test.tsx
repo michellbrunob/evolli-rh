@@ -721,3 +721,15 @@ describe("T215 — calendário do mês como o da referência", () => {
     ).toBe(true);
   });
 });
+
+describe("T215 — legenda dos feriados no plural certo", () => {
+  it("conta os feriados do mês: 3 feriados em novembro, 1 feriado em dezembro", async () => {
+    montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
+    const legenda = () =>
+      document.querySelector(".escala-ficha__legenda") as HTMLElement;
+    await waitFor(() => expect(legenda()).toHaveTextContent("3 feriados"));
+    fireEvent.click(screen.getByRole("button", { name: "Próximo mês" }));
+    await waitFor(() => expect(legenda()).toHaveTextContent("1 feriado"));
+    expect(legenda()).not.toHaveTextContent("1 feriados");
+  });
+});
