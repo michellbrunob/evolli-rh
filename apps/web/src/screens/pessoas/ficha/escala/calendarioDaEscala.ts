@@ -193,17 +193,24 @@ export function formatarHoras(totalMinutos: number): string {
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, "0")}`;
 }
 
-const FERIADOS_NACIONAIS = new Set([
-  "01-01",
-  "04-21",
-  "05-01",
-  "09-07",
-  "10-12",
-  "11-02",
-  "11-15",
-  "11-20",
-  "12-25",
-]);
+/** Feriados nacionais de data fixa (mês-dia → nome). */
+const NOMES_DOS_FERIADOS: Record<string, string> = {
+  "01-01": "Confraternização Universal",
+  "04-21": "Tiradentes",
+  "05-01": "Dia do Trabalho",
+  "09-07": "Independência do Brasil",
+  "10-12": "Nossa Senhora Aparecida",
+  "11-02": "Finados",
+  "11-15": "Proclamação da República",
+  "11-20": "Dia Nacional de Zumbi e da Consciência Negra",
+  "12-25": "Natal",
+};
+const FERIADOS_NACIONAIS = new Set(Object.keys(NOMES_DOS_FERIADOS));
+
+/** O nome do feriado nacional de data fixa no dia, ou `null`. */
+export function feriadoDe(dia: string): string | null {
+  return NOMES_DOS_FERIADOS[dia.slice(5)] ?? null;
+}
 
 function diasDoMes(mes: string): number {
   const [ano, m] = mes.split("-").map(Number);

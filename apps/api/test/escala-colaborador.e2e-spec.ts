@@ -105,6 +105,8 @@ interface Escala {
   inicioCiclo: string | null;
   vigenciaInicio: string;
   vigenciaFim: string | null;
+  definidaEm: string;
+  definidaPor: string | null;
 }
 
 interface Escalas {
@@ -509,6 +511,18 @@ describe("T215 — escala do colaborador (e2e)", () => {
       { campo: "modelo", motivo: "igual_a_vigente" },
     ]);
     expect((await escalas(p.id)).escalas).toHaveLength(1);
+    // Na mesma data de início, o padrão aberto é substituído (correção).
+    const corrigida = (
+      await definir(p.id, { modelo: "4x3", vigenciaInicio: D2 }).expect(201)
+    ).body as Escalas;
+    expect(corrigida.escalas).toHaveLength(1);
+    expect(corrigida.escalas[0]).toMatchObject({
+      modelo: "4x3",
+      vigenciaInicio: D2,
+      vigenciaFim: null,
+      definidaPor: null,
+    });
+    expect(corrigida.escalas[0]!.definidaEm).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it("encerrar: o primeiro dia sem a escala; já encerrada e fim fora de ordem dão 422; e não se sobrepõe depois", async () => {

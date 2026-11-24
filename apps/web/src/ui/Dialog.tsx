@@ -55,6 +55,8 @@ export interface JanelaProps {
   readonly alterado?: boolean;
   /** Ilustração decorativa ao lado do título. */
   readonly icone?: ReactNode;
+  /** T215 — linha curta sob o título, no cabeçalho (ex.: pessoa · cargo). */
+  readonly subtitulo?: string;
   /** Ações fixas no rodapé. */
   readonly rodape?: ReactNode;
   readonly children: ReactNode;
@@ -70,6 +72,7 @@ function Janela({
   bloqueado = false,
   alterado = false,
   icone,
+  subtitulo,
   rodape,
   children,
   className,
@@ -170,13 +173,20 @@ function Janela({
                   {icone}
                 </span>
               ) : null}
-              <RadixDialog.Title
-                ref={tituloRef}
-                tabIndex={-1}
-                className="ev:m-0 ev:min-w-0 ev:text-[length:var(--text-lead)] ev:font-semibold ev:leading-[var(--leading-tight)] ev:text-[var(--color-ink)]"
-              >
-                {titulo}
-              </RadixDialog.Title>
+              <div className="ev:min-w-0">
+                <RadixDialog.Title
+                  ref={tituloRef}
+                  tabIndex={-1}
+                  className="ev:m-0 ev:min-w-0 ev:text-[length:var(--text-lead)] ev:font-semibold ev:leading-[var(--leading-tight)] ev:text-[var(--color-ink)]"
+                >
+                  {titulo}
+                </RadixDialog.Title>
+                {subtitulo ? (
+                  <p className="ev:m-0 ev:truncate ev:text-[length:var(--text-caption)] ev:text-[var(--color-ink-subtle)]">
+                    {subtitulo}
+                  </p>
+                ) : null}
+              </div>
             </div>
             <IconButton
               label="Fechar"

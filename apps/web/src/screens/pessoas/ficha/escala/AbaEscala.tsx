@@ -1,19 +1,19 @@
 /**
- * T215 — aba Escala da ficha do colaborador: o PADRÃO DE ESCALA, com
- * vigência.
+ * T215 — aba Escala da ficha do colaborador, no desenho da referência:
  *
- * - **Escala atual:** o modelo (5x2, 6x1, semana espanhola, revezamentos,
- *   plantões, embarque ou "outra"), o turno, o turno da noite (12x36), a
- *   folga semanal (6x1), os dias de trabalho ("outra"), o início do ciclo,
- *   as horas por semana, os dias para benefícios no mês e a vigência; e os
- *   próximos 14 dias, com trabalho e folga.
- * - **Histórico de escalas:** da mais nova à mais antiga.
+ * - **Escala atual:** o padrão (5x2, 6x1, revezamentos, plantões, embarque
+ *   ou "outra") com o turno, desde quando vale e os indicadores (horas por
+ *   semana, dias de benefício no mês e a particularidade do modelo); "Abrir
+ *   no quadro" e "Alterar padrão".
+ * - **Próximos 7 dias** e o **calendário do mês** (com os feriados).
+ * - **Histórico da escala:** cada mudança de padrão, com o período, quem
+ *   definiu e quando.
  * - **Definir/Alterar padrão de escala** (gaveta): cada modelo mostra só os
- *   campos dele, e "O que muda" compara antes e depois.
- * - **Encerrar escala:** o último dia na escala.
+ *   campos dele; "O que muda" compara antes e depois. "Encerrar escala" fica
+ *   no rodapé da gaveta de alteração.
  *
  * RH e DP (`podeOperar`) definem, alteram e encerram; os demais só leem. Os
- * turnos são as jornadas ativas da empresa (Jornadas de trabalho).
+ * turnos são as jornadas ativas da empresa.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -37,7 +37,12 @@ import {
 } from "../../../../api/csrfClient";
 import { Button, FormActions } from "../../../../components";
 import { Sheet } from "../../../../ui";
-import { IconeCalendario, IconeRelogio } from "../../../../ui/icones";
+import {
+  IconeCalendario,
+  IconeMais,
+  IconeRelogio,
+  IconeRemover,
+} from "../../../../ui/icones";
 import {
   AvisoAnimado,
   Esqueleto,
@@ -49,14 +54,17 @@ import {
   diaAnteriorCivil,
   diaDeHoje,
   proximoDiaCivil,
-  rotuloDaJornada,
 } from "../../jornadaColaborador";
 import {
   type PadraoDeEscala,
+  diaDaSemana,
   diasNoMes,
+  feriadoDe,
   formatarHoras,
   horasPorSemana,
-  proximosDias,
+  minutosNoDia,
+  somarDias,
+  trabalhoNoDia,
 } from "./calendarioDaEscala";
 import {
   DIAS_DA_SEMANA,
@@ -66,6 +74,7 @@ import {
   temCiclo,
 } from "./modelosDeEscala";
 import { formatarDuracao, gradeDaSemana } from "./resumoDaEscala";
+import { SeletorRico, type GrupoRico } from "./SeletorRico";
 import "./AbaEscala.css";
 
 /** As operações da aba (o servidor, ou um dublê nos testes). */
@@ -95,10 +104,12 @@ interface Props {
   readonly colaboradorId: string;
   readonly nome: string;
   readonly primeiroNome: string;
+  /** "TI · CLT" — cargo e tipo de contrato, para o cabeçalho da gaveta. */
+  readonly detalhe?: string;
   /** RH e DP: definir, alterar e encerrar. */
   readonly podeOperar: boolean;
-  /** Abre Jornadas de trabalho (criar ou ajustar turnos). */
-  readonly onAbrirJornadas?: () => void;
+  /** Abre o quadro da Escala de trabalho. */
+  readonly onAbrirQuadro?: () => void;
   /** Dia civil de hoje (testes). */
   readonly hoje?: string;
   readonly servico?: ServicoDeEscala;
@@ -106,21 +117,25 @@ interface Props {
 
 const VAZIO = "—";
 const SEM_TURNO = "sem";
+const MESMO_TURNO = "mesmo";
 const MESES = [
-  "jan.",
-  "fev.",
-  "mar.",
-  "abr.",
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
   "maio",
-  "jun.",
-  "jul.",
-  "ago.",
-  "set.",
-  "out.",
-  "nov.",
-  "dez.",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
 ];
-const DIAS_CURTOS = ["", "seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+const DIAS_CURTOS = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const CABECALHO_DO_MES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+/** Cor dos turnos enquanto o catálogo não guarda cor própria. */
+const COR_DO_TURNO = "var(--color-ink-subtle)";
 
 type Situacao = "vigente" | "programada" | "encerrada";
 const ROTULO_SITUACAO: Record<Situacao, string> = {
@@ -130,7 +145,6 @@ const ROTULO_SITUACAO: Record<Situacao, string> = {
 };
 
 type Turno = {
-  codigo: string | null;
   nome: string;
   periodos: { dia: string; inicio: string; fim: string }[];
 };
@@ -141,9 +155,21 @@ function situacaoDe(e: EscalaApi, hoje: string): Situacao {
   return "vigente";
 }
 
+function diaTipico(periodos: Turno["periodos"]) {
+  return gradeDaSemana(periodos).find((d) => d.minutos > 0) ?? null;
+}
+
+/** "09:00–18:00". */
+function faixaDoTurno(t: Turno | null): string {
+  const dia = t ? diaTipico(t.periodos) : null;
+  return dia
+    ? `${dia.periodos[0]!.inicio}–${dia.periodos[dia.periodos.length - 1]!.fim}`
+    : "";
+}
+
 /** "09:00–18:00 · 1 h de intervalo". */
 export function descricaoDoTurno(periodos: Turno["periodos"]): string {
-  const dia = gradeDaSemana(periodos).find((d) => d.minutos > 0);
+  const dia = diaTipico(periodos);
   if (!dia) return "sem horário";
   const faixa = `${dia.periodos[0]!.inicio}–${dia.periodos[dia.periodos.length - 1]!.fim}`;
   return dia.intervalo === 0
@@ -151,25 +177,27 @@ export function descricaoDoTurno(periodos: Turno["periodos"]): string {
     : `${faixa} · ${formatarDuracao(dia.intervalo)} de intervalo`;
 }
 
-function nomeDoTurno(t: Turno | null): string {
-  return t ? rotuloDaJornada(t) : "Sem turno fixo";
+/** "Comercial 09:00–18:00" (sem turno: "Sem turno"). */
+function curtoDoTurno(t: Turno | null): string {
+  return t ? `${t.nome} ${faixaDoTurno(t)}`.trim() : "Sem turno";
 }
 
-function curtoDoTurno(t: Turno | null): string {
-  if (!t) return "Sem turno";
-  const dia = gradeDaSemana(t.periodos).find((d) => d.minutos > 0);
-  const faixa = dia
-    ? ` ${dia.periodos[0]!.inicio}–${dia.periodos[dia.periodos.length - 1]!.fim}`
-    : "";
-  return `${t.nome}${faixa}`;
+function siglaDe(t: Turno | null): string {
+  return (t?.nome.trim()[0] ?? "?").toUpperCase();
+}
+
+function nomeDoDia(n: number): string {
+  return DIAS_DA_SEMANA.find((d) => d.numero === n)?.nome ?? "";
 }
 
 function listaDeDias(dias: readonly number[]): string {
-  const nomes = dias.map(
-    (n) => DIAS_DA_SEMANA.find((d) => d.numero === n)?.nome ?? "",
-  );
+  const nomes = dias.map(nomeDoDia);
   if (nomes.length <= 1) return nomes.join("");
   return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
+
+function maiuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 function padraoDe(e: EscalaApi): PadraoDeEscala {
@@ -188,24 +216,45 @@ function mesDe(dia: string): string {
   return dia.slice(0, 7);
 }
 
-function rotuloDoMes(dia: string): string {
-  return MESES[Number(dia.slice(5, 7)) - 1]!;
+function mesCurto(dia: string): string {
+  const nome = MESES[Number(dia.slice(5, 7)) - 1]!;
+  return nome.length <= 5 ? nome : `${nome.slice(0, 3)}.`;
 }
 
-/** Detalhes do padrão que só alguns modelos têm. */
-function particularidades(e: EscalaApi): string[] {
-  const itens: string[] = [];
-  if (e.folgaSemanal !== null) {
-    itens.push(`Folga semanal: ${listaDeDias([e.folgaSemanal])}`);
+/** A escala que vale no dia, entre todas. */
+function escalaDoDia(escalas: EscalaApi[], dia: string): EscalaApi | null {
+  return (
+    escalas.find(
+      (e) =>
+        e.vigenciaInicio <= dia &&
+        (e.vigenciaFim === null || dia < e.vigenciaFim),
+    ) ?? null
+  );
+}
+
+interface DiaResolvido {
+  readonly tipo: "trabalho" | "folga" | "dsr" | "sem-escala";
+  readonly turno: Turno | null;
+}
+
+function resolverDia(escalas: EscalaApi[], dia: string): DiaResolvido {
+  const e = escalaDoDia(escalas, dia);
+  if (!e) return { tipo: "sem-escala", turno: null };
+  const t = trabalhoNoDia(padraoDe(e), dia);
+  if (t === null) {
+    // DSR: a folga escolhida no 6x1 e o domingo nas semanas fixas; nos
+    // revezamentos, plantões e embarque, a folga é do ciclo.
+    const tipo = modeloDe(e.modelo)?.tipo;
+    const dsr =
+      e.modelo === "6x1"
+        ? diaDaSemana(dia) === (e.folgaSemanal ?? 7)
+        : (tipo === "semanal" || tipo === "outra") && diaDaSemana(dia) === 7;
+    return { tipo: dsr ? "dsr" : "folga", turno: null };
   }
-  if (e.diasTrabalho.length > 0) {
-    itens.push(`Dias de trabalho: ${listaDeDias(e.diasTrabalho)}`);
-  }
-  if (e.turnoNoite) itens.push(`Turno da noite: ${nomeDoTurno(e.turnoNoite)}`);
-  if (e.inicioCiclo) {
-    itens.push(`Início do ciclo: ${formatarDiaCivil(e.inicioCiclo)}`);
-  }
-  return itens;
+  return {
+    tipo: "trabalho",
+    turno: t === "noite" ? e.turnoNoite : e.turno,
+  };
 }
 
 type Carga =
@@ -223,8 +272,9 @@ export function AbaEscala({
   colaboradorId,
   nome,
   primeiroNome,
+  detalhe,
   podeOperar,
-  onAbrirJornadas,
+  onAbrirQuadro,
   hoje = diaDeHoje(),
   servico = servicoDeEscalaDoServidor,
 }: Props) {
@@ -295,40 +345,13 @@ export function AbaEscala({
     void carregar(true);
   };
 
-  const verJornadas = onAbrirJornadas ? (
-    <Button type="button" variant="secondary" onClick={onAbrirJornadas}>
-      Ver jornadas de trabalho
-    </Button>
-  ) : null;
-
-  const acoes = podeOperar ? (
-    aberta ? (
-      <>
-        <Button type="button" onClick={() => setGaveta("alterar")}>
-          Alterar escala
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setGaveta("encerrar")}
-        >
-          Encerrar escala
-        </Button>
-      </>
-    ) : (
-      <Button type="button" onClick={() => setGaveta("definir")}>
-        Definir escala
-      </Button>
-    )
-  ) : null;
-
   return (
     <Revelar>
       <div className="escala-ficha">
         {escalas.length === 0 ? (
           <section className="ficha-ref__cartao escala-ficha__vazio">
-            <span className="ficha-ref__cartao-icone" aria-hidden="true">
-              <IconeRelogio tamanho={18} />
+            <span className="escala-ficha__vazio-icone" aria-hidden="true">
+              <IconeRelogio tamanho={20} />
             </span>
             <h3
               id={idTitulo}
@@ -339,12 +362,25 @@ export function AbaEscala({
             </h3>
             <p className="escala-ficha__vazio-texto">
               {cadastro
-                ? `Hoje vale a escala do cadastro (${cadastro.nome}): os benefícios pagos por dia usam os dias dela no mês. Defina o padrão aqui para guardar o turno e a vigência.`
-                : "Sem escala, os benefícios pagos por dia usam os dias úteis do mês. Defina a escala aqui; os turnos ficam em Jornadas de trabalho."}
+                ? `Hoje vale a escala do cadastro (${cadastro.nome}): os benefícios pagos por dia usam os dias dela no mês. Defina o padrão aqui ou aplique um modelo para várias pessoas no quadro.`
+                : "Sem escala, os benefícios pagos por dia usam os dias úteis do mês. Defina a escala aqui ou aplique um modelo para várias pessoas no quadro."}
             </p>
             <div className="escala-ficha__acoes">
-              {verJornadas}
-              {acoes}
+              {onAbrirQuadro ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={onAbrirQuadro}
+                >
+                  Abrir o quadro
+                </Button>
+              ) : null}
+              {podeOperar ? (
+                <Button type="button" onClick={() => setGaveta("definir")}>
+                  <IconeMais tamanho={16} />
+                  Definir escala
+                </Button>
+              ) : null}
             </div>
           </section>
         ) : (
@@ -356,17 +392,30 @@ export function AbaEscala({
               escalas={escalas}
               hoje={hoje}
               acoes={
-                acoes || verJornadas ? (
-                  <div className="escala-ficha__acoes">
-                    {acoes}
-                    {verJornadas}
-                  </div>
-                ) : null
+                <>
+                  {onAbrirQuadro ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={onAbrirQuadro}
+                    >
+                      Abrir no quadro
+                    </Button>
+                  ) : null}
+                  {podeOperar ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setGaveta(aberta ? "alterar" : "definir")}
+                    >
+                      {aberta ? "Alterar padrão" : "Definir escala"}
+                    </Button>
+                  ) : null}
+                </>
               }
             />
-            {(atual ?? programada) ? (
-              <ProximosDias escala={(atual ?? programada)!} hoje={hoje} />
-            ) : null}
+            <ProximosDias escalas={escalas} hoje={hoje} />
+            <CalendarioDoMes escalas={escalas} hoje={hoje} />
             <Historico escalas={escalas} hoje={hoje} />
           </>
         )}
@@ -388,19 +437,22 @@ export function AbaEscala({
             modo={gaveta}
             colaboradorId={colaboradorId}
             nome={nome}
+            detalhe={detalhe}
             dados={dados}
             aberta={aberta}
             turnos={turnos}
             hoje={hoje}
             servico={servico}
-            {...(onAbrirJornadas ? { onAbrirJornadas } : {})}
             onFechar={() => setGaveta(null)}
+            onEncerrar={() => setGaveta("encerrar")}
             onGravado={gravado}
           />
         ) : null}
         {gaveta === "encerrar" && aberta ? (
           <GavetaDeEncerramento
             colaboradorId={colaboradorId}
+            nome={nome}
+            detalhe={detalhe}
             escala={aberta}
             servico={servico}
             onFechar={() => setGaveta(null)}
@@ -412,97 +464,50 @@ export function AbaEscala({
   );
 }
 
-// ------------------------------------------------------------ Escala atual
+// ------------------------------------------------------------- Cartões
 
-function Metricas({
-  e,
-  hoje,
+function Cartao({
+  icone,
+  titulo,
+  idTitulo,
+  subtitulo,
+  acoes,
+  className,
+  children,
 }: {
-  readonly e: EscalaApi;
-  readonly hoje: string;
+  readonly icone: ReactNode;
+  readonly titulo: string;
+  readonly idTitulo?: string;
+  readonly subtitulo?: string;
+  readonly acoes?: ReactNode;
+  readonly className?: string;
+  readonly children: ReactNode;
 }) {
-  const p = padraoDe(e);
-  const ultimo = e.vigenciaFim ? diaAnteriorCivil(e.vigenciaFim) : null;
-  const base = e.vigenciaInicio > hoje ? e.vigenciaInicio : hoje;
-  const itens: [string, ReactNode][] = [
-    [
-      "Turno",
-      e.turno ? (
-        <>
-          {nomeDoTurno(e.turno)}
-          <span className="escala-ficha__sub">
-            {descricaoDoTurno(e.turno.periodos)}
-          </span>
-        </>
-      ) : (
-        "Sem turno fixo"
-      ),
-    ],
-  ];
-  if (e.turnoNoite) {
-    itens.push([
-      "Turno da noite",
-      <>
-        {nomeDoTurno(e.turnoNoite)}
-        <span className="escala-ficha__sub">
-          {descricaoDoTurno(e.turnoNoite.periodos)}
-        </span>
-      </>,
-    ]);
-  }
-  if (e.folgaSemanal !== null) {
-    itens.push(["Folga semanal (DSR)", listaDeDias([e.folgaSemanal])]);
-  }
-  if (e.diasTrabalho.length > 0) {
-    itens.push(["Dias de trabalho", listaDeDias(e.diasTrabalho)]);
-  }
-  if (e.inicioCiclo) {
-    itens.push(["Início do ciclo", formatarDiaCivil(e.inicioCiclo)]);
-  }
-  itens.push(
-    ["Horas por semana", formatarHoras(horasPorSemana(p, base))],
-    [
-      `Benefício em ${rotuloDoMes(base)}`,
-      `${diasNoMes(e.modelo, mesDe(base))} dias`,
-    ],
-    ["Vale desde", formatarDiaCivil(e.vigenciaInicio)],
-    ["Termina em", ultimo ? formatarDiaCivil(ultimo) : "Sem término"],
-  );
+  const proprio = useId();
+  const id = idTitulo ?? proprio;
   return (
-    <dl className="escala-ficha__metricas">
-      {itens.map(([rotulo, valor]) => (
-        <div key={rotulo} className="escala-ficha__metrica">
-          <dt>{rotulo}</dt>
-          <dd>{valor}</dd>
+    <section
+      className={`ficha-ref__cartao escala-ficha__cartao ${className ?? ""}`}
+      aria-labelledby={id}
+    >
+      <header className="escala-ficha__cabeca">
+        <span className="escala-ficha__cabeca-icone" aria-hidden="true">
+          {icone}
+        </span>
+        <div className="escala-ficha__cabeca-textos">
+          <h3 id={id} tabIndex={-1} className="escala-ficha__titulo">
+            {titulo}
+          </h3>
+          {subtitulo ? (
+            <p className="escala-ficha__subtitulo">{subtitulo}</p>
+          ) : null}
         </div>
-      ))}
-    </dl>
-  );
-}
-
-function CabecaDoModelo({
-  e,
-  situacao,
-}: {
-  readonly e: EscalaApi;
-  readonly situacao: Situacao;
-}) {
-  const m = modeloDe(e.modelo);
-  return (
-    <div className="escala-ficha__modelo">
-      <p className="escala-ficha__modelo-nome">
-        <strong>{m?.nome ?? e.modelo}</strong>
-        <span className={`escala-ficha__selo escala-ficha__selo--${situacao}`}>
-          {ROTULO_SITUACAO[situacao]}
-        </span>
-        {e.turno && !e.turno.ativo ? (
-          <span className="escala-ficha__selo escala-ficha__selo--alerta">
-            Turno inativo
-          </span>
+        {acoes ? (
+          <div className="escala-ficha__cabeca-acoes">{acoes}</div>
         ) : null}
-      </p>
-      {m ? <p className="escala-ficha__sub">{m.descricao}</p> : null}
-    </div>
+      </header>
+      {children}
+    </section>
   );
 }
 
@@ -521,109 +526,320 @@ function EscalaAtual({
   readonly hoje: string;
   readonly acoes: ReactNode;
 }) {
+  const e = atual ?? programada;
+  const subtitulo = e
+    ? `Definida na ficha em ${formatarDiaCivil(e.definidaEm.slice(0, 10))}${e.definidaPor ? ` · ${e.definidaPor}` : ""}`
+    : undefined;
   const ultimaEncerrada = escalas.find(
-    (e) => situacaoDe(e, hoje) === "encerrada",
+    (x) => situacaoDe(x, hoje) === "encerrada",
   );
   return (
-    <section
-      className="ficha-ref__cartao escala-ficha__atual"
-      aria-labelledby={idTitulo}
+    <Cartao
+      icone={<IconeRelogio tamanho={18} />}
+      titulo="Escala atual"
+      idTitulo={idTitulo}
+      {...(subtitulo ? { subtitulo } : {})}
+      acoes={acoes}
     >
-      <header className="ficha-ref__cartao-cabeca">
-        <span className="ficha-ref__cartao-icone" aria-hidden="true">
-          <IconeRelogio tamanho={18} />
-        </span>
-        <h3 id={idTitulo} tabIndex={-1} className="escala-ficha__titulo">
-          Escala atual
-        </h3>
-      </header>
       <div className="escala-ficha__corpo">
-        {atual ? (
-          <>
-            <CabecaDoModelo e={atual} situacao="vigente" />
-            <Metricas e={atual} hoje={hoje} />
-          </>
+        {e ? (
+          <Resumo e={e} hoje={hoje} programada={!atual} />
         ) : (
           <p className="escala-ficha__sem-vigente">
-            {ultimaEncerrada && !programada && ultimaEncerrada.vigenciaFim
+            {ultimaEncerrada?.vigenciaFim
               ? `Sem escala vigente hoje. A última terminou em ${formatarDiaCivil(diaAnteriorCivil(ultimaEncerrada.vigenciaFim))}.`
               : "Sem escala vigente hoje."}
           </p>
         )}
-        {programada ? (
+        {atual && programada ? (
           <p className="escala-ficha__programada">
             <IconeCalendario tamanho={16} />
             <span>
-              {`A partir de ${formatarDiaCivil(programada.vigenciaInicio)}: ${modeloDe(programada.modelo)?.nome ?? programada.modelo} · ${nomeDoTurno(programada.turno)}.`}
+              {`A partir de ${formatarDiaCivil(programada.vigenciaInicio)}: ${modeloDe(programada.modelo)?.nome ?? programada.modelo} · ${curtoDoTurno(programada.turno)}.`}
             </span>
           </p>
         ) : null}
-        {acoes}
       </div>
-    </section>
+    </Cartao>
   );
 }
 
-// ---------------------------------------------------------- Próximos dias
+function Resumo({
+  e,
+  hoje,
+  programada,
+}: {
+  readonly e: EscalaApi;
+  readonly hoje: string;
+  readonly programada: boolean;
+}) {
+  const base = e.vigenciaInicio > hoje ? e.vigenciaInicio : hoje;
+  const ultimo = e.vigenciaFim ? diaAnteriorCivil(e.vigenciaFim) : null;
+  const indicadores: [string, string][] = [
+    [formatarHoras(horasPorSemana(padraoDe(e), base)), "por semana"],
+    [
+      `${diasNoMes(e.modelo, mesDe(base))} dias`,
+      `de benefício em ${mesCurto(base)}`,
+    ],
+  ];
+  if (e.folgaSemanal !== null) {
+    indicadores.push([maiuscula(nomeDoDia(e.folgaSemanal)), "folga semanal"]);
+  }
+  if (e.diasTrabalho.length > 0) {
+    indicadores.push([
+      maiuscula(listaDeDias(e.diasTrabalho)),
+      "dias de trabalho",
+    ]);
+  }
+  if (e.turnoNoite) {
+    indicadores.push([e.turnoNoite.nome, "turno da noite"]);
+  }
+  if (e.inicioCiclo) {
+    indicadores.push([formatarDiaCivil(e.inicioCiclo), "início do ciclo"]);
+  }
+  return (
+    <div className="escala-ficha__resumo">
+      <div className="escala-ficha__padrao">
+        <p className="escala-ficha__padrao-linha">
+          <strong className="escala-ficha__modelo">
+            {modeloDe(e.modelo)?.nome ?? e.modelo}
+          </strong>
+          <span className="escala-ficha__turno">
+            <span
+              className="seletor-rico__ponto"
+              style={{ background: COR_DO_TURNO }}
+              aria-hidden="true"
+            />
+            {e.turno?.nome ?? "Sem turno fixo"}
+          </span>
+          {programada ? (
+            <span className="escala-ficha__selo escala-ficha__selo--programada">
+              Programada
+            </span>
+          ) : null}
+          {e.turno && !e.turno.ativo ? (
+            <span className="escala-ficha__selo escala-ficha__selo--alerta">
+              Turno inativo
+            </span>
+          ) : null}
+        </p>
+        <p className="escala-ficha__sub">
+          {[
+            e.turno ? descricaoDoTurno(e.turno.periodos) : null,
+            programada
+              ? `a partir de ${formatarDiaCivil(e.vigenciaInicio)}`
+              : `desde ${formatarDiaCivil(e.vigenciaInicio)}`,
+            ultimo ? `até ${formatarDiaCivil(ultimo)}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </div>
+      <dl className="escala-ficha__indicadores">
+        {indicadores.map(([valor, rotulo]) => (
+          <div key={rotulo} className="escala-ficha__indicador">
+            <dt>{rotulo}</dt>
+            <dd>{valor}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function DescricaoDoDia({ d }: { readonly d: DiaResolvido }) {
+  if (d.tipo === "sem-escala") {
+    return <span className="escala-ficha__folga">Sem escala</span>;
+  }
+  if (d.tipo === "dsr") {
+    return <span className="escala-ficha__folga">Folga · DSR</span>;
+  }
+  if (d.tipo === "folga") {
+    return <span className="escala-ficha__folga">Folga</span>;
+  }
+  return (
+    <span className="escala-ficha__turno">
+      <span
+        className="seletor-rico__ponto"
+        style={{ background: COR_DO_TURNO }}
+        aria-hidden="true"
+      />
+      <strong>{d.turno?.nome ?? "Trabalho"}</strong>
+      {d.turno ? (
+        <span className="escala-ficha__sub">
+          {descricaoDoTurno(d.turno.periodos)}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function ProximosDias({
-  escala,
+  escalas,
   hoje,
 }: {
-  readonly escala: EscalaApi;
+  readonly escalas: EscalaApi[];
   readonly hoje: string;
 }) {
-  const id = useId();
-  const inicio = escala.vigenciaInicio > hoje ? escala.vigenciaInicio : hoje;
-  const fim = escala.vigenciaFim;
-  const dias = proximosDias(padraoDe(escala), inicio, 14);
+  const dias = Array.from({ length: 7 }, (_, i) => somarDias(hoje, i));
+  const rotulo = (dia: string, i: number) =>
+    i === 0
+      ? "Hoje"
+      : i === 1
+        ? "Amanhã"
+        : `${DIAS_CURTOS[diaDaSemana(dia)]}, ${formatarDiaCivil(dia).slice(0, 5)}`;
   return (
-    <section
-      className="ficha-ref__cartao escala-ficha__proximos"
-      aria-labelledby={`${id}-titulo`}
+    <Cartao
+      icone={<IconeCalendario tamanho={18} />}
+      titulo="Próximos 7 dias"
+      subtitulo={`De hoje até ${formatarDiaCivil(dias[6]!).slice(0, 5)}, com o que ainda está em rascunho`}
     >
-      <header className="ficha-ref__cartao-cabeca">
-        <span className="ficha-ref__cartao-icone" aria-hidden="true">
-          <IconeCalendario tamanho={18} />
-        </span>
-        <h3 id={`${id}-titulo`} className="escala-ficha__titulo">
-          Próximos 14 dias
-        </h3>
-      </header>
-      <ul className="escala-ficha__dias" aria-label="Próximos 14 dias">
-        {dias.map((d) => {
-          const fora = fim !== null && d.dia >= fim;
-          const semana = new Date(`${d.dia}T12:00:00Z`).getUTCDay() || 7;
-          const turno =
-            d.trabalho === "noite" ? escala.turnoNoite : escala.turno;
-          return (
-            <li
-              key={d.dia}
-              className={`escala-ficha__dia${d.trabalho && !fora ? "" : " escala-ficha__dia--folga"}`}
+      <ul className="escala-ficha__dias" aria-label="Próximos 7 dias">
+        {dias.map((dia, i) => (
+          <li key={dia} className="escala-ficha__dia">
+            <span
+              className={`escala-ficha__dia-rotulo${i === 0 ? " escala-ficha__dia-rotulo--hoje" : ""}`}
             >
-              <span className="escala-ficha__dia-data">
-                <span>{DIAS_CURTOS[semana]}</span>
-                <strong>{formatarDiaCivil(d.dia).slice(0, 5)}</strong>
-              </span>
-              {fora ? (
-                <span className="escala-ficha__dia-estado">Sem escala</span>
-              ) : d.trabalho ? (
-                <span className="escala-ficha__dia-estado">
-                  {`Trabalho · ${curtoDoTurno(turno)}`}
-                  {d.trabalho === "noite" ? " (noite)" : ""}
-                </span>
-              ) : (
-                <span className="escala-ficha__dia-estado">Folga</span>
-              )}
-            </li>
-          );
-        })}
+              {rotulo(dia, i)}
+            </span>
+            <DescricaoDoDia d={resolverDia(escalas, dia)} />
+            <span className="escala-ficha__etiqueta">Não publicado</span>
+          </li>
+        ))}
       </ul>
-    </section>
+    </Cartao>
   );
 }
 
-// -------------------------------------------------------------- Histórico
+function CalendarioDoMes({
+  escalas,
+  hoje,
+}: {
+  readonly escalas: EscalaApi[];
+  readonly hoje: string;
+}) {
+  const [mes, setMes] = useState(mesDe(hoje));
+  const primeiro = `${mes}-01`;
+  const ano = Number(mes.slice(0, 4));
+  const numeroMes = Number(mes.slice(5, 7));
+  const totalDias = new Date(Date.UTC(ano, numeroMes, 0)).getUTCDate();
+  const deslocamento = diaDaSemana(primeiro) % 7; // domingo = 0
+  const dias = Array.from({ length: totalDias }, (_, i) =>
+    somarDias(primeiro, i),
+  );
+  let trabalhados = 0;
+  let minutos = 0;
+  const turnosUsados = new Map<string, Turno>();
+  let temFeriado = false;
+  for (const dia of dias) {
+    if (feriadoDe(dia)) temFeriado = true;
+    const e = escalaDoDia(escalas, dia);
+    if (!e) continue;
+    const r = resolverDia(escalas, dia);
+    if (r.tipo === "trabalho") {
+      trabalhados += 1;
+      minutos += minutosNoDia(padraoDe(e), dia);
+      if (r.turno) turnosUsados.set(r.turno.nome, r.turno);
+    }
+  }
+  const mover = (n: number) => {
+    const d = new Date(Date.UTC(ano, numeroMes - 1 + n, 1));
+    setMes(d.toISOString().slice(0, 7));
+  };
+  const titulo = `${maiuscula(MESES[numeroMes - 1]!)} de ${ano}`;
+  return (
+    <Cartao
+      icone={<IconeCalendario tamanho={18} />}
+      titulo={titulo}
+      subtitulo={`${trabalhados} dias de trabalho · ${formatarHoras(minutos)} previstas · ainda não publicada`}
+      acoes={
+        <div className="escala-ficha__navegar">
+          <button
+            type="button"
+            className="escala-ficha__seta escala-ficha__seta--anterior"
+            aria-label="Mês anterior"
+            onClick={() => mover(-1)}
+          />
+          <button
+            type="button"
+            className="escala-ficha__seta"
+            aria-label="Próximo mês"
+            onClick={() => mover(1)}
+          />
+        </div>
+      }
+    >
+      <div className="escala-ficha__calendario-moldura">
+        <div className="escala-ficha__calendario" aria-label={titulo}>
+          <div className="escala-ficha__semana-linha" aria-hidden="true">
+            {CABECALHO_DO_MES.map((c) => (
+              <span key={c} className="escala-ficha__semana-dia">
+                {c}
+              </span>
+            ))}
+          </div>
+          <ol className="escala-ficha__grade" aria-label={`Dias de ${titulo}`}>
+            {Array.from({ length: deslocamento }, (_, i) => (
+              <li
+                key={`v${i}`}
+                aria-hidden="true"
+                className="escala-ficha__celula escala-ficha__celula--vazia"
+              />
+            ))}
+            {dias.map((dia) => {
+              const feriado = feriadoDe(dia);
+              const r = resolverDia(escalas, dia);
+              return (
+                <li
+                  key={dia}
+                  className={`escala-ficha__celula${feriado ? " escala-ficha__celula--feriado" : ""}`}
+                  aria-current={dia === hoje ? "date" : undefined}
+                >
+                  <span className="escala-ficha__celula-topo">
+                    <span
+                      className={`escala-ficha__numero${dia === hoje ? " escala-ficha__numero--hoje" : ""}`}
+                    >
+                      {Number(dia.slice(8, 10))}
+                    </span>
+                    {feriado ? (
+                      <span className="escala-ficha__feriado" title={feriado}>
+                        {feriado}
+                      </span>
+                    ) : null}
+                  </span>
+                  {r.tipo === "trabalho" ? (
+                    <span className="escala-ficha__celula-turno">
+                      <span className="escala-ficha__sigla">
+                        {siglaDe(r.turno)}
+                      </span>
+                      <span>{faixaDoTurno(r.turno)}</span>
+                    </span>
+                  ) : r.tipo === "dsr" ? (
+                    <span className="escala-ficha__folga">Folga · DSR</span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </div>
+      <p className="escala-ficha__legenda">
+        {[...turnosUsados.values()].map((t) => (
+          <span key={t.nome} className="escala-ficha__legenda-item">
+            <span className="escala-ficha__sigla">{siglaDe(t)}</span>
+            {curtoDoTurno(t)}
+          </span>
+        ))}
+        {temFeriado ? (
+          <span className="escala-ficha__legenda-item">
+            <span className="escala-ficha__legenda-feriado">2</span>
+            Feriado
+          </span>
+        ) : null}
+      </p>
+    </Cartao>
+  );
+}
 
 function Historico({
   escalas,
@@ -632,25 +848,28 @@ function Historico({
   readonly escalas: EscalaApi[];
   readonly hoje: string;
 }) {
-  const id = useId();
   return (
-    <section
-      className="ficha-ref__cartao escala-ficha__historico"
-      aria-labelledby={`${id}-titulo`}
+    <Cartao
+      icone={<IconeRelogio tamanho={18} />}
+      titulo="Histórico da escala"
+      subtitulo="Cada mudança de padrão, com o período em que valeu"
     >
-      <header className="ficha-ref__cartao-cabeca">
-        <span className="ficha-ref__cartao-icone" aria-hidden="true">
-          <IconeCalendario tamanho={18} />
-        </span>
-        <h3 id={`${id}-titulo`} className="escala-ficha__titulo">
-          Histórico de escalas
-        </h3>
-      </header>
-      <ol className="escala-ficha__linhas" aria-label="Histórico de escalas">
+      <ol className="escala-ficha__linhas" aria-label="Histórico da escala">
         {escalas.map((e) => {
           const situacao = situacaoDe(e, hoje);
           const ultimo = e.vigenciaFim ? diaAnteriorCivil(e.vigenciaFim) : null;
-          const base = e.vigenciaInicio;
+          const extras = [
+            e.folgaSemanal !== null
+              ? `Folga semanal: ${nomeDoDia(e.folgaSemanal)}`
+              : null,
+            e.diasTrabalho.length > 0
+              ? `Dias de trabalho: ${listaDeDias(e.diasTrabalho)}`
+              : null,
+            e.turnoNoite ? `Turno da noite: ${e.turnoNoite.nome}` : null,
+            e.inicioCiclo
+              ? `Início do ciclo: ${formatarDiaCivil(e.inicioCiclo)}`
+              : null,
+          ].filter(Boolean);
           return (
             <li
               key={e.id}
@@ -658,16 +877,30 @@ function Historico({
             >
               <span className="escala-ficha__marca" aria-hidden="true" />
               <div className="escala-ficha__linha-corpo">
-                <CabecaDoModelo e={e} situacao={situacao} />
-                <p className="escala-ficha__linha-detalhe">
-                  {ultimo
-                    ? `${formatarDiaCivil(e.vigenciaInicio)} a ${formatarDiaCivil(ultimo)}`
-                    : `Desde ${formatarDiaCivil(e.vigenciaInicio)}`}
-                  {` · ${nomeDoTurno(e.turno)} · ${formatarHoras(horasPorSemana(padraoDe(e), base))} por semana`}
+                <p className="escala-ficha__linha-titulo">
+                  <strong>{modeloDe(e.modelo)?.nome ?? e.modelo}</strong>
+                  <span className="escala-ficha__turno">
+                    <span
+                      className="seletor-rico__ponto"
+                      style={{ background: COR_DO_TURNO }}
+                      aria-hidden="true"
+                    />
+                    {e.turno
+                      ? `${e.turno.nome} · ${faixaDoTurno(e.turno)}`
+                      : "Sem turno fixo"}
+                  </span>
+                  <span
+                    className={`escala-ficha__selo escala-ficha__selo--${situacao}`}
+                  >
+                    {ROTULO_SITUACAO[situacao]}
+                  </span>
                 </p>
-                {particularidades(e).length > 0 ? (
+                <p className="escala-ficha__linha-detalhe">
+                  {`${formatarDiaCivil(e.vigenciaInicio)} até ${ultimo ? formatarDiaCivil(ultimo) : "atual"} · Ficha do colaborador${e.definidaPor ? ` · ${e.definidaPor}` : ""} em ${formatarDiaCivil(e.definidaEm.slice(0, 10))}`}
+                </p>
+                {extras.length > 0 ? (
                   <p className="escala-ficha__linha-detalhe">
-                    {particularidades(e).join(" · ")}
+                    {extras.join(" · ")}
                   </p>
                 ) : null}
               </div>
@@ -675,7 +908,7 @@ function Historico({
           );
         })}
       </ol>
-    </section>
+    </Cartao>
   );
 }
 
@@ -696,7 +929,7 @@ const MENSAGEM_DO_SERVIDOR: Record<string, string> = {
   "vigenciaInicio:sobreposta":
     "Este período cruza outra escala. Escolha outra data.",
   "vigenciaInicio:fora_de_ordem":
-    "A nova escala precisa começar depois do início da atual.",
+    "A nova escala não pode começar antes do início da atual.",
   "vigenciaInicio:antes_da_admissao":
     "A escala não pode começar antes da admissão.",
   "modelo:igual_a_vigente":
@@ -788,29 +1021,39 @@ function Erro({
   ) : null;
 }
 
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima =
+    partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? "") : "";
+  return `${primeira}${ultima}`.toUpperCase();
+}
+
 function GavetaDoPadrao({
   modo,
   colaboradorId,
   nome,
+  detalhe,
   dados,
   aberta,
   turnos,
   hoje,
   servico,
-  onAbrirJornadas,
   onFechar,
+  onEncerrar,
   onGravado,
 }: {
   readonly modo: "definir" | "alterar";
   readonly colaboradorId: string;
   readonly nome: string;
+  readonly detalhe: string | undefined;
   readonly dados: EscalasDoColaboradorApi;
   readonly aberta: EscalaApi | null;
   readonly turnos: TabelaHorarioApi[] | "erro";
   readonly hoje: string;
   readonly servico: ServicoDeEscala;
-  readonly onAbrirJornadas?: () => void;
   readonly onFechar: () => void;
+  readonly onEncerrar: () => void;
   readonly onGravado: (mensagem: string) => void;
 }) {
   const base = useId();
@@ -836,21 +1079,20 @@ function GavetaDoPadrao({
         : maior,
     null,
   );
-  // Ao alterar, a nova começa no mínimo no dia seguinte ao início da atual.
-  const depoisDaAtual =
-    modo === "alterar" && aberta
-      ? proximoDiaCivil(aberta.vigenciaInicio)
-      : null;
-  const valeInicial = [hoje, admissao, livre, depoisDaAtual].reduce<string>(
-    (maior, d) => (d !== null && d > maior ? d : maior),
-    hoje,
-  );
+  const minimo = [
+    admissao,
+    livre,
+    modo === "alterar" ? (aberta?.vigenciaInicio ?? null) : null,
+  ]
+    .filter((d): d is string => d !== null)
+    .reduce((maior, d) => (d > maior ? d : maior), admissao);
+  const valeInicial = hoje > minimo ? hoje : minimo;
   const inicial = {
     modelo: aberta?.modelo ?? modeloDe(dados.escalaDoCadastro)?.codigo ?? "5x2",
     turno: aberta
       ? (aberta.turno?.id ?? SEM_TURNO)
       : (lista[0]?.id ?? SEM_TURNO),
-    noite: aberta?.turnoNoite?.id ?? "",
+    noite: aberta?.turnoNoite?.id ?? MESMO_TURNO,
     folga: aberta?.folgaSemanal ?? 7,
     dias:
       aberta && aberta.diasTrabalho.length > 0
@@ -909,7 +1151,8 @@ function GavetaDoPadrao({
     vigenciaInicio: vale || hoje,
   };
   const dataBase = vale || hoje;
-  const antes = modo === "alterar" ? aberta : null;
+  const antes = aberta;
+  const modeloAntes = antes?.modelo ?? dados.escalaDoCadastro;
 
   function limpar(campo: Campo) {
     setErros((atual) => {
@@ -940,8 +1183,8 @@ function GavetaDoPadrao({
       locais.vigenciaInicio = `A escala não pode começar antes da admissão (${formatarDiaCivil(admissao)}).`;
     } else if (livre !== null && vale < livre) {
       locais.vigenciaInicio = `Já existe escala até ${formatarDiaCivil(diaAnteriorCivil(livre))}. A nova precisa começar a partir de ${formatarDiaCivil(livre)}.`;
-    } else if (modo === "alterar" && aberta && vale <= aberta.vigenciaInicio) {
-      locais.vigenciaInicio = `A nova escala precisa começar depois de ${formatarDiaCivil(aberta.vigenciaInicio)}, início da atual.`;
+    } else if (modo === "alterar" && aberta && vale < aberta.vigenciaInicio) {
+      locais.vigenciaInicio = `A nova escala não pode começar antes de ${formatarDiaCivil(aberta.vigenciaInicio)}, início da atual.`;
     }
     if (Object.keys(locais).length > 0) {
       setErros(locais);
@@ -951,7 +1194,7 @@ function GavetaDoPadrao({
     const dto: DefinirEscalaDto = {
       modelo,
       tabelaHorarioId: turnoId === SEM_TURNO ? null : turnoId,
-      ...(eDoze && noiteId ? { turnoNoiteId: noiteId } : {}),
+      ...(eDoze && noiteId !== MESMO_TURNO ? { turnoNoiteId: noiteId } : {}),
       ...(modelo === "6x1" ? { folgaSemanal: folga } : {}),
       ...(modelo === "outra"
         ? { diasTrabalho: [...dias].sort((a, b) => a - b) }
@@ -964,9 +1207,7 @@ function GavetaDoPadrao({
     try {
       await servico.definir(colaboradorId, dto);
       onGravado(
-        modo === "alterar"
-          ? `Escala alterada a partir de ${formatarDiaCivil(vale)}. A anterior fica no histórico.`
-          : `Escala definida a partir de ${formatarDiaCivil(vale)}.`,
+        `Padrão de escala definido. Vale a partir de ${formatarDiaCivil(vale)}.`,
       );
     } catch (erro) {
       const recusa = errosDaRecusa(erro);
@@ -977,22 +1218,44 @@ function GavetaDoPadrao({
     }
   }
 
-  const descreve = (campo: Campo, ajuda?: boolean) =>
+  const descreve = (campo: Campo, ajuda?: boolean): string | undefined =>
     erros[campo]
       ? `${ids[campo]}-erro`
       : ajuda
         ? `${ids[campo]}-ajuda`
         : undefined;
 
-  const horasAntes = antes
-    ? formatarHoras(horasPorSemana(padraoDe(antes), dataBase))
-    : VAZIO;
+  const opcaoDoTurno = (t: TabelaHorarioApi) => ({
+    valor: t.id,
+    nome: t.nome,
+    descricao: descricaoDoTurno(t.periodos),
+    cor: COR_DO_TURNO,
+  });
+  const gruposDeEscala: GrupoRico[] = GRUPOS_DE_ESCALA.map((grupo) => ({
+    rotulo: grupo,
+    opcoes: MODELOS_DE_ESCALA.filter((x) => x.grupo === grupo).map((x) => ({
+      valor: x.codigo,
+      nome: x.nome,
+      descricao: x.descricao,
+    })),
+  }));
+  const gruposDeTurno: GrupoRico[] = [
+    ...(lista.length > 0 ? [{ opcoes: lista.map(opcaoDoTurno) }] : []),
+    { opcoes: [{ valor: SEM_TURNO, nome: "Sem turno fixo" }] },
+  ];
+  const gruposDaNoite: GrupoRico[] = [
+    ...(lista.length > 0 ? [{ opcoes: lista.map(opcaoDoTurno) }] : []),
+    {
+      opcoes: [
+        { valor: MESMO_TURNO, nome: "Mesmo turno em todos os plantões" },
+      ],
+    },
+  ];
+
+  const nomeDoModelo = (c: string | null) =>
+    c ? (modeloDe(c)?.nome ?? c) : VAZIO;
   const linhas: [string, string, string][] = [
-    [
-      "Escala",
-      antes ? (modeloDe(antes.modelo)?.nome ?? antes.modelo) : VAZIO,
-      m?.nome ?? modelo,
-    ],
+    ["Escala", nomeDoModelo(modeloAntes), m?.nome ?? modelo],
     [
       "Turno",
       antes ? curtoDoTurno(antes.turno) : VAZIO,
@@ -1000,15 +1263,22 @@ function GavetaDoPadrao({
     ],
     [
       "Horas por semana",
-      horasAntes,
+      antes ? formatarHoras(horasPorSemana(padraoDe(antes), dataBase)) : VAZIO,
       formatarHoras(horasPorSemana(novo, dataBase)),
     ],
     [
-      `Benefício em ${rotuloDoMes(dataBase)}`,
-      `${diasNoMes(antes?.modelo ?? null, mesDe(dataBase))} dias`,
+      `Benefício em ${mesCurto(dataBase)}`,
+      `${diasNoMes(modeloAntes, mesDe(dataBase))} dias`,
       `${diasNoMes(modelo, mesDe(dataBase))} dias`,
     ],
   ];
+  // Como na referência: a escala sai do quadro quando não muda.
+  const visiveis = linhas.filter(
+    ([r, de, para]) => r !== "Escala" || de !== para,
+  );
+
+  const turnoDescritoPor = descreve("tabelaHorarioId", lista.length === 0);
+  const noiteDescritaPor = descreve("turnoNoiteId", true);
 
   return (
     <Sheet
@@ -1018,24 +1288,38 @@ function GavetaDoPadrao({
           ? "Alterar padrão de escala"
           : "Definir padrão de escala"
       }
-      descricao={nome}
+      subtitulo={[nome, detalhe].filter(Boolean).join(" · ")}
+      icone={<span className="escala-gaveta__iniciais">{iniciais(nome)}</span>}
       onFechar={onFechar}
       bloqueado={enviando}
       alterado={alterado}
       className="escala-gaveta"
       rodape={
-        <FormActions>
-          <Button type="button" variant="secondary" onClick={onFechar}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            disabled={enviando}
-            onClick={() => void gravar()}
-          >
-            {enviando ? "Salvando…" : "Salvar padrão"}
-          </Button>
-        </FormActions>
+        <div className="escala-gaveta__rodape">
+          {modo === "alterar" ? (
+            <button
+              type="button"
+              className="escala-gaveta__encerrar"
+              onClick={onEncerrar}
+              disabled={enviando}
+            >
+              <IconeRemover tamanho={16} />
+              Encerrar escala
+            </button>
+          ) : null}
+          <FormActions>
+            <Button type="button" variant="secondary" onClick={onFechar}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={enviando}
+              onClick={() => void gravar()}
+            >
+              {enviando ? "Salvando…" : "Salvar padrão"}
+            </Button>
+          </FormActions>
+        </div>
       }
     >
       <form
@@ -1044,106 +1328,72 @@ function GavetaDoPadrao({
         onSubmit={(e) => void gravar(e)}
       >
         <div className="escala-gaveta__campo">
-          <label htmlFor={ids.modelo}>Escala</label>
-          <select
+          <span className="escala-gaveta__rotulo-campo">Escala</span>
+          <SeletorRico
             id={ids.modelo}
-            value={modelo}
-            disabled={enviando}
-            aria-describedby={descreve("modelo", true)}
-            aria-invalid={erros.modelo ? "true" : undefined}
-            onChange={(e) => {
-              setModelo(e.target.value);
+            rotulo="Escala"
+            valor={modelo}
+            grupos={gruposDeEscala}
+            desabilitado={enviando}
+            invalido={!!erros.modelo}
+            {...(erros.modelo ? { descritoPor: `${ids.modelo}-erro` } : {})}
+            onEscolher={(v) => {
+              setModelo(v);
               limpar("modelo");
             }}
-          >
-            {GRUPOS_DE_ESCALA.map((grupo) => (
-              <optgroup key={grupo} label={grupo}>
-                {MODELOS_DE_ESCALA.filter((x) => x.grupo === grupo).map((x) => (
-                  <option key={x.codigo} value={x.codigo}>
-                    {x.nome}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          />
           <Erro id={`${ids.modelo}-erro`} texto={erros.modelo} />
-          <span id={`${ids.modelo}-ajuda`} className="escala-ficha__ajuda">
-            {m?.descricao}
-          </span>
         </div>
 
         <div className="escala-gaveta__campo">
-          <label htmlFor={ids.tabelaHorarioId}>Turno</label>
-          <select
+          <span className="escala-gaveta__rotulo-campo">Turno</span>
+          <SeletorRico
             id={ids.tabelaHorarioId}
-            value={turnoId}
-            disabled={enviando}
-            aria-describedby={descreve("tabelaHorarioId", true)}
-            aria-invalid={erros.tabelaHorarioId ? "true" : undefined}
-            onChange={(e) => {
-              setTurnoId(e.target.value);
+            rotulo="Turno"
+            valor={turnoId}
+            grupos={gruposDeTurno}
+            desabilitado={enviando}
+            invalido={!!erros.tabelaHorarioId}
+            {...(turnoDescritoPor ? { descritoPor: turnoDescritoPor } : {})}
+            onEscolher={(v) => {
+              setTurnoId(v);
               limpar("tabelaHorarioId");
             }}
-          >
-            {lista.map((t) => (
-              <option key={t.id} value={t.id}>
-                {`${rotuloDaJornada(t)} · ${descricaoDoTurno(t.periodos)}`}
-              </option>
-            ))}
-            <option value={SEM_TURNO}>Sem turno fixo</option>
-          </select>
+          />
           <Erro
             id={`${ids.tabelaHorarioId}-erro`}
             texto={erros.tabelaHorarioId}
           />
-          <span
-            id={`${ids.tabelaHorarioId}-ajuda`}
-            className="escala-ficha__ajuda"
-          >
-            {turnos === "erro"
-              ? "Não foi possível carregar os turnos."
-              : lista.length === 0
-                ? "Nenhum turno ativo na empresa."
-                : "Os turnos são as jornadas ativas da empresa."}
-          </span>
-          {onAbrirJornadas ? (
-            <button
-              type="button"
-              className="escala-gaveta__link"
-              onClick={() => {
-                onFechar();
-                onAbrirJornadas();
-              }}
+          {lista.length === 0 ? (
+            <span
+              id={`${ids.tabelaHorarioId}-ajuda`}
+              className="escala-ficha__ajuda"
             >
-              Criar ou ajustar turno
-            </button>
+              {turnos === "erro"
+                ? "Não foi possível carregar os turnos."
+                : "Nenhum turno ativo na empresa. Os turnos ficam em Jornadas de trabalho."}
+            </span>
           ) : null}
         </div>
 
         {eDoze ? (
           <div className="escala-gaveta__campo">
-            <span className="escala-gaveta__rotulo">
-              <label htmlFor={ids.turnoNoiteId}>Turno da noite</label>
+            <span className="escala-gaveta__rotulo-campo">
+              Turno da noite
               <span className="escala-ficha__opcional">Opcional</span>
             </span>
-            <select
+            <SeletorRico
               id={ids.turnoNoiteId}
-              value={noiteId}
-              disabled={enviando}
-              aria-describedby={descreve("turnoNoiteId", true)}
-              aria-invalid={erros.turnoNoiteId ? "true" : undefined}
-              onChange={(e) => {
-                setNoiteId(e.target.value);
+              rotulo="Turno da noite"
+              valor={noiteId}
+              grupos={gruposDaNoite}
+              desabilitado={enviando}
+              {...(noiteDescritaPor ? { descritoPor: noiteDescritaPor } : {})}
+              onEscolher={(v) => {
+                setNoiteId(v);
                 limpar("turnoNoiteId");
               }}
-            >
-              <option value="">Mesmo turno em todos os plantões</option>
-              {lista.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {`${rotuloDaJornada(t)} · ${descricaoDoTurno(t.periodos)}`}
-                </option>
-              ))}
-            </select>
+            />
             <Erro id={`${ids.turnoNoiteId}-erro`} texto={erros.turnoNoiteId} />
             <span
               id={`${ids.turnoNoiteId}-ajuda`}
@@ -1277,7 +1527,8 @@ function GavetaDoPadrao({
             id={`${ids.vigenciaInicio}-ajuda`}
             className="escala-ficha__ajuda"
           >
-            A escala anterior termina no dia anterior e continua no histórico.
+            Dias já publicados não mudam. O quadro usa o padrão novo a partir
+            dessa data.
           </span>
         </div>
 
@@ -1289,23 +1540,29 @@ function GavetaDoPadrao({
             O que muda
           </h4>
           <dl className="escala-gaveta__muda-lista">
-            {linhas.map(([rotulo, de, para]) => (
+            {visiveis.map(([rotulo, de, para]) => (
               <div key={rotulo} className="escala-gaveta__muda-linha">
                 <dt>{rotulo}</dt>
                 <dd>
                   <span className="escala-gaveta__antes">{de}</span>
-                  <span aria-hidden="true"> → </span>
+                  <span className="escala-gaveta__seta" aria-hidden="true">
+                    ›
+                  </span>
                   <span className="ev:sr-only"> passa a </span>
-                  <strong>{para}</strong>
+                  <strong
+                    className={de === para ? "escala-gaveta__igual" : undefined}
+                  >
+                    {para}
+                  </strong>
                 </dd>
               </div>
             ))}
           </dl>
-          <p className="escala-ficha__ajuda">
-            Os benefícios pagos por dia usam os dias de trabalho da escala no
-            mês; sem escala, os dias úteis.
-          </p>
         </section>
+        <p className="escala-ficha__ajuda">
+          Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam
+          quando a escala for publicada.
+        </p>
 
         {erros.geral ? (
           <p
@@ -1325,12 +1582,16 @@ function GavetaDoPadrao({
 
 function GavetaDeEncerramento({
   colaboradorId,
+  nome,
+  detalhe,
   escala,
   servico,
   onFechar,
   onGravado,
 }: {
   readonly colaboradorId: string;
+  readonly nome: string;
+  readonly detalhe: string | undefined;
   readonly escala: EscalaApi;
   readonly servico: ServicoDeEscala;
   readonly onFechar: () => void;
@@ -1383,6 +1644,8 @@ function GavetaDeEncerramento({
     <Sheet
       aberto
       titulo="Encerrar escala"
+      subtitulo={[nome, detalhe].filter(Boolean).join(" · ")}
+      icone={<span className="escala-gaveta__iniciais">{iniciais(nome)}</span>}
       descricao={`Informe o último dia na escala ${modeloDe(escala.modelo)?.nome ?? escala.modelo}, que começou em ${formatarDiaCivil(escala.vigenciaInicio)}. Ela continua no histórico.`}
       onFechar={onFechar}
       bloqueado={enviando}

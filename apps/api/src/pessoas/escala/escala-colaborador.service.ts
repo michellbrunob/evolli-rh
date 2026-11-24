@@ -37,6 +37,9 @@ export interface EscalaProjetada {
   vigenciaInicio: string;
   /** O primeiro dia SEM a escala, ou `null` (aberta). */
   vigenciaFim: string | null;
+  /** Quando e por quem o padrão foi definido (só o nome de exibição). */
+  definidaEm: string;
+  definidaPor: string | null;
 }
 
 /** T215 — a aba Escala da ficha. */
@@ -71,6 +74,8 @@ const PROJECAO = {
   inicioCiclo: true,
   vigenciaInicio: true,
   vigenciaFim: true,
+  criadoEm: true,
+  criadoPor: { select: { nomeExibicao: true } },
   turno: TURNO,
   turnoNoite: TURNO,
 } as const satisfies Prisma.EscalaColaboradorSelect;
@@ -118,6 +123,8 @@ function projetar(l: LinhaDeEscala): EscalaProjetada {
     inicioCiclo: l.inicioCiclo ? diaCivil(l.inicioCiclo) : null,
     vigenciaInicio: diaCivil(l.vigenciaInicio),
     vigenciaFim: l.vigenciaFim ? diaCivil(l.vigenciaFim) : null,
+    definidaEm: l.criadoEm.toISOString(),
+    definidaPor: l.criadoPor.nomeExibicao,
   };
 }
 
@@ -227,7 +234,7 @@ export class EscalaColaboradorService {
           where: { colaboradorId, empresaId, vigenciaFim: null },
         });
         if (aberta !== null) {
-          if (inicio <= aberta.vigenciaInicio) {
+          if (inicio < aberta.vigenciaInicio) {
             recusar({ campo: "vigenciaInicio", motivo: "fora_de_ordem" });
           }
           const atual = {
@@ -238,6 +245,33 @@ export class EscalaColaboradorService {
           };
           if (mesmoPadrao(atual, padrao)) {
             recusar({ campo: "modelo", motivo: "igual_a_vigente" });
+          }
+          if (inicio.getTime() === aberta.vigenciaInicio.getTime()) {
+            // Mesma data de início: o padrão aberto é substituído (correção),
+            // sem período de um dia só no histórico.
+            await tx.escalaColaborador.update({
+              where: { id: aberta.id },
+              data: {
+                modelo: padrao.modelo,
+                tabelaHorarioId: padrao.tabelaHorarioId,
+                turnoNoiteId: padrao.turnoNoiteId,
+                folgaSemanal: padrao.folgaSemanal,
+                diasTrabalho: padrao.diasTrabalho,
+                inicioCiclo: padrao.inicioCiclo
+                  ? dataDoDia(padrao.inicioCiclo)
+                  : null,
+                criadoPorUserId: ctx.actor.id,
+              },
+            });
+            await this.auditoria.registrarMutacao(
+              tx,
+              ctx,
+              "pessoas_escala_definida",
+              "escala_colaborador",
+              aberta.id,
+              empresaId,
+            );
+            return this.montar(tx, colaboradorId, resolvido);
           }
           await tx.escalaColaborador.update({
             where: { id: aberta.id },

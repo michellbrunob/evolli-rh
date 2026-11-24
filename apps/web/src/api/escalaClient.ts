@@ -36,6 +36,9 @@ export interface EscalaApi {
   vigenciaInicio: string;
   /** O primeiro dia SEM a escala; `null` = aberta. */
   vigenciaFim: string | null;
+  /** Quando o padrão foi definido (ISO) e por quem (nome de exibição). */
+  definidaEm: string;
+  definidaPor: string | null;
 }
 
 export interface EscalasDoColaboradorApi {

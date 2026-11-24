@@ -74,6 +74,8 @@ function escala(
     inicioCiclo: null,
     vigenciaInicio: inicio,
     vigenciaFim: fim,
+    definidaEm: `${inicio}T12:00:00.000Z`,
+    definidaPor: "Rita RH",
     ...extra,
   };
 }
@@ -91,7 +93,7 @@ function resposta(
   };
 }
 
-type Dublê = ServicoDeEscala & {
+type Duble = ServicoDeEscala & {
   consultar: ReturnType<typeof vi.fn>;
   turnos: ReturnType<typeof vi.fn>;
   definir: ReturnType<typeof vi.fn>;
@@ -101,7 +103,7 @@ type Dublê = ServicoDeEscala & {
 function servicoCom(
   escalas: EscalaApi[],
   escalaDoCadastro: string | null = null,
-): Dublê {
+): Duble {
   const r = resposta(escalas, escalaDoCadastro);
   return {
     consultar: vi.fn().mockResolvedValue(r),
@@ -120,6 +122,7 @@ function montar(
       colaboradorId={COLAB}
       nome="Ana Souza"
       primeiroNome="Ana"
+      detalhe="Analista · CLT"
       podeOperar
       hoje={HOJE}
       servico={servico}
@@ -128,18 +131,30 @@ function montar(
   );
 }
 
-async function abrirGaveta(nome: "Definir escala" | "Alterar escala") {
-  const botao = await screen.findByRole("button", { name: nome });
-  botao.focus();
-  fireEvent.click(botao);
+async function abrirGaveta(botao: "Definir escala" | "Alterar padrão") {
+  const b = await screen.findByRole("button", { name: botao });
+  b.focus();
+  fireEvent.click(b);
   return screen.findByRole("dialog", {
     name:
-      nome === "Definir escala"
+      botao === "Definir escala"
         ? "Definir padrão de escala"
         : "Alterar padrão de escala",
   });
 }
 
+/** Abre o seletor rico pelo teclado e escolhe a opção. */
+async function escolher(raiz: HTMLElement, campo: string, opcao: RegExp) {
+  const gatilho = within(raiz).getByRole("button", { name: campo });
+  fireEvent.keyDown(gatilho, { key: "Enter" });
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: opcao }));
+  await waitFor(() =>
+    expect(screen.queryByRole("menuitemradio", { name: opcao })).toBeNull(),
+  );
+}
+
+const gatilho = (g: HTMLElement, campo: string) =>
+  within(g).getByRole("button", { name: campo });
 const muda = (g: HTMLElement) =>
   within(g).getByRole("region", { name: "O que muda" });
 
@@ -147,8 +162,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("T215 — aba Escala (padrão de escala)", () => {
-  it("carregando e depois o estado vazio, com Definir e Jornadas de trabalho", async () => {
+describe("T215 — aba Escala (desenho da referência)", () => {
+  it("carregando e o estado vazio: Abrir o quadro e Definir escala", async () => {
     let soltar: (v: EscalasDoColaboradorApi) => void = () => undefined;
     const servico = servicoCom([]);
     servico.consultar.mockReturnValue(
@@ -156,26 +171,26 @@ describe("T215 — aba Escala (padrão de escala)", () => {
         soltar = r;
       }),
     );
-    const onAbrirJornadas = vi.fn();
-    montar(servico, { onAbrirJornadas });
+    const onAbrirQuadro = vi.fn();
+    montar(servico, { onAbrirQuadro });
     expect(await screen.findByText("Carregando escala…")).toBeInTheDocument();
     await act(async () => soltar(resposta([])));
     expect(
       await screen.findByRole("heading", { name: "Ana ainda não tem escala" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/os benefícios pagos por dia usam os dias úteis do mês/),
+      screen.getByText(
+        "Sem escala, os benefícios pagos por dia usam os dias úteis do mês. Defina a escala aqui ou aplique um modelo para várias pessoas no quadro.",
+      ),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Ver jornadas de trabalho" }),
-    );
-    expect(onAbrirJornadas).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir o quadro" }));
+    expect(onAbrirQuadro).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole("button", { name: "Definir escala" }),
     ).toBeEnabled();
   });
 
-  it("sem padrão, mas com a escala do cadastro: diz que ela vale hoje", async () => {
+  it("sem padrão, com a escala do cadastro: diz que ela vale hoje", async () => {
     montar(servicoCom([], "6x1"));
     expect(
       await screen.findByText(/Hoje vale a escala do cadastro \(6x1\)/),
@@ -195,26 +210,60 @@ describe("T215 — aba Escala (padrão de escala)", () => {
     expect(servico.turnos).not.toHaveBeenCalled();
   });
 
-  it("escala atual: modelo, turno, horas por semana, dias no mês, vigência e os próximos dias", async () => {
+  it("Escala atual: modelo, turno, desde quando, quem definiu e os indicadores", async () => {
     montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
     const atual = await screen.findByRole("region", { name: "Escala atual" });
+    expect(atual).toHaveTextContent(
+      "Definida na ficha em 02/02/2026 · Rita RH",
+    );
     expect(atual).toHaveTextContent("5x2");
-    expect(atual).toHaveTextContent("Segunda a sexta, folga sábado e domingo");
-    expect(atual).toHaveTextContent("Vigente");
-    expect(atual).toHaveTextContent("COM — Comercial");
-    expect(atual).toHaveTextContent("09:00–18:00 · 1 h de intervalo");
+    expect(atual).toHaveTextContent("Comercial");
+    expect(atual).toHaveTextContent(
+      "09:00–18:00 · 1 h de intervalo · desde 02/02/2026",
+    );
     expect(atual).toHaveTextContent("40 h");
+    expect(atual).toHaveTextContent("por semana");
     expect(atual).toHaveTextContent("19 dias");
-    expect(atual).toHaveTextContent("02/02/2026");
-    const dias = within(
-      screen.getByRole("list", { name: "Próximos 14 dias" }),
-    ).getAllByRole("listitem");
-    expect(dias).toHaveLength(14);
-    expect(dias[0]).toHaveTextContent("Trabalho");
-    expect(dias[4]).toHaveTextContent("Folga"); // sábado 28/11
+    expect(atual).toHaveTextContent("de benefício em nov.");
   });
 
-  it("6x1, outra, 12x36 com turno da noite: as particularidades aparecem no resumo", async () => {
+  it("Próximos 7 dias: hoje, amanhã, os dias da semana, folga e DSR, não publicado", async () => {
+    montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
+    const dias = within(
+      await screen.findByRole("list", { name: "Próximos 7 dias" }),
+    ).getAllByRole("listitem");
+    expect(dias).toHaveLength(7);
+    expect(dias[0]).toHaveTextContent("Hoje");
+    expect(dias[0]).toHaveTextContent("Comercial");
+    expect(dias[1]).toHaveTextContent("Amanhã");
+    expect(dias[2]).toHaveTextContent("Qui, 26/11");
+    expect(dias[4]).toHaveTextContent(/^Sáb, 28\/11Folga/);
+    expect(dias[5]).toHaveTextContent("Folga · DSR");
+    expect(dias[0]).toHaveTextContent("Não publicado");
+  });
+
+  it("calendário do mês: totais, feriados e navegação", async () => {
+    montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
+    const mes = await screen.findByRole("region", { name: "Novembro de 2026" });
+    expect(mes).toHaveTextContent(
+      "21 dias de trabalho · 168 h previstas · ainda não publicada",
+    );
+    const dias = within(
+      within(mes).getByRole("list", { name: "Dias de Novembro de 2026" }),
+    ).getAllByRole("listitem");
+    expect(dias.find((d) => d.textContent?.startsWith("2"))).toHaveTextContent(
+      "Finados",
+    );
+    expect(
+      dias.find((d) => d.getAttribute("aria-current") === "date"),
+    ).toHaveTextContent("24");
+    fireEvent.click(within(mes).getByRole("button", { name: "Próximo mês" }));
+    expect(
+      screen.getByRole("region", { name: "Dezembro de 2026" }),
+    ).toBeInTheDocument();
+  });
+
+  it("histórico: período, origem, quem e quando; particularidades de 6x1, outra e 12x36", async () => {
     montar(
       servicoCom([
         escala("e3", "12x36", "2026-11-01", null, {
@@ -234,18 +283,18 @@ describe("T215 — aba Escala (padrão de escala)", () => {
       ]),
     );
     const atual = await screen.findByRole("region", { name: "Escala atual" });
-    expect(atual).toHaveTextContent("Turno da noite");
-    expect(atual).toHaveTextContent("EST — Estágio");
-    expect(atual).toHaveTextContent("Início do ciclo");
-    expect(atual).toHaveTextContent("01/11/2026");
+    expect(atual).toHaveTextContent("turno da noite");
+    expect(atual).toHaveTextContent("Estágio");
+    expect(atual).toHaveTextContent("início do ciclo");
     const linhas = within(
-      screen.getByRole("list", { name: "Histórico de escalas" }),
+      screen.getByRole("list", { name: "Histórico da escala" }),
     ).getAllByRole("listitem");
-    expect(linhas.map((l) => l.textContent)).toEqual([
-      expect.stringContaining("Vigente"),
-      expect.stringContaining("Encerrada"),
-      expect.stringContaining("Encerrada"),
-    ]);
+    expect(linhas[0]).toHaveTextContent("Vigente");
+    expect(linhas[0]).toHaveTextContent(
+      "01/11/2026 até atual · Ficha do colaborador · Rita RH em 01/11/2026",
+    );
+    expect(linhas[1]).toHaveTextContent("Encerrada");
+    expect(linhas[1]).toHaveTextContent("01/06/2026 até 31/10/2026");
     expect(linhas[1]).toHaveTextContent("segunda, quarta e sexta");
     expect(linhas[2]).toHaveTextContent("Folga semanal: quarta");
   });
@@ -261,72 +310,94 @@ describe("T215 — aba Escala (padrão de escala)", () => {
     await screen.findByRole("heading", { name: "Ana ainda não tem escala" });
   });
 
-  describe("gaveta Definir padrão de escala", () => {
-    it("vem com 5x2, o primeiro turno e hoje; O que muda com horas e benefício do mês", async () => {
+  describe("gaveta Definir/Alterar padrão de escala", () => {
+    it("cabeçalho da pessoa; vem com 5x2, o primeiro turno e hoje; O que muda", async () => {
       montar(servicoCom([]));
       const g = await abrirGaveta("Definir escala");
-      expect(within(g).getByLabelText("Escala")).toHaveValue("5x2");
-      expect(within(g).getByLabelText("Turno")).toHaveValue("t1");
+      expect(g).toHaveTextContent("Ana Souza · Analista · CLT");
+      expect(gatilho(g, "Escala")).toHaveTextContent(
+        "5x2Segunda a sexta, folga sábado e domingo",
+      );
+      expect(gatilho(g, "Turno")).toHaveTextContent(
+        "Comercial09:00–18:00 · 1 h de intervalo",
+      );
       expect(within(g).getByLabelText("Vale a partir de")).toHaveValue(HOJE);
+      expect(g).toHaveTextContent(
+        "Dias já publicados não mudam. O quadro usa o padrão novo a partir dessa data.",
+      );
       const m = muda(g);
-      expect(m).toHaveTextContent("5x2");
+      expect(m).toHaveTextContent("Escala");
+      expect(m).toHaveTextContent("Horas por semana");
       expect(m).toHaveTextContent("40 h");
       expect(m).toHaveTextContent("Benefício em nov.");
       expect(m).toHaveTextContent("19 dias");
     });
 
-    it("com a escala do cadastro, ela vem escolhida", async () => {
+    it("com a escala do cadastro: ela vem escolhida e sai do O que muda", async () => {
       montar(servicoCom([], "6x1"));
       const g = await abrirGaveta("Definir escala");
-      expect(within(g).getByLabelText("Escala")).toHaveValue("6x1");
+      expect(gatilho(g, "Escala")).toHaveTextContent("6x1");
+      expect(
+        within(muda(g))
+          .getAllByRole("term")
+          .map((t) => t.textContent),
+      ).toEqual(["Turno", "Horas por semana", "Benefício em nov."]);
+    });
+
+    it("lista de escalas agrupada, com descrição e ✓ na escolhida", async () => {
+      montar(servicoCom([]));
+      const g = await abrirGaveta("Definir escala");
+      fireEvent.keyDown(gatilho(g, "Escala"), { key: "Enter" });
+      const menu = await screen.findByRole("menu");
+      expect(menu).toHaveTextContent("Dias fixos na semana");
+      expect(menu).toHaveTextContent("Plantão em horas");
+      expect(
+        within(menu).getByRole("menuitemradio", { name: /^5x2/ }),
+      ).toHaveAttribute("aria-checked", "true");
+      expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(25);
+      fireEvent.keyDown(menu, { key: "Escape" });
     });
 
     it("cada modelo mostra só os campos dele", async () => {
       montar(servicoCom([]));
       const g = await abrirGaveta("Definir escala");
-      const escolher = (v: string) =>
-        fireEvent.change(within(g).getByLabelText("Escala"), {
-          target: { value: v },
-        });
-      escolher("6x1");
+      await escolher(g, "Escala", /^6x1/);
       const dsr = within(g).getByRole("radiogroup", {
         name: "Folga semanal (DSR)",
       });
       expect(within(dsr).getByRole("radio", { name: "domingo" })).toBeChecked();
       expect(g).toHaveTextContent("Lei 10.101/2000");
       expect(within(g).queryByLabelText("Início do ciclo")).toBeNull();
-      escolher("outra");
+      await escolher(g, "Escala", /^Outra/);
       const dias = within(g).getByRole("group", { name: "Dias de trabalho" });
       expect(
         within(dias)
           .getAllByRole("checkbox")
           .map((c) => (c as HTMLInputElement).checked),
       ).toEqual([true, true, true, true, true, false, false]);
-      escolher("4x2");
+      await escolher(g, "Escala", /^4x2/);
       expect(within(g).getByLabelText("Início do ciclo")).toHaveValue(HOJE);
-      expect(within(g).queryByLabelText("Turno da noite")).toBeNull();
-      escolher("12x36");
-      expect(within(g).getByLabelText("Turno da noite")).toHaveValue("");
+      expect(
+        within(g).queryByRole("button", { name: "Turno da noite" }),
+      ).toBeNull();
+      await escolher(g, "Escala", /^12x36/);
+      expect(gatilho(g, "Turno da noite")).toHaveTextContent(
+        "Mesmo turno em todos os plantões",
+      );
       expect(g).toHaveTextContent("Um mês de dia, o seguinte de noite");
       expect(muda(g)).toHaveTextContent("28 h");
-      fireEvent.change(within(g).getByLabelText("Turno da noite"), {
-        target: { value: "t2" },
-      });
+      await escolher(g, "Turno da noite", /^Estágio/);
       expect(muda(g)).toHaveTextContent("22 h 23");
-      fireEvent.change(within(g).getByLabelText("Turno"), {
-        target: { value: "sem" },
-      });
+      await escolher(g, "Turno", /^Sem turno fixo/);
       expect(muda(g)).toHaveTextContent("Sem turno");
       expect(muda(g)).toHaveTextContent("14 h 23");
     });
 
-    it("grava só os campos do modelo e avisa; relê a lista", async () => {
+    it("grava só os campos do modelo e avisa", async () => {
       const servico = servicoCom([]);
       montar(servico);
       const g = await abrirGaveta("Definir escala");
-      fireEvent.change(within(g).getByLabelText("Escala"), {
-        target: { value: "6x1" },
-      });
+      await escolher(g, "Escala", /^6x1/);
       fireEvent.click(within(g).getByRole("radio", { name: "quarta" }));
       fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
       await waitFor(() =>
@@ -338,7 +409,9 @@ describe("T215 — aba Escala (padrão de escala)", () => {
         }),
       );
       expect(
-        await screen.findByText("Escala definida a partir de 24/11/2026."),
+        await screen.findByText(
+          "Padrão de escala definido. Vale a partir de 24/11/2026.",
+        ),
       ).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
@@ -347,12 +420,8 @@ describe("T215 — aba Escala (padrão de escala)", () => {
       const servico = servicoCom([]);
       montar(servico);
       const g = await abrirGaveta("Definir escala");
-      fireEvent.change(within(g).getByLabelText("Escala"), {
-        target: { value: "12x36" },
-      });
-      fireEvent.change(within(g).getByLabelText("Turno da noite"), {
-        target: { value: "t2" },
-      });
+      await escolher(g, "Escala", /^12x36/);
+      await escolher(g, "Turno da noite", /^Estágio/);
       fireEvent.change(within(g).getByLabelText("Início do ciclo"), {
         target: { value: "2026-11-25" },
       });
@@ -372,9 +441,7 @@ describe("T215 — aba Escala (padrão de escala)", () => {
       const servico = servicoCom([]);
       montar(servico);
       const g = await abrirGaveta("Definir escala");
-      fireEvent.change(within(g).getByLabelText("Escala"), {
-        target: { value: "outra" },
-      });
+      await escolher(g, "Escala", /^Outra/);
       const dias = within(g).getByRole("group", { name: "Dias de trabalho" });
       for (const c of within(dias).getAllByRole("checkbox")) {
         if ((c as HTMLInputElement).checked) fireEvent.click(c);
@@ -391,34 +458,29 @@ describe("T215 — aba Escala (padrão de escala)", () => {
       expect(servico.definir).not.toHaveBeenCalled();
     });
 
-    it("alterar: começa depois da atual; o antes → depois mostra a escala atual", async () => {
+    it("alterar: título, antes › depois, e não começa antes da atual", async () => {
       const servico = servicoCom([escala("e1", "5x2", HOJE, null)]);
       montar(servico);
-      const g = await abrirGaveta("Alterar escala");
-      // A data vem no dia seguinte ao início da atual.
-      expect(within(g).getByLabelText("Vale a partir de")).toHaveValue(
-        "2026-11-25",
-      );
-      fireEvent.change(within(g).getByLabelText("Vale a partir de"), {
-        target: { value: HOJE },
-      });
-      fireEvent.change(within(g).getByLabelText("Escala"), {
-        target: { value: "4x3" },
-      });
+      const g = await abrirGaveta("Alterar padrão");
+      expect(within(g).getByLabelText("Vale a partir de")).toHaveValue(HOJE);
+      await escolher(g, "Escala", /^4x3/);
       const m = muda(g);
       expect(m).toHaveTextContent("5x2");
       expect(m).toHaveTextContent("4x3");
       expect(m).toHaveTextContent("40 h");
       expect(m).toHaveTextContent("32 h");
+      fireEvent.change(within(g).getByLabelText("Vale a partir de"), {
+        target: { value: "2026-11-20" },
+      });
       fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
       expect(g).toHaveTextContent(
-        "A nova escala precisa começar depois de 24/11/2026, início da atual.",
+        "A nova escala não pode começar antes de 24/11/2026, início da atual.",
       );
       expect(within(g).getByLabelText("Vale a partir de")).toHaveFocus();
       expect(servico.definir).not.toHaveBeenCalled();
     });
 
-    it("recusas do servidor no campo: sobreposição, igual à vigente, turno indisponível", async () => {
+    it("recusas do servidor: sobreposição e turno indisponível", async () => {
       const servico = servicoCom([]);
       servico.definir
         .mockRejectedValueOnce(
@@ -445,21 +507,16 @@ describe("T215 — aba Escala (padrão de escala)", () => {
           "Este turno não está disponível. Escolha um turno ativo.",
         ),
       ).toBeInTheDocument();
-      expect(within(g).getByLabelText("Escala")).toHaveValue("5x2");
+      expect(gatilho(g, "Escala")).toHaveTextContent("5x2");
     });
 
-    it("sem turno ativo: aponta Jornadas de trabalho", async () => {
+    it("sem turno ativo: Sem turno fixo e o aviso", async () => {
       const servico = servicoCom([]);
       servico.turnos.mockResolvedValue([]);
-      const onAbrirJornadas = vi.fn();
-      montar(servico, { onAbrirJornadas });
+      montar(servico);
       const g = await abrirGaveta("Definir escala");
-      expect(within(g).getByLabelText("Turno")).toHaveValue("sem");
+      expect(gatilho(g, "Turno")).toHaveTextContent("Sem turno fixo");
       expect(g).toHaveTextContent("Nenhum turno ativo na empresa.");
-      fireEvent.click(
-        within(g).getByRole("button", { name: "Criar ou ajustar turno" }),
-      );
-      expect(onAbrirJornadas).toHaveBeenCalledTimes(1);
     });
 
     it("Escape fecha a gaveta limpa e o foco volta ao botão", async () => {
@@ -475,11 +532,12 @@ describe("T215 — aba Escala (padrão de escala)", () => {
     });
   });
 
-  it("encerrar: pede o último dia, valida e envia o dia seguinte; o foco vai ao título", async () => {
+  it("encerrar pela gaveta de alteração: último dia, validação, dia seguinte e foco no título", async () => {
     const servico = servicoCom([escala("e1", "5x2", "2026-02-02", null)]);
     montar(servico);
+    const alterar = await abrirGaveta("Alterar padrão");
     fireEvent.click(
-      await screen.findByRole("button", { name: "Encerrar escala" }),
+      within(alterar).getByRole("button", { name: "Encerrar escala" }),
     );
     const g = await screen.findByRole("dialog", { name: "Encerrar escala" });
     const ultimo = within(g).getByLabelText("Último dia na escala");

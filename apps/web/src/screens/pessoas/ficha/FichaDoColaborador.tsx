@@ -996,7 +996,13 @@ export function FichaDoColaborador({
                 nome={nome}
                 primeiroNome={primeiroNome(nome)}
                 podeOperar={podeOperarEscala}
-                {...(onAbrirJornadas ? { onAbrirJornadas } : {})}
+                detalhe={[
+                  lotacao.cargo,
+                  vinculo ? ROTULO_DO_TIPO_DE_VINCULO[vinculo.tipo] : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {...(onAbrirJornadas ? { onAbrirQuadro: onAbrirJornadas } : {})}
                 hoje={hoje}
               />
             ) : null

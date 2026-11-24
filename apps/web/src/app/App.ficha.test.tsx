@@ -600,6 +600,8 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
           inicioCiclo: null,
           vigenciaInicio: "2025-01-10",
           vigenciaFim: null,
+          definidaEm: "2025-01-10T12:00:00.000Z",
+          definidaPor: null,
         },
       ],
     });
@@ -608,12 +610,12 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
       const { unmount } = render(<App papelDoAtor={papel} />);
       await esperarFicha(ana.nome);
       const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
-      await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
+      await waitFor(() => expect(ficha).toHaveTextContent("Comercial (teste)"));
       expect(
-        within(ficha).getByRole("button", { name: "Alterar escala" }),
+        within(ficha).getByRole("button", { name: "Alterar padrão" }),
       ).toBeInTheDocument();
       expect(
-        within(ficha).getByRole("button", { name: "Encerrar escala" }),
+        within(ficha).getByRole("button", { name: "Abrir no quadro" }),
       ).toBeInTheDocument();
       unmount();
     }
@@ -621,10 +623,10 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
     render(<App papelDoAtor="master_tecnico" />);
     await esperarFicha(ana.nome);
     const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
-    await waitFor(() => expect(ficha).toHaveTextContent("JOR44"));
+    await waitFor(() => expect(ficha).toHaveTextContent("Comercial (teste)"));
     expect(
       within(ficha).queryByRole("button", {
-        name: /Alterar escala|Encerrar escala|Definir escala/,
+        name: /Alterar padrão|Definir escala/,
       }),
     ).toBeNull();
     expect(ficha).toHaveTextContent("Somente consulta");
