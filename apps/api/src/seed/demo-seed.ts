@@ -1037,8 +1037,14 @@ export async function semearDemonstracao(
           // a jornada anterior, sem código.
           codigo: "COMERCIAL_44H",
           nome: nomeHorario,
-          periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].map(
-            (dia) => ({ dia, inicio: "08:00", fim: "17:00" }),
+          // T215 — prática de mercado dentro da CLT: 44 h em cinco dias
+          // (8 h 48 por dia, sábado compensado por acordo escrito, art. 59,
+          // § 2º) com 1 h de almoço (art. 71).
+          periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].flatMap(
+            (dia) => [
+              { dia, inicio: "08:00", fim: "12:00" },
+              { dia, inicio: "13:00", fim: "17:48" },
+            ],
           ),
         }),
     );
