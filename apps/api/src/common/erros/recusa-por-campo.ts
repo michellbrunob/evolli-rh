@@ -87,7 +87,9 @@ export type CampoPublico =
   | "turnoNoiteId"
   | "folgaSemanal"
   | "diasTrabalho"
-  | "inicioCiclo";
+  | "inicioCiclo"
+  // T215 — Turnos: a unidade do turno.
+  | "unidadeOrganizacionalId";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

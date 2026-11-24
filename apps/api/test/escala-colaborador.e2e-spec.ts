@@ -405,6 +405,9 @@ describe("T215 — escala do colaborador (e2e)", () => {
     });
     const eventos = await trilha(e.escalas[0]!.id);
     expect(eventos.map((x) => x.action)).toContain("pessoas_escala_definida");
+    // T215 — o turno passa a contar a pessoa em "Em uso".
+    const turno = await get(`/v1/horarios/${turnoA}`, rhA).expect(200);
+    expect(turno.body.emUso).toBeGreaterThanOrEqual(1);
     const texto = JSON.stringify(eventos);
     expect(texto).not.toContain("5x2");
     expect(texto).not.toContain("Comercial");

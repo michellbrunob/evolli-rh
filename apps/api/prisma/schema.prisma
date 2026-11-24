@@ -1745,15 +1745,27 @@ model SolicitacaoDocumento {
 /// os vinculos historicos que a usaram permanecem. Nao ha exclusao fisica (a
 /// migration REVOGA DELETE de `evolli_app`).
 model TabelaHorario {
-  id              String  @id @default(uuid())
-  empresaId       String  @map("empresa_id")
+  id                      String  @id @default(uuid())
+  empresaId               String  @map("empresa_id")
   /// T182 — código da jornada, único na empresa. Anulável: tabelas criadas
   /// antes da T182 ficam sem código até alguém editá-las (migration aditiva,
   /// sem valor inventado). Forma `^[A-Z0-9_]{2,32}$` (CHECK na migration).
-  codigo          String?
-  nome            String
-  ativo           Boolean @default(true)
-  criadoPorUserId String  @map("criado_por_user_id")
+  codigo                  String?
+  nome                    String
+  ativo                   Boolean @default(true)
+  criadoPorUserId         String  @map("criado_por_user_id")
+  /// T215 — turno da escala: cor no quadro (uma de 12), sigla do mês (1 ou
+  /// 2 letras), unidade (nula = todas), modo ("mesmo_horario": os períodos
+  /// de segunda valem para todo dia de trabalho; "por_dia": cada dia tem os
+  /// seus), intervalo descontado de quem tem um período só, tolerância de
+  /// marcação e mínimo de pessoas por dia (cobertura).
+  cor                     String  @default("cinza")
+  sigla                   String? @db.VarChar(2)
+  unidadeOrganizacionalId String? @map("unidade_organizacional_id")
+  modo                    String  @default("por_dia")
+  intervaloMinutos        Int     @default(0) @map("intervalo_minutos")
+  toleranciaMinutos       Int?    @map("tolerancia_minutos")
+  minimoPorDia            Int?    @map("minimo_por_dia")
 
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")

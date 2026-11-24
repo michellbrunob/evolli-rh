@@ -1186,8 +1186,9 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       expect(lista.body.itens.map((t: { id: string }) => t.id)).toEqual([id]);
     });
 
+    // T215 — sem código, o servidor gera um a partir do nome (ver "turnos da
+    // escala"); o código informado continua validado.
     it.each([
-      ["sem código", {}],
       ["minúsculas", { codigo: "com_t182" }],
       ["curto", { codigo: "A" }],
       ["com espaço", { codigo: "COM T182" }],
@@ -2417,6 +2418,137 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
         expect(r.status).toBe(403);
         expect(JSON.stringify(r.body)).not.toMatch(/csrf/i);
       });
+    });
+  });
+
+  describe("T215 — turnos da escala", () => {
+    function patch(rota: string, cred: Credencial) {
+      return agent()
+        .patch(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    const UM_PERIODO = [{ dia: "segunda", inicio: "08:00", fim: "17:00" }];
+
+    it("cria sem código (gerado do nome), com cor, sigla padrão e modo mesmo horário", async () => {
+      const r = await post("/v1/horarios", rhA)
+        .send({
+          nome: "Turno Sintetico Manhã",
+          periodos: UM_PERIODO,
+          modo: "mesmo_horario",
+          intervaloMinutos: 60,
+          cor: "laranja",
+          toleranciaMinutos: 5,
+        })
+        .expect(201);
+      expect(r.body).toMatchObject({
+        codigo: "TURNO_SINTETICO_MANHA",
+        cor: "laranja",
+        sigla: "TS",
+        modo: "mesmo_horario",
+        intervaloMinutos: 60,
+        toleranciaMinutos: 5,
+        minimoPorDia: null,
+        unidadeOrganizacionalId: null,
+        emUso: 0,
+      });
+      // O mesmo nome de novo: outro código livre.
+      const outro = await post("/v1/horarios", rhA)
+        .send({ nome: "Turno Sintetico Manhã", periodos: UM_PERIODO })
+        .expect(201);
+      expect(outro.body.codigo).toBe("TURNO_SINTETICO_MANHA_2");
+      expect(outro.body.cor).toBe("azul");
+      expect(outro.body.modo).toBe("por_dia");
+    });
+
+    it("recusa mais de 3 períodos no dia, período fora de segunda no mesmo horário, e cor/sigla/intervalo inválidos", async () => {
+      const quatro = ["06:00", "09:00", "12:00", "15:00"].map((inicio, i) => ({
+        dia: "terca",
+        inicio,
+        fim: ["07:00", "10:00", "13:00", "16:00"][i],
+      }));
+      await post("/v1/horarios", rhA)
+        .send({ nome: "Quatro Periodos", periodos: quatro })
+        .expect(422);
+      await post("/v1/horarios", rhA)
+        .send({
+          nome: "Mesmo Na Terca",
+          modo: "mesmo_horario",
+          periodos: [{ dia: "terca", inicio: "08:00", fim: "12:00" }],
+        })
+        .expect(422);
+      for (const extra of [
+        { cor: "rosa" },
+        { sigla: "ABC" },
+        { intervaloMinutos: 20 },
+        { toleranciaMinutos: 61 },
+      ]) {
+        await post("/v1/horarios", rhA)
+          .send({ nome: "Invalido", periodos: UM_PERIODO, ...extra })
+          .expect(400);
+      }
+    });
+
+    it("unidade: só da própria empresa; filtro da lista traz os da unidade", async () => {
+      const { unidadeOrganizacionalId: unidadeA } = await lotacaoMinima(
+        appUrl,
+        empresaA,
+      );
+      const { unidadeOrganizacionalId: unidadeB } = await lotacaoMinima(
+        appUrl,
+        empresaB,
+      );
+      const r = await post("/v1/horarios", rhA)
+        .send({
+          nome: "Turno Da Unidade",
+          periodos: UM_PERIODO,
+          unidadeOrganizacionalId: unidadeA,
+        })
+        .expect(201);
+      const recusa = await post("/v1/horarios", rhA)
+        .send({
+          nome: "Turno Outra Unidade",
+          periodos: UM_PERIODO,
+          unidadeOrganizacionalId: unidadeB,
+        })
+        .expect(422);
+      expect(recusa.body.erros).toEqual([
+        { campo: "unidadeOrganizacionalId", motivo: "indisponivel" },
+      ]);
+      const lista = await get(
+        `/v1/horarios?unidadeOrganizacionalId=${unidadeA}&tamanhoPagina=100`,
+        rhA,
+      ).expect(200);
+      expect(lista.body.itens.map((t: { id: string }) => t.id)).toEqual([
+        r.body.id,
+      ]);
+    });
+
+    it("edita cor, sigla, unidade, tolerância e mínimo (o DP não edita)", async () => {
+      const r = await post("/v1/horarios", rhA)
+        .send({ nome: "Turno Editavel", periodos: UM_PERIODO })
+        .expect(201);
+      const e = await patch(`/v1/horarios/${r.body.id}`, rhA)
+        .send({
+          cor: "verde",
+          sigla: "ed",
+          toleranciaMinutos: 10,
+          minimoPorDia: 2,
+        })
+        .expect(200);
+      expect(e.body).toMatchObject({
+        cor: "verde",
+        sigla: "ED",
+        toleranciaMinutos: 10,
+        minimoPorDia: 2,
+      });
+      await patch(`/v1/horarios/${r.body.id}`, dpA)
+        .send({ cor: "roxo" })
+        .expect(403);
+      // Os períodos seguem imutáveis.
+      await patch(`/v1/horarios/${r.body.id}`, rhA)
+        .send({ periodos: UM_PERIODO })
+        .expect(400);
     });
   });
 });
