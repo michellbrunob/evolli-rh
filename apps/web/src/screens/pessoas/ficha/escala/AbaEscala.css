@@ -175,9 +175,57 @@
 }
 
 .escala-ficha__indicador {
+  position: relative;
   display: flex;
   flex-direction: column-reverse;
   min-width: 0;
+}
+
+/* T215 — explicação do indicador (como a da referência): aparece no
+   ponteiro e no foco do teclado, acima do valor. */
+.escala-ficha__indicador[tabindex] {
+  cursor: help;
+  border-radius: var(--radius-sm);
+}
+
+.escala-ficha__indicador[tabindex]:focus-visible {
+  outline: var(--foco-anel);
+  outline-offset: var(--focus-offset);
+}
+
+.escala-ficha__dica {
+  position: absolute;
+  bottom: calc(100% + var(--space-xs));
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2 * var(--space-md)));
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dark);
+  color: var(--color-on-dark-muted);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 120ms ease,
+    visibility 120ms ease;
+}
+
+.escala-ficha__dica strong {
+  color: var(--color-on-dark);
+  font-weight: var(--weight-strong);
+}
+
+.escala-ficha__indicador:hover .escala-ficha__dica,
+.escala-ficha__indicador:focus-visible .escala-ficha__dica {
+  opacity: 1;
+  visibility: visible;
 }
 
 .escala-ficha__indicador dt {

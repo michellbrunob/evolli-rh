@@ -395,6 +395,10 @@ describe("T215 — escala do colaborador (e2e)", () => {
         nome: "Comercial Sintetico",
         ativo: true,
         periodos: GRADE_COMERCIAL,
+        // T215 — o que a aba precisa para horas, intervalo e quadro.
+        intervaloMinutos: 0,
+        cor: expect.any(String),
+        sigla: expect.any(String),
       },
       turnoNoite: null,
       folgaSemanal: null,

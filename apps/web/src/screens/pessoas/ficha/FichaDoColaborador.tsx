@@ -1003,6 +1003,8 @@ export function FichaDoColaborador({
                   .filter(Boolean)
                   .join(" · ")}
                 {...(onAbrirJornadas ? { onAbrirQuadro: onAbrirJornadas } : {})}
+                jornadaContratoHoras={horas}
+                local={lotacao.unidade || null}
                 hoje={hoje}
               />
             ) : null

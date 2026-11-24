@@ -8,6 +8,8 @@ import {
   minutosDoTurno,
   proximosDias,
   trabalhoNoDia,
+  jornadaPorSemana,
+  limiteLegalSemanal,
 } from "./calendarioDaEscala";
 import { MODELOS_DE_ESCALA, modeloDe } from "./modelosDeEscala";
 
@@ -202,5 +204,35 @@ describe("calendário da escala (mesmos números da referência)", () => {
       ["2026-11-27", null],
       ["2026-11-28", "dia"],
     ]);
+  });
+});
+
+describe("T215 — EC 141/2026 e intervalo do turno", () => {
+  it.each([
+    ["2026-12-15", 44],
+    ["2026-12-16", 42],
+    ["2027-12-15", 42],
+    ["2027-12-16", 40],
+  ])("limite legal em %s: %i h", (dia, horas) => {
+    expect(limiteLegalSemanal(dia)).toBe(horas);
+  });
+
+  it("jornada por semana: o menor entre o contrato e o limite; sem contrato, o limite", () => {
+    expect(jornadaPorSemana(44, "2026-11-24")).toBe(44 * 60);
+    expect(jornadaPorSemana(44, "2026-12-16")).toBe(42 * 60);
+    expect(jornadaPorSemana(30, "2027-12-16")).toBe(30 * 60);
+    expect(jornadaPorSemana(null, "2026-11-24")).toBe(44 * 60);
+    expect(jornadaPorSemana(0, "2026-11-24")).toBe(44 * 60);
+  });
+
+  it("um período corrido desconta o intervalo; com dois períodos, não", () => {
+    const corrido = [{ dia: "segunda", inicio: "08:00", fim: "17:00" }];
+    expect(minutosDoTurno(corrido, "2026-11-23", 60)).toBe(480);
+    expect(minutosDoTurno(corrido, "2026-11-23")).toBe(540);
+    const dois = [
+      { dia: "segunda", inicio: "08:00", fim: "12:00" },
+      { dia: "segunda", inicio: "13:00", fim: "17:00" },
+    ];
+    expect(minutosDoTurno(dois, "2026-11-23", 60)).toBe(480);
   });
 });

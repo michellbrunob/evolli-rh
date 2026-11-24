@@ -18,6 +18,10 @@ export interface TurnoDaEscalaApi {
   nome: string;
   ativo: boolean;
   periodos: { dia: string; inicio: string; fim: string }[];
+  /** Intervalo do turno de um período corrido (minutos). */
+  intervaloMinutos?: number;
+  cor?: string | null;
+  sigla?: string | null;
 }
 
 export interface EscalaApi {

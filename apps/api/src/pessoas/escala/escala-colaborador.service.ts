@@ -24,6 +24,10 @@ export interface TurnoDaEscala {
   nome: string;
   ativo: boolean;
   periodos: { dia: string; inicio: string; fim: string }[];
+  /** T215 — intervalo do período corrido (minutos), cor e sigla do quadro. */
+  intervaloMinutos: number;
+  cor: string | null;
+  sigla: string | null;
 }
 
 export interface EscalaProjetada {
@@ -59,6 +63,9 @@ const TURNO = {
     codigo: true,
     nome: true,
     ativo: true,
+    intervaloMinutos: true,
+    cor: true,
+    sigla: true,
     periodos: {
       select: { diaSemana: true, inicioMinuto: true, fimMinuto: true },
       orderBy: [{ diaSemana: "asc" }, { inicioMinuto: "asc" }],
@@ -104,6 +111,9 @@ function projetarTurno(t: LinhaDeTurno | null): TurnoDaEscala | null {
     codigo: t.codigo,
     nome: t.nome,
     ativo: t.ativo,
+    intervaloMinutos: t.intervaloMinutos,
+    cor: t.cor,
+    sigla: t.sigla,
     periodos: t.periodos.map((p) => ({
       dia: numeroParaDia(p.diaSemana),
       inicio: formatarHora(p.inicioMinuto),

@@ -38,17 +38,16 @@ import {
 import { Button, FormActions } from "../../../../components";
 import { Sheet } from "../../../../ui";
 import {
+  AvisoFlutuante,
+  type ConteudoDoAviso,
+} from "../../../../ui/AvisoFlutuante";
+import {
   IconeCalendario,
   IconeMais,
   IconeRelogio,
   IconeRemover,
 } from "../../../../ui/icones";
-import {
-  AvisoAnimado,
-  Esqueleto,
-  Revelar,
-  ehAvisoDeFalha,
-} from "../../../../ui/movimento";
+import { Esqueleto, Revelar } from "../../../../ui/movimento";
 import { formatarDiaCivil } from "../../../../format/data";
 import {
   diaAnteriorCivil,
@@ -60,8 +59,10 @@ import {
   diaDaSemana,
   diasNoMes,
   feriadoDe,
+  beneficioPelosDiasUteis,
   formatarHoras,
   horasPorSemana,
+  jornadaPorSemana,
   minutosNoDia,
   somarDias,
   trabalhoNoDia,
@@ -110,6 +111,10 @@ interface Props {
   readonly podeOperar: boolean;
   /** Abre o quadro da Escala de trabalho. */
   readonly onAbrirQuadro?: () => void;
+  /** T215 — jornada semanal do contrato (horas), para "por semana". */
+  readonly jornadaContratoHoras?: number | null;
+  /** T215 — a unidade da lotação, mostrada como "local". */
+  readonly local?: string | null;
   /** Dia civil de hoje (testes). */
   readonly hoje?: string;
   readonly servico?: ServicoDeEscala;
@@ -147,6 +152,7 @@ const ROTULO_SITUACAO: Record<Situacao, string> = {
 type Turno = {
   nome: string;
   periodos: { dia: string; inicio: string; fim: string }[];
+  intervaloMinutos?: number;
 };
 
 function situacaoDe(e: EscalaApi, hoje: string): Situacao {
@@ -167,14 +173,22 @@ function faixaDoTurno(t: Turno | null): string {
     : "";
 }
 
-/** "09:00–18:00 · 1 h de intervalo". */
-export function descricaoDoTurno(periodos: Turno["periodos"]): string {
+/**
+ * "09:00–18:00 · 1 h de intervalo". T215 — num período corrido, o intervalo
+ * é o do turno; com dois ou mais, o vão entre eles.
+ */
+export function descricaoDoTurno(
+  periodos: Turno["periodos"],
+  intervaloMinutos = 0,
+): string {
   const dia = diaTipico(periodos);
   if (!dia) return "sem horário";
   const faixa = `${dia.periodos[0]!.inicio}–${dia.periodos[dia.periodos.length - 1]!.fim}`;
-  return dia.intervalo === 0
+  const intervalo =
+    dia.periodos.length === 1 ? intervaloMinutos : dia.intervalo;
+  return intervalo === 0
     ? `${faixa} · sem intervalo`
-    : `${faixa} · ${formatarDuracao(dia.intervalo)} de intervalo`;
+    : `${faixa} · ${formatarDuracao(intervalo)} de intervalo`;
 }
 
 /** "Comercial 09:00–18:00" (sem turno: "Sem turno"). */
@@ -205,6 +219,8 @@ function padraoDe(e: EscalaApi): PadraoDeEscala {
     modelo: e.modelo,
     turno: e.turno?.periodos ?? null,
     turnoNoite: e.turnoNoite?.periodos ?? null,
+    intervaloTurno: e.turno?.intervaloMinutos ?? 0,
+    intervaloTurnoNoite: e.turnoNoite?.intervaloMinutos ?? 0,
     folgaSemanal: e.folgaSemanal,
     diasTrabalho: e.diasTrabalho,
     inicioCiclo: e.inicioCiclo,
@@ -275,12 +291,14 @@ export function AbaEscala({
   detalhe,
   podeOperar,
   onAbrirQuadro,
+  jornadaContratoHoras = null,
+  local = null,
   hoje = diaDeHoje(),
   servico = servicoDeEscalaDoServidor,
 }: Props) {
   const [carga, setCarga] = useState<Carga>({ estado: "carregando" });
   const [gaveta, setGaveta] = useState<Gaveta>(null);
-  const [aviso, setAviso] = useState("");
+  const [aviso, setAviso] = useState<ConteudoDoAviso | null>(null);
   const idTitulo = useId();
   const focarTitulo = useRef(false);
 
@@ -338,10 +356,10 @@ export function AbaEscala({
     escalas.find((e) => situacaoDe(e, hoje) === "programada") ?? null;
   const cadastro = modeloDe(dados.escalaDoCadastro);
 
-  const gravado = (mensagem: string) => {
+  const gravado = (titulo: string, texto: string) => {
     focarTitulo.current = true;
     setGaveta(null);
-    setAviso(mensagem);
+    setAviso({ id: Date.now(), titulo, texto });
     void carregar(true);
   };
 
@@ -391,6 +409,8 @@ export function AbaEscala({
               programada={programada}
               escalas={escalas}
               hoje={hoje}
+              jornadaContratoHoras={jornadaContratoHoras}
+              local={local}
               acoes={
                 <>
                   {onAbrirQuadro ? (
@@ -426,11 +446,7 @@ export function AbaEscala({
           </p>
         ) : null}
 
-        <AvisoAnimado
-          className="escala-ficha__status"
-          mensagem={aviso}
-          tipo={ehAvisoDeFalha(aviso) ? "neutro" : "sucesso"}
-        />
+        <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
 
         {gaveta === "definir" || gaveta === "alterar" ? (
           <GavetaDoPadrao
@@ -517,6 +533,8 @@ function EscalaAtual({
   programada,
   escalas,
   hoje,
+  jornadaContratoHoras,
+  local,
   acoes,
 }: {
   readonly idTitulo: string;
@@ -524,6 +542,8 @@ function EscalaAtual({
   readonly programada: EscalaApi | null;
   readonly escalas: EscalaApi[];
   readonly hoje: string;
+  readonly jornadaContratoHoras: number | null;
+  readonly local: string | null;
   readonly acoes: ReactNode;
 }) {
   const e = atual ?? programada;
@@ -543,7 +563,13 @@ function EscalaAtual({
     >
       <div className="escala-ficha__corpo">
         {e ? (
-          <Resumo e={e} hoje={hoje} programada={!atual} />
+          <Resumo
+            e={e}
+            hoje={hoje}
+            programada={!atual}
+            jornadaContratoHoras={jornadaContratoHoras}
+            local={local}
+          />
         ) : (
           <p className="escala-ficha__sem-vigente">
             {ultimaEncerrada?.vigenciaFim
@@ -564,22 +590,68 @@ function EscalaAtual({
   );
 }
 
+/** Um indicador da Escala atual, com a explicação (dica) opcional. */
+type Indicador = [
+  valor: string,
+  rotulo: string,
+  dica?: { readonly titulo: string; readonly texto: string },
+];
+
+const NOMES_DOS_MESES = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
 function Resumo({
   e,
   hoje,
   programada,
+  jornadaContratoHoras,
+  local,
 }: {
   readonly e: EscalaApi;
   readonly hoje: string;
   readonly programada: boolean;
+  readonly jornadaContratoHoras: number | null;
+  readonly local: string | null;
 }) {
+  const idDica = useId();
   const base = e.vigenciaInicio > hoje ? e.vigenciaInicio : hoje;
   const ultimo = e.vigenciaFim ? diaAnteriorCivil(e.vigenciaFim) : null;
-  const indicadores: [string, string][] = [
-    [formatarHoras(horasPorSemana(padraoDe(e), base)), "por semana"],
+  const beneficio = diasNoMes(e.modelo, mesDe(base));
+  const nomeDoModelo = modeloDe(e.modelo)?.nome ?? e.modelo;
+  // T215 — como na referência: a jornada do contrato e o limite legal da
+  // data (EC 141/2026), o menor; o benefício pelos dias úteis ou pelo
+  // catálogo da escala.
+  const indicadores: Indicador[] = [
     [
-      `${diasNoMes(e.modelo, mesDe(base))} dias`,
+      formatarHoras(jornadaPorSemana(jornadaContratoHoras, base)),
+      "por semana",
+      {
+        titulo: "Jornada por semana",
+        texto:
+          "Pela jornada do contrato e pela data (EC 141/2026): vale o menor limite.",
+      },
+    ],
+    [
+      `${beneficio} dias`,
       `de benefício em ${mesCurto(base)}`,
+      {
+        titulo: `${beneficio} dias de benefício em ${NOMES_DOS_MESES[Number(base.slice(5, 7)) - 1]}`,
+        texto: beneficioPelosDiasUteis(e.modelo)
+          ? "Pelos dias úteis do mês (sem escala no catálogo)."
+          : `Pelo catálogo (${nomeDoModelo}).`,
+      },
     ],
   ];
   if (e.folgaSemanal !== null) {
@@ -597,6 +669,7 @@ function Resumo({
   if (e.inicioCiclo) {
     indicadores.push([formatarDiaCivil(e.inicioCiclo), "início do ciclo"]);
   }
+  if (local) indicadores.push([local, "local"]);
   return (
     <div className="escala-ficha__resumo">
       <div className="escala-ficha__padrao">
@@ -625,7 +698,9 @@ function Resumo({
         </p>
         <p className="escala-ficha__sub">
           {[
-            e.turno ? descricaoDoTurno(e.turno.periodos) : null,
+            e.turno
+              ? descricaoDoTurno(e.turno.periodos, e.turno.intervaloMinutos)
+              : null,
             programada
               ? `a partir de ${formatarDiaCivil(e.vigenciaInicio)}`
               : `desde ${formatarDiaCivil(e.vigenciaInicio)}`,
@@ -636,10 +711,25 @@ function Resumo({
         </p>
       </div>
       <dl className="escala-ficha__indicadores">
-        {indicadores.map(([valor, rotulo]) => (
-          <div key={rotulo} className="escala-ficha__indicador">
+        {indicadores.map(([valor, rotulo, dica], i) => (
+          <div
+            key={rotulo}
+            className="escala-ficha__indicador"
+            {...(dica
+              ? { tabIndex: 0, "aria-describedby": `${idDica}-${i}` }
+              : {})}
+          >
             <dt>{rotulo}</dt>
             <dd>{valor}</dd>
+            {dica ? (
+              <span
+                role="tooltip"
+                id={`${idDica}-${i}`}
+                className="escala-ficha__dica"
+              >
+                <strong>{dica.titulo}</strong> <span>{dica.texto}</span>
+              </span>
+            ) : null}
           </div>
         ))}
       </dl>
@@ -667,7 +757,7 @@ function DescricaoDoDia({ d }: { readonly d: DiaResolvido }) {
       <strong>{d.turno?.nome ?? "Trabalho"}</strong>
       {d.turno ? (
         <span className="escala-ficha__sub">
-          {descricaoDoTurno(d.turno.periodos)}
+          {descricaoDoTurno(d.turno.periodos, d.turno.intervaloMinutos)}
         </span>
       ) : null}
     </span>
@@ -1054,7 +1144,7 @@ function GavetaDoPadrao({
   readonly servico: ServicoDeEscala;
   readonly onFechar: () => void;
   readonly onEncerrar: () => void;
-  readonly onGravado: (mensagem: string) => void;
+  readonly onGravado: (titulo: string, texto: string) => void;
 }) {
   const base = useId();
   const ids = {
@@ -1145,6 +1235,8 @@ function GavetaDoPadrao({
     modelo,
     turno: turnoEscolhido?.periodos ?? null,
     turnoNoite: noiteEscolhida?.periodos ?? null,
+    intervaloTurno: turnoEscolhido?.intervaloMinutos ?? 0,
+    intervaloTurnoNoite: noiteEscolhida?.intervaloMinutos ?? 0,
     folgaSemanal: modelo === "6x1" ? folga : null,
     diasTrabalho: modelo === "outra" ? dias : [],
     inicioCiclo: comCiclo ? ciclo || vale : null,
@@ -1207,7 +1299,10 @@ function GavetaDoPadrao({
     try {
       await servico.definir(colaboradorId, dto);
       onGravado(
-        `Padrão de escala definido. Vale a partir de ${formatarDiaCivil(vale)}.`,
+        modo === "alterar"
+          ? "Padrão de escala alterado"
+          : "Padrão de escala definido",
+        `Vale a partir de ${formatarDiaCivil(vale)}.`,
       );
     } catch (erro) {
       const recusa = errosDaRecusa(erro);
@@ -1228,7 +1323,7 @@ function GavetaDoPadrao({
   const opcaoDoTurno = (t: TabelaHorarioApi) => ({
     valor: t.id,
     nome: t.nome,
-    descricao: descricaoDoTurno(t.periodos),
+    descricao: descricaoDoTurno(t.periodos, t.intervaloMinutos),
     cor: COR_DO_TURNO,
   });
   const gruposDeEscala: GrupoRico[] = GRUPOS_DE_ESCALA.map((grupo) => ({
@@ -1595,7 +1690,7 @@ function GavetaDeEncerramento({
   readonly escala: EscalaApi;
   readonly servico: ServicoDeEscala;
   readonly onFechar: () => void;
-  readonly onGravado: (mensagem: string) => void;
+  readonly onGravado: (titulo: string, texto: string) => void;
 }) {
   const base = useId();
   const idData = `${base}-ultimo`;
@@ -1629,7 +1724,8 @@ function GavetaDeEncerramento({
     try {
       await servico.encerrar(colaboradorId, escala.id, proximoDiaCivil(ultimo));
       onGravado(
-        `Escala encerrada. O último dia nela é ${formatarDiaCivil(ultimo)}.`,
+        "Escala encerrada",
+        `O último dia nela é ${formatarDiaCivil(ultimo)}.`,
       );
     } catch (erro) {
       const recusa = errosDaRecusa(erro);

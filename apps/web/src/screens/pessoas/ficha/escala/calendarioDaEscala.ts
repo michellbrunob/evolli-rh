@@ -23,6 +23,12 @@ export interface PadraoDeEscala {
   /** A grade do turno; `null` = sem turno fixo. */
   readonly turno: readonly PeriodoDoTurno[] | null;
   readonly turnoNoite: readonly PeriodoDoTurno[] | null;
+  /**
+   * T215 — intervalo do turno (minutos), descontado no dia de UM período
+   * corrido (com dois ou mais períodos, a pausa é o vão entre eles).
+   */
+  readonly intervaloTurno?: number;
+  readonly intervaloTurnoNoite?: number;
   readonly folgaSemanal: number | null;
   readonly diasTrabalho: readonly number[];
   readonly inicioCiclo: string | null;
@@ -73,13 +79,21 @@ function minutos(hora: string): number {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
-function liquidoPorDia(turno: readonly PeriodoDoTurno[]): Map<string, number> {
+function liquidoPorDia(
+  turno: readonly PeriodoDoTurno[],
+  intervalo: number,
+): Map<string, number> {
   const porDia = new Map<string, number>();
+  const quantos = new Map<string, number>();
   for (const p of turno) {
     porDia.set(
       p.dia,
       (porDia.get(p.dia) ?? 0) + minutos(p.fim) - minutos(p.inicio),
     );
+    quantos.set(p.dia, (quantos.get(p.dia) ?? 0) + 1);
+  }
+  for (const [dia, total] of porDia) {
+    if (quantos.get(dia) === 1) porDia.set(dia, Math.max(0, total - intervalo));
   }
   return porDia;
 }
@@ -107,9 +121,10 @@ function uniforme(turno: readonly PeriodoDoTurno[]): string | null {
 export function minutosDoTurno(
   turno: readonly PeriodoDoTurno[] | null,
   dia: string,
+  intervalo = 0,
 ): number {
   if (!turno || turno.length === 0) return 0;
-  const porDia = liquidoPorDia(turno);
+  const porDia = liquidoPorDia(turno, intervalo);
   const igual = uniforme(turno);
   if (igual !== null) return porDia.get(igual) ?? 0;
   return porDia.get(DIA_DA_API[diaDaSemana(dia)]!) ?? 0;
@@ -176,7 +191,46 @@ export function trabalhoNoDia(
 export function minutosNoDia(p: PadraoDeEscala, dia: string): number {
   const t = trabalhoNoDia(p, dia);
   if (t === null) return 0;
-  return minutosDoTurno(t === "noite" ? p.turnoNoite : p.turno, dia);
+  return t === "noite"
+    ? minutosDoTurno(p.turnoNoite, dia, p.intervaloTurnoNoite ?? 0)
+    : minutosDoTurno(p.turno, dia, p.intervaloTurno ?? 0);
+}
+
+/**
+ * T215 — EC 141/2026: o limite constitucional da jornada semanal cai de 44 h
+ * para 42 h dois meses depois da publicação e para 40 h um ano depois
+ * (datas da transição; editáveis nas Regras da escala quando elas existirem).
+ */
+export const TRANSICAO_EC_141: readonly {
+  readonly desde: string;
+  readonly horas: number;
+}[] = [
+  { desde: "2026-12-16", horas: 42 },
+  { desde: "2027-12-16", horas: 40 },
+];
+
+/** Limite legal da jornada semanal (horas) no dia. */
+export function limiteLegalSemanal(dia: string): number {
+  let horas = 44;
+  for (const etapa of TRANSICAO_EC_141)
+    if (dia >= etapa.desde) horas = etapa.horas;
+  return horas;
+}
+
+/**
+ * T215 — "Jornada por semana" da Escala atual, como na referência: a
+ * jornada do contrato e o limite legal da data — vale o menor. Em minutos.
+ */
+export function jornadaPorSemana(
+  jornadaContratoHoras: number | null | undefined,
+  dia: string,
+): number {
+  const legal = limiteLegalSemanal(dia);
+  const contrato =
+    jornadaContratoHoras != null && jornadaContratoHoras > 0
+      ? jornadaContratoHoras
+      : legal;
+  return Math.min(contrato, legal) * 60;
 }
 
 /** Minutos por semana: os 28 dias a partir de `base`, divididos por 4. */
@@ -233,9 +287,15 @@ export function diasUteisDoMes(mes: string): number {
  * Dias para os benefícios pagos por dia, no mês (`AAAA-MM`). Sem escala, no
  * 5x2 e em "outra": os dias úteis.
  */
+/** Sem escala, 5x2 e "outra" contam os dias úteis (fora do catálogo). */
+export function beneficioPelosDiasUteis(modelo: string | null): boolean {
+  const m = modeloDe(modelo);
+  return !m || m.codigo === "5x2" || m.tipo === "outra";
+}
+
 export function diasNoMes(modelo: string | null, mes: string): number {
   const m = modeloDe(modelo);
-  if (!m || m.codigo === "5x2" || m.tipo === "outra") {
+  if (!m || beneficioPelosDiasUteis(modelo)) {
     return diasUteisDoMes(mes);
   }
   const dias = diasDoMes(mes);

@@ -221,7 +221,8 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     expect(atual).toHaveTextContent(
       "09:00–18:00 · 1 h de intervalo · desde 02/02/2026",
     );
-    expect(atual).toHaveTextContent("40 h");
+    // T215 — sem jornada no contrato, vale o limite legal da data (44 h).
+    expect(atual).toHaveTextContent("44 h");
     expect(atual).toHaveTextContent("por semana");
     expect(atual).toHaveTextContent("19 dias");
     expect(atual).toHaveTextContent("de benefício em nov.");
@@ -409,10 +410,10 @@ describe("T215 — aba Escala (desenho da referência)", () => {
         }),
       );
       expect(
-        await screen.findByText(
-          "Padrão de escala definido. Vale a partir de 24/11/2026.",
-        ),
-      ).toBeInTheDocument();
+        await screen.findByRole("status", {
+          name: "Padrão de escala definido",
+        }),
+      ).toHaveTextContent("Vale a partir de 24/11/2026.");
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
@@ -553,10 +554,8 @@ describe("T215 — aba Escala (desenho da referência)", () => {
       expect(servico.encerrar).toHaveBeenCalledWith(COLAB, "e1", "2027-01-01"),
     );
     expect(
-      await screen.findByText(
-        "Escala encerrada. O último dia nela é 31/12/2026.",
-      ),
-    ).toBeInTheDocument();
+      await screen.findByRole("status", { name: "Escala encerrada" }),
+    ).toHaveTextContent("O último dia nela é 31/12/2026.");
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { name: "Escala atual" }),
@@ -573,5 +572,99 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     // o clique não chega nas opções e não dá para trocar o padrão.
     const camada = /\.seletor-rico__lista\s*\{[^}]*z-index:\s*(\d+)/.exec(css);
     expect(Number(camada?.[1])).toBeGreaterThan(100);
+  });
+});
+
+describe("T215 — Escala atual e gaveta como na referência (regras e explicações)", () => {
+  const indicador = (valor: string) =>
+    screen
+      .getByText(valor, { selector: "dd" })
+      .closest(".escala-ficha__indicador") as HTMLElement;
+
+  it("por semana: o menor entre a jornada do contrato e o limite da data (EC 141/2026), com a explicação", async () => {
+    montar(servicoCom([escala("e1", "6x1", "2026-02-02", null)]), {
+      jornadaContratoHoras: 44,
+      local: "Matriz Sintética",
+    });
+    await screen.findByRole("region", { name: "Escala atual" });
+    // 6 dias de 8 h dariam 48 h; vale o limite: 44 h.
+    expect(indicador("44 h")).toHaveAccessibleDescription(
+      "Jornada por semana Pela jornada do contrato e pela data (EC 141/2026): vale o menor limite.",
+    );
+    expect(indicador("26 dias")).toHaveAccessibleDescription(
+      "26 dias de benefício em novembro Pelo catálogo (6x1).",
+    );
+    expect(indicador("Matriz Sintética")).toHaveTextContent("local");
+  });
+
+  it("5x2: benefício pelos dias úteis; sem contrato vale o limite legal da data", async () => {
+    montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
+    await screen.findByRole("region", { name: "Escala atual" });
+    expect(indicador("19 dias")).toHaveAccessibleDescription(
+      "19 dias de benefício em novembro Pelos dias úteis do mês (sem escala no catálogo).",
+    );
+    // O card não soma o turno (5 × 8 h): sem contrato, vale o limite da data.
+    expect(indicador("44 h")).toHaveTextContent("por semana");
+    expect(screen.queryByText("local")).toBeNull();
+  });
+
+  it.each([
+    ["2026-12-20", 44, "42 h"],
+    ["2027-12-20", 44, "40 h"],
+    ["2026-11-24", 36, "36 h"],
+  ])("em %s, com contrato de %i h: %s", async (hoje, contrato, esperado) => {
+    montar(servicoCom([escala("e1", "6x1", "2026-02-02", null)]), {
+      hoje,
+      jornadaContratoHoras: contrato,
+    });
+    await screen.findByRole("region", { name: "Escala atual" });
+    expect(indicador(esperado)).toHaveTextContent("por semana");
+  });
+
+  it("intervalo do turno: um período corrido com 1 h de intervalo conta 8 h por dia na gaveta", async () => {
+    const corrido = UTEIS.map((dia) => ({
+      dia,
+      inicio: "08:00",
+      fim: "17:00",
+    }));
+    montar(
+      servicoCom([
+        escala("e1", "5x2", "2026-02-02", null, {
+          turno: {
+            id: "t9",
+            codigo: "COR",
+            nome: "Corrido",
+            ativo: true,
+            periodos: corrido,
+            intervaloMinutos: 60,
+          },
+        }),
+      ]),
+    );
+    const atual = await screen.findByRole("region", { name: "Escala atual" });
+    expect(atual).toHaveTextContent("08:00–17:00 · 1 h de intervalo");
+    const g = await abrirGaveta("Alterar padrão");
+    expect(g.textContent).toMatch(/Horas por semana40 h/);
+  });
+
+  it("salvar: aviso flutuante verde com título e a data, que some ao fechar", async () => {
+    const servico = servicoCom([escala("e1", "5x2", "2026-02-02", null)]);
+    montar(servico);
+    const g = await abrirGaveta("Alterar padrão");
+    await escolher(g, "Escala", /^6x1/);
+    fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
+    const aviso = await screen.findByRole("status", {
+      name: "Padrão de escala alterado",
+    });
+    expect(aviso).toHaveClass("aviso-flutuante");
+    expect(aviso).toHaveTextContent("Vale a partir de 24/11/2026.");
+    fireEvent.click(
+      within(aviso).getByRole("button", { name: "Fechar aviso" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("status", { name: "Padrão de escala alterado" }),
+      ).toBeNull(),
+    );
   });
 });
