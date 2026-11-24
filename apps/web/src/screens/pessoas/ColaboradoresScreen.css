@@ -260,8 +260,10 @@
 }
 
 /* Aba ativa: nunca só cor — `aria-selected`, peso e barra inferior sólida.
-   T215 — a barra é o indicador que desliza entre as abas (ui/movimento). */
+   T215 — com o movimento global ligado, a barra fixa dá lugar ao sublinhado
+   que desliza entre as abas (ui/movimento.css); sem ele, fica esta. */
 .colaboradores-screen__aba--ativa {
+  border-bottom-color: var(--color-action);
   color: var(--color-ink);
   font-weight: var(--weight-strong);
 }

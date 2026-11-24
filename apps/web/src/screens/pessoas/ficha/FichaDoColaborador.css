@@ -439,6 +439,7 @@
 }
 
 .ficha-ref__aba--atual {
+  border-bottom-color: var(--color-action);
   color: var(--color-ink);
   font-weight: var(--weight-strong);
 }

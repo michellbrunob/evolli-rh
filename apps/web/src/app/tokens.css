@@ -239,11 +239,10 @@
   --foco-anel: var(--focus-width) solid var(--color-action);
 
   /* T209 — movimento dos painéis laterais: curto e profissional. Quem pede
-     movimento reduzido não vê animação (`Modal.css`).
-     T215 — alinhado ao conjunto de movimento abaixo (mesma curva). */
-  --movimento-painel-entrada: 280ms;
-  --movimento-painel-saida: 180ms;
-  --movimento-curva: var(--movimento-curva-suave);
+     movimento reduzido não vê animação (`Modal.css`). */
+  --movimento-painel-entrada: 200ms;
+  --movimento-painel-saida: 160ms;
+  --movimento-curva: cubic-bezier(0.2, 0, 0, 1);
 
   /* T215 — movimento da interface (ui/movimento.css): sutil e corporativo.
      Abre um pouco mais devagar do que fecha; desacelera no fim; desloca
