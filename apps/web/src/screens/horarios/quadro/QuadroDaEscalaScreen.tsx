@@ -82,6 +82,7 @@ import { Esqueleto, Revelar } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import { OPCOES_GENERO, OPCOES_NIVEL } from "../../pessoas/NovaAdmissaoScreen";
 import { GavetaDoQuadro } from "./GavetaDoQuadro";
+import { periodosDaPublicacao, resumoDaPublicacao } from "./publicacaoDaEscala";
 import { pedirSecaoDasRegras } from "./secaoDasRegras";
 import {
   idsComAusencia,
@@ -1182,23 +1183,7 @@ export function QuadroDaEscalaScreen({
     0,
   );
   // O que publicar leva: dias do rascunho, novos ou sobre um publicado.
-  const resumoDaPublicacao = (() => {
-    let novas = 0;
-    let alteradas = 0;
-    const comMudanca = new Set<string>();
-    for (const p of todas) {
-      for (const d of p.dias ?? []) {
-        if (d.camada !== "rascunho") continue;
-        comMudanca.add(p.colaboradorId);
-        const publicado = (p.dias ?? []).some(
-          (x) => x.dia === d.dia && x.camada === "publicado",
-        );
-        if (publicado) alteradas += 1;
-        else novas += 1;
-      }
-    }
-    return { novas, alteradas, pessoas: comMudanca.size };
-  })();
+  const resumoDoQuadro = resumoDaPublicacao(todas, new Set(dias));
   const publicacao =
     carga.estado === "pronto" ? (carga.dados.publicacao ?? null) : null;
   const primeiraCelula = daPagina[0]
@@ -2131,24 +2116,25 @@ export function QuadroDaEscalaScreen({
         })()}
         {publicando ? (
           <DialogoPublicar
-            periodo={visao === "semana" ? `Semana de ${titulo}` : titulo}
-            resumo={resumoDaPublicacao}
+            periodos={periodosDaPublicacao(visao, inicio, fim)}
+            resumoInicial={resumoDoQuadro}
+            resumir={async (i, f) =>
+              resumoDaPublicacao(
+                (await consultarQuadro(i, f)).pessoas,
+                new Set(diasDoPeriodo(i, f)),
+              )
+            }
+            hoje={hoje}
             avisos={avisosDeAtencao}
             onVerAvisos={() => {
               setPublicando(false);
               setVendoAvisos("todos");
             }}
             avisarPadrao={regras?.avisarPadrao ?? true}
-            antecedenciaFaltando={
-              regras &&
-              regras.antecedenciaDias > 0 &&
-              inicio < somarDiasLocal(hoje, regras.antecedenciaDias)
-                ? regras.antecedenciaDias
-                : null
-            }
+            antecedenciaDias={regras?.antecedenciaDias ?? 0}
             onFechar={() => setPublicando(false)}
-            onPublicar={async (avisar) => {
-              const r = await publicarEscala(inicio, fim, avisar);
+            onPublicar={async (avisar, i, f) => {
+              const r = await publicarEscala(i, f, avisar);
               setPublicando(false);
               setTentativa((n) => n + 1);
               setAviso({

@@ -809,11 +809,23 @@ describe("T215 — publicar a escala", () => {
       (d) => d.textContent,
     );
     expect(linhas).toEqual([
-      "PeríodoSemana de 23 a 29 de novembro de 2026",
       "Alocações novas1",
       "Alteradas1",
+      "Removidas0",
       "Pessoas afetadas1",
     ]);
+    const periodo = within(dialogo).getByRole("combobox", { name: "Período" });
+    expect(
+      [...(periodo as HTMLSelectElement).options].map((o) => o.textContent),
+    ).toEqual([
+      "Semana de 23 a 29 de novembro de 2026",
+      "Mês de novembro de 2026",
+      "Até 20/12 (4 semanas)",
+    ]);
+    // Hoje (25/11) está dentro da semana.
+    expect(dialogo).toHaveTextContent(
+      "O período já começou. Avise as pessoas o quanto antes.",
+    );
     const avisar = within(dialogo).getByRole("checkbox", {
       name: "Avisar as pessoas pelo Portal e por e-mail",
     });
@@ -856,11 +868,32 @@ describe("T215 — publicar a escala", () => {
     fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
     const dialogo = screen.getByRole("dialog", { name: "Publicar a escala" });
     fireEvent.click(within(dialogo).getByRole("checkbox"));
+    // O mês inteiro: lê o resumo do mês antes de publicar.
+    fireEvent.change(
+      within(dialogo).getByRole("combobox", { name: "Período" }),
+      { target: { value: "1" } },
+    );
+    await waitFor(() =>
+      expect(consultarQuadro).toHaveBeenLastCalledWith(
+        "2026-11-01",
+        "2026-11-30",
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        [...dialogo.querySelectorAll("dl > div")].map((d) => d.textContent),
+      ).toEqual([
+        "Alocações novas1",
+        "Alteradas0",
+        "Removidas0",
+        "Pessoas afetadas1",
+      ]),
+    );
     fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
     await waitFor(() =>
       expect(publicarEscala).toHaveBeenCalledWith(
-        "2026-11-23",
-        "2026-11-29",
+        "2026-11-01",
+        "2026-11-30",
         false,
       ),
     );

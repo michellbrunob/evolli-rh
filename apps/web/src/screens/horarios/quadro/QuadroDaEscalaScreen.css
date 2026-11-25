@@ -1408,18 +1408,26 @@
   background: currentColor;
 }
 
+/* O resumo numa caixa neutra, abaixo do período (como a referência). */
 .dialogo-publicar__resumo {
   display: grid;
   gap: var(--space-xs);
-  margin: 0 0 var(--space-md);
+  margin: var(--space-sm) 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
 }
 
 .dialogo-publicar__resumo > div {
   display: flex;
   justify-content: space-between;
   gap: var(--space-md);
-  padding-bottom: var(--space-xs);
-  border-bottom: var(--divisor);
+}
+
+.dialogo-publicar__comecou + .dialogo-publicar__aviso,
+.dialogo-publicar__comecou {
+  margin-bottom: var(--space-md);
 }
 
 .dialogo-publicar__resumo dt {
@@ -2398,4 +2406,14 @@
 
 .regras--pagina {
   padding-bottom: 0;
+}
+
+/* Publicar: o período já começou. */
+.dialogo-publicar__comecou {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
 }
