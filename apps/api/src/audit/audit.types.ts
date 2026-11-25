@@ -107,6 +107,7 @@ export const AUDIT_ACTIONS = [
   // T215 — quadro da escala: o dia gravado ou limpo no rascunho.
   "pessoas_escala_dia_gravado",
   "pessoas_escala_dia_limpo",
+  "pessoas_escala_publicada",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",

@@ -207,7 +207,19 @@ Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
   hora na folha) · termina no dia seguinte") e os avisos da CLT ao vivo (art.
   59, 71 e 244, § 2º), que não impedem salvar. "Limpar o dia" só com
   rascunho. Turno de 3 períodos traz os dois primeiros para o RH ajustar.
-- Ainda não: Publicar (o rascunho vira publicado), ações em massa, Avisos,
+- Publicar (25/11/2026): `POST /v1/escala/publicar` {inicio, fim, avisar}
+  troca ou cria o publicado de cada dia do rascunho do período, tira o
+  rascunho e registra `escala_publicacao` (novas, alteradas, pessoas, aviso
+  pedido, quem e quando; só se cria). Sem rascunho no período: 422
+  `escala_nada_para_publicar`. O quadro mostra "Publicada em d/m por …" (a
+  publicação mais recente que toca o período) e o botão vira "Publicar
+  mudanças". O diálogo mostra período, novas, alteradas e pessoas afetadas, e
+  a escolha "Avisar as pessoas pelo Portal e por e-mail" — registrada; o
+  envio depende do Portal e do e-mail, que ainda não existem no Evolli. A
+  frase da referência sobre VR/VA/VT por dia ficou de fora (não há folha de
+  benefícios por dia), assim como "Removidas" (o quadro não remove um dia
+  publicado; muda-o).
+- Ainda não: ações em massa, Avisos,
   Regras, Aplicar modelo, Exportar, menu ⋯ e o aviso da transição da EC
   141/2026 ("Já temos convenção" / "Planejar a transição").
 

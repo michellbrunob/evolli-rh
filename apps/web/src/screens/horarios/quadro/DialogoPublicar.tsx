@@ -1,0 +1,113 @@
+/**
+ * T215 — "Publicar a escala": o período, quantas alocações são novas ou
+ * alteradas, quantas pessoas, e o aviso às pessoas (registrado; o envio pelo
+ * Portal e por e-mail depende dessas integrações). Publica todo o rascunho do
+ * período de uma vez.
+ */
+import { useId, useState } from "react";
+import { ApiError } from "../../../api/colaboradoresClient";
+import { Button, Dialog } from "../../../ui";
+import { plural } from "../../../format/plural";
+
+export interface ResumoDaPublicacao {
+  readonly novas: number;
+  readonly alteradas: number;
+  readonly pessoas: number;
+}
+
+export function DialogoPublicar({
+  periodo,
+  resumo,
+  onPublicar,
+  onFechar,
+}: {
+  /** "Semana de 23 a 29 de novembro de 2026" ou "Novembro de 2026". */
+  readonly periodo: string;
+  readonly resumo: ResumoDaPublicacao;
+  readonly onPublicar: (avisar: boolean) => Promise<void>;
+  readonly onFechar: () => void;
+}) {
+  const id = useId();
+  const [avisar, setAvisar] = useState(true);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const publicar = async () => {
+    setEnviando(true);
+    setErro(null);
+    try {
+      await onPublicar(avisar);
+    } catch (e) {
+      setErro(
+        e instanceof ApiError && e.codigo === "escala_nada_para_publicar"
+          ? "Nada para publicar neste período."
+          : "Não foi possível publicar. Tente de novo.",
+      );
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Dialog
+      aberto
+      titulo="Publicar a escala"
+      descricao="As pessoas passam a ver a escala publicada; o rascunho do período deixa de existir."
+      onFechar={onFechar}
+      bloqueado={enviando}
+      className="dialogo-publicar"
+      rodape={
+        <>
+          <Button variant="secondary" onClick={onFechar} disabled={enviando}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={publicar} disabled={enviando}>
+            Publicar
+          </Button>
+        </>
+      }
+    >
+      <dl className="dialogo-publicar__resumo">
+        <div>
+          <dt>Período</dt>
+          <dd>{periodo}</dd>
+        </div>
+        <div>
+          <dt>Alocações novas</dt>
+          <dd>{resumo.novas}</dd>
+        </div>
+        <div>
+          <dt>Alteradas</dt>
+          <dd>{resumo.alteradas}</dd>
+        </div>
+        <div>
+          <dt>Pessoas afetadas</dt>
+          <dd>{resumo.pessoas}</dd>
+        </div>
+      </dl>
+      <div className="dialogo-publicar__aviso">
+        <input
+          id={`${id}-avisar`}
+          type="checkbox"
+          checked={avisar}
+          onChange={(e) => setAvisar(e.target.checked)}
+          aria-describedby={`${id}-avisar-ajuda`}
+        />
+        <label htmlFor={`${id}-avisar`}>
+          Avisar as pessoas pelo Portal e por e-mail
+        </label>
+        <p id={`${id}-avisar-ajuda`} className="dialogo-publicar__ajuda">
+          {`Só quem teve a escala mudada recebe (${plural(
+            resumo.pessoas,
+            "pessoa",
+            "pessoas",
+          )}). Quem não tem Portal não recebe nada. A escolha fica registrada; o envio começa quando o Portal e o e-mail estiverem ligados ao Evolli.`}
+        </p>
+      </div>
+      {erro ? (
+        <p role="alert" className="painel-dia__erro">
+          {erro}
+        </p>
+      ) : null}
+    </Dialog>
+  );
+}

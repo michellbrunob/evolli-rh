@@ -211,10 +211,35 @@ export function limparDia(
   return enviar("POST", `${BASE}/escala/dias/limpar`, { colaboradorId, dia });
 }
 
+/** T215 — uma publicação do quadro ("Publicada em 25/11 por Ana"). */
+export interface PublicacaoDaEscalaApi {
+  id: string;
+  inicio: string;
+  fim: string;
+  novas: number;
+  alteradas: number;
+  pessoas: number;
+  avisar: boolean;
+  /** Instante ISO. */
+  publicadaEm: string;
+  publicadaPor: string | null;
+}
+
+/** Publica todo o rascunho do período; devolve a publicação. */
+export function publicarEscala(
+  inicio: string,
+  fim: string,
+  avisar: boolean,
+): Promise<PublicacaoDaEscalaApi> {
+  return enviar("POST", `${BASE}/escala/publicar`, { inicio, fim, avisar });
+}
+
 export interface QuadroDaEscalaApi {
   empresaId: string;
   inicio: string;
   fim: string;
+  /** A publicação mais recente que toca o período, ou `null`. */
+  publicacao?: PublicacaoDaEscalaApi | null;
   pessoas: PessoaDoQuadroApi[];
 }
 

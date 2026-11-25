@@ -600,4 +600,145 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       ["publicado", "folga"],
     ]);
   });
+
+  describe("publicar", () => {
+    const publicar = (corpo: Record<string, unknown>, cred: Credencial = rhA) =>
+      post("/v1/escala/publicar", cred).send(corpo);
+    const DIA_SEGUINTE = `${ANO - 1}-03-04`;
+    const FORA = `${ANO - 1}-03-10`;
+
+    it("sem mudança no rascunho do período: 422 escala_nada_para_publicar", async () => {
+      const r = await publicar({
+        inicio: SEMANA_INICIO,
+        fim: SEMANA_FIM,
+        avisar: false,
+      }).expect(422);
+      expect(r.body.codigo).toBe("escala_nada_para_publicar");
+    });
+
+    it("o rascunho do período vira publicado (novas e alteradas), sai do rascunho e a publicação aparece no quadro", async () => {
+      // Já há um publicado (folga) no DIA, do teste do banco.
+      await put({ colaboradorId: pessoaA, dia: DIA, tipo: "dsr" }).expect(200);
+      await put({
+        colaboradorId: pessoaA,
+        dia: DIA_SEGUINTE,
+        tipo: "trabalho",
+        tabelaHorarioId: turnoA,
+        periodos: [{ inicio: "09:00", fim: "18:00" }],
+        intervaloMinutos: 60,
+        observacao: "Abertura",
+      }).expect(200);
+      // Fora do período: fica no rascunho.
+      await put({ colaboradorId: pessoaA, dia: FORA, tipo: "folga" }).expect(
+        200,
+      );
+
+      const r = await publicar({
+        inicio: SEMANA_INICIO,
+        fim: SEMANA_FIM,
+        avisar: true,
+      }).expect(200);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toMatchObject({
+        inicio: SEMANA_INICIO,
+        fim: SEMANA_FIM,
+        novas: 1,
+        alteradas: 1,
+        pessoas: 1,
+        avisar: true,
+        publicadaEm: expect.any(String),
+      });
+      expect(r.body).toHaveProperty("publicadaPor");
+
+      const dias = await diasNoQuadro(pessoaA);
+      expect(dias.map((d) => [d.dia, d.camada, d.tipo])).toEqual([
+        [DIA, "publicado", "dsr"],
+        [DIA_SEGUINTE, "publicado", "trabalho"],
+      ]);
+      expect(dias[1]).toMatchObject({
+        turno: { id: turnoA },
+        periodos: [{ inicio: "09:00", fim: "18:00" }],
+        intervaloMinutos: 60,
+        observacao: "Abertura",
+      });
+      const q = (await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200)).body as {
+        publicacao: { id: string; novas: number } | null;
+      };
+      expect(q.publicacao).toMatchObject({ id: r.body.id, novas: 1 });
+      // O de fora continua no rascunho.
+      expect(
+        await prisma.escalaDia.count({
+          where: { colaboradorId: pessoaA, camada: "rascunho" },
+        }),
+      ).toBe(1);
+
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: r.body.id },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_escala_publicada",
+      ]);
+      expect(JSON.stringify(eventos)).not.toContain("Abertura");
+
+      // Publicar de novo, sem mudança: nada a publicar.
+      await publicar({
+        inicio: SEMANA_INICIO,
+        fim: SEMANA_FIM,
+        avisar: false,
+      }).expect(422);
+    });
+
+    it("permissões e escopo: DP publica; outra empresa não toca o rascunho; master e demais negados", async () => {
+      await put({ colaboradorId: pessoaA, dia: DIA, tipo: "folga" }).expect(
+        200,
+      );
+      const corpo = { inicio: SEMANA_INICIO, fim: SEMANA_FIM, avisar: false };
+      expect((await publicar(corpo, rhB).expect(422)).body.codigo).toBe(
+        "escala_nada_para_publicar",
+      );
+      await publicar(corpo, master).expect(403);
+      for (const cred of outros) await publicar(corpo, cred).expect(403);
+      await agent()
+        .post("/v1/escala/publicar")
+        .set("Cookie", rhA.cookie)
+        .send(corpo)
+        .expect(403);
+      const r = await publicar(corpo, dpA).expect(200);
+      expect(r.body).toMatchObject({ novas: 0, alteradas: 1, pessoas: 1 });
+    });
+
+    it("período inválido e corpo malformado", async () => {
+      await publicar({
+        inicio: SEMANA_FIM,
+        fim: SEMANA_INICIO,
+        avisar: false,
+      }).expect(422);
+      await publicar({
+        inicio: `${ANO - 1}-01-01`,
+        fim: `${ANO - 1}-03-01`,
+        avisar: false,
+      }).expect(422);
+      await publicar({ inicio: SEMANA_INICIO, fim: SEMANA_FIM }).expect(400);
+      await publicar({
+        inicio: SEMANA_INICIO,
+        fim: SEMANA_FIM,
+        avisar: "sim",
+      }).expect(400);
+    });
+
+    it("o banco: a publicação só se cria", async () => {
+      const pub = await prisma.escalaPublicacao.findFirstOrThrow({
+        where: { empresaId: empresaA },
+      });
+      await expect(
+        prisma.escalaPublicacao.update({
+          where: { id: pub.id },
+          data: { novas: 99 },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        prisma.escalaPublicacao.delete({ where: { id: pub.id } }),
+      ).rejects.toThrow();
+    });
+  });
 });

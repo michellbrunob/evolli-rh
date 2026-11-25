@@ -133,6 +133,8 @@ model AccessUser {
   /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
   diasDeEscalaCriados       EscalaDia[]         @relation("EscalaDiaCriadoPor")
   diasDeEscalaAtualizados   EscalaDia[]         @relation("EscalaDiaAtualizadoPor")
+  /// T215 — publicações do quadro da escala feitas por esta conta.
+  publicacoesDeEscala       EscalaPublicacao[]  @relation("EscalaPublicacaoPor")
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -538,6 +540,8 @@ enum AuditAction {
   // dia e a empresa (nunca turno, horário ou observação).
   pessoas_escala_dia_gravado @map("pessoas.escala.dia_gravado")
   pessoas_escala_dia_limpo   @map("pessoas.escala.dia_limpo")
+  // T215 — o rascunho do período publicado (id da publicação e a empresa).
+  pessoas_escala_publicada   @map("pessoas.escala.publicada")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -838,6 +842,7 @@ model Empresa {
   /// T215 — padrões de escala (aba Escala da ficha).
   escalasColaborador EscalaColaborador[]
   diasDeEscala       EscalaDia[]
+  publicacoesDeEscala EscalaPublicacao[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -3160,4 +3165,27 @@ model EscalaDia {
   @@unique([colaboradorId, empresaId, dia, camada])
   @@index([empresaId, dia])
   @@map("escala_dia")
+}
+
+/// T215 — uma publicação do quadro da escala: o rascunho do período
+/// [inicio, fim] virou publicado. Guarda as contagens (novas, alteradas,
+/// pessoas) e se o RH pediu o aviso às pessoas (o envio depende do Portal e
+/// do e-mail). Só se cria; nunca muda nem se apaga.
+model EscalaPublicacao {
+  id                 String   @id @default(uuid())
+  empresaId          String   @map("empresa_id")
+  inicio             DateTime @db.Date
+  fim                DateTime @db.Date
+  novas              Int
+  alteradas          Int
+  pessoas            Int
+  avisar             Boolean
+  publicadoPorUserId String   @map("publicado_por_user_id")
+  publicadoEm        DateTime @default(now()) @map("publicado_em")
+
+  empresa      Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  publicadoPor AccessUser @relation("EscalaPublicacaoPor", fields: [publicadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, inicio, fim])
+  @@map("escala_publicacao")
 }

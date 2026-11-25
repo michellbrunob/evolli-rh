@@ -153,7 +153,9 @@ export type CodigoDeRecusa =
   | "anexo_formato_invalido"
   | "anexo_arquivo_malformado"
   | "anexo_com_macro"
-  | "anexo_reprovado_antivirus";
+  | "anexo_reprovado_antivirus"
+  // T215 — Publicar a escala sem mudança no rascunho do período.
+  | "escala_nada_para_publicar";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência

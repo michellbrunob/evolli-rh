@@ -16,6 +16,11 @@ import {
   PROJECAO_DO_DIA,
   projetarDia,
 } from "./escala-dia.service";
+import {
+  type PublicacaoDaEscala,
+  PROJECAO_DA_PUBLICACAO,
+  projetarPublicacao,
+} from "./escala-publicacao.service";
 
 /** Até seis semanas: o mês inteiro com as semanas das pontas. */
 export const DIAS_NO_QUADRO = 42;
@@ -60,6 +65,8 @@ export interface QuadroDaEscala {
   empresaId: string;
   inicio: string;
   fim: string;
+  /** A publicação mais recente que toca o período, ou `null`. */
+  publicacao: PublicacaoDaEscala | null;
   pessoas: PessoaDoQuadro[];
 }
 
@@ -239,6 +246,18 @@ export class QuadroEscalaService {
         a.colaboradorId.localeCompare(b.colaboradorId),
     );
 
-    return { empresaId, inicio: dto.inicio, fim: dto.fim, pessoas };
+    const publicacao = await this.prisma.escalaPublicacao.findFirst({
+      where: { empresaId, inicio: { lte: fim }, fim: { gte: inicio } },
+      orderBy: [{ publicadoEm: "desc" }],
+      select: PROJECAO_DA_PUBLICACAO,
+    });
+
+    return {
+      empresaId,
+      inicio: dto.inicio,
+      fim: dto.fim,
+      publicacao: publicacao ? projetarPublicacao(publicacao) : null,
+      pessoas,
+    };
   }
 }

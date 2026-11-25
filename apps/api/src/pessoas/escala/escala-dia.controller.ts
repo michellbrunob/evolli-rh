@@ -19,22 +19,30 @@ import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import { DiaDoQuadroDto, GravarDiaDto } from "./escala-dia.dto";
 import { EscalaDiaService } from "./escala-dia.service";
+import {
+  EscalaPublicacaoService,
+  PublicarEscalaDto,
+} from "./escala-publicacao.service";
 
 /**
  * T215 — o dia do quadro "Escala de trabalho", no rascunho:
  *
  * - `PUT /escala/dias`: grava o dia (menu da célula e painel do dia);
- * - `POST /escala/dias/limpar`: desfaz a mudança do dia (volta ao padrão).
+ * - `POST /escala/dias/limpar`: desfaz a mudança do dia (volta ao padrão);
+ * - `POST /escala/publicar`: o rascunho do período vira publicado.
  *
  * `rh` e `dp` na empresa ativa; `no-store`.
  */
 @ApiTags("pessoas")
-@Controller("escala/dias")
+@Controller("escala")
 @UseGuards(SessionGuard)
 export class EscalaDiaController {
-  constructor(private readonly service: EscalaDiaService) {}
+  constructor(
+    private readonly service: EscalaDiaService,
+    private readonly publicacao: EscalaPublicacaoService,
+  ) {}
 
-  @Put()
+  @Put("dias")
   @UseGuards(CsrfGuard, AuthorizationGuard)
   @RequirePermission("escala_colaborador", "alter")
   @Header("Cache-Control", "no-store")
@@ -50,7 +58,7 @@ export class EscalaDiaController {
     });
   }
 
-  @Post("limpar")
+  @Post("dias/limpar")
   @HttpCode(200)
   @UseGuards(CsrfGuard, AuthorizationGuard)
   @RequirePermission("escala_colaborador", "alter")
@@ -62,6 +70,23 @@ export class EscalaDiaController {
     @Req() req: Request,
   ) {
     return this.service.limpar(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Post("publicar")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("escala_colaborador", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Publica o rascunho do período" })
+  async publicar(
+    @Body() dto: PublicarEscalaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.publicacao.publicar(dto, {
       actor,
       metadata: extractRequestMetadata(req),
     });

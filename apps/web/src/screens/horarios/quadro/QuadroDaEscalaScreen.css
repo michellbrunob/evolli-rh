@@ -185,6 +185,8 @@
 
 /* Tabela. */
 .quadro__rolagem {
+  /* Contém os textos de leitor de tela (posição absoluta) das células. */
+  position: relative;
   overflow-x: auto;
   border: var(--divisor);
   border-radius: var(--radius-md);
@@ -1104,4 +1106,95 @@
   margin: 0;
   color: var(--status-danger-ink);
   font-weight: 600;
+}
+
+/* Fase 4 — Publicar: ações do cabeçalho, selo "Publicada" e diálogo. */
+.quadro__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+.quadro__acoes [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.quadro__selo-publicada {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin-left: var(--space-sm);
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.quadro__selo-publicada::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dialogo-publicar__resumo {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+}
+
+.dialogo-publicar__resumo > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: var(--divisor);
+}
+
+.dialogo-publicar__resumo dt {
+  color: var(--color-ink-muted);
+}
+
+.dialogo-publicar__resumo dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: right;
+}
+
+.dialogo-publicar__aviso {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-xxs) var(--space-sm);
+}
+
+.dialogo-publicar__aviso input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--color-action);
+}
+
+.dialogo-publicar__aviso input:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.dialogo-publicar__aviso label {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.dialogo-publicar__ajuda {
+  grid-column: 2;
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
 }

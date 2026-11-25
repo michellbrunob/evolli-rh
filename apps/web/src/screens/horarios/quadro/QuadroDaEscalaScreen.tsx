@@ -18,6 +18,7 @@ import {
   consultarQuadro,
   gravarDia,
   limparDia,
+  publicarEscala,
   type DiaGravadoApi,
   type GravarDiaDto,
   type PessoaDoQuadroApi,
@@ -60,6 +61,7 @@ import {
   sobreavisoDepoisDoTurno,
 } from "./MenuDaCelula";
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
+import { DialogoPublicar } from "./DialogoPublicar";
 import {
   type FiltrosDoQuadro,
   type RotulosDosCodigos,
@@ -343,6 +345,7 @@ export function QuadroDaEscalaScreen({
   const [aviso, setAviso] = useState<ConteudoDoAviso | null>(null);
   const [falha, setFalha] = useState<string | null>(null);
   const [ativa, setAtiva] = useState<string | null>(null);
+  const [publicando, setPublicando] = useState(false);
   const tabelaRef = useRef<HTMLTableElement | null>(null);
   const focoAplicado = useRef(false);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
@@ -708,6 +711,26 @@ export function QuadroDaEscalaScreen({
     (t, p) => t + (p.dias ?? []).filter((d) => d.camada === "rascunho").length,
     0,
   );
+  // O que publicar leva: dias do rascunho, novos ou sobre um publicado.
+  const resumoDaPublicacao = (() => {
+    let novas = 0;
+    let alteradas = 0;
+    const comMudanca = new Set<string>();
+    for (const p of todas) {
+      for (const d of p.dias ?? []) {
+        if (d.camada !== "rascunho") continue;
+        comMudanca.add(p.colaboradorId);
+        const publicado = (p.dias ?? []).some(
+          (x) => x.dia === d.dia && x.camada === "publicado",
+        );
+        if (publicado) alteradas += 1;
+        else novas += 1;
+      }
+    }
+    return { novas, alteradas, pessoas: comMudanca.size };
+  })();
+  const publicacao =
+    carga.estado === "pronto" ? (carga.dados.publicacao ?? null) : null;
   const primeiraCelula = daPagina[0]
     ? `${daPagina[0].colaboradorId}|${dias[0]}`
     : null;
@@ -918,6 +941,15 @@ export function QuadroDaEscalaScreen({
             </h1>
             <p className="quadro__subtitulo">
               {titulo}
+              {publicacao ? (
+                <span className="quadro__selo-publicada">
+                  {`Publicada em ${diaMesCurto(diaCivilDeHoje(new Date(publicacao.publicadaEm)))}${
+                    publicacao.publicadaPor
+                      ? ` por ${publicacao.publicadaPor}`
+                      : ""
+                  }`}
+                </span>
+              ) : null}
               {mudancas > 0 ? (
                 <span className="quadro__selo-rascunho">
                   {`Rascunho · ${plural(mudancas, "mudança não publicada", "mudanças não publicadas")}`}
@@ -925,6 +957,28 @@ export function QuadroDaEscalaScreen({
               ) : null}
             </p>
           </div>
+          {podeOperar && carga.estado === "pronto" ? (
+            <div className="quadro__acoes">
+              <Button
+                type="button"
+                variant="primary"
+                aria-disabled={mudancas === 0}
+                aria-describedby={
+                  mudancas === 0 ? "quadro-nada-para-publicar" : undefined
+                }
+                onClick={() => {
+                  if (mudancas > 0) setPublicando(true);
+                }}
+              >
+                {publicacao && mudancas > 0 ? "Publicar mudanças" : "Publicar"}
+              </Button>
+              {mudancas === 0 ? (
+                <span id="quadro-nada-para-publicar" className="sr-only">
+                  Nada para publicar neste período.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <div className="quadro__barra">
@@ -1332,6 +1386,25 @@ export function QuadroDaEscalaScreen({
             />
           );
         })()}
+        {publicando ? (
+          <DialogoPublicar
+            periodo={visao === "semana" ? `Semana de ${titulo}` : titulo}
+            resumo={resumoDaPublicacao}
+            onFechar={() => setPublicando(false)}
+            onPublicar={async (avisar) => {
+              const r = await publicarEscala(inicio, fim, avisar);
+              setPublicando(false);
+              setTentativa((n) => n + 1);
+              setAviso({
+                id: Date.now(),
+                titulo: "Escala publicada",
+                texto: `${plural(r.pessoas, "pessoa", "pessoas")} com mudança · ${
+                  r.avisar ? "aviso registrado" : "sem aviso"
+                }`,
+              });
+            }}
+          />
+        ) : null}
         <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
         <GavetaDoQuadro
           aberta={gaveta}

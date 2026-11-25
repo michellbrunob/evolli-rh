@@ -12,6 +12,7 @@ import {
   consultarQuadro,
   gravarDia,
   limparDia,
+  publicarEscala,
   type DiaGravadoApi,
   type GravarDiaDto,
   type PessoaDoQuadroApi,
@@ -100,6 +101,7 @@ beforeEach(() => {
   vi.mocked(consultarQuadro).mockReset();
   vi.mocked(gravarDia).mockReset();
   vi.mocked(limparDia).mockReset();
+  vi.mocked(publicarEscala).mockReset();
   pessoas = [ana()];
   vi.mocked(consultarQuadro).mockImplementation(async (inicio, fim) => ({
     empresaId: "emp",
@@ -638,5 +640,163 @@ describe("T215 — avisos do dia (CLT)", () => {
         sobreaviso: [],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("T215 — publicar a escala", () => {
+  it("sem rascunho no período, Publicar fica indisponível; sem permissão, não aparece", async () => {
+    await montar();
+    const botao = screen.getByRole("button", { name: /^Publicar/ });
+    expect(botao).toHaveAttribute("aria-disabled", "true");
+    expect(botao).toHaveAccessibleDescription(
+      "Nada para publicar neste período.",
+    );
+    fireEvent.click(botao);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("sem permissão de operar, não há Publicar", async () => {
+    await montar(false);
+    expect(screen.queryByRole("button", { name: /^Publicar/ })).toBeNull();
+  });
+
+  it("resume novas, alteradas e pessoas; publica com o aviso pedido e recarrega o quadro", async () => {
+    pessoas = [
+      ana([
+        gravado("2026-11-23", { camada: "publicado", tipo: "dsr" }),
+        gravado("2026-11-23"),
+        gravado("2026-11-24", { tipo: "dsr" }),
+      ]),
+    ];
+    vi.mocked(publicarEscala).mockResolvedValue({
+      id: "pub",
+      inicio: "2026-11-23",
+      fim: "2026-11-29",
+      novas: 1,
+      alteradas: 1,
+      pessoas: 1,
+      avisar: true,
+      publicadaEm: "2026-11-25T15:00:00.000Z",
+      publicadaPor: "Ana RH",
+    });
+    await montar();
+    expect(
+      screen.getByText("Rascunho · 2 mudanças não publicadas"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
+    const dialogo = screen.getByRole("dialog", { name: "Publicar a escala" });
+    const linhas = [...dialogo.querySelectorAll("dl > div")].map(
+      (d) => d.textContent,
+    );
+    expect(linhas).toEqual([
+      "PeríodoSemana de 23 a 29 de novembro de 2026",
+      "Alocações novas1",
+      "Alteradas1",
+      "Pessoas afetadas1",
+    ]);
+    const avisar = within(dialogo).getByRole("checkbox", {
+      name: "Avisar as pessoas pelo Portal e por e-mail",
+    });
+    expect(avisar).toBeChecked();
+    expect(avisar).toHaveAccessibleDescription(
+      /Só quem teve a escala mudada recebe \(1 pessoa\)/,
+    );
+
+    const chamadas = vi.mocked(consultarQuadro).mock.calls.length;
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
+    await screen.findByRole("status", { name: "Escala publicada" });
+    expect(publicarEscala).toHaveBeenCalledWith(
+      "2026-11-23",
+      "2026-11-29",
+      true,
+    );
+    expect(
+      screen.getByRole("status", { name: "Escala publicada" }),
+    ).toHaveTextContent("1 pessoa com mudança · aviso registrado");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() =>
+      expect(vi.mocked(consultarQuadro).mock.calls.length).toBe(chamadas + 1),
+    );
+  });
+
+  it("sem o aviso: publica com avisar=false", async () => {
+    pessoas = [ana([gravado("2026-11-24")])];
+    vi.mocked(publicarEscala).mockResolvedValue({
+      id: "p",
+      inicio: "2026-11-23",
+      fim: "2026-11-29",
+      novas: 1,
+      alteradas: 0,
+      pessoas: 1,
+      avisar: false,
+      publicadaEm: "2026-11-25T15:00:00.000Z",
+      publicadaPor: null,
+    });
+    await montar();
+    fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
+    const dialogo = screen.getByRole("dialog", { name: "Publicar a escala" });
+    fireEvent.click(within(dialogo).getByRole("checkbox"));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
+    await waitFor(() =>
+      expect(publicarEscala).toHaveBeenCalledWith(
+        "2026-11-23",
+        "2026-11-29",
+        false,
+      ),
+    );
+    expect(
+      await screen.findByRole("status", { name: "Escala publicada" }),
+    ).toHaveTextContent("sem aviso");
+  });
+
+  it("já publicada: selo 'Publicada em … por …' e o botão vira Publicar mudanças", async () => {
+    pessoas = [ana([gravado("2026-11-24")])];
+    vi.mocked(consultarQuadro).mockImplementation(async (inicio, fim) => ({
+      empresaId: "emp",
+      inicio,
+      fim,
+      publicacao: {
+        id: "p0",
+        inicio,
+        fim,
+        novas: 3,
+        alteradas: 0,
+        pessoas: 1,
+        avisar: false,
+        // 23h de 24/11 em São Paulo (02h de 25/11 em UTC).
+        publicadaEm: "2026-11-25T02:00:00.000Z",
+        publicadaPor: "Ana RH",
+      },
+      pessoas,
+    }));
+    await montar();
+    expect(
+      screen.getByText("Publicada em 24/11 por Ana RH"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Publicar mudanças" }),
+    ).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("falha: nada para publicar e erro genérico ficam no diálogo", async () => {
+    pessoas = [ana([gravado("2026-11-24")])];
+    vi.mocked(publicarEscala)
+      .mockRejectedValueOnce(
+        new ApiError(422, "x", { codigo: "escala_nada_para_publicar" }),
+      )
+      .mockRejectedValueOnce(new Error("rede"));
+    await montar();
+    fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
+    const dialogo = screen.getByRole("dialog", { name: "Publicar a escala" });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
+    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
+      "Nada para publicar neste período.",
+    );
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
+    await waitFor(() =>
+      expect(within(dialogo).getByRole("alert")).toHaveTextContent(
+        "Não foi possível publicar. Tente de novo.",
+      ),
+    );
   });
 });
