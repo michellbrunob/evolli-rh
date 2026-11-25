@@ -408,8 +408,27 @@ export function criarFeriadoLocal(dto: {
   return enviar("POST", ROTA_DOS_FERIADOS, dto);
 }
 
-export function removerFeriadoLocal(id: string): Promise<RegrasDaEscalaApi> {
-  return enviar("DELETE", `${ROTA_DOS_FERIADOS}/${encodeURIComponent(id)}`);
+export type FeriadoLocalDto = {
+  data: string;
+  nome: string;
+  tipo: FeriadoLocalApi["tipo"];
+  unidadeIds: string[];
+};
+
+/** Editar o feriado local (o mesmo corpo do cadastro). */
+export function alterarFeriadoLocal(
+  id: string,
+  dto: FeriadoLocalDto,
+): Promise<RegrasDaEscalaApi> {
+  return enviar("PATCH", `${ROTA_DOS_FERIADOS}/${encodeURIComponent(id)}`, dto);
+}
+
+/** Arquivar: sai do quadro e dos avisos; o registro fica. */
+export function arquivarFeriadoLocal(id: string): Promise<RegrasDaEscalaApi> {
+  return enviar(
+    "POST",
+    `${ROTA_DOS_FERIADOS}/${encodeURIComponent(id)}/arquivar`,
+  );
 }
 
 /**

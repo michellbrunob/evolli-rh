@@ -1012,7 +1012,7 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       );
     });
 
-    it("feriados locais: cria em todas ou em algumas unidades, recusa unidade de outra empresa, remove", async () => {
+    it("feriados locais: cria em todas ou em algumas unidades, recusa unidade de outra empresa, edita e arquiva", async () => {
       const unidadeA = (await lotacaoMinima(appUrl, empresaA))
         .unidadeOrganizacionalId;
       const unidadeB = (await lotacaoMinima(appUrl, empresaB))
@@ -1092,28 +1092,99 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       ]);
 
       const id = r.body.feriados[0].id as string;
-      // Outra empresa não remove: 404.
+      const editar = (corpo: Record<string, unknown>, cred: Credencial = rhA) =>
+        agent()
+          .patch(`/v1/escala/feriados/${id}`)
+          .set("Cookie", cred.cookie)
+          .set("x-csrf-token", cred.csrfToken)
+          .send(corpo);
+      const arquivar = (cred: Credencial = rhA) =>
+        post(`/v1/escala/feriados/${id}/arquivar`, cred).send();
+
+      // Editar: data, nome, tipo e unidades; recusa unidade de fora.
+      const ed = await editar({
+        data: `${ANO - 1}-03-03`,
+        nome: " Aniversario editado ",
+        tipo: "ponto_facultativo",
+        unidadeIds: [unidadeA],
+      }).expect(200);
+      expect(
+        (ed.body.feriados as { id: string }[]).find((f) => f.id === id),
+      ).toEqual({
+        id,
+        data: `${ANO - 1}-03-03`,
+        nome: "Aniversario editado",
+        tipo: "ponto_facultativo",
+        unidadeIds: [unidadeA],
+      });
+      expect(
+        (
+          await editar({
+            data: `${ANO - 1}-03-03`,
+            nome: "X",
+            tipo: "municipal",
+            unidadeIds: [unidadeB],
+          }).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "unidadeOrganizacionalId", motivo: "indisponivel" }]);
+      await editar({
+        data: "03/03",
+        nome: "X",
+        tipo: "municipal",
+        unidadeIds: [],
+      }).expect(400);
+      // Outra empresa não edita nem arquiva: 404.
+      await editar(
+        {
+          data: `${ANO - 1}-03-03`,
+          nome: "X",
+          tipo: "municipal",
+          unidadeIds: [],
+        },
+        rhB,
+      ).expect(404);
+      await arquivar(rhB).expect(404);
+
+      // Arquivar: sai das regras e do quadro; o registro fica.
+      const arq = await arquivar().expect(200);
+      expect(arq.body.feriados.map((f: { nome: string }) => f.nome)).toEqual([
+        "Ponto sintetico",
+      ]);
+      const q2 = (await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200)).body as {
+        regras: { feriados: { nome: string }[] };
+      };
+      expect(q2.regras.feriados.map((f) => f.nome)).toEqual([
+        "Ponto sintetico",
+      ]);
+      const linha = await prisma.escalaFeriadoLocal.findUniqueOrThrow({
+        where: { id },
+      });
+      expect(linha.arquivadoEm).not.toBeNull();
+      expect(linha.nome).toBe("Aniversario editado");
+      // Já arquivado: não arquiva nem edita de novo.
+      await arquivar().expect(404);
+      await editar({
+        data: `${ANO - 1}-03-03`,
+        nome: "X",
+        tipo: "municipal",
+        unidadeIds: [],
+      }).expect(404);
+      // Não há mais rota de apagar.
       await agent()
-        .delete(`/v1/escala/feriados/${id}`)
-        .set("Cookie", rhB.cookie)
-        .set("x-csrf-token", rhB.csrfToken)
-        .expect(404);
-      const rem = await agent()
         .delete(`/v1/escala/feriados/${id}`)
         .set("Cookie", rhA.cookie)
         .set("x-csrf-token", rhA.csrfToken)
-        .expect(200);
-      expect(rem.body.feriados.map((f: { nome: string }) => f.nome)).toEqual([
-        "Ponto sintetico",
-      ]);
+        .expect(404);
       const trilha = await prisma.auditEvent.findMany({
         where: { resourceId: id },
         orderBy: { occurredAt: "asc" },
       });
       expect(trilha.map((e) => e.action)).toEqual([
         "pessoas_escala_feriado_criado",
-        "pessoas_escala_feriado_removido",
+        "pessoas_escala_feriado_alterado",
+        "pessoas_escala_feriado_arquivado",
       ]);
+      expect(JSON.stringify(trilha)).not.toContain("Aniversario");
     });
 
     it("permissões: DP salva; master lê só com empresa ativa (sem ela, 403); demais negados", async () => {
@@ -1167,6 +1238,7 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
             comAviso: false,
             semEscala: true,
             mudancas: false,
+            ausentes: false,
             unidades: [],
             departamentos: ["d1", "d2"],
             tipos: [],

@@ -203,7 +203,7 @@ export class EscalaRegrasService {
     const [linha, feriados] = await Promise.all([
       tx.escalaRegras.findUnique({ where: { empresaId } }),
       tx.escalaFeriadoLocal.findMany({
-        where: { empresaId },
+        where: { empresaId, arquivadoEm: null },
         orderBy: [{ data: "asc" }, { nome: "asc" }],
       }),
     ]);
@@ -270,12 +270,12 @@ export class EscalaRegrasService {
     });
   }
 
-  async criarFeriado(
-    dto: CriarFeriadoDto,
-    ctx: PessoasAuditContext,
-  ): Promise<RegrasDaEscala> {
-    const empresaId = this.empresa(ctx);
-    const unidadeIds = [...new Set(dto.unidadeIds)];
+  /** As unidades do feriado: sem repetição, ativas e da empresa. */
+  private async unidadesDoFeriado(
+    empresaId: string,
+    ids: readonly string[],
+  ): Promise<string[]> {
+    const unidadeIds = [...new Set(ids)];
     if (unidadeIds.length > 0) {
       const ativas = await this.prisma.unidadeOrganizacional.count({
         where: { id: { in: unidadeIds }, empresaId, status: "ativo" },
@@ -286,6 +286,15 @@ export class EscalaRegrasService {
         ]);
       }
     }
+    return unidadeIds;
+  }
+
+  async criarFeriado(
+    dto: CriarFeriadoDto,
+    ctx: PessoasAuditContext,
+  ): Promise<RegrasDaEscala> {
+    const empresaId = this.empresa(ctx);
+    const unidadeIds = await this.unidadesDoFeriado(empresaId, dto.unidadeIds);
     return this.prisma.$transaction(async (tx) => {
       const f = await tx.escalaFeriadoLocal.create({
         data: {
@@ -309,22 +318,61 @@ export class EscalaRegrasService {
     });
   }
 
-  async removerFeriado(
+  /** Editar: data, nome, tipo e unidades (o mesmo corpo do cadastro). */
+  async alterarFeriado(
+    feriadoId: string,
+    dto: CriarFeriadoDto,
+    ctx: PessoasAuditContext,
+  ): Promise<RegrasDaEscala> {
+    const empresaId = this.empresa(ctx);
+    const unidadeIds = await this.unidadesDoFeriado(empresaId, dto.unidadeIds);
+    return this.prisma.$transaction(async (tx) => {
+      const f = await tx.escalaFeriadoLocal.findFirst({
+        where: { id: feriadoId, empresaId, arquivadoEm: null },
+        select: { id: true },
+      });
+      if (f === null) throw new NotFoundException();
+      await tx.escalaFeriadoLocal.update({
+        where: { id: f.id },
+        data: {
+          data: new Date(`${dto.data}T00:00:00.000Z`),
+          nome: dto.nome,
+          tipo: dto.tipo,
+          unidadeIds,
+        },
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_escala_feriado_alterado",
+        "escala_colaborador",
+        f.id,
+        empresaId,
+      );
+      return this.montar(tx, empresaId);
+    });
+  }
+
+  /** Arquivar: sai do quadro e dos avisos; o registro fica. */
+  async arquivarFeriado(
     feriadoId: string,
     ctx: PessoasAuditContext,
   ): Promise<RegrasDaEscala> {
     const empresaId = this.empresa(ctx);
     return this.prisma.$transaction(async (tx) => {
       const f = await tx.escalaFeriadoLocal.findFirst({
-        where: { id: feriadoId, empresaId },
+        where: { id: feriadoId, empresaId, arquivadoEm: null },
         select: { id: true },
       });
       if (f === null) throw new NotFoundException();
-      await tx.escalaFeriadoLocal.delete({ where: { id: f.id } });
+      await tx.escalaFeriadoLocal.update({
+        where: { id: f.id },
+        data: { arquivadoEm: new Date() },
+      });
       await this.auditoria.registrarMutacao(
         tx,
         ctx,
-        "pessoas_escala_feriado_removido",
+        "pessoas_escala_feriado_arquivado",
         "escala_colaborador",
         f.id,
         empresaId,

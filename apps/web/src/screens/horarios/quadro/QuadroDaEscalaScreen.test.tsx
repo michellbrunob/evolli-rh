@@ -9,6 +9,7 @@ import {
   criarVisao,
 } from "../../../api/escalaClient";
 import { FILTROS_DO_QUADRO_VAZIOS } from "./filtrosDoQuadro";
+import { esquecerSecaoDasRegras, lerSecaoDasRegras } from "./secaoDasRegras";
 import { QuadroDaEscalaScreen } from "./QuadroDaEscalaScreen";
 import { escala, pessoa, turno } from "./fixturasDoQuadro";
 
@@ -610,6 +611,20 @@ describe("T215 — quadro da escala: semana", () => {
     expect(linha.querySelector(".quadro__mes-dias")).toHaveTextContent(
       "Falta justificada até 26/11",
     );
+  });
+
+  it("Avisos › Regras dos avisos abre as Regras já na seção Avisos", async () => {
+    esquecerSecaoDasRegras();
+    const onAbrirRegras = vi.fn();
+    montar({ onAbrirRegras });
+    await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: /^Avisos/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Regras dos avisos" }),
+    );
+    expect(onAbrirRegras).toHaveBeenCalledTimes(1);
+    expect(lerSecaoDasRegras()).toBe("avisos");
+    esquecerSecaoDasRegras();
   });
 
   it("legenda com os turnos da página; ações de voltar e Turnos", async () => {

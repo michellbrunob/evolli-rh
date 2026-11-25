@@ -82,6 +82,7 @@ import { Esqueleto, Revelar } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import { OPCOES_GENERO, OPCOES_NIVEL } from "../../pessoas/NovaAdmissaoScreen";
 import { GavetaDoQuadro } from "./GavetaDoQuadro";
+import { pedirSecaoDasRegras } from "./secaoDasRegras";
 import {
   idsComAusencia,
   resumoDasAusencias,
@@ -2450,7 +2451,14 @@ export function QuadroDaEscalaScreen({
                 : visiveis
             }
             onIrParaCelula={irParaAviso}
-            {...(onAbrirRegras ? { onAbrirRegras } : {})}
+            {...(onAbrirRegras
+              ? {
+                  onAbrirRegras: () => {
+                    pedirSecaoDasRegras("avisos");
+                    onAbrirRegras();
+                  },
+                }
+              : {})}
             onFechar={() => setVendoAvisos(false)}
           />
         ) : null}

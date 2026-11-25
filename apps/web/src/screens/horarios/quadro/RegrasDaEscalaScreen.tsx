@@ -14,8 +14,10 @@ import {
   type RegrasDaEscalaApi,
   consultarQuadro,
   consultarRegras,
+  type FeriadoLocalDto,
+  alterarFeriadoLocal,
+  arquivarFeriadoLocal,
   criarFeriadoLocal,
-  removerFeriadoLocal,
   salvarRegras,
 } from "../../../api/escalaClient";
 import {
@@ -27,13 +29,27 @@ import {
   PaginaComSecoes,
   type SecaoDaPagina,
 } from "../../../components/PaginaComSecoes";
-import { Button, Dialog } from "../../../ui";
+import {
+  Button,
+  Dialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../../ui";
+import {
+  AvisoFlutuante,
+  type ConteudoDoAviso,
+} from "../../../ui/AvisoFlutuante";
 import {
   IconeAviso,
   IconeCalendario,
   IconeDocumento,
+  IconeEditar,
   IconeEnviar,
   IconeMais,
+  IconeMaisAcoes,
+  IconeRemover,
   IconeRelogio,
   IconeVoltar,
 } from "../../../ui/icones";
@@ -47,6 +63,7 @@ import { plural } from "../../../format/plural";
 import { somarDias } from "../../pessoas/ficha/escala/calendarioDaEscala";
 import { CATEGORIA, pessoasEm6x1NaTransicao } from "./avisosDaEscala";
 import { diasDoPeriodo } from "./quadroDaEscala";
+import { esquecerSecaoDasRegras, lerSecaoDasRegras } from "./secaoDasRegras";
 import "./QuadroDaEscalaScreen.css";
 
 export const REGRAS_ESCALA_TITULO_ID = "regras-escala-titulo";
@@ -315,7 +332,14 @@ export function RegrasDaEscalaScreen({
   const [erro, setErro] = useState<string | null>(null);
   const [em6x1, setEm6x1] = useState<number | null>(null);
   const [unidades, setUnidades] = useState<UnidadeOrganizacionalApi[]>([]);
-  const [novoFeriado, setNovoFeriado] = useState(false);
+  /** O diálogo do feriado: novo (`null`) ou a editar; `undefined`, fechado. */
+  const [feriadoAberto, setFeriadoAberto] = useState<
+    FeriadoLocalApi | null | undefined
+  >(undefined);
+  const [aviso, setAviso] = useState<ConteudoDoAviso | null>(null);
+  // Aberta por um link para uma seção (ex.: "Regras dos avisos").
+  const [secaoInicial] = useState(lerSecaoDasRegras);
+  useEffect(() => esquecerSecaoDasRegras, []);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
@@ -392,14 +416,18 @@ export function RegrasDaEscalaScreen({
     }
   };
 
-  const removerFeriado = async (f: FeriadoLocalApi) => {
+  const arquivarFeriado = async (f: FeriadoLocalApi) => {
     setErro(null);
     try {
-      const r = await removerFeriadoLocal(f.id);
+      const r = await arquivarFeriadoLocal(f.id);
       setRegras((atual) => (atual ? { ...atual, feriados: r.feriados } : r));
-      setMensagem(`Feriado "${f.nome}" removido.`);
+      setAviso({
+        id: Date.now(),
+        titulo: "Feriado arquivado.",
+        texto: `"${f.nome}" saiu do quadro e dos avisos.`,
+      });
     } catch {
-      setErro("Não foi possível remover o feriado. Tente de novo.");
+      setErro("Não foi possível arquivar o feriado. Tente de novo.");
     }
   };
 
@@ -468,6 +496,7 @@ export function RegrasDaEscalaScreen({
               secoes={SECOES}
               prefixo="regras"
               rotulo="Seções das regras"
+              secaoInicial={secaoInicial}
             >
               <section
                 id="regras-jornada"
@@ -660,7 +689,7 @@ export function RegrasDaEscalaScreen({
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => setNovoFeriado(true)}
+                      onClick={() => setFeriadoAberto(null)}
                     >
                       <IconeMais tamanho={16} />
                       Adicionar feriado
@@ -700,13 +729,17 @@ export function RegrasDaEscalaScreen({
                             <td>{formatarDiaCivil(f.data)}</td>
                             <td>{f.nome}</td>
                             <td>
-                              {f.tipo === "municipal"
-                                ? "Municipal"
-                                : "Ponto facultativo"}
+                              <span
+                                className={`regras__tipo-feriado regras__tipo-feriado--${f.tipo}`}
+                              >
+                                {f.tipo === "municipal"
+                                  ? "Municipal"
+                                  : "Ponto facultativo"}
+                              </span>
                             </td>
                             <td>
                               {f.unidadeIds.length === 0
-                                ? "Todas as unidades"
+                                ? "Todas"
                                 : f.unidadeIds
                                     .map(
                                       (id) =>
@@ -716,15 +749,39 @@ export function RegrasDaEscalaScreen({
                                     .join(", ")}
                             </td>
                             {podeOperar ? (
-                              <td>
-                                <Button
-                                  type="button"
-                                  variant="subtle"
-                                  aria-label={`Remover ${f.nome}`}
-                                  onClick={() => void removerFeriado(f)}
-                                >
-                                  Remover
-                                </Button>
+                              <td className="regras__acoes-feriado">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    className="quadro__icone-botao"
+                                    aria-label={`Ações de ${f.nome}`}
+                                  >
+                                    <IconeMaisAcoes tamanho={18} />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onSelect={() => setFeriadoAberto(f)}
+                                    >
+                                      <span className="quadro__item-menu quadro__item-menu--icone">
+                                        <IconeEditar tamanho={16} />
+                                        <span>Editar</span>
+                                      </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() => void arquivarFeriado(f)}
+                                    >
+                                      <span className="quadro__item-menu quadro__item-menu--icone quadro__item-menu--perigo">
+                                        <IconeRemover tamanho={16} />
+                                        <span>
+                                          Arquivar
+                                          <small>
+                                            Sai do quadro e dos avisos; o
+                                            registro fica
+                                          </small>
+                                        </span>
+                                      </span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </td>
                             ) : null}
                           </tr>
@@ -865,20 +922,30 @@ export function RegrasDaEscalaScreen({
           </>
         )}
 
-        {novoFeriado ? (
+        {feriadoAberto !== undefined ? (
           <DialogoFeriado
             unidades={unidades}
-            onFechar={() => setNovoFeriado(false)}
-            onCriar={async (dto) => {
-              const r = await criarFeriadoLocal(dto);
+            feriado={feriadoAberto}
+            onFechar={() => setFeriadoAberto(undefined)}
+            onSalvar={async (dto) => {
+              const r = feriadoAberto
+                ? await alterarFeriadoLocal(feriadoAberto.id, dto)
+                : await criarFeriadoLocal(dto);
               setRegras((atual) =>
                 atual ? { ...atual, feriados: r.feriados } : r,
               );
-              setNovoFeriado(false);
-              setMensagem(`Feriado "${dto.nome}" adicionado.`);
+              setAviso({
+                id: Date.now(),
+                titulo: feriadoAberto
+                  ? "Feriado salvo."
+                  : "Feriado adicionado.",
+                texto: "Já aparece no quadro e entra nos avisos.",
+              });
+              setFeriadoAberto(undefined);
             }}
           />
         ) : null}
+        <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
       </section>
     </Revelar>
   );
@@ -886,26 +953,36 @@ export function RegrasDaEscalaScreen({
 
 function DialogoFeriado({
   unidades,
-  onCriar,
+  feriado,
+  onSalvar,
   onFechar,
 }: {
   readonly unidades: readonly UnidadeOrganizacionalApi[];
-  readonly onCriar: (dto: {
-    data: string;
-    nome: string;
-    tipo: FeriadoLocalApi["tipo"];
-    unidadeIds: string[];
-  }) => Promise<void>;
+  /** O feriado a editar, ou `null` (novo). */
+  readonly feriado: FeriadoLocalApi | null;
+  readonly onSalvar: (dto: FeriadoLocalDto) => Promise<void>;
   readonly onFechar: () => void;
 }) {
   const id = useId();
-  const [data, setData] = useState("");
-  const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState<FeriadoLocalApi["tipo"]>("municipal");
-  const [todas, setTodas] = useState(true);
-  const [escolhidas, setEscolhidas] = useState<ReadonlySet<string>>(new Set());
+  const [data, setData] = useState(feriado?.data ?? "");
+  const [nome, setNome] = useState(feriado?.nome ?? "");
+  const [tipo, setTipo] = useState<FeriadoLocalApi["tipo"]>(
+    feriado?.tipo ?? "municipal",
+  );
+  const [todas, setTodas] = useState((feriado?.unidadeIds.length ?? 0) === 0);
+  const [escolhidas, setEscolhidas] = useState<ReadonlySet<string>>(
+    () => new Set(feriado?.unidadeIds ?? []),
+  );
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const editando = feriado !== null;
+  const alterado = editando
+    ? data !== feriado.data ||
+      nome !== feriado.nome ||
+      tipo !== feriado.tipo ||
+      todas !== (feriado.unidadeIds.length === 0) ||
+      [...escolhidas].sort().join() !== [...feriado.unidadeIds].sort().join()
+    : data !== "" || nome !== "";
 
   const criar = async () => {
     if (!data || !nome.trim()) {
@@ -919,14 +996,18 @@ function DialogoFeriado({
     setEnviando(true);
     setErro(null);
     try {
-      await onCriar({
+      await onSalvar({
         data,
         nome: nome.trim(),
         tipo,
         unidadeIds: todas ? [] : [...escolhidas],
       });
     } catch {
-      setErro("Não foi possível adicionar o feriado. Tente de novo.");
+      setErro(
+        editando
+          ? "Não foi possível salvar o feriado. Tente de novo."
+          : "Não foi possível adicionar o feriado. Tente de novo.",
+      );
       setEnviando(false);
     }
   };
@@ -934,11 +1015,11 @@ function DialogoFeriado({
   return (
     <Dialog
       aberto
-      titulo="Adicionar feriado"
+      titulo={editando ? "Editar feriado" : "Adicionar feriado"}
       descricao="Aparece no quadro como os outros feriados e entra nos avisos e na folha (feriado trabalhado)."
       onFechar={onFechar}
       bloqueado={enviando}
-      alterado={data !== "" || nome !== ""}
+      alterado={alterado}
       className="dialogo-massa"
       rodape={
         <>
@@ -950,7 +1031,7 @@ function DialogoFeriado({
             onClick={() => void criar()}
             disabled={enviando}
           >
-            Adicionar feriado
+            {editando ? "Salvar feriado" : "Adicionar feriado"}
           </Button>
         </>
       }
@@ -997,30 +1078,30 @@ function DialogoFeriado({
         </fieldset>
         <fieldset className="dialogo-massa__grupo">
           <legend>Unidades</legend>
-          <label className="dialogo-massa__opcao">
-            <input
-              type="radio"
-              name={`${id}-u`}
-              checked={todas}
-              onChange={() => setTodas(true)}
-            />
-            <span>
-              <strong>Todas as unidades</strong>
-            </span>
-          </label>
-          <label className="dialogo-massa__opcao">
-            <input
-              type="radio"
-              name={`${id}-u`}
-              checked={!todas}
-              onChange={() => setTodas(false)}
-            />
-            <span>
-              <strong>Só algumas</strong>
-            </span>
-          </label>
+          <div
+            className="gaveta-quadro__pilulas"
+            role="group"
+            aria-label="Unidades"
+          >
+            {(
+              [
+                [true, "Todas as unidades"],
+                [false, "Só algumas"],
+              ] as const
+            ).map(([valor, rotulo]) => (
+              <button
+                key={rotulo}
+                type="button"
+                className="gaveta-quadro__pilula"
+                aria-pressed={todas === valor}
+                onClick={() => setTodas(valor)}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
           {!todas ? (
-            <ul className="gaveta-quadro__opcoes">
+            <ul className="gaveta-quadro__opcoes regras__unidades">
               {unidades.map((u) => (
                 <li key={u.id}>
                   <input

@@ -539,18 +539,20 @@ enum AuditAction {
 
   // T215 — escala do colaborador (aba Escala da ficha). Sem conteúdo: só o
   // id da escala e a empresa (nunca modelo, turno ou datas).
-  pessoas_escala_definida         @map("pessoas.escala.definida")
-  pessoas_escala_encerrada        @map("pessoas.escala.encerrada")
+  pessoas_escala_definida          @map("pessoas.escala.definida")
+  pessoas_escala_encerrada         @map("pessoas.escala.encerrada")
   // T215 — quadro da escala: o dia gravado ou limpo no rascunho. Só o id do
   // dia e a empresa (nunca turno, horário ou observação).
-  pessoas_escala_dia_gravado      @map("pessoas.escala.dia_gravado")
-  pessoas_escala_dia_limpo        @map("pessoas.escala.dia_limpo")
+  pessoas_escala_dia_gravado       @map("pessoas.escala.dia_gravado")
+  pessoas_escala_dia_limpo         @map("pessoas.escala.dia_limpo")
   // T215 — o rascunho do período publicado (id da publicação e a empresa).
-  pessoas_escala_publicada        @map("pessoas.escala.publicada")
+  pessoas_escala_publicada         @map("pessoas.escala.publicada")
   // T215 — Regras da escala e feriados locais (id e empresa, sem conteúdo).
-  pessoas_escala_regras_salvas    @map("pessoas.escala.regras_salvas")
-  pessoas_escala_feriado_criado   @map("pessoas.escala.feriado_criado")
-  pessoas_escala_feriado_removido @map("pessoas.escala.feriado_removido")
+  pessoas_escala_regras_salvas     @map("pessoas.escala.regras_salvas")
+  pessoas_escala_feriado_criado    @map("pessoas.escala.feriado_criado")
+  pessoas_escala_feriado_removido  @map("pessoas.escala.feriado_removido")
+  pessoas_escala_feriado_alterado  @map("pessoas.escala.feriado_alterado")
+  pessoas_escala_feriado_arquivado @map("pessoas.escala.feriado_arquivado")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -3227,14 +3229,16 @@ model EscalaRegras {
 /// T215 — feriado local da empresa (municipal ou ponto facultativo), em
 /// todas as unidades (lista vazia) ou só em algumas.
 model EscalaFeriadoLocal {
-  id              String   @id @default(uuid())
-  empresaId       String   @map("empresa_id")
-  data            DateTime @db.Date
-  nome            String   @db.VarChar(80)
+  id              String    @id @default(uuid())
+  empresaId       String    @map("empresa_id")
+  data            DateTime  @db.Date
+  nome            String    @db.VarChar(80)
   tipo            String
-  unidadeIds      String[] @default([]) @map("unidade_ids")
-  criadoPorUserId String   @map("criado_por_user_id")
-  criadoEm        DateTime @default(now()) @map("criado_em")
+  unidadeIds      String[]  @default([]) @map("unidade_ids")
+  criadoPorUserId String    @map("criado_por_user_id")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+  /// Arquivado: sai do quadro e dos avisos; o registro fica.
+  arquivadoEm     DateTime? @map("arquivado_em")
 
   empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   criadoPor AccessUser @relation("EscalaFeriadoLocalPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)

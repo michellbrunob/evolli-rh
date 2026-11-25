@@ -10,9 +10,10 @@ import {
   CHAVES_DOS_AVISOS,
   consultarQuadro,
   consultarRegras,
+  alterarFeriadoLocal,
+  arquivarFeriadoLocal,
   criarFeriadoLocal,
   definirEscala,
-  removerFeriadoLocal,
   salvarRegras,
   type PessoaDoQuadroApi,
   type RegrasDaEscalaApi,
@@ -30,6 +31,7 @@ import {
 } from "./PlanejarTransicaoScreen";
 import { QuadroDaEscalaScreen } from "./QuadroDaEscalaScreen";
 import { escala, pessoa, turno } from "./fixturasDoQuadro";
+import { lerSecaoDasRegras, pedirSecaoDasRegras } from "./secaoDasRegras";
 
 vi.mock("../../../api/escalaClient", async (original) => ({
   ...(await original<typeof import("../../../api/escalaClient")>()),
@@ -37,7 +39,8 @@ vi.mock("../../../api/escalaClient", async (original) => ({
   consultarRegras: vi.fn(),
   salvarRegras: vi.fn(),
   criarFeriadoLocal: vi.fn(),
-  removerFeriadoLocal: vi.fn(),
+  alterarFeriadoLocal: vi.fn(),
+  arquivarFeriadoLocal: vi.fn(),
   definirEscala: vi.fn(),
   publicarEscala: vi.fn(),
 }));
@@ -234,21 +237,30 @@ describe("T215 — Regras da escala", () => {
     ).toBeNull();
   });
 
-  it("feriados locais: adiciona (todas ou só algumas unidades) e remove", async () => {
+  it("feriados locais: adiciona (pílulas Todas/Só algumas), edita e arquiva pelo menu da linha, com aviso flutuante", async () => {
+    const aniversario = {
+      id: "f1",
+      data: "2027-03-04",
+      nome: "Aniversário",
+      tipo: "municipal" as const,
+      unidadeIds: ["u1"],
+    };
     vi.mocked(criarFeriadoLocal).mockResolvedValue(
+      regras({ feriados: [aniversario] }),
+    );
+    vi.mocked(alterarFeriadoLocal).mockResolvedValue(
       regras({
         feriados: [
           {
-            id: "f1",
-            data: "2027-03-04",
-            nome: "Aniversário",
-            tipo: "municipal",
-            unidadeIds: ["u1"],
+            ...aniversario,
+            nome: "Aniversário da cidade",
+            tipo: "ponto_facultativo",
+            unidadeIds: [],
           },
         ],
       }),
     );
-    vi.mocked(removerFeriadoLocal).mockResolvedValue(regras());
+    vi.mocked(arquivarFeriadoLocal).mockResolvedValue(regras());
     render(<RegrasDaEscalaScreen podeOperar onVoltar={() => {}} />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Adicionar feriado" }),
@@ -266,7 +278,10 @@ describe("T215 — Regras da escala", () => {
     fireEvent.change(within(d).getByLabelText("Nome"), {
       target: { value: " Aniversário " },
     });
-    fireEvent.click(within(d).getByRole("radio", { name: "Só algumas" }));
+    const todas = within(d).getByRole("button", { name: "Todas as unidades" });
+    expect(todas).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(d).getByRole("button", { name: "Só algumas" }));
+    expect(todas).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(
       within(d).getByRole("button", { name: "Adicionar feriado" }),
     );
@@ -285,14 +300,104 @@ describe("T215 — Regras da escala", () => {
         unidadeIds: ["u1"],
       }),
     );
+    expect(await screen.findByText("Feriado adicionado.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Já aparece no quadro e entra nos avisos."),
+    ).toBeInTheDocument();
     const linha = (
       await screen.findByRole("cell", { name: "Aniversário" })
     ).closest("tr")!;
     expect(linha).toHaveTextContent("04/03/2027AniversárioMunicipalMatriz");
-    fireEvent.click(
-      within(linha).getByRole("button", { name: "Remover Aniversário" }),
+
+    // Editar: o diálogo vem preenchido; salva pela API de edição.
+    fireEvent.keyDown(
+      within(linha).getByRole("button", { name: "Ações de Aniversário" }),
+      { key: "Enter" },
     );
-    await waitFor(() => expect(removerFeriadoLocal).toHaveBeenCalledWith("f1"));
+    fireEvent.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", {
+        name: "Editar",
+      }),
+    );
+    const e = screen.getByRole("dialog", { name: "Editar feriado" });
+    expect(within(e).getByLabelText("Data")).toHaveValue("2027-03-04");
+    expect(within(e).getByLabelText("Nome")).toHaveValue("Aniversário");
+    expect(within(e).getByRole("checkbox", { name: "Matriz" })).toBeChecked();
+    fireEvent.change(within(e).getByLabelText("Nome"), {
+      target: { value: "Aniversário da cidade" },
+    });
+    fireEvent.click(
+      within(e).getByRole("button", { name: "Ponto facultativo" }),
+    );
+    fireEvent.click(
+      within(e).getByRole("button", { name: "Todas as unidades" }),
+    );
+    fireEvent.click(within(e).getByRole("button", { name: "Salvar feriado" }));
+    await waitFor(() =>
+      expect(alterarFeriadoLocal).toHaveBeenCalledWith("f1", {
+        data: "2027-03-04",
+        nome: "Aniversário da cidade",
+        tipo: "ponto_facultativo",
+        unidadeIds: [],
+      }),
+    );
+    expect(await screen.findByText("Feriado salvo.")).toBeInTheDocument();
+    const editada = (
+      await screen.findByRole("cell", { name: "Aniversário da cidade" })
+    ).closest("tr")!;
+    expect(editada).toHaveTextContent("Ponto facultativoTodas");
+
+    // Arquivar: sai da lista; o aviso diz que saiu do quadro e dos avisos.
+    fireEvent.keyDown(
+      within(editada).getByRole("button", {
+        name: "Ações de Aniversário da cidade",
+      }),
+      { key: "Enter" },
+    );
+    const arquivar = within(await screen.findByRole("menu")).getByRole(
+      "menuitem",
+      { name: /Arquivar/ },
+    );
+    expect(arquivar).toHaveTextContent(
+      "Sai do quadro e dos avisos; o registro fica",
+    );
+    fireEvent.click(arquivar);
+    await waitFor(() =>
+      expect(arquivarFeriadoLocal).toHaveBeenCalledWith("f1"),
+    );
+    expect(await screen.findByText("Feriado arquivado.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("cell", { name: "Aniversário da cidade" }),
+    ).toBeNull();
+  });
+});
+
+describe("T215 — Regras abertas numa seção", () => {
+  it("o pedido de seção abre a página nela (rola e marca no menu) e é esquecido ao sair", async () => {
+    vi.mocked(consultarRegras).mockResolvedValue(regras());
+    const rolar = vi.fn();
+    Element.prototype.scrollIntoView = rolar;
+    pedirSecaoDasRegras("feriados");
+    const { unmount } = render(
+      <RegrasDaEscalaScreen podeOperar onVoltar={() => {}} />,
+    );
+    const menu = await screen.findByRole("navigation", {
+      name: "Seções das regras",
+    });
+    await waitFor(() =>
+      expect(
+        within(menu).getByRole("link", { name: "Feriados locais" }),
+      ).toHaveAttribute("aria-current", "true"),
+    );
+    expect(rolar).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+    expect(rolar.mock.contexts[0]).toBe(
+      document.getElementById("regras-feriados"),
+    );
+    expect(document.activeElement).toBe(
+      document.getElementById("regras-feriados-titulo"),
+    );
+    unmount();
+    expect(lerSecaoDasRegras()).toBeNull();
   });
 });
 

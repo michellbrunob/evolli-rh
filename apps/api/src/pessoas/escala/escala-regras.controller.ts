@@ -1,11 +1,12 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Header,
+  HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Req,
@@ -30,7 +31,9 @@ import {
  * T215 — Regras da escala da empresa ativa e os feriados locais:
  *
  * - `GET /escala/regras` (quem lê o quadro) e `PUT /escala/regras`;
- * - `POST /escala/feriados` e `DELETE /escala/feriados/:feriadoId`.
+ * - `POST /escala/feriados`, `PATCH /escala/feriados/:feriadoId` (editar) e
+ *   `POST /escala/feriados/:feriadoId/arquivar` (sai do quadro e dos avisos;
+ *   o registro fica).
  *
  * Gravar é de `rh` e `dp`. Toda resposta traz as regras inteiras; `no-store`.
  */
@@ -79,16 +82,31 @@ export class EscalaRegrasController {
     return this.service.criarFeriado(dto, this.ctx(actor, req));
   }
 
-  @Delete("feriados/:feriadoId")
+  @Patch("feriados/:feriadoId")
   @UseGuards(CsrfGuard, AuthorizationGuard)
   @RequirePermission("escala_colaborador", "alter")
   @Header("Cache-Control", "no-store")
-  @ApiOperation({ summary: "Remove um feriado local" })
-  async removerFeriado(
+  @ApiOperation({ summary: "Edita um feriado local" })
+  async alterarFeriado(
+    @Param("feriadoId", ParseUUIDPipe) feriadoId: string,
+    @Body() dto: CriarFeriadoDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.alterarFeriado(feriadoId, dto, this.ctx(actor, req));
+  }
+
+  @Post("feriados/:feriadoId/arquivar")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("escala_colaborador", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Arquiva um feriado local; o registro fica" })
+  async arquivarFeriado(
     @Param("feriadoId", ParseUUIDPipe) feriadoId: string,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.service.removerFeriado(feriadoId, this.ctx(actor, req));
+    return this.service.arquivarFeriado(feriadoId, this.ctx(actor, req));
   }
 }
