@@ -104,6 +104,22 @@ Valem para o sistema inteiro; a tela não redesenha estes controles.
 Decisão da proprietária (2026-11-25): valem para o sistema inteiro. Toda tela
 nova do mesmo tipo usa o mesmo padrão, sem variação local.
 
+Os **próximos módulos já nascem neste padrão**. As medidas são tokens globais
+em `app/tokens.css` (nunca números soltos na tela):
+
+| Token                               | Valor    | Uso                                                |
+| ----------------------------------- | -------- | -------------------------------------------------- |
+| `--altura-botao`                    | 40 px    | botão de texto                                     |
+| `--botao-icone`                     | 36 px    | botão quadrado de ícone                            |
+| `--pagina-menu-largura`             | 264 px   | coluna do menu de seções                           |
+| `--pagina-menu-recuo`               | 24 px    | item do menu a partir da barra lateral             |
+| `--pagina-menu-recuo-direito`       | 18 px    | item com 222 px de largura                         |
+| `--pagina-conteudo-afastamento`     | 48 px    | conteúdo a partir da linha do menu                 |
+| `--pagina-rodape-recuo`             | 48 px    | pontas do rodapé fixo                              |
+| `--altura-rodape-pagina`            | 72 px    | altura do rodapé fixo                              |
+| `--movimento-curto`                 | 150 ms   | destaque e troca de estado                         |
+| `--main-recuo-x` / `--main-recuo-y` | do shell | recuo do conteúdo (para encostar na barra lateral) |
+
 - **Página longa de configuração** — `components/PaginaComSecoes`: menu
   lateral de seções com ícone, encostado na barra lateral principal (coluna
   de 264 px, item a 24 px, conteúdo a 48 px da linha), fixo ao rolar e

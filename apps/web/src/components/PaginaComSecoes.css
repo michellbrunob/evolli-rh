@@ -25,14 +25,14 @@
   text-decoration: none;
   white-space: nowrap;
   transition:
-    background-color 150ms ease,
-    color 150ms ease;
+    background-color var(--movimento-curto) ease,
+    color var(--movimento-curto) ease;
 }
 
 .pagina-secoes__item svg {
   flex: none;
   color: var(--color-ink-subtle);
-  transition: color 150ms ease;
+  transition: color var(--movimento-curto) ease;
 }
 
 .pagina-secoes__item:hover {
@@ -65,8 +65,8 @@
   .pagina-secoes {
     /* Medidas da referência: coluna de 264 px, item a 24 px da barra
        lateral (222 px de largura) e o conteúdo a 48 px da linha. */
-    grid-template-columns: 16.5rem minmax(0, 1fr);
-    gap: 3rem;
+    grid-template-columns: var(--pagina-menu-largura) minmax(0, 1fr);
+    gap: var(--pagina-conteudo-afastamento);
   }
 
   /* O menu encosta na barra lateral principal (sem o recuo da página) e
@@ -84,7 +84,8 @@
     min-height: calc(
       100dvh - var(--altura-barra-superior, 60px) - var(--altura-rodape-pagina)
     );
-    padding: var(--space-md) 1.125rem var(--space-md) 1.5rem;
+    padding: var(--space-md) var(--pagina-menu-recuo-direito) var(--space-md)
+      var(--pagina-menu-recuo);
     border-right: var(--divisor);
   }
 
@@ -92,7 +93,7 @@
   .pagina-secoes__item::before {
     position: absolute;
     top: 50%;
-    left: -1rem;
+    left: calc(var(--space-xs) - var(--pagina-menu-recuo));
     width: 2px;
     height: 1.25rem;
     border-radius: var(--radius-pill);
@@ -101,8 +102,8 @@
     opacity: 0;
     transform: translateY(-50%) scaleY(0.4);
     transition:
-      opacity 150ms ease,
-      transform 150ms ease;
+      opacity var(--movimento-curto) ease,
+      transform var(--movimento-curto) ease;
   }
 
   .pagina-secoes__item[aria-current="true"]::before {
@@ -126,10 +127,6 @@
 
 /* O rodapé fixo da página (estado, Descartar e Salvar): de ponta a ponta da
    área de conteúdo, encostado na barra lateral, com a linha em cima. */
-:root {
-  --altura-rodape-pagina: 4.5rem;
-}
-
 .pagina-secoes__rodape {
   position: sticky;
   bottom: 0;
@@ -142,7 +139,7 @@
   min-height: var(--altura-rodape-pagina);
   margin: 0 calc(-1 * var(--main-recuo-x, 0px))
     calc(-1 * var(--main-recuo-y, 0px));
-  padding: var(--space-sm) 3rem;
+  padding: var(--space-sm) var(--pagina-rodape-recuo);
   border-top: var(--divisor);
   background: var(--surface-canvas);
 }

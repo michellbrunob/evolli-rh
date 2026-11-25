@@ -228,6 +228,16 @@
      proprietária. O alvo continua acima dos 24 px do WCAG 2.5.8. */
   --altura-botao: 2.5rem;
   --botao-icone: 2.25rem;
+  /* T215 — medidas globais de página (medidas na referência, 2026-11-25).
+     Página com menu de seções: coluna do menu, recuo do item a partir da
+     barra lateral, afastamento do conteúdo e recuo do rodapé fixo. */
+  --pagina-menu-largura: 16.5rem; /* 264 px */
+  --pagina-menu-recuo: 1.5rem; /* 24 px: item a partir da barra lateral */
+  --pagina-menu-recuo-direito: 1.125rem; /* 18 px: item com 222 px */
+  --pagina-conteudo-afastamento: 3rem; /* 48 px da linha do menu */
+  --pagina-rodape-recuo: 3rem; /* 48 px nas duas pontas do rodapé */
+  --altura-rodape-pagina: 4.5rem;
+  --movimento-curto: 150ms; /* transições de destaque e troca */
 
   /* Largura máxima de conteúdo (trava responsiva). */
   --content-max: 1120px;
