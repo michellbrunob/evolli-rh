@@ -219,7 +219,31 @@ Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
   frase da referência sobre VR/VA/VT por dia ficou de fora (não há folha de
   benefícios por dia), assim como "Removidas" (o quadro não remove um dia
   publicado; muda-o).
-- Ainda não: ações em massa, Avisos,
+- Ações em massa e menu ⋯ (25/11/2026), conferidas na referência por
+  simulação (pessoa de teste):
+  - API: `PUT /v1/escala/dias/lote` e `POST /v1/escala/dias/limpar-lote`
+    (até 500 dias por envio, tudo ou nada, um evento de trilha por dia); o
+    cliente manda blocos de 100 (o corpo JSON do servidor tem limite de 100
+    kB). Lotes acima de 100 dias não são atômicos entre blocos.
+  - Seleção por pessoa, grupo e página (parcial quando há só parte), barra
+    "N pessoa(s) selecionada(s)" com Trocar turno, Dar folga, Copiar semana
+    anterior e limpar a seleção (Esc).
+  - Trocar turno: novo turno, De/Até (a semana; até 42 dias), dias da
+    semana (segunda a sexta), "Só onde já há turno" ou "Também nas folgas"
+    e "O que muda" por pessoa. Dar folga: dia (hoje) e Folga ou DSR.
+  - Menu ⋯: Turnos, Copiar semana anterior (pessoas do filtro), Repetir
+    esta semana até… (até um ano) e Limpar o rascunho do período (com a
+    contagem; indisponível sem rascunho).
+  - Copiar e repetir: cada dia recebe o dia correspondente da origem; dia
+    da origem que vem do padrão deixa o destino no padrão (sai o rascunho),
+    como a referência faz.
+  - Cada ação mostra o aviso com Desfazer (regrava o rascunho de antes, ou o
+    limpa) e o quadro recarrega.
+  - Ficam para as próximas fases: Aplicar modelo e Exportar (na barra e no
+    menu), Regras da escala e Planejar a transição (menu e aviso da EC 141).
+    "Quem já tem ausência aprovada nesse dia não muda" depende da
+    integração com Férias e ausências.
+- Ainda não: Avisos,
   Regras, Aplicar modelo, Exportar, menu ⋯ e o aviso da transição da EC
   141/2026 ("Já temos convenção" / "Planejar a transição").
 

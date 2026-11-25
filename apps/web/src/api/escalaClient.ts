@@ -203,6 +203,50 @@ export function gravarDia(dto: GravarDiaDto): Promise<DiaGravadoApi> {
   return enviar("PUT", `${BASE}/escala/dias`, dto);
 }
 
+/**
+ * Quantos dias vão por envio: o servidor aceita até 500, e o corpo JSON tem
+ * limite de 100 kB (100 dias cabem mesmo com observação de 300 caracteres).
+ */
+const DIAS_POR_ENVIO = 100;
+
+const ROTA_DO_LOTE = `${BASE}/escala/dias/lote`;
+const ROTA_DE_LIMPAR_LOTE = `${BASE}/escala/dias/limpar-lote`;
+
+/**
+ * T215 — grava vários dias no rascunho (ações em massa); em envios de até
+ * cem dias, cada envio tudo ou nada. Devolve os dias gravados.
+ */
+export async function gravarDias(
+  dias: readonly GravarDiaDto[],
+): Promise<(DiaGravadoApi & { colaboradorId: string })[]> {
+  const gravados: (DiaGravadoApi & { colaboradorId: string })[] = [];
+  for (let i = 0; i < dias.length; i += DIAS_POR_ENVIO) {
+    const r = await enviar<{
+      dias: (DiaGravadoApi & { colaboradorId: string })[];
+    }>("PUT", ROTA_DO_LOTE, {
+      dias: dias.slice(i, i + DIAS_POR_ENVIO),
+    });
+    gravados.push(...r.dias);
+  }
+  return gravados;
+}
+
+/** T215 — desfaz a mudança de vários dias no rascunho (em envios de cem). */
+export async function limparDias(
+  dias: readonly { colaboradorId: string; dia: string }[],
+): Promise<number> {
+  let limpos = 0;
+  for (let i = 0; i < dias.length; i += DIAS_POR_ENVIO) {
+    const r = await enviar<{ dias: { limpo: boolean }[] }>(
+      "POST",
+      ROTA_DE_LIMPAR_LOTE,
+      { dias: dias.slice(i, i + DIAS_POR_ENVIO) },
+    );
+    limpos += r.dias.filter((d) => d.limpo).length;
+  }
+  return limpos;
+}
+
 /** Desfaz a mudança do dia no rascunho (volta ao padrão). */
 export function limparDia(
   colaboradorId: string,

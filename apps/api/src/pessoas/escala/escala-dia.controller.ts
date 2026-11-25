@@ -17,7 +17,12 @@ import { AuthorizationGuard } from "../../auth/authorization/authorization.guard
 import { RequirePermission } from "../../auth/authorization/require-permission.decorator";
 import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
-import { DiaDoQuadroDto, GravarDiaDto } from "./escala-dia.dto";
+import {
+  DiaDoQuadroDto,
+  GravarDiaDto,
+  GravarLoteDto,
+  LimparLoteDto,
+} from "./escala-dia.dto";
 import { EscalaDiaService } from "./escala-dia.service";
 import {
   EscalaPublicacaoService,
@@ -29,6 +34,8 @@ import {
  *
  * - `PUT /escala/dias`: grava o dia (menu da célula e painel do dia);
  * - `POST /escala/dias/limpar`: desfaz a mudança do dia (volta ao padrão);
+ * - `PUT /escala/dias/lote` e `POST /escala/dias/limpar-lote`: o mesmo para
+ *   vários dias (ações em massa), tudo ou nada;
  * - `POST /escala/publicar`: o rascunho do período vira publicado.
  *
  * `rh` e `dp` na empresa ativa; `no-store`.
@@ -56,6 +63,43 @@ export class EscalaDiaController {
       actor,
       metadata: extractRequestMetadata(req),
     });
+  }
+
+  @Put("dias/lote")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("escala_colaborador", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Grava varios dias no rascunho (tudo ou nada)" })
+  async gravarLote(
+    @Body() dto: GravarLoteDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return {
+      dias: await this.service.gravarLote(dto.dias, {
+        actor,
+        metadata: extractRequestMetadata(req),
+      }),
+    };
+  }
+
+  @Post("dias/limpar-lote")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("escala_colaborador", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Desfaz a mudanca de varios dias no rascunho" })
+  async limparLote(
+    @Body() dto: LimparLoteDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return {
+      dias: await this.service.limparLote(dto.dias, {
+        actor,
+        metadata: extractRequestMetadata(req),
+      }),
+    };
   }
 
   @Post("dias/limpar")

@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsDateString,
   IsIn,
@@ -81,4 +82,27 @@ export class GravarDiaDto extends DiaDoQuadroDto {
   @IsString()
   @MaxLength(300)
   observacao?: string | null;
+}
+
+/**
+ * T215 — vários dias de uma vez (ações em massa); até 500 por envio (o corpo
+ * JSON do servidor tem limite de 100 kB; o cliente manda blocos de 100).
+ */
+export class GravarLoteDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => GravarDiaDto)
+  dias!: GravarDiaDto[];
+}
+
+/** T215 — desfazer a mudança de vários dias; até 500 por envio. */
+export class LimparLoteDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => DiaDoQuadroDto)
+  dias!: DiaDoQuadroDto[];
 }

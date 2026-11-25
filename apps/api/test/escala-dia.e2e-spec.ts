@@ -741,4 +741,148 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       ).rejects.toThrow();
     });
   });
+
+  describe("lote", () => {
+    const DIAS_LOTE = [`${ANO - 1}-04-06`, `${ANO - 1}-04-07`];
+    const putLote = (dias: Record<string, unknown>[], cred: Credencial = rhA) =>
+      agent()
+        .put("/v1/escala/dias/lote")
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken)
+        .send({ dias });
+    const limparLote = (
+      dias: Record<string, unknown>[],
+      cred: Credencial = rhA,
+    ) => post("/v1/escala/dias/limpar-lote", cred).send({ dias });
+    let pessoaB: string;
+
+    beforeAll(async () => {
+      pessoaB = await admitirNomeada("Lote Sintetico Dois");
+    });
+
+    it("grava vários dias de várias pessoas de uma vez, com um evento por dia", async () => {
+      const antes = await prisma.auditEvent.count({
+        where: { action: "pessoas_escala_dia_gravado" },
+      });
+      const r = await putLote([
+        { colaboradorId: pessoaA, dia: DIAS_LOTE[0], tipo: "folga" },
+        { colaboradorId: pessoaB, dia: DIAS_LOTE[0], tipo: "dsr" },
+        {
+          colaboradorId: pessoaB,
+          dia: DIAS_LOTE[1],
+          tipo: "trabalho",
+          tabelaHorarioId: turnoA,
+          periodos: [{ inicio: "09:00", fim: "18:00" }],
+          intervaloMinutos: 60,
+        },
+      ]).expect(200);
+      expect(
+        r.body.dias.map((d: { colaboradorId: string; tipo: string }) => [
+          d.colaboradorId,
+          d.tipo,
+        ]),
+      ).toEqual([
+        [pessoaA, "folga"],
+        [pessoaB, "dsr"],
+        [pessoaB, "trabalho"],
+      ]);
+      expect(
+        await prisma.auditEvent.count({
+          where: { action: "pessoas_escala_dia_gravado" },
+        }),
+      ).toBe(antes + 3);
+    });
+
+    it("tudo ou nada: um dia fora do vínculo recusa o lote inteiro", async () => {
+      const r = await putLote([
+        { colaboradorId: pessoaA, dia: DIAS_LOTE[1], tipo: "folga" },
+        { colaboradorId: pessoaA, dia: `${ANO - 3}-01-01`, tipo: "folga" },
+      ]).expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "dia", motivo: "fora_do_vinculo" },
+      ]);
+      expect(
+        await prisma.escalaDia.count({
+          where: {
+            colaboradorId: pessoaA,
+            dia: new Date(`${DIAS_LOTE[1]}T00:00:00.000Z`),
+          },
+        }),
+      ).toBe(0);
+      // Cada pessoa no SEU vínculo: a admitida depois não vale pelo da outra.
+      const nova = await admitirNomeada("Lote Sintetico Nova", {
+        dataAdmissao: DIAS_LOTE[1]!,
+      });
+      const r2 = await putLote([
+        { colaboradorId: pessoaA, dia: DIAS_LOTE[0], tipo: "folga" },
+        { colaboradorId: nova, dia: DIAS_LOTE[0], tipo: "folga" },
+      ]).expect(422);
+      expect(r2.body.erros).toEqual([
+        { campo: "dia", motivo: "fora_do_vinculo" },
+      ]);
+      // Turno de outra empresa em qualquer item (mesmo junto de um válido):
+      // o lote inteiro recusado.
+      const turnoB = await criarTurno(rhB, "Outro Lote", "OUT_LOT");
+      await putLote([
+        {
+          colaboradorId: pessoaA,
+          dia: DIAS_LOTE[1],
+          tipo: "trabalho",
+          tabelaHorarioId: turnoA,
+          periodos: [{ inicio: "09:00", fim: "18:00" }],
+        },
+        {
+          colaboradorId: pessoaB,
+          dia: DIAS_LOTE[1],
+          tipo: "trabalho",
+          tabelaHorarioId: turnoB,
+          periodos: [{ inicio: "09:00", fim: "18:00" }],
+        },
+      ]).expect(422);
+    });
+
+    it("limpa vários dias (idempotente) e diz quais tinham rascunho", async () => {
+      const r = await limparLote([
+        { colaboradorId: pessoaA, dia: DIAS_LOTE[0] },
+        { colaboradorId: pessoaB, dia: DIAS_LOTE[0] },
+        { colaboradorId: pessoaB, dia: DIAS_LOTE[1] },
+        { colaboradorId: pessoaA, dia: DIAS_LOTE[1] },
+      ]).expect(200);
+      expect(r.body.dias.map((d: { limpo: boolean }) => d.limpo)).toEqual([
+        true,
+        true,
+        true,
+        false,
+      ]);
+      expect(
+        await prisma.escalaDia.count({
+          where: {
+            colaboradorId: { in: [pessoaA, pessoaB] },
+            camada: "rascunho",
+            dia: { in: DIAS_LOTE.map((d) => new Date(`${d}T00:00:00.000Z`)) },
+          },
+        }),
+      ).toBe(0);
+    });
+
+    it("limites e permissões: vazio e acima de 500 são 400; master e demais negados", async () => {
+      await putLote([]).expect(400);
+      await putLote(
+        Array.from({ length: 501 }, () => ({
+          colaboradorId: pessoaA,
+          dia: DIAS_LOTE[0],
+          tipo: "folga",
+        })),
+      ).expect(400);
+      await limparLote([]).expect(400);
+      const um = [{ colaboradorId: pessoaA, dia: DIAS_LOTE[0], tipo: "folga" }];
+      await putLote(um, master).expect(403);
+      for (const cred of outros) await putLote(um, cred).expect(403);
+      await putLote(um, dpA).expect(200);
+      await limparLote(
+        [{ colaboradorId: pessoaA, dia: DIAS_LOTE[0] }],
+        dpA,
+      ).expect(200);
+    });
+  });
 });

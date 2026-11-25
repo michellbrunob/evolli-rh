@@ -17,7 +17,9 @@ import { ApiError } from "../../../api/colaboradoresClient";
 import {
   consultarQuadro,
   gravarDia,
+  gravarDias,
   limparDia,
+  limparDias,
   publicarEscala,
   type DiaGravadoApi,
   type GravarDiaDto,
@@ -38,6 +40,12 @@ import {
 } from "../../../ui/AvisoFlutuante";
 import { Button } from "../../../components";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../../ui";
+import {
   diaCivilDeHoje,
   diaDaSemanaEDiaMes,
   diaMesCurto,
@@ -49,6 +57,8 @@ import {
   IconeBuscar,
   IconeComentario,
   IconeFiltrar,
+  IconeFechar,
+  IconeMaisAcoes,
   IconeVoltar,
 } from "../../../ui/icones";
 import { Esqueleto, Revelar } from "../../../ui/movimento";
@@ -62,6 +72,23 @@ import {
 } from "./MenuDaCelula";
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import { DialogoPublicar } from "./DialogoPublicar";
+import {
+  DialogoDarFolga,
+  DialogoLimparRascunho,
+  DialogoRepetir,
+  DialogoTrocarTurno,
+} from "./DialogosEmMassa";
+import {
+  type PlanoDoLote,
+  chaveDoDia,
+  copiarDias,
+  darFolga,
+  pessoasDoLote,
+  planoParaDesfazer,
+  rascunhosDe,
+  rascunhosPorChave,
+  semanasAte,
+} from "./acoesEmMassa";
 import {
   type FiltrosDoQuadro,
   type RotulosDosCodigos,
@@ -96,6 +123,7 @@ import {
   ordenar,
   periodoDa,
   periodosNoDia,
+  segundaDaSemana,
   rotuloDaEscala,
   tituloDoPeriodo,
 } from "./quadroDaEscala";
@@ -137,6 +165,46 @@ export interface QuadroDaEscalaScreenProps {
   readonly hoje?: string;
   /** rh e dp gravam no rascunho; os demais só consultam. */
   readonly podeOperar?: boolean;
+}
+
+/**
+ * As pessoas com os dias de outro período (em consultas de até 42 dias),
+ * juntando padrões e dias gravados de cada uma.
+ */
+async function pessoasDoPeriodo(
+  de: string,
+  ate: string,
+): Promise<Map<string, PessoaDoQuadroApi>> {
+  const m = new Map<string, PessoaDoQuadroApi>();
+  for (let i = de; i <= ate;) {
+    const f = [ate, somarDiasLocal(i, 41)].sort()[0]!;
+    const q = await consultarQuadro(i, f);
+    for (const p of q.pessoas) {
+      const atual = m.get(p.colaboradorId);
+      if (!atual) {
+        m.set(p.colaboradorId, { ...p, dias: [...(p.dias ?? [])] });
+        continue;
+      }
+      const escalas = [...atual.escalas];
+      for (const e of p.escalas) {
+        if (!escalas.some((x) => x.id === e.id)) escalas.push(e);
+      }
+      escalas.sort((a, b) => b.vigenciaInicio.localeCompare(a.vigenciaInicio));
+      m.set(p.colaboradorId, {
+        ...atual,
+        escalas,
+        dias: [...(atual.dias ?? []), ...(p.dias ?? [])],
+      });
+    }
+    i = somarDiasLocal(f, 1);
+  }
+  return m;
+}
+
+function somarDiasLocal(dia: string, n: number): string {
+  const d = new Date(`${dia}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 /** O DTO que regrava um dia já gravado (o "Desfazer"). */
@@ -346,6 +414,16 @@ export function QuadroDaEscalaScreen({
   const [falha, setFalha] = useState<string | null>(null);
   const [ativa, setAtiva] = useState<string | null>(null);
   const [publicando, setPublicando] = useState(false);
+  const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [dialogo, setDialogo] = useState<
+    | { tipo: "trocar"; alvo: "selecao" }
+    | { tipo: "folga"; alvo: "selecao" }
+    | { tipo: "repetir" }
+    | { tipo: "limpar" }
+    | null
+  >(null);
   const tabelaRef = useRef<HTMLTableElement | null>(null);
   const focoAplicado = useRef(false);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
@@ -429,6 +507,59 @@ export function QuadroDaEscalaScreen({
   const rascunhoDe = (p: PessoaDoQuadroApi, dia: string) =>
     (p.dias ?? []).find((d) => d.dia === dia && d.camada === "rascunho") ??
     null;
+
+  /**
+   * Executa um lote no rascunho e oferece Desfazer (regrava o rascunho que
+   * cada dia tinha, ou o limpa). Depois, o quadro recarrega.
+   */
+  const executarLote = async (
+    plano: PlanoDoLote,
+    anteriores: ReadonlyMap<string, DiaGravadoApi>,
+    titulo: string,
+  ) => {
+    // Só limpa o que tem rascunho.
+    const limpar = plano.limpar.filter((d) =>
+      anteriores.has(chaveDoDia(d.colaboradorId, d.dia)),
+    );
+    const efetivo = { gravar: plano.gravar, limpar };
+    if (limpar.length > 0) await limparDias(limpar);
+    if (plano.gravar.length > 0) await gravarDias(plano.gravar);
+    setTentativa((n) => n + 1);
+    const volta = planoParaDesfazer(efetivo, anteriores);
+    setAviso({
+      id: Date.now(),
+      titulo,
+      acao: {
+        rotulo: "Desfazer",
+        onClick: () =>
+          void (async () => {
+            setFalha(null);
+            try {
+              if (volta.limpar.length > 0) await limparDias(volta.limpar);
+              if (volta.gravar.length > 0) await gravarDias(volta.gravar);
+              setTentativa((n) => n + 1);
+              setAviso({ id: Date.now(), titulo: "Ação desfeita" });
+            } catch {
+              setFalha("Não foi possível desfazer. Tente de novo.");
+            }
+          })(),
+      },
+    });
+  };
+
+  const copiarSemanaAnterior = async (alvo: readonly PessoaDoQuadroApi[]) => {
+    const origem = dias.map((d) => somarDiasLocal(d, -7));
+    const daOrigem = await pessoasDoPeriodo(
+      origem[0]!,
+      origem[origem.length - 1]!,
+    );
+    const plano = copiarDias(alvo, daOrigem, origem, dias);
+    await executarLote(
+      plano,
+      rascunhosPorChave(alvo),
+      `Semana anterior copiada para ${plural(alvo.length, "pessoa", "pessoas")}`,
+    );
+  };
 
   const desfazer = async (
     p: PessoaDoQuadroApi,
@@ -627,6 +758,26 @@ export function QuadroDaEscalaScreen({
     }
   };
 
+  useEffect(() => {
+    if (selecionados.size === 0) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (
+        e.key === "Escape" &&
+        !document.querySelector('[role="dialog"], [role="menu"]')
+      ) {
+        setSelecionados(new Set());
+      }
+    };
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, [selecionados.size]);
+
+  // O quadro recarregou (outro período ou depois de um lote): a célula de
+  // origem do menu não existe mais.
+  useEffect(() => {
+    setMenu(null);
+  }, [inicio, fim, tentativa]);
+
   // Aberto pela ficha: o departamento da pessoa, uma vez.
   useEffect(() => {
     if (focoAplicado.current || carga.estado !== "pronto") return;
@@ -764,6 +915,33 @@ export function QuadroDaEscalaScreen({
   const titulo = tituloDoPeriodo(visao, inicio, fim);
   const colunas = dias.length + 2;
 
+  /** Caixa de seleção de um grupo de pessoas (marcada, parcial ou não). */
+  const caixa = (ps: readonly PessoaDoQuadroApi[], rotulo: string) => {
+    const marcadas = ps.filter((p) => selecionados.has(p.colaboradorId)).length;
+    const todas = ps.length > 0 && marcadas === ps.length;
+    return (
+      <input
+        type="checkbox"
+        className="quadro__selecao"
+        aria-label={rotulo}
+        checked={todas}
+        ref={(el) => {
+          if (el) el.indeterminate = marcadas > 0 && !todas;
+        }}
+        onChange={() =>
+          setSelecionados((atual) => {
+            const novo = new Set(atual);
+            for (const p of ps) {
+              if (todas) novo.delete(p.colaboradorId);
+              else novo.add(p.colaboradorId);
+            }
+            return novo;
+          })
+        }
+      />
+    );
+  };
+
   const cabecaDoGrupo = (g: GrupoDoQuadro) => {
     const completo = grupos.find((x) => x.chave === g.chave) ?? g;
     const aberto = !recolhidos.has(g.chave);
@@ -772,6 +950,9 @@ export function QuadroDaEscalaScreen({
       <tr className="quadro__grupo">
         <th scope="colgroup" colSpan={colunas}>
           <div className="quadro__grupo-linha">
+            {podeOperar
+              ? caixa(completo.pessoas, `Selecionar ${g.nome}`)
+              : null}
             <button
               type="button"
               className="quadro__grupo-botao"
@@ -809,6 +990,7 @@ export function QuadroDaEscalaScreen({
     return (
       <th scope="row" className="quadro__pessoa">
         <div className="quadro__pessoa-linha">
+          {podeOperar ? caixa([p], `Selecionar ${p.nome}`) : null}
           <span className="quadro__avatar" aria-hidden="true">
             {iniciais(p.nome)}
           </span>
@@ -1029,6 +1211,56 @@ export function QuadroDaEscalaScreen({
               Turnos
             </Button>
           ) : null}
+          {podeOperar && carga.estado === "pronto" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="quadro__icone-botao"
+                aria-label="Mais ações"
+              >
+                <IconeMaisAcoes tamanho={18} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {onAbrirTurnos ? (
+                  <DropdownMenuItem onSelect={onAbrirTurnos}>
+                    <span className="quadro__item-menu">
+                      Turnos
+                      <small>Horários da empresa</small>
+                    </span>
+                  </DropdownMenuItem>
+                ) : null}
+                {visao === "semana" ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void tentar(() => copiarSemanaAnterior(filtradas))
+                      }
+                    >
+                      <span className="quadro__item-menu">
+                        Copiar semana anterior
+                        <small>Para as pessoas do filtro</small>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => setDialogo({ tipo: "repetir" })}
+                    >
+                      <span className="quadro__item-menu">
+                        Repetir esta semana até…
+                      </span>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                <DropdownMenuItem
+                  disabled={rascunhosDe(filtradas).length === 0}
+                  onSelect={() => setDialogo({ tipo: "limpar" })}
+                >
+                  <span className="quadro__item-menu quadro__item-menu--perigo">
+                    Limpar o rascunho do período
+                    <small>Só o que ainda não foi publicado</small>
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
 
         <div className="quadro__filtros">
@@ -1134,6 +1366,9 @@ export function QuadroDaEscalaScreen({
                 <thead>
                   <tr>
                     <th scope="col" className="quadro__col-pessoa">
+                      {podeOperar
+                        ? caixa(daPagina, "Selecionar as pessoas desta página")
+                        : null}
                       <button
                         type="button"
                         className="quadro__ordenar"
@@ -1405,6 +1640,164 @@ export function QuadroDaEscalaScreen({
             }}
           />
         ) : null}
+        {podeOperar && selecionados.size > 0 ? (
+          <div
+            role="toolbar"
+            aria-label="Ações para as pessoas selecionadas"
+            className="quadro__barra-selecao"
+          >
+            <span className="quadro__selecionadas" aria-live="polite">
+              <strong>{selecionados.size}</strong>
+              {selecionados.size === 1
+                ? " pessoa selecionada"
+                : " pessoas selecionadas"}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDialogo({ tipo: "trocar", alvo: "selecao" })}
+              disabled={turnos.length === 0}
+            >
+              Trocar turno
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDialogo({ tipo: "folga", alvo: "selecao" })}
+            >
+              Dar folga
+            </Button>
+            {visao === "semana" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  void tentar(() =>
+                    copiarSemanaAnterior(
+                      todas.filter((p) => selecionados.has(p.colaboradorId)),
+                    ),
+                  )
+                }
+              >
+                Copiar semana anterior
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              className="quadro__icone-botao"
+              aria-label="Limpar a seleção (Esc)"
+              onClick={() => setSelecionados(new Set())}
+            >
+              <IconeFechar tamanho={14} />
+            </button>
+          </div>
+        ) : null}
+        {(() => {
+          const sel = todas.filter((p) => selecionados.has(p.colaboradorId));
+          if (dialogo?.tipo === "trocar") {
+            return (
+              <DialogoTrocarTurno
+                pessoas={sel}
+                turnos={turnos}
+                inicio={inicio}
+                fim={fim}
+                obterPessoas={async (de, ate) => {
+                  const m = await pessoasDoPeriodo(de, ate);
+                  return sel.map((p) => m.get(p.colaboradorId) ?? p);
+                }}
+                onFechar={() => setDialogo(null)}
+                onAplicar={async (plano, doIntervalo, turno) => {
+                  await executarLote(
+                    plano,
+                    rascunhosPorChave(doIntervalo),
+                    `${turno.nome} em ${plural(plano.gravar.length, "dia", "dias")} no rascunho`,
+                  );
+                  setDialogo(null);
+                }}
+              />
+            );
+          }
+          if (dialogo?.tipo === "folga") {
+            return (
+              <DialogoDarFolga
+                pessoas={sel}
+                diaInicial={referencia}
+                onFechar={() => setDialogo(null)}
+                onAplicar={async (dia, tipo) => {
+                  const m = await pessoasDoPeriodo(dia, dia);
+                  const alvo = sel.map((p) => m.get(p.colaboradorId) ?? p);
+                  const plano = darFolga(alvo, dia, tipo);
+                  await executarLote(
+                    plano,
+                    rascunhosPorChave(alvo),
+                    `${tipo === "dsr" ? "DSR" : "Folga"} em ${diaMesCurto(dia)} para ${plural(pessoasDoLote(plano), "pessoa", "pessoas")} no rascunho`,
+                  );
+                  setDialogo(null);
+                }}
+              />
+            );
+          }
+          if (dialogo?.tipo === "repetir") {
+            return (
+              <DialogoRepetir
+                fimDaSemana={fim}
+                onFechar={() => setDialogo(null)}
+                onAplicar={async (ate) => {
+                  const semanas = semanasAte(segundaDaSemana(inicio), ate);
+                  const destino = await pessoasDoPeriodo(
+                    somarDiasLocal(fim, 1),
+                    ate,
+                  );
+                  const gravar: PlanoDoLote["gravar"] = [];
+                  const limpar: PlanoDoLote["limpar"] = [];
+                  const origem = new Map(
+                    filtradas.map((p) => [p.colaboradorId, p] as const),
+                  );
+                  for (const semana of semanas) {
+                    const alvo = filtradas.map(
+                      (p) => destino.get(p.colaboradorId) ?? p,
+                    );
+                    const plano = copiarDias(
+                      alvo,
+                      origem,
+                      dias.slice(0, semana.length),
+                      semana,
+                    );
+                    gravar.push(...plano.gravar);
+                    limpar.push(...plano.limpar);
+                  }
+                  await executarLote(
+                    { gravar, limpar },
+                    rascunhosPorChave(destino.values()),
+                    `Semana repetida até ${diaMesCurto(ate)}`,
+                  );
+                  setDialogo(null);
+                }}
+              />
+            );
+          }
+          if (dialogo?.tipo === "limpar") {
+            const itens = rascunhosDe(filtradas);
+            return (
+              <DialogoLimparRascunho
+                periodo={titulo}
+                quantas={itens.length}
+                onFechar={() => setDialogo(null)}
+                onConfirmar={async () => {
+                  await executarLote(
+                    { gravar: [], limpar: itens },
+                    rascunhosPorChave(filtradas),
+                    itens.length === 1
+                      ? "1 mudança desfeita"
+                      : `${itens.length} mudanças desfeitas`,
+                  );
+                  setDialogo(null);
+                }}
+              />
+            );
+          }
+          return null;
+        })()}
         <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
         <GavetaDoQuadro
           aberta={gaveta}

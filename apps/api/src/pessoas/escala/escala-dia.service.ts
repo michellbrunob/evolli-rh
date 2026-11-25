@@ -102,106 +102,168 @@ export class EscalaDiaService {
     return escopo.empresaId;
   }
 
-  private async conferirVinculo(
+  /**
+   * Confere um ou mais dias (forma, vínculo, turno e local) e devolve os
+   * dados a gravar, na ordem. A primeira recusa interrompe tudo.
+   */
+  private async preparar(
     empresaId: string,
-    colaboradorId: string,
-    dia: Date,
+    dtos: readonly GravarDiaDto[],
+    ctx: PessoasAuditContext,
+  ) {
+    for (const dto of dtos) {
+      const regras = conferirDia(dto);
+      if (regras.length > 0) recusar(...regras);
+    }
+    await this.conferirVinculos(
+      empresaId,
+      dtos.map((d) => ({ colaboradorId: d.colaboradorId, dia: d.dia })),
+    );
+
+    const turnos = [
+      ...new Set(
+        dtos.map((d) => d.tabelaHorarioId).filter((x): x is string => !!x),
+      ),
+    ];
+    if (turnos.length > 0) {
+      const ativos = await this.prisma.tabelaHorario.count({
+        where: { id: { in: turnos }, empresaId, ativo: true },
+      });
+      if (ativos !== turnos.length) {
+        recusar({ campo: "tabelaHorarioId", motivo: "indisponivel" });
+      }
+    }
+    const unidades = [
+      ...new Set(
+        dtos
+          .map((d) => d.unidadeOrganizacionalId)
+          .filter((x): x is string => !!x),
+      ),
+    ];
+    if (unidades.length > 0) {
+      const ativas = await this.prisma.unidadeOrganizacional.count({
+        where: { id: { in: unidades }, empresaId, status: "ativo" },
+      });
+      if (ativas !== unidades.length) {
+        recusar({ campo: "unidadeOrganizacionalId", motivo: "indisponivel" });
+      }
+    }
+
+    // `conferirDia` já recusou o que não se aplica ao tipo.
+    return dtos.map((dto) => ({
+      colaboradorId: dto.colaboradorId,
+      dia: dataDoDia(dto.dia),
+      dados: {
+        tipo: dto.tipo,
+        tabelaHorarioId: dto.tabelaHorarioId ?? null,
+        periodos: (dto.periodos ?? []).map((p) => ({
+          inicio: p.inicio,
+          fim: p.fim,
+        })) as Prisma.InputJsonValue,
+        intervaloMinutos: dto.intervaloMinutos ?? 0,
+        sobreaviso: (dto.sobreaviso ?? []).map((p) => ({
+          inicio: p.inicio,
+          fim: p.fim,
+        })) as Prisma.InputJsonValue,
+        unidadeOrganizacionalId: dto.unidadeOrganizacionalId ?? null,
+        observacao: dto.observacao?.trim() || null,
+        atualizadoPorUserId: ctx.actor.id,
+      },
+    }));
+  }
+
+  /** Cada dia está no vínculo da pessoa na empresa (sem desativação). */
+  private async conferirVinculos(
+    empresaId: string,
+    itens: readonly { colaboradorId: string; dia: string }[],
   ): Promise<void> {
-    const vinculo = await this.prisma.vinculoFuncional.findFirst({
+    const ids = [...new Set(itens.map((i) => i.colaboradorId))];
+    const vinculos = await this.prisma.vinculoFuncional.findMany({
       where: {
-        colaboradorId,
+        colaboradorId: { in: ids },
         empresaId,
-        dataAdmissao: { lte: dia },
-        OR: [{ dataDesligamento: null }, { dataDesligamento: { gte: dia } }],
         colaborador: semDesativacaoVigente(empresaId),
       },
-      select: { id: true },
+      select: {
+        colaboradorId: true,
+        dataAdmissao: true,
+        dataDesligamento: true,
+      },
     });
-    if (vinculo === null) recusar({ campo: "dia", motivo: "fora_do_vinculo" });
+    for (const item of itens) {
+      const dia = dataDoDia(item.dia);
+      const dentro = vinculos.some(
+        (v) =>
+          v.colaboradorId === item.colaboradorId &&
+          v.dataAdmissao <= dia &&
+          (v.dataDesligamento === null || v.dataDesligamento >= dia),
+      );
+      if (!dentro) recusar({ campo: "dia", motivo: "fora_do_vinculo" });
+    }
   }
 
   async gravar(
     dto: GravarDiaDto,
     ctx: PessoasAuditContext,
   ): Promise<DiaGravado> {
+    const [gravado] = await this.gravarLote([dto], ctx);
+    // O dia sozinho não leva a pessoa (quem chamou já sabe quem é).
+    const dia: DiaGravado & { colaboradorId?: string } = { ...gravado! };
+    delete dia.colaboradorId;
+    return dia;
+  }
+
+  /**
+   * T215 — vários dias de uma vez (ações em massa, copiar e repetir semana,
+   * desfazer): tudo ou nada, numa transação; um evento de trilha por dia.
+   */
+  async gravarLote(
+    dtos: readonly GravarDiaDto[],
+    ctx: PessoasAuditContext,
+  ): Promise<(DiaGravado & { colaboradorId: string })[]> {
     const empresaId = this.empresaDaSessao(ctx);
-    const dia = dataDoDia(dto.dia);
-
-    const regras = conferirDia(dto);
-    if (regras.length > 0) recusar(...regras);
-    await this.conferirVinculo(empresaId, dto.colaboradorId, dia);
-
-    // `conferirDia` já recusou o que não se aplica ao tipo.
-    const turnoId = dto.tabelaHorarioId ?? null;
-    if (turnoId !== null) {
-      const turno = await this.prisma.tabelaHorario.findFirst({
-        where: { id: turnoId, empresaId, ativo: true },
-        select: { id: true },
-      });
-      if (turno === null) {
-        recusar({ campo: "tabelaHorarioId", motivo: "indisponivel" });
-      }
-    }
-    const unidadeId = dto.unidadeOrganizacionalId ?? null;
-    if (unidadeId !== null) {
-      const unidade = await this.prisma.unidadeOrganizacional.findFirst({
-        where: { id: unidadeId, empresaId, status: "ativo" },
-        select: { id: true },
-      });
-      if (unidade === null) {
-        recusar({ campo: "unidadeOrganizacionalId", motivo: "indisponivel" });
-      }
-    }
-
-    const observacao = dto.observacao?.trim() || null;
-    const dados = {
-      tipo: dto.tipo,
-      tabelaHorarioId: turnoId,
-      periodos: (dto.periodos ?? []).map((p) => ({
-        inicio: p.inicio,
-        fim: p.fim,
-      })) as Prisma.InputJsonValue,
-      intervaloMinutos: dto.intervaloMinutos ?? 0,
-      sobreaviso: (dto.sobreaviso ?? []).map((p) => ({
-        inicio: p.inicio,
-        fim: p.fim,
-      })) as Prisma.InputJsonValue,
-      unidadeOrganizacionalId: unidadeId,
-      observacao,
-      atualizadoPorUserId: ctx.actor.id,
-    };
-
-    return this.prisma.$transaction(async (tx) => {
-      const linha = await tx.escalaDia.upsert({
-        where: {
-          colaboradorId_empresaId_dia_camada: {
-            colaboradorId: dto.colaboradorId,
+    const preparados = await this.preparar(empresaId, dtos, ctx);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const gravados: (DiaGravado & { colaboradorId: string })[] = [];
+        for (const p of preparados) {
+          const linha = await tx.escalaDia.upsert({
+            where: {
+              colaboradorId_empresaId_dia_camada: {
+                colaboradorId: p.colaboradorId,
+                empresaId,
+                dia: p.dia,
+                camada: "rascunho",
+              },
+            },
+            create: {
+              ...p.dados,
+              colaboradorId: p.colaboradorId,
+              empresaId,
+              dia: p.dia,
+              camada: "rascunho",
+              criadoPorUserId: ctx.actor.id,
+            },
+            update: p.dados,
+            select: { ...PROJECAO_DO_DIA, id: true },
+          });
+          await this.auditoria.registrarMutacao(
+            tx,
+            ctx,
+            "pessoas_escala_dia_gravado",
+            "escala_colaborador",
+            linha.id,
             empresaId,
-            dia,
-            camada: "rascunho",
-          },
-        },
-        create: {
-          ...dados,
-          colaboradorId: dto.colaboradorId,
-          empresaId,
-          dia,
-          camada: "rascunho",
-          criadoPorUserId: ctx.actor.id,
-        },
-        update: dados,
-        select: { ...PROJECAO_DO_DIA, id: true },
-      });
-      await this.auditoria.registrarMutacao(
-        tx,
-        ctx,
-        "pessoas_escala_dia_gravado",
-        "escala_colaborador",
-        linha.id,
-        empresaId,
-      );
-      return projetarDia(linha);
-    });
+          );
+          gravados.push({
+            colaboradorId: p.colaboradorId,
+            ...projetarDia(linha),
+          });
+        }
+        return gravados;
+      },
+      { timeout: 60_000 },
+    );
   }
 
   /** Desfaz a mudança do dia no rascunho; idempotente. */
@@ -209,34 +271,54 @@ export class EscalaDiaService {
     dto: DiaDoQuadroDto,
     ctx: PessoasAuditContext,
   ): Promise<{ colaboradorId: string; dia: string; limpo: boolean }> {
+    const [r] = await this.limparLote([dto], ctx);
+    return r!;
+  }
+
+  /** T215 — desfaz a mudança de vários dias no rascunho; idempotente. */
+  async limparLote(
+    itens: readonly DiaDoQuadroDto[],
+    ctx: PessoasAuditContext,
+  ): Promise<{ colaboradorId: string; dia: string; limpo: boolean }[]> {
     const empresaId = this.empresaDaSessao(ctx);
-    const dia = dataDoDia(dto.dia);
-    await this.conferirVinculo(empresaId, dto.colaboradorId, dia);
-    return this.prisma.$transaction(async (tx) => {
-      const linha = await tx.escalaDia.findUnique({
-        where: {
-          colaboradorId_empresaId_dia_camada: {
-            colaboradorId: dto.colaboradorId,
+    await this.conferirVinculos(empresaId, itens);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const resultado: {
+          colaboradorId: string;
+          dia: string;
+          limpo: boolean;
+        }[] = [];
+        for (const item of itens) {
+          const linha = await tx.escalaDia.findUnique({
+            where: {
+              colaboradorId_empresaId_dia_camada: {
+                colaboradorId: item.colaboradorId,
+                empresaId,
+                dia: dataDoDia(item.dia),
+                camada: "rascunho",
+              },
+            },
+            select: { id: true },
+          });
+          if (linha === null) {
+            resultado.push({ ...item, limpo: false });
+            continue;
+          }
+          await tx.escalaDia.delete({ where: { id: linha.id } });
+          await this.auditoria.registrarMutacao(
+            tx,
+            ctx,
+            "pessoas_escala_dia_limpo",
+            "escala_colaborador",
+            linha.id,
             empresaId,
-            dia,
-            camada: "rascunho",
-          },
-        },
-        select: { id: true },
-      });
-      if (linha === null) {
-        return { colaboradorId: dto.colaboradorId, dia: dto.dia, limpo: false };
-      }
-      await tx.escalaDia.delete({ where: { id: linha.id } });
-      await this.auditoria.registrarMutacao(
-        tx,
-        ctx,
-        "pessoas_escala_dia_limpo",
-        "escala_colaborador",
-        linha.id,
-        empresaId,
-      );
-      return { colaboradorId: dto.colaboradorId, dia: dto.dia, limpo: true };
-    });
+          );
+          resultado.push({ ...item, limpo: true });
+        }
+        return resultado;
+      },
+      { timeout: 60_000 },
+    );
   }
 }

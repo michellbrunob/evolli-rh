@@ -187,7 +187,7 @@ export function MenuDaCelula({
 
   useEffect(() => {
     itens()[0]?.focus();
-    const fora = (e: MouseEvent) => {
+    const fora = (e: PointerEvent) => {
       if (
         menuRef.current &&
         !menuRef.current.contains(e.target as Node) &&
@@ -196,8 +196,9 @@ export function MenuDaCelula({
         onFechar(false);
       }
     };
-    document.addEventListener("mousedown", fora);
-    return () => document.removeEventListener("mousedown", fora);
+    // pointerdown: os gatilhos do Radix cancelam o mousedown.
+    document.addEventListener("pointerdown", fora);
+    return () => document.removeEventListener("pointerdown", fora);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

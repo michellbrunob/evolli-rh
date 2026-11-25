@@ -11,7 +11,9 @@ import { ApiError } from "../../../api/colaboradoresClient";
 import {
   consultarQuadro,
   gravarDia,
+  gravarDias,
   limparDia,
+  limparDias,
   publicarEscala,
   type DiaGravadoApi,
   type GravarDiaDto,
@@ -102,12 +104,25 @@ beforeEach(() => {
   vi.mocked(gravarDia).mockReset();
   vi.mocked(limparDia).mockReset();
   vi.mocked(publicarEscala).mockReset();
+  vi.mocked(gravarDias).mockReset();
+  vi.mocked(limparDias).mockReset();
+  vi.mocked(gravarDias).mockImplementation(async (dias) =>
+    dias.map((d) => ({
+      ...gravado(d.dia, { tipo: d.tipo }),
+      colaboradorId: d.colaboradorId,
+    })),
+  );
+  vi.mocked(limparDias).mockImplementation(async (dias) => dias.length);
   pessoas = [ana()];
+  // Como a API: só os dias gravados do período.
   vi.mocked(consultarQuadro).mockImplementation(async (inicio, fim) => ({
     empresaId: "emp",
     inicio,
     fim,
-    pessoas,
+    pessoas: pessoas.map((p) => ({
+      ...p,
+      dias: (p.dias ?? []).filter((d) => d.dia >= inicio && d.dia <= fim),
+    })),
   }));
   vi.mocked(listarTabelasHorario).mockResolvedValue({
     itens: [COMERCIAL, ESTAGIO],
@@ -798,5 +813,230 @@ describe("T215 — publicar a escala", () => {
         "Não foi possível publicar. Tente de novo.",
       ),
     );
+  });
+});
+
+describe("T215 — ações em massa", () => {
+  async function abrirMaisAcoes() {
+    fireEvent.keyDown(screen.getByRole("button", { name: "Mais ações" }), {
+      key: "Enter",
+    });
+    return screen.findByRole("menu");
+  }
+
+  it("seleção: pessoa, grupo e página; a barra conta e Esc limpa", async () => {
+    pessoas = [
+      ana(),
+      pessoa("Bruno Reis", {
+        colaboradorId: "c-bruno",
+        departamento: { id: "d", nome: "TI" },
+        escalas: [escala()],
+      }),
+    ];
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    const barra = screen.getByRole("toolbar", {
+      name: "Ações para as pessoas selecionadas",
+    });
+    expect(barra).toHaveTextContent("1 pessoa selecionada");
+    const pagina = screen.getByRole("checkbox", {
+      name: "Selecionar as pessoas desta página",
+    }) as HTMLInputElement;
+    expect(pagina.indeterminate).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar TI" }));
+    expect(barra).toHaveTextContent("2 pessoas selecionadas");
+    expect(pagina).toBeChecked();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("Dar folga: dia de hoje por padrão, grava no rascunho e Desfazer limpa", async () => {
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Dar folga" }));
+    const dialogo = screen.getByRole("dialog", {
+      name: "Dar folga para 1 pessoa",
+    });
+    expect(within(dialogo).getByLabelText("Dia")).toHaveValue("2026-11-25");
+    fireEvent.change(within(dialogo).getByRole("combobox", { name: "Tipo" }), {
+      target: { value: "dsr" },
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Dar folga no rascunho" }),
+    );
+    const aviso = await screen.findByRole("status", {
+      name: "DSR em 25/11 para 1 pessoa no rascunho",
+    });
+    expect(gravarDias).toHaveBeenCalledWith([
+      {
+        colaboradorId: "c-ana",
+        dia: "2026-11-25",
+        tipo: "dsr",
+        observacao: null,
+      },
+    ]);
+    fireEvent.click(within(aviso).getByRole("button", { name: "Desfazer" }));
+    await screen.findByRole("status", { name: "Ação desfeita" });
+    expect(limparDias).toHaveBeenCalledWith([
+      { colaboradorId: "c-ana", dia: "2026-11-25" },
+    ]);
+  });
+
+  it("Trocar turno: período da semana e dias úteis por padrão; o que muda por pessoa; aplica ao rascunho", async () => {
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Trocar turno" }));
+    const dialogo = screen.getByRole("dialog", {
+      name: "Trocar turno de 1 pessoa",
+    });
+    expect(within(dialogo).getByLabelText("De")).toHaveValue("2026-11-23");
+    expect(within(dialogo).getByLabelText("Até")).toHaveValue("2026-11-29");
+    expect(
+      within(dialogo)
+        .getAllByRole("button", { pressed: true })
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Segunda", "Terça", "Quarta", "Quinta", "Sexta"]);
+    // Comercial já é o turno: sem mudança.
+    expect(
+      await within(dialogo).findByText("sem mudança (já é Comercial)"),
+    ).toBeInTheDocument();
+    fireEvent.change(
+      within(dialogo).getByRole("combobox", { name: "Novo turno" }),
+      {
+        target: { value: ESTAGIO.id },
+      },
+    );
+    expect(within(dialogo).getByText("5 dias com Estágio")).toBeInTheDocument();
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Aplicar ao rascunho" }),
+    );
+    await screen.findByRole("status", {
+      name: "Estágio em 5 dias no rascunho",
+    });
+    const enviados = vi.mocked(gravarDias).mock.calls[0]![0];
+    expect(enviados.map((d) => d.dia)).toEqual([
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25",
+      "2026-11-26",
+      "2026-11-27",
+    ]);
+    expect(enviados[0]).toMatchObject({
+      tipo: "trabalho",
+      tabelaHorarioId: ESTAGIO.id,
+      periodos: [{ inicio: "09:00", fim: "15:00" }],
+      intervaloMinutos: 15,
+    });
+  });
+
+  it("menu ⋯: Copiar semana anterior (pessoas do filtro) grava o gravado da semana anterior e avisa", async () => {
+    pessoas = [ana([gravado("2026-11-17", { tipo: "dsr" })])];
+    await montar();
+    const menu = await abrirMaisAcoes();
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual([
+      "Copiar semana anteriorPara as pessoas do filtro",
+      "Repetir esta semana até…",
+      "Limpar o rascunho do períodoSó o que ainda não foi publicado",
+    ]);
+    // Sem rascunho no período, Limpar fica indisponível.
+    expect(
+      within(menu).getByRole("menuitem", { name: /Limpar o rascunho/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Copiar semana anterior/ }),
+    );
+    await screen.findByRole("status", {
+      name: "Semana anterior copiada para 1 pessoa",
+    });
+    expect(consultarQuadro).toHaveBeenCalledWith("2026-11-16", "2026-11-22");
+    expect(gravarDias).toHaveBeenCalledWith([
+      {
+        colaboradorId: "c-ana",
+        dia: "2026-11-24",
+        tipo: "dsr",
+        observacao: null,
+      },
+    ]);
+    // O padrão da origem não limpa nada que não tem rascunho.
+    expect(limparDias).not.toHaveBeenCalled();
+  });
+
+  it("menu ⋯: Repetir esta semana até a data copia para as semanas seguintes", async () => {
+    pessoas = [ana([gravado("2026-11-24", { tipo: "dsr" })])];
+    await montar();
+    const menu = await abrirMaisAcoes();
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Repetir esta semana/ }),
+    );
+    const dialogo = screen.getByRole("dialog", { name: "Repetir esta semana" });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Repetir no rascunho" }),
+    );
+    expect(within(dialogo).getByRole("alert")).toHaveTextContent(
+      "Escolha uma data depois desta semana, até um ano.",
+    );
+    fireEvent.change(within(dialogo).getByLabelText("Repetir até"), {
+      target: { value: "2026-12-08" },
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Repetir no rascunho" }),
+    );
+    await screen.findByRole("status", { name: "Semana repetida até 8/12" });
+    expect(vi.mocked(gravarDias).mock.calls[0]![0]).toEqual([
+      {
+        colaboradorId: "c-ana",
+        dia: "2026-12-01",
+        tipo: "dsr",
+        observacao: null,
+      },
+      {
+        colaboradorId: "c-ana",
+        dia: "2026-12-08",
+        tipo: "dsr",
+        observacao: null,
+      },
+    ]);
+  });
+
+  it("menu ⋯: Limpar o rascunho do período conta, confirma e limpa", async () => {
+    pessoas = [
+      ana([gravado("2026-11-24"), gravado("2026-11-25", { tipo: "dsr" })]),
+    ];
+    await montar();
+    const menu = await abrirMaisAcoes();
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Limpar o rascunho/ }),
+    );
+    const dialogo = screen.getByRole("dialog", {
+      name: "Limpar o rascunho do período",
+    });
+    expect(dialogo).toHaveTextContent(
+      "Desfaz as mudanças não publicadas de 23 a 29 de novembro de 2026 para as pessoas do filtro. O que já foi publicado continua igual.",
+    );
+    expect(dialogo).toHaveTextContent("2 mudanças serão desfeitas.");
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Limpar rascunho" }),
+    );
+    await screen.findByRole("status", { name: "2 mudanças desfeitas" });
+    expect(limparDias).toHaveBeenCalledWith([
+      { colaboradorId: "c-ana", dia: "2026-11-24" },
+      { colaboradorId: "c-ana", dia: "2026-11-25" },
+    ]);
+  });
+
+  it("sem permissão: sem seleção nem menu ⋯", async () => {
+    await montar(false);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais ações" })).toBeNull();
   });
 });
