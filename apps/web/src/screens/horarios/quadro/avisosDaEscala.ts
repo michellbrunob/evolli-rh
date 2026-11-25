@@ -23,6 +23,7 @@ import { plural } from "../../../format/plural";
 import {
   diaDaSemana,
   feriadoDe,
+  feriadoEstadualDe,
   formatarHoras,
   jornadaPorSemana,
   limiteLegalSemanal,
@@ -119,13 +120,16 @@ function turnoDeNoite(trechos: readonly [number, number][]): boolean {
   return total > 0 && noite * 2 >= total;
 }
 
-/** O feriado do dia para a pessoa (nacional ou local da unidade dela). */
+/**
+ * O feriado do dia para a pessoa: nacional, estadual (do estado da empresa)
+ * ou local da unidade dela.
+ */
 export function feriadoDaPessoa(
   p: PessoaDoQuadroApi,
   dia: string,
   regras: RegrasDaEscalaApi | undefined,
 ): string | null {
-  const nacional = feriadoDe(dia);
+  const nacional = feriadoDe(dia) ?? feriadoEstadualDe(dia, regras?.uf);
   if (nacional) return nacional;
   const local = regras?.feriados.find(
     (f) =>

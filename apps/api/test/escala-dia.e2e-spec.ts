@@ -914,6 +914,19 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
         antecedenciaDias: 7,
         avisarPadrao: true,
         feriados: [],
+        uf: null,
+      });
+      // O estado da empresa (para os feriados estaduais).
+      await prisma.empresa.update({
+        where: { id: empresaB },
+        data: { uf: "SP" },
+      });
+      expect((await get("/v1/escala/regras", rhB).expect(200)).body.uf).toBe(
+        "SP",
+      );
+      await prisma.empresa.update({
+        where: { id: empresaB },
+        data: { uf: null },
       });
       expect(r.body.convencao).toMatchObject({
         "6x1_autorizada": false,

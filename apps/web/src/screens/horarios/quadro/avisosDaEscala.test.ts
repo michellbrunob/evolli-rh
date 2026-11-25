@@ -185,6 +185,11 @@ describe("T215 — avisos da CLT no quadro", () => {
       ],
     });
     expect(feriadoDaPessoa(p, "2026-12-26", base)).toBe("Aniversário");
+    // Estadual: pelo estado da empresa, para todos.
+    expect(feriadoDaPessoa(p, "2026-07-09", { ...base, uf: "SP" })).toBe(
+      "Revolução Constitucionalista",
+    );
+    expect(feriadoDaPessoa(p, "2026-07-09", base)).toBeNull();
     expect(
       feriadoDaPessoa(
         { ...p, unidade: { id: "u2", nome: "X" } },

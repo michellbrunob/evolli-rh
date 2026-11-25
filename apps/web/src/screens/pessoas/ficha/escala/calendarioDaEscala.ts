@@ -282,6 +282,66 @@ export function feriadoDe(dia: string): string | null {
   return NOMES_DOS_FERIADOS[dia.slice(5)] ?? null;
 }
 
+/**
+ * T215 — feriados estaduais de data fixa, pela lei de cada estado (UF →
+ * mês-dia → nome). Só as datas firmes; os de data móvel e os municipais
+ * ficam nos feriados locais das Regras. Estados sem data fixa ficam fora.
+ */
+export const FERIADOS_ESTADUAIS: Readonly<
+  Record<string, Readonly<Record<string, string>>>
+> = {
+  AC: {
+    "01-23": "Dia do Evangélico",
+    "06-15": "Aniversário do Acre",
+    "08-06": "Início da Revolução Acreana",
+    "11-17": "Assinatura do Tratado de Petrópolis",
+  },
+  AL: {
+    "06-24": "São João",
+    "06-29": "São Pedro",
+    "09-16": "Emancipação Política de Alagoas",
+  },
+  AM: { "09-05": "Elevação do Amazonas à categoria de província" },
+  AP: {
+    "03-19": "Dia de São José",
+    "09-13": "Criação do Território Federal do Amapá",
+  },
+  BA: { "07-02": "Independência da Bahia" },
+  CE: { "03-25": "Data Magna do Ceará" },
+  DF: { "11-30": "Dia do Evangélico" },
+  MA: { "07-28": "Adesão do Maranhão à Independência" },
+  MS: { "10-11": "Criação do Estado de Mato Grosso do Sul" },
+  PA: { "08-15": "Adesão do Grão-Pará à Independência" },
+  PB: { "08-05": "Fundação do Estado da Paraíba" },
+  PE: { "03-06": "Revolução Pernambucana" },
+  PI: { "10-19": "Dia do Piauí" },
+  PR: { "12-19": "Emancipação Política do Paraná" },
+  RJ: { "04-23": "Dia de São Jorge" },
+  RN: { "10-03": "Mártires de Cunhaú e Uruaçu" },
+  RO: {
+    "01-04": "Criação do Estado de Rondônia",
+    "06-18": "Dia do Evangélico",
+  },
+  RR: { "10-05": "Criação do Estado de Roraima" },
+  RS: { "09-20": "Revolução Farroupilha" },
+  SE: { "07-08": "Emancipação Política de Sergipe" },
+  SP: { "07-09": "Revolução Constitucionalista" },
+  TO: {
+    "03-18": "Autonomia do Estado do Tocantins",
+    "09-08": "Nossa Senhora da Natividade",
+    "10-05": "Criação do Estado do Tocantins",
+  },
+};
+
+/** O feriado estadual de data fixa no dia, pelo estado (UF), ou `null`. */
+export function feriadoEstadualDe(
+  dia: string,
+  uf: string | null | undefined,
+): string | null {
+  if (!uf) return null;
+  return FERIADOS_ESTADUAIS[uf]?.[dia.slice(5)] ?? null;
+}
+
 function diasDoMes(mes: string): number {
   const [ano, m] = mes.split("-").map(Number);
   return new Date(Date.UTC(ano!, m!, 0)).getUTCDate();

@@ -681,8 +681,13 @@ export function RegrasDaEscalaScreen({
                       Feriados locais
                     </h2>
                     <p className="regras__texto">
-                      Nacionais já vêm do calendário. Cadastre aqui os
-                      municipais e os pontos facultativos de cada unidade.
+                      Nacionais e estaduais já vêm do calendário. Cadastre aqui
+                      os municipais e os pontos facultativos de cada unidade.
+                    </p>
+                    <p className="regras__nota">
+                      {regras.uf
+                        ? `Estaduais de ${regras.uf}, o estado da empresa.`
+                        : "Para os estaduais, informe o estado (UF) no cadastro da empresa."}
                     </p>
                   </div>
                   {podeOperar ? (

@@ -396,8 +396,22 @@ describe("T215 — Regras abertas numa seção", () => {
     expect(document.activeElement).toBe(
       document.getElementById("regras-feriados-titulo"),
     );
+    // Sem UF na empresa: diz onde informar.
+    expect(
+      screen.getByText(
+        "Para os estaduais, informe o estado (UF) no cadastro da empresa.",
+      ),
+    ).toBeInTheDocument();
     unmount();
     expect(lerSecaoDasRegras()).toBeNull();
+  });
+
+  it("com UF na empresa: os estaduais vêm dela", async () => {
+    vi.mocked(consultarRegras).mockResolvedValue({ ...regras(), uf: "SP" });
+    render(<RegrasDaEscalaScreen podeOperar onVoltar={() => {}} />);
+    expect(
+      await screen.findByText("Estaduais de SP, o estado da empresa."),
+    ).toBeInTheDocument();
   });
 });
 

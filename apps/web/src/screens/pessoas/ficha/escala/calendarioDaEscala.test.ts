@@ -13,6 +13,7 @@ import {
   avisosDaJornada,
 } from "./calendarioDaEscala";
 import { MODELOS_DE_ESCALA, modeloDe } from "./modelosDeEscala";
+import { FERIADOS_ESTADUAIS, feriadoEstadualDe } from "./calendarioDaEscala";
 
 const DIAS_UTEIS = ["segunda", "terca", "quarta", "quinta", "sexta"];
 /** 09:00–18:00 com 1 h de intervalo: 8 h por dia. */
@@ -344,5 +345,30 @@ describe("T215 — avisos de legislação da jornada (gaveta)", () => {
     expect(
       avisosDaJornada({ ...padrao("5x2", []), turno: null }, 44, "2026-11-02"),
     ).toEqual([]);
+  });
+});
+
+describe("T215 — feriados estaduais de data fixa", () => {
+  it("pelo estado (UF): o nome no dia; outro estado ou sem UF, nenhum", () => {
+    expect(feriadoEstadualDe("2026-07-09", "SP")).toBe(
+      "Revolução Constitucionalista",
+    );
+    expect(feriadoEstadualDe("2027-07-09", "SP")).toBe(
+      "Revolução Constitucionalista",
+    );
+    expect(feriadoEstadualDe("2026-07-09", "RJ")).toBeNull();
+    expect(feriadoEstadualDe("2026-07-09", null)).toBeNull();
+    expect(feriadoEstadualDe("2026-07-09", "XX")).toBeNull();
+    expect(feriadoEstadualDe("2026-10-05", "TO")).toBe(
+      "Criação do Estado do Tocantins",
+    );
+    expect(feriadoEstadualDe("2026-09-20", "RS")).toBe("Revolução Farroupilha");
+    // Todas as chaves são UF e "MM-DD" válidos.
+    for (const [uf, dias] of Object.entries(FERIADOS_ESTADUAIS)) {
+      expect(uf).toMatch(/^[A-Z]{2}$/);
+      for (const md of Object.keys(dias)) {
+        expect(md).toMatch(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+      }
+    }
   });
 });

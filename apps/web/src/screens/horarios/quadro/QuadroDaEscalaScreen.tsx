@@ -136,6 +136,7 @@ import {
 import {
   diaDaSemana,
   feriadoDe,
+  feriadoEstadualDe,
   formatarHoras,
 } from "../../pessoas/ficha/escala/calendarioDaEscala";
 import { corDoTurno, siglaDoNome } from "../turnos/turnos";
@@ -1868,6 +1869,7 @@ export function QuadroDaEscalaScreen({
                     {dias.map((d) => {
                       const feriado =
                         feriadoDe(d) ??
+                        feriadoEstadualDe(d, regras?.uf) ??
                         ([
                           ...new Set(
                             (regras?.feriados ?? [])

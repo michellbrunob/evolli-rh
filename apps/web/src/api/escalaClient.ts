@@ -381,11 +381,13 @@ export interface RegrasDaEscalaApi {
   antecedenciaDias: number;
   avisarPadrao: boolean;
   feriados: FeriadoLocalApi[];
+  /** O estado (UF) da empresa: os feriados estaduais vêm dele. */
+  uf?: string | null;
 }
 
 export type SalvarRegrasDto = Omit<
   RegrasDaEscalaApi,
-  "personalizadas" | "feriados" | "inicioTransicao"
+  "personalizadas" | "feriados" | "inicioTransicao" | "uf"
 > & { inicioTransicao: string | null };
 
 const ROTA_DAS_REGRAS = `${BASE}/escala/regras`;

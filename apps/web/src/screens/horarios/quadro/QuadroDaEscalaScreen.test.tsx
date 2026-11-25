@@ -147,6 +147,22 @@ describe("T215 — quadro da escala: semana", () => {
     expect(hoje).toHaveTextContent("Hoje");
   });
 
+  it("feriado estadual: pelo estado da empresa, no cabeçalho e na coluna de todos", async () => {
+    quadroCom([michell, julia, teste], { ...regrasCom([]), uf: "DF" });
+    montar();
+    await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: "Próximo período" }));
+    await screen.findByText("30 de novembro a 6 de dezembro de 2026");
+    const cab = await within(tabela()).findByRole("columnheader", {
+      name: /segunda 30\/11/,
+    });
+    expect(cab.querySelector(".quadro__feriado")).toHaveTextContent(
+      "Dia do Evangélico",
+    );
+    const cj = within(linhaDe("Julia Costa")).getAllByRole("cell");
+    expect(cj[0]!.className).toContain("quadro__celula--feriado");
+  });
+
   it("feriado local: nome sob o dia no cabeçalho e a coluna em âmbar só para quem é da unidade; escalado continua escalado", async () => {
     quadroCom(
       [michell, julia, teste],
@@ -206,6 +222,7 @@ describe("T215 — quadro da escala: semana", () => {
     expect(cm[2]!.className).toContain("quadro__celula--feriado");
     // teste (sem unidade): o feriado não é dela.
     const ct = within(linhaDe("teste")).getAllByRole("cell");
+    expect(ct[3]!.className).not.toContain("quadro__celula--feriado");
     expect(ct[3]!.className).not.toContain("quadro__celula--feriado");
     expect(ct[2]!.className).toContain("quadro__celula--feriado");
   });

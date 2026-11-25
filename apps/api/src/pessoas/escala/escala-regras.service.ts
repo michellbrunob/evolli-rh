@@ -138,6 +138,11 @@ export interface RegrasDaEscala {
   antecedenciaDias: number;
   avisarPadrao: boolean;
   feriados: FeriadoLocal[];
+  /**
+   * O estado (UF) do cadastro da empresa: os feriados estaduais vêm dele.
+   * `null` quando a empresa não tem UF.
+   */
+  uf: string | null;
 }
 
 function diaCivil(d: Date): string {
@@ -200,12 +205,13 @@ export class EscalaRegrasService {
     tx: Prisma.TransactionClient,
     empresaId: string,
   ): Promise<RegrasDaEscala> {
-    const [linha, feriados] = await Promise.all([
+    const [linha, feriados, empresa] = await Promise.all([
       tx.escalaRegras.findUnique({ where: { empresaId } }),
       tx.escalaFeriadoLocal.findMany({
         where: { empresaId, arquivadoEm: null },
         orderBy: [{ data: "asc" }, { nome: "asc" }],
       }),
+      tx.empresa.findUnique({ where: { id: empresaId }, select: { uf: true } }),
     ]);
     return {
       personalizadas: linha !== null,
@@ -224,6 +230,8 @@ export class EscalaRegrasService {
         tipo: f.tipo as FeriadoLocal["tipo"],
         unidadeIds: f.unidadeIds,
       })),
+      // O banco só aceita UF válida (duas letras maiúsculas).
+      uf: empresa?.uf ?? null,
     };
   }
 
