@@ -54,6 +54,7 @@ import {
   Repeat,
   Routing2,
   SearchNormal1,
+  Star1,
   Send2,
   SecurityUser,
   ShieldCross,
@@ -150,6 +151,8 @@ export const IconeRelogio = decorativo(Clock, "Bulk");
 export const IconeCopiar = decorativo(Copy, "Bulk");
 /** T215 — repetir (ex.: "Repetir esta semana até…"). */
 export const IconeRepetir = decorativo(Repeat, "Linear");
+/** T215 — visão salva (estrela). */
+export const IconeEstrela = decorativo(Star1, "Linear");
 /** T215 — documento (ex.: acordos e convenção). */
 export const IconeDocumento = decorativo(DocumentText, "Bulk");
 /** T215 — enviar ou publicar. */

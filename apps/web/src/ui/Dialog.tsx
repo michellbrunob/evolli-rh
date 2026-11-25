@@ -59,6 +59,8 @@ export interface JanelaProps {
   readonly subtitulo?: string;
   /** Ações fixas no rodapé. */
   readonly rodape?: ReactNode;
+  /** T215 — ação no cabeçalho, ao lado de Fechar (ex.: "Limpar tudo"). */
+  readonly acaoDoCabecalho?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
   /**
@@ -79,6 +81,7 @@ function Janela({
   icone,
   subtitulo,
   rodape,
+  acaoDoCabecalho,
   children,
   className,
   focoInicialRef,
@@ -203,12 +206,15 @@ function Janela({
                 ) : null}
               </div>
             </div>
-            <IconButton
-              label="Fechar"
-              icon={<IconeFechar tamanho={20} />}
-              onClick={pedirFechamento}
-              disabled={bloqueado}
-            />
+            <div className="ev:flex ev:shrink-0 ev:items-center ev:gap-[var(--space-xs)]">
+              {acaoDoCabecalho}
+              <IconButton
+                label="Fechar"
+                icon={<IconeFechar tamanho={20} />}
+                onClick={pedirFechamento}
+                disabled={bloqueado}
+              />
+            </div>
           </header>
           {descricao ? (
             <RadixDialog.Description className="ev:m-0 ev:px-[var(--space-lg)] ev:pt-[var(--space-sm)] ev:text-[var(--color-ink-muted)]">

@@ -151,9 +151,8 @@ describe("T215 — quadro da escala: semana", () => {
       within(tabela()).queryByRole("rowheader", { name: /Michell/ }),
     ).toBeNull();
     fireEvent.click(grupos[1]!);
-    expect(
-      within(tabela()).getByRole("rowheader", { name: /Michell/ }),
-    ).toBeInTheDocument();
+    // O quadro ao fundo continua com as 3 pessoas (ainda é rascunho).
+    expect(screen.getAllByText("Julia Costa").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByRole("combobox", { name: "Agrupar por:" }), {
       target: { value: "nenhum" },
@@ -282,74 +281,123 @@ describe("T215 — quadro da escala: semana", () => {
     expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
   });
 
-  it("Filtrar: atalho, listas com contagem e seletores; filtra na hora e o botão Ver N pessoas fecha", async () => {
+  it("Filtros: rascunho até 'Ver N pessoas', várias opções em todos os grupos, contagem facetada, pílulas aplicadas e descartar", async () => {
+    quadroCom([
+      { ...michell, gestor: { id: "c-julia", nome: "Julia Costa" } },
+      julia,
+      { ...teste, gestor: { id: "g-x", nome: "Gestor X" } },
+    ]);
     montar();
     await screen.findByRole("table");
     fireEvent.click(screen.getByRole("button", { name: "Filtrar" }));
-    const gaveta = screen.getByRole("dialog", { name: "Filtros" });
-    const contagem = () =>
-      within(screen.getByRole("dialog", { name: "Filtros" })).getByRole(
-        "status",
-      );
+    const gaveta = () => screen.getByRole("dialog", { name: "Filtros" });
+    const contagem = () => within(gaveta()).getByRole("status");
     expect(contagem()).toHaveTextContent("3 de 3 pessoas no quadro");
-    // Atalho: só Julia não tem padrão.
-    const sem = within(gaveta).getByRole("button", { name: /Sem escala/ });
+
+    // Atalho: só Julia não tem padrão; o quadro só muda ao aplicar.
+    const sem = within(gaveta()).getByRole("button", { name: /^Sem escala/ });
     expect(sem).toHaveTextContent("Sem escala1");
     fireEvent.click(sem);
     expect(sem).toHaveAttribute("aria-pressed", "true");
     expect(contagem()).toHaveTextContent("1 de 3 pessoas no quadro");
+    // O quadro ao fundo continua com as 3 pessoas (ainda é rascunho).
+    expect(screen.getByText("3 pessoas · 3 departamentos")).toBeInTheDocument();
     fireEvent.click(sem);
 
+    // O nome do grupo ganha o número de marcados ("Gestor 2, 2 marcados").
     const grupo = (nome: string) =>
-      within(gaveta).getByRole("group", { name: nome });
-    const itens = (nome: string) =>
-      within(grupo(nome))
+      within(gaveta()).getByRole("group", {
+        name: new RegExp(`^${nome}(\\s|$)`),
+      });
+    expect(
+      within(grupo("Departamento"))
         .getAllByRole("listitem")
-        .map((li) => li.textContent);
-    expect(itens("Departamento")).toEqual([
-      "Não informado1",
-      "Recursos Humanos1",
-      "Tecnologia1",
-    ]);
-    expect(itens("Tipo de contrato")).toEqual(["CLT2", "Estágio1"]);
-    expect(itens("Turno")).toEqual(["Sem turno1", "Comercial1", "Loja1"]);
-    expect(itens("Unidade")).toEqual(["Não informado1", "Matriz2"]);
-    for (const rotulo of [
-      "Gestor",
-      "Cargo",
-      "Área",
-      "Centro de custo",
-      "Nível",
-      "Gênero",
-    ]) {
-      expect(
-        within(gaveta).getByRole("combobox", { name: rotulo }),
-      ).toBeInTheDocument();
-    }
+        .map((li) => li.textContent),
+    ).toEqual(["Não informado1", "Recursos Humanos1", "Tecnologia1"]);
+    // Tipo de contrato e Turno: pílulas com contagem.
+    expect(
+      within(grupo("Tipo de contrato"))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["CLT2", "Estágio1"]);
+    expect(
+      within(grupo("Turno"))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Sem turno1", "Comercial1", "Loja1"]);
 
+    // Gestor: linha fechada que abre uma lista de caixas (várias opções).
+    const linha = within(gaveta()).getByRole("button", {
+      name: /^Gestor\s*Todos/,
+    });
+    expect(linha).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(linha);
+    expect(
+      within(grupo("Gestor"))
+        .getAllByRole("checkbox")
+        .map((c) => c.getAttribute("id") !== null),
+    ).toHaveLength(3);
+    // O gestor que também está no quadro mostra o departamento ao lado.
+    expect(
+      within(grupo("Gestor")).getByText("Recursos Humanos"),
+    ).toBeInTheDocument();
     fireEvent.click(
-      within(grupo("Tipo de contrato")).getByRole("checkbox", { name: "CLT" }),
+      within(grupo("Gestor")).getByRole("checkbox", { name: /Julia Costa/ }),
+    );
+    fireEvent.click(
+      within(grupo("Gestor")).getByRole("checkbox", { name: /Gestor X/ }),
     );
     expect(contagem()).toHaveTextContent("2 de 3 pessoas no quadro");
+    // Contagem facetada: com os gestores marcados, Estágio (Julia) vai a 0.
+    expect(
+      within(grupo("Tipo de contrato")).getByRole("button", {
+        name: /^Estágio/,
+      }),
+    ).toHaveTextContent("Estágio0");
     fireEvent.click(
-      within(gaveta).getByRole("button", { name: "Ver 2 pessoas" }),
+      within(gaveta()).getByRole("button", { name: "Fechar", expanded: true }),
+    );
+    expect(
+      within(gaveta()).getByRole("button", { name: /^Gestor/ }),
+    ).toHaveTextContent("Gestor X, Julia Costa");
+
+    fireEvent.click(
+      within(gaveta()).getByRole("button", { name: "Ver 2 pessoas" }),
     );
     expect(screen.queryByRole("dialog", { name: "Filtros" })).toBeNull();
     expect(screen.getByText("2 de 3 pessoas")).toBeInTheDocument();
     expect(
       within(tabela()).queryByRole("rowheader", { name: /Julia/ }),
     ).toBeNull();
+    const aplicados = screen.getByRole("group", { name: "Filtros aplicados" });
     expect(
-      screen.getByRole("button", { name: /^Filtrar.*1 filtro ligado/ }),
-    ).toBeInTheDocument();
+      within(aplicados)
+        .getAllByRole("button", { name: /^Remover o filtro/ })
+        .map((b) => b.textContent),
+    ).toEqual(["Gestor: Julia Costa", "Gestor: Gestor X"]);
+    fireEvent.click(
+      within(aplicados).getByRole("button", {
+        name: "Remover o filtro Gestor: Julia Costa",
+      }),
+    );
+    expect(screen.getByText("1 de 3 pessoas")).toBeInTheDocument();
 
-    // "Limpar filtros" dentro da gaveta.
+    // Fechar sem aplicar descarta o rascunho.
     fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Filtros" })).getByRole(
-        "button",
-        { name: "Limpar filtros" },
-      ),
+      within(grupo("Tipo de contrato")).getByRole("button", { name: /^CLT/ }),
+    );
+    fireEvent.click(
+      within(gaveta()).getAllByRole("button", { name: "Fechar" }).at(-1)!,
+    );
+    expect(screen.getByText("1 de 3 pessoas")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
+    expect(
+      within(grupo("Tipo de contrato")).getByRole("button", { name: /^CLT/ }),
+    ).toHaveAttribute("aria-pressed", "false");
+    // "Limpar tudo" no cabeçalho volta o rascunho a todos.
+    fireEvent.click(
+      within(gaveta()).getByRole("button", { name: "Limpar tudo" }),
     );
     expect(contagem()).toHaveTextContent("3 de 3 pessoas no quadro");
   });

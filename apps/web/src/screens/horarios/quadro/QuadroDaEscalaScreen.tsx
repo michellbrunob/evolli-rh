@@ -117,6 +117,7 @@ import {
   type RotulosDosCodigos,
   FILTROS_DO_QUADRO_VAZIOS,
   filtrar,
+  filtrosAplicados,
   quantosFiltros,
 } from "./filtrosDoQuadro";
 import {
@@ -986,9 +987,30 @@ export function QuadroDaEscalaScreen({
     [avisosTodos],
   );
 
+  // Quem tem rascunho no período (atalho "Mudanças não publicadas").
+  const idsComMudanca = useMemo(() => {
+    const noPeriodo = new Set(dias);
+    return new Set(
+      todas
+        .filter((p) =>
+          (p.dias ?? []).some(
+            (d) => d.camada === "rascunho" && noPeriodo.has(d.dia),
+          ),
+        )
+        .map((p) => p.colaboradorId),
+    );
+  }, [todas, dias]);
+  const contextoDoFiltro = useMemo(
+    () => ({ referencia, comAviso: idsComAviso, comMudanca: idsComMudanca }),
+    [referencia, idsComAviso, idsComMudanca],
+  );
   const filtradas = useMemo(
-    () => buscar(filtrar(todas, filtros, referencia, idsComAviso), busca),
-    [todas, filtros, referencia, busca, idsComAviso],
+    () => buscar(filtrar(todas, filtros, contextoDoFiltro), busca),
+    [todas, filtros, contextoDoFiltro, busca],
+  );
+  const aplicados = useMemo(
+    () => filtrosAplicados(todas, filtros, contextoDoFiltro, ROTULOS),
+    [todas, filtros, contextoDoFiltro],
   );
   // Os avisos das pessoas filtradas (os do painel, das células e do botão).
   const visiveis = useMemo(() => {
@@ -1641,18 +1663,6 @@ export function QuadroDaEscalaScreen({
               </span>
             ) : null}
           </Button>
-          {ligados > 0 ? (
-            <Button
-              type="button"
-              variant="subtle"
-              onClick={() => {
-                setFiltros(FILTROS_DO_QUADRO_VAZIOS);
-                setPagina(1);
-              }}
-            >
-              Limpar filtros
-            </Button>
-          ) : null}
           <label className="quadro__agrupar">
             <span>Agrupar por:</span>
             <select
@@ -1675,6 +1685,40 @@ export function QuadroDaEscalaScreen({
             </p>
           ) : null}
         </div>
+
+        {aplicados.length > 0 ? (
+          <div
+            className="quadro__aplicados"
+            role="group"
+            aria-label="Filtros aplicados"
+          >
+            {aplicados.map((a) => (
+              <button
+                key={a.chave}
+                type="button"
+                className="quadro__aplicado"
+                aria-label={`Remover o filtro ${a.texto}`}
+                onClick={() => {
+                  setFiltros(a.sem);
+                  setPagina(1);
+                }}
+              >
+                {a.texto}
+                <IconeFechar tamanho={12} />
+              </button>
+            ))}
+            <Button
+              type="button"
+              variant="subtle"
+              onClick={() => {
+                setFiltros(FILTROS_DO_QUADRO_VAZIOS);
+                setPagina(1);
+              }}
+            >
+              Limpar filtros
+            </Button>
+          </div>
+        ) : null}
 
         {carga.estado === "pronto" && em6x1.length > 0 ? (
           <FaixaDaTransicao
@@ -2317,14 +2361,16 @@ export function QuadroDaEscalaScreen({
         <GavetaDoQuadro
           aberta={gaveta}
           pessoas={todas}
-          quantas={total}
           filtros={filtros}
-          referencia={referencia}
+          contexto={contextoDoFiltro}
           rotulos={ROTULOS}
-          idsComAviso={idsComAviso}
-          onMudar={(f) => {
+          contar={(f) =>
+            buscar(filtrar(todas, f, contextoDoFiltro), busca).length
+          }
+          onAplicar={(f) => {
             setFiltros(f);
             setPagina(1);
+            setGaveta(false);
           }}
           onFechar={() => setGaveta(false)}
         />

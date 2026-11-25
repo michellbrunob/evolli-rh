@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  type ContextoDoFiltro,
   FILTROS_DO_QUADRO_VAZIOS,
   SEM_VALOR,
   alternarOpcao,
+  contagemDoAtalho,
   filtrar,
+  filtrosAplicados,
   opcoesDo,
   quantosFiltros,
+  resumoDoGrupo,
   semEscala,
 } from "./filtrosDoQuadro";
 import { escala, pessoa, turno } from "./fixturasDoQuadro";
@@ -33,75 +37,151 @@ const ana = pessoa("Ana", {
 const bia = pessoa("Bia", {
   tipoVinculo: "estagio",
   departamento: mk,
-  escalas: [escala({ turno: turno("Loja") })],
+  gestor: { id: "g2", nome: "Outro Gestor" },
+  cargo: { id: "c2", nome: "Estagiária" },
+  escalas: [escala({ turno: turno("Loja", { cor: "verde" }) })],
 });
 const caio = pessoa("Caio");
 const todas = [ana, bia, caio];
 
+const CTX: ContextoDoFiltro = {
+  referencia: REF,
+  comAviso: new Set(["c-Ana"]),
+  comMudanca: new Set(["c-Bia"]),
+};
+const nomes = (ps: { nome: string }[]) => ps.map((p) => p.nome);
+const V = FILTROS_DO_QUADRO_VAZIOS;
+
 describe("T215 — filtros do quadro", () => {
-  it("opções com contagem: 'Não informado' primeiro, depois em ordem alfabética", () => {
-    expect(opcoesDo(todas, "departamentos", REF, ROTULOS)).toEqual([
-      { valor: SEM_VALOR, rotulo: "Não informado", quantas: 1 },
-      { valor: "d-mk", rotulo: "Marketing", quantas: 1 },
-      { valor: "d-ti", rotulo: "Tecnologia", quantas: 1 },
-    ]);
-    expect(opcoesDo(todas, "tipos", REF, ROTULOS)).toEqual([
-      { valor: "clt", rotulo: "CLT", quantas: 2 },
-      { valor: "estagio", rotulo: "Estágio", quantas: 1 },
-    ]);
+  it("opções: 'Não informado'/'Sem turno'/'Sem gestor' primeiro, depois em ordem alfabética; turno com a cor", () => {
     expect(
-      opcoesDo(todas, "turnos", REF, ROTULOS).map((o) => [o.rotulo, o.quantas]),
+      opcoesDo(todas, "departamentos", V, CTX, ROTULOS).map((o) => [
+        o.rotulo,
+        o.quantas,
+      ]),
     ).toEqual([
-      ["Sem turno", 1],
-      ["Comercial", 1],
-      ["Loja", 1],
+      ["Não informado", 1],
+      ["Marketing", 1],
+      ["Tecnologia", 1],
     ]);
-    expect(opcoesDo(todas, "nivel", REF, ROTULOS).map((o) => o.rotulo)).toEqual(
-      ["Não informado", "Pleno"],
-    );
-  });
-
-  it("sem filtro, todas; atalho Sem escala", () => {
-    expect(filtrar(todas, FILTROS_DO_QUADRO_VAZIOS, REF)).toHaveLength(3);
-    expect(semEscala(caio)).toBe(true);
+    expect(opcoesDo(todas, "turnos", V, CTX, ROTULOS)).toEqual([
+      { valor: SEM_VALOR, rotulo: "Sem turno", quantas: 1, cor: null },
+      { valor: "t-Comercial", rotulo: "Comercial", quantas: 1, cor: "azul" },
+      { valor: "t-Loja", rotulo: "Loja", quantas: 1, cor: "verde" },
+    ]);
     expect(
-      filtrar(todas, { ...FILTROS_DO_QUADRO_VAZIOS, semEscala: true }, REF),
-    ).toEqual([caio]);
+      opcoesDo(todas, "gestores", V, CTX, ROTULOS).map((o) => o.rotulo),
+    ).toEqual(["Sem gestor", "Gestora", "Outro Gestor"]);
+    expect(
+      opcoesDo(todas, "tipos", V, CTX, ROTULOS).map((o) => o.rotulo),
+    ).toEqual(["CLT", "Estágio"]);
   });
 
-  it("lista: várias opções = qualquer uma; 'Não informado' é uma opção; grupos se somam", () => {
-    let f = alternarOpcao(FILTROS_DO_QUADRO_VAZIOS, "departamentos", "d-ti");
-    f = alternarOpcao(f, "departamentos", SEM_VALOR);
-    expect(filtrar(todas, f, REF)).toEqual([ana, caio]);
-    f = alternarOpcao(f, "tipos", "clt");
-    expect(filtrar(todas, f, REF)).toEqual([ana, caio]);
-    f = alternarOpcao(f, "turnos", "t-Comercial");
-    expect(filtrar(todas, f, REF)).toEqual([ana]);
-    // Desmarcar devolve.
-    f = alternarOpcao(f, "turnos", "t-Comercial");
-    expect(filtrar(todas, f, REF)).toEqual([ana, caio]);
-    expect(quantosFiltros(f)).toBe(3);
+  it("contagem facetada: conta quem passa nos OUTROS filtros; a opção zerada fica", () => {
+    const f = { ...V, tipos: ["clt"] };
+    expect(
+      opcoesDo(todas, "departamentos", f, CTX, ROTULOS).map((o) => [
+        o.rotulo,
+        o.quantas,
+      ]),
+    ).toEqual([
+      ["Não informado", 1],
+      ["Marketing", 0],
+      ["Tecnologia", 1],
+    ]);
+    // O próprio grupo não se conta: com CLT marcado, Estágio continua 1.
+    expect(
+      opcoesDo(todas, "tipos", f, CTX, ROTULOS).map((o) => [
+        o.rotulo,
+        o.quantas,
+      ]),
+    ).toEqual([
+      ["CLT", 2],
+      ["Estágio", 1],
+    ]);
   });
 
-  it("seletores: gestor, cargo, área, centro de custo, nível e gênero", () => {
-    for (const [grupo, valor] of [
-      ["gestor", "g1"],
-      ["cargo", "c1"],
-      ["area", "a1"],
-      ["centroCusto", "cc1"],
-      ["nivel", "pleno"],
-      ["genero", "feminino"],
-    ] as const) {
-      const f = { ...FILTROS_DO_QUADRO_VAZIOS, [grupo]: valor };
-      expect(filtrar(todas, f, REF)).toEqual([ana]);
-      expect(quantosFiltros(f)).toBe(1);
-      expect(
+  it("atalhos: com aviso, sem escala e mudanças não publicadas, com contagem facetada", () => {
+    expect(semEscala(caio)).toBe(true);
+    expect(nomes(filtrar(todas, { ...V, comAviso: true }, CTX))).toEqual([
+      "Ana",
+    ]);
+    expect(nomes(filtrar(todas, { ...V, semEscala: true }, CTX))).toEqual([
+      "Caio",
+    ]);
+    expect(nomes(filtrar(todas, { ...V, mudancas: true }, CTX))).toEqual([
+      "Bia",
+    ]);
+    expect(contagemDoAtalho(todas, "mudancas", V, CTX)).toBe(1);
+    expect(
+      contagemDoAtalho(todas, "mudancas", { ...V, tipos: ["clt"] }, CTX),
+    ).toBe(0);
+    // O próprio atalho ligado não zera a contagem dele.
+    expect(
+      contagemDoAtalho(todas, "semEscala", { ...V, semEscala: true }, CTX),
+    ).toBe(1);
+  });
+
+  it("várias opções = qualquer uma; grupos se somam; todos os grupos são de várias opções", () => {
+    expect(nomes(filtrar(todas, V, CTX))).toEqual(["Ana", "Bia", "Caio"]);
+    expect(
+      nomes(filtrar(todas, { ...V, departamentos: ["d-ti", SEM_VALOR] }, CTX)),
+    ).toEqual(["Ana", "Caio"]);
+    expect(
+      nomes(
         filtrar(
           todas,
-          { ...FILTROS_DO_QUADRO_VAZIOS, [grupo]: SEM_VALOR },
-          REF,
+          { ...V, departamentos: ["d-ti", "d-mk"], tipos: ["estagio"] },
+          CTX,
         ),
-      ).toEqual([bia, caio]);
+      ),
+    ).toEqual(["Bia"]);
+    expect(
+      nomes(filtrar(todas, { ...V, gestores: ["g1", "g2"] }, CTX)),
+    ).toEqual(["Ana", "Bia"]);
+    expect(nomes(filtrar(todas, { ...V, gestores: [SEM_VALOR] }, CTX))).toEqual(
+      ["Caio"],
+    );
+    for (const [grupo, valor, quem] of [
+      ["cargos", "c2", "Bia"],
+      ["areas", "a1", "Ana"],
+      ["centrosCusto", "cc1", "Ana"],
+      ["niveis", "pleno", "Ana"],
+      ["generos", "feminino", "Ana"],
+      ["unidades", "u1", "Ana"],
+      ["turnos", "t-Loja", "Bia"],
+    ] as const) {
+      expect(nomes(filtrar(todas, { ...V, [grupo]: [valor] }, CTX))).toEqual([
+        quem,
+      ]);
     }
+  });
+
+  it("marcar, contar, resumir e as pílulas dos filtros aplicados", () => {
+    let f = alternarOpcao(V, "cargos", "c1");
+    f = alternarOpcao(f, "cargos", "c2");
+    f = { ...f, semEscala: true };
+    expect(quantosFiltros(f)).toBe(3);
+    expect(alternarOpcao(f, "cargos", "c1").cargos).toEqual(["c2"]);
+    const opcoes = opcoesDo(todas, "cargos", V, CTX, ROTULOS);
+    expect(resumoDoGrupo(opcoes, f.cargos, "Todos")).toBe(
+      "Analista, Estagiária",
+    );
+    expect(resumoDoGrupo(opcoes, [], "Todos")).toBe("Todos");
+    const aplicados = filtrosAplicados(
+      todas,
+      { ...f, gestores: [SEM_VALOR] },
+      CTX,
+      ROTULOS,
+    );
+    expect(aplicados.map((a) => a.texto)).toEqual([
+      "Sem escala",
+      "Gestor: Sem gestor",
+      "Cargo: Analista",
+      "Cargo: Estagiária",
+    ]);
+    // Cada pílula tira só o dela.
+    expect(aplicados[2]!.sem.cargos).toEqual(["c2"]);
+    expect(aplicados[0]!.sem.semEscala).toBe(false);
   });
 });
