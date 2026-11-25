@@ -1902,59 +1902,6 @@
 }
 
 /* ---- T215 — Regras da escala: menu lateral e seções em linhas ---------- */
-.regras__corpo {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-lg);
-}
-
-@media (min-width: 900px) {
-  .regras__corpo {
-    grid-template-columns: 14rem minmax(0, 1fr);
-    gap: var(--space-xl, 2rem);
-  }
-
-  .regras--pagina .regras__secoes {
-    position: sticky;
-    top: calc(var(--altura-barra-superior, 60px) + var(--space-md));
-    align-self: start;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    padding: 0;
-    padding-right: var(--space-md);
-    border-right: var(--divisor);
-  }
-}
-
-.regras--pagina .regras__secao-link {
-  display: flex;
-  gap: var(--space-xs);
-  align-items: center;
-  min-height: var(--altura-botao);
-  padding: 0 var(--space-sm);
-  border-radius: var(--radius-md);
-  color: var(--color-ink-muted);
-}
-
-.regras--pagina .regras__secao-link svg {
-  flex: none;
-  color: var(--color-ink-subtle);
-}
-
-.regras--pagina .regras__secao-link[aria-current="true"] {
-  background: var(--surface-neutral);
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.regras--pagina .regras__secao-link[aria-current="true"] svg {
-  color: var(--color-ink);
-}
-
-.regras__conteudo {
-  display: grid;
-  min-width: 0;
-}
 
 .regras__bloco--secao {
   /* O html já desconta a barra superior (scroll-padding-top). */
@@ -2081,7 +2028,7 @@
 
 .regras__controle {
   justify-self: start;
-  min-width: 14rem;
+  min-width: 17rem;
   min-height: var(--altura-botao);
   padding: 0 var(--space-sm);
   border: 1px solid var(--borda-controle);
@@ -2092,6 +2039,7 @@
 }
 
 .regras__controle--leitura {
+  min-width: 23rem;
   display: inline-flex;
   align-items: center;
   border-color: var(--divisor-cor);
@@ -2153,10 +2101,31 @@
   font-size: var(--text-caption);
 }
 
+/* Feriados: título e texto à esquerda, "Adicionar feriado" no alto, à direita. */
 .regras--pagina .regras__titulo-linha {
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
 }
 
+.regras--pagina .regras__titulo-linha .regras__texto {
+  max-width: 22rem;
+}
+
+/* Linha com interruptor à direita (Publicação › Avisar as pessoas). */
+.regras__linha .regras__interruptor {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.regras--pagina .regras__rodape {
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* O fundo da página do Evolli é o cinza neutro: o bloco da transição fica
+   branco com borda, e a nota da 6x1 dentro dele, em cinza. */
 .regras--pagina .regras__transicao {
   border: 1px solid var(--divisor-cor);
   background: var(--surface-canvas);
@@ -2166,8 +2135,13 @@
   background: var(--surface-neutral);
 }
 
-.regras--pagina .regras__rodape {
+/* O rodapé das Regras segue o padrão de página (PaginaComSecoes.css). */
+.regras--pagina .regras__rodape.pagina-secoes__rodape {
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.regras--pagina {
+  padding-bottom: 0;
 }

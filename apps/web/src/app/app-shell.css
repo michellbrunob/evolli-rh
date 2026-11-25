@@ -291,11 +291,14 @@
    própria vaze a rolagem para a página inteira. Sem `max-width` (T206): o
    conteúdo ocupa a largura da coluna, e a largura que o trilho libera. */
 .app-shell__main {
+  /* T215 — o recuo do conteúdo, para quem precisa encostar na barra lateral
+     (o menu de seções e o rodapé fixo de PaginaComSecoes). */
+  --main-recuo-x: clamp(var(--space-md), 3vw, var(--space-xl));
+  --main-recuo-y: clamp(var(--space-lg), 4vw, var(--space-2xl));
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  padding: clamp(var(--space-lg), 4vw, var(--space-2xl))
-    clamp(var(--space-md), 3vw, var(--space-xl));
+  padding: var(--main-recuo-y) var(--main-recuo-x);
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
 }
 

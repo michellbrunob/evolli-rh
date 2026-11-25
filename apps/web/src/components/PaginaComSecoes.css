@@ -1,0 +1,148 @@
+/* T215 — página com menu lateral de seções (padrão do sistema). */
+
+.pagina-secoes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+}
+
+.pagina-secoes__menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs);
+}
+
+.pagina-secoes__item {
+  position: relative;
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  min-height: var(--altura-botao);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.pagina-secoes__item svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+  transition: color 150ms ease;
+}
+
+.pagina-secoes__item:hover {
+  /* Tom relativo: aparece sobre o fundo branco ou o cinza. */
+  background: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  color: var(--color-ink);
+}
+
+.pagina-secoes__item:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.pagina-secoes__item[aria-current="true"] {
+  background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.pagina-secoes__item[aria-current="true"] svg {
+  color: var(--color-ink);
+}
+
+.pagina-secoes__conteudo {
+  display: grid;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .pagina-secoes {
+    /* Medidas da referência: coluna de 264 px, item a 24 px da barra
+       lateral (222 px de largura) e o conteúdo a 48 px da linha. */
+    grid-template-columns: 16.5rem minmax(0, 1fr);
+    gap: 3rem;
+  }
+
+  /* O menu encosta na barra lateral principal (sem o recuo da página) e
+     desce até o rodapé, com a linha à direita, como uma coluna. */
+  .pagina-secoes {
+    margin-left: calc(-1 * var(--main-recuo-x, 0px));
+  }
+
+  .pagina-secoes__menu {
+    position: sticky;
+    top: var(--altura-barra-superior, 60px);
+    align-self: start;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    min-height: calc(
+      100dvh - var(--altura-barra-superior, 60px) - var(--altura-rodape-pagina)
+    );
+    padding: var(--space-md) 1.125rem var(--space-md) 1.5rem;
+    border-right: var(--divisor);
+  }
+
+  /* A barra de destaque na borda esquerda do menu. */
+  .pagina-secoes__item::before {
+    position: absolute;
+    top: 50%;
+    left: -1rem;
+    width: 2px;
+    height: 1.25rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-action);
+    content: "";
+    opacity: 0;
+    transform: translateY(-50%) scaleY(0.4);
+    transition:
+      opacity 150ms ease,
+      transform 150ms ease;
+  }
+
+  .pagina-secoes__item[aria-current="true"]::before {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
+  }
+}
+
+/* A seção: começa numa linha (o divisor da anterior) e para ali no clique. */
+.pagina-secoes__conteudo > section {
+  scroll-margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagina-secoes__item,
+  .pagina-secoes__item svg,
+  .pagina-secoes__item::before {
+    transition: none;
+  }
+}
+
+/* O rodapé fixo da página (estado, Descartar e Salvar): de ponta a ponta da
+   área de conteúdo, encostado na barra lateral, com a linha em cima. */
+:root {
+  --altura-rodape-pagina: 4.5rem;
+}
+
+.pagina-secoes__rodape {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  min-height: var(--altura-rodape-pagina);
+  margin: 0 calc(-1 * var(--main-recuo-x, 0px))
+    calc(-1 * var(--main-recuo-y, 0px));
+  padding: var(--space-sm) 3rem;
+  border-top: var(--divisor);
+  background: var(--surface-canvas);
+}

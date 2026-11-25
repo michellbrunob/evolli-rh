@@ -89,6 +89,7 @@ export function MenuDaCelula({
   celula,
   turnos,
   onEscolher,
+  focarPrimeiro = true,
   onFechar,
 }: {
   readonly ancora: HTMLElement;
@@ -97,6 +98,11 @@ export function MenuDaCelula({
   readonly celula: CelulaDoQuadro;
   readonly turnos: readonly TabelaHorarioApi[];
   readonly onEscolher: (acao: AcaoDaCelula) => void;
+  /**
+   * Aberto pelo teclado: o foco vai ao primeiro item. Pelo mouse, fica no
+   * menu: as setas entram nos itens e os atalhos (Enter, Del) valem.
+   */
+  readonly focarPrimeiro?: boolean;
   readonly onFechar: (devolverFoco: boolean) => void;
 }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -217,7 +223,8 @@ export function MenuDaCelula({
   ];
 
   useEffect(() => {
-    itens()[0]?.focus();
+    if (focarPrimeiro) itens()[0]?.focus();
+    else menuRef.current?.focus();
     const fora = (e: PointerEvent) => {
       if (
         menuRef.current &&
@@ -240,6 +247,25 @@ export function MenuDaCelula({
       e.preventDefault();
       lista[(i + lista.length) % lista.length]?.focus();
     };
+    // Atalhos: Enter (sem item em foco) abre os detalhes; Del limpa.
+    const comAtalho = (tecla: string) =>
+      grupos.flatMap((g) => g.itens).find((i) => i.atalho === tecla);
+    if (e.key === "Enter" && atual < 0) {
+      const item = comAtalho("Enter");
+      if (item) {
+        e.preventDefault();
+        onEscolher(item.acao);
+      }
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      const item = comAtalho("Del");
+      if (item) {
+        e.preventDefault();
+        onEscolher(item.acao);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") ir(atual + 1);
     else if (e.key === "ArrowUp") ir(atual - 1);
     else if (e.key === "Home") ir(0);
@@ -258,6 +284,7 @@ export function MenuDaCelula({
       ref={menuRef}
       role="menu"
       aria-label={rotulo}
+      tabIndex={-1}
       className="menu-celula"
       style={{ top: posicao.top, left: posicao.left }}
       onKeyDown={teclado}

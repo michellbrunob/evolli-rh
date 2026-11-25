@@ -180,13 +180,13 @@ describe("T215 — Regras da escala", () => {
     expect(
       screen.getByRole("switch", { name: "Turno noturno (22h às 5h)" }),
     ).toHaveAttribute("aria-checked", "false");
-    expect(screen.getAllByRole("switch")).toHaveLength(8 + 21);
-    // Publicação: "Avisar as pessoas" é a caixa marcada por padrão.
+    expect(screen.getAllByRole("switch")).toHaveLength(8 + 21 + 1);
+    // Publicação: "Avisar as pessoas" é o interruptor ligado por padrão.
     expect(
-      screen.getByRole("checkbox", {
-        name: /Marcado por padrão no diálogo de publicar/,
+      screen.getByRole("switch", {
+        name: "Marcado por padrão no diálogo de publicar",
       }),
-    ).toBeChecked();
+    ).toHaveAttribute("aria-checked", "true");
     // O menu lateral marca a seção atual.
     expect(
       screen.getByRole("link", { name: "Jornada e transição" }),

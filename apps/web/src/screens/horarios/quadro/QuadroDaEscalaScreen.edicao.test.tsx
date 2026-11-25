@@ -326,6 +326,42 @@ describe("T215 — menu da célula", () => {
     expect(limparDia).not.toHaveBeenCalled();
   });
 
+  it("atalhos: Enter na célula abre os detalhes; com o menu aberto pelo mouse, Enter detalha e Del limpa", async () => {
+    pessoas = [ana([gravado("2026-11-24")])];
+    await montar();
+    const comercial = () =>
+      screen.getAllByRole("button", { name: /^Comercial, 09:00–18:00$/ })[0]!;
+    // Enter na célula: os detalhes, sem passar pelo menu.
+    fireEvent.keyDown(comercial(), { key: "Enter" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    const painel = screen.getByRole("dialog", { name: "Ana Lima" });
+    fireEvent.click(within(painel).getByRole("button", { name: "Cancelar" }));
+    // Menu aberto pelo mouse (detail 1): o foco fica no menu.
+    fireEvent.click(comercial(), { detail: 1 });
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "Enter" });
+    expect(
+      screen.getByRole("dialog", { name: "Ana Lima" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Ana Lima" })).getByRole(
+        "button",
+        {
+          name: "Cancelar",
+        },
+      ),
+    );
+    // Del com o menu aberto no dia com rascunho: limpa.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Folga, mudança não publicada" }),
+      { detail: 1 },
+    );
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Delete" });
+    await screen.findByRole("status", { name: "Dia limpo no rascunho" });
+    expect(limparDia).toHaveBeenCalledWith("c-ana", "2026-11-24");
+  });
+
   it("Delete limpa o dia com rascunho", async () => {
     pessoas = [ana([gravado("2026-11-24")])];
     await montar();

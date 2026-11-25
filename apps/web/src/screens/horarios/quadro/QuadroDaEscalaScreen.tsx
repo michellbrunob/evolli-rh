@@ -530,6 +530,8 @@ export function QuadroDaEscalaScreen({
     colaboradorId: string;
     dia: string;
     ancora: HTMLElement;
+    /** Aberto pelo teclado (Espaço): o foco vai ao primeiro item. */
+    porTeclado?: boolean;
   } | null>(null);
   const [painel, setPainel] = useState<{
     colaboradorId: string;
@@ -889,7 +891,13 @@ export function QuadroDaEscalaScreen({
     else if (e.key === "ArrowUp") l -= 1;
     else if (e.key === "Home") k = 0;
     else if (e.key === "End") k = dias.length - 1;
-    else if (e.key === "Delete" || e.key === "Backspace") {
+    else if (e.key === "Enter") {
+      // Atalho do menu: Enter abre os detalhes do dia (Espaço abre o menu).
+      e.preventDefault();
+      setMenu(null);
+      abrirPainel(p, c.dia, null);
+      return;
+    } else if (e.key === "Delete" || e.key === "Backspace") {
       // Sem rascunho no dia, `limpar` não faz nada.
       e.preventDefault();
       void tentar(() => limpar(p, c.dia));
@@ -1307,6 +1315,8 @@ export function QuadroDaEscalaScreen({
                                 colaboradorId: p.colaboradorId,
                                 dia: c.dia,
                                 ancora: e.currentTarget,
+                                // detail 0: clique pelo teclado.
+                                porTeclado: e.detail === 0,
                               })
                             }
                           >
@@ -1908,6 +1918,7 @@ export function QuadroDaEscalaScreen({
               rotulo={`Dia de ${p.nome}, ${diaDaSemanaEDiaMes(menu.dia)}`}
               celula={c}
               turnos={turnos}
+              focarPrimeiro={menu.porTeclado ?? false}
               onEscolher={(acao) => escolher(p, c, acao)}
               onFechar={(devolver) => {
                 const ancoraDoMenu = menu.ancora;

@@ -99,6 +99,36 @@ Valem para o sistema inteiro; a tela não redesenha estes controles.
 - **Interruptor** (liga/desliga) — botão com `role="switch"` e
   `aria-checked`, não caixa de seleção.
 
+## Padrões de página e movimento
+
+Decisão da proprietária (2026-11-25): valem para o sistema inteiro. Toda tela
+nova do mesmo tipo usa o mesmo padrão, sem variação local.
+
+- **Página longa de configuração** — `components/PaginaComSecoes`: menu
+  lateral de seções com ícone, encostado na barra lateral principal (coluna
+  de 264 px, item a 24 px, conteúdo a 48 px da linha), fixo ao rolar e
+  descendo até o rodapé. A seção atual fica marcada (fundo, ícone escuro e a
+  barra na borda esquerda, transição de 150 ms) e acompanha a rolagem. O
+  clique rola suave até o começo da seção, logo abaixo da barra superior, e
+  leva o foco ao título dela. Conteúdo em seções separadas por linha.
+- **Linha de formulário** — rótulo e ajuda à esquerda, campo à direita;
+  linhas separadas por divisor. Liga/desliga é interruptor à direita.
+- **Rodapé fixo da página** (`pagina-secoes__rodape`) — de ponta a ponta da
+  área de conteúdo, linha em cima: o estado à esquerda ("Ainda sem
+  alterações…", "Alterações não salvas.") e, à direita, Descartar (botão de
+  texto) e a ação principal.
+- **Cadastro em etapas** — `components/cadastro/CadastroEmEtapas`: etapas à
+  esquerda, troca com fade, foco no título da etapa nova, barra de
+  "% concluído" e ações no rodapé.
+- **Filtros de lista** — busca com ícone e filtros em pílula
+  ("Unidade: Todas ▾"), numa linha; tabela num cartão com borda.
+- **Período** — `SeletorDePeriodo`: botão com ícone que abre um calendário
+  (anterior/próximo, mês, setas do teclado; Esc fecha só o calendário).
+- **Janelas** — altura estável: trocar opções não muda o tamanho nem
+  desloca a janela; enquanto carrega, o conteúdo anterior fica, esmaecido.
+- **Movimento** — transições curtas (120–150 ms); quem pede menos movimento
+  (`prefers-reduced-motion`) não tem animação nem rolagem suave.
+
 ## Temas de Aparência
 
 Quatro temas, escolhidos em Configurações › Aparência. Todos redefinem os
