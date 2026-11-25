@@ -72,7 +72,7 @@ const rota = (colaboradorId: string) =>
   `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/escalas`;
 
 async function enviar<T>(
-  metodo: "GET" | "POST" | "PUT" | "DELETE",
+  metodo: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   corpo?: unknown,
 ): Promise<T> {
@@ -386,4 +386,60 @@ export function criarFeriadoLocal(dto: {
 
 export function removerFeriadoLocal(id: string): Promise<RegrasDaEscalaApi> {
   return enviar("DELETE", `${ROTA_DOS_FERIADOS}/${encodeURIComponent(id)}`);
+}
+
+/**
+ * T215 — Visões salvas do quadro: os filtros com um nome, só da conta e da
+ * empresa ativa. Toda resposta traz a lista inteira, em ordem de nome.
+ */
+export interface FiltrosDaVisaoApi {
+  comAviso: boolean;
+  semEscala: boolean;
+  mudancas: boolean;
+  unidades: readonly string[];
+  departamentos: readonly string[];
+  tipos: readonly string[];
+  turnos: readonly string[];
+  gestores: readonly string[];
+  cargos: readonly string[];
+  areas: readonly string[];
+  centrosCusto: readonly string[];
+  niveis: readonly string[];
+  generos: readonly string[];
+}
+
+export interface VisaoDoQuadroApi {
+  id: string;
+  nome: string;
+  filtros: FiltrosDaVisaoApi;
+}
+
+export interface VisoesDoQuadroApi {
+  visoes: VisaoDoQuadroApi[];
+}
+
+const ROTA_DAS_VISOES = `${BASE}/escala/visoes`;
+const rotaDaVisao = (id: string) =>
+  `${ROTA_DAS_VISOES}/${encodeURIComponent(id)}`;
+
+export function consultarVisoes(): Promise<VisoesDoQuadroApi> {
+  return enviar("GET", ROTA_DAS_VISOES);
+}
+
+export function criarVisao(dto: {
+  nome: string;
+  filtros: FiltrosDaVisaoApi;
+}): Promise<VisoesDoQuadroApi> {
+  return enviar("POST", ROTA_DAS_VISOES, dto);
+}
+
+export function renomearVisao(
+  id: string,
+  nome: string,
+): Promise<VisoesDoQuadroApi> {
+  return enviar("PATCH", rotaDaVisao(id), { nome });
+}
+
+export function removerVisao(id: string): Promise<VisoesDoQuadroApi> {
+  return enviar("DELETE", rotaDaVisao(id));
 }

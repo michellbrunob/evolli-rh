@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../../api/colaboradoresClient";
 import {
   consultarQuadro,
+  consultarVisoes,
   gravarDia,
   gravarDias,
   limparDia,
@@ -26,6 +27,7 @@ import {
   type GravarDiaDto,
   type PessoaDoQuadroApi,
   type QuadroDaEscalaApi,
+  type VisaoDoQuadroApi,
 } from "../../../api/escalaClient";
 import {
   listarTabelasHorario,
@@ -70,6 +72,7 @@ import {
   IconeTentarDeNovo,
   IconeInformacao,
   IconeFiltrar,
+  IconeEstrela,
   IconeFechar,
   IconeMaisAcoes,
   IconeModelo,
@@ -79,6 +82,7 @@ import { Esqueleto, Revelar } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import { OPCOES_GENERO, OPCOES_NIVEL } from "../../pessoas/NovaAdmissaoScreen";
 import { GavetaDoQuadro } from "./GavetaDoQuadro";
+import { DialogoGerenciarVisoes, DialogoSalvarVisao } from "./VisoesDoQuadro";
 import {
   type AcaoDaCelula,
   MenuDaCelula,
@@ -526,6 +530,24 @@ export function QuadroDaEscalaScreen({
     FILTROS_DO_QUADRO_VAZIOS,
   );
   const [gaveta, setGaveta] = useState(false);
+  // Visões salvas (só da conta): carregadas uma vez; falha = nenhuma.
+  const [visoes, setVisoes] = useState<VisaoDoQuadroApi[]>([]);
+  const [salvarVisao, setSalvarVisao] = useState<FiltrosDoQuadro | null>(null);
+  const [gerenciarVisoes, setGerenciarVisoes] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await consultarVisoes();
+        if (vivo && r) setVisoes(r.visoes);
+      } catch {
+        // Sem visões: o quadro segue igual.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [turnos, setTurnos] = useState<TabelaHorarioApi[]>([]);
   const [unidades, setUnidades] = useState<UnidadeOrganizacionalApi[]>([]);
   const [menu, setMenu] = useState<{
@@ -1715,6 +1737,14 @@ export function QuadroDaEscalaScreen({
             <Button
               type="button"
               variant="subtle"
+              onClick={() => setSalvarVisao(filtros)}
+            >
+              <IconeEstrela tamanho={16} />
+              Salvar como visão
+            </Button>
+            <Button
+              type="button"
+              variant="subtle"
               onClick={() => {
                 setFiltros(FILTROS_DO_QUADRO_VAZIOS);
                 setPagina(1);
@@ -2393,6 +2423,32 @@ export function QuadroDaEscalaScreen({
             setGaveta(false);
           }}
           onFechar={() => setGaveta(false)}
+          visoes={visoes}
+          onSalvarVisao={(f) => setSalvarVisao(f)}
+          onGerenciarVisoes={() => setGerenciarVisoes(true)}
+        />
+        <DialogoSalvarVisao
+          aberto={salvarVisao !== null}
+          filtros={salvarVisao ?? FILTROS_DO_QUADRO_VAZIOS}
+          onFechar={() => setSalvarVisao(null)}
+          onSalva={(lista) => {
+            setVisoes(lista);
+            setSalvarVisao(null);
+            setAviso({
+              id: Date.now(),
+              titulo: "Visão salva",
+              texto: "Abra pelos Filtros, em Visões salvas.",
+            });
+          }}
+        />
+        <DialogoGerenciarVisoes
+          aberto={gerenciarVisoes}
+          visoes={visoes}
+          onFechar={() => setGerenciarVisoes(false)}
+          onMudou={(lista, texto) => {
+            setVisoes(lista);
+            setAviso({ id: Date.now(), titulo: texto });
+          }}
         />
       </section>
     </Revelar>

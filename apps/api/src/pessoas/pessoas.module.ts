@@ -24,6 +24,8 @@ import { EscalaDiaService } from "./escala/escala-dia.service";
 import { EscalaPublicacaoService } from "./escala/escala-publicacao.service";
 import { EscalaRegrasController } from "./escala/escala-regras.controller";
 import { EscalaRegrasService } from "./escala/escala-regras.service";
+import { EscalaVisoesController } from "./escala/escala-visoes.controller";
+import { EscalaVisoesService } from "./escala/escala-visoes.service";
 import { QuadroEscalaService } from "./escala/quadro-escala.service";
 import { HistoricoSalarialService } from "./salarios/historico-salarial.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
@@ -91,6 +93,7 @@ import {
     QuadroEscalaController,
     EscalaDiaController,
     EscalaRegrasController,
+    EscalaVisoesController,
     FeriasDoColaboradorController,
   ],
   providers: [
@@ -113,6 +116,7 @@ import {
     EscalaDiaService,
     EscalaPublicacaoService,
     EscalaRegrasService,
+    EscalaVisoesService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,

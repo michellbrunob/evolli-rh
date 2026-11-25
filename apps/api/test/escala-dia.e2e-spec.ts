@@ -1108,6 +1108,7 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       ]);
       const trilha = await prisma.auditEvent.findMany({
         where: { resourceId: id },
+        orderBy: { occurredAt: "asc" },
       });
       expect(trilha.map((e) => e.action)).toEqual([
         "pessoas_escala_feriado_criado",
@@ -1125,6 +1126,197 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
         await putRegras(BASE_REGRAS, cred).expect(403);
       }
       await agent().get("/v1/escala/regras").expect(401);
+    });
+  });
+  describe("visões salvas do quadro", () => {
+    const VISOES = "/v1/escala/visoes";
+    const criar = (corpo: Record<string, unknown>, cred: Credencial = rhA) =>
+      post(VISOES, cred).send(corpo);
+    const patch = (
+      id: string,
+      corpo: Record<string, unknown>,
+      cred: Credencial = rhA,
+    ) =>
+      agent()
+        .patch(`${VISOES}/${id}`)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken)
+        .send(corpo);
+    const apagar = (id: string, cred: Credencial = rhA) =>
+      agent()
+        .delete(`${VISOES}/${id}`)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    interface Visao {
+      id: string;
+      nome: string;
+      filtros: Record<string, unknown>;
+    }
+
+    it("salva com a forma completa, lista em ordem de nome e só para a própria conta e empresa", async () => {
+      const r = await criar({
+        nome: "  Sem escala da loja  ",
+        filtros: { semEscala: true, departamentos: ["d1", "d1", "d2"] },
+      }).expect(201);
+      const visoes = r.body.visoes as Visao[];
+      expect(visoes).toEqual([
+        {
+          id: expect.any(String),
+          nome: "Sem escala da loja",
+          filtros: {
+            comAviso: false,
+            semEscala: true,
+            mudancas: false,
+            unidades: [],
+            departamentos: ["d1", "d2"],
+            tipos: [],
+            turnos: [],
+            gestores: [],
+            cargos: [],
+            areas: [],
+            centrosCusto: [],
+            niveis: [],
+            generos: [],
+          },
+        },
+      ]);
+      await criar({ nome: "Avisos", filtros: { comAviso: true } }).expect(201);
+      expect(
+        ((await get(VISOES, rhA).expect(200)).body.visoes as Visao[]).map(
+          (v) => v.nome,
+        ),
+      ).toEqual(["Avisos", "Sem escala da loja"]);
+      // Outra conta da mesma empresa e outra empresa não veem.
+      expect((await get(VISOES, dpA).expect(200)).body.visoes).toEqual([]);
+      expect((await get(VISOES, rhB).expect(200)).body.visoes).toEqual([]);
+      // O mesmo nome em outra conta pode.
+      await criar({ nome: "Avisos", filtros: { comAviso: true } }, dpA).expect(
+        201,
+      );
+      // Preferência de tela: sem trilha.
+      const trilha = await prisma.auditEvent.findMany({
+        where: { resourceId: visoes[0]!.id },
+      });
+      expect(trilha).toEqual([]);
+    });
+
+    it("recusa nome repetido (409), filtros vazios, chave desconhecida e forma errada", async () => {
+      expect(
+        (
+          await criar({ nome: "Avisos", filtros: { mudancas: true } }).expect(
+            409,
+          )
+        ).body.erros,
+      ).toEqual([{ campo: "nome", motivo: "em_uso" }]);
+      expect(
+        (await criar({ nome: "Vazia", filtros: {} }).expect(422)).body.erros,
+      ).toEqual([{ campo: "filtros", motivo: "obrigatorio" }]);
+      for (const filtros of [
+        { inventado: true },
+        { comAviso: "sim" },
+        { cargos: "c1" },
+        { cargos: [1] },
+        { cargos: [""] },
+        { cargos: ["x".repeat(81)] },
+      ]) {
+        expect(
+          (await criar({ nome: "X", filtros }).expect(422)).body.erros,
+        ).toEqual([{ campo: "filtros", motivo: "invalido" }]);
+      }
+      await criar({ nome: "   ", filtros: { comAviso: true } }).expect(400);
+      await criar({ nome: "x".repeat(61), filtros: { comAviso: true } }).expect(
+        400,
+      );
+      await criar({ nome: "X", filtros: [] }).expect(400);
+    });
+
+    it("renomeia e remove só a própria; nome repetido ao renomear é 409", async () => {
+      const lista = (await get(VISOES, rhA).expect(200)).body.visoes as Visao[];
+      const avisos = lista.find((v) => v.nome === "Avisos")!;
+      expect(
+        (await patch(avisos.id, { nome: "Sem escala da loja" }).expect(409))
+          .body.erros,
+      ).toEqual([{ campo: "nome", motivo: "em_uso" }]);
+      const r = await patch(avisos.id, { nome: "Com aviso" }).expect(200);
+      expect((r.body.visoes as Visao[]).map((v) => v.nome)).toEqual([
+        "Com aviso",
+        "Sem escala da loja",
+      ]);
+      // Outra conta: 404 (não revela que existe).
+      await patch(avisos.id, { nome: "Dela" }, dpA).expect(404);
+      await apagar(avisos.id, dpA).expect(404);
+      await apagar(avisos.id, rhB).expect(404);
+      const rem = await apagar(avisos.id).expect(200);
+      expect((rem.body.visoes as Visao[]).map((v) => v.nome)).toEqual([
+        "Sem escala da loja",
+      ]);
+      await apagar(avisos.id).expect(404);
+      await patch("nao-e-uuid", { nome: "X" }).expect(400);
+    });
+
+    it("teto de 30 visões por conta e empresa", async () => {
+      const ja = ((await get(VISOES, rhB).expect(200)).body.visoes as Visao[])
+        .length;
+      for (let i = ja; i < 30; i++) {
+        await criar(
+          { nome: `Visao ${i}`, filtros: { comAviso: true } },
+          rhB,
+        ).expect(201);
+      }
+      expect(
+        (
+          await criar(
+            { nome: "Uma a mais", filtros: { comAviso: true } },
+            rhB,
+          ).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "nome", motivo: "limite" }]);
+      // A lista vem em ordem de nome (não de criação).
+      const nomes = (
+        (await get(VISOES, rhB).expect(200)).body.visoes as Visao[]
+      ).map((v) => v.nome);
+      expect(nomes).toHaveLength(30);
+      expect(nomes).toEqual(
+        [...nomes].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+      );
+      expect(nomes.slice(0, 3)).toEqual(["Visao 0", "Visao 1", "Visao 10"]);
+    });
+
+    it("forma gravada fora do padrão vira filtro vazio ao ler", async () => {
+      const r = await criar(
+        { nome: "Para estragar", filtros: { comAviso: true } },
+        dpA,
+      ).expect(201);
+      const id = (r.body.visoes as Visao[]).find(
+        (v) => v.nome === "Para estragar",
+      )!.id;
+      await prisma.escalaVisao.update({
+        where: { id },
+        data: { filtros: { comAviso: "sim" } },
+      });
+      const v = (
+        (await get(VISOES, dpA).expect(200)).body.visoes as Visao[]
+      ).find((x) => x.id === id)!;
+      expect(v.filtros).toMatchObject({ comAviso: false, cargos: [] });
+    });
+
+    it("permissões: master sem empresa ativa 403; demais papéis, sem CSRF e sem sessão negados", async () => {
+      await get(VISOES, master).expect(403);
+      await criar({ nome: "M", filtros: { comAviso: true } }, master).expect(
+        403,
+      );
+      for (const cred of outros) {
+        await get(VISOES, cred).expect(403);
+        await criar({ nome: "O", filtros: { comAviso: true } }, cred).expect(
+          403,
+        );
+      }
+      await agent()
+        .post(VISOES)
+        .set("Cookie", rhA.cookie)
+        .send({ nome: "Sem CSRF", filtros: { comAviso: true } })
+        .expect(403);
+      await agent().get(VISOES).expect(401);
     });
   });
 });

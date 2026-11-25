@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCsrfToken, setCsrfToken } from "./csrfClient";
-import { gravarDias, limparDias, publicarEscala } from "./escalaClient";
+import {
+  criarVisao,
+  gravarDias,
+  limparDias,
+  publicarEscala,
+  removerVisao,
+  renomearVisao,
+} from "./escalaClient";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -10,6 +17,67 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 const PESSOA = "11111111-1111-4111-8111-111111111111";
+
+describe("T215 — cliente das visões salvas", () => {
+  beforeEach(() => {
+    clearCsrfToken();
+    setCsrfToken("token");
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cria, renomeia e remove com CSRF; o erro por campo chega ao chamador", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(201, { visoes: [] }))
+      .mockResolvedValueOnce(jsonResponse(200, { visoes: [] }))
+      .mockResolvedValueOnce(jsonResponse(200, { visoes: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse(409, { erros: [{ campo: "nome", motivo: "em_uso" }] }),
+      );
+    const filtros = {
+      comAviso: true,
+      semEscala: false,
+      mudancas: false,
+      unidades: [],
+      departamentos: [],
+      tipos: [],
+      turnos: [],
+      gestores: [],
+      cargos: [],
+      areas: [],
+      centrosCusto: [],
+      niveis: [],
+      generos: [],
+    };
+    await criarVisao({ nome: "Com aviso", filtros });
+    await renomearVisao("v/1", "Outro");
+    await removerVisao("v1");
+    const chamadas = fetchMock.mock.calls.map(([url, init]) => [
+      url,
+      (init as RequestInit).method,
+      ((init as RequestInit).headers as Record<string, string>)["x-csrf-token"],
+      (init as RequestInit).body ?? null,
+    ]);
+    expect(chamadas).toEqual([
+      [
+        "/v1/escala/visoes",
+        "POST",
+        "token",
+        JSON.stringify({ nome: "Com aviso", filtros }),
+      ],
+      [
+        "/v1/escala/visoes/v%2F1",
+        "PATCH",
+        "token",
+        JSON.stringify({ nome: "Outro" }),
+      ],
+      ["/v1/escala/visoes/v1", "DELETE", "token", null],
+    ]);
+    await expect(criarVisao({ nome: "X", filtros })).rejects.toMatchObject({
+      status: 409,
+    });
+  });
+});
 
 describe("T215 — cliente do quadro da escala (lote e publicar)", () => {
   beforeEach(() => {

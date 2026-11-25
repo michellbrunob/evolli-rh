@@ -398,3 +398,33 @@ próprios.
 - O Evolli tem design próprio: o arquivo de referência visual externa da
   T032 foi removido do repositório e a fonte oficial passou a ser
   [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md).
+
+## Filtros do quadro, visões salvas e feriados no quadro (25/11/2026)
+
+Conferido na referência; textos e desenho próprios.
+
+- Gaveta "Filtros": o que se marca é rascunho até "Ver N pessoas"; fechar
+  descarta. Todos os grupos aceitam várias opções (Unidade e Departamento em
+  lista; Tipo de contrato e Turno em pílulas; Gestor, Cargo, Área, Centro de
+  custo, Nível e Gênero em linhas que abrem). Contagem facetada (quem passa
+  nos outros filtros); opção zerada fica apagada. Atalhos: "Com aviso da
+  CLT", "Sem escala" e "Mudanças não publicadas". Filtros aplicados viram
+  pílulas removíveis acima do quadro.
+- Visões salvas: os filtros com um nome, só da conta e da empresa ativa
+  ("Só você vê"). Tabela `escala_visao` (migration
+  `20261125180000_escala_visao`, aditiva); `GET/POST /v1/escala/visoes`,
+  `PATCH/DELETE /v1/escala/visoes/:visaoId`, para quem lê o quadro, com
+  CSRF nas gravações. Nome de 1 a 60 caracteres, único por conta e empresa
+  (409 `nome em_uso`); teto de 30 visões (422 `nome limite`); filtros só com
+  chaves conhecidas (422 `filtros invalido`) e ao menos um filtro (422
+  `filtros obrigatorio`). Preferência de tela: sem trilha de auditoria.
+  Na tela: "Salvar como visão" no rodapé da gaveta e na linha dos filtros
+  aplicados; a visão abre como rascunho na gaveta; "Gerenciar" renomeia e
+  apaga (com confirmação) — a referência só orienta a salvar com outro nome.
+- Feriado no quadro: nacional (calendário) ou local (Regras), na unidade da
+  pessoa ou em todas. Semana: nome sob o dia, em âmbar; mês: número e
+  coluna em âmbar com o nome na dica. A coluna fica em âmbar só para quem o
+  feriado vale. Feriado não muda a escala: quem está escalado continua; o
+  trabalho no feriado entra nos avisos e na folha como feriado trabalhado.
+- Transição da EC 141/2026: decisão da proprietária — seguir as datas da
+  emenda (16/12/2026 e 16/12/2027), editáveis em Regras.

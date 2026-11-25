@@ -47,7 +47,9 @@ export type MotivoDoCampo =
   // T215 — Escala: vigência antes da admissão do colaborador.
   | "antes_da_admissao"
   // T215 — Quadro da escala: dia fora do vínculo da pessoa na empresa.
-  | "fora_do_vinculo";
+  | "fora_do_vinculo"
+  // T215 — Visões salvas: o teto de visões por pessoa.
+  | "limite";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -100,7 +102,10 @@ export type CampoPublico =
   | "observacao"
   // T215 — Regras da escala.
   | "convencao"
-  | "avisos";
+  | "avisos"
+  // T215 — Visões salvas do quadro.
+  | "nome"
+  | "filtros";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

@@ -5,7 +5,10 @@ import {
   CHAVES_DOS_AVISOS,
   type RegrasDaEscalaApi,
   consultarQuadro,
+  consultarVisoes,
+  criarVisao,
 } from "../../../api/escalaClient";
+import { FILTROS_DO_QUADRO_VAZIOS } from "./filtrosDoQuadro";
 import { QuadroDaEscalaScreen } from "./QuadroDaEscalaScreen";
 import { escala, pessoa, turno } from "./fixturasDoQuadro";
 
@@ -94,6 +97,7 @@ const linhaDe = (nome: string) =>
 describe("T215 — quadro da escala: semana", () => {
   beforeEach(() => {
     vi.mocked(consultarQuadro).mockReset();
+    vi.mocked(consultarVisoes).mockReset();
     quadroCom();
   });
 
@@ -497,6 +501,66 @@ describe("T215 — quadro da escala: semana", () => {
     expect(contagem()).toHaveTextContent("3 de 3 pessoas no quadro");
   });
 
+  it("visões salvas: aparecem na gaveta, carregam o rascunho e aplicam; salvar pela linha dos filtros aplicados", async () => {
+    const semEscala = { ...FILTROS_DO_QUADRO_VAZIOS, semEscala: true };
+    vi.mocked(consultarVisoes).mockResolvedValue({
+      visoes: [{ id: "v1", nome: "Sem escala", filtros: semEscala }],
+    });
+    montar();
+    await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: "Filtrar" }));
+    const gaveta = () => screen.getByRole("dialog", { name: "Filtros" });
+    const chip = await within(gaveta()).findByRole("button", {
+      name: "Sem escala",
+      pressed: false,
+    });
+    expect(
+      within(gaveta()).getByRole("button", { name: "Gerenciar" }),
+    ).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(within(gaveta()).getByRole("status")).toHaveTextContent(
+      "1 de 3 pessoas no quadro",
+    );
+    fireEvent.click(
+      within(gaveta()).getByRole("button", { name: "Ver 1 pessoa" }),
+    );
+    expect(screen.getByText("1 de 3 pessoas")).toBeInTheDocument();
+
+    // "Salvar como visão" na linha dos filtros aplicados.
+    vi.mocked(criarVisao).mockResolvedValue({
+      visoes: [
+        { id: "v2", nome: "Outra", filtros: semEscala },
+        { id: "v1", nome: "Sem escala", filtros: semEscala },
+      ],
+    });
+    const aplicados = screen.getByRole("group", { name: "Filtros aplicados" });
+    fireEvent.click(
+      within(aplicados).getByRole("button", { name: "Salvar como visão" }),
+    );
+    const janela = screen.getByRole("dialog", { name: "Salvar como visão" });
+    fireEvent.change(within(janela).getByRole("textbox", { name: "Nome" }), {
+      target: { value: "Outra" },
+    });
+    fireEvent.click(
+      within(janela).getByRole("button", { name: "Salvar visão" }),
+    );
+    expect(await screen.findByText("Visão salva")).toBeInTheDocument();
+    expect(criarVisao).toHaveBeenCalledWith({
+      nome: "Outra",
+      filtros: semEscala,
+    });
+    expect(
+      screen.queryByRole("dialog", { name: "Salvar como visão" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
+    expect(
+      within(gaveta())
+        .getAllByRole("button", { name: /^(Outra|Sem escala)$/ })
+        .map((b) => b.textContent),
+    ).toEqual(["Outra", "Sem escala"]);
+  });
+
   it("legenda com os turnos da página; ações de voltar e Turnos", async () => {
     const onVoltar = vi.fn();
     const onAbrirTurnos = vi.fn();
@@ -549,6 +613,7 @@ describe("T215 — quadro da escala: semana", () => {
 describe("T215 — quadro da escala: mês", () => {
   beforeEach(() => {
     vi.mocked(consultarQuadro).mockReset();
+    vi.mocked(consultarVisoes).mockReset();
     quadroCom();
   });
 

@@ -126,18 +126,20 @@ model AccessUser {
   // T038 — Cadastros: Horarios. Quem cadastrou uma tabela de horario e quem
   // criou um vinculo horario<->colaborador. Mesma natureza das relacoes acima:
   // identifica o ATOR da operacao, nunca a pessoa cujo horario foi vinculado.
-  tabelasHorarioCriadas     TabelaHorario[]     @relation("HorarioTabelaCriadaPor")
-  vinculosHorarioCriados    VinculoHorario[]    @relation("HorarioVinculoCriadoPor")
+  tabelasHorarioCriadas     TabelaHorario[]      @relation("HorarioTabelaCriadaPor")
+  vinculosHorarioCriados    VinculoHorario[]     @relation("HorarioVinculoCriadoPor")
   /// T215 — escalas de colaborador definidas por esta conta.
-  escalasColaboradorCriadas EscalaColaborador[] @relation("EscalaColaboradorCriadaPor")
+  escalasColaboradorCriadas EscalaColaborador[]  @relation("EscalaColaboradorCriadaPor")
   /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
-  diasDeEscalaCriados       EscalaDia[]         @relation("EscalaDiaCriadoPor")
-  diasDeEscalaAtualizados   EscalaDia[]         @relation("EscalaDiaAtualizadoPor")
+  diasDeEscalaCriados       EscalaDia[]          @relation("EscalaDiaCriadoPor")
+  diasDeEscalaAtualizados   EscalaDia[]          @relation("EscalaDiaAtualizadoPor")
   /// T215 — publicações do quadro da escala feitas por esta conta.
-  publicacoesDeEscala       EscalaPublicacao[]  @relation("EscalaPublicacaoPor")
+  publicacoesDeEscala       EscalaPublicacao[]   @relation("EscalaPublicacaoPor")
   /// T215 — regras da escala salvas e feriados locais criados por esta conta.
   regrasDeEscalaSalvas      EscalaRegras[]       @relation("EscalaRegrasPor")
   feriadosLocaisCriados     EscalaFeriadoLocal[] @relation("EscalaFeriadoLocalPor")
+  /// T215 — visões salvas do quadro da escala (só desta conta).
+  visoesDeEscala            EscalaVisao[]
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -537,17 +539,17 @@ enum AuditAction {
 
   // T215 — escala do colaborador (aba Escala da ficha). Sem conteúdo: só o
   // id da escala e a empresa (nunca modelo, turno ou datas).
-  pessoas_escala_definida  @map("pessoas.escala.definida")
-  pessoas_escala_encerrada @map("pessoas.escala.encerrada")
+  pessoas_escala_definida         @map("pessoas.escala.definida")
+  pessoas_escala_encerrada        @map("pessoas.escala.encerrada")
   // T215 — quadro da escala: o dia gravado ou limpo no rascunho. Só o id do
   // dia e a empresa (nunca turno, horário ou observação).
-  pessoas_escala_dia_gravado @map("pessoas.escala.dia_gravado")
-  pessoas_escala_dia_limpo   @map("pessoas.escala.dia_limpo")
+  pessoas_escala_dia_gravado      @map("pessoas.escala.dia_gravado")
+  pessoas_escala_dia_limpo        @map("pessoas.escala.dia_limpo")
   // T215 — o rascunho do período publicado (id da publicação e a empresa).
-  pessoas_escala_publicada   @map("pessoas.escala.publicada")
+  pessoas_escala_publicada        @map("pessoas.escala.publicada")
   // T215 — Regras da escala e feriados locais (id e empresa, sem conteúdo).
-  pessoas_escala_regras_salvas   @map("pessoas.escala.regras_salvas")
-  pessoas_escala_feriado_criado  @map("pessoas.escala.feriado_criado")
+  pessoas_escala_regras_salvas    @map("pessoas.escala.regras_salvas")
+  pessoas_escala_feriado_criado   @map("pessoas.escala.feriado_criado")
   pessoas_escala_feriado_removido @map("pessoas.escala.feriado_removido")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
@@ -844,14 +846,15 @@ model Empresa {
   // (fronteira `empresa_id`); o vinculo horario<->colaborador carrega
   // `empresa_id` redundante por desenho, para que a FK COMPOSTA garanta, no
   // banco, que o vinculo nunca aponte para tabela de outra empresa.
-  tabelasHorario     TabelaHorario[]
-  vinculosHorario    VinculoHorario[]
+  tabelasHorario      TabelaHorario[]
+  vinculosHorario     VinculoHorario[]
   /// T215 — padrões de escala (aba Escala da ficha).
-  escalasColaborador EscalaColaborador[]
-  diasDeEscala       EscalaDia[]
+  escalasColaborador  EscalaColaborador[]
+  diasDeEscala        EscalaDia[]
   publicacoesDeEscala EscalaPublicacao[]
   regrasDeEscala      EscalaRegras?
   feriadosLocais      EscalaFeriadoLocal[]
+  visoesDeEscala      EscalaVisao[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -3224,18 +3227,37 @@ model EscalaRegras {
 /// T215 — feriado local da empresa (municipal ou ponto facultativo), em
 /// todas as unidades (lista vazia) ou só em algumas.
 model EscalaFeriadoLocal {
-  id               String   @id @default(uuid())
-  empresaId        String   @map("empresa_id")
-  data             DateTime @db.Date
-  nome             String   @db.VarChar(80)
-  tipo             String
-  unidadeIds       String[] @default([]) @map("unidade_ids")
-  criadoPorUserId  String   @map("criado_por_user_id")
-  criadoEm         DateTime @default(now()) @map("criado_em")
+  id              String   @id @default(uuid())
+  empresaId       String   @map("empresa_id")
+  data            DateTime @db.Date
+  nome            String   @db.VarChar(80)
+  tipo            String
+  unidadeIds      String[] @default([]) @map("unidade_ids")
+  criadoPorUserId String   @map("criado_por_user_id")
+  criadoEm        DateTime @default(now()) @map("criado_em")
 
   empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   criadoPor AccessUser @relation("EscalaFeriadoLocalPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([empresaId, data])
   @@map("escala_feriado_local")
+}
+
+/// T215 — visão salva do quadro da escala: os filtros com um nome, para abrir
+/// de novo com um clique. Só a conta que salvou vê, e só na empresa em que
+/// salvou. Os filtros são conferidos pelo serviço (chaves conhecidas).
+model EscalaVisao {
+  id           String   @id @default(uuid())
+  empresaId    String   @map("empresa_id")
+  userId       String   @map("user_id")
+  nome         String   @db.VarChar(60)
+  filtros      Json
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user    AccessUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([empresaId, userId, nome])
+  @@map("escala_visao")
 }
