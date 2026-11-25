@@ -951,7 +951,7 @@ describe("T215 — ações em massa", () => {
     ).toEqual([
       "Copiar semana anteriorPara as pessoas do filtro",
       "Repetir esta semana até…",
-      "ExportarPDF para imprimir ou planilha",
+      "ExportarPDF ou planilha, por unidade, turno ou departamento",
       "Limpar o rascunho do períodoSó o que ainda não foi publicado",
     ]);
     // Sem rascunho no período, Limpar fica indisponível.
@@ -974,6 +974,20 @@ describe("T215 — ações em massa", () => {
       },
     ]);
     // O padrão da origem não limpa nada que não tem rascunho.
+    expect(limparDias).not.toHaveBeenCalled();
+  });
+
+  it("menu ⋯: Copiar semana anterior sem nada gravado avisa e não grava", async () => {
+    pessoas = [ana()];
+    await montar();
+    const menu = await abrirMaisAcoes();
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Copiar semana anterior/ }),
+    );
+    await screen.findByRole("status", {
+      name: "Nada para copiar: a semana anterior está só no padrão.",
+    });
+    expect(gravarDias).not.toHaveBeenCalled();
     expect(limparDias).not.toHaveBeenCalled();
   });
 

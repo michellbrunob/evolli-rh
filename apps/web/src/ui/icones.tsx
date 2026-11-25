@@ -51,6 +51,7 @@ import {
   Rank,
   Receipt,
   Refresh2,
+  Repeat,
   Routing2,
   SearchNormal1,
   SecurityUser,
@@ -146,6 +147,8 @@ export const IconeTempo = decorativo(Timer1, "Bulk");
 export const IconeRelogio = decorativo(Clock, "Bulk");
 /** T215 — copiar (ex.: "Copiar semana anterior"). */
 export const IconeCopiar = decorativo(Copy, "Bulk");
+/** T215 — repetir (ex.: "Repetir esta semana até…"). */
+export const IconeRepetir = decorativo(Repeat, "Linear");
 /** T215 — aplicar um modelo (escala do catálogo). */
 export const IconeModelo = decorativo(Element4, "Bulk");
 /** T215 — aviso de atenção (avisos da escala). */

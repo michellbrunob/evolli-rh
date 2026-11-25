@@ -144,15 +144,58 @@
   outline: none;
 }
 
-.quadro__agrupar {
-  display: inline-flex;
-  align-items: center;
+/* T215 — Avisos, Turnos e ⋯ ficam à direita da barra. */
+.quadro__barra-direita {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
-  color: var(--color-ink-muted);
-  font-size: var(--text-ui);
+  align-items: center;
+  margin-left: auto;
 }
 
-.quadro__agrupar select,
+/* "Agrupar por: Departamento ▾" numa pílula só. */
+.quadro__agrupar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: var(--altura-botao);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.quadro__agrupar:focus-within {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.quadro__agrupar select {
+  field-sizing: content;
+  min-height: 0;
+  padding: 0 1.1rem 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.quadro__agrupar::after {
+  position: absolute;
+  right: var(--space-sm);
+  color: var(--color-ink-subtle);
+  font-size: 0.7em;
+  content: "▾";
+  pointer-events: none;
+}
+
 .quadro__por-pagina select {
   min-height: var(--touch-target);
   padding: 0 var(--space-sm);

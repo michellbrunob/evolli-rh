@@ -125,21 +125,27 @@ export function DialogoExportar({
   const { inicio, fim } = periodoQueContem(periodo, ancora, semanaComeca);
   const dias = useMemo(() => diasDoPeriodo(inicio, fim), [inicio, fim]);
 
-  // O período escolhido: as pessoas com os dias (e a publicação) dele.
+  // O período escolhido: as pessoas com os dias (e a publicação) dele. Na
+  // troca de período, o que já está na tela fica até chegar o novo (a janela
+  // não muda de tamanho nem pisca); o botão de baixar espera.
+  const [atualizando, setAtualizando] = useState(false);
   useEffect(() => {
     let vivo = true;
-    setCarga({ estado: "carregando" });
+    setAtualizando(true);
     consultarQuadro(inicio, fim)
       .then((q) => {
-        if (vivo)
-          setCarga({
-            estado: "pronto",
-            pessoas: q.pessoas,
-            publicacao: q.publicacao ?? null,
-          });
+        if (!vivo) return;
+        setCarga({
+          estado: "pronto",
+          pessoas: q.pessoas,
+          publicacao: q.publicacao ?? null,
+        });
+        setAtualizando(false);
       })
       .catch(() => {
-        if (vivo) setCarga({ estado: "erro" });
+        if (!vivo) return;
+        setCarga({ estado: "erro" });
+        setAtualizando(false);
       });
     return () => {
       vivo = false;
@@ -252,7 +258,7 @@ export function DialogoExportar({
             variant="primary"
             onClick={baixar}
             aria-disabled={!arquivo}
-            disabled={carga.estado !== "pronto"}
+            disabled={carga.estado !== "pronto" || atualizando}
           >
             {formato === "pdf"
               ? o.zipPorPessoa
@@ -483,7 +489,11 @@ export function DialogoExportar({
           ) : null}
         </div>
 
-        <aside className="exportar__previa" aria-label="Prévia">
+        <aside
+          className={`exportar__previa${atualizando && carga.estado === "pronto" ? " exportar__previa--atualizando" : ""}`}
+          aria-label="Prévia"
+          aria-busy={atualizando}
+        >
           <h3>Prévia</h3>
           {carga.estado === "carregando" ? (
             <p className="exportar__ajuda">Carregando o período…</p>

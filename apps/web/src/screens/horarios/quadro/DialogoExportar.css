@@ -3,6 +3,13 @@
 .exportar {
   width: calc(100vw - 2 * var(--space-md));
   max-width: 60rem;
+  /* Altura fixa: trocar período, formato ou opções não mexe na janela. */
+  height: min(46rem, calc(100dvh - 2 * var(--space-lg)));
+}
+
+.exportar__previa--atualizando > :not(h3) {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
 }
 
 .exportar__corpo {

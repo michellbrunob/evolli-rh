@@ -58,6 +58,9 @@ import {
   IconeAbrir,
   IconeAvancar,
   IconeAviso,
+  IconeConfiguracoes,
+  IconeRelogio,
+  IconeRepetir,
   IconeBaixarArquivo,
   IconeBuscar,
   IconeCalendario,
@@ -653,12 +656,18 @@ export function QuadroDaEscalaScreen({
     plano: PlanoDoLote,
     anteriores: ReadonlyMap<string, DiaGravadoApi>,
     titulo: string,
+    /** O aviso quando nada muda (sem "Desfazer"). */
+    semMudanca = "Nada mudou no rascunho.",
   ) => {
     // Só limpa o que tem rascunho.
     const limpar = plano.limpar.filter((d) =>
       anteriores.has(chaveDoDia(d.colaboradorId, d.dia)),
     );
     const efetivo = { gravar: plano.gravar, limpar };
+    if (efetivo.gravar.length === 0 && efetivo.limpar.length === 0) {
+      setAviso({ id: Date.now(), titulo: semMudanca });
+      return;
+    }
     if (limpar.length > 0) await limparDias(limpar);
     if (plano.gravar.length > 0) await gravarDias(plano.gravar);
     setTentativa((n) => n + 1);
@@ -695,6 +704,7 @@ export function QuadroDaEscalaScreen({
       plano,
       rascunhosPorChave(alvo),
       `Semana anterior copiada para ${plural(alvo.length, "pessoa", "pessoas")}`,
+      "Nada para copiar: a semana anterior está só no padrão.",
     );
   };
 
@@ -1379,6 +1389,7 @@ export function QuadroDaEscalaScreen({
               >
                 <IconeBaixarArquivo tamanho={16} />
                 Exportar
+                <IconeAbrir tamanho={14} />
               </Button>
               {podeOperar && onAbrirModelo ? (
                 <Button
@@ -1459,105 +1470,134 @@ export function QuadroDaEscalaScreen({
           >
             Hoje
           </Button>
-          {carga.estado === "pronto" ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setVendoAvisos("todos")}
-            >
-              Avisos
-              <span
-                className={`quadro__avisos-numero${
-                  visiveis.some((a) => a.categoria === "atencao")
-                    ? " quadro__avisos-numero--atencao"
-                    : ""
-                }`}
+          <div className="quadro__barra-direita">
+            {carga.estado === "pronto" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setVendoAvisos("todos")}
               >
-                {visiveis.length}
-              </span>
-            </Button>
-          ) : null}
-          {onAbrirTurnos ? (
-            <Button type="button" variant="secondary" onClick={onAbrirTurnos}>
-              Turnos
-            </Button>
-          ) : null}
-          {podeOperar && carga.estado === "pronto" ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="quadro__icone-botao"
-                aria-label="Mais ações"
-              >
-                <IconeMaisAcoes tamanho={18} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {onAbrirRegras ? (
-                  <DropdownMenuItem onSelect={onAbrirRegras}>
-                    <span className="quadro__item-menu">
-                      Regras da escala
-                      <small>
-                        Jornada, convenção, feriados locais e avisos
-                      </small>
-                    </span>
-                  </DropdownMenuItem>
-                ) : null}
-                {onAbrirTurnos ? (
-                  <DropdownMenuItem onSelect={onAbrirTurnos}>
-                    <span className="quadro__item-menu">
-                      Turnos
-                      <small>Horários da empresa</small>
-                    </span>
-                  </DropdownMenuItem>
-                ) : null}
-                {onAbrirTransicao && em6x1.length > 0 ? (
-                  <DropdownMenuItem onSelect={onAbrirTransicao}>
-                    <span className="quadro__item-menu">
-                      Planejar a transição
-                      <small>EC 141/2026: 6x1 → 2 descansos por semana</small>
-                    </span>
-                  </DropdownMenuItem>
-                ) : null}
-                {visao === "semana" ? (
-                  <>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void tentar(() => copiarSemanaAnterior(filtradas))
-                      }
-                    >
-                      <span className="quadro__item-menu">
-                        Copiar semana anterior
-                        <small>Para as pessoas do filtro</small>
+                <IconeAviso tamanho={16} />
+                Avisos
+                <span
+                  className={`quadro__avisos-numero${
+                    visiveis.some((a) => a.categoria === "atencao")
+                      ? " quadro__avisos-numero--atencao"
+                      : ""
+                  }`}
+                >
+                  {visiveis.length}
+                </span>
+              </Button>
+            ) : null}
+            {onAbrirTurnos ? (
+              <Button type="button" variant="secondary" onClick={onAbrirTurnos}>
+                <IconeRelogio tamanho={16} />
+                Turnos
+              </Button>
+            ) : null}
+            {podeOperar && carga.estado === "pronto" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="quadro__icone-botao"
+                  aria-label="Mais ações"
+                >
+                  <IconeMaisAcoes tamanho={18} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onAbrirRegras ? (
+                    <DropdownMenuItem onSelect={onAbrirRegras}>
+                      <span className="quadro__item-menu quadro__item-menu--icone">
+                        <IconeConfiguracoes tamanho={16} />
+                        <span>
+                          Regras da escala
+                          <small>
+                            Jornada, convenção, feriados locais e avisos
+                          </small>
+                        </span>
                       </span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => setDialogo({ tipo: "repetir" })}
-                    >
-                      <span className="quadro__item-menu">
-                        Repetir esta semana até…
+                  ) : null}
+                  {onAbrirTurnos ? (
+                    <DropdownMenuItem onSelect={onAbrirTurnos}>
+                      <span className="quadro__item-menu quadro__item-menu--icone">
+                        <IconeRelogio tamanho={16} />
+                        <span>
+                          Turnos
+                          <small>Horários da empresa</small>
+                        </span>
                       </span>
                     </DropdownMenuItem>
-                  </>
-                ) : null}
-                <DropdownMenuItem
-                  onSelect={() => setDialogo({ tipo: "exportar" })}
-                >
-                  <span className="quadro__item-menu">
-                    Exportar
-                    <small>PDF para imprimir ou planilha</small>
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={rascunhosDe(filtradas).length === 0}
-                  onSelect={() => setDialogo({ tipo: "limpar" })}
-                >
-                  <span className="quadro__item-menu quadro__item-menu--perigo">
-                    Limpar o rascunho do período
-                    <small>Só o que ainda não foi publicado</small>
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+                  ) : null}
+                  {onAbrirTransicao && em6x1.length > 0 ? (
+                    <DropdownMenuItem onSelect={onAbrirTransicao}>
+                      <span className="quadro__item-menu quadro__item-menu--icone">
+                        <IconeCalendario tamanho={16} />
+                        <span>
+                          Planejar a transição
+                          <small>
+                            EC 141/2026: 6x1 → 2 descansos por semana
+                          </small>
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  {visao === "semana" ? (
+                    <>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void tentar(() => copiarSemanaAnterior(filtradas))
+                        }
+                      >
+                        <span className="quadro__item-menu quadro__item-menu--icone">
+                          <IconeCopiar tamanho={16} />
+                          <span>
+                            Copiar semana anterior
+                            <small>Para as pessoas do filtro</small>
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setDialogo({ tipo: "repetir" })}
+                      >
+                        <span className="quadro__item-menu quadro__item-menu--icone">
+                          <IconeRepetir tamanho={16} />
+                          <span>Repetir esta semana até…</span>
+                        </span>
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                  <DropdownMenuItem
+                    onSelect={() => setDialogo({ tipo: "exportar" })}
+                  >
+                    <span className="quadro__item-menu quadro__item-menu--icone">
+                      <IconeBaixarArquivo tamanho={16} />
+                      <span>
+                        Exportar
+                        <small>
+                          PDF ou planilha, por unidade, turno ou departamento
+                        </small>
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={rascunhosDe(filtradas).length === 0}
+                    onSelect={() => setDialogo({ tipo: "limpar" })}
+                  >
+                    <span className="quadro__item-menu quadro__item-menu--icone quadro__item-menu--perigo">
+                      <IconeRemover tamanho={16} />
+                      <span>
+                        Limpar o rascunho do período
+                        <small>Só o que ainda não foi publicado</small>
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         </div>
 
         <div className="quadro__filtros">
@@ -1573,22 +1613,6 @@ export function QuadroDaEscalaScreen({
                 setPagina(1);
               }}
             />
-          </label>
-          <label className="quadro__agrupar">
-            <span>Agrupar por:</span>
-            <select
-              value={agruparPor}
-              onChange={(e) => {
-                setAgruparPor(e.target.value as Agrupamento);
-                setPagina(1);
-              }}
-            >
-              {AGRUPAMENTOS.map((a) => (
-                <option key={a} value={a}>
-                  {ROTULO_DO_AGRUPAMENTO[a]}
-                </option>
-              ))}
-            </select>
           </label>
           <Button
             type="button"
@@ -1619,6 +1643,22 @@ export function QuadroDaEscalaScreen({
               Limpar filtros
             </Button>
           ) : null}
+          <label className="quadro__agrupar">
+            <span>Agrupar por:</span>
+            <select
+              value={agruparPor}
+              onChange={(e) => {
+                setAgruparPor(e.target.value as Agrupamento);
+                setPagina(1);
+              }}
+            >
+              {AGRUPAMENTOS.map((a) => (
+                <option key={a} value={a}>
+                  {ROTULO_DO_AGRUPAMENTO[a]}
+                </option>
+              ))}
+            </select>
+          </label>
           {carga.estado === "pronto" ? (
             <p className="quadro__contagem" aria-live="polite">
               {contagem}
