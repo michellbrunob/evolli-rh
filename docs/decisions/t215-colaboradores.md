@@ -428,3 +428,36 @@ Conferido na referência; textos e desenho próprios.
   trabalho no feriado entra nos avisos e na folha como feriado trabalhado.
 - Transição da EC 141/2026: decisão da proprietária — seguir as datas da
   emenda (16/12/2026 e 16/12/2027), editáveis em Regras.
+
+## Fechamento da Escala: ausências, feriados, rascunho e pente fino (25/11/2026)
+
+Conferido navegando na referência, uma funcionalidade por vez; textos e
+desenho próprios.
+
+- **Férias e ausências no quadro.** O quadro traz as ausências aprovadas (ou
+  com cancelamento pedido) do período, sem home office. Ausência vence o
+  turno: caixa neutra com o tipo e "Aprovada" na semana; sigla com a dica do
+  período no mês; "<tipo> até dd/mm" na coluna de horas; painel do dia na
+  aba Ausência, só com a observação. Aviso "Escalado durante ausência
+  aprovada" quando há trabalho ou sobreaviso gravado no dia. Atalho "De
+  férias ou afastados". Dar folga, Trocar turno, Copiar/Repetir e Aplicar
+  modelo deixam o dia de ausência como está.
+- **Feriados locais.** Editar e Arquivar no menu da linha (arquivar sai do
+  quadro e dos avisos; o registro fica — coluna `arquivado_em`, migration
+  `20261125190000_escala_feriado_arquivado`); unidades em pílulas; aviso
+  flutuante ao adicionar. Feriados estaduais de data fixa pelo estado (UF)
+  da empresa.
+- **Regras abertas numa seção** ("Regras dos avisos" abre em Avisos); o menu
+  lateral marca a seção que está no terço de cima da tela.
+- **Refazer o rascunho do quadro** ao definir ou alterar o padrão na ficha
+  (28 dias a partir da data; marcado por padrão).
+- **Tempo parcial** (CLT, art. 58-A): até 30 h; contrato de até 26 h aceita
+  6 extras (32 h). **Intermitente:** não há esse contrato no cadastro (nem na
+  referência); o aviso fica nas Regras sem quem o dispare.
+- **Benefícios.** A escala já mostra os dias de benefício (ficha, gaveta e
+  Aplicar modelo). Não há módulo de Benefícios no Evolli; ligar a escala a
+  ele é tarefa futura, só com ordem.
+- **Pente fino:** Publicar com período (semana, mês ou 4 semanas), Removidas
+  e "O período já começou"; trabalho em feriado é informativo e o número de
+  Avisos não conta informativos; aba Escala da ficha lê o quadro (rascunho,
+  ausências e feriados da pessoa).
