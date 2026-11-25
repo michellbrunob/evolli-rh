@@ -169,8 +169,8 @@
 .ausencias-barra__engrenagem {
   display: inline-grid;
   place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface-canvas);
@@ -197,8 +197,8 @@
 .ausencias__acoes {
   display: inline-grid;
   place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -589,8 +589,8 @@
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;

@@ -77,13 +77,14 @@
 
 .exportar__periodo {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-xs);
   align-items: center;
 }
 
 .exportar__abas {
   display: inline-flex;
+  flex: none;
   padding: 3px;
   border-radius: var(--radius-md);
   background: var(--surface-neutral);
@@ -253,4 +254,165 @@
   margin: 0 auto 0 0;
   color: var(--color-ink-subtle);
   font-size: var(--text-caption);
+}
+
+.exportar__vazio-icone {
+  display: inline-grid;
+  place-items: center;
+  justify-self: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+}
+
+/* T215 — seletor de período: botão com calendário (também noutras telas). */
+.periodo {
+  position: relative;
+  display: inline-block;
+}
+
+.periodo__gatilho {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+  min-height: var(--altura-botao);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.periodo__gatilho svg {
+  color: var(--color-ink-subtle);
+}
+
+.periodo__gatilho[aria-expanded="true"] {
+  border-color: var(--color-action);
+}
+
+.periodo__seta {
+  color: var(--color-ink-subtle);
+  font-size: 0.75em;
+}
+
+.periodo__calendario {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: var(--space-xs);
+  width: 20rem;
+  max-width: calc(100vw - 2 * var(--space-md));
+  padding: var(--space-sm);
+  border: 1px solid var(--divisor-cor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.periodo__topo,
+.periodo__mes {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-ui);
+}
+
+.periodo__topo {
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--divisor-cor);
+}
+
+.periodo__calendario .quadro__icone-botao {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+}
+
+.periodo__grade {
+  display: grid;
+  gap: 2px;
+}
+
+.periodo__semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.periodo__nome-dia {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.periodo__dia {
+  width: 100%;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.periodo__dia:hover {
+  background: var(--surface-neutral);
+}
+
+.periodo__dia--fora {
+  color: var(--color-ink-subtle);
+  opacity: 0.6;
+}
+
+.periodo__dia--hoje {
+  font-weight: 700;
+}
+
+.periodo__dia--escolhido {
+  background: color-mix(in srgb, var(--color-action) 12%, transparent);
+}
+
+.periodo__dia--inicio,
+.periodo__dia--fim {
+  background: var(--color-action);
+  color: var(--color-on-action);
+  opacity: 1;
+}
+
+.periodo__dia--inicio {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.periodo__dia--fim {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.periodo__dia--inicio.periodo__dia--fim {
+  border-radius: var(--radius-sm);
+}
+
+/* O seletor divide a linha com Dia, Semana e Mês: encolhe, sem quebrar. */
+.exportar__periodo .periodo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.exportar__periodo .periodo__gatilho {
+  max-width: 100%;
+}
+
+.periodo__gatilho > span:not(.periodo__seta) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

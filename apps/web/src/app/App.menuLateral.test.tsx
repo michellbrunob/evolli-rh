@@ -754,10 +754,11 @@ describe("T206 — contrato de CSS do shell", () => {
     );
   });
 
-  it("botão de recolher com alvo de 44px e a dica fixa, sem deslocamento horizontal", () => {
+  // T215 — o botão quadrado segue o padrão do sistema (--botao-icone).
+  it("botão de recolher no tamanho do botão de ícone e a dica fixa, sem deslocamento horizontal", () => {
     const botao = regra(shellCss, ".app-shell__recolher");
-    expect(botao).toMatch(/width:\s*var\(--touch-target\)/);
-    expect(botao).toMatch(/height:\s*var\(--touch-target\)/);
+    expect(botao).toMatch(/width:\s*var\(--botao-icone\)/);
+    expect(botao).toMatch(/height:\s*var\(--botao-icone\)/);
     expect(regra(shellCss, ".dica-trilho")).toMatch(/position:\s*fixed/);
     expect(shellCss).not.toMatch(/translateX|translate3d/);
   });

@@ -28,8 +28,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-botao);
   background: var(--surface-canvas);

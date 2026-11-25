@@ -38,8 +38,8 @@
 .turnos__mais {
   display: inline-grid;
   place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: var(--divisor);
   border-radius: var(--radius-md);
   background: var(--surface-canvas);
@@ -389,8 +389,8 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border-radius: var(--radius-pill);
   cursor: pointer;
 }

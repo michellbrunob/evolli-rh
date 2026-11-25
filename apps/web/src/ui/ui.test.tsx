@@ -48,7 +48,8 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
     const b = screen.getByRole("button", { name: "Salvar" });
     expect(b).toHaveAttribute("type", "button");
     expect(b).toHaveAttribute("data-variant", "primary");
-    expect(b.className).toMatch(/ev:min-h-\[var\(--touch-target\)\]/);
+    // T215 — altura padrão do botão de texto.
+    expect(b.className).toMatch(/ev:min-h-\[var\(--altura-botao\)\]/);
   });
 
   it("IconButton exige rótulo; o ícone é decorativo", () => {
@@ -58,7 +59,10 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
       "aria-hidden",
       "true",
     );
-    expect(b.className).toMatch(/ev:min-w-\[var\(--touch-target\)\]/);
+    // T215 — o botão de ícone é quadrado, no tamanho padrão.
+    expect(b.className).toMatch(/ev:min-w-\[var\(--botao-icone\)\]/);
+    expect(b.className).toMatch(/ev:min-h-\[var\(--botao-icone\)\]/);
+    expect(b.className).not.toMatch(/--altura-botao/);
   });
 
   it("Card é uma seção com a borda de card; CardSection divide grupos", () => {

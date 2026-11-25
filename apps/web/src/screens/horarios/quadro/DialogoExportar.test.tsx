@@ -155,7 +155,18 @@ describe("T215 — diálogo Exportar escala", () => {
   it("sem publicação no período: avisa e não baixa; outro período recarrega", async () => {
     const { onBaixar } = montar();
     await screen.findByText(/Sai a versão publicada/);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Período: 23 a 29 de novembro de 2026. Abrir calendário",
+      }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Próximo período" }));
+    fireEvent.keyDown(
+      screen.getByRole("dialog", { name: "Escolher o período" }),
+      {
+        key: "Escape",
+      },
+    );
     expect(
       screen.getByText("30 de novembro a 6 de dezembro de 2026"),
     ).toBeInTheDocument();

@@ -19,8 +19,7 @@ import {
 } from "../../../format/data";
 import { plural } from "../../../format/plural";
 import { Button, Dialog } from "../../../ui";
-import { IconeAvancar, IconeVoltar } from "../../../ui/icones";
-import { somarDias } from "../../pessoas/ficha/escala/calendarioDaEscala";
+import { IconeCalendario } from "../../../ui/icones";
 import {
   DETALHE_DA_SEPARACAO,
   type FormatoDaExportacao,
@@ -39,12 +38,11 @@ import {
 import {
   NAO_INFORMADO,
   celulaDoDia,
-  deslocar,
   diasDoPeriodo,
-  periodoDa,
   turnoDaPessoa,
 } from "./quadroDaEscala";
 import { formatarHoras } from "../../pessoas/ficha/escala/calendarioDaEscala";
+import { SeletorDePeriodo, periodoQueContem } from "./SeletorDePeriodo";
 import "./DialogoExportar.css";
 
 type QuemEntra = "filtro" | "selecionadas" | "escolher";
@@ -56,39 +54,6 @@ const SEPARACOES: readonly SepararPor[] = [
   "pessoa",
   "nenhum",
 ];
-
-function periodoDaExportacao(
-  periodo: PeriodoDaExportacao,
-  ancora: string,
-  semanaComeca: number,
-): { inicio: string; fim: string } {
-  if (periodo === "dia") return { inicio: ancora, fim: ancora };
-  return periodoDa(
-    periodo === "semana" ? "semana" : "mes",
-    ancora,
-    semanaComeca,
-  );
-}
-
-function deslocarExportacao(
-  periodo: PeriodoDaExportacao,
-  ancora: string,
-  passo: 1 | -1,
-  semanaComeca: number,
-): string {
-  if (periodo === "dia") return somarDias(ancora, passo);
-  return deslocar(
-    periodo === "semana" ? "semana" : "mes",
-    ancora,
-    passo,
-    semanaComeca,
-  );
-}
-
-/** "7 a 13 de dezembro de 2026", "Dezembro de 2026" ou "07/12/2026". */
-function rotuloDoPeriodo(o: OpcoesDaExportacao): string {
-  return tituloDaExportacao(o).replace(/^Escala d[aoe] [a-zê]+ · /, "");
-}
 
 export interface DialogoExportarProps {
   /** O período do quadro agora (o padrão do diálogo). */
@@ -157,7 +122,7 @@ export function DialogoExportar({
   >({ estado: "carregando" });
   const [erro, setErro] = useState<string | null>(null);
 
-  const { inicio, fim } = periodoDaExportacao(periodo, ancora, semanaComeca);
+  const { inicio, fim } = periodoQueContem(periodo, ancora, semanaComeca);
   const dias = useMemo(() => diasDoPeriodo(inicio, fim), [inicio, fim]);
 
   // O período escolhido: as pessoas com os dias (e a publicação) dele.
@@ -354,33 +319,12 @@ export function DialogoExportar({
                   </button>
                 ))}
               </div>
-              <div className="exportar__navegar">
-                <button
-                  type="button"
-                  className="quadro__icone-botao"
-                  aria-label="Período anterior"
-                  onClick={() =>
-                    setAncora(
-                      deslocarExportacao(periodo, ancora, -1, semanaComeca),
-                    )
-                  }
-                >
-                  <IconeVoltar tamanho={14} />
-                </button>
-                <span aria-live="polite">{rotuloDoPeriodo(o)}</span>
-                <button
-                  type="button"
-                  className="quadro__icone-botao"
-                  aria-label="Próximo período"
-                  onClick={() =>
-                    setAncora(
-                      deslocarExportacao(periodo, ancora, 1, semanaComeca),
-                    )
-                  }
-                >
-                  <IconeAvancar tamanho={14} />
-                </button>
-              </div>
+              <SeletorDePeriodo
+                tamanho={periodo}
+                ancora={ancora}
+                semanaComeca={semanaComeca}
+                onEscolher={setAncora}
+              />
             </div>
           </fieldset>
 
@@ -549,6 +493,9 @@ export function DialogoExportar({
             </p>
           ) : publicadas.length === 0 ? (
             <div className="exportar__vazio">
+              <span className="exportar__vazio-icone" aria-hidden="true">
+                <IconeCalendario tamanho={20} />
+              </span>
               <strong>Nada publicado neste período</strong>
               <p>
                 O arquivo leva só a escala publicada, para o mural e o

@@ -223,6 +223,11 @@
 
   /* Alvo mínimo de interação. */
   --touch-target: 44px;
+  /* T215 — padrão do sistema (2026-11-25): botão de texto com 40 px de
+     altura e botão quadrado de ícone com 36 px, mais enxutos, como pediu a
+     proprietária. O alvo continua acima dos 24 px do WCAG 2.5.8. */
+  --altura-botao: 2.5rem;
+  --botao-icone: 2.25rem;
 
   /* Largura máxima de conteúdo (trava responsiva). */
   --content-max: 1120px;

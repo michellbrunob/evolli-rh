@@ -8,8 +8,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  min-height: var(--touch-target);
-  min-width: var(--touch-target);
+  min-height: var(--altura-botao);
+  min-width: var(--altura-botao);
   /* Respiro lateral enxuto (16px), como nos botões de ação da referência. */
   padding: 0 var(--space-md);
   border: 1px solid transparent;

@@ -85,10 +85,12 @@ fora do arquivo de tokens não entra.
 Valem para o sistema inteiro; a tela não redesenha estes controles.
 
 - **Botão** — sempre pelo componente (`components/Button` ou `ui/Button`):
-  altura mínima de 44 px (alvo de toque), respiro lateral de 16 px
+  altura de 40 px (`--altura-botao`), respiro lateral de 16 px
   (`--space-md`), ícone de 16 px à esquerda com 8 px de distância
   (`--space-xs`), cantos `--radius-botao`. Primário preenchido na cor de ação;
   secundário com contorno.
+- **Botão de ícone** (quadrado: fechar, anterior/próximo, ⋯) — 36 × 36 px
+  (`--botao-icone`), pelo `IconButton` ou pela regra da tela com o token.
 - **Caixa de seleção** — toda `<input type="checkbox">` usa o padrão de
   `tokens.css`: quadrado de 18 px com cantos `--radius-caixa`; marcada na cor
   de ação do tema, visto branco e halo suave; parcial (`indeterminate`) com

@@ -165,6 +165,13 @@ function Janela({
             if (alvo && document.contains(alvo)) alvo.focus();
           }}
           onEscapeKeyDown={(evento) => {
+            // T215 — um painel de dentro que fecha com Esc (ex.: o calendário
+            // do período) fecha só ele, não a janela.
+            const alvo = evento.target;
+            if (alvo instanceof Element && alvo.closest("[data-esc-proprio]")) {
+              evento.preventDefault();
+              return;
+            }
             if (confirmando) {
               evento.preventDefault();
               continuarEditando();

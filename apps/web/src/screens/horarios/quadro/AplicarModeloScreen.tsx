@@ -39,6 +39,7 @@ import {
   numeroDoDia,
 } from "../../../format/data";
 import { plural } from "../../../format/plural";
+import { IconeBuscar } from "../../../ui/icones";
 import { Esqueleto } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import {
@@ -532,127 +533,136 @@ export function AplicarModeloScreen({
       idDoTituloDaEtapa={idDaEtapa}
     >
       {atual === 0 ? (
-        <>
-          <SecaoDoCadastro
-            titulo="Pessoas"
-            descricao="Os filtros da lista abaixo valem para as duas opções."
-          >
-            <LinhaDoCadastro rotulo="Para quem">
-              <div
-                className="modelo__opcoes"
-                role="radiogroup"
-                aria-label="Para quem"
-              >
-                <OpcaoEmCartao
-                  marcada={paraQuem === "filtro"}
-                  onMarcar={() => setParaQuem("filtro")}
-                  titulo="Todo o time do filtro atual"
-                  texto={`${pedido.current?.doFiltro ? "As pessoas do filtro do quadro" : "Todas as pessoas do quadro"} · ${plural(naLista.length, "pessoa", "pessoas")}`}
-                />
-                <OpcaoEmCartao
-                  marcada={paraQuem === "escolher"}
-                  onMarcar={() => setParaQuem("escolher")}
-                  titulo="Escolher pessoas"
-                  texto="Marque na lista abaixo."
-                />
-              </div>
-            </LinhaDoCadastro>
-          </SecaoDoCadastro>
-          <SecaoDoCadastro
-            titulo="Lista"
-            descricao="Ativos, de férias e afastados da empresa ativa."
-          >
-            <div className="modelo__filtros">
-              <input
-                type="search"
-                className="modelo__busca"
-                placeholder="Buscar colaborador"
-                aria-label="Buscar colaborador"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
+        <SecaoDoCadastro
+          titulo="Pessoas"
+          descricao="Os filtros da lista abaixo valem para as duas opções."
+        >
+          <LinhaDoCadastro rotulo="Para quem">
+            <div
+              className="modelo__opcoes"
+              role="radiogroup"
+              aria-label="Para quem"
+            >
+              <OpcaoEmCartao
+                marcada={paraQuem === "filtro"}
+                onMarcar={() => setParaQuem("filtro")}
+                titulo="Todo o time do filtro atual"
+                texto={`${pedido.current?.doFiltro ? "As pessoas do filtro do quadro" : "Todas as pessoas do quadro"} · ${plural(naLista.length, "pessoa", "pessoas")}`}
               />
-              <FiltroDaLista
-                rotulo="Unidade"
-                valor={unidade}
-                onMudar={setUnidade}
-                opcoes={unidades}
-                todos="Todas"
-              />
-              <FiltroDaLista
-                rotulo="Departamento"
-                valor={departamento}
-                onMudar={setDepartamento}
-                opcoes={departamentos}
-                todos="Todos"
-              />
-              <FiltroDaLista
-                rotulo="Contrato"
-                valor={contrato}
-                onMudar={setContrato}
-                opcoes={contratos}
-                todos="Todos"
+              <OpcaoEmCartao
+                marcada={paraQuem === "escolher"}
+                onMarcar={() => setParaQuem("escolher")}
+                titulo="Escolher pessoas"
+                texto="Marque na lista abaixo."
               />
             </div>
-            <table className="modelo__tabela">
-              <thead>
-                <tr>
-                  {paraQuem === "escolher" ? (
-                    <th scope="col" className="modelo__col-marca">
-                      <span className="sr-only">Marcar</span>
-                    </th>
-                  ) : null}
-                  <th scope="col">Colaborador</th>
-                  <th scope="col">Contrato</th>
-                  <th scope="col">Escala atual</th>
-                </tr>
-              </thead>
-              <tbody>
-                {naLista.map((p) => (
-                  <tr key={p.colaboradorId}>
-                    {paraQuem === "escolher" ? (
-                      <td className="modelo__col-marca">
-                        <input
-                          type="checkbox"
-                          aria-label={`Marcar ${p.nome}`}
-                          checked={marcadas.has(p.colaboradorId)}
-                          onChange={(e) => {
-                            const novo = new Set(marcadas);
-                            if (e.target.checked) novo.add(p.colaboradorId);
-                            else novo.delete(p.colaboradorId);
-                            setMarcadas(novo);
-                          }}
-                        />
-                      </td>
-                    ) : null}
-                    <td>
-                      <span className="modelo__pessoa">
-                        <span className="modelo__avatar" aria-hidden="true">
-                          {iniciais(p.nome)}
-                        </span>
-                        <span>
-                          {p.nome}
-                          {p.cargo ? <small>{p.cargo.nome}</small> : null}
-                        </span>
-                      </span>
-                    </td>
-                    <td>{rotuloDoContrato(p.tipoVinculo)}</td>
-                    <td>{rotuloDaEscala(p, hoje)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {naLista.length === 0 ? (
-              <p className="modelo__vazio">Ninguém com estes filtros.</p>
-            ) : null}
-            <p className="modelo__contagem" aria-live="polite">
-              {plural(
-                escolhidas.length,
-                "pessoa selecionada",
-                "pessoas selecionadas",
-              )}
-            </p>
-          </SecaoDoCadastro>
-        </>
+          </LinhaDoCadastro>
+          <LinhaDoCadastro
+            rotulo="Lista"
+            ajuda="Ativos, de férias e afastados da empresa ativa."
+            grupo={false}
+          >
+            <div className="modelo__lista">
+              <label className="modelo__busca">
+                <IconeBuscar tamanho={16} />
+                <span className="sr-only">Buscar colaborador</span>
+                <input
+                  type="search"
+                  placeholder="Buscar colaborador"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
+              </label>
+              <div className="modelo__pilulas">
+                <FiltroDaLista
+                  rotulo="Unidade"
+                  valor={unidade}
+                  onMudar={setUnidade}
+                  opcoes={unidades}
+                  todos="Todas"
+                />
+                <FiltroDaLista
+                  rotulo="Departamento"
+                  valor={departamento}
+                  onMudar={setDepartamento}
+                  opcoes={departamentos}
+                  todos="Todos"
+                />
+                <FiltroDaLista
+                  rotulo="Contrato"
+                  valor={contrato}
+                  onMudar={setContrato}
+                  opcoes={contratos}
+                  todos="Todos"
+                />
+              </div>
+              <div className="modelo__cartao-tabela">
+                <table className="modelo__tabela">
+                  <thead>
+                    <tr>
+                      {paraQuem === "escolher" ? (
+                        <th scope="col" className="modelo__col-marca">
+                          <CaixaDeTodos
+                            ids={naLista.map((p) => p.colaboradorId)}
+                            marcadas={marcadas}
+                            onMudar={setMarcadas}
+                          />
+                        </th>
+                      ) : null}
+                      <th scope="col">Colaborador</th>
+                      <th scope="col">Contrato</th>
+                      <th scope="col">Escala atual</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {naLista.map((p) => (
+                      <tr key={p.colaboradorId}>
+                        {paraQuem === "escolher" ? (
+                          <td className="modelo__col-marca">
+                            <input
+                              type="checkbox"
+                              aria-label={`Marcar ${p.nome}`}
+                              checked={marcadas.has(p.colaboradorId)}
+                              onChange={(e) => {
+                                const novo = new Set(marcadas);
+                                if (e.target.checked) novo.add(p.colaboradorId);
+                                else novo.delete(p.colaboradorId);
+                                setMarcadas(novo);
+                              }}
+                            />
+                          </td>
+                        ) : null}
+                        <td>
+                          <span className="modelo__pessoa">
+                            <span className="modelo__avatar" aria-hidden="true">
+                              {iniciais(p.nome)}
+                            </span>
+                            <span>
+                              <strong>{p.nome}</strong>
+                              {p.cargo ? <small>{p.cargo.nome}</small> : null}
+                            </span>
+                          </span>
+                        </td>
+                        <td>{rotuloDoContrato(p.tipoVinculo)}</td>
+                        <td>{rotuloDaEscala(p, hoje)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {naLista.length === 0 ? (
+                  <p className="modelo__vazio">Ninguém com estes filtros.</p>
+                ) : null}
+              </div>
+              <p className="modelo__contagem" aria-live="polite">
+                {plural(
+                  escolhidas.length,
+                  "pessoa selecionada",
+                  "pessoas selecionadas",
+                )}
+              </p>
+            </div>
+          </LinhaDoCadastro>
+        </SecaoDoCadastro>
       ) : null}
 
       {atual === 1 ? (
@@ -1139,7 +1149,7 @@ function FiltroDaLista({
   readonly todos: string;
 }) {
   return (
-    <label className="modelo__filtro">
+    <label className="modelo__pilula">
       <span>{`${rotulo}:`}</span>
       <select
         value={valor}
@@ -1154,6 +1164,41 @@ function FiltroDaLista({
         ))}
       </select>
     </label>
+  );
+}
+
+/** "Marcar todos" da lista: parcial quando só parte está marcada. */
+function CaixaDeTodos({
+  ids,
+  marcadas,
+  onMudar,
+}: {
+  readonly ids: readonly string[];
+  readonly marcadas: ReadonlySet<string>;
+  readonly onMudar: (novo: ReadonlySet<string>) => void;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  const quantas = ids.filter((id) => marcadas.has(id)).length;
+  const todas = ids.length > 0 && quantas === ids.length;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = quantas > 0 && !todas;
+  }, [quantas, todas]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label="Marcar todos da lista"
+      checked={todas}
+      disabled={ids.length === 0}
+      onChange={() => {
+        const novo = new Set(marcadas);
+        for (const id of ids) {
+          if (todas) novo.delete(id);
+          else novo.add(id);
+        }
+        onMudar(novo);
+      }}
+    />
   );
 }
 

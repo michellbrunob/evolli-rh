@@ -39,8 +39,8 @@
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: var(--divisor);
   border-radius: var(--radius-botao);
   background: var(--surface-canvas);
