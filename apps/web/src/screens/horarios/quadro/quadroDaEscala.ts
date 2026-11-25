@@ -12,6 +12,7 @@
  * - busca, ordem e agrupamento (departamento, unidade, turno, gestor).
  */
 import type {
+  AusenciaNoQuadroApi,
   DiaGravadoApi,
   EscalaApi,
   PeriodoDoDiaApi,
@@ -30,6 +31,7 @@ import {
   resolverDia,
 } from "../../pessoas/ficha/escala/diaDaEscala";
 import { modeloDe } from "../../pessoas/ficha/escala/modelosDeEscala";
+import { ausenciaDoDia } from "./ausenciasDoQuadro";
 
 export type Visao = "semana" | "mes";
 
@@ -203,7 +205,13 @@ export function periodosNoDia(
 }
 
 export type TipoDaCelula =
-  "trabalho" | "folga" | "dsr" | "sobreaviso" | "sem-escala" | "fora";
+  | "trabalho"
+  | "folga"
+  | "dsr"
+  | "sobreaviso"
+  | "sem-escala"
+  | "fora"
+  | "ausencia";
 
 /** O turno como a célula precisa: nome, cor e sigla. */
 export interface TurnoDaCelula {
@@ -229,6 +237,8 @@ export interface CelulaDoQuadro {
   readonly sobreaviso: readonly PeriodoDoDiaApi[];
   readonly unidade: { readonly id: string; readonly nome: string } | null;
   readonly observacao: string | null;
+  /** Na ausência: a ausência aprovada que cobre o dia (vence o turno). */
+  readonly ausencia?: AusenciaNoQuadroApi | null;
 }
 
 /** Fora do vínculo: antes da admissão ou depois do último dia. */
@@ -292,6 +302,17 @@ export function celulaDoDia(p: PessoaDoQuadroApi, dia: string): CelulaDoQuadro {
   if (foraDoVinculo(p, dia)) return { ...vazio, tipo: "fora" };
 
   const g = diaGravado(p, dia);
+  // Ausência aprovada vence o turno: só a observação do dia continua.
+  const ausencia = ausenciaDoDia(p, dia);
+  if (ausencia) {
+    return {
+      ...vazio,
+      tipo: "ausencia",
+      ausencia,
+      origem: g?.camada ?? "padrao",
+      observacao: g?.observacao ?? null,
+    };
+  }
   if (g) {
     const comum = {
       ...vazio,

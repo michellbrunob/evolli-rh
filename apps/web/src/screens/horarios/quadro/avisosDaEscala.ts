@@ -8,8 +8,10 @@
  *
  * O que olha dias de fora do período (descanso entre jornadas na virada,
  * dias seguidos, domingos seguidos) vê só o período carregado. "Escalado
- * durante ausência aprovada" depende da integração com Férias e ausências;
- * "Turnos sobrepostos" o servidor já recusa; não há contrato intermitente.
+ * durante ausência aprovada" olha o dia gravado (rascunho ou publicado) com
+ * trabalho ou sobreaviso num dia de ausência aprovada (a ausência vence o
+ * turno). "Turnos sobrepostos" o servidor já recusa; não há contrato
+ * intermitente.
  */
 import type {
   ChaveDoAviso,
@@ -27,7 +29,13 @@ import {
 } from "../../pessoas/ficha/escala/calendarioDaEscala";
 import { escalaDoDia } from "../../pessoas/ficha/escala/diaDaEscala";
 import { modeloDe as modeloDoCatalogo } from "../../pessoas/ficha/escala/modelosDeEscala";
-import { type CelulaDoQuadro, celulaDoDia, duracao } from "./quadroDaEscala";
+import {
+  type CelulaDoQuadro,
+  celulaDoDia,
+  diaGravado,
+  duracao,
+} from "./quadroDaEscala";
+import { tituloDaAusencia } from "./ausenciasDoQuadro";
 
 export type CategoriaDoAviso = "atencao" | "conferir" | "informativo";
 
@@ -186,6 +194,19 @@ export function calcularAvisos(
         modelo !== null && modeloDoCatalogo(modelo)?.tipo === "plantao";
       const trechos = trechosDoDia(c);
       const min = c.minutos;
+
+      // Escalado num dia de ausência aprovada (a ausência vence o turno).
+      if (c.tipo === "ausencia" && c.ausencia) {
+        const g = diaGravado(p, dia);
+        if (g && (g.tipo === "trabalho" || g.tipo === "sobreaviso")) {
+          add(
+            dia,
+            "ausencia",
+            "Escalado durante ausência aprovada",
+            `${tituloDaAusencia(c.ausencia)}: o dia não conta como trabalhado. Limpe o dia ou ajuste em Férias e ausências.`,
+          );
+        }
+      }
 
       // 6x1 depois da transição, sem convenção.
       if (

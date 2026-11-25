@@ -455,6 +455,70 @@ describe("T215 — painel do dia", () => {
     ).toBeNull();
   });
 
+  it("ausência aprovada: aba Ausência, o período e só a observação; salva o dia sem a ausência com a observação", async () => {
+    pessoas = [
+      {
+        ...ana(),
+        ausencias: [
+          {
+            id: "a1",
+            tipo: "ferias",
+            motivoAfastamento: null,
+            inicio: "2026-11-24",
+            fim: "2026-11-28",
+          },
+        ],
+      },
+    ];
+    await montar();
+    // A célula da quarta (25/11) mostra a ausência; o menu abre os detalhes.
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Férias de 24\/11 a 28\/11/ })[1]!,
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: /Abrir detalhes/ }));
+    const painel = screen.getByRole("dialog", { name: "Ana Lima" });
+    expect(
+      within(painel)
+        .getAllByRole("tab")
+        .map((t) => [
+          t.textContent,
+          t.getAttribute("aria-selected"),
+          (t as HTMLButtonElement).disabled,
+        ]),
+    ).toEqual([
+      ["Trabalho", "false", true],
+      ["Folga", "false", true],
+      ["DSR", "false", true],
+      ["Sobreaviso", "false", true],
+      ["Ausência", "true", false],
+    ]);
+    expect(within(painel).getByRole("note")).toHaveTextContent(
+      "Férias aprovadaDe 24/11/2026 a 28/11/2026. Ausência vence o turno e só muda em Férias e ausências.",
+    );
+    expect(
+      within(painel).queryByRole("combobox", { name: "Turno" }),
+    ).toBeNull();
+    const salvar = within(painel).getByRole("button", {
+      name: "Salvar no rascunho",
+    });
+    expect(salvar).toBeDisabled();
+    fireEvent.change(
+      within(painel).getByRole("textbox", { name: /Observação/ }),
+      {
+        target: { value: "Cobertura combinada" },
+      },
+    );
+    fireEvent.click(salvar);
+    await waitFor(() => expect(gravarDia).toHaveBeenCalled());
+    expect(vi.mocked(gravarDia).mock.calls[0]![0]).toMatchObject({
+      colaboradorId: "c-ana",
+      dia: "2026-11-25",
+      tipo: "trabalho",
+      tabelaHorarioId: COMERCIAL.id,
+      observacao: "Cobertura combinada",
+    });
+  });
+
   it("salva trabalho com 2º período, local e observação; o aviso leva o nome do turno", async () => {
     const painel = await abrirDetalhes();
     fireEvent.click(

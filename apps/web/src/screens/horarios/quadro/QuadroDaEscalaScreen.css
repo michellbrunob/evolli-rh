@@ -581,6 +581,38 @@
   background: var(--surface-neutral);
 }
 
+/* Ausência aprovada: caixa neutra (vence o turno). */
+.quadro__ausencia {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--radius-caixa);
+  background: var(--surface-neutral);
+}
+
+.quadro__ausencia-nome {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quadro__sigla--ausencia {
+  color: var(--color-ink-muted);
+  background: var(--surface-neutral);
+}
+
+.quadro__legenda-ausencia {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.875rem;
+  border-radius: var(--radius-caixa);
+  background: var(--surface-neutral);
+}
+
 .quadro__horas {
   padding: var(--space-xs);
   border-left: var(--divisor);
@@ -611,6 +643,9 @@
 }
 
 .quadro__mes-dias {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink-subtle);
   font-weight: 400;
 }
@@ -1297,6 +1332,25 @@
   color: var(--color-ink);
   font-size: var(--text-ui);
   font-weight: 600;
+}
+
+/* Ausência aprovada no painel do dia (vence o turno). */
+.painel-dia__ausencia {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.painel-dia__ausencia p {
+  margin: 0;
+}
+
+.painel-dia__ausencia .painel-dia__subtitulo {
+  color: var(--color-ink);
 }
 
 .painel-dia__avisos {

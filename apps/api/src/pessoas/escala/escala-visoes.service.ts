@@ -15,7 +15,12 @@ import { resolverEscopoContatos } from "../contatos/escopo-contatos.util";
 import { PessoasAuditContext } from "../pessoas.types";
 
 /** Os atalhos do filtro (ligados ou não). */
-export const ATALHOS_DA_VISAO = ["comAviso", "semEscala", "mudancas"] as const;
+export const ATALHOS_DA_VISAO = [
+  "comAviso",
+  "semEscala",
+  "mudancas",
+  "ausentes",
+] as const;
 
 /** Os grupos do filtro: cada um, a lista de valores marcados. */
 export const GRUPOS_DA_VISAO = [

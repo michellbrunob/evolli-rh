@@ -570,6 +570,139 @@ describe("T215 — quadro da escala (e2e)", () => {
       .expect(401);
   });
 
+  it("ausências aprovadas que tocam o período (sem home office, recusadas ou fora dele), por início", async () => {
+    const id = await admitirNomeada("Quadro Ausente Sintetica");
+    const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
+      where: { colaboradorId: id },
+    });
+    const autor = await prisma.accessUser.findFirstOrThrow({
+      where: { email: "rh.quadroa@example.test" },
+    });
+    const base = {
+      empresaId: empresaA,
+      colaboradorId: id,
+      vinculoId: vinculo.id,
+      registradoPorId: autor.id,
+      status: "aprovada" as const,
+    };
+    const d = (dia: string) => new Date(`${dia}T00:00:00.000Z`);
+    // Semana: ${SEMANA_INICIO} (segunda) a ${SEMANA_FIM} (domingo).
+    const [ferias, falta, afastada, pedida] = await Promise.all([
+      prisma.ausencia.create({
+        data: {
+          ...base,
+          tipo: "ferias",
+          inicio: d(`${ANO - 1}-02-20`),
+          fim: d(`${ANO - 1}-03-03`),
+        },
+      }),
+      prisma.ausencia.create({
+        data: {
+          ...base,
+          tipo: "falta_justificada",
+          inicio: d(`${ANO - 1}-03-05`),
+          fim: d(`${ANO - 1}-03-05`),
+        },
+      }),
+      prisma.ausencia.create({
+        data: {
+          ...base,
+          tipo: "afastamento",
+          motivoAfastamento: "auxilio_doenca",
+          inicio: d(`${ANO - 1}-03-07`),
+          fim: null,
+        },
+      }),
+      prisma.ausencia.create({
+        data: {
+          ...base,
+          status: "cancelamento_pedido",
+          tipo: "day_off",
+          inicio: d(`${ANO - 1}-03-06`),
+          fim: d(`${ANO - 1}-03-06`),
+        },
+      }),
+    ]);
+    // Não entram: home office, recusada, aguardando e fora do período.
+    await prisma.ausencia.createMany({
+      data: [
+        {
+          ...base,
+          tipo: "home_office",
+          inicio: d(`${ANO - 1}-03-04`),
+          fim: d(`${ANO - 1}-03-04`),
+        },
+        {
+          ...base,
+          status: "recusada",
+          tipo: "day_off",
+          inicio: d(`${ANO - 1}-03-04`),
+          fim: d(`${ANO - 1}-03-04`),
+        },
+        {
+          ...base,
+          status: "aguardando_rh",
+          tipo: "day_off",
+          inicio: d(`${ANO - 1}-03-04`),
+          fim: d(`${ANO - 1}-03-04`),
+        },
+        {
+          ...base,
+          tipo: "falta_justificada",
+          inicio: d(`${ANO - 1}-03-01`),
+          fim: d(`${ANO - 1}-03-01`),
+        },
+        {
+          ...base,
+          tipo: "falta_justificada",
+          inicio: d(`${ANO - 1}-03-09`),
+          fim: d(`${ANO - 1}-03-09`),
+        },
+      ],
+    });
+    const r = await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200);
+    const pessoa = (
+      r.body.pessoas as { colaboradorId: string; ausencias: unknown[] }[]
+    ).find((p) => p.colaboradorId === id)!;
+    expect(pessoa.ausencias).toEqual([
+      {
+        id: ferias.id,
+        tipo: "ferias",
+        motivoAfastamento: null,
+        inicio: `${ANO - 1}-02-20`,
+        fim: `${ANO - 1}-03-03`,
+      },
+      {
+        id: falta.id,
+        tipo: "falta_justificada",
+        motivoAfastamento: null,
+        inicio: `${ANO - 1}-03-05`,
+        fim: `${ANO - 1}-03-05`,
+      },
+      {
+        id: pedida.id,
+        tipo: "day_off",
+        motivoAfastamento: null,
+        inicio: `${ANO - 1}-03-06`,
+        fim: `${ANO - 1}-03-06`,
+      },
+      {
+        id: afastada.id,
+        tipo: "afastamento",
+        motivoAfastamento: "auxilio_doenca",
+        inicio: `${ANO - 1}-03-07`,
+        fim: null,
+      },
+    ]);
+    // Outra empresa não vê a pessoa (nem as ausências dela).
+    const rb = await quadro(SEMANA_INICIO, SEMANA_FIM, rhB).expect(200);
+    expect(
+      (rb.body.pessoas as { colaboradorId: string }[]).some(
+        (p) => p.colaboradorId === id,
+      ),
+    ).toBe(false);
+  });
+
   it("leitura sem trilha de auditoria", async () => {
     const antes = await prisma.auditEvent.count();
     await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200);

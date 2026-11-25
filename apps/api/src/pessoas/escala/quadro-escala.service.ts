@@ -1,5 +1,10 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { SituacaoVinculo, TipoVinculo } from "@prisma/client";
+import {
+  MotivoAfastamento,
+  SituacaoVinculo,
+  TipoAusencia,
+  TipoVinculo,
+} from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { CamposRecusadosException } from "../../common/erros/recusa-por-campo";
 import { semDesativacaoVigente } from "../colaborador/desativacao";
@@ -34,6 +39,25 @@ interface Referencia {
   nome: string;
 }
 
+/**
+ * Uma ausência aprovada que toca o período (Férias e ausências). Ausência
+ * vence o turno: o dia é da ausência e só muda em Férias e ausências.
+ */
+export interface AusenciaNoQuadro {
+  id: string;
+  tipo: TipoAusencia;
+  motivoAfastamento: MotivoAfastamento | null;
+  inicio: string;
+  /** `null`: afastamento sem data de volta. */
+  fim: string | null;
+}
+
+/** Aprovada (ou com cancelamento pedido, que ainda vale até a decisão). */
+const STATUS_QUE_VALEM = ["aprovada", "cancelamento_pedido"] as const;
+
+/** Home office não é ausência do trabalho: fica fora do quadro. */
+const TIPOS_FORA_DO_QUADRO: TipoAusencia[] = ["home_office"];
+
 /** Uma pessoa do quadro: o vínculo no período, a lotação e os padrões. */
 export interface PessoaDoQuadro {
   colaboradorId: string;
@@ -65,6 +89,8 @@ export interface PessoaDoQuadro {
   escalas: EscalaProjetada[];
   /** Os dias gravados no período (rascunho e publicado), por dia. */
   dias: DiaGravado[];
+  /** As ausências aprovadas que tocam o período, por início. */
+  ausencias: AusenciaNoQuadro[];
 }
 
 export interface QuadroDaEscala {
@@ -224,6 +250,41 @@ export class QuadroEscalaService {
       diasPorColaborador.set(d.colaboradorId, lista);
     }
 
+    const ausencias =
+      ids.length === 0
+        ? []
+        : await this.prisma.ausencia.findMany({
+            where: {
+              empresaId,
+              colaboradorId: { in: ids },
+              status: { in: [...STATUS_QUE_VALEM] },
+              tipo: { notIn: TIPOS_FORA_DO_QUADRO },
+              inicio: { lte: fim },
+              OR: [{ fim: null }, { fim: { gte: inicio } }],
+            },
+            orderBy: [{ inicio: "asc" }, { id: "asc" }],
+            select: {
+              id: true,
+              colaboradorId: true,
+              tipo: true,
+              motivoAfastamento: true,
+              inicio: true,
+              fim: true,
+            },
+          });
+    const ausenciasPorColaborador = new Map<string, AusenciaNoQuadro[]>();
+    for (const a of ausencias) {
+      const lista = ausenciasPorColaborador.get(a.colaboradorId) ?? [];
+      lista.push({
+        id: a.id,
+        tipo: a.tipo,
+        motivoAfastamento: a.motivoAfastamento,
+        inicio: diaCivil(a.inicio),
+        fim: a.fim ? diaCivil(a.fim) : null,
+      });
+      ausenciasPorColaborador.set(a.colaboradorId, lista);
+    }
+
     const pessoas: PessoaDoQuadro[] = [...porColaborador.entries()].map(
       ([colaboradorId, v]) => {
         const lotacao = v.alocacoes[0];
@@ -251,6 +312,7 @@ export class QuadroEscalaService {
           jornadaSemanalHoras: v.contrato?.jornadaSemanalHoras ?? null,
           escalas: escalasPorColaborador.get(colaboradorId) ?? [],
           dias: diasPorColaborador.get(colaboradorId) ?? [],
+          ausencias: ausenciasPorColaborador.get(colaboradorId) ?? [],
         };
       },
     );

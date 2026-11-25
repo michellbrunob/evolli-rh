@@ -29,13 +29,15 @@ export type GrupoDoFiltro =
   | "niveis"
   | "generos";
 
-export type AtalhoDoFiltro = "comAviso" | "semEscala" | "mudancas";
+export type AtalhoDoFiltro = "comAviso" | "semEscala" | "mudancas" | "ausentes";
 
 export interface FiltrosDoQuadro {
   readonly comAviso: boolean;
   readonly semEscala: boolean;
   /** Atalho "Mudanças não publicadas" (rascunho no período). */
   readonly mudancas: boolean;
+  /** Atalho "De férias ou afastados" (ausência aprovada no período). */
+  readonly ausentes: boolean;
   readonly unidades: readonly string[];
   readonly departamentos: readonly string[];
   readonly tipos: readonly string[];
@@ -52,6 +54,7 @@ export const FILTROS_DO_QUADRO_VAZIOS: FiltrosDoQuadro = {
   comAviso: false,
   semEscala: false,
   mudancas: false,
+  ausentes: false,
   unidades: [],
   departamentos: [],
   tipos: [],
@@ -103,12 +106,14 @@ export const ROTULO_DO_ATALHO: Readonly<Record<AtalhoDoFiltro, string>> = {
   comAviso: "Com aviso da CLT",
   semEscala: "Sem escala",
   mudancas: "Mudanças não publicadas",
+  ausentes: "De férias ou afastados",
 };
 
 export const ATALHOS_DO_FILTRO: readonly AtalhoDoFiltro[] = [
   "comAviso",
   "semEscala",
   "mudancas",
+  "ausentes",
 ];
 
 /** Quantos filtros estão ligados (cada opção marcada conta um). */
@@ -126,6 +131,8 @@ export interface ContextoDoFiltro {
   readonly comAviso: ReadonlySet<string>;
   /** Quem tem rascunho no período. */
   readonly comMudanca: ReadonlySet<string>;
+  /** Quem tem ausência aprovada no período. */
+  readonly comAusencia: ReadonlySet<string>;
 }
 
 /** O valor (id ou código) da pessoa no grupo; `SEM_VALOR` quando não há. */
@@ -221,6 +228,7 @@ function passaNoAtalho(
 ): boolean {
   if (atalho === "comAviso") return ctx.comAviso.has(p.colaboradorId);
   if (atalho === "semEscala") return semEscala(p);
+  if (atalho === "ausentes") return ctx.comAusencia.has(p.colaboradorId);
   return ctx.comMudanca.has(p.colaboradorId);
 }
 

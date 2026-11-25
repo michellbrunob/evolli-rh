@@ -23,6 +23,7 @@ import {
   diaDaSemana,
   somarDias,
 } from "../../pessoas/ficha/escala/calendarioDaEscala";
+import { ausenciaDoDia } from "./ausenciasDoQuadro";
 import {
   type CelulaDoQuadro,
   celulaDoDia,
@@ -47,7 +48,9 @@ export const chaveDoDia = (colaboradorId: string, dia: string) =>
 
 /** O valor que regrava a célula; `null` quando ela não tem alocação própria. */
 export function valorDaCelula(c: CelulaDoQuadro): ValorDoDia | null {
-  if (c.tipo === "sem-escala" || c.tipo === "fora") return null;
+  // Sem escala, fora do vínculo e ausência (vence o turno): nada a copiar.
+  if (c.tipo === "sem-escala" || c.tipo === "fora" || c.tipo === "ausencia")
+    return null;
   if (c.tipo === "folga" || c.tipo === "dsr") {
     return { tipo: c.tipo, observacao: c.observacao };
   }
@@ -109,8 +112,11 @@ export function copiarDias(
   for (const p of pessoas) {
     const fonte = pessoasDaOrigem.get(p.colaboradorId) ?? p;
     destino.forEach((dia, i) => {
-      if (!noVinculo(p, dia)) return;
+      // Fora do vínculo ou ausência aprovada no destino: o dia fica como está.
+      if (!noVinculo(p, dia) || ausenciaDoDia(p, dia)) return;
       const c = celulaDoDia(fonte, origem[i]!);
+      // Ausência na origem não se copia (é de Férias e ausências).
+      if (c.tipo === "ausencia") return;
       const valor = c.origem === "padrao" ? null : valorDaCelula(c);
       if (valor) gravar.push({ ...valor, colaboradorId: p.colaboradorId, dia });
       else limpar.push({ colaboradorId: p.colaboradorId, dia });
@@ -168,6 +174,8 @@ export function trocarTurno(
     for (const dia of dias) {
       if (!noVinculo(p, dia)) continue;
       const c = celulaDoDia(p, dia);
+      // Ausência aprovada vence o turno: o dia fica de fora.
+      if (c.tipo === "ausencia") continue;
       // Só onde já há turno, salvo "Também nas folgas".
       if (c.tipo !== "trabalho" && !o.tambemNasFolgas) continue;
       if (c.tipo === "trabalho" && c.turno?.id === o.turno.id) {
@@ -202,7 +210,10 @@ export function trocarTurno(
   return { plano: { gravar, limpar: [] }, mudancas };
 }
 
-/** Dar folga (ou DSR) num dia; quem está fora do vínculo fica de fora. */
+/**
+ * Dar folga (ou DSR) num dia; quem está fora do vínculo ou com ausência
+ * aprovada no dia fica de fora.
+ */
 export function darFolga(
   pessoas: readonly PessoaDoQuadroApi[],
   dia: string,
@@ -210,7 +221,7 @@ export function darFolga(
 ): PlanoDoLote {
   return {
     gravar: pessoas
-      .filter((p) => noVinculo(p, dia))
+      .filter((p) => noVinculo(p, dia) && !ausenciaDoDia(p, dia))
       .map((p) => ({
         colaboradorId: p.colaboradorId,
         dia,

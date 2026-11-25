@@ -134,6 +134,28 @@ export interface ReferenciaDoQuadroApi {
   nome: string;
 }
 
+/**
+ * T215 — ausência aprovada que toca o período (Férias e ausências). Ausência
+ * vence o turno: o dia é dela e só muda em Férias e ausências.
+ */
+export interface AusenciaNoQuadroApi {
+  id: string;
+  tipo:
+    | "ferias"
+    | "licenca_medica"
+    | "licenca_maternidade"
+    | "licenca_paternidade"
+    | "afastamento"
+    | "falta_justificada"
+    | "falta_sem_justificativa"
+    | "day_off"
+    | "home_office";
+  motivoAfastamento: string | null;
+  inicio: string;
+  /** `null`: afastamento sem data de volta. */
+  fim: string | null;
+}
+
 export interface PessoaDoQuadroApi {
   colaboradorId: string;
   nome: string;
@@ -160,6 +182,8 @@ export interface PessoaDoQuadroApi {
   escalas: EscalaApi[];
   /** Os dias gravados no período (rascunho e publicado). */
   dias: DiaGravadoApi[];
+  /** As ausências aprovadas que tocam o período (ausente: nenhuma). */
+  ausencias?: AusenciaNoQuadroApi[];
 }
 
 /** "HH:MM"; o fim antes do início termina no dia seguinte. */
@@ -396,6 +420,7 @@ export interface FiltrosDaVisaoApi {
   comAviso: boolean;
   semEscala: boolean;
   mudancas: boolean;
+  ausentes: boolean;
   unidades: readonly string[];
   departamentos: readonly string[];
   tipos: readonly string[];

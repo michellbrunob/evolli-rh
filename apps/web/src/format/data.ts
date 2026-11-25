@@ -489,6 +489,16 @@ export function mesDoDia(valor: string): string {
   return valor.slice(0, 7);
 }
 
+/**
+ * T215 — o período de uma ausência por extenso: "De 19/11/2026 a
+ * 19/11/2026" ou, sem data de volta, "Desde 07/03/2026, sem data de volta".
+ */
+export function periodoDaAusencia(inicio: string, fim: string | null): string {
+  return fim === null
+    ? `Desde ${formatarDiaCivil(inicio)}, sem data de volta`
+    : `De ${formatarDiaCivil(inicio)} a ${formatarDiaCivil(fim)}`;
+}
+
 /** T215 — "07/12" (dia e mês com dois dígitos) de uma data civil. */
 export function diaMesComZero(valor: string): string {
   return formatarDiaCivil(valor).slice(0, 5);

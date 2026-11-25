@@ -177,6 +177,27 @@ describe("T215 — Exportar a escala", () => {
     );
     expect(textoDaCelula(celulaDoDia(ana, "2026-12-08"))).toBe("DSR");
     expect(textoDaCelula(celulaDoDia(ana, "2026-12-09"))).toBe("");
+    // Ausência aprovada vence o publicado: sai o tipo.
+    const ausente = pessoasPublicadas(
+      [
+        {
+          ...ANA,
+          ausencias: [
+            {
+              id: "a",
+              tipo: "licenca_medica",
+              motivoAfastamento: null,
+              inicio: "2026-12-07",
+              fim: "2026-12-07",
+            },
+          ],
+        },
+      ],
+      SEMANA,
+    )[0]!;
+    expect(textoDaCelula(celulaDoDia(ausente, "2026-12-07"))).toBe(
+      "Licença médica",
+    );
   });
 
   it("páginas: por unidade (com departamentos), por departamento, por pessoa e sem separar", () => {

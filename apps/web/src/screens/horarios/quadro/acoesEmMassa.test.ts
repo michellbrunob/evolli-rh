@@ -37,6 +37,14 @@ function gravado(
   };
 }
 
+const AUSENCIA = {
+  id: "x",
+  tipo: "ferias" as const,
+  motivoAfastamento: null,
+  inicio: "2026-11-24",
+  fim: "2026-11-25",
+};
+
 const LOJA: TabelaHorarioApi = {
   id: "t-loja",
   empresaId: "e",
@@ -185,6 +193,91 @@ describe("T215 — ações em massa (puras)", () => {
     const b = pessoa("B", { colaboradorId: "b", dataAdmissao: "2026-12-01" });
     expect(darFolga([a, b], "2026-11-25", "dsr").gravar).toEqual([
       { colaboradorId: "a", dia: "2026-11-25", tipo: "dsr", observacao: null },
+    ]);
+  });
+
+  it("ausência aprovada vence o turno: dar folga, trocar turno e copiar deixam o dia como está", () => {
+    const a = pessoa("A", {
+      colaboradorId: "a",
+      escalas: [escala()],
+      ausencias: [
+        {
+          id: "x",
+          tipo: "ferias" as const,
+          motivoAfastamento: null,
+          inicio: "2026-11-24",
+          fim: "2026-11-25",
+        },
+      ],
+    });
+    const b = pessoa("B", { colaboradorId: "b", escalas: [escala()] });
+    expect(
+      darFolga([a, b], "2026-11-25", "folga").gravar.map(
+        (g) => g.colaboradorId,
+      ),
+    ).toEqual(["b"]);
+    expect(valorDaCelula(celulaDoDia(a, "2026-11-24"))).toBeNull();
+    const troca = trocarTurno([a], {
+      turno: LOJA,
+      de: "2026-11-23",
+      ate: "2026-11-27",
+      diasDaSemana: new Set([1, 2, 3, 4, 5]),
+      tambemNasFolgas: false,
+    });
+    expect(troca.plano.gravar.map((g) => g.dia)).toEqual([
+      "2026-11-23",
+      "2026-11-26",
+      "2026-11-27",
+    ]);
+    // Nem com "Também nas folgas" a ausência recebe turno.
+    const nasFolgas = trocarTurno([a], {
+      turno: LOJA,
+      de: "2026-11-23",
+      ate: "2026-11-27",
+      diasDaSemana: new Set([1, 2, 3, 4, 5]),
+      tambemNasFolgas: true,
+    });
+    expect(nasFolgas.plano.gravar.map((g) => g.dia)).not.toContain(
+      "2026-11-24",
+    );
+    // A célula da ausência guarda a observação do dia gravado.
+    const comObs = pessoa("A", {
+      colaboradorId: "a",
+      escalas: [escala()],
+      ausencias: [AUSENCIA],
+      dias: [gravado("2026-11-24", { observacao: "Combinado" })],
+    });
+    expect(celulaDoDia(comObs, "2026-11-24")).toMatchObject({
+      tipo: "ausencia",
+      origem: "rascunho",
+      observacao: "Combinado",
+    });
+    // Copiar: destino em ausência fica; origem em ausência não se copia.
+    const origem = pessoa("A", {
+      colaboradorId: "a",
+      escalas: [escala()],
+      dias: ANTERIOR.map((d) => gravado(d)),
+      ausencias: [
+        {
+          ...{
+            id: "x",
+            tipo: "ferias" as const,
+            motivoAfastamento: null,
+            inicio: "2026-11-24",
+            fim: "2026-11-25",
+          },
+          inicio: "2026-11-20",
+          fim: "2026-11-20",
+        },
+      ],
+    });
+    const plano = copiarDias([a], new Map([["a", origem]]), ANTERIOR, SEMANA);
+    const tocados = [...plano.gravar, ...plano.limpar].map((d) => d.dia).sort();
+    expect(tocados).toEqual([
+      "2026-11-23",
+      "2026-11-26",
+      "2026-11-28",
+      "2026-11-29",
     ]);
   });
 

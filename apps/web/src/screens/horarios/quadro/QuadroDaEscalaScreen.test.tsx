@@ -561,6 +561,57 @@ describe("T215 — quadro da escala: semana", () => {
     ).toEqual(["Outra", "Sem escala"]);
   });
 
+  it("ausência aprovada vence o turno: caixa na semana, sigla e resumo no mês, atalho De férias ou afastados", async () => {
+    quadroCom([
+      {
+        ...michell,
+        ausencias: [
+          {
+            id: "a1",
+            tipo: "falta_justificada",
+            motivoAfastamento: null,
+            inicio: "2026-11-26",
+            fim: "2026-11-26",
+          },
+        ],
+      },
+      julia,
+      teste,
+    ]);
+    montar();
+    await screen.findByRole("table");
+    const cm = within(linhaDe("Michell Bruno")).getAllByRole("cell");
+    expect(cm[3]).toHaveTextContent("Falta justificadaAprovada");
+    expect(cm[3]).toHaveTextContent(
+      "Falta justificada de 26/11 a 26/11, aprovada",
+    );
+    // O dia não conta: 4 dias × 8 h.
+    expect(cm[7]).toHaveTextContent("32 h");
+
+    // Atalho: 1 pessoa ausente no período.
+    fireEvent.click(screen.getByRole("button", { name: "Filtrar" }));
+    const gaveta = screen.getByRole("dialog", { name: "Filtros" });
+    const atalho = within(gaveta).getByRole("button", {
+      name: /^De férias ou afastados/,
+    });
+    expect(atalho).toHaveTextContent("De férias ou afastados1");
+    fireEvent.click(atalho);
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Ver 1 pessoa" }),
+    );
+    expect(screen.getByText("1 de 3 pessoas")).toBeInTheDocument();
+
+    // Mês: a sigla com a dica e o resumo na coluna de horas.
+    fireEvent.click(screen.getByRole("button", { name: "Mês" }));
+    await screen.findByRole("table");
+    const linha = linhaDe("Michell Bruno");
+    const sigla = linha.querySelector(".quadro__sigla--ausencia")!;
+    expect(sigla).toHaveTextContent("F");
+    expect(linha.querySelector(".quadro__mes-dias")).toHaveTextContent(
+      "Falta justificada até 26/11",
+    );
+  });
+
   it("legenda com os turnos da página; ações de voltar e Turnos", async () => {
     const onVoltar = vi.fn();
     const onAbrirTurnos = vi.fn();
@@ -663,7 +714,7 @@ describe("T215 — quadro da escala: mês", () => {
       within(legenda)
         .getAllByRole("listitem")
         .map((i) => i.textContent),
-    ).toEqual(["CComercial", "LJLoja", "DDSR"]);
+    ).toEqual(["CComercial", "LJLoja", "DDSR", "Ausência"]);
   });
 
   it("próximo mês e virada de ano", async () => {

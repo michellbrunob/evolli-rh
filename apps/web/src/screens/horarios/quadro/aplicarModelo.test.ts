@@ -271,6 +271,25 @@ describe("T215 — Aplicar modelo", () => {
     ]);
   });
 
+  it("ausência aprovada: o modelo não escala o dia e conta quantos ficam de fora", () => {
+    const p = pessoa("Ana", {
+      ausencias: [
+        {
+          id: "x",
+          tipo: "ferias" as const,
+          motivoAfastamento: null,
+          inicio: "2026-12-01",
+          fim: "2026-12-02",
+        },
+      ],
+    });
+    const plano = planoDoModelo([p], opcoes());
+    expect(plano.gravar.map((g) => g.dia)).not.toContain("2026-12-01");
+    expect(plano.gravar.map((g) => g.dia)).not.toContain("2026-12-02");
+    expect(plano.ausentes).toBe(2);
+    expect(planoDoModelo([pessoa("Bia")], opcoes()).ausentes).toBe(0);
+  });
+
   it("as pessoas com o modelo: o lote entra como rascunho por cima", () => {
     const p = pessoa("Ana", {
       colaboradorId: "c-a",

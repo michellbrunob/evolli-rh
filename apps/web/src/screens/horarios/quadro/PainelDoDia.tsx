@@ -19,14 +19,18 @@ import { Button, Sheet } from "../../../ui";
 import {
   diaPorExtensoComSemana,
   intervaloCurtoDeDias,
+  periodoDaAusencia,
 } from "../../../format/data";
 import {
   formatarHoras,
   somarDias,
 } from "../../pessoas/ficha/escala/calendarioDaEscala";
 import { INTERVALOS } from "../turnos/turnos";
+import { valorDaCelula } from "./acoesEmMassa";
+import { rotuloDaAusencia } from "./ausenciasDoQuadro";
 import {
   type CelulaDoQuadro,
+  celulaDoDia,
   duracao,
   minutosDosPeriodos,
   periodosNoDia,
@@ -339,7 +343,27 @@ export function PainelDoDia({
       f.aba === "sobreaviso" ? periodos : completo(f.depois) ? [f.depois] : [],
   });
 
+  // Ausência aprovada vence o turno: só a observação do dia muda aqui.
+  const ausencia =
+    celula.tipo === "ausencia" ? (celula.ausencia ?? null) : null;
+
   const salvar = async () => {
+    if (ausencia) {
+      // Guarda o dia como ele é sem a ausência (padrão ou gravado), só com a
+      // observação nova: se a ausência for cancelada, o dia continua certo.
+      const base = valorDaCelula(
+        celulaDoDia({ ...pessoa, ausencias: [] }, celula.dia),
+      ) ?? { tipo: "folga" as const };
+      setEnviando(true);
+      try {
+        await onSalvar({ ...base, observacao: f.observacao.trim() || null });
+      } catch (e) {
+        setErro(mensagemDoErro(e));
+      } finally {
+        setEnviando(false);
+      }
+      return;
+    }
     if (problemas.length > 0) {
       setErro(problemas[0]!);
       return;
@@ -462,7 +486,11 @@ export function PainelDoDia({
           <Button variant="secondary" onClick={onFechar} disabled={enviando}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={salvar} disabled={enviando}>
+          <Button
+            variant="primary"
+            onClick={salvar}
+            disabled={enviando || (ausencia !== null && !alterado)}
+          >
             Salvar no rascunho
           </Button>
         </>
@@ -518,7 +546,14 @@ export function PainelDoDia({
               key={a}
               type="button"
               role="tab"
-              aria-selected={f.aba === a}
+              aria-selected={ausencia === null && f.aba === a}
+              {...(ausencia
+                ? {
+                    disabled: true,
+                    "aria-disabled": true,
+                    title: "Ausência vence o turno.",
+                  }
+                : {})}
               className="painel-dia__aba"
               onClick={() => {
                 const parcial: Partial<Formulario> = { aba: a };
@@ -534,9 +569,9 @@ export function PainelDoDia({
           <button
             type="button"
             role="tab"
-            aria-selected={false}
+            aria-selected={ausencia !== null}
             aria-disabled="true"
-            disabled
+            disabled={ausencia === null}
             title="Ausências vêm de Férias e ausências."
             className="painel-dia__aba"
           >
@@ -544,7 +579,16 @@ export function PainelDoDia({
           </button>
         </div>
 
-        {f.aba === "trabalho" ? (
+        {ausencia ? (
+          <div role="note" className="painel-dia__ausencia">
+            <p className="painel-dia__subtitulo">{`${rotuloDaAusencia(ausencia)} aprovada`}</p>
+            <p>
+              {`${periodoDaAusencia(ausencia.inicio, ausencia.fim)}. Ausência vence o turno e só muda em Férias e ausências.`}
+            </p>
+          </div>
+        ) : null}
+
+        {ausencia === null && f.aba === "trabalho" ? (
           <div className="painel-dia__secao">
             <label className="painel-dia__campo painel-dia__campo--largo">
               <span>Turno</span>
@@ -659,7 +703,7 @@ export function PainelDoDia({
           </div>
         ) : null}
 
-        {f.aba === "sobreaviso" ? (
+        {ausencia === null && f.aba === "sobreaviso" ? (
           <div className="painel-dia__secao">
             {f.sobreaviso.map((p, i) => (
               <div key={i} className="painel-dia__linha">
@@ -731,7 +775,7 @@ export function PainelDoDia({
           <small aria-live="polite">{`${f.observacao.length}/${MAX_OBSERVACAO}`}</small>
         </label>
 
-        {avisos.length > 0 ? (
+        {ausencia === null && avisos.length > 0 ? (
           <div
             role="note"
             aria-label="Atenção à legislação"

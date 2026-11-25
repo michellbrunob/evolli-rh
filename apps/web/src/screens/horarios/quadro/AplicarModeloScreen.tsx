@@ -954,8 +954,11 @@ export function AplicarModeloScreen({
             </LinhaDoCadastro>
             <LinhaDoCadastro rotulo="Publicação" grupo={false}>
               <p className="modelo__nota">
-                A escala publicada não muda até você publicar de novo. Férias e
-                ausências ainda não entram no quadro: confira antes de publicar.
+                {`A escala publicada não muda até você publicar de novo. Férias e ausências aprovadas vencem o turno: ${
+                  (plano?.ausentes ?? 0) === 0
+                    ? "nenhum dia do período cai nelas."
+                    : `${plural(plano!.ausentes, "dia fica", "dias ficam")} de fora do modelo.`
+                }`}
               </p>
             </LinhaDoCadastro>
           </SecaoDoCadastro>

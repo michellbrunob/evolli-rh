@@ -25,6 +25,7 @@ import {
   somarDias,
 } from "../../pessoas/ficha/escala/calendarioDaEscala";
 import { modeloDe } from "../../pessoas/ficha/escala/modelosDeEscala";
+import { ausenciaDoDia } from "./ausenciasDoQuadro";
 import {
   type CelulaDoQuadro,
   celulaDoDia,
@@ -256,6 +257,8 @@ export interface PlanoDoModelo {
   readonly gravar: GravarDiaDto[];
   /** Dias com rascunho ou publicado no período (o "Substituir"). */
   readonly ocupadas: number;
+  /** Dias de ausência aprovada no período: ficam de fora do modelo. */
+  readonly ausentes: number;
   readonly porPessoa: PessoaNoModelo[];
 }
 
@@ -268,6 +271,7 @@ export function planoDoModelo(
   const gravar: GravarDiaDto[] = [];
   const porPessoa: PessoaNoModelo[] = [];
   let ocupadas = 0;
+  let ausentes = 0;
   pessoas.forEach((p, indice) => {
     const celulas = celulasDoModelo(p, o, indice, dias);
     let n = 0;
@@ -275,6 +279,11 @@ export function planoDoModelo(
     celulas.forEach((c, i) => {
       if (!c) return;
       const dia = dias[i]!;
+      // Ausência aprovada vence o turno: o modelo não escala o dia.
+      if (ausenciaDoDia(p, dia)) {
+        ausentes += 1;
+        return;
+      }
       if (i < 7) minutosNaSemana += c.minutos;
       const existente = diaGravado(p, dia);
       if (existente) ocupadas += 1;
@@ -308,7 +317,7 @@ export function planoDoModelo(
       celulas: n,
     });
   });
-  return { gravar, ocupadas, porPessoa };
+  return { gravar, ocupadas, ausentes, porPessoa };
 }
 
 /**

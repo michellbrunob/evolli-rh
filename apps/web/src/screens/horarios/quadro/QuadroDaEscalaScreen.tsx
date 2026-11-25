@@ -82,6 +82,13 @@ import { Esqueleto, Revelar } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import { OPCOES_GENERO, OPCOES_NIVEL } from "../../pessoas/NovaAdmissaoScreen";
 import { GavetaDoQuadro } from "./GavetaDoQuadro";
+import {
+  idsComAusencia,
+  resumoDasAusencias,
+  siglaDaAusencia,
+  tituloDaAusencia,
+  rotuloDaAusencia,
+} from "./ausenciasDoQuadro";
 import { DialogoGerenciarVisoes, DialogoSalvarVisao } from "./VisoesDoQuadro";
 import {
   type AcaoDaCelula,
@@ -305,6 +312,13 @@ export function descricaoDaCelula(
     case "fora":
       partes.push("Fora do vínculo");
       break;
+    case "ausencia":
+      partes.push(
+        c.ausencia
+          ? `${tituloDaAusencia(c.ausencia)}, aprovada`
+          : "Ausência aprovada",
+      );
+      break;
   }
   if (c.observacao) partes.push(`observação: ${c.observacao}`);
   if (c.origem === "rascunho") partes.push("mudança não publicada");
@@ -407,6 +421,16 @@ function CelulaDaSemana({
     );
   } else if (c.tipo === "folga") {
     conteudo = <span className="quadro__descanso-nome">Folga</span>;
+  } else if (c.tipo === "ausencia" && c.ausencia) {
+    // Ausência vence o turno: o tipo e "Aprovada", numa caixa neutra.
+    conteudo = (
+      <div className="quadro__ausencia">
+        <span className="quadro__ausencia-nome">
+          {rotuloDaAusencia(c.ausencia)}
+        </span>
+        <span className="quadro__turno-horario">Aprovada</span>
+      </div>
+    );
   } else if (c.tipo === "sem-escala") {
     // O "+" do dia vazio, ao passar o mouse ou no foco (só em quem edita).
     conteudo = <span className="quadro__mais">+</span>;
@@ -444,6 +468,12 @@ function CelulaDoMes({
     sigla = <span className="quadro__sigla quadro__sigla--sobreaviso">SA</span>;
   } else if (c.tipo === "dsr") {
     sigla = <span className="quadro__sigla quadro__sigla--dsr">D</span>;
+  } else if (c.tipo === "ausencia" && c.ausencia) {
+    sigla = (
+      <span className="quadro__sigla quadro__sigla--ausencia">
+        {siglaDaAusencia(c.ausencia)}
+      </span>
+    );
   } else if (c.tipo === "sem-escala") {
     sigla = <span className="quadro__mais">+</span>;
   }
@@ -1023,9 +1053,16 @@ export function QuadroDaEscalaScreen({
         .map((p) => p.colaboradorId),
     );
   }, [todas, dias]);
+  // Quem tem ausência aprovada no período (atalho "De férias ou afastados").
+  const idsAusentes = useMemo(() => idsComAusencia(todas, dias), [todas, dias]);
   const contextoDoFiltro = useMemo(
-    () => ({ referencia, comAviso: idsComAviso, comMudanca: idsComMudanca }),
-    [referencia, idsComAviso, idsComMudanca],
+    () => ({
+      referencia,
+      comAviso: idsComAviso,
+      comMudanca: idsComMudanca,
+      comAusencia: idsAusentes,
+    }),
+    [referencia, idsComAviso, idsComMudanca, idsAusentes],
   );
   const filtradas = useMemo(
     () => buscar(filtrar(todas, filtros, contextoDoFiltro), busca),
@@ -1387,6 +1424,7 @@ export function QuadroDaEscalaScreen({
                         diasDeTrabalho={
                           cs.filter((c) => c.tipo === "trabalho").length
                         }
+                        ausencia={resumoDasAusencias(p, dias)}
                       />
                     )}
                   </td>
@@ -1988,6 +2026,15 @@ export function QuadroDaEscalaScreen({
                     DSR
                   </li>
                 ) : null}
+                {visao === "mes" ? (
+                  <li>
+                    <span
+                      className="quadro__legenda-ausencia"
+                      aria-hidden="true"
+                    />
+                    Ausência
+                  </li>
+                ) : null}
               </ul>
               {visao === "mes" ? (
                 <p className="quadro__dica">Shift + rolar para os lados</p>
@@ -2459,10 +2506,13 @@ function HorasDoMes({
   minutos,
   meta,
   diasDeTrabalho,
+  ausencia = null,
 }: {
   minutos: number;
   meta: number;
   diasDeTrabalho: number;
+  /** "Férias até 19/11": a ausência do período, no lugar dos dias. */
+  ausencia?: string | null;
 }) {
   const horas = Math.round(minutos / 60);
   const metaHoras = Math.round(meta / 60);
@@ -2475,8 +2525,8 @@ function HorasDoMes({
       <span className="quadro__barra-horas" aria-hidden="true">
         <span style={{ width: `${Math.round(proporcao * 100)}%` }} />
       </span>
-      <span className="quadro__mes-dias">
-        {plural(diasDeTrabalho, "dia", "dias")}
+      <span className="quadro__mes-dias" title={ausencia ?? undefined}>
+        {ausencia ?? plural(diasDeTrabalho, "dia", "dias")}
       </span>
     </div>
   );

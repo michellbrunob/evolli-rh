@@ -38,6 +38,7 @@ import {
   calcularAvisos,
   feriadoDaPessoa,
 } from "./avisosDaEscala";
+import { rotuloDaAusencia, siglaDaAusencia } from "./ausenciasDoQuadro";
 import {
   type CelulaDoQuadro,
   DIAS_CURTOS,
@@ -167,6 +168,7 @@ export function tituloDaExportacao(o: OpcoesDaExportacao): string {
 
 /** O texto da célula: "Comercial 09:00–18:00", "Folga", "DSR", "Sobreaviso …" ou "". */
 export function textoDaCelula(c: CelulaDoQuadro): string {
+  if (c.tipo === "ausencia" && c.ausencia) return rotuloDaAusencia(c.ausencia);
   if (c.tipo === "folga") return "Folga";
   if (c.tipo === "dsr") return "DSR";
   if (c.tipo === "sobreaviso")
@@ -571,11 +573,13 @@ export function pdfDaEquipe(
         } else if (c.tipo !== "sem-escala" && c.tipo !== "fora") {
           const t =
             o.periodo === "mes"
-              ? c.tipo === "dsr"
-                ? "D"
-                : c.tipo === "folga"
-                  ? "F"
-                  : "S"
+              ? c.tipo === "ausencia" && c.ausencia
+                ? siglaDaAusencia(c.ausencia)
+                : c.tipo === "dsr"
+                  ? "D"
+                  : c.tipo === "folga"
+                    ? "F"
+                    : "S"
               : textoDaCelula(c);
           pg.texto(x, y + 11, cortarTexto(t, col - 4, 7), {
             tamanho: 7,
@@ -762,7 +766,8 @@ export function pdfDaPessoa(
       } else if (
         c.tipo === "folga" ||
         c.tipo === "dsr" ||
-        c.tipo === "sobreaviso"
+        c.tipo === "sobreaviso" ||
+        c.tipo === "ausencia"
       ) {
         pg.texto(x + 4, y + 25, cortarTexto(textoDaCelula(c), largura - 8, 7), {
           tamanho: 7,

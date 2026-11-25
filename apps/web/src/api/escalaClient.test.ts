@@ -38,6 +38,7 @@ describe("T215 — cliente das visões salvas", () => {
       comAviso: true,
       semEscala: false,
       mudancas: false,
+      ausentes: false,
       unidades: [],
       departamentos: [],
       tipos: [],

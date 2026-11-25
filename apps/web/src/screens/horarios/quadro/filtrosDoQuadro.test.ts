@@ -48,6 +48,7 @@ const CTX: ContextoDoFiltro = {
   referencia: REF,
   comAviso: new Set(["c-Ana"]),
   comMudanca: new Set(["c-Bia"]),
+  comAusencia: new Set(["c-Caio"]),
 };
 const nomes = (ps: { nome: string }[]) => ps.map((p) => p.nome);
 const V = FILTROS_DO_QUADRO_VAZIOS;
@@ -113,6 +114,13 @@ describe("T215 — filtros do quadro", () => {
       "Bia",
     ]);
     expect(contagemDoAtalho(todas, "mudancas", V, CTX)).toBe(1);
+    expect(nomes(filtrar(todas, { ...V, ausentes: true }, CTX))).toEqual([
+      "Caio",
+    ]);
+    expect(contagemDoAtalho(todas, "ausentes", V, CTX)).toBe(1);
+    expect(
+      contagemDoAtalho(todas, "ausentes", { ...V, tipos: ["estagio"] }, CTX),
+    ).toBe(0);
     expect(
       contagemDoAtalho(todas, "mudancas", { ...V, tipos: ["clt"] }, CTX),
     ).toBe(0);

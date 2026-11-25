@@ -210,6 +210,49 @@ describe("T215 — avisos da CLT no quadro", () => {
     ).toEqual(["feriado_comercio", "feriado_comercio"]);
   });
 
+  it("ausência aprovada: escalado (gravado) no dia vira aviso de atenção; o padrão não; desligado nas Regras some", () => {
+    const p = pessoa("Ana", {
+      escalas: [escala({ vigenciaInicio: "2026-01-01" })],
+      dias: [
+        dia("2026-11-24"),
+        dia("2026-11-25", { tipo: "sobreaviso" }),
+        dia("2026-11-26", { tipo: "folga", periodos: [] }),
+      ],
+      ausencias: [
+        {
+          id: "a",
+          tipo: "ferias",
+          motivoAfastamento: null,
+          inicio: "2026-11-23",
+          fim: "2026-11-27",
+        },
+      ],
+    });
+    const avisos = calcularAvisos([p], NOV, regras()).filter(
+      (a) => a.chave === "ausencia",
+    );
+    expect(avisos.map((a) => [a.dia, a.categoria, a.titulo])).toEqual([
+      ["2026-11-24", "atencao", "Escalado durante ausência aprovada"],
+      ["2026-11-25", "atencao", "Escalado durante ausência aprovada"],
+    ]);
+    expect(avisos[0]!.explicacao).toBe(
+      "Férias de 23/11 a 27/11: o dia não conta como trabalhado. Limpe o dia ou ajuste em Férias e ausências.",
+    );
+    // Na ausência o dia não conta como trabalhado: nada de jornada.
+    expect(
+      calcularAvisos([p], NOV, regras()).filter(
+        (a) => a.chave === "dez_horas" && a.dia === "2026-11-24",
+      ),
+    ).toEqual([]);
+    const desligado = regras();
+    expect(
+      calcularAvisos([p], NOV, {
+        ...desligado,
+        avisos: { ...desligado.avisos, ausencia: false },
+      }).filter((a) => a.chave === "ausencia"),
+    ).toEqual([]);
+  });
+
   it("contratos especiais: aprendiz acima de 6 h; menor em horário noturno; noturno e sobreaviso informativos", () => {
     const aprendiz = pessoa("Apr", {
       tipoVinculo: "aprendiz",

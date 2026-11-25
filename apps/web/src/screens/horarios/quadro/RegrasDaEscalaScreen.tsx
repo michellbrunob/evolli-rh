@@ -150,7 +150,7 @@ const AVISOS: readonly [string, readonly [ChaveDoAviso, string, string][]][] = [
       [
         "ausencia",
         "Escalado durante ausência aprovada",
-        "Férias e ausências · o dia não conta como trabalhado · calculado quando o quadro mostrar as ausências",
+        "Férias e ausências · o dia não conta como trabalhado",
       ],
     ],
   ],
