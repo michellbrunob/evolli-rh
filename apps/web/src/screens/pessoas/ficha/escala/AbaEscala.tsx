@@ -67,7 +67,6 @@ import {
   type PadraoDeEscala,
   diaDaSemana,
   diasNoMes,
-  feriadoDe,
   avisosDaJornada,
   beneficioPelosDiasUteis,
   formatarHoras,
