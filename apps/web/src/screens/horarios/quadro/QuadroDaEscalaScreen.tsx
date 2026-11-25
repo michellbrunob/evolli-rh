@@ -1570,7 +1570,8 @@ export function QuadroDaEscalaScreen({
                       : ""
                   }`}
                 >
-                  {visiveis.length}
+                  {/* Como a referência: o número não conta os informativos. */}
+                  {visiveis.filter((a) => a.categoria !== "informativo").length}
                 </span>
               </Button>
             ) : null}

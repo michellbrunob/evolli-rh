@@ -54,7 +54,8 @@ export const CATEGORIA: Readonly<Record<ChaveDoAviso, CategoriaDoAviso>> = {
   ausencia: "atencao",
   domingo: "conferir",
   feriado_comercio: "atencao",
-  feriado: "conferir",
+  // Como a referência: trabalho em feriado é informativo (vai para a folha).
+  feriado: "informativo",
   "6x1_transicao": "atencao",
   aprendiz_estagio: "atencao",
   menor_noturno: "atencao",
@@ -313,15 +314,15 @@ export function calcularAvisos(
             add(
               dia,
               "feriado_comercio",
-              `Trabalho no feriado (${feriado})`,
+              `Trabalho no feriado: ${feriado}`,
               "No comércio, só com convenção coletiva (Lei 10.101/2000, art. 6º-A).",
             );
           } else {
             add(
               dia,
               "feriado",
-              `Trabalho no feriado (${feriado})`,
-              "O feriado trabalhado vai para a folha (Lei 605/1949).",
+              `Trabalho no feriado: ${feriado}`,
+              "Pagar em dobro ou dar folga compensatória (Lei 605/1949).",
             );
           }
         }

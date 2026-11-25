@@ -218,6 +218,10 @@ describe("T215 — quadro da escala: semana", () => {
     const cm = within(linhaDe("Michell Bruno")).getAllByRole("cell");
     expect(cm[3]!.className).toContain("quadro__celula--feriado");
     expect(cm[3]).toHaveTextContent("Comercial09:00–18:00");
+    // Trabalho no feriado é informativo: o número do botão Avisos não conta.
+    expect(screen.getByRole("button", { name: /^Avisos/ })).toHaveTextContent(
+      /^Avisos0$/,
+    );
     expect(cm[1]!.className).not.toContain("quadro__celula--feriado");
     expect(cm[2]!.className).toContain("quadro__celula--feriado");
     // teste (sem unidade): o feriado não é dela.

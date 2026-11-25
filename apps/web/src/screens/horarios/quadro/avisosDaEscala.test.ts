@@ -166,7 +166,7 @@ describe("T215 — avisos da CLT no quadro", () => {
     ).toEqual([]);
   });
 
-  it("feriado: trabalhado vai para conferir; no comércio sem convenção, atenção; feriado local da unidade", () => {
+  it("feriado: trabalhado é informativo (como a referência); no comércio sem convenção, atenção; feriado local da unidade", () => {
     const dez = diasDoPeriodo("2026-12-21", "2026-12-27");
     const p = pessoa("Ana", {
       unidade: { id: "u1", nome: "Loja" },
@@ -201,9 +201,12 @@ describe("T215 — avisos da CLT no quadro", () => {
       a.chave.startsWith("feriado"),
     );
     expect(avisos.map((a) => [a.chave, a.categoria, a.titulo])).toEqual([
-      ["feriado", "conferir", "Trabalho no feriado (Natal)"],
-      ["feriado", "conferir", "Trabalho no feriado (Aniversário)"],
+      ["feriado", "informativo", "Trabalho no feriado: Natal"],
+      ["feriado", "informativo", "Trabalho no feriado: Aniversário"],
     ]);
+    expect(avisos[0]!.explicacao).toBe(
+      "Pagar em dobro ou dar folga compensatória (Lei 605/1949).",
+    );
     const comercio = regras({
       ...base,
       convencao: { ...base.convencao, comercio: true },
