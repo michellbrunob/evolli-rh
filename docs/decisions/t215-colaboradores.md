@@ -243,7 +243,7 @@ Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
     menu). Regras e transição: seção abaixo.
     "Quem já tem ausência aprovada nesse dia não muda" depende da
     integração com Férias e ausências.
-- Ainda não: Exportar (próxima fase).
+- Ainda não: integrações com Férias e ausências e benefícios (próxima fase).
 
 ## Regras da escala, avisos da CLT e transição da EC 141/2026 (25/11/2026)
 
@@ -340,6 +340,43 @@ textos e desenho próprios, sobre o padrão de cadastro em etapas.
   no quadro (integração da próxima fase), e a nota diz isso.
 - Caixas de seleção e opções dentro do cadastro em etapas deixaram de
   herdar a largura dos campos de texto (padrão do sistema preservado).
+
+## Exportar a escala (25/11/2026)
+
+Conferido na referência por simulação (sem baixar lá); textos e desenho
+próprios.
+
+- Onde: "Exportar" no topo do quadro (também para quem só consulta), na
+  barra da seleção (entram as pessoas selecionadas), no menu ⋯ do quadro e
+  "Exportar a escala de cada uma" no ⋯ da seleção (uma página por pessoa,
+  um PDF por pessoa num .zip).
+- Diálogo: formato (PDF para imprimir, A4 com a cor de cada turno; ou
+  planilha .xlsx, pessoa × dia com as horas); período (dia, semana ou mês,
+  com anterior e próximo; começa no período do quadro); quem entra (as
+  selecionadas, quem está no filtro do quadro ou escolher por unidade,
+  departamento, turno e área, com a contagem de pessoas e departamentos);
+  páginas (uma por unidade, departamento, turno, pessoa ou sem separar;
+  "Um PDF por pessoa, num arquivo .zip"); incluir (horas, legenda dos
+  turnos, linha de assinatura, avisos da CLT — este só para o RH); prévia
+  com o tamanho da folha, as páginas e o nome do arquivo
+  (`escala-semana-AAAA-MM-DD.pdf`).
+- Só a escala PUBLICADA sai no arquivo (o rascunho e o padrão ficam de
+  fora): sem publicação no período, o diálogo diz "Nada publicado neste
+  período" e não baixa; com publicação, diz a data e quantas mudanças do
+  rascunho não entram.
+- PDF da equipe (A4 deitado): faixa com a marca, título do período, local ·
+  empresa · versão publicada, a tabela (colaborador, os dias, horas) por
+  grupo, legenda, avisos (opcional), assinatura do responsável e o rodapé
+  "Gerado pelo Evolli em …" com a página. No mês, a célula mostra a sigla.
+- PDF da pessoa (A4 em pé): os números do período (dias de trabalho, horas
+  previstas, folgas, feriados trabalhados), o calendário a partir do dia de
+  início da semana das Regras, a legenda e "Ciente do colaborador".
+- Planilha: abas "Escala" (o texto de cada dia e as horas) e "Horas
+  previstas" (horas por dia e o total); "Avisos da CLT" quando pedido.
+- Geração no navegador, sem dependência nova: um gerador de PDF próprio
+  (`src/arquivos/pdfSimples.ts`: Helvetica WinAnsi, texto, retângulos e
+  linhas) e o gerador de .xlsx e .zip que a importação já usava. As cores
+  vêm dos tokens do tema (ação e cores dos turnos).
 
 ## Controles padrão do sistema (25/11/2026)
 

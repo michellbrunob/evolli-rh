@@ -951,6 +951,7 @@ describe("T215 — ações em massa", () => {
     ).toEqual([
       "Copiar semana anteriorPara as pessoas do filtro",
       "Repetir esta semana até…",
+      "ExportarPDF para imprimir ou planilha",
       "Limpar o rascunho do períodoSó o que ainda não foi publicado",
     ]);
     // Sem rascunho no período, Limpar fica indisponível.
@@ -1067,6 +1068,7 @@ describe("T215 — ações em massa", () => {
         .map((i) => i.textContent),
     ).toEqual([
       "Ver avisos dessas pessoasAbre o painel de avisos filtrado",
+      "Exportar a escala de cada umaUm PDF por pessoa, num arquivo .zip",
       "Abrir no mêsMesmo filtro, visão mensal",
       "Limpar o rascunho do períodoSó o que ainda não foi publicado",
     ]);
@@ -1174,5 +1176,12 @@ describe("T215 — ações em massa", () => {
     await montar(false);
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: "Mais ações" })).toBeNull();
+    // Consulta: exporta, mas não publica nem aplica modelo.
+    expect(screen.queryByRole("button", { name: "Publicar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Aplicar modelo" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+    expect(
+      screen.getByRole("dialog", { name: "Exportar escala" }),
+    ).toBeInTheDocument();
   });
 });

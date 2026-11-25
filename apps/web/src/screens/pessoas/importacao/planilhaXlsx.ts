@@ -87,7 +87,7 @@ function crc32(dados: Uint8Array): number {
 const UTF8 = new TextEncoder();
 
 /** ZIP sem compressão (método 0), nomes em UTF-8. */
-function montarZip(
+export function montarZip(
   arquivos: ReadonlyArray<readonly [string, Uint8Array]>,
 ): Uint8Array {
   const locais: Uint8Array[] = [];

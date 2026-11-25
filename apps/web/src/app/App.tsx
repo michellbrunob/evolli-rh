@@ -624,6 +624,9 @@ function conteudoDoDestino(
         colaboradorEmFoco={escala.colaboradorEmFoco}
         // T215 — gravar no rascunho do quadro é de RH e DP.
         podeOperar={podeOperarEscala(admissao.papelDoAtor)}
+        nomeDaEmpresa={empresaAtiva?.nome ?? null}
+        // T215 — os avisos da CLT no arquivo exportado são só do RH.
+        podeExportarAvisos={admissao.papelDoAtor === "rh"}
       />
     );
   }

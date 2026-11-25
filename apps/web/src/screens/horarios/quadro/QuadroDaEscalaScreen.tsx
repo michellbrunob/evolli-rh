@@ -58,6 +58,7 @@ import {
   IconeAbrir,
   IconeAvancar,
   IconeAviso,
+  IconeBaixarArquivo,
   IconeBuscar,
   IconeCalendario,
   IconeComentario,
@@ -83,6 +84,7 @@ import {
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import { DialogoPublicar } from "./DialogoPublicar";
 import { PainelDeAvisos } from "./PainelDeAvisos";
+import { DialogoExportar } from "./DialogoExportar";
 import { lerAvisoDoQuadro, pedirModelo } from "./aplicarModelo";
 import {
   type AvisoDaEscala,
@@ -188,6 +190,10 @@ export interface QuadroDaEscalaScreenProps {
   readonly hoje?: string;
   /** rh e dp gravam no rascunho; os demais só consultam. */
   readonly podeOperar?: boolean;
+  /** O nome da empresa ativa (no arquivo exportado). */
+  readonly nomeDaEmpresa?: string | null;
+  /** Avisos da CLT no arquivo exportado: só para o RH. */
+  readonly podeExportarAvisos?: boolean;
 }
 
 /**
@@ -495,6 +501,8 @@ export function QuadroDaEscalaScreen({
   colaboradorEmFoco = null,
   hoje: hojeFixo,
   podeOperar = false,
+  nomeDaEmpresa = null,
+  podeExportarAvisos = false,
 }: QuadroDaEscalaScreenProps) {
   const hoje = hojeFixo ?? diaCivilDeHoje();
   const [visao, setVisao] = useState<Visao>("semana");
@@ -548,6 +556,7 @@ export function QuadroDaEscalaScreen({
     | { tipo: "folga"; alvo: "selecao" }
     | { tipo: "repetir" }
     | { tipo: "limpar"; alvo?: "selecao" }
+    | { tipo: "exportar"; selecao?: boolean; cadaUma?: boolean }
     | null
   >(null);
   const tabelaRef = useRef<HTMLTableElement | null>(null);
@@ -1361,9 +1370,17 @@ export function QuadroDaEscalaScreen({
               ) : null}
             </p>
           </div>
-          {podeOperar && carga.estado === "pronto" ? (
+          {carga.estado === "pronto" ? (
             <div className="quadro__acoes">
-              {onAbrirModelo ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDialogo({ tipo: "exportar" })}
+              >
+                <IconeBaixarArquivo tamanho={16} />
+                Exportar
+              </Button>
+              {podeOperar && onAbrirModelo ? (
                 <Button
                   type="button"
                   variant="secondary"
@@ -1373,20 +1390,24 @@ export function QuadroDaEscalaScreen({
                   Aplicar modelo
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="primary"
-                aria-disabled={mudancas === 0}
-                aria-describedby={
-                  mudancas === 0 ? "quadro-nada-para-publicar" : undefined
-                }
-                onClick={() => {
-                  if (mudancas > 0) setPublicando(true);
-                }}
-              >
-                {publicacao && mudancas > 0 ? "Publicar mudanças" : "Publicar"}
-              </Button>
-              {mudancas === 0 ? (
+              {podeOperar ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  aria-disabled={mudancas === 0}
+                  aria-describedby={
+                    mudancas === 0 ? "quadro-nada-para-publicar" : undefined
+                  }
+                  onClick={() => {
+                    if (mudancas > 0) setPublicando(true);
+                  }}
+                >
+                  {publicacao && mudancas > 0
+                    ? "Publicar mudanças"
+                    : "Publicar"}
+                </Button>
+              ) : null}
+              {podeOperar && mudancas === 0 ? (
                 <span id="quadro-nada-para-publicar" className="sr-only">
                   Nada para publicar neste período.
                 </span>
@@ -1517,6 +1538,14 @@ export function QuadroDaEscalaScreen({
                     </DropdownMenuItem>
                   </>
                 ) : null}
+                <DropdownMenuItem
+                  onSelect={() => setDialogo({ tipo: "exportar" })}
+                >
+                  <span className="quadro__item-menu">
+                    Exportar
+                    <small>PDF para imprimir ou planilha</small>
+                  </span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={rascunhosDe(filtradas).length === 0}
                   onSelect={() => setDialogo({ tipo: "limpar" })}
@@ -1992,6 +2021,14 @@ export function QuadroDaEscalaScreen({
                 Copiar semana anterior
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDialogo({ tipo: "exportar", selecao: true })}
+            >
+              <IconeBaixarArquivo tamanho={16} />
+              Exportar
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
                 className="quadro__icone-botao"
@@ -2006,6 +2043,23 @@ export function QuadroDaEscalaScreen({
                     <span>
                       Ver avisos dessas pessoas
                       <small>Abre o painel de avisos filtrado</small>
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setDialogo({
+                      tipo: "exportar",
+                      selecao: true,
+                      cadaUma: true,
+                    })
+                  }
+                >
+                  <span className="quadro__item-menu quadro__item-menu--icone">
+                    <IconeBaixarArquivo tamanho={16} />
+                    <span>
+                      Exportar a escala de cada uma
+                      <small>Um PDF por pessoa, num arquivo .zip</small>
                     </span>
                   </span>
                 </DropdownMenuItem>
@@ -2141,6 +2195,24 @@ export function QuadroDaEscalaScreen({
                   );
                   setDialogo(null);
                 }}
+              />
+            );
+          }
+          if (dialogo?.tipo === "exportar") {
+            return (
+              <DialogoExportar
+                visao={visao}
+                ancora={ancora}
+                semanaComeca={semanaComeca}
+                doFiltro={filtradas}
+                {...(dialogo.selecao
+                  ? { selecionadas: [...selecionados] }
+                  : {})}
+                cadaUma={dialogo.cadaUma ?? false}
+                regras={regras}
+                empresa={nomeDaEmpresa}
+                podeIncluirAvisos={podeExportarAvisos}
+                onFechar={() => setDialogo(null)}
               />
             );
           }

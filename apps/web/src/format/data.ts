@@ -488,3 +488,8 @@ export function idadeEmAnos(nascimento: string, dia: string): number {
 export function mesDoDia(valor: string): string {
   return valor.slice(0, 7);
 }
+
+/** T215 — "07/12" (dia e mês com dois dígitos) de uma data civil. */
+export function diaMesComZero(valor: string): string {
+  return formatarDiaCivil(valor).slice(0, 5);
+}
