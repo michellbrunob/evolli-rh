@@ -95,6 +95,8 @@ import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import {
   CadastrosScreen,
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  AplicarModeloScreen,
+  MODELO_ESCALA_TITULO_ID,
   PlanejarTransicaoScreen,
   QUADRO_ESCALA_TITULO_ID,
   QuadroDaEscalaScreen,
@@ -314,6 +316,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "turnos-escala": TURNOS_TITULO_ID,
   "regras-escala": REGRAS_ESCALA_TITULO_ID,
   "transicao-escala": TRANSICAO_TITULO_ID,
+  "modelo-escala": MODELO_ESCALA_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
   "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
@@ -613,7 +616,10 @@ function conteudoDoDestino(
         onAbrirTurnos={() => onNavegar("turnos-escala")}
         onAbrirRegras={() => onNavegar("regras-escala")}
         {...(podeOperarEscala(admissao.papelDoAtor)
-          ? { onAbrirTransicao: () => onNavegar("transicao-escala") }
+          ? {
+              onAbrirTransicao: () => onNavegar("transicao-escala"),
+              onAbrirModelo: () => onNavegar("modelo-escala"),
+            }
           : {})}
         colaboradorEmFoco={escala.colaboradorEmFoco}
         // T215 — gravar no rascunho do quadro é de RH e DP.
@@ -630,6 +636,11 @@ function conteudoDoDestino(
           ? { onAbrirTransicao: () => onNavegar("transicao-escala") }
           : {})}
       />
+    );
+  }
+  if (destinoId === "modelo-escala") {
+    return (
+      <AplicarModeloScreen onVoltar={() => onNavegar("jornadas-trabalho")} />
     );
   }
   if (destinoId === "transicao-escala") {

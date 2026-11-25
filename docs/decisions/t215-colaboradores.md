@@ -243,7 +243,7 @@ Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
     menu). Regras e transição: seção abaixo.
     "Quem já tem ausência aprovada nesse dia não muda" depende da
     integração com Férias e ausências.
-- Ainda não: Aplicar modelo e Exportar (próximas fases).
+- Ainda não: Exportar (próxima fase).
 
 ## Regras da escala, avisos da CLT e transição da EC 141/2026 (25/11/2026)
 
@@ -295,6 +295,51 @@ próprios.
   também na barra.
 - Menu da célula: ícone por item e o atalho à direita ("Abrir detalhes ·
   Enter", "Limpar · Del"); "+" na célula vazia ao passar o mouse.
+
+## Aplicar modelo de escala (25/11/2026)
+
+Conferido na referência por simulação (pessoa de teste, sem aplicar lá);
+textos e desenho próprios, sobre o padrão de cadastro em etapas.
+
+- Página `#/pessoas/escala/modelo` (RH e DP), aberta pelo botão "Aplicar
+  modelo" no topo do quadro (leva o filtro atual) e na barra da seleção
+  (leva também as pessoas selecionadas).
+- 5 etapas:
+  1. Quem: todo o time do filtro atual ou escolher pessoas; lista com busca e
+     filtros de Unidade, Departamento e Contrato (valem para as duas
+     opções), contrato e escala atual.
+  2. Escala: o catálogo do cadastro por grupo, com os dias de benefício no
+     mês; selos "Padrão da EC 141" (5x2) e "Convenção a partir de dd/mm"
+     (6x1, pela data das Regras).
+  3. Turnos: turno dos dias de trabalho, ou um turno por dia nas escalas de
+     dias fixos (fora a 6x1); dias de trabalho em "Outra"; horas por semana
+     e dias de benefício; na 6x1, folga semanal no domingo para todos ou
+     distribuída (domingo, segunda, terça…) e "folga no domingo pelo menos
+     a cada 3 semanas" (a folga da semana troca de lugar com o domingo);
+     prévia das duas primeiras semanas por pessoa, com as siglas.
+  4. Período: começa no primeiro dia da próxima semana (pelas Regras);
+     termina numa data (sugestão: 4 semanas; até um ano) ou sem data de
+     fim; "Substituir o que já está escalado" com a contagem das células
+     já preenchidas (rascunho ou publicado).
+  5. Prévia: resumo (pessoas, escala, início, células no rascunho), por
+     pessoa (horas da primeira semana, dias no mês, avisos), avisos da CLT
+     com o modelo (Atenção primeiro; "Ver os N avisos"), "Tirar … do
+     modelo".
+- Aplicar: sem data de fim, troca o padrão de cada pessoa a partir do
+  início (ou da admissão, se posterior; o padrão igual ao vigente não é
+  falha) e o rascunho recebe 8 semanas; até uma data, só o rascunho muda.
+  Nada é publicado. Na volta, o quadro mostra "Modelo aplicado: N células
+  no rascunho para N pessoas" (e quem ficou sem trocar o padrão).
+- As células saem da mesma regra do padrão (`celulaDoDia` sobre a escala do
+  modelo). Sem "Substituir", ocupa só os dias vazios; com ele, regrava
+  mantendo a observação e o local do dia.
+- Diferenças em relação à referência: lá, a etapa 2 aparece em branco ao
+  voltar da 3 (a rolagem fica embaixo); aqui, a troca de etapa leva o foco
+  ao título da etapa. Aplicar sem nenhuma célula para gravar é recusado com
+  a orientação de marcar "Substituir". Férias e ausências ainda não entram
+  no quadro (integração da próxima fase), e a nota diz isso.
+- Caixas de seleção e opções dentro do cadastro em etapas deixaram de
+  herdar a largura dos campos de texto (padrão do sistema preservado).
 
 ## Controles padrão do sistema (25/11/2026)
 

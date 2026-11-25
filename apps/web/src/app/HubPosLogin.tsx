@@ -128,6 +128,8 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Regras da escala: transição da EC 141/2026, convenção, feriados locais, avisos da CLT e publicação.",
   "transicao-escala":
     "Planejar a transição da EC 141/2026: quem está em 6x1 e o novo padrão a partir da data da transição.",
+  "modelo-escala":
+    "Aplicar modelo: uma escala do catálogo para várias pessoas de uma vez, no rascunho do quadro.",
   ponto: "Registros de ponto do período e conferência das folhas apuradas.",
   equipe:
     "Consulta da sua equipe: quem responde a você hoje, pela atribuição vigente.",

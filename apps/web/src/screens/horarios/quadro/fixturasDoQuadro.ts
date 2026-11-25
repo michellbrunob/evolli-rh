@@ -4,6 +4,7 @@ import type {
   PessoaDoQuadroApi,
   TurnoDaEscalaApi,
 } from "../../../api/escalaClient";
+import type { TabelaHorarioApi } from "../../../api/horariosClient";
 
 export const DIAS_UTEIS = ["segunda", "terca", "quarta", "quinta", "sexta"];
 
@@ -64,6 +65,28 @@ export function pessoa(
     jornadaSemanalHoras: 44,
     escalas: [],
     dias: [],
+    ...extra,
+  };
+}
+
+/** O turno como a lista de turnos devolve. */
+export function tabelaHorario(
+  nome: string,
+  extra: Partial<TabelaHorarioApi> = {},
+): TabelaHorarioApi {
+  return {
+    id: `t-${nome}`,
+    empresaId: "emp",
+    codigo: null,
+    nome,
+    ativo: true,
+    criadoPorUserId: "u",
+    criadoEm: "2026-01-01T00:00:00.000Z",
+    atualizadoEm: "2026-01-01T00:00:00.000Z",
+    periodos: DIAS_UTEIS.map((dia) => ({ dia, inicio: "09:00", fim: "18:00" })),
+    cor: "azul",
+    sigla: nome[0]!,
+    intervaloMinutos: 60,
     ...extra,
   };
 }

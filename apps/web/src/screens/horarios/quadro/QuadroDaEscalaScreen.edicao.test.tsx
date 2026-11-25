@@ -27,6 +27,11 @@ import { listarUnidades } from "../../../api/organizacaoClient";
 import { QuadroDaEscalaScreen } from "./QuadroDaEscalaScreen";
 import { avisosDoDia } from "./PainelDoDia";
 import { escala, pessoa } from "./fixturasDoQuadro";
+import {
+  avisarNoQuadro,
+  esquecerPedidoDoModelo,
+  lerPedidoDoModelo,
+} from "./aplicarModelo";
 
 vi.mock("../../../api/escalaClient");
 vi.mock("../../../api/horariosClient");
@@ -1112,6 +1117,57 @@ describe("T215 — ações em massa", () => {
         name: "Ações para as pessoas selecionadas",
       }),
     ).toHaveTextContent("1 pessoa selecionada");
+  });
+
+  it("Aplicar modelo: no topo leva o filtro; na barra, também a seleção; na volta, o aviso", async () => {
+    esquecerPedidoDoModelo();
+    pessoas = [
+      ana(),
+      pessoa("Bruno Reis", {
+        colaboradorId: "c-bruno",
+        departamento: { id: "d", nome: "TI" },
+        escalas: [escala()],
+      }),
+    ];
+    avisarNoQuadro("Modelo aplicado: 5 células no rascunho para 1 pessoa.");
+    const onAbrirModelo = vi.fn();
+    render(
+      <QuadroDaEscalaScreen
+        hoje={HOJE}
+        podeOperar
+        onAbrirModelo={onAbrirModelo}
+      />,
+    );
+    await screen.findByRole("table");
+    expect(
+      await screen.findByRole("status", {
+        name: "Modelo aplicado: 5 células no rascunho para 1 pessoa.",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar modelo" }));
+    expect(onAbrirModelo).toHaveBeenCalledTimes(1);
+    expect(lerPedidoDoModelo()).toEqual({ doFiltro: null, selecionadas: [] });
+    // Com busca: o filtro; com seleção: as selecionadas.
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Buscar colaborador" }),
+      {
+        target: { value: "Ana" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    const barra = screen.getByRole("toolbar", {
+      name: "Ações para as pessoas selecionadas",
+    });
+    fireEvent.click(
+      within(barra).getByRole("button", { name: "Aplicar modelo" }),
+    );
+    expect(onAbrirModelo).toHaveBeenCalledTimes(2);
+    expect(lerPedidoDoModelo()).toEqual({
+      doFiltro: ["c-ana"],
+      selecionadas: ["c-ana"],
+    });
   });
 
   it("sem permissão: sem seleção nem menu ⋯", async () => {

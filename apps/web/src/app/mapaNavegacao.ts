@@ -329,6 +329,15 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         agrupadoEm: "jornadas-trabalho",
       },
       {
+        // T215 — Aplicar modelo: uma escala do catálogo para várias pessoas.
+        id: "modelo-escala",
+        label: "Aplicar modelo",
+        subRotulo: "Uma escala para várias pessoas, no rascunho",
+        estado: "funcional",
+        papeis: PAPEIS_OPERACAO_ESCALA,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
         // T182 — sem a aba Horários, o contêiner abre na Estrutura
         // organizacional. T211 — no submenu de Colaboradores, como
         // "Organograma" (rótulo de navegação; a tela mantém o título dela).
@@ -664,6 +673,7 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `turnos-escala` (T215)    | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
  * | `regras-escala` (T215)    | `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
  * | `transicao-escala` (T215) | `escala_colaborador` alter | `rh`, `dp`                     |
+ * | `modelo-escala` (T215)    | `escala_colaborador` alter | `rh`, `dp`                     |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
@@ -714,6 +724,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "turnos-escala",
     "regras-escala",
     "transicao-escala",
+    "modelo-escala",
     "ponto",
     "equipe",
     "administracao-lideranca",
@@ -734,6 +745,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "turnos-escala",
     "regras-escala",
     "transicao-escala",
+    "modelo-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",

@@ -12,6 +12,10 @@ export {
   PlanejarTransicaoScreen,
 } from "./quadro/PlanejarTransicaoScreen";
 export {
+  AplicarModeloScreen,
+  MODELO_ESCALA_TITULO_ID,
+} from "./quadro/AplicarModeloScreen";
+export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
 } from "./CalendarioFeriadosScreen";

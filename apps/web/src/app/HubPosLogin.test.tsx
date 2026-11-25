@@ -128,6 +128,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         // T215 — Regras da escala e Planejar a transição.
         "Regras da escala",
         "Planejar a transição",
+        // T215 — Aplicar modelo (quem opera a escala).
+        "Aplicar modelo",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -159,6 +161,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         // T215 — Regras da escala e Planejar a transição.
         "Regras da escala",
         "Planejar a transição",
+        // T215 — Aplicar modelo (quem opera a escala).
+        "Aplicar modelo",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -554,8 +558,8 @@ describe("T162 — acessibilidade e estrutura", () => {
     montar({ papel: "rh" });
     // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança e 15
     // com Turnos (sub-página do quadro da escala).
-    // T215 — mais Regras da escala e Planejar a transição: 17.
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(17));
+    // T215 — mais Regras da escala, Planejar a transição e Aplicar modelo: 18.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(18));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",

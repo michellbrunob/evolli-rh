@@ -175,6 +175,7 @@ describe("o estado declarado bate com o código", () => {
     "regras-escala": "src/screens/horarios/quadro/RegrasDaEscalaScreen.tsx",
     "transicao-escala":
       "src/screens/horarios/quadro/PlanejarTransicaoScreen.tsx",
+    "modelo-escala": "src/screens/horarios/quadro/AplicarModeloScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":

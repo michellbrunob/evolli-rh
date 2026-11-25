@@ -488,7 +488,11 @@ button.cadastro-etapas__etapa-passo:focus-visible {
   gap: var(--space-sm);
 }
 
-.cadastro-etapas__linha-campos :where(input:not([type="file"]), select) {
+.cadastro-etapas__linha-campos
+  :where(
+    input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+    select
+  ) {
   width: 100%;
   min-height: var(--touch-target);
   padding: var(--space-xs) var(--space-sm);

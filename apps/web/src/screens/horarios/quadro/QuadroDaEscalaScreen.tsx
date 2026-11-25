@@ -68,6 +68,7 @@ import {
   IconeFiltrar,
   IconeFechar,
   IconeMaisAcoes,
+  IconeModelo,
   IconeVoltar,
 } from "../../../ui/icones";
 import { Esqueleto, Revelar } from "../../../ui/movimento";
@@ -82,6 +83,7 @@ import {
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import { DialogoPublicar } from "./DialogoPublicar";
 import { PainelDeAvisos } from "./PainelDeAvisos";
+import { lerAvisoDoQuadro, pedirModelo } from "./aplicarModelo";
 import {
   type AvisoDaEscala,
   avisosPorCelula,
@@ -175,6 +177,8 @@ export interface QuadroDaEscalaScreenProps {
   readonly onAbrirRegras?: () => void;
   /** Planejar a transição da EC 141/2026 (sub-página). */
   readonly onAbrirTransicao?: () => void;
+  /** Aplicar modelo (página): o quadro deixa o filtro e a seleção. */
+  readonly onAbrirModelo?: () => void;
   /**
    * Aberto pela ficha ("Abrir no quadro"): já filtra o departamento da
    * pessoa (na gaveta "Filtros", removível).
@@ -487,6 +491,7 @@ export function QuadroDaEscalaScreen({
   onAbrirTurnos,
   onAbrirRegras,
   onAbrirTransicao,
+  onAbrirModelo,
   colaboradorEmFoco = null,
   hoje: hojeFixo,
   podeOperar = false,
@@ -522,6 +527,11 @@ export function QuadroDaEscalaScreen({
   } | null>(null);
   const pessoaDoPainel = useRef<PessoaDoQuadroApi | null>(null);
   const [aviso, setAviso] = useState<ConteudoDoAviso | null>(null);
+  // Na volta do "Aplicar modelo": o aviso do que foi aplicado.
+  useEffect(() => {
+    const texto = lerAvisoDoQuadro();
+    if (texto) setAviso({ id: Date.now(), titulo: texto });
+  }, []);
   const [falha, setFalha] = useState<string | null>(null);
   const [ativa, setAtiva] = useState<string | null>(null);
   const [publicando, setPublicando] = useState(false);
@@ -1095,6 +1105,14 @@ export function QuadroDaEscalaScreen({
       ? plural(total, "pessoa", "pessoas")
       : `${plural(total, "pessoa", "pessoas")} · ${nomeDosGrupos(agruparPor, grupos.length)}`;
 
+  const abrirModelo = (comSelecao: boolean) => {
+    if (!onAbrirModelo) return;
+    pedirModelo({
+      doFiltro: filtrando ? filtradas.map((p) => p.colaboradorId) : null,
+      selecionadas: comSelecao ? [...selecionados] : [],
+    });
+    onAbrirModelo();
+  };
   const trocarVisao = (v: Visao) => {
     setVisao(v);
     setPagina(1);
@@ -1345,6 +1363,16 @@ export function QuadroDaEscalaScreen({
           </div>
           {podeOperar && carga.estado === "pronto" ? (
             <div className="quadro__acoes">
+              {onAbrirModelo ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => abrirModelo(false)}
+                >
+                  <IconeModelo tamanho={16} />
+                  Aplicar modelo
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="primary"
@@ -1921,6 +1949,16 @@ export function QuadroDaEscalaScreen({
                 ? " pessoa selecionada"
                 : " pessoas selecionadas"}
             </span>
+            {onAbrirModelo ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => abrirModelo(true)}
+              >
+                <IconeModelo tamanho={16} />
+                Aplicar modelo
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"

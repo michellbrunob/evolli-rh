@@ -483,3 +483,8 @@ export function idadeEmAnos(nascimento: string, dia: string): number {
   if (dia.slice(5) < nascimento.slice(5)) anos -= 1;
   return anos;
 }
+
+/** T215 — o mês (`AAAA-MM`) de uma data civil. */
+export function mesDoDia(valor: string): string {
+  return valor.slice(0, 7);
+}
