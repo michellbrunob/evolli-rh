@@ -10,8 +10,9 @@
  * dias seguidos, domingos seguidos) vê só o período carregado. "Escalado
  * durante ausência aprovada" olha o dia gravado (rascunho ou publicado) com
  * trabalho ou sobreaviso num dia de ausência aprovada (a ausência vence o
- * turno). "Turnos sobrepostos" o servidor já recusa; não há contrato
- * intermitente.
+ * turno). "Turnos sobrepostos" o servidor já recusa. Não há contrato
+ * intermitente no cadastro (nem na referência): o aviso de convocação com
+ * menos de 3 dias fica nas Regras, sem quem o dispare.
  */
 import type {
   ChaveDoAviso,
@@ -440,16 +441,23 @@ export function calcularAvisos(
             "Estágio: até 6 h por dia e 30 h por semana (Lei 11.788/2008, art. 10).",
           );
         }
+        // Tempo parcial (CLT, art. 58-A): até 30 h sem extras; com contrato
+        // de até 26 h, até 6 h extras (32 h na semana).
+        const ateVinteESeis =
+          p.jornadaSemanalHoras !== null && p.jornadaSemanalHoras <= 26;
+        const tetoParcial = (ateVinteESeis ? 32 : 30) * 60;
         if (
           p.tipoVinculo === "part_time" &&
-          minutos > 30 * 60 &&
+          minutos > tetoParcial &&
           semana.length === 7
         ) {
           add(
             ultimo.dia,
             "tempo_parcial",
             `${formatarHoras(minutos)} na semana em tempo parcial`,
-            "Até 30 h por semana, ou 26 h com até 6 extras (CLT, art. 58-A).",
+            ateVinteESeis
+              ? "Contrato de até 26 h: até 6 h extras na semana, 32 h no total (CLT, art. 58-A)."
+              : "Tempo parcial acima de 26 h: até 30 h por semana, sem horas extras (CLT, art. 58-A).",
           );
         }
       }

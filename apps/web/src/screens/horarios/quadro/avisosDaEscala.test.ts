@@ -258,6 +258,46 @@ describe("T215 — avisos da CLT no quadro", () => {
     ).toEqual([]);
   });
 
+  it("tempo parcial (CLT, 58-A): até 30 h; contrato de até 26 h aceita 6 extras (32 h)", () => {
+    const parcial = (jornada: number, ate: string) =>
+      pessoa("Par", {
+        colaboradorId: "c-par",
+        tipoVinculo: "part_time",
+        jornadaSemanalHoras: jornada,
+        dias: NOV.slice(0, 5).map((d) =>
+          dia(d, {
+            periodos: [{ inicio: "09:00", fim: ate }],
+            intervaloMinutos: 0,
+          }),
+        ),
+      });
+    const doParcial = (p: ReturnType<typeof parcial>) =>
+      calcularAvisos([p], NOV, regras()).filter(
+        (a) => a.chave === "tempo_parcial",
+      );
+    // 5 × 6 h 12 = 31 h.
+    const trinta = doParcial(parcial(30, "15:12"));
+    expect(trinta.map((a) => [a.dia, a.titulo])).toEqual([
+      ["2026-11-27", "31 h na semana em tempo parcial"],
+    ]);
+    expect(trinta[0]!.explicacao).toBe(
+      "Tempo parcial acima de 26 h: até 30 h por semana, sem horas extras (CLT, art. 58-A).",
+    );
+    expect(doParcial(parcial(26, "15:12"))).toEqual([]);
+    // 5 × 6 h 30 = 32 h 30 passa das 32 h.
+    const vinte = doParcial(parcial(26, "15:30"));
+    expect(vinte.map((a) => a.titulo)).toEqual([
+      "32 h 30 na semana em tempo parcial",
+    ]);
+    expect(vinte[0]!.explicacao).toBe(
+      "Contrato de até 26 h: até 6 h extras na semana, 32 h no total (CLT, art. 58-A).",
+    );
+    // CLT comum com 31 h: não é tempo parcial.
+    expect(doParcial({ ...parcial(30, "15:12"), tipoVinculo: "clt" })).toEqual(
+      [],
+    );
+  });
+
   it("contratos especiais: aprendiz acima de 6 h; menor em horário noturno; noturno e sobreaviso informativos", () => {
     const aprendiz = pessoa("Apr", {
       tipoVinculo: "aprendiz",
