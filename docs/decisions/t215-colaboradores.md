@@ -171,6 +171,46 @@ Primeira fatia do quadro "Escala de trabalho", só leitura.
   rascunho × publicado e Publicar, ações em massa, Regras e avisos da CLT,
   Aplicar modelo, Exportar, integrações (férias, ausências, benefícios).
 
+## Menu da célula e painel do dia — rascunho (25/11/2026)
+
+Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
+
+- Banco: `escala_dia` (migration aditiva `20261125150000_escala_dia`), um dia
+  por pessoa e camada (`rascunho` ou `publicado`) por cima do padrão; tipos
+  trabalho (turno opcional, 1 ou 2 períodos, intervalo de 0 a 2 h, até 1
+  sobreaviso depois do turno), folga, DSR e sobreaviso (1 ou 2 períodos);
+  local (unidade) e observação (até 300). CHECKs da forma de cada tipo; o
+  publicado não se apaga (gatilho). Auditoria só com o id do dia:
+  `pessoas.escala.dia_gravado` e `pessoas.escala.dia_limpo`.
+- API: `PUT /v1/escala/dias` (grava no rascunho) e `POST
+/v1/escala/dias/limpar` (desfaz a mudança do dia; idempotente), `rh` e
+  `dp` na empresa ativa. Recusas por campo: período sobreposto, sobreaviso
+  dentro do turno, intervalo fora da lista, turno ou local indisponível
+  (inativo ou de outra empresa), dia fora do vínculo (`fora_do_vinculo`,
+  também para pessoa de outra empresa). O quadro passou a trazer os dias
+  gravados do período.
+- Tela: a célula é um botão (setas, Home/End; Enter abre o menu; Delete limpa
+  o dia com rascunho). O menu tem os turnos ativos (horário e intervalo do
+  dia, o atual marcado), Folga, DSR, Sobreaviso, Sobreaviso depois do turno
+  (do fim do turno ao início dele no dia seguinte), Dois turnos no dia, Abrir
+  detalhes, Adicionar/Editar observação e Limpar (só com rascunho). Cada
+  escolha mostra o aviso "<turno ou tipo> em d/m no rascunho" com Desfazer;
+  "Limpar" mostra "Dia limpo no rascunho"; Desfazer mostra "1 mudança
+  desfeita". O dia com rascunho ganha o ponto âmbar, e o cabeçalho, o selo
+  "Rascunho · N mudança(s) não publicada(s)" do período.
+- Painel do dia: pessoa (departamento · contrato · escala), dia anterior e
+  próximo (travados com mudança não salva), "Semana de … · pelo padrão /
+  rascunho / publicada", Ver semana; abas Trabalho, Folga, DSR, Sobreaviso e
+  Ausência (desabilitada: vem de Férias e ausências); turno, início, fim,
+  intervalo, 2º período, sobreaviso depois do turno, local e observação; o
+  resumo ("8 h de trabalho · termina no mesmo dia", "… de sobreaviso (1/3 da
+  hora na folha) · termina no dia seguinte") e os avisos da CLT ao vivo (art.
+  59, 71 e 244, § 2º), que não impedem salvar. "Limpar o dia" só com
+  rascunho. Turno de 3 períodos traz os dois primeiros para o RH ajustar.
+- Ainda não: Publicar (o rascunho vira publicado), ações em massa, Avisos,
+  Regras, Aplicar modelo, Exportar, menu ⋯ e o aviso da transição da EC
+  141/2026 ("Já temos convenção" / "Planejar a transição").
+
 ## Botões quadrados e design próprio (2026-11-25)
 
 - Decisão da proprietária: todos os botões do sistema seguem o padrão

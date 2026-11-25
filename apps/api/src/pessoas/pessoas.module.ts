@@ -19,6 +19,8 @@ import { HistoricoSalarialController } from "./salarios/historico-salarial.contr
 import { EscalaColaboradorController } from "./escala/escala-colaborador.controller";
 import { EscalaColaboradorService } from "./escala/escala-colaborador.service";
 import { QuadroEscalaController } from "./escala/quadro-escala.controller";
+import { EscalaDiaController } from "./escala/escala-dia.controller";
+import { EscalaDiaService } from "./escala/escala-dia.service";
 import { QuadroEscalaService } from "./escala/quadro-escala.service";
 import { HistoricoSalarialService } from "./salarios/historico-salarial.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
@@ -84,6 +86,7 @@ import {
     HistoricoSalarialController,
     EscalaColaboradorController,
     QuadroEscalaController,
+    EscalaDiaController,
     FeriasDoColaboradorController,
   ],
   providers: [
@@ -103,6 +106,7 @@ import {
     HistoricoSalarialService,
     EscalaColaboradorService,
     QuadroEscalaService,
+    EscalaDiaService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,

@@ -168,6 +168,110 @@ describe("célula do dia", () => {
   });
 });
 
+describe("célula com dia gravado (rascunho e publicado)", () => {
+  const base = {
+    camada: "rascunho" as const,
+    turno: null,
+    periodos: [],
+    intervaloMinutos: 0,
+    sobreaviso: [],
+    unidade: null,
+    observacao: null,
+  };
+
+  it("o rascunho vale por cima do publicado, que vale por cima do padrão", () => {
+    const p = pessoa("Ana", {
+      escalas: [escala()],
+      dias: [
+        { ...base, dia: "2026-11-23", camada: "publicado", tipo: "dsr" },
+        { ...base, dia: "2026-11-23", tipo: "folga", observacao: "Troca" },
+        { ...base, dia: "2026-11-24", camada: "publicado", tipo: "folga" },
+      ],
+    });
+    expect(celulaDoDia(p, "2026-11-23")).toMatchObject({
+      tipo: "folga",
+      origem: "rascunho",
+      observacao: "Troca",
+      minutos: 0,
+    });
+    expect(celulaDoDia(p, "2026-11-24")).toMatchObject({
+      tipo: "folga",
+      origem: "publicado",
+    });
+    expect(celulaDoDia(p, "2026-11-25")).toMatchObject({
+      tipo: "trabalho",
+      origem: "padrao",
+      periodos: [{ inicio: "09:00", fim: "18:00" }],
+      intervaloMinutos: 60,
+    });
+  });
+
+  it("trabalho gravado: horas pelos períodos (intervalo só num corrido); turno partido e noite", () => {
+    const p = pessoa("Bia", {
+      escalas: [escala()],
+      dias: [
+        {
+          ...base,
+          dia: "2026-11-23",
+          tipo: "trabalho",
+          turno: { id: "t", nome: "Loja", cor: "verde", sigla: "L" },
+          periodos: [{ inicio: "09:00", fim: "18:00" }],
+          intervaloMinutos: 60,
+          sobreaviso: [{ inicio: "18:00", fim: "09:00" }],
+        },
+        {
+          ...base,
+          dia: "2026-11-24",
+          tipo: "trabalho",
+          periodos: [
+            { inicio: "08:00", fim: "12:00" },
+            { inicio: "14:00", fim: "18:00" },
+          ],
+          intervaloMinutos: 60,
+        },
+        {
+          ...base,
+          dia: "2026-11-25",
+          tipo: "trabalho",
+          periodos: [{ inicio: "22:00", fim: "06:00" }],
+        },
+        {
+          ...base,
+          dia: "2026-11-26",
+          tipo: "sobreaviso",
+          periodos: [{ inicio: "18:00", fim: "06:00" }],
+        },
+      ],
+    });
+    expect(celulaDoDia(p, "2026-11-23")).toMatchObject({
+      tipo: "trabalho",
+      turno: { nome: "Loja" },
+      horario: "09:00–18:00",
+      minutos: 8 * 60,
+      sobreaviso: [{ inicio: "18:00", fim: "09:00" }],
+    });
+    expect(celulaDoDia(p, "2026-11-24")).toMatchObject({
+      horario: "08:00–18:00",
+      minutos: 8 * 60,
+    });
+    expect(celulaDoDia(p, "2026-11-25").minutos).toBe(8 * 60);
+    expect(celulaDoDia(p, "2026-11-26")).toMatchObject({
+      tipo: "sobreaviso",
+      turno: null,
+      minutos: 0,
+      horario: "18:00–06:00",
+    });
+  });
+
+  it("fora do vínculo vence o dia gravado", () => {
+    const p = pessoa("Caio", {
+      dataAdmissao: "2026-11-25",
+      dias: [{ ...base, dia: "2026-11-24", tipo: "folga" }],
+    });
+    expect(celulaDoDia(p, "2026-11-24").tipo).toBe("fora");
+  });
+});
+
 describe("rótulos, metas e grupos", () => {
   it("rótulo da escala: padrão com turno, só o modelo, o do contrato ou sem escala", () => {
     expect(

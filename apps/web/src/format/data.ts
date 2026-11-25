@@ -400,3 +400,66 @@ export function diaDaSemanaEDiaMes(valor: string | null | undefined): string {
   const semana = new Date(Date.UTC(Number(ano), mes - 1, dia)).getUTCDay();
   return `${DIAS_DA_SEMANA_POR_EXTENSO[semana]} ${dia}/${mes}`;
 }
+
+const MESES_POR_EXTENSO = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+] as const;
+
+/**
+ * T215 — data civil → "Quarta, 3 de março", o título do painel do dia no
+ * quadro da escala. Recusa devolve `AUSENTE`.
+ */
+export function diaPorExtensoComSemana(
+  valor: string | null | undefined,
+): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  const dia = Number(valor.slice(8, 10));
+  const semana =
+    DIAS_DA_SEMANA_POR_EXTENSO[
+      new Date(Date.UTC(Number(ano), mes - 1, dia)).getUTCDay()
+    ]!;
+  return `${semana.charAt(0).toUpperCase()}${semana.slice(1)}, ${dia} de ${MESES_POR_EXTENSO[mes - 1]}`;
+}
+
+/**
+ * T215 — o intervalo de dias curto: "1 a 7/3", ou "30/11 a 6/12" entre meses.
+ * Recusa devolve `AUSENTE`.
+ */
+export function intervaloCurtoDeDias(
+  inicio: string | null | undefined,
+  fim: string | null | undefined,
+): string {
+  if (
+    anoDoDiaCivil(inicio) === null ||
+    anoDoDiaCivil(fim) === null ||
+    typeof inicio !== "string" ||
+    typeof fim !== "string"
+  ) {
+    return AUSENTE;
+  }
+  const d = (v: string) => Number(v.slice(8, 10));
+  const m = (v: string) => Number(v.slice(5, 7));
+  return m(inicio) === m(fim)
+    ? `${d(inicio)} a ${d(fim)}/${m(fim)}`
+    : `${d(inicio)}/${m(inicio)} a ${d(fim)}/${m(fim)}`;
+}
+
+/** T215 — data civil → dia e mês curtos ("2/3", "24/11"); recusa: `AUSENTE`. */
+export function diaMesCurto(valor: string | null | undefined): string {
+  if (anoDoDiaCivil(valor) === null || typeof valor !== "string")
+    return AUSENTE;
+  return `${Number(valor.slice(8, 10))}/${Number(valor.slice(5, 7))}`;
+}

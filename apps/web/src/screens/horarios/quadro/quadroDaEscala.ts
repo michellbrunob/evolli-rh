@@ -12,7 +12,9 @@
  * - busca, ordem e agrupamento (departamento, unidade, turno, gestor).
  */
 import type {
+  DiaGravadoApi,
   EscalaApi,
+  PeriodoDoDiaApi,
   PessoaDoQuadroApi,
   TurnoDaEscalaApi,
 } from "../../../api/escalaClient";
@@ -184,17 +186,33 @@ export function periodosNoDia(
   return [...lista].sort((a, b) => a.inicio.localeCompare(b.inicio));
 }
 
-export type TipoDaCelula = "trabalho" | "folga" | "dsr" | "sem-escala" | "fora";
+export type TipoDaCelula =
+  "trabalho" | "folga" | "dsr" | "sobreaviso" | "sem-escala" | "fora";
+
+/** O turno como a célula precisa: nome, cor e sigla. */
+export interface TurnoDaCelula {
+  readonly id: string;
+  readonly nome: string;
+  readonly cor?: string | null;
+  readonly sigla?: string | null;
+}
 
 export interface CelulaDoQuadro {
   readonly dia: string;
   readonly tipo: TipoDaCelula;
   /** No trabalho: o turno do dia, ou `null` (sem turno fixo). */
-  readonly turno: TurnoDaEscalaApi | null;
-  /** "09:00–18:00", ou `null`. */
+  readonly turno: TurnoDaCelula | null;
+  /** "09:00–18:00" (turno partido: "08:00–12:00 · 14:00–18:00"), ou `null`. */
   readonly horario: string | null;
   /** Horas líquidas do dia, em minutos. */
   readonly minutos: number;
+  /** De onde vem o dia: o padrão da pessoa, o publicado ou o rascunho. */
+  readonly origem: "padrao" | "publicado" | "rascunho";
+  readonly periodos: readonly PeriodoDoDiaApi[];
+  readonly intervaloMinutos: number;
+  readonly sobreaviso: readonly PeriodoDoDiaApi[];
+  readonly unidade: { readonly id: string; readonly nome: string } | null;
+  readonly observacao: string | null;
 }
 
 /** Fora do vínculo: antes da admissão ou depois do último dia. */
@@ -205,9 +223,86 @@ function foraDoVinculo(p: PessoaDoQuadroApi, dia: string): boolean {
   );
 }
 
+function minutosDaHora(hora: string): number {
+  const [h, m] = hora.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/** Duração do período; o fim antes (ou igual) do início é do dia seguinte. */
+export function duracao(p: PeriodoDoDiaApi): number {
+  const d = minutosDaHora(p.fim) - minutosDaHora(p.inicio);
+  return d > 0 ? d : d + 24 * 60;
+}
+
+/** Trabalho do dia: a soma dos períodos, menos o intervalo num corrido. */
+export function minutosDosPeriodos(
+  periodos: readonly PeriodoDoDiaApi[],
+  intervaloMinutos: number,
+): number {
+  const total = periodos.reduce((t, p) => t + duracao(p), 0);
+  return periodos.length === 1 ? Math.max(0, total - intervaloMinutos) : total;
+}
+
+export function faixaDosPeriodos(periodos: readonly PeriodoDoDiaApi[]): string {
+  return periodos.map((p) => `${p.inicio}–${p.fim}`).join(" · ");
+}
+
+/** O dia gravado que vale: o rascunho por cima do publicado. */
+export function diaGravado(
+  p: PessoaDoQuadroApi,
+  dia: string,
+): DiaGravadoApi | null {
+  const doDia = (p.dias ?? []).filter((d) => d.dia === dia);
+  return (
+    doDia.find((d) => d.camada === "rascunho") ??
+    doDia.find((d) => d.camada === "publicado") ??
+    null
+  );
+}
+
 export function celulaDoDia(p: PessoaDoQuadroApi, dia: string): CelulaDoQuadro {
-  const vazio = { dia, turno: null, horario: null, minutos: 0 };
+  const vazio = {
+    dia,
+    turno: null,
+    horario: null,
+    minutos: 0,
+    origem: "padrao" as const,
+    periodos: [],
+    intervaloMinutos: 0,
+    sobreaviso: [],
+    unidade: null,
+    observacao: null,
+  };
   if (foraDoVinculo(p, dia)) return { ...vazio, tipo: "fora" };
+
+  const g = diaGravado(p, dia);
+  if (g) {
+    const comum = {
+      ...vazio,
+      origem: g.camada,
+      unidade: g.unidade,
+      observacao: g.observacao,
+    };
+    if (g.tipo === "folga" || g.tipo === "dsr")
+      return { ...comum, tipo: g.tipo };
+    return {
+      ...comum,
+      tipo: g.tipo,
+      turno: g.tipo === "trabalho" ? g.turno : null,
+      periodos: g.periodos,
+      intervaloMinutos: g.intervaloMinutos,
+      sobreaviso: g.sobreaviso,
+      horario:
+        g.periodos.length > 0
+          ? `${g.periodos[0]!.inicio}–${g.periodos[g.periodos.length - 1]!.fim}`
+          : null,
+      minutos:
+        g.tipo === "trabalho"
+          ? minutosDosPeriodos(g.periodos, g.intervaloMinutos)
+          : 0,
+    };
+  }
+
   const r = resolverDia(p.escalas, dia);
   if (r.tipo === "sem-escala") return { ...vazio, tipo: "sem-escala" };
   if (r.tipo === "folga" || r.tipo === "dsr") return { ...vazio, tipo: r.tipo };
@@ -216,12 +311,15 @@ export function celulaDoDia(p: PessoaDoQuadroApi, dia: string): CelulaDoQuadro {
   // Jornada que muda por dia da semana e não tem período hoje: folga do turno.
   if (periodos.length === 0) return { ...vazio, tipo: "folga" };
   const escala = escalaDoDia(p.escalas, dia)!;
+  const intervalo = r.turno.intervaloMinutos ?? 0;
   return {
-    dia,
+    ...vazio,
     tipo: "trabalho",
     turno: r.turno,
     horario: `${periodos[0]!.inicio}–${periodos[periodos.length - 1]!.fim}`,
     minutos: minutosNoDia(padraoDe(escala), dia),
+    periodos: periodos.map((x) => ({ inicio: x.inicio, fim: x.fim })),
+    intervaloMinutos: periodos.length === 1 ? intervalo : 0,
   };
 }
 

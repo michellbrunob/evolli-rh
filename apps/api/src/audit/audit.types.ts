@@ -104,6 +104,9 @@ export const AUDIT_ACTIONS = [
   // T215 — escala do colaborador: só o id da escala e a empresa.
   "pessoas_escala_definida",
   "pessoas_escala_encerrada",
+  // T215 — quadro da escala: o dia gravado ou limpo no rascunho.
+  "pessoas_escala_dia_gravado",
+  "pessoas_escala_dia_limpo",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",

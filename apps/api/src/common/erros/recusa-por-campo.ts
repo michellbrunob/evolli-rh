@@ -45,7 +45,9 @@ export type MotivoDoCampo =
   // T215 — Salários: data de vigência depois de hoje.
   | "futura"
   // T215 — Escala: vigência antes da admissão do colaborador.
-  | "antes_da_admissao";
+  | "antes_da_admissao"
+  // T215 — Quadro da escala: dia fora do vínculo da pessoa na empresa.
+  | "fora_do_vinculo";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -89,7 +91,13 @@ export type CampoPublico =
   | "diasTrabalho"
   | "inicioCiclo"
   // T215 — Turnos: a unidade do turno.
-  | "unidadeOrganizacionalId";
+  | "unidadeOrganizacionalId"
+  // T215 — Quadro da escala: o dia gravado.
+  | "dia"
+  | "periodos"
+  | "sobreaviso"
+  | "intervaloMinutos"
+  | "observacao";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

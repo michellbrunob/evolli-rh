@@ -49,6 +49,24 @@
   opacity: 0.7;
 }
 
+.aviso-flutuante__acao {
+  flex: none;
+  padding: var(--space-xxs) var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.aviso-flutuante__acao:focus-visible {
+  outline: var(--focus-width) solid currentColor;
+  outline-offset: var(--focus-offset);
+}
+
 .aviso-flutuante__fechar:hover,
 .aviso-flutuante__fechar:focus-visible {
   opacity: 1;

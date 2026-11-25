@@ -63,6 +63,7 @@ export function pessoa(
     escalaDoCadastro: null,
     jornadaSemanalHoras: 44,
     escalas: [],
+    dias: [],
     ...extra,
   };
 }

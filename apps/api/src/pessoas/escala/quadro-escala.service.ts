@@ -11,6 +11,11 @@ import {
   PROJECAO,
   projetar,
 } from "./escala-colaborador.service";
+import {
+  type DiaGravado,
+  PROJECAO_DO_DIA,
+  projetarDia,
+} from "./escala-dia.service";
 
 /** Até seis semanas: o mês inteiro com as semanas das pontas. */
 export const DIAS_NO_QUADRO = 42;
@@ -47,6 +52,8 @@ export interface PessoaDoQuadro {
   jornadaSemanalHoras: number | null;
   /** Os padrões que tocam o período, do mais novo ao mais antigo. */
   escalas: EscalaProjetada[];
+  /** Os dias gravados no período (rascunho e publicado), por dia. */
+  dias: DiaGravado[];
 }
 
 export interface QuadroDaEscala {
@@ -180,6 +187,25 @@ export class QuadroEscalaService {
       escalasPorColaborador.set(e.colaboradorId, lista);
     }
 
+    const gravados =
+      ids.length === 0
+        ? []
+        : await this.prisma.escalaDia.findMany({
+            where: {
+              empresaId,
+              colaboradorId: { in: ids },
+              dia: { gte: inicio, lte: fim },
+            },
+            orderBy: [{ dia: "asc" }, { camada: "asc" }],
+            select: { ...PROJECAO_DO_DIA, colaboradorId: true },
+          });
+    const diasPorColaborador = new Map<string, DiaGravado[]>();
+    for (const d of gravados) {
+      const lista = diasPorColaborador.get(d.colaboradorId) ?? [];
+      lista.push(projetarDia(d));
+      diasPorColaborador.set(d.colaboradorId, lista);
+    }
+
     const pessoas: PessoaDoQuadro[] = [...porColaborador.entries()].map(
       ([colaboradorId, v]) => {
         const lotacao = v.alocacoes[0];
@@ -203,6 +229,7 @@ export class QuadroEscalaService {
           escalaDoCadastro: v.contrato?.escala ?? null,
           jornadaSemanalHoras: v.contrato?.jornadaSemanalHoras ?? null,
           escalas: escalasPorColaborador.get(colaboradorId) ?? [],
+          dias: diasPorColaborador.get(colaboradorId) ?? [],
         };
       },
     );

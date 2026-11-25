@@ -12,6 +12,8 @@ export interface ConteudoDoAviso {
   readonly id: number;
   readonly titulo: string;
   readonly texto?: string;
+  /** T215 — uma ação no próprio aviso (ex.: "Desfazer"); usada, o aviso some. */
+  readonly acao?: { readonly rotulo: string; readonly onClick: () => void };
 }
 
 export function AvisoFlutuante({
@@ -71,6 +73,18 @@ export function AvisoFlutuante({
           <p className="aviso-flutuante__texto">{aviso.texto}</p>
         ) : null}
       </div>
+      {aviso.acao ? (
+        <button
+          type="button"
+          className="aviso-flutuante__acao"
+          onClick={() => {
+            aviso.acao!.onClick();
+            onFechar();
+          }}
+        >
+          {aviso.acao.rotulo}
+        </button>
+      ) : null}
       <button
         type="button"
         className="aviso-flutuante__fechar"

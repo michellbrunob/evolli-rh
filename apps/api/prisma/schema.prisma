@@ -130,6 +130,9 @@ model AccessUser {
   vinculosHorarioCriados    VinculoHorario[]    @relation("HorarioVinculoCriadoPor")
   /// T215 — escalas de colaborador definidas por esta conta.
   escalasColaboradorCriadas EscalaColaborador[] @relation("EscalaColaboradorCriadaPor")
+  /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
+  diasDeEscalaCriados       EscalaDia[]         @relation("EscalaDiaCriadoPor")
+  diasDeEscalaAtualizados   EscalaDia[]         @relation("EscalaDiaAtualizadoPor")
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -531,6 +534,10 @@ enum AuditAction {
   // id da escala e a empresa (nunca modelo, turno ou datas).
   pessoas_escala_definida  @map("pessoas.escala.definida")
   pessoas_escala_encerrada @map("pessoas.escala.encerrada")
+  // T215 — quadro da escala: o dia gravado ou limpo no rascunho. Só o id do
+  // dia e a empresa (nunca turno, horário ou observação).
+  pessoas_escala_dia_gravado @map("pessoas.escala.dia_gravado")
+  pessoas_escala_dia_limpo   @map("pessoas.escala.dia_limpo")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -830,6 +837,7 @@ model Empresa {
   vinculosHorario    VinculoHorario[]
   /// T215 — padrões de escala (aba Escala da ficha).
   escalasColaborador EscalaColaborador[]
+  diasDeEscala       EscalaDia[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -892,6 +900,9 @@ model UnidadeOrganizacional {
   // Etapa 1 — Fatia 2
   alocacoes         AlocacaoOrganizacional[]
   movimentacoesAlvo MovimentacaoFuncional[]
+
+  /// T215 — dias do quadro da escala com esta unidade como local.
+  diasDeEscala EscalaDia[]
 
   @@unique([empresaId, codigo])
   // Alvo da FK composta vinda de Equipe: o banco passa a garantir que a
@@ -1188,6 +1199,7 @@ model Colaborador {
   vinculosHorario    VinculoHorario[]
   /// T215 — padrões de escala (aba Escala da ficha).
   escalasColaborador EscalaColaborador[]
+  diasDeEscala       EscalaDia[]
 
   // T151 — Gestor consultivo. `contasDeAcesso` e o elo DP-23 (quem acessa o
   // sistema como esta pessoa); `equipesQueGerencia` e `excecoesDeAcesso`
@@ -1777,6 +1789,8 @@ model TabelaHorario {
   /// T215 — escalas que usam esta jornada como turno (ou turno da noite).
   escalasComoTurno      EscalaColaborador[] @relation("EscalaTurno")
   escalasComoTurnoNoite EscalaColaborador[] @relation("EscalaTurnoNoite")
+  /// T215 — dias do quadro com esta jornada como turno.
+  diasDeEscala          EscalaDia[]
 
   /// Alvo da FK COMPOSTA de `vinculo_horario` — garante, no banco, que um
   /// vinculo so referencie tabela da MESMA empresa.
@@ -3102,4 +3116,48 @@ model EscalaColaborador {
   @@index([colaboradorId, empresaId, vigenciaInicio])
   @@index([empresaId])
   @@map("escala_colaborador")
+}
+
+/// T215 — um dia do quadro "Escala de trabalho", gravado à mão (menu da
+/// célula ou painel do dia), por cima do padrão da pessoa. Duas camadas: o
+/// rascunho (o que o RH está montando) e o publicado (o que a pessoa vê);
+/// sem linha, vale o padrão de escala (escala_colaborador).
+///
+/// - `tipo`: trabalho (turno, até 2 períodos, intervalo e sobreaviso depois
+///   do turno), folga, dsr ou sobreaviso (até 2 períodos);
+/// - `periodos` e `sobreaviso`: [{ inicio: "HH:MM", fim: "HH:MM" }] — fim
+///   antes do início termina no dia seguinte;
+/// - `unidadeOrganizacionalId`: o local do dia (nulo = a unidade da pessoa);
+/// - `observacao`: até 300 caracteres.
+///
+/// O banco garante a forma (CHECKs) e que o publicado não é apagado.
+model EscalaDia {
+  id                      String   @id @default(uuid())
+  colaboradorId           String   @map("colaborador_id")
+  empresaId               String   @map("empresa_id")
+  dia                     DateTime @db.Date
+  camada                  String
+  tipo                    String
+  tabelaHorarioId         String?  @map("tabela_horario_id")
+  periodos                Json     @default("[]")
+  intervaloMinutos        Int      @default(0) @map("intervalo_minutos")
+  sobreaviso              Json     @default("[]")
+  unidadeOrganizacionalId String?  @map("unidade_organizacional_id")
+  observacao              String?  @db.VarChar(300)
+  criadoPorUserId         String   @map("criado_por_user_id")
+  atualizadoPorUserId     String   @map("atualizado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador   Colaborador            @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa                @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turno         TabelaHorario?         @relation(fields: [tabelaHorarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  unidade       UnidadeOrganizacional? @relation(fields: [unidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser             @relation("EscalaDiaCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser             @relation("EscalaDiaAtualizadoPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([colaboradorId, empresaId, dia, camada])
+  @@index([empresaId, dia])
+  @@map("escala_dia")
 }

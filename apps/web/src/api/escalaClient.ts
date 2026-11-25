@@ -72,7 +72,7 @@ const rota = (colaboradorId: string) =>
   `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/escalas`;
 
 async function enviar<T>(
-  metodo: "GET" | "POST",
+  metodo: "GET" | "POST" | "PUT",
   url: string,
   corpo?: unknown,
 ): Promise<T> {
@@ -156,6 +156,59 @@ export interface PessoaDoQuadroApi {
   jornadaSemanalHoras: number | null;
   /** Do mais novo ao mais antigo. */
   escalas: EscalaApi[];
+  /** Os dias gravados no período (rascunho e publicado). */
+  dias: DiaGravadoApi[];
+}
+
+/** "HH:MM"; o fim antes do início termina no dia seguinte. */
+export interface PeriodoDoDiaApi {
+  inicio: string;
+  fim: string;
+}
+
+export type TipoDoDia = "trabalho" | "folga" | "dsr" | "sobreaviso";
+
+/** T215 — um dia gravado à mão no quadro, por cima do padrão. */
+export interface DiaGravadoApi {
+  dia: string;
+  camada: "rascunho" | "publicado";
+  tipo: TipoDoDia;
+  turno: {
+    id: string;
+    nome: string;
+    cor: string | null;
+    sigla: string | null;
+  } | null;
+  periodos: PeriodoDoDiaApi[];
+  intervaloMinutos: number;
+  sobreaviso: PeriodoDoDiaApi[];
+  unidade: { id: string; nome: string } | null;
+  observacao: string | null;
+}
+
+export interface GravarDiaDto {
+  colaboradorId: string;
+  dia: string;
+  tipo: TipoDoDia;
+  tabelaHorarioId?: string | null;
+  periodos?: PeriodoDoDiaApi[];
+  intervaloMinutos?: number;
+  sobreaviso?: PeriodoDoDiaApi[];
+  unidadeOrganizacionalId?: string | null;
+  observacao?: string | null;
+}
+
+/** Grava o dia no rascunho; devolve o dia gravado. */
+export function gravarDia(dto: GravarDiaDto): Promise<DiaGravadoApi> {
+  return enviar("PUT", `${BASE}/escala/dias`, dto);
+}
+
+/** Desfaz a mudança do dia no rascunho (volta ao padrão). */
+export function limparDia(
+  colaboradorId: string,
+  dia: string,
+): Promise<{ colaboradorId: string; dia: string; limpo: boolean }> {
+  return enviar("POST", `${BASE}/escala/dias/limpar`, { colaboradorId, dia });
 }
 
 export interface QuadroDaEscalaApi {

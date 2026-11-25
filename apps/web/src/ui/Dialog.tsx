@@ -61,6 +61,11 @@ export interface JanelaProps {
   readonly rodape?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
+  /**
+   * T215 — onde pôr o foco ao abrir (ex.: o campo que o menu pediu); sem
+   * ele, ou vazio, o título.
+   */
+  readonly focoInicialRef?: { readonly current: HTMLElement | null };
 }
 
 function Janela({
@@ -76,6 +81,7 @@ function Janela({
   rodape,
   children,
   className,
+  focoInicialRef,
 }: JanelaProps & { readonly lado: "centro" | "direita" }) {
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   const confirmacaoRef = useRef<HTMLDivElement | null>(null);
@@ -148,7 +154,9 @@ function Janela({
               ativo instanceof HTMLElement && ativo !== document.body
                 ? ativo
                 : null;
-            tituloRef.current?.focus({ preventScroll: true });
+            (focoInicialRef?.current ?? tituloRef.current)?.focus({
+              preventScroll: true,
+            });
           }}
           onCloseAutoFocus={(evento) => {
             evento.preventDefault();

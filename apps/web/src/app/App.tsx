@@ -606,6 +606,8 @@ function conteudoDoDestino(
         onVoltar={() => onNavegar("pessoas")}
         onAbrirTurnos={() => onNavegar("turnos-escala")}
         colaboradorEmFoco={escala.colaboradorEmFoco}
+        // T215 — gravar no rascunho do quadro é de RH e DP.
+        podeOperar={podeOperarEscala(admissao.papelDoAtor)}
       />
     );
   }

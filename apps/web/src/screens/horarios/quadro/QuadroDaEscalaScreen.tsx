@@ -5,24 +5,48 @@
  * mês, busca, agrupamento e paginação. Os dias saem dos padrões de escala de
  * cada pessoa (aba Escala da ficha), pela mesma regra.
  *
- * Esta fatia só lê: editar uma célula, rascunho e publicação, ações em massa,
- * avisos da CLT e exportação vêm nas próximas.
+ * T215 (fase 2) — quem opera (rh, dp) clica na célula: o menu do dia
+ * (turnos, Folga, DSR, Sobreaviso, Sobreaviso depois do turno, Dois turnos
+ * no dia, Abrir detalhes, observação, Limpar) e o painel do dia gravam no
+ * RASCUNHO, com o ponto de "mudança não publicada", o selo "Rascunho · N
+ * mudanças não publicadas" e o aviso com Desfazer. Setas andam entre as
+ * células; Enter abre o menu; Delete limpa o dia.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../../api/colaboradoresClient";
 import {
   consultarQuadro,
+  gravarDia,
+  limparDia,
+  type DiaGravadoApi,
+  type GravarDiaDto,
   type PessoaDoQuadroApi,
   type QuadroDaEscalaApi,
-  type TurnoDaEscalaApi,
 } from "../../../api/escalaClient";
+import {
+  listarTabelasHorario,
+  type TabelaHorarioApi,
+} from "../../../api/horariosClient";
+import {
+  listarUnidades,
+  type UnidadeOrganizacionalApi,
+} from "../../../api/organizacaoClient";
+import {
+  AvisoFlutuante,
+  type ConteudoDoAviso,
+} from "../../../ui/AvisoFlutuante";
 import { Button } from "../../../components";
-import { diaCivilDeHoje, diaDaSemanaEDiaMes } from "../../../format/data";
+import {
+  diaCivilDeHoje,
+  diaDaSemanaEDiaMes,
+  diaMesCurto,
+} from "../../../format/data";
 import { plural } from "../../../format/plural";
 import {
   IconeAbrir,
   IconeAvancar,
   IconeBuscar,
+  IconeComentario,
   IconeFiltrar,
   IconeVoltar,
 } from "../../../ui/icones";
@@ -30,6 +54,12 @@ import { Esqueleto, Revelar } from "../../../ui/movimento";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../pessoas/edicao/dadosProfissionais";
 import { OPCOES_GENERO, OPCOES_NIVEL } from "../../pessoas/NovaAdmissaoScreen";
 import { GavetaDoQuadro } from "./GavetaDoQuadro";
+import {
+  type AcaoDaCelula,
+  MenuDaCelula,
+  sobreavisoDepoisDoTurno,
+} from "./MenuDaCelula";
+import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import {
   type FiltrosDoQuadro,
   type RotulosDosCodigos,
@@ -47,6 +77,7 @@ import {
   type Agrupamento,
   type CelulaDoQuadro,
   type GrupoDoQuadro,
+  type TurnoDaCelula,
   type Visao,
   DIAS_CURTOS,
   LETRAS_DOS_DIAS,
@@ -56,11 +87,13 @@ import {
   celulaDoDia,
   deslocar,
   diasDoPeriodo,
+  faixaDosPeriodos,
   iniciais,
   metaDoPeriodo,
   nomeDosGrupos,
   ordenar,
   periodoDa,
+  periodosNoDia,
   rotuloDaEscala,
   tituloDoPeriodo,
 } from "./quadroDaEscala";
@@ -100,88 +133,174 @@ export interface QuadroDaEscalaScreenProps {
   readonly colaboradorEmFoco?: string | null;
   /** Para testes: o dia de hoje. */
   readonly hoje?: string;
+  /** rh e dp gravam no rascunho; os demais só consultam. */
+  readonly podeOperar?: boolean;
 }
 
-function siglaDe(t: TurnoDaEscalaApi): string {
+/** O DTO que regrava um dia já gravado (o "Desfazer"). */
+function dtoDoDia(
+  g: DiaGravadoApi,
+): Omit<GravarDiaDto, "colaboradorId" | "dia"> {
+  return {
+    tipo: g.tipo,
+    tabelaHorarioId: g.turno?.id ?? null,
+    periodos: g.periodos,
+    intervaloMinutos: g.intervaloMinutos,
+    sobreaviso: g.sobreaviso,
+    unidadeOrganizacionalId: g.unidade?.id ?? null,
+    observacao: g.observacao,
+  };
+}
+
+const NOME_DO_TIPO: Readonly<Record<GravarDiaDto["tipo"], string>> = {
+  trabalho: "Trabalho",
+  folga: "Folga",
+  dsr: "DSR",
+  sobreaviso: "Sobreaviso",
+};
+
+function siglaDe(t: TurnoDaCelula): string {
   return t.sigla ?? siglaDoNome(t.nome);
 }
 
 /** "Comercial, 09:00–18:00" etc. — o que a célula diz a quem lê pela tela. */
-function descricaoDaCelula(c: CelulaDoQuadro): string {
+export function descricaoDaCelula(c: CelulaDoQuadro): string {
+  const partes: string[] = [];
   switch (c.tipo) {
     case "trabalho":
-      return c.turno
-        ? `${c.turno.nome}, ${c.horario ?? ""}`
-        : "Trabalho, sem turno fixo";
+      partes.push(
+        c.turno
+          ? `${c.turno.nome}, ${faixaDosPeriodos(c.periodos) || (c.horario ?? "")}`
+          : c.periodos.length > 0
+            ? `Trabalho, ${faixaDosPeriodos(c.periodos)}`
+            : "Trabalho, sem turno fixo",
+      );
+      if (c.sobreaviso.length > 0) {
+        partes.push(`sobreaviso ${faixaDosPeriodos(c.sobreaviso)}`);
+      }
+      break;
+    case "sobreaviso":
+      partes.push(`Sobreaviso, ${faixaDosPeriodos(c.periodos)}`);
+      break;
     case "folga":
-      return "Folga";
+      partes.push("Folga");
+      break;
     case "dsr":
-      return "DSR, descanso semanal remunerado";
+      partes.push("DSR, descanso semanal remunerado");
+      break;
     case "sem-escala":
-      return "Sem escala";
+      partes.push("Sem escala");
+      break;
     case "fora":
-      return "Fora do vínculo";
+      partes.push("Fora do vínculo");
+      break;
   }
+  if (c.observacao) partes.push(`observação: ${c.observacao}`);
+  if (c.origem === "rascunho") partes.push("mudança não publicada");
+  return partes.join(", ");
+}
+
+/** O ponto âmbar de "mudança não publicada" e o sinal de observação. */
+function Marcas({ c }: { c: CelulaDoQuadro }) {
+  return (
+    <>
+      {c.origem === "rascunho" ? (
+        <span className="quadro__marca-rascunho" aria-hidden="true" />
+      ) : null}
+      {c.observacao ? (
+        <span
+          className="quadro__marca-observacao"
+          aria-hidden="true"
+          title={c.observacao}
+        >
+          <IconeComentario tamanho={12} />
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 function CelulaDaSemana({ c }: { c: CelulaDoQuadro }) {
+  let conteudo: React.ReactNode = null;
   if (c.tipo === "trabalho") {
-    return c.turno ? (
+    conteudo = (
       <div className="quadro__turno">
         <span className="quadro__turno-nome">
-          <span
-            className="quadro__ponto"
-            style={{ background: corDoTurno(c.turno.cor) }}
-            aria-hidden="true"
-          />
-          {c.turno.nome}
+          {c.turno ? (
+            <span
+              className="quadro__ponto"
+              style={{ background: corDoTurno(c.turno.cor) }}
+              aria-hidden="true"
+            />
+          ) : null}
+          {c.turno ? c.turno.nome : "Trabalho"}
+        </span>
+        <span className="quadro__turno-horario">
+          {c.horario ?? "Sem turno fixo"}
+        </span>
+        {c.sobreaviso.length > 0 ? (
+          <span className="quadro__turno-horario quadro__turno-sobreaviso">
+            {`+ sobreaviso ${faixaDosPeriodos(c.sobreaviso)}`}
+          </span>
+        ) : null}
+      </div>
+    );
+  } else if (c.tipo === "sobreaviso") {
+    conteudo = (
+      <div className="quadro__descanso">
+        <span className="quadro__descanso-nome quadro__sobreaviso-nome">
+          Sobreaviso
         </span>
         <span className="quadro__turno-horario">{c.horario}</span>
       </div>
-    ) : (
-      <div className="quadro__turno">
-        <span className="quadro__turno-nome">Trabalho</span>
-        <span className="quadro__turno-horario">Sem turno fixo</span>
-      </div>
     );
-  }
-  if (c.tipo === "dsr") {
-    return (
+  } else if (c.tipo === "dsr") {
+    conteudo = (
       <div className="quadro__descanso">
         <span className="quadro__descanso-nome">DSR</span>
         <span className="quadro__turno-horario">Descanso</span>
       </div>
     );
+  } else if (c.tipo === "folga") {
+    conteudo = <span className="quadro__descanso-nome">Folga</span>;
   }
-  if (c.tipo === "folga") {
-    return <span className="quadro__descanso-nome">Folga</span>;
-  }
-  return <span className="sr-only">{descricaoDaCelula(c)}</span>;
+  return (
+    <>
+      <span aria-hidden="true" className="quadro__conteudo">
+        {conteudo}
+      </span>
+      <Marcas c={c} />
+      <span className="sr-only">{descricaoDaCelula(c)}</span>
+    </>
+  );
 }
 
 function CelulaDoMes({ c }: { c: CelulaDoQuadro }) {
+  let sigla: React.ReactNode = null;
   if (c.tipo === "trabalho") {
     const t = c.turno;
-    return (
+    sigla = (
       <span
         className="quadro__sigla"
         style={t ? { color: corDoTurno(t.cor) } : undefined}
-        title={descricaoDaCelula(c)}
       >
-        <span aria-hidden="true">{t ? siglaDe(t) : "T"}</span>
-        <span className="sr-only">{descricaoDaCelula(c)}</span>
+        {t ? siglaDe(t) : "T"}
       </span>
     );
+  } else if (c.tipo === "sobreaviso") {
+    sigla = <span className="quadro__sigla quadro__sigla--sobreaviso">SA</span>;
+  } else if (c.tipo === "dsr") {
+    sigla = <span className="quadro__sigla quadro__sigla--dsr">D</span>;
   }
-  if (c.tipo === "dsr") {
-    return (
-      <span className="quadro__sigla quadro__sigla--dsr" title="DSR">
-        <span aria-hidden="true">D</span>
-        <span className="sr-only">{descricaoDaCelula(c)}</span>
+  return (
+    <>
+      <span aria-hidden="true" title={descricaoDaCelula(c)}>
+        {sigla}
       </span>
-    );
-  }
-  return <span className="sr-only">{descricaoDaCelula(c)}</span>;
+      <Marcas c={c} />
+      <span className="sr-only">{descricaoDaCelula(c)}</span>
+    </>
+  );
 }
 
 export function QuadroDaEscalaScreen({
@@ -189,6 +308,7 @@ export function QuadroDaEscalaScreen({
   onAbrirTurnos,
   colaboradorEmFoco = null,
   hoje: hojeFixo,
+  podeOperar = false,
 }: QuadroDaEscalaScreenProps) {
   const hoje = hojeFixo ?? diaCivilDeHoje();
   const [visao, setVisao] = useState<Visao>("semana");
@@ -207,6 +327,23 @@ export function QuadroDaEscalaScreen({
     FILTROS_DO_QUADRO_VAZIOS,
   );
   const [gaveta, setGaveta] = useState(false);
+  const [turnos, setTurnos] = useState<TabelaHorarioApi[]>([]);
+  const [unidades, setUnidades] = useState<UnidadeOrganizacionalApi[]>([]);
+  const [menu, setMenu] = useState<{
+    colaboradorId: string;
+    dia: string;
+    ancora: HTMLElement;
+  } | null>(null);
+  const [painel, setPainel] = useState<{
+    colaboradorId: string;
+    dia: string;
+    foco: FocoDoPainel | null;
+  } | null>(null);
+  const pessoaDoPainel = useRef<PessoaDoQuadroApi | null>(null);
+  const [aviso, setAviso] = useState<ConteudoDoAviso | null>(null);
+  const [falha, setFalha] = useState<string | null>(null);
+  const [ativa, setAtiva] = useState<string | null>(null);
+  const tabelaRef = useRef<HTMLTableElement | null>(null);
   const focoAplicado = useRef(false);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
 
@@ -235,6 +372,257 @@ export function QuadroDaEscalaScreen({
       vivo = false;
     };
   }, [inicio, fim, tentativa]);
+
+  // Turnos (ativos) e unidades (ativas) para o menu e o painel do dia.
+  useEffect(() => {
+    if (!podeOperar) return;
+    let vivo = true;
+    listarTabelasHorario({ ativo: true, tamanhoPagina: 100 }).then(
+      (r) => {
+        if (vivo) setTurnos(r.itens);
+      },
+      () => undefined,
+    );
+    listarUnidades({ status: "ativo", tamanhoPagina: 100 }).then(
+      (r) => {
+        if (vivo) setUnidades(r.itens);
+      },
+      () => undefined,
+    );
+    return () => {
+      vivo = false;
+    };
+  }, [podeOperar]);
+
+  /** Troca o rascunho do dia na tela (`null` = sem rascunho). */
+  const trocarNoQuadro = (
+    colaboradorId: string,
+    dia: string,
+    gravado: DiaGravadoApi | null,
+  ) =>
+    setCarga((atual) => {
+      if (atual.estado !== "pronto") return atual;
+      return {
+        estado: "pronto",
+        dados: {
+          ...atual.dados,
+          pessoas: atual.dados.pessoas.map((p) =>
+            p.colaboradorId !== colaboradorId
+              ? p
+              : {
+                  ...p,
+                  dias: [
+                    ...(p.dias ?? []).filter(
+                      (d) => !(d.dia === dia && d.camada === "rascunho"),
+                    ),
+                    ...(gravado ? [gravado] : []),
+                  ],
+                },
+          ),
+        },
+      };
+    });
+
+  const rascunhoDe = (p: PessoaDoQuadroApi, dia: string) =>
+    (p.dias ?? []).find((d) => d.dia === dia && d.camada === "rascunho") ??
+    null;
+
+  const desfazer = async (
+    p: PessoaDoQuadroApi,
+    dia: string,
+    anterior: DiaGravadoApi | null,
+  ) => {
+    setFalha(null);
+    try {
+      if (anterior) {
+        const g = await gravarDia({
+          ...dtoDoDia(anterior),
+          colaboradorId: p.colaboradorId,
+          dia,
+        });
+        trocarNoQuadro(p.colaboradorId, dia, g);
+      } else {
+        await limparDia(p.colaboradorId, dia);
+        trocarNoQuadro(p.colaboradorId, dia, null);
+      }
+      setAviso({ id: Date.now(), titulo: "1 mudança desfeita" });
+    } catch {
+      setFalha("Não foi possível desfazer. Tente de novo.");
+    }
+  };
+
+  /** Grava o dia no rascunho, com aviso e Desfazer. Erro sobe a quem chamou. */
+  const gravar = async (
+    p: PessoaDoQuadroApi,
+    dia: string,
+    dto: Omit<GravarDiaDto, "colaboradorId" | "dia">,
+    nome: string,
+  ) => {
+    const anterior = rascunhoDe(p, dia);
+    const g = await gravarDia({ ...dto, colaboradorId: p.colaboradorId, dia });
+    trocarNoQuadro(p.colaboradorId, dia, g);
+    setAviso({
+      id: Date.now(),
+      titulo: `${nome} em ${diaMesCurto(dia)} no rascunho`,
+      acao: {
+        rotulo: "Desfazer",
+        onClick: () => void desfazer(p, dia, anterior),
+      },
+    });
+  };
+
+  const limpar = async (p: PessoaDoQuadroApi, dia: string) => {
+    const anterior = rascunhoDe(p, dia);
+    if (!anterior) return;
+    await limparDia(p.colaboradorId, dia);
+    trocarNoQuadro(p.colaboradorId, dia, null);
+    setAviso({
+      id: Date.now(),
+      titulo: "Dia limpo no rascunho",
+      acao: {
+        rotulo: "Desfazer",
+        onClick: () => void desfazer(p, dia, anterior),
+      },
+    });
+  };
+
+  const tentar = async (acao: () => Promise<void>) => {
+    setFalha(null);
+    try {
+      await acao();
+    } catch {
+      setFalha("Não foi possível gravar o dia. Tente de novo.");
+    }
+  };
+
+  const abrirPainel = (
+    p: PessoaDoQuadroApi,
+    dia: string,
+    foco: FocoDoPainel | null,
+  ) => {
+    pessoaDoPainel.current = p;
+    setPainel({ colaboradorId: p.colaboradorId, dia, foco });
+  };
+
+  const escolher = (
+    p: PessoaDoQuadroApi,
+    c: CelulaDoQuadro,
+    acao: AcaoDaCelula,
+  ) => {
+    setMenu(null);
+    const manter = { observacao: c.observacao };
+    switch (acao.tipo) {
+      case "turno": {
+        const t = acao.turno;
+        const ps = periodosNoDia(
+          { ...t, intervaloMinutos: t.intervaloMinutos ?? 0 },
+          c.dia,
+        );
+        // Sem horário neste dia, ou mais de 2 períodos: o RH ajusta no painel.
+        if (ps.length === 0 || ps.length > 2) {
+          abrirPainel(p, c.dia, "inicio");
+          return;
+        }
+        void tentar(() =>
+          gravar(
+            p,
+            c.dia,
+            {
+              tipo: "trabalho",
+              tabelaHorarioId: t.id,
+              periodos: ps.map((x) => ({ inicio: x.inicio, fim: x.fim })),
+              intervaloMinutos: ps.length === 1 ? (t.intervaloMinutos ?? 0) : 0,
+              sobreaviso: [],
+              unidadeOrganizacionalId: c.unidade?.id ?? null,
+              ...manter,
+            },
+            t.nome,
+          ),
+        );
+        return;
+      }
+      case "folga":
+      case "dsr":
+        void tentar(() =>
+          gravar(
+            p,
+            c.dia,
+            { tipo: acao.tipo, ...manter },
+            NOME_DO_TIPO[acao.tipo],
+          ),
+        );
+        return;
+      case "sobreaviso-depois": {
+        const depois = sobreavisoDepoisDoTurno(c);
+        if (!depois) return;
+        void tentar(() =>
+          gravar(
+            p,
+            c.dia,
+            {
+              tipo: "trabalho",
+              tabelaHorarioId: c.turno?.id ?? null,
+              periodos: [...c.periodos],
+              intervaloMinutos: c.intervaloMinutos,
+              sobreaviso: [depois],
+              unidadeOrganizacionalId: c.unidade?.id ?? null,
+              ...manter,
+            },
+            "Sobreaviso",
+          ),
+        );
+        return;
+      }
+      case "sobreaviso":
+        abrirPainel(p, c.dia, "sobreaviso");
+        return;
+      case "dois-turnos":
+        abrirPainel(p, c.dia, "segundo-periodo");
+        return;
+      case "detalhes":
+        abrirPainel(p, c.dia, null);
+        return;
+      case "observacao":
+        abrirPainel(p, c.dia, "observacao");
+        return;
+      case "limpar":
+        void tentar(() => limpar(p, c.dia));
+        return;
+    }
+  };
+
+  /** Setas, Home/End, Delete: o teclado do quadro (célula com foco itinerante). */
+  const tecladoDaCelula = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    p: PessoaDoQuadroApi,
+    c: CelulaDoQuadro,
+  ) => {
+    const alvo = e.currentTarget;
+    const linha = Number(alvo.dataset.linha);
+    const coluna = Number(alvo.dataset.coluna);
+    let l = linha;
+    let k = coluna;
+    if (e.key === "ArrowRight") k += 1;
+    else if (e.key === "ArrowLeft") k -= 1;
+    else if (e.key === "ArrowDown") l += 1;
+    else if (e.key === "ArrowUp") l -= 1;
+    else if (e.key === "Home") k = 0;
+    else if (e.key === "End") k = dias.length - 1;
+    else if (e.key === "Delete" || e.key === "Backspace") {
+      // Sem rascunho no dia, `limpar` não faz nada.
+      e.preventDefault();
+      void tentar(() => limpar(p, c.dia));
+      return;
+    } else return;
+    e.preventDefault();
+    const destino = tabelaRef.current?.querySelector<HTMLButtonElement>(
+      `[data-linha="${l}"][data-coluna="${k}"]`,
+    );
+    if (destino) {
+      setAtiva(destino.dataset.celula ?? null);
+      destino.focus();
+    }
+  };
 
   // Aberto pela ficha: o departamento da pessoa, uma vez.
   useEffect(() => {
@@ -307,7 +695,7 @@ export function QuadroDaEscalaScreen({
   );
   const minutosTotais = filtradas.reduce((s, p) => s + minutosDe(p), 0);
 
-  const turnosNaPagina = new Map<string, TurnoDaEscalaApi>();
+  const turnosNaPagina = new Map<string, TurnoDaCelula>();
   for (const p of daPagina) {
     for (const c of celulas.get(p.colaboradorId) ?? []) {
       if (c.turno) turnosNaPagina.set(c.turno.id, c.turno);
@@ -315,6 +703,20 @@ export function QuadroDaEscalaScreen({
   }
 
   const filtrando = ligados > 0 || busca.trim() !== "";
+  // Mudanças não publicadas no período (o quadro só traz os dias dele).
+  const mudancas = todas.reduce(
+    (t, p) => t + (p.dias ?? []).filter((d) => d.camada === "rascunho").length,
+    0,
+  );
+  const primeiraCelula = daPagina[0]
+    ? `${daPagina[0].colaboradorId}|${dias[0]}`
+    : null;
+  const celulaComFoco =
+    ativa &&
+    daPagina.some((p) => ativa.startsWith(`${p.colaboradorId}|`)) &&
+    dias.includes(ativa.split("|")[1] ?? "")
+      ? ativa
+      : primeiraCelula;
   const contagem = filtrando
     ? `${total} de ${plural(todas.length, "pessoa", "pessoas")}`
     : agruparPor === "nenhum"
@@ -419,24 +821,57 @@ export function QuadroDaEscalaScreen({
         {agruparPor === "nenhum" || !recolhidos.has(g.chave)
           ? g.pessoas.map((p) => {
               const cs = celulas.get(p.colaboradorId) ?? [];
+              const linhaNaPagina = daPagina.indexOf(p);
               const minutos = minutosDe(p);
               return (
                 <tr key={p.colaboradorId} className="quadro__linha">
                   {cabecaDaPessoa(p)}
-                  {cs.map((c) => (
-                    <td
-                      key={c.dia}
-                      className={`quadro__celula quadro__celula--${c.tipo}${
-                        c.dia === hoje ? " quadro__celula--hoje" : ""
-                      }`}
-                    >
-                      {visao === "semana" ? (
+                  {cs.map((c, coluna) => {
+                    const chave = `${p.colaboradorId}|${c.dia}`;
+                    const conteudo =
+                      visao === "semana" ? (
                         <CelulaDaSemana c={c} />
                       ) : (
                         <CelulaDoMes c={c} />
-                      )}
-                    </td>
-                  ))}
+                      );
+                    return (
+                      <td
+                        key={c.dia}
+                        className={`quadro__celula quadro__celula--${c.tipo}${
+                          c.dia === hoje ? " quadro__celula--hoje" : ""
+                        }${c.origem === "rascunho" ? " quadro__celula--rascunho" : ""}`}
+                      >
+                        {podeOperar && c.tipo !== "fora" ? (
+                          <button
+                            type="button"
+                            className="quadro__celula-botao"
+                            data-celula={chave}
+                            data-linha={linhaNaPagina}
+                            data-coluna={coluna}
+                            tabIndex={chave === celulaComFoco ? 0 : -1}
+                            aria-haspopup="menu"
+                            aria-expanded={
+                              menu?.colaboradorId === p.colaboradorId &&
+                              menu.dia === c.dia
+                            }
+                            onFocus={() => setAtiva(chave)}
+                            onKeyDown={(e) => tecladoDaCelula(e, p, c)}
+                            onClick={(e) =>
+                              setMenu({
+                                colaboradorId: p.colaboradorId,
+                                dia: c.dia,
+                                ancora: e.currentTarget,
+                              })
+                            }
+                          >
+                            {conteudo}
+                          </button>
+                        ) : (
+                          conteudo
+                        )}
+                      </td>
+                    );
+                  })}
                   <td className="quadro__horas">
                     {visao === "semana" ? (
                       formatarHoras(minutos)
@@ -481,7 +916,14 @@ export function QuadroDaEscalaScreen({
             >
               Escala de trabalho
             </h1>
-            <p className="quadro__subtitulo">{titulo}</p>
+            <p className="quadro__subtitulo">
+              {titulo}
+              {mudancas > 0 ? (
+                <span className="quadro__selo-rascunho">
+                  {`Rascunho · ${plural(mudancas, "mudança não publicada", "mudanças não publicadas")}`}
+                </span>
+              ) : null}
+            </p>
           </div>
         </header>
 
@@ -628,7 +1070,10 @@ export function QuadroDaEscalaScreen({
               role="region"
               aria-label={`Quadro de escala ${visao === "semana" ? "da semana" : "do mês"}`}
             >
-              <table className={`quadro__tabela quadro__tabela--${visao}`}>
+              <table
+                ref={tabelaRef}
+                className={`quadro__tabela quadro__tabela--${visao}`}
+              >
                 <caption className="sr-only">
                   {`Escala de trabalho: ${titulo}`}
                 </caption>
@@ -804,6 +1249,90 @@ export function QuadroDaEscalaScreen({
             </footer>
           </>
         )}
+        {falha ? (
+          <p role="alert" className="quadro__falha">
+            {falha}
+          </p>
+        ) : null}
+        {(() => {
+          const p = menu
+            ? todas.find((x) => x.colaboradorId === menu.colaboradorId)
+            : undefined;
+          if (!menu || !p) return null;
+          const c = celulaDoDia(p, menu.dia);
+          return (
+            <MenuDaCelula
+              ancora={menu.ancora}
+              rotulo={`Dia de ${p.nome}, ${diaDaSemanaEDiaMes(menu.dia)}`}
+              celula={c}
+              turnos={turnos}
+              onEscolher={(acao) => escolher(p, c, acao)}
+              onFechar={(devolver) => {
+                const ancoraDoMenu = menu.ancora;
+                setMenu(null);
+                if (devolver) ancoraDoMenu.focus();
+              }}
+            />
+          );
+        })()}
+        {(() => {
+          if (!painel) return null;
+          const p =
+            todas.find((x) => x.colaboradorId === painel.colaboradorId) ??
+            pessoaDoPainel.current;
+          if (!p) return null;
+          pessoaDoPainel.current = p;
+          const c = celulaDoDia(p, painel.dia);
+          const tipo =
+            (ROTULO_DO_TIPO_DE_VINCULO as Record<string, string>)[
+              p.tipoVinculo
+            ] ?? p.tipoVinculo;
+          const subtitulo = [
+            p.departamento?.nome,
+            tipo,
+            rotuloDaEscala(p, painel.dia).split(" · ")[0],
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <PainelDoDia
+              pessoa={p}
+              celula={c}
+              turnos={turnos}
+              unidades={unidades}
+              foco={painel.foco}
+              subtitulo={subtitulo}
+              onSalvar={async (dto) => {
+                const turno =
+                  dto.tipo === "trabalho"
+                    ? turnos.find((x) => x.id === dto.tabelaHorarioId)
+                    : undefined;
+                await gravar(
+                  p,
+                  painel.dia,
+                  dto,
+                  turno?.nome ?? NOME_DO_TIPO[dto.tipo],
+                );
+                setPainel(null);
+              }}
+              onLimpar={async () => {
+                await limpar(p, painel.dia);
+                setPainel(null);
+              }}
+              onTrocarDia={(dia) => {
+                if (dia < inicio || dia > fim) setAncora(dia);
+                setPainel({ ...painel, dia, foco: null });
+              }}
+              onVerSemana={(dia) => {
+                setPainel(null);
+                setVisao("semana");
+                setAncora(dia);
+              }}
+              onFechar={() => setPainel(null)}
+            />
+          );
+        })()}
+        <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
         <GavetaDoQuadro
           aberta={gaveta}
           pessoas={todas}

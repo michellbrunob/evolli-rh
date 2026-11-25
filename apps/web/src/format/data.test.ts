@@ -11,6 +11,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   AUSENTE,
   diaDaSemanaEDiaMes,
+  diaMesCurto,
+  diaPorExtensoComSemana,
+  intervaloCurtoDeDias,
   FUSO_DE_NEGOCIO,
   formatarDiaCivil,
   formatarInstante,
@@ -656,5 +659,32 @@ describe("T215 — diaDaSemanaEDiaMes", () => {
     expect(diaDaSemanaEDiaMes("2026-11-24")).toBe("terça 24/11");
     expect(diaDaSemanaEDiaMes("2026-03-01")).toBe("domingo 1/3");
     expect(diaDaSemanaEDiaMes("2026-02-30")).toBe(diaDaSemanaEDiaMes(null));
+  });
+});
+
+describe("T215 — painel do dia do quadro", () => {
+  it("dia por extenso com a semana e intervalo curto de dias", () => {
+    expect(diaPorExtensoComSemana("2027-03-03")).toBe("Quarta, 3 de março");
+    expect(diaPorExtensoComSemana("2026-11-29")).toBe(
+      "Domingo, 29 de novembro",
+    );
+    expect(diaPorExtensoComSemana("2026-13-01")).toBe(
+      diaPorExtensoComSemana(null),
+    );
+    expect(intervaloCurtoDeDias("2027-03-01", "2027-03-07")).toBe("1 a 7/3");
+    expect(intervaloCurtoDeDias("2026-11-30", "2026-12-06")).toBe(
+      "30/11 a 6/12",
+    );
+    expect(intervaloCurtoDeDias("x", "2026-12-06")).toBe(
+      diaPorExtensoComSemana(null),
+    );
+  });
+});
+
+describe("T215 — diaMesCurto", () => {
+  it("dia e mês sem zero à esquerda", () => {
+    expect(diaMesCurto("2027-03-02")).toBe("2/3");
+    expect(diaMesCurto("2026-11-24")).toBe("24/11");
+    expect(diaMesCurto("")).toBe(diaMesCurto(null));
   });
 });
