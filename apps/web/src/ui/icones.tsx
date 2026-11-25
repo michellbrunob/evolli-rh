@@ -54,6 +54,7 @@ import {
   Repeat,
   Routing2,
   SearchNormal1,
+  Send2,
   SecurityUser,
   ShieldCross,
   ShieldSearch,
@@ -149,6 +150,10 @@ export const IconeRelogio = decorativo(Clock, "Bulk");
 export const IconeCopiar = decorativo(Copy, "Bulk");
 /** T215 — repetir (ex.: "Repetir esta semana até…"). */
 export const IconeRepetir = decorativo(Repeat, "Linear");
+/** T215 — documento (ex.: acordos e convenção). */
+export const IconeDocumento = decorativo(DocumentText, "Bulk");
+/** T215 — enviar ou publicar. */
+export const IconeEnviar = decorativo(Send2, "Bulk");
 /** T215 — aplicar um modelo (escala do catálogo). */
 export const IconeModelo = decorativo(Element4, "Bulk");
 /** T215 — aviso de atenção (avisos da escala). */

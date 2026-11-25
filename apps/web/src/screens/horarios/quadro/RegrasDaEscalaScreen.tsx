@@ -24,7 +24,15 @@ import {
 } from "../../../api/organizacaoClient";
 import { useEdicaoEmAndamento } from "../../../app/edicoesPendentes";
 import { Button, Dialog } from "../../../ui";
-import { IconeVoltar } from "../../../ui/icones";
+import {
+  IconeAviso,
+  IconeCalendario,
+  IconeDocumento,
+  IconeEnviar,
+  IconeMais,
+  IconeRelogio,
+  IconeVoltar,
+} from "../../../ui/icones";
 import { Esqueleto, Revelar } from "../../../ui/movimento";
 import {
   diaCivilDeHoje,
@@ -33,18 +41,18 @@ import {
 } from "../../../format/data";
 import { plural } from "../../../format/plural";
 import { somarDias } from "../../pessoas/ficha/escala/calendarioDaEscala";
-import { pessoasEm6x1NaTransicao } from "./avisosDaEscala";
+import { CATEGORIA, pessoasEm6x1NaTransicao } from "./avisosDaEscala";
 import { diasDoPeriodo } from "./quadroDaEscala";
 import "./QuadroDaEscalaScreen.css";
 
 export const REGRAS_ESCALA_TITULO_ID = "regras-escala-titulo";
 
 const SECOES = [
-  ["jornada", "Jornada e transição"],
-  ["convencao", "Acordos e convenção"],
-  ["feriados", "Feriados locais"],
-  ["avisos", "Avisos"],
-  ["publicacao", "Publicação"],
+  ["jornada", "Jornada e transição", IconeRelogio],
+  ["convencao", "Acordos e convenção", IconeDocumento],
+  ["feriados", "Feriados locais", IconeCalendario],
+  ["avisos", "Avisos", IconeAviso],
+  ["publicacao", "Publicação", IconeEnviar],
 ] as const;
 
 const CONVENCAO: readonly [ChaveDaConvencao, string, string][] = [
@@ -243,16 +251,25 @@ function Interruptor({
   ajuda,
   desabilitado,
   onMudar,
+  categoria,
 }: {
   ligado: boolean;
   rotulo: string;
   ajuda: string;
   desabilitado: boolean;
   onMudar: (v: boolean) => void;
+  /** Avisos: o ponto da cor da categoria (atenção, conferir, informativo). */
+  categoria?: "atencao" | "conferir" | "informativo";
 }) {
   const id = useId();
   return (
     <div className="regras__interruptor">
+      {categoria ? (
+        <span
+          className={`regras__ponto regras__ponto--${categoria}`}
+          aria-hidden="true"
+        />
+      ) : null}
       <span className="regras__interruptor-textos">
         <span id={`${id}-r`} className="regras__interruptor-rotulo">
           {rotulo}
@@ -396,6 +413,41 @@ export function RegrasDaEscalaScreen({
         form ? formatarDiaCivil(umAnoDepois(form.inicioTransicao)) : "",
       );
 
+  // A seção que está na tela fica marcada no menu lateral: a última cujo
+  // começo já passou do topo da área (logo abaixo da barra superior); no fim
+  // da página, a última seção.
+  const [ativa, setAtiva] = useState<string>(SECOES[0][0]);
+  const carregado = form !== null && regras !== null;
+  useEffect(() => {
+    if (!carregado) return;
+    const calcular = () => {
+      const barra =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--altura-barra-superior",
+          ),
+        ) || 60;
+      const limite = barra + 96;
+      const raiz = document.scrollingElement ?? document.documentElement;
+      const noFim =
+        raiz.scrollHeight > raiz.clientHeight &&
+        raiz.scrollTop + raiz.clientHeight >= raiz.scrollHeight - 2;
+      let atual: string = SECOES[0][0];
+      for (const [id] of SECOES) {
+        const el = document.getElementById(`regras-${id}`);
+        if (el && el.getBoundingClientRect().top <= limite) atual = id;
+      }
+      setAtiva(noFim ? SECOES[SECOES.length - 1]![0] : atual);
+    };
+    calcular();
+    document.addEventListener("scroll", calcular, {
+      capture: true,
+      passive: true,
+    });
+    return () =>
+      document.removeEventListener("scroll", calcular, { capture: true });
+  }, [carregado]);
+
   const hoje = diaCivilDeHoje();
   const etapa =
     form === null || hoje < form.inicioTransicao
@@ -406,7 +458,10 @@ export function RegrasDaEscalaScreen({
 
   return (
     <Revelar>
-      <section className="regras" aria-labelledby={REGRAS_ESCALA_TITULO_ID}>
+      <section
+        className="regras regras--pagina"
+        aria-labelledby={REGRAS_ESCALA_TITULO_ID}
+      >
         <header className="quadro__cabeca">
           <button
             type="button"
@@ -440,343 +495,407 @@ export function RegrasDaEscalaScreen({
           <Esqueleto rotulo="Carregando as regras…" linhas={6} />
         ) : (
           <>
-            <nav aria-label="Seções das regras" className="regras__secoes">
-              {SECOES.map(([id, rotulo]) => (
-                <a
-                  key={id}
-                  href={`#regras-${id}`}
-                  className="regras__secao-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document
-                      .getElementById(`regras-${id}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    document
-                      .getElementById(`regras-${id}-titulo`)
-                      ?.focus({ preventScroll: true });
-                  }}
-                >
-                  {rotulo}
-                </a>
-              ))}
-            </nav>
-
-            <section
-              id="regras-jornada"
-              className="regras__bloco"
-              aria-labelledby="regras-jornada-titulo"
-            >
-              <h2
-                id="regras-jornada-titulo"
-                tabIndex={-1}
-                className="regras__titulo"
-              >
-                Jornada e transição
-              </h2>
-              <p className="regras__texto">
-                A EC 141/2026, promulgada em 16/10/2026, acaba com a escala 6x1
-                e reduz a jornada.
-              </p>
-              <ol className="regras__linha-do-tempo">
-                {[
-                  [
-                    `Até ${formatarDiaCivil(somarDias(form.inicioTransicao, -1))}`,
-                    "44 h por semana",
-                    "1 descanso semanal (DSR)",
-                  ],
-                  [
-                    `De ${formatarDiaCivil(form.inicioTransicao)}`,
-                    "42 h por semana",
-                    "2 descansos por semana, em média no mês",
-                  ],
-                  [
-                    `De ${formatarDiaCivil(umAnoDepois(form.inicioTransicao))}`,
-                    "40 h por semana",
-                    "2 descansos por semana; até 8 h por dia",
-                  ],
-                ].map(([quando, horas, descanso], i) => (
-                  <li
-                    key={quando}
-                    className={
-                      i === etapa
-                        ? "regras__etapa regras__etapa--agora"
-                        : "regras__etapa"
-                    }
+            <div className="regras__corpo">
+              <nav aria-label="Seções das regras" className="regras__secoes">
+                {SECOES.map(([id, rotulo, Icone]) => (
+                  <a
+                    key={id}
+                    href={`#regras-${id}`}
+                    className="regras__secao-link"
+                    aria-current={ativa === id ? "true" : undefined}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setAtiva(id);
+                      document.getElementById(`regras-${id}`)?.scrollIntoView({
+                        behavior: "auto",
+                        block: "start",
+                      });
+                      document
+                        .getElementById(`regras-${id}-titulo`)
+                        ?.focus({ preventScroll: true });
+                    }}
                   >
-                    <span className="regras__etapa-quando">
-                      {quando}
-                      {i === etapa ? (
-                        <span className="regras__agora">Agora</span>
-                      ) : null}
-                    </span>
-                    <strong>{horas}</strong>
-                    <span>{descanso}</span>
-                  </li>
+                    <Icone tamanho={16} />
+                    {rotulo}
+                  </a>
                 ))}
-              </ol>
-              {em6x1 !== null &&
-              em6x1 > 0 &&
-              !form.convencao["6x1_autorizada"] ? (
-                <div className="quadro__faixa-transicao">
-                  <p className="quadro__faixa-texto">
-                    {`${em6x1 === 1 ? "1 pessoa está" : `${em6x1} pessoas estão`} em 6x1. A partir de ${formatarDiaCivil(form.inicioTransicao)} ${em6x1 === 1 ? "ela precisa" : "elas precisam"} de 2 descansos por semana, a não ser que a convenção coletiva autorize a 6x1.`}
-                  </p>
-                  {onAbrirTransicao ? (
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={onAbrirTransicao}
-                    >
-                      Planejar a transição
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="regras__campos">
-                <div className="painel-dia__campo">
-                  <label htmlFor="regras-inicio-transicao">
-                    Início da transição
-                  </label>
-                  <input
-                    id="regras-inicio-transicao"
-                    type="date"
-                    value={form.inicioTransicao}
-                    disabled={!podeOperar}
-                    aria-describedby="regras-inicio-transicao-ajuda"
-                    onChange={(e) => mudar({ inicioTransicao: e.target.value })}
-                  />
-                  <small id="regras-inicio-transicao-ajuda">
-                    Dois meses depois da publicação no Diário Oficial
-                    (16/10/2026). Confira com a contabilidade.
-                  </small>
-                </div>
-                <div className="painel-dia__campo">
-                  <span>Jornada padrão</span>
-                  <strong className="regras__valor">
-                    44 h, depois 42 h e 40 h
-                  </strong>
-                  <small>
-                    Para quem não tem jornada no cadastro. Segue as datas acima.
-                  </small>
-                </div>
-                <label className="painel-dia__campo">
-                  <span>A semana começa em</span>
-                  <select
-                    value={form.semanaComeca}
-                    disabled={!podeOperar}
-                    onChange={(e) =>
-                      mudar({ semanaComeca: Number(e.target.value) })
-                    }
-                  >
-                    {DIAS_DA_SEMANA.map((d, i) => (
-                      <option key={d} value={i + 1}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </section>
+              </nav>
 
-            <section
-              id="regras-convencao"
-              className="regras__bloco"
-              aria-labelledby="regras-convencao-titulo"
-            >
-              <h2
-                id="regras-convencao-titulo"
-                tabIndex={-1}
-                className="regras__titulo"
-              >
-                Acordos e convenção
-              </h2>
-              <p className="regras__texto">
-                Marque o que a convenção ou o acordo coletivo da sua categoria
-                permite. Os avisos mudam conforme o que estiver marcado.
-              </p>
-              {CONVENCAO.map(([chave, rotulo, ajuda]) => (
-                <Interruptor
-                  key={chave}
-                  ligado={form.convencao[chave]}
-                  rotulo={textos(rotulo)}
-                  ajuda={textos(ajuda)}
-                  desabilitado={!podeOperar}
-                  onMudar={(v) =>
-                    mudar({ convencao: { ...form.convencao, [chave]: v } })
-                  }
-                />
-              ))}
-            </section>
-
-            <section
-              id="regras-feriados"
-              className="regras__bloco"
-              aria-labelledby="regras-feriados-titulo"
-            >
-              <div className="regras__titulo-linha">
-                <h2
-                  id="regras-feriados-titulo"
-                  tabIndex={-1}
-                  className="regras__titulo"
+              <div className="regras__conteudo">
+                <section
+                  id="regras-jornada"
+                  className="regras__bloco regras__bloco--secao"
+                  aria-labelledby="regras-jornada-titulo"
                 >
-                  Feriados locais
-                </h2>
-                {podeOperar ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setNovoFeriado(true)}
+                  <h2
+                    id="regras-jornada-titulo"
+                    tabIndex={-1}
+                    className="regras__titulo"
                   >
-                    Adicionar feriado
-                  </Button>
-                ) : null}
-              </div>
-              <p className="regras__texto">
-                Nacionais já vêm do calendário. Cadastre aqui os municipais e os
-                pontos facultativos de cada unidade.
-              </p>
-              {regras.feriados.length === 0 ? (
-                <p className="dialogo-massa__ajuda">
-                  Nenhum feriado local cadastrado. Use “Adicionar feriado” para
-                  o aniversário da cidade e os pontos facultativos.
-                </p>
-              ) : (
-                <table className="regras__tabela">
-                  <thead>
-                    <tr>
-                      <th scope="col">Data</th>
-                      <th scope="col">Feriado</th>
-                      <th scope="col">Tipo</th>
-                      <th scope="col">Unidades</th>
-                      {podeOperar ? (
-                        <th scope="col">
-                          <span className="sr-only">Ações</span>
-                        </th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {regras.feriados.map((f) => (
-                      <tr key={f.id}>
-                        <td>{formatarDiaCivil(f.data)}</td>
-                        <td>{f.nome}</td>
-                        <td>
-                          {f.tipo === "municipal"
-                            ? "Municipal"
-                            : "Ponto facultativo"}
-                        </td>
-                        <td>
-                          {f.unidadeIds.length === 0
-                            ? "Todas as unidades"
-                            : f.unidadeIds
-                                .map(
-                                  (id) =>
-                                    unidades.find((u) => u.id === id)?.nome ??
-                                    "Unidade",
-                                )
-                                .join(", ")}
-                        </td>
-                        {podeOperar ? (
-                          <td>
-                            <Button
-                              type="button"
-                              variant="subtle"
-                              aria-label={`Remover ${f.nome}`}
-                              onClick={() => void removerFeriado(f)}
-                            >
-                              Remover
-                            </Button>
-                          </td>
+                    Jornada e transição
+                  </h2>
+                  <p className="regras__texto">
+                    A EC 141/2026, promulgada em 16/10/2026, acaba com a escala
+                    6x1 e reduz a jornada.
+                  </p>
+                  <div className="regras__transicao">
+                    <ol className="regras__linha-do-tempo">
+                      {[
+                        [
+                          `Até ${formatarDiaCivil(somarDias(form.inicioTransicao, -1))}`,
+                          "44 h por semana",
+                          "1 descanso semanal (DSR)",
+                        ],
+                        [
+                          `De ${formatarDiaCivil(form.inicioTransicao)}`,
+                          "42 h por semana",
+                          "2 descansos por semana, em média no mês",
+                        ],
+                        [
+                          `De ${formatarDiaCivil(umAnoDepois(form.inicioTransicao))}`,
+                          "40 h por semana",
+                          "2 descansos por semana; até 8 h por dia",
+                        ],
+                      ].map(([quando, horas, descanso], i) => (
+                        <li
+                          key={quando}
+                          className={
+                            i === etapa
+                              ? "regras__etapa regras__etapa--agora"
+                              : "regras__etapa"
+                          }
+                        >
+                          <span className="regras__etapa-quando">
+                            <span
+                              className="regras__etapa-ponto"
+                              aria-hidden="true"
+                            />
+                            {quando}
+                            {i === etapa ? (
+                              <span className="regras__agora">Agora</span>
+                            ) : null}
+                          </span>
+                          <strong>{horas}</strong>
+                          <span>{descanso}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    {em6x1 !== null &&
+                    em6x1 > 0 &&
+                    !form.convencao["6x1_autorizada"] ? (
+                      <div className="regras__nota-6x1">
+                        <span
+                          className="regras__ponto regras__ponto--conferir"
+                          aria-hidden="true"
+                        />
+                        <p>
+                          {`${em6x1 === 1 ? "1 pessoa está" : `${em6x1} pessoas estão`} em 6x1. A partir de ${formatarDiaCivil(form.inicioTransicao)} ${em6x1 === 1 ? "ela precisa" : "elas precisam"} de 2 descansos por semana, a não ser que a convenção coletiva autorize a 6x1.`}
+                        </p>
+                        {onAbrirTransicao ? (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            onClick={onAbrirTransicao}
+                          >
+                            Planejar a transição
+                          </Button>
                         ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              <p className="dialogo-massa__ajuda">
-                Feriado aparece em âmbar no quadro. Trabalhar nele gera aviso e
-                vai para a folha como “feriado trabalhado”.
-              </p>
-            </section>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="regras__linha">
+                    <div className="regras__linha-rotulo">
+                      <label htmlFor="regras-inicio-transicao">
+                        Início da transição
+                      </label>
+                      <small id="regras-inicio-transicao-ajuda">
+                        Dois meses depois da publicação no Diário Oficial
+                        (16/10/2026). Confira com a contabilidade.
+                      </small>
+                    </div>
+                    <input
+                      id="regras-inicio-transicao"
+                      className="regras__controle"
+                      type="date"
+                      value={form.inicioTransicao}
+                      disabled={!podeOperar}
+                      aria-describedby="regras-inicio-transicao-ajuda"
+                      onChange={(e) =>
+                        mudar({ inicioTransicao: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="regras__linha">
+                    <div className="regras__linha-rotulo">
+                      <span id="regras-jornada-padrao">Jornada padrão</span>
+                      <small>
+                        Para quem não tem jornada no cadastro. Segue as datas
+                        acima.
+                      </small>
+                    </div>
+                    <span
+                      className="regras__controle regras__controle--leitura"
+                      aria-labelledby="regras-jornada-padrao"
+                    >
+                      44 h, depois 42 h e 40 h
+                    </span>
+                  </div>
+                  <div className="regras__linha">
+                    <div className="regras__linha-rotulo">
+                      <label htmlFor="regras-semana">A semana começa em</label>
+                    </div>
+                    <select
+                      id="regras-semana"
+                      className="regras__controle"
+                      value={form.semanaComeca}
+                      disabled={!podeOperar}
+                      onChange={(e) =>
+                        mudar({ semanaComeca: Number(e.target.value) })
+                      }
+                    >
+                      {DIAS_DA_SEMANA.map((d, i) => (
+                        <option key={d} value={i + 1}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </section>
 
-            <section
-              id="regras-avisos"
-              className="regras__bloco"
-              aria-labelledby="regras-avisos-titulo"
-            >
-              <h2
-                id="regras-avisos-titulo"
-                tabIndex={-1}
-                className="regras__titulo"
-              >
-                Avisos
-              </h2>
-              <p className="regras__texto">
-                Aviso não bloqueia: aparece na célula, no painel e ao publicar.
-                PJ e autônomos só recebem os informativos.
-              </p>
-              {AVISOS.map(([grupo, itens]) => (
-                <div key={grupo} className="regras__grupo">
-                  <h3 className="regras__subtitulo">{grupo}</h3>
-                  {itens.map(([chave, rotulo, ajuda]) => (
+                <section
+                  id="regras-convencao"
+                  className="regras__bloco regras__bloco--secao"
+                  aria-labelledby="regras-convencao-titulo"
+                >
+                  <h2
+                    id="regras-convencao-titulo"
+                    tabIndex={-1}
+                    className="regras__titulo"
+                  >
+                    Acordos e convenção
+                  </h2>
+                  <p className="regras__texto">
+                    Marque o que a convenção ou o acordo coletivo da sua
+                    categoria permite. Os avisos mudam conforme o que estiver
+                    marcado.
+                  </p>
+                  {CONVENCAO.map(([chave, rotulo, ajuda]) => (
                     <Interruptor
                       key={chave}
-                      ligado={form.avisos[chave]}
+                      ligado={form.convencao[chave]}
                       rotulo={textos(rotulo)}
                       ajuda={textos(ajuda)}
                       desabilitado={!podeOperar}
                       onMudar={(v) =>
-                        mudar({ avisos: { ...form.avisos, [chave]: v } })
+                        mudar({ convencao: { ...form.convencao, [chave]: v } })
                       }
                     />
                   ))}
-                </div>
-              ))}
-            </section>
+                </section>
 
-            <section
-              id="regras-publicacao"
-              className="regras__bloco"
-              aria-labelledby="regras-publicacao-titulo"
-            >
-              <h2
-                id="regras-publicacao-titulo"
-                tabIndex={-1}
-                className="regras__titulo"
-              >
-                Publicação
-              </h2>
-              <div className="painel-dia__campo">
-                <label htmlFor="regras-antecedencia">Antecedência mínima</label>
-                <select
-                  id="regras-antecedencia"
-                  value={form.antecedenciaDias}
-                  disabled={!podeOperar}
-                  aria-describedby="regras-antecedencia-ajuda"
-                  onChange={(e) =>
-                    mudar({ antecedenciaDias: Number(e.target.value) })
-                  }
+                <section
+                  id="regras-feriados"
+                  className="regras__bloco regras__bloco--secao"
+                  aria-labelledby="regras-feriados-titulo"
                 >
-                  {ANTECEDENCIAS.map((n) => (
-                    <option key={n} value={n}>
-                      {n === 0
-                        ? "Sem antecedência mínima"
-                        : `${plural(n, "dia", "dias")} antes do início`}
-                    </option>
+                  <div className="regras__titulo-linha">
+                    <div>
+                      <h2
+                        id="regras-feriados-titulo"
+                        tabIndex={-1}
+                        className="regras__titulo"
+                      >
+                        Feriados locais
+                      </h2>
+                      <p className="regras__texto">
+                        Nacionais já vêm do calendário. Cadastre aqui os
+                        municipais e os pontos facultativos de cada unidade.
+                      </p>
+                    </div>
+                    {podeOperar ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setNovoFeriado(true)}
+                      >
+                        <IconeMais tamanho={16} />
+                        Adicionar feriado
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="regras__cartao-tabela">
+                    <table className="regras__tabela">
+                      <thead>
+                        <tr>
+                          <th scope="col">Data</th>
+                          <th scope="col">Feriado</th>
+                          <th scope="col">Tipo</th>
+                          <th scope="col">Unidades</th>
+                          {podeOperar ? (
+                            <th scope="col">
+                              <span className="sr-only">Ações</span>
+                            </th>
+                          ) : null}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regras.feriados.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={podeOperar ? 5 : 4}
+                              className="regras__tabela-vazia"
+                            >
+                              Nenhum feriado local cadastrado. Use “Adicionar
+                              feriado” para o aniversário da cidade e os pontos
+                              facultativos.
+                            </td>
+                          </tr>
+                        ) : (
+                          regras.feriados.map((f) => (
+                            <tr key={f.id}>
+                              <td>{formatarDiaCivil(f.data)}</td>
+                              <td>{f.nome}</td>
+                              <td>
+                                {f.tipo === "municipal"
+                                  ? "Municipal"
+                                  : "Ponto facultativo"}
+                              </td>
+                              <td>
+                                {f.unidadeIds.length === 0
+                                  ? "Todas as unidades"
+                                  : f.unidadeIds
+                                      .map(
+                                        (id) =>
+                                          unidades.find((u) => u.id === id)
+                                            ?.nome ?? "Unidade",
+                                      )
+                                      .join(", ")}
+                              </td>
+                              {podeOperar ? (
+                                <td>
+                                  <Button
+                                    type="button"
+                                    variant="subtle"
+                                    aria-label={`Remover ${f.nome}`}
+                                    onClick={() => void removerFeriado(f)}
+                                  >
+                                    Remover
+                                  </Button>
+                                </td>
+                              ) : null}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="regras__nota">
+                    Feriado aparece em âmbar no quadro. Trabalhar nele gera
+                    aviso e vai para a folha como “feriado trabalhado”.
+                  </p>
+                </section>
+
+                <section
+                  id="regras-avisos"
+                  className="regras__bloco regras__bloco--secao"
+                  aria-labelledby="regras-avisos-titulo"
+                >
+                  <h2
+                    id="regras-avisos-titulo"
+                    tabIndex={-1}
+                    className="regras__titulo"
+                  >
+                    Avisos
+                  </h2>
+                  <p className="regras__texto">
+                    Aviso não bloqueia: aparece na célula, no painel e ao
+                    publicar. PJ e autônomos só recebem os informativos.
+                  </p>
+                  {AVISOS.map(([grupo, itens]) => (
+                    <div key={grupo} className="regras__grupo">
+                      <h3 className="regras__subtitulo">{grupo}</h3>
+                      {itens.map(([chave, rotulo, ajuda]) => (
+                        <Interruptor
+                          key={chave}
+                          ligado={form.avisos[chave]}
+                          rotulo={textos(rotulo)}
+                          ajuda={textos(ajuda)}
+                          desabilitado={!podeOperar}
+                          categoria={CATEGORIA[chave]}
+                          onMudar={(v) =>
+                            mudar({ avisos: { ...form.avisos, [chave]: v } })
+                          }
+                        />
+                      ))}
+                    </div>
                   ))}
-                </select>
-                <small id="regras-antecedencia-ajuda">
-                  Publicar com menos tempo mostra um aviso.
-                </small>
+                </section>
+
+                <section
+                  id="regras-publicacao"
+                  className="regras__bloco regras__bloco--secao"
+                  aria-labelledby="regras-publicacao-titulo"
+                >
+                  <h2
+                    id="regras-publicacao-titulo"
+                    tabIndex={-1}
+                    className="regras__titulo"
+                  >
+                    Publicação
+                  </h2>
+                  <div className="regras__linha">
+                    <div className="regras__linha-rotulo">
+                      <label htmlFor="regras-antecedencia">
+                        Antecedência mínima
+                      </label>
+                      <small id="regras-antecedencia-ajuda">
+                        Publicar com menos tempo mostra um aviso.
+                      </small>
+                    </div>
+                    <select
+                      id="regras-antecedencia"
+                      className="regras__controle"
+                      value={form.antecedenciaDias}
+                      disabled={!podeOperar}
+                      aria-describedby="regras-antecedencia-ajuda"
+                      onChange={(e) =>
+                        mudar({ antecedenciaDias: Number(e.target.value) })
+                      }
+                    >
+                      {ANTECEDENCIAS.map((n) => (
+                        <option key={n} value={n}>
+                          {n === 0
+                            ? "Sem antecedência mínima"
+                            : `${plural(n, "dia", "dias")} antes do início`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="regras__linha">
+                    <div className="regras__linha-rotulo">
+                      <span>Avisar as pessoas</span>
+                    </div>
+                    <label className="regras__marcar">
+                      <input
+                        type="checkbox"
+                        checked={form.avisarPadrao}
+                        disabled={!podeOperar}
+                        aria-describedby="regras-avisar-ajuda"
+                        onChange={(e) =>
+                          mudar({ avisarPadrao: e.target.checked })
+                        }
+                      />
+                      <span>
+                        Marcado por padrão no diálogo de publicar
+                        <small id="regras-avisar-ajuda">
+                          Portal e e-mail, só para quem teve a escala mudada.
+                        </small>
+                      </span>
+                    </label>
+                  </div>
+                </section>
               </div>
-              <Interruptor
-                ligado={form.avisarPadrao}
-                rotulo="Avisar as pessoas ao publicar"
-                ajuda="Marcado por padrão no diálogo de publicar · Portal e e-mail, só para quem teve a escala mudada."
-                desabilitado={!podeOperar}
-                onMudar={(v) => mudar({ avisarPadrao: v })}
-              />
-            </section>
+            </div>
 
             {podeOperar ? (
               <footer className="regras__rodape">

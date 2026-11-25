@@ -1900,3 +1900,274 @@
   font-family: inherit;
   font-size: var(--text-caption);
 }
+
+/* ---- T215 — Regras da escala: menu lateral e seções em linhas ---------- */
+.regras__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (min-width: 900px) {
+  .regras__corpo {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: var(--space-xl, 2rem);
+  }
+
+  .regras--pagina .regras__secoes {
+    position: sticky;
+    top: calc(var(--altura-barra-superior, 60px) + var(--space-md));
+    align-self: start;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    padding: 0;
+    padding-right: var(--space-md);
+    border-right: var(--divisor);
+  }
+}
+
+.regras--pagina .regras__secao-link {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  min-height: var(--altura-botao);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+}
+
+.regras--pagina .regras__secao-link svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.regras--pagina .regras__secao-link[aria-current="true"] {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.regras--pagina .regras__secao-link[aria-current="true"] svg {
+  color: var(--color-ink);
+}
+
+.regras__conteudo {
+  display: grid;
+  min-width: 0;
+}
+
+.regras__bloco--secao {
+  /* O html já desconta a barra superior (scroll-padding-top). */
+  scroll-margin-top: 0;
+  padding: var(--space-lg) 0;
+  border: 0;
+  border-bottom: var(--divisor);
+  border-radius: 0;
+  background: transparent;
+}
+
+.regras__bloco--secao:first-child {
+  padding-top: 0;
+}
+
+.regras__transicao {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.regras--pagina .regras__etapa {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.regras--pagina .regras__etapa strong {
+  font-size: var(--text-lead);
+}
+
+.regras__etapa-ponto {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--divisor-cor-forte);
+}
+
+.regras--pagina .regras__etapa--agora .regras__etapa-quando {
+  color: var(--color-action);
+}
+
+.regras--pagina .regras__etapa--agora .regras__etapa-ponto {
+  background: var(--color-action);
+}
+
+.regras--pagina .regras__agora {
+  padding: 1px var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-action) 12%, transparent);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.regras__nota-6x1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.regras__nota-6x1 p {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+.regras__ponto {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-ink-subtle);
+}
+
+.regras__ponto--atencao {
+  background: var(--status-danger-ink);
+}
+
+.regras__ponto--conferir {
+  background: var(--status-warning-ink);
+}
+
+.regras__linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xs) var(--space-lg);
+  align-items: start;
+  padding: var(--space-md) 0;
+  border-bottom: var(--divisor);
+}
+
+.regras__linha:last-child {
+  border-bottom: 0;
+}
+
+@media (min-width: 640px) {
+  .regras__linha {
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  }
+}
+
+.regras__linha-rotulo {
+  display: grid;
+  gap: 2px;
+}
+
+.regras__linha-rotulo label,
+.regras__linha-rotulo > span {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.regras__linha-rotulo small {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.regras__controle {
+  justify-self: start;
+  min-width: 14rem;
+  min-height: var(--altura-botao);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.regras__controle--leitura {
+  display: inline-flex;
+  align-items: center;
+  border-color: var(--divisor-cor);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.regras__marcar {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.regras__marcar input {
+  margin-top: 2px;
+}
+
+.regras__marcar small {
+  display: block;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.regras--pagina .regras__interruptor {
+  gap: var(--space-sm);
+}
+
+.regras--pagina .regras__interruptor-textos {
+  flex: 1;
+}
+
+.regras--pagina .regras__interruptor-rotulo {
+  font-weight: 500;
+}
+
+.regras__cartao-tabela {
+  overflow-x: auto;
+  border: 1px solid var(--divisor-cor-forte);
+  border-radius: var(--radius-md);
+}
+
+.regras__cartao-tabela .regras__tabela th {
+  background: var(--surface-neutral);
+}
+
+.regras__cartao-tabela .regras__tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.regras__tabela td.regras__tabela-vazia {
+  padding: var(--space-md);
+  color: var(--color-ink-subtle);
+}
+
+.regras__nota {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.regras--pagina .regras__titulo-linha {
+  align-items: flex-start;
+}
+
+.regras--pagina .regras__transicao {
+  border: 1px solid var(--divisor-cor);
+  background: var(--surface-canvas);
+}
+
+.regras--pagina .regras__nota-6x1 {
+  background: var(--surface-neutral);
+}
+
+.regras--pagina .regras__rodape {
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: none;
+}
