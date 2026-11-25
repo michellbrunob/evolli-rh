@@ -20,12 +20,17 @@ import type { FormEvent, ReactNode } from "react";
 import { ApiError } from "../../../../api/colaboradoresClient";
 import {
   consultarEscalas,
+  consultarQuadro,
   definirEscala,
   encerrarEscala,
   type DefinirEscalaDto,
   type EscalaApi,
   type EscalasDoColaboradorApi,
+  type QuadroDaEscalaApi,
 } from "../../../../api/escalaClient";
+import { rotuloDaAusencia } from "../../../horarios/quadro/ausenciasDoQuadro";
+import type { CelulaDoQuadro } from "../../../horarios/quadro/quadroDaEscala";
+import { diaNoQuadro, useQuadroDaPessoa } from "./quadroNaFicha";
 import {
   listarTabelasHorario,
   type TabelaHorarioApi,
@@ -107,6 +112,11 @@ export interface ServicoDeEscala {
    * da data; devolve quantos dias mudaram. Sem ela, a gaveta não oferece.
    */
   refazerRascunho?(colaboradorId: string, inicio: string): Promise<number>;
+  /**
+   * T215 — o quadro do período (rascunho, publicado, ausências e feriados);
+   * sem ela, os dias da aba mostram só o padrão.
+   */
+  quadro?(inicio: string, fim: string): Promise<QuadroDaEscalaApi>;
 }
 
 export const servicoDeEscalaDoServidor: ServicoDeEscala = {
@@ -116,6 +126,7 @@ export const servicoDeEscalaDoServidor: ServicoDeEscala = {
   definir: definirEscala,
   encerrar: encerrarEscala,
   refazerRascunho: refazerRascunhoDoQuadro,
+  quadro: consultarQuadro,
 };
 
 interface Props {
@@ -405,8 +416,18 @@ export function AbaEscala({
                 </>
               }
             />
-            <ProximosDias escalas={escalas} hoje={hoje} />
-            <CalendarioDoMes escalas={escalas} hoje={hoje} />
+            <ProximosDias
+              escalas={escalas}
+              hoje={hoje}
+              colaboradorId={colaboradorId}
+              consultarQuadro={servico.quadro}
+            />
+            <CalendarioDoMes
+              escalas={escalas}
+              hoje={hoje}
+              colaboradorId={colaboradorId}
+              consultarQuadro={servico.quadro}
+            />
             <Historico escalas={escalas} hoje={hoje} />
           </>
         )}
@@ -736,14 +757,68 @@ function DescricaoDoDia({ d }: { readonly d: DiaResolvido }) {
   );
 }
 
+/** O dia como o quadro o mostra (rascunho, publicado, ausência). */
+function DescricaoDaCelula({ c }: { readonly c: CelulaDoQuadro }) {
+  if (c.tipo === "ausencia" && c.ausencia) {
+    return (
+      <span className="escala-ficha__folga">
+        {rotuloDaAusencia(c.ausencia)}
+      </span>
+    );
+  }
+  if (c.tipo === "trabalho" || c.tipo === "sobreaviso") {
+    return (
+      <span className="escala-ficha__turno">
+        <span
+          className="seletor-rico__ponto"
+          style={{ background: COR_DO_TURNO }}
+          aria-hidden="true"
+        />
+        <strong>
+          {c.tipo === "sobreaviso"
+            ? "Sobreaviso"
+            : (c.turno?.nome ?? "Trabalho")}
+        </strong>
+        {c.horario ? (
+          <span className="escala-ficha__sub">
+            {c.intervaloMinutos > 0
+              ? `${c.horario} · ${formatarDuracao(c.intervaloMinutos)} de intervalo`
+              : c.horario}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+  const texto =
+    c.tipo === "dsr"
+      ? "Folga · DSR"
+      : c.tipo === "folga"
+        ? "Folga"
+        : c.tipo === "fora"
+          ? "Fora do vínculo"
+          : "Sem escala";
+  return <span className="escala-ficha__folga">{texto}</span>;
+}
+
 function ProximosDias({
   escalas,
   hoje,
+  colaboradorId,
+  consultarQuadro,
 }: {
   readonly escalas: EscalaApi[];
   readonly hoje: string;
+  readonly colaboradorId: string;
+  readonly consultarQuadro: ServicoDeEscala["quadro"];
 }) {
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(hoje, i));
+  const quadro = useQuadroDaPessoa(
+    consultarQuadro,
+    colaboradorId,
+    dias[0]!,
+    dias[6]!,
+    escalas,
+  );
   const rotulo = (dia: string, i: number) =>
     i === 0
       ? "Hoje"
@@ -757,17 +832,32 @@ function ProximosDias({
       subtitulo={`De hoje até ${formatarDiaCivil(dias[6]!).slice(0, 5)}, com o que ainda está em rascunho`}
     >
       <ul className="escala-ficha__dias" aria-label="Próximos 7 dias">
-        {dias.map((dia, i) => (
-          <li key={dia} className="escala-ficha__dia">
-            <span
-              className={`escala-ficha__dia-rotulo${i === 0 ? " escala-ficha__dia-rotulo--hoje" : ""}`}
-            >
-              {rotulo(dia, i)}
-            </span>
-            <DescricaoDoDia d={resolverDia(escalas, dia)} />
-            <span className="escala-ficha__etiqueta">Não publicado</span>
-          </li>
-        ))}
+        {dias.map((dia, i) => {
+          const { celula, feriado } = diaNoQuadro(quadro, dia);
+          return (
+            <li key={dia} className="escala-ficha__dia">
+              <span
+                className={`escala-ficha__dia-rotulo${i === 0 ? " escala-ficha__dia-rotulo--hoje" : ""}`}
+              >
+                {rotulo(dia, i)}
+                {feriado ? (
+                  <small className="escala-ficha__dia-feriado" title={feriado}>
+                    {feriado}
+                  </small>
+                ) : null}
+              </span>
+              {celula ? (
+                <DescricaoDaCelula c={celula} />
+              ) : (
+                <DescricaoDoDia d={resolverDia(escalas, dia)} />
+              )}
+              {celula?.origem === "publicado" ||
+              celula?.tipo === "ausencia" ? null : (
+                <span className="escala-ficha__etiqueta">Não publicado</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </Cartao>
   );
@@ -776,9 +866,13 @@ function ProximosDias({
 function CalendarioDoMes({
   escalas,
   hoje,
+  colaboradorId,
+  consultarQuadro,
 }: {
   readonly escalas: EscalaApi[];
   readonly hoje: string;
+  readonly colaboradorId: string;
+  readonly consultarQuadro: ServicoDeEscala["quadro"];
 }) {
   const [mes, setMes] = useState(mesDe(hoje));
   const primeiro = `${mes}-01`;
@@ -793,11 +887,30 @@ function CalendarioDoMes({
   let minutos = 0;
   const turnosUsados = new Map<string, Turno>();
   let feriados = 0;
+  const quadro = useQuadroDaPessoa(
+    consultarQuadro,
+    colaboradorId,
+    dias[0]!,
+    dias[dias.length - 1]!,
+    escalas,
+  );
+  const doDia = new Map(dias.map((d) => [d, diaNoQuadro(quadro, d)]));
   for (const dia of dias) {
-    if (feriadoDe(dia)) feriados += 1;
+    const { celula, feriado } = doDia.get(dia)!;
+    if (feriado) feriados += 1;
     const e = escalaDoDia(escalas, dia);
-    if (!e) continue;
     const r = resolverDia(escalas, dia);
+    if (celula) {
+      // Com o quadro: o que vale no dia (ausência não conta).
+      if (celula.tipo === "trabalho") {
+        trabalhados += 1;
+        minutos += celula.minutos;
+        if (r.tipo === "trabalho" && r.turno)
+          turnosUsados.set(r.turno.nome, r.turno);
+      }
+      continue;
+    }
+    if (!e) continue;
     if (r.tipo === "trabalho") {
       trabalhados += 1;
       minutos += minutosNoDia(padraoDe(e), dia);
@@ -849,8 +962,13 @@ function CalendarioDoMes({
               />
             ))}
             {dias.map((dia) => {
-              const feriado = feriadoDe(dia);
+              const { celula, feriado } = doDia.get(dia)!;
               const r = resolverDia(escalas, dia);
+              const ausencia =
+                celula?.tipo === "ausencia" && celula.ausencia
+                  ? rotuloDaAusencia(celula.ausencia)
+                  : null;
+              const tipo = celula ? celula.tipo : r.tipo;
               return (
                 <li
                   key={dia}
@@ -867,17 +985,26 @@ function CalendarioDoMes({
                       <span className="escala-ficha__feriado" title={feriado}>
                         {feriado}
                       </span>
+                    ) : ausencia ? (
+                      <span className="escala-ficha__ausencia" title={ausencia}>
+                        {ausencia}
+                      </span>
                     ) : null}
                   </span>
-                  {r.tipo === "trabalho" ? (
+                  {tipo === "trabalho" ? (
                     <span className="escala-ficha__celula-turno">
                       <span className="escala-ficha__sigla">
-                        {siglaDe(r.turno)}
+                        {celula?.turno
+                          ? (celula.turno.sigla ??
+                            celula.turno.nome.trim()[0]?.toUpperCase())
+                          : siglaDe(r.turno)}
                       </span>
-                      <span>{faixaDoTurno(r.turno)}</span>
+                      <span>{celula?.horario ?? faixaDoTurno(r.turno)}</span>
                     </span>
-                  ) : r.tipo === "dsr" ? (
+                  ) : tipo === "dsr" ? (
                     <span className="escala-ficha__folga">Folga · DSR</span>
+                  ) : tipo === "folga" && celula ? (
+                    <span className="escala-ficha__folga">Folga</span>
                   ) : null}
                 </li>
               );

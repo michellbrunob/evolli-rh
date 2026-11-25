@@ -243,6 +243,107 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     expect(dias[0]).toHaveTextContent("Não publicado");
   });
 
+  it("com o quadro: rascunho por cima do padrão, ausência aprovada e feriados da pessoa (7 dias e calendário)", async () => {
+    const padrao = escala("e1", "5x2", "2026-02-02", null);
+    const servico = {
+      ...servicoCom([padrao]),
+      quadro: vi.fn(async (inicio: string, fim: string) => ({
+        empresaId: "emp",
+        inicio,
+        fim,
+        regras: {
+          personalizadas: true,
+          inicioTransicao: "2026-12-16",
+          semanaComeca: 1,
+          convencao: {} as never,
+          avisos: {} as never,
+          antecedenciaDias: 7,
+          avisarPadrao: true,
+          feriados: [
+            {
+              id: "f",
+              data: "2026-11-24",
+              nome: "Aniversário da cidade",
+              tipo: "municipal" as const,
+              unidadeIds: [],
+            },
+          ],
+        },
+        pessoas: [
+          {
+            colaboradorId: COLAB,
+            nome: "Ana Souza",
+            tipoVinculo: "clt",
+            situacao: "ativo" as const,
+            dataAdmissao: "2026-01-05",
+            dataDesligamento: null,
+            departamento: null,
+            unidade: null,
+            cargo: null,
+            area: null,
+            centroCusto: null,
+            gestor: null,
+            nivel: null,
+            genero: null,
+            escalaDoCadastro: "5x2",
+            jornadaSemanalHoras: 44,
+            escalas: [padrao],
+            dias: [
+              {
+                dia: "2026-11-26",
+                camada: "rascunho" as const,
+                tipo: "folga" as const,
+                turno: null,
+                periodos: [],
+                intervaloMinutos: 0,
+                sobreaviso: [],
+                unidade: null,
+                observacao: null,
+              },
+            ],
+            ausencias: [
+              {
+                id: "a",
+                tipo: "ferias" as const,
+                motivoAfastamento: null,
+                inicio: "2026-11-25",
+                fim: "2026-11-25",
+              },
+            ],
+          },
+        ],
+      })),
+    };
+    montar(servico);
+    const lista = await screen.findByRole("list", { name: "Próximos 7 dias" });
+    await waitFor(() =>
+      expect(within(lista).getAllByRole("listitem")[1]).toHaveTextContent(
+        "Férias",
+      ),
+    );
+    const dias = within(lista).getAllByRole("listitem");
+    expect(servico.quadro).toHaveBeenCalledWith("2026-11-24", "2026-11-30");
+    // Hoje é feriado local (todas as unidades): o nome sob o dia.
+    expect(dias[0]).toHaveTextContent("HojeAniversário da cidade");
+    // Amanhã: férias aprovadas, sem "Não publicado".
+    expect(dias[1]).toHaveTextContent("AmanhãFérias");
+    expect(dias[1]).not.toHaveTextContent("Não publicado");
+    // Quinta: o rascunho (folga) vence o padrão.
+    expect(dias[2]).toHaveTextContent("Qui, 26/11FolgaNão publicado");
+
+    const mes = await screen.findByRole("region", { name: "Novembro de 2026" });
+    const celulas = within(
+      within(mes).getByRole("list", { name: "Dias de Novembro de 2026" }),
+    ).getAllByRole("listitem");
+    const doDia = (n: number) =>
+      celulas.find((c) => c.textContent?.startsWith(String(n)))!;
+    await waitFor(() => expect(doDia(25)).toHaveTextContent("25Férias"));
+    expect(doDia(24)).toHaveTextContent("Aniversário da cidade");
+    expect(doDia(26)).toHaveTextContent("26Folga");
+    // 21 dias úteis − férias (25) − folga (26) = 19 dias.
+    expect(mes).toHaveTextContent("19 dias de trabalho");
+  });
+
   it("calendário do mês: totais, feriados e navegação", async () => {
     montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
     const mes = await screen.findByRole("region", { name: "Novembro de 2026" });
