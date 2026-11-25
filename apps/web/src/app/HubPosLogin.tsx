@@ -119,9 +119,11 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Várias admissões de uma vez, por planilha CSV conferida linha a linha na empresa ativa.",
   cadastros:
     "Estrutura organizacional da empresa: unidades, departamentos, áreas, equipes, cargos e centros de custo.",
-  // T182 — tela própria do catálogo de jornadas (antes a aba Horários).
+  // T215 — o quadro da escala (antes, o catálogo de jornadas).
   "jornadas-trabalho":
-    "Jornadas de trabalho da empresa: código, nome e os dias e horários de cada turno.",
+    "Quadro da escala por semana e por mês: quem trabalha em cada dia, com o turno, as folgas e as horas.",
+  "turnos-escala":
+    "Turnos da empresa: nome, cor, sigla e os dias e horários de cada um, usados no quadro de escala.",
   ponto: "Registros de ponto do período e conferência das folhas apuradas.",
   equipe:
     "Consulta da sua equipe: quem responde a você hoje, pela atribuição vigente.",

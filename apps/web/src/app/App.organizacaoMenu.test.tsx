@@ -327,14 +327,22 @@ describe("T211 — rotas", () => {
     ["contas-acesso", "#/seguranca/permissoes-de-acesso"],
     ["ponto", "#/jornada/ponto"],
     ["administracao-lideranca", "#/lideranca/administracao"],
+    // T215 — o quadro da escala e os turnos, sub-página dele.
+    ["jornadas-trabalho", "#/pessoas/escala"],
+    ["turnos-escala", "#/pessoas/escala/turnos"],
   ])("%s ganha a URL %s, de ida e volta", (destino, rota) => {
     expect(rotaDoDestino(destino)).toBe(rota);
     expect(destinoDaRota(rota)).toBe(destino);
   });
 
+  it("T215 — o endereço antigo de Escala de trabalho ainda abre o quadro", () => {
+    expect(destinoDaRota("#/estrutura/jornadas-trabalho")).toBe(
+      "jornadas-trabalho",
+    );
+  });
+
   it.each([
     ["pessoas", "#/pessoas/colaboradores"],
-    ["jornadas-trabalho", "#/estrutura/jornadas-trabalho"],
     ["configuracoes", "#/configuracoes/meu-perfil"],
     ["configuracoes-aparencia", "#/configuracoes/aparencia"],
     ["configuracoes-empresas", "#/configuracoes/empresas"],
@@ -347,6 +355,11 @@ describe("T211 — rotas", () => {
 describe("T211 — trilha", () => {
   it.each([
     ["jornadas-trabalho", ["Pessoas", "Colaboradores", "Escala de trabalho"]],
+    // T215 — Turnos, sub-página do quadro.
+    [
+      "turnos-escala",
+      ["Pessoas", "Colaboradores", "Escala de trabalho", "Turnos"],
+    ],
     ["cadastros", ["Pessoas", "Colaboradores", "Organograma"]],
     ["equipe", ["Pessoas", "Liderança", "Minha equipe"]],
     // T215 — em Segurança.

@@ -48,7 +48,10 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T209 (Bloco C) — importação por planilha, sub-página de Colaboradores.
   "importar-colaboradores": "#/pessoas/importar",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
-  "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
+  // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
+  // sub-página dele.
+  "jornadas-trabalho": "#/pessoas/escala",
+  "turnos-escala": "#/pessoas/escala/turnos",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
   configuracoes: "#/configuracoes/meu-perfil",
   // T210 — Configurações › Aparência (o tema da própria conta).
@@ -81,6 +84,8 @@ const ROTA_DO_MODULO_CONFIGURACOES = "#/configuracoes";
 const ROTAS_ALTERNATIVAS: Readonly<Record<string, string>> = {
   "#/seguranca": "seguranca",
   "#/configuracoes/equipe-e-permissoes": "contas-acesso",
+  // T215 — endereço antigo de "Escala de trabalho" (catálogo de jornadas).
+  "#/estrutura/jornadas-trabalho": "jornadas-trabalho",
 };
 
 /** O fragmento da URL do destino, ou `null` se ele não tem rota própria. */

@@ -66,8 +66,13 @@ import {
   jornadaPorSemana,
   minutosNoDia,
   somarDias,
-  trabalhoNoDia,
 } from "./calendarioDaEscala";
+import {
+  type DiaResolvido,
+  escalaDoDia,
+  padraoDe,
+  resolverDia,
+} from "./diaDaEscala";
 import {
   DIAS_DA_SEMANA,
   GRUPOS_DE_ESCALA,
@@ -218,20 +223,6 @@ function maiuscula(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-function padraoDe(e: EscalaApi): PadraoDeEscala {
-  return {
-    modelo: e.modelo,
-    turno: e.turno?.periodos ?? null,
-    turnoNoite: e.turnoNoite?.periodos ?? null,
-    intervaloTurno: e.turno?.intervaloMinutos ?? 0,
-    intervaloTurnoNoite: e.turnoNoite?.intervaloMinutos ?? 0,
-    folgaSemanal: e.folgaSemanal,
-    diasTrabalho: e.diasTrabalho,
-    inicioCiclo: e.inicioCiclo,
-    vigenciaInicio: e.vigenciaInicio,
-  };
-}
-
 function mesDe(dia: string): string {
   return dia.slice(0, 7);
 }
@@ -239,42 +230,6 @@ function mesDe(dia: string): string {
 function mesCurto(dia: string): string {
   const nome = MESES[Number(dia.slice(5, 7)) - 1]!;
   return nome.length <= 5 ? nome : `${nome.slice(0, 3)}.`;
-}
-
-/** A escala que vale no dia, entre todas. */
-function escalaDoDia(escalas: EscalaApi[], dia: string): EscalaApi | null {
-  return (
-    escalas.find(
-      (e) =>
-        e.vigenciaInicio <= dia &&
-        (e.vigenciaFim === null || dia < e.vigenciaFim),
-    ) ?? null
-  );
-}
-
-interface DiaResolvido {
-  readonly tipo: "trabalho" | "folga" | "dsr" | "sem-escala";
-  readonly turno: Turno | null;
-}
-
-function resolverDia(escalas: EscalaApi[], dia: string): DiaResolvido {
-  const e = escalaDoDia(escalas, dia);
-  if (!e) return { tipo: "sem-escala", turno: null };
-  const t = trabalhoNoDia(padraoDe(e), dia);
-  if (t === null) {
-    // DSR: a folga escolhida no 6x1 e o domingo nas semanas fixas; nos
-    // revezamentos, plantões e embarque, a folga é do ciclo.
-    const tipo = modeloDe(e.modelo)?.tipo;
-    const dsr =
-      e.modelo === "6x1"
-        ? diaDaSemana(dia) === (e.folgaSemanal ?? 7)
-        : (tipo === "semanal" || tipo === "outra") && diaDaSemana(dia) === 7;
-    return { tipo: dsr ? "dsr" : "folga", turno: null };
-  }
-  return {
-    tipo: "trabalho",
-    turno: t === "noite" ? e.turnoNoite : e.turno,
-  };
 }
 
 type Carga =

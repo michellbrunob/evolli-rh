@@ -125,8 +125,51 @@ cada um; links nos itens do meio, só texto no último):
 | Portal                                   | Portal                                                          | `#/portal`                                    |
 | Suporte · Roadmap                        | Suporte · Roadmap                                               | `#/suporte` · `#/roadmap`                     |
 
-Quando o quadro existir, "Escala de trabalho" deixa de abrir os Turnos e
-passa a abrir o quadro; os Turnos viram sub-página dele (tabela acima).
+Desde 25/11/2026, "Escala de trabalho" abre o quadro (`#/pessoas/escala`; o
+endereço antigo `#/estrutura/jornadas-trabalho` continua abrindo o quadro) e os
+Turnos são sub-página dele (`#/pessoas/escala/turnos`, botão "Turnos" e voltar).
+
+## Quadro da escala — semana e mês (25/11/2026)
+
+Primeira fatia do quadro "Escala de trabalho", só leitura.
+
+- API: `GET /v1/escala/quadro?inicio=&fim=` (até 42 dias; período invertido ou
+  maior é 422 no campo `fim`). Devolve as pessoas da empresa ativa com vínculo
+  no período (previsto, ativo ou encerrado dentro dele; sem quem está
+  desativado na empresa; readmissão vira uma linha só), com a lotação vigente,
+  o gestor direto, a escala e a jornada do contrato, e os padrões de escala que
+  tocam o período. `rh` e `dp` leem; o `master_tecnico` só com empresa ativa
+  (sem ela, 403). Leitura sem trilha, como a listagem.
+- Os dias saem dos padrões, no cliente, pela MESMA regra da aba Escala da
+  ficha (`ficha/escala/diaDaEscala.ts`): trabalho com o turno do dia (no
+  12x36 com turno da noite, mês sim, mês não), folga, DSR (a folga escolhida
+  no 6x1; o domingo nas semanas fixas e em "outra"), sem escala e fora do
+  vínculo. Dia sem edição conta como publicado, como na referência.
+- Semana: turno com cor, nome e horário; "Escalados no dia" (N de M e o total
+  de horas); horas líquidas por pessoa e por grupo ("X h na semana").
+- Mês: dias com a letra da semana, feriados nacionais de data fixa
+  destacados, sigla do turno, "D" no DSR, e "horas/meta h" com a barra e os
+  dias de trabalho. Meta = jornada por semana de cada dia (o menor entre o
+  contrato e o limite legal da data, EC 141/2026) × dias ÷ 7.
+- Busca pelo nome sem acento, ordem A–Z/Z–A, agrupar por departamento,
+  unidade, turno, gestor ou nenhum ("Não informado" por último; a unidade
+  aparece quando é a mesma no grupo), 10/50/100 pessoas por página.
+- Filtrar (gaveta "Filtros", no navegador, sobre as pessoas do período):
+  "N de M pessoas no quadro"; atalho "Sem escala" (sem padrão no período);
+  listas com contagem — Unidade, Departamento, Tipo de contrato e Turno
+  (várias opções = qualquer uma; "Não informado"/"Sem turno" é opção);
+  seletores Gestor, Cargo, Área, Centro de custo, Nível e Gênero; grupos se
+  somam; "Limpar filtros" e "Ver N pessoas". O botão mostra quantos filtros
+  estão ligados. A API passou a mandar área, centro de custo, nível e gênero
+  (quem lê o quadro lê os dados pessoais pela mesma matriz).
+- "Abrir no quadro" na ficha abre o quadro já filtrado no departamento da
+  pessoa (removível em "Limpar filtros").
+- Atalhos da referência que dependem de fases seguintes: "Com aviso da CLT"
+  (Regras e avisos), "Mudanças não publicadas" (rascunho), "De férias ou
+  afastados" (integração com férias e ausências) e "Salvar como visão".
+- Fora desta fatia (próximas, nesta ordem): menu da célula e painel do dia,
+  rascunho × publicado e Publicar, ações em massa, Regras e avisos da CLT,
+  Aplicar modelo, Exportar, integrações (férias, ausências, benefícios).
 
 ## Botões quadrados e design próprio (2026-11-25)
 

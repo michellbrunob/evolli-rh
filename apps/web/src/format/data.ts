@@ -376,3 +376,27 @@ export function diaEMesAbreviado(
     mes: MESES_ABREVIADOS[Number(valor.slice(5, 7)) - 1]!,
   };
 }
+
+const DIAS_DA_SEMANA_POR_EXTENSO = [
+  "domingo",
+  "segunda",
+  "terça",
+  "quarta",
+  "quinta",
+  "sexta",
+  "sábado",
+] as const;
+
+/**
+ * T215 — data civil → dia da semana, dia e mês (`terça 24/11`), para o quadro
+ * da escala dizer o dia de cada coluna a quem lê pela tela. Recusa devolve
+ * `AUSENTE`.
+ */
+export function diaDaSemanaEDiaMes(valor: string | null | undefined): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  const dia = Number(valor.slice(8, 10));
+  const semana = new Date(Date.UTC(Number(ano), mes - 1, dia)).getUTCDay();
+  return `${DIAS_DA_SEMANA_POR_EXTENSO[semana]} ${dia}/${mes}`;
+}

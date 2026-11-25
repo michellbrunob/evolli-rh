@@ -90,7 +90,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(rotulo).toHaveTextContent("Colaboradores");
   });
 
-  it("renderiza Escala de trabalho > Turnos dentro do <main> (T215)", () => {
+  it("renderiza Escala de trabalho (o quadro) dentro do <main>; o botão Turnos abre os turnos, com voltar (T215)", () => {
     render(<App papelDoAtor="rh" />);
     fireEvent.click(
       screen.getByRole("button", { name: /^Escala de trabalho/ }),
@@ -98,11 +98,30 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     const main = screen.getByRole("main");
     expect(main).toContainElement(
-      screen.getByRole("heading", { level: 1, name: "Turnos" }),
+      screen.getByRole("heading", { level: 1, name: "Escala de trabalho" }),
     );
     expect(
       document.getElementById(main.getAttribute("aria-labelledby")!),
-    ).toHaveTextContent("Turnos");
+    ).toHaveTextContent("Escala de trabalho");
+
+    fireEvent.click(within(main).getByRole("button", { name: "Turnos" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Turnos" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/pessoas/escala/turnos");
+    // Sub-página: a barra continua marcando "Escala de trabalho".
+    expect(
+      within(
+        screen.getByRole("navigation", { name: "Navegação do painel" }),
+      ).getByRole("button", { name: /^Escala de trabalho/ }),
+    ).toHaveAttribute("aria-current", "page");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para a escala de trabalho" }),
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Escala de trabalho" }),
+    ).toBeInTheDocument();
   });
 
   it("Estrutura não tem mais a aba Horários: ela virou Jornadas de trabalho (T182)", () => {
@@ -222,7 +241,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     for (const nome of [
       "Colaboradores Consulta, ficha e vida funcional",
-      "Escala de trabalho Turnos da empresa",
+      "Escala de trabalho Quadro da semana e do mês",
       "Organograma Unidades, cargos e centros de custo",
       "Liderança Consulta do gestor",
     ]) {
@@ -1300,7 +1319,7 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
   });
 
   it("T182/T215 — dp entra em Turnos, só para consultar", () => {
-    render(<App papelDoAtor="dp" destinoInicial="jornadas-trabalho" />);
+    render(<App papelDoAtor="dp" destinoInicial="turnos-escala" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Turnos",
     );

@@ -123,3 +123,53 @@ export function encerrarEscala(
     { vigenciaFim },
   );
 }
+
+/**
+ * T215 — o quadro "Escala de trabalho" (semana ou mês) da empresa ativa: as
+ * pessoas com vínculo no período, a lotação vigente, o gestor, a jornada do
+ * contrato e os padrões que tocam o período.
+ */
+export interface ReferenciaDoQuadroApi {
+  id: string;
+  nome: string;
+}
+
+export interface PessoaDoQuadroApi {
+  colaboradorId: string;
+  nome: string;
+  tipoVinculo: string;
+  situacao: "previsto" | "ativo" | "encerrado";
+  dataAdmissao: string;
+  /** O último dia do vínculo, ou `null`. */
+  dataDesligamento: string | null;
+  departamento: ReferenciaDoQuadroApi | null;
+  unidade: ReferenciaDoQuadroApi | null;
+  cargo: ReferenciaDoQuadroApi | null;
+  area: ReferenciaDoQuadroApi | null;
+  centroCusto: ReferenciaDoQuadroApi | null;
+  gestor: ReferenciaDoQuadroApi | null;
+  /** Nível de carreira do contrato (código), ou `null`. */
+  nivel: string | null;
+  /** Gênero do perfil pessoal (código), ou `null`. */
+  genero: string | null;
+  escalaDoCadastro: string | null;
+  jornadaSemanalHoras: number | null;
+  /** Do mais novo ao mais antigo. */
+  escalas: EscalaApi[];
+}
+
+export interface QuadroDaEscalaApi {
+  empresaId: string;
+  inicio: string;
+  fim: string;
+  pessoas: PessoaDoQuadroApi[];
+}
+
+/** `inicio` e `fim` contam; até 42 dias. */
+export function consultarQuadro(
+  inicio: string,
+  fim: string,
+): Promise<QuadroDaEscalaApi> {
+  const q = new URLSearchParams({ inicio, fim });
+  return enviar("GET", `${BASE}/escala/quadro?${q.toString()}`);
+}

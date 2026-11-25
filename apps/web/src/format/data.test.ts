@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   AUSENTE,
+  diaDaSemanaEDiaMes,
   FUSO_DE_NEGOCIO,
   formatarDiaCivil,
   formatarInstante,
@@ -647,5 +648,13 @@ describe("contrato do módulo", () => {
 
   it("T154.20 o traço é o mesmo caractere usado no produto", () => {
     expect(AUSENTE).toBe("—");
+  });
+});
+
+describe("T215 — diaDaSemanaEDiaMes", () => {
+  it("dia da semana, dia e mês sem zero à esquerda; recusa vira ausente", () => {
+    expect(diaDaSemanaEDiaMes("2026-11-24")).toBe("terça 24/11");
+    expect(diaDaSemanaEDiaMes("2026-03-01")).toBe("domingo 1/3");
+    expect(diaDaSemanaEDiaMes("2026-02-30")).toBe(diaDaSemanaEDiaMes(null));
   });
 });

@@ -1,0 +1,751 @@
+/*
+ * T215 — quadro "Escala de trabalho" (semana e mês). Só tokens; a tabela rola
+ * para os lados com a coluna da pessoa fixa (375 px incluso).
+ */
+
+.quadro {
+  display: grid;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.quadro__cabeca {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.quadro__cabeca-textos {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.quadro__titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+}
+
+.quadro__titulo:focus {
+  outline: none;
+}
+
+.quadro__subtitulo {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+.quadro__icone-botao {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.quadro__icone-botao:disabled {
+  color: var(--color-ink-subtle);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.quadro__icone-botao:focus-visible,
+.quadro__visao-botao:focus-visible,
+.quadro__grupo-botao:focus-visible,
+.quadro__ordenar:focus-visible,
+.quadro__rolagem:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+/* Barra: visão, período, Hoje, Turnos. */
+.quadro__barra,
+.quadro__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.quadro__visao {
+  display: inline-flex;
+  padding: 3px;
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-neutral);
+}
+
+.quadro__visao-botao {
+  min-height: calc(var(--touch-target) - 8px);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.quadro__visao-botao[aria-pressed="true"] {
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--divisor-cor);
+}
+
+.quadro__periodo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.quadro__periodo-texto {
+  min-width: 12rem;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Busca, agrupar, filtro e contagem. */
+.quadro__busca {
+  display: inline-flex;
+  flex: 1 1 14rem;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 22rem;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink-subtle);
+}
+
+.quadro__busca:focus-within {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.quadro__busca input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  outline: none;
+}
+
+.quadro__agrupar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-ui);
+}
+
+.quadro__agrupar select,
+.quadro__por-pagina select {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+}
+
+.quadro__contagem {
+  margin: 0 0 0 auto;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.quadro__aviso {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+}
+
+.quadro__aviso p {
+  margin: 0;
+}
+
+/* Tabela. */
+.quadro__rolagem {
+  overflow-x: auto;
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.quadro__tabela {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--text-ui);
+}
+
+.quadro__tabela--semana {
+  min-width: 62rem;
+}
+
+.quadro__tabela--mes {
+  min-width: 78rem;
+}
+
+.quadro__col-pessoa {
+  width: 15rem;
+}
+
+.quadro__tabela--mes .quadro__col-pessoa {
+  width: 13rem;
+}
+
+.quadro__col-horas {
+  width: 5.5rem;
+}
+
+.quadro__tabela--mes .quadro__col-horas {
+  width: 7.5rem;
+}
+
+.quadro__tabela th,
+.quadro__tabela td {
+  border-bottom: var(--divisor);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.quadro__tabela thead th {
+  padding: var(--space-xs);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+/* A coluna da pessoa fica parada quando a tabela rola. */
+.quadro__tabela tr > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-canvas);
+  border-right: var(--divisor);
+}
+
+.quadro__tabela thead tr > :first-child {
+  background: var(--surface-neutral);
+}
+
+.quadro__ordenar {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quadro__dia {
+  text-align: center !important;
+}
+
+.quadro__dia-nome,
+.quadro__dia-numero {
+  display: block;
+}
+
+.quadro__dia-numero {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.quadro__dia--hoje .quadro__dia-numero {
+  color: var(--color-action);
+}
+
+.quadro__hoje {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0 var(--space-xxs);
+  border-radius: var(--radius-sm);
+  background: var(--color-action);
+  color: var(--surface-canvas);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.quadro__dia--feriado {
+  background: var(--status-warning-surface) !important;
+}
+
+.quadro__dia--feriado .quadro__dia-numero {
+  color: var(--status-warning-ink);
+}
+
+.quadro__escalados th,
+.quadro__escalados td {
+  background: var(--surface-canvas) !important;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-align: center;
+}
+
+.quadro__escalados th {
+  text-align: left;
+}
+
+.quadro__escalados strong {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+/* Grupo. */
+.quadro__grupo th {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-neutral) !important;
+  font-weight: 400;
+}
+
+.quadro__grupo-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  position: sticky;
+  left: var(--space-sm);
+  width: max-content;
+  max-width: calc(100vw - 6rem);
+}
+
+.quadro__grupo-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 2rem;
+  padding: 0 var(--space-xxs);
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quadro__seta {
+  transition: transform var(--duracao-curta, 150ms) ease;
+}
+
+.quadro__seta--fechada {
+  transform: rotate(-90deg);
+}
+
+.quadro__grupo-info,
+.quadro__grupo-horas {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.quadro__grupo-horas::before {
+  content: "·";
+  margin-right: var(--space-sm);
+}
+
+/* Pessoa. */
+.quadro__pessoa {
+  padding: var(--space-xs) var(--space-sm);
+  font-weight: 400;
+}
+
+.quadro__pessoa-linha,
+.quadro__pessoa-textos {
+  display: flex;
+  min-width: 0;
+}
+
+.quadro__pessoa-linha {
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.quadro__pessoa-textos {
+  flex-direction: column;
+}
+
+.quadro__avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-action) 12%, transparent);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.quadro__pessoa-nome {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quadro__pessoa-escala {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  overflow: hidden;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.quadro__tag {
+  padding: 0 var(--space-xxs);
+  border: var(--divisor);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+/* Células. */
+.quadro__celula {
+  height: 3.75rem;
+  padding: var(--space-xxs) var(--space-xs);
+  border-left: var(--divisor);
+}
+
+.quadro__tabela--mes .quadro__celula {
+  height: 3rem;
+  padding: 0;
+  text-align: center !important;
+}
+
+.quadro__celula--hoje {
+  background: color-mix(in srgb, var(--color-action) 5%, transparent);
+}
+
+.quadro__celula--fora {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-neutral),
+    var(--surface-neutral) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.quadro__turno,
+.quadro__descanso {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quadro__turno-nome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quadro__turno-horario {
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.quadro__descanso-nome {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.quadro__ponto {
+  display: inline-block;
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.quadro__sigla {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.25rem;
+  border: var(--divisor);
+  border-radius: 0.3125rem;
+  background: var(--surface-canvas);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.quadro__sigla--dsr {
+  color: var(--color-ink-muted);
+  background: var(--surface-neutral);
+}
+
+.quadro__horas {
+  padding: var(--space-xs);
+  border-left: var(--divisor);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.quadro__mes-horas {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-caption);
+}
+
+.quadro__barra-horas {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-neutral);
+}
+
+.quadro__barra-horas > span {
+  display: block;
+  height: 100%;
+  background: var(--color-action);
+}
+
+.quadro__mes-dias {
+  color: var(--color-ink-subtle);
+  font-weight: 400;
+}
+
+.quadro__vazio {
+  padding: var(--space-xl) var(--space-md);
+  color: var(--color-ink-subtle);
+  text-align: center !important;
+}
+
+/* Rodapé: paginação e legenda. */
+.quadro__rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-lg);
+}
+
+.quadro__paginacao {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.quadro__paginacao p {
+  margin: 0 var(--space-xs) 0 0;
+}
+
+.quadro__legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  list-style: none;
+}
+
+.quadro__legenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quadro__dica {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quadro__seta {
+    transition: none;
+  }
+}
+
+/* Filtrar: botão e gaveta "Filtros". */
+.quadro__filtrar-numero {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-action);
+  color: var(--surface-canvas);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.gaveta-quadro__corpo {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.gaveta-quadro__contagem {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.gaveta-quadro__contagem strong {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+}
+
+.gaveta-quadro__grupo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.gaveta-quadro__legenda {
+  margin-bottom: var(--space-xs);
+  padding: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gaveta-quadro__atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.gaveta-quadro__atalho {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.gaveta-quadro__atalho[aria-pressed="true"] {
+  border-color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 8%, transparent);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.gaveta-quadro__atalho:focus-visible,
+.gaveta-quadro__opcoes input:focus-visible,
+.gaveta-quadro__seletor select:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.gaveta-quadro__opcoes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gaveta-quadro__opcoes li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 2.25rem;
+}
+
+.gaveta-quadro__opcoes input {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--color-action);
+}
+
+.gaveta-quadro__opcoes label {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.gaveta-quadro__numero {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.gaveta-quadro__seletores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-sm);
+}
+
+.gaveta-quadro__seletor {
+  display: grid;
+  gap: var(--space-xxs);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.gaveta-quadro__seletor select {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: 400;
+}

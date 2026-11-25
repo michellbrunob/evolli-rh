@@ -73,7 +73,7 @@ const TURNO = {
   },
 } as const satisfies Prisma.TabelaHorarioDefaultArgs;
 
-const PROJECAO = {
+export const PROJECAO = {
   id: true,
   modelo: true,
   folgaSemanal: true,
@@ -122,7 +122,7 @@ function projetarTurno(t: LinhaDeTurno | null): TurnoDaEscala | null {
   };
 }
 
-function projetar(l: LinhaDeEscala): EscalaProjetada {
+export function projetar(l: LinhaDeEscala): EscalaProjetada {
   return {
     id: l.id,
     modelo: l.modelo,

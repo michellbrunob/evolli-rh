@@ -123,6 +123,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Colaboradores",
         // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
         "Escala de trabalho",
+        // T215 — os turnos, sub-página do quadro.
+        "Turnos",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -149,6 +151,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Colaboradores",
         // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
         "Escala de trabalho",
+        // T215 — os turnos, sub-página do quadro.
+        "Turnos",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -168,6 +172,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Colaboradores",
         // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
         "Escala de trabalho",
+        // T215 — os turnos, sub-página do quadro.
+        "Turnos",
         "Organograma",
         "Jornada",
         "Segurança",
@@ -539,8 +545,9 @@ describe("T162 — acessibilidade e estrutura", () => {
 
   it("cada cartão tem nome acessível com o rótulo do produto", async () => {
     montar({ papel: "rh" });
-    // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança.
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(14));
+    // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança e 15
+    // com Turnos (sub-página do quadro da escala).
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(15));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",

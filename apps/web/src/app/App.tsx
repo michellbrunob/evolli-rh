@@ -95,6 +95,8 @@ import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import {
   CadastrosScreen,
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  QUADRO_ESCALA_TITULO_ID,
+  QuadroDaEscalaScreen,
   TURNOS_TITULO_ID,
   TurnosScreen,
 } from "../screens/horarios";
@@ -303,7 +305,9 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
-  "jornadas-trabalho": TURNOS_TITULO_ID,
+  // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
+  "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
+  "turnos-escala": TURNOS_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
   "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
@@ -525,6 +529,12 @@ function conteudoDoDestino(
       destino: DestinoDepoisDaEmpresa,
     ) => void;
   },
+  // T215 — o quadro da escala: a pessoa da ficha que pediu "Abrir no
+  // quadro" (uma vez) e como abri-lo a partir da ficha.
+  escala: {
+    readonly colaboradorEmFoco: string | null;
+    readonly onAbrirQuadro: () => void;
+  },
 ) {
   if (destinoId === "configuracoes") {
     return (
@@ -590,9 +600,22 @@ function conteudoDoDestino(
     );
   }
   if (destinoId === "jornadas-trabalho") {
+    // T215 — o quadro da escala (semana e mês).
+    return (
+      <QuadroDaEscalaScreen
+        onVoltar={() => onNavegar("pessoas")}
+        onAbrirTurnos={() => onNavegar("turnos-escala")}
+        colaboradorEmFoco={escala.colaboradorEmFoco}
+      />
+    );
+  }
+  if (destinoId === "turnos-escala") {
     // T182 — só o RH opera; DP e `master_tecnico` consultam.
     return (
-      <TurnosScreen podeOperar={podeOperarJornadas(admissao.papelDoAtor)} />
+      <TurnosScreen
+        podeOperar={podeOperarJornadas(admissao.papelDoAtor)}
+        onVoltar={() => onNavegar("jornadas-trabalho")}
+      />
     );
   }
   if (destinoId === "cadastros-demonstracao") {
@@ -632,7 +655,7 @@ function conteudoDoDestino(
         podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
         // T215 — a escala (aba da ficha) é de RH e DP.
         podeOperarEscala={podeOperarEscala(admissao.papelDoAtor)}
-        onAbrirJornadas={() => onNavegar("jornadas-trabalho")}
+        onAbrirJornadas={escala.onAbrirQuadro}
         // T203 — a aba Solicitações só existe para quem a lê (não o DP).
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
         // T215 — a aba Organograma da listagem abre a estrutura.
@@ -986,6 +1009,9 @@ export function App({
    */
   const [ficha, setFicha] = useState<RotaDaFicha | null>(entradaDaUrl.ficha);
   // T212 — o arquivo escolhido no painel, até a página de importação o ler.
+  // T215 — quem pediu "Abrir no quadro" na ficha (o quadro mostra o
+  // departamento dessa pessoa); some ao abrir o quadro por outro caminho.
+  const [quadroEmFoco, setQuadroEmFoco] = useState<string | null>(null);
   const [arquivoParaImportar, setArquivoParaImportar] = useState<File | null>(
     null,
   );
@@ -1361,6 +1387,8 @@ export function App({
     if (destinoAtivoId !== "configuracoes-empresas") {
       setAvisoDeEmpresas(undefined);
     }
+    // T215 — fora do quadro, o pedido da ficha não vale mais.
+    if (destinoAtivoId !== "jornadas-trabalho") setQuadroEmFoco(null);
   }, [destinoAtivoId]);
 
   /** O destino exibido agora — lido pelo manipulador de URL, fora do React. */
@@ -2065,6 +2093,13 @@ export function App({
                   },
                   onEmpresaAberta: (empresa, destino) =>
                     onEmpresaTrocada?.(empresa, destino),
+                },
+                {
+                  colaboradorEmFoco: quadroEmFoco,
+                  onAbrirQuadro: () => {
+                    setQuadroEmFoco(ficha?.colaboradorId ?? null);
+                    irPara("jornadas-trabalho");
+                  },
                 },
               )}
             </main>

@@ -50,7 +50,7 @@ import {
 import { listarAlocacoesVinculo } from "../api/vinculoContratualClient";
 import { listarVinculosHorario } from "../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../api/horariosClient";
-import { consultarEscalas } from "../api/escalaClient";
+import { consultarEscalas, consultarQuadro } from "../api/escalaClient";
 import { consultarContatosDoColaborador } from "../api/contatosColaboradorClient";
 import { consultarDadosPessoaisDoColaborador } from "../api/dadosPessoaisClient";
 import {
@@ -239,6 +239,12 @@ beforeEach(() => {
   vi.mocked(buscarDepartamento).mockRejectedValue(new Error("não usado"));
   vi.mocked(listarVinculosHorario).mockResolvedValue(paginado([]));
   vi.mocked(listarTabelasHorario).mockResolvedValue(paginado([]));
+  vi.mocked(consultarQuadro).mockResolvedValue({
+    empresaId: EMPRESA,
+    inicio: "2026-11-23",
+    fim: "2026-11-29",
+    pessoas: [],
+  });
   vi.mocked(consultarEscalas).mockImplementation(async (colaboradorId) => ({
     colaboradorId,
     empresaId: EMPRESA,
@@ -1642,10 +1648,12 @@ describe("T200 — guarda de saída no App", () => {
       montarComGuarda();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
 
-      // Jornadas de trabalho com o formulário aberto.
-      const jornadas = () =>
+      // T215 — Escala de trabalho abre o quadro; Turnos (sub-página) com o
+      // formulário aberto.
+      const escala = () =>
         within(barra()).getByRole("button", { name: /^Escala de trabalho/ });
-      fireEvent.click(jornadas());
+      fireEvent.click(escala());
+      fireEvent.click(await screen.findByRole("button", { name: "Turnos" }));
       fireEvent.click(
         await screen.findByRole("button", { name: "Novo turno" }),
       );
@@ -1653,16 +1661,21 @@ describe("T200 — guarda de saída no App", () => {
         await screen.findByRole("textbox", { name: /^Nome do turno/ }),
         { target: { value: "Turno sintético" } },
       );
-      fireEvent.click(jornadas());
-      expect(screen.queryByRole("alertdialog")).toBeNull();
-      // Outro destino desmonta: pergunta.
+      // O item da barra leva ao quadro, outro destino: desmonta e pergunta.
+      fireEvent.click(escala());
+      expect(telasDaPergunta()).toEqual(["Turnos"]);
+      sairSemSalvar();
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Escala de trabalho",
+      });
+      // No quadro (sem edição), outro destino não pergunta.
       fireEvent.click(
         within(barra()).getByRole("button", {
           name: /^Colaboradores Consulta/,
         }),
       );
-      expect(telasDaPergunta()).toEqual(["Turnos"]);
-      sairSemSalvar();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
     });
 

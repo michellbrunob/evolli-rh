@@ -1,5 +1,9 @@
 export { TURNOS_TITULO_ID, TurnosScreen } from "./turnos/TurnosScreen";
 export {
+  QUADRO_ESCALA_TITULO_ID,
+  QuadroDaEscalaScreen,
+} from "./quadro/QuadroDaEscalaScreen";
+export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
 } from "./CalendarioFeriadosScreen";

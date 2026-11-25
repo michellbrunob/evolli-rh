@@ -292,13 +292,23 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
       {
         // T182 — tela própria do catálogo de jornadas (antes a aba Horários
         // de Cadastros), sobre o mesmo contrato de `/v1/horarios`.
-        // T211 — no submenu de Colaboradores, como "Escala de trabalho"
-        // (rótulo de navegação; a tela mantém o título dela).
+        // T211 — no submenu de Colaboradores, como "Escala de trabalho".
+        // T215 — abre o quadro da escala (semana e mês); o id fica, para os
+        // endereços salvos. Os turnos viram sub-página dele.
         id: "jornadas-trabalho",
         label: "Escala de trabalho",
-        subRotulo: "Turnos da empresa",
+        subRotulo: "Quadro da semana e do mês",
         estado: "funcional",
         papeis: PAPEIS_CONSULTA_JORNADAS,
+      },
+      {
+        // T215 — Turnos: sub-página do quadro (botão "Turnos"), com voltar.
+        id: "turnos-escala",
+        label: "Turnos",
+        subRotulo: "Horários do quadro",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
+        agrupadoEm: "jornadas-trabalho",
       },
       {
         // T182 — sem a aba Horários, o contêiner abre na Estrutura
@@ -632,7 +642,8 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
  * | `nova-admissao`           | `colaborador` create    | `rh`, `dp`                       |
  * | `cadastros`               | `unidade_organizacional`| `rh`, `dp`, `master_tecnico`     |
- * | `jornadas-trabalho`       | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
+ * | `jornadas-trabalho` (T215)| `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
+ * | `turnos-escala` (T215)    | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
@@ -680,6 +691,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "importar-colaboradores",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
     "ponto",
     "equipe",
     "administracao-lideranca",
@@ -697,6 +709,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "importar-colaboradores",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",
@@ -709,6 +722,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",

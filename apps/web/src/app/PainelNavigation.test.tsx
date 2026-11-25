@@ -169,7 +169,9 @@ describe("o estado declarado bate com o código", () => {
     "importar-colaboradores":
       "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
-    "jornadas-trabalho": "src/screens/horarios/turnos/TurnosScreen.tsx",
+    // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
+    "jornadas-trabalho": "src/screens/horarios/quadro/QuadroDaEscalaScreen.tsx",
+    "turnos-escala": "src/screens/horarios/turnos/TurnosScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":
@@ -527,7 +529,7 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
           .map((b) => b.textContent),
       ).toEqual([
         "Colaboradores Consulta, ficha e vida funcional",
-        "Escala de trabalho Turnos da empresa",
+        "Escala de trabalho Quadro da semana e do mês",
         "Organograma Unidades, cargos e centros de custo",
         // T209 — subitem em desenvolvimento, ao lado dos funcionais.
         "Desenvolvimento Em desenvolvimento",

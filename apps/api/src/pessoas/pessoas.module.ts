@@ -18,6 +18,8 @@ import { AnexoAusenciaService } from "./ausencias/anexo-ausencia.service";
 import { HistoricoSalarialController } from "./salarios/historico-salarial.controller";
 import { EscalaColaboradorController } from "./escala/escala-colaborador.controller";
 import { EscalaColaboradorService } from "./escala/escala-colaborador.service";
+import { QuadroEscalaController } from "./escala/quadro-escala.controller";
+import { QuadroEscalaService } from "./escala/quadro-escala.service";
 import { HistoricoSalarialService } from "./salarios/historico-salarial.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
 import { VinculoService } from "./vinculo/vinculo.service";
@@ -81,6 +83,7 @@ import {
     AnexoAusenciaController,
     HistoricoSalarialController,
     EscalaColaboradorController,
+    QuadroEscalaController,
     FeriasDoColaboradorController,
   ],
   providers: [
@@ -99,6 +102,7 @@ import {
     AnexoAusenciaService,
     HistoricoSalarialService,
     EscalaColaboradorService,
+    QuadroEscalaService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,
