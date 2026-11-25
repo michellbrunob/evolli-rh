@@ -344,6 +344,29 @@
   color: var(--status-warning-ink);
 }
 
+/* O nome do feriado sob o dia (semana), cortado com reticências. */
+.quadro__feriado {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 var(--space-xxs);
+  color: var(--status-warning-ink);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A coluna do feriado, só para quem o feriado vale (unidade); vale mais que
+   o tom de hoje. */
+.quadro__celula.quadro__celula--feriado {
+  background: color-mix(
+    in srgb,
+    var(--status-warning-surface) 60%,
+    transparent
+  );
+}
+
 .quadro__escalados th,
 .quadro__escalados td {
   background: var(--surface-canvas) !important;

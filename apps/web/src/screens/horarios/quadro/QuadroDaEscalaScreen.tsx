@@ -93,6 +93,7 @@ import {
   type AvisoDaEscala,
   avisosPorCelula,
   calcularAvisos,
+  feriadoDaPessoa,
   pessoasEm6x1NaTransicao,
 } from "./avisosDaEscala";
 import {
@@ -1315,6 +1316,10 @@ export function QuadroDaEscalaScreen({
                         key={c.dia}
                         className={`quadro__celula quadro__celula--${c.tipo}${
                           c.dia === hoje ? " quadro__celula--hoje" : ""
+                        }${
+                          feriadoDaPessoa(p, c.dia, regras)
+                            ? " quadro__celula--feriado"
+                            : ""
                         }${c.origem === "rascunho" ? " quadro__celula--rascunho" : ""}`}
                       >
                         {podeOperar && c.tipo !== "fora" ? (
@@ -1794,8 +1799,14 @@ export function QuadroDaEscalaScreen({
                     {dias.map((d) => {
                       const feriado =
                         feriadoDe(d) ??
-                        regras?.feriados.find((x) => x.data === d)?.nome ??
-                        null;
+                        ([
+                          ...new Set(
+                            (regras?.feriados ?? [])
+                              .filter((x) => x.data === d)
+                              .map((x) => x.nome),
+                          ),
+                        ].join(" · ") ||
+                          null);
                       const semana = diaDaSemana(d) - 1;
                       return (
                         <th
@@ -1830,6 +1841,15 @@ export function QuadroDaEscalaScreen({
                           </span>
                           {d === hoje && visao === "semana" ? (
                             <span className="quadro__hoje">Hoje</span>
+                          ) : null}
+                          {feriado && visao === "semana" ? (
+                            <span
+                              className="quadro__feriado"
+                              title={feriado}
+                              aria-hidden="true"
+                            >
+                              {feriado}
+                            </span>
                           ) : null}
                           {feriado ? (
                             <span className="sr-only">{`, feriado: ${feriado}`}</span>

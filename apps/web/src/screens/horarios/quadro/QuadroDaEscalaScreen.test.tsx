@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../api/colaboradoresClient";
-import { consultarQuadro } from "../../../api/escalaClient";
+import {
+  CHAVES_DOS_AVISOS,
+  type RegrasDaEscalaApi,
+  consultarQuadro,
+} from "../../../api/escalaClient";
 import { QuadroDaEscalaScreen } from "./QuadroDaEscalaScreen";
 import { escala, pessoa, turno } from "./fixturasDoQuadro";
 
@@ -38,13 +42,41 @@ const teste = pessoa("teste", {
   ],
 });
 
-function quadroCom(pessoas = [michell, julia, teste]) {
+function quadroCom(
+  pessoas = [michell, julia, teste],
+  regras?: RegrasDaEscalaApi,
+) {
   vi.mocked(consultarQuadro).mockImplementation(async (inicio, fim) => ({
     empresaId: "emp",
     inicio,
     fim,
     pessoas,
+    ...(regras ? { regras } : {}),
   }));
+}
+
+function regrasCom(feriados: RegrasDaEscalaApi["feriados"]): RegrasDaEscalaApi {
+  return {
+    personalizadas: true,
+    inicioTransicao: "2026-12-16",
+    semanaComeca: 1,
+    convencao: {
+      "6x1_autorizada": false,
+      jornada_ampliada: false,
+      "12x36_acordo": true,
+      revezamento_8h: false,
+      intervalo_30min: false,
+      comercio: false,
+      feriado_convencao: false,
+      portaria_1316: false,
+    },
+    avisos: Object.fromEntries(
+      CHAVES_DOS_AVISOS.map((k) => [k, k !== "noturno"]),
+    ) as RegrasDaEscalaApi["avisos"],
+    antecedenciaDias: 7,
+    avisarPadrao: true,
+    feriados,
+  };
 }
 
 function montar(
@@ -108,6 +140,69 @@ describe("T215 — quadro da escala: semana", () => {
       name: /quarta 25\/11/,
     });
     expect(hoje).toHaveTextContent("Hoje");
+  });
+
+  it("feriado local: nome sob o dia no cabeçalho e a coluna em âmbar só para quem é da unidade; escalado continua escalado", async () => {
+    quadroCom(
+      [michell, julia, teste],
+      regrasCom([
+        {
+          id: "f1",
+          data: "2026-11-26",
+          nome: "Aniversário da cidade",
+          tipo: "municipal",
+          unidadeIds: [MATRIZ.id],
+        },
+        {
+          id: "f2",
+          data: "2026-11-26",
+          nome: "Ponto da prefeitura",
+          tipo: "ponto_facultativo",
+          unidadeIds: [MATRIZ.id],
+        },
+        {
+          id: "f3",
+          data: "2026-11-25",
+          nome: "Feriado de hoje",
+          tipo: "municipal",
+          unidadeIds: [],
+        },
+      ]),
+    );
+    montar();
+    await screen.findByRole("table");
+    const cab = within(tabela()).getByRole("columnheader", {
+      name: /quinta 26\/11/,
+    });
+    expect(cab.className).toContain("quadro__dia--feriado");
+    const nome = cab.querySelector(".quadro__feriado")!;
+    // Dois no mesmo dia: os dois nomes.
+    const nomes = "Aniversário da cidade · Ponto da prefeitura";
+    expect(nome).toHaveTextContent(nomes);
+    expect(nome).toHaveAttribute("title", nomes);
+    expect(cab).toHaveTextContent(`, feriado: ${nomes}`);
+    // Hoje e feriado: os dois; a coluna fica em âmbar (todas as unidades).
+    const quarta = within(tabela()).getByRole("columnheader", {
+      name: /quarta 25\/11/,
+    });
+    expect(quarta).toHaveTextContent("Hoje");
+    expect(quarta.querySelector(".quadro__feriado")).toHaveTextContent(
+      "Feriado de hoje",
+    );
+    const terca = within(tabela()).getByRole("columnheader", {
+      name: /terça 24\/11/,
+    });
+    expect(terca.querySelector(".quadro__feriado")).toBeNull();
+    // Michell (Matriz): a quinta em âmbar e continua escalado.
+    const cm = within(linhaDe("Michell Bruno")).getAllByRole("cell");
+    expect(cm[3]!.className).toContain("quadro__celula--feriado");
+    expect(cm[3]).toHaveTextContent("Comercial09:00–18:00");
+    expect(cm[1]!.className).not.toContain("quadro__celula--feriado");
+    expect(cm[2]!.className).toContain("quadro__celula--feriado");
+    // teste (sem unidade): o feriado não é dela.
+    const ct = within(linhaDe("teste")).getAllByRole("cell");
+    expect(ct[3]!.className).not.toContain("quadro__celula--feriado");
+    expect(ct[2]!.className).toContain("quadro__celula--feriado");
   });
 
   it("'Escalados no dia' conta quem trabalha em cada dia, com o total de horas", async () => {
