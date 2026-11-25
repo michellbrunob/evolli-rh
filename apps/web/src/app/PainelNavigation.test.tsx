@@ -172,6 +172,9 @@ describe("o estado declarado bate com o código", () => {
     // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
     "jornadas-trabalho": "src/screens/horarios/quadro/QuadroDaEscalaScreen.tsx",
     "turnos-escala": "src/screens/horarios/turnos/TurnosScreen.tsx",
+    "regras-escala": "src/screens/horarios/quadro/RegrasDaEscalaScreen.tsx",
+    "transicao-escala":
+      "src/screens/horarios/quadro/PlanejarTransicaoScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":

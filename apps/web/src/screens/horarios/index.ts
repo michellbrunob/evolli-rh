@@ -4,6 +4,14 @@ export {
   QuadroDaEscalaScreen,
 } from "./quadro/QuadroDaEscalaScreen";
 export {
+  REGRAS_ESCALA_TITULO_ID,
+  RegrasDaEscalaScreen,
+} from "./quadro/RegrasDaEscalaScreen";
+export {
+  TRANSICAO_TITULO_ID,
+  PlanejarTransicaoScreen,
+} from "./quadro/PlanejarTransicaoScreen";
+export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,
 } from "./CalendarioFeriadosScreen";

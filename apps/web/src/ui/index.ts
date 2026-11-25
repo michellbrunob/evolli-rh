@@ -18,6 +18,7 @@ export {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./DropdownMenu";
 export { Dialog, Sheet, usePedirFechamentoJanela } from "./Dialog";

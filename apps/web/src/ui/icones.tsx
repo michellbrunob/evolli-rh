@@ -21,6 +21,8 @@ import {
   Building,
   Calendar,
   Clock,
+  Copy,
+  Danger,
   ColorSwatch,
   Cup,
   DocumentDownload,
@@ -141,6 +143,10 @@ export const IconeEmail = decorativo(Sms, "Bulk");
 export const IconeFormacao = decorativo(Teacher, "Bulk");
 export const IconeTempo = decorativo(Timer1, "Bulk");
 export const IconeRelogio = decorativo(Clock, "Bulk");
+/** T215 — copiar (ex.: "Copiar semana anterior"). */
+export const IconeCopiar = decorativo(Copy, "Bulk");
+/** T215 — aviso de atenção (avisos da escala). */
+export const IconeAviso = decorativo(Danger, "Bulk");
 export const IconePresente = decorativo(Gift, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");

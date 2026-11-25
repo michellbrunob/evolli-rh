@@ -80,6 +80,23 @@ fora do arquivo de tokens não entra.
 - Sem gradientes decorativos; sombra só em camadas flutuantes
   (`--sombra-flutuante`).
 
+## Controles padrão
+
+Valem para o sistema inteiro; a tela não redesenha estes controles.
+
+- **Botão** — sempre pelo componente (`components/Button` ou `ui/Button`):
+  altura mínima de 44 px (alvo de toque), respiro lateral de 16 px
+  (`--space-md`), ícone de 16 px à esquerda com 8 px de distância
+  (`--space-xs`), cantos `--radius-botao`. Primário preenchido na cor de ação;
+  secundário com contorno.
+- **Caixa de seleção** — toda `<input type="checkbox">` usa o padrão de
+  `tokens.css`: quadrado de 18 px com cantos `--radius-caixa`; marcada na cor
+  de ação do tema, visto branco e halo suave; parcial (`indeterminate`) com
+  traço; desabilitada a 50%. A tela só ajusta tamanho e margem — nunca
+  `accent-color`, borda ou fundo próprios.
+- **Interruptor** (liga/desliga) — botão com `role="switch"` e
+  `aria-checked`, não caixa de seleção.
+
 ## Temas de Aparência
 
 Quatro temas, escolhidos em Configurações › Aparência. Todos redefinem os

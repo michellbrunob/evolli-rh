@@ -97,7 +97,10 @@ export type CampoPublico =
   | "periodos"
   | "sobreaviso"
   | "intervaloMinutos"
-  | "observacao";
+  | "observacao"
+  // T215 — Regras da escala.
+  | "convencao"
+  | "avisos";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

@@ -91,21 +91,37 @@ export function segundaDaSemana(dia: string): string {
   return somarDias(dia, 1 - diaDaSemana(dia));
 }
 
+/**
+ * O primeiro dia da semana do dia. T215 — a semana começa no dia das Regras
+ * (1 = segunda … 7 = domingo).
+ */
+export function inicioDaSemana(dia: string, semanaComeca = 1): string {
+  return somarDias(dia, -((diaDaSemana(dia) - semanaComeca + 7) % 7));
+}
+
 /** Primeiro e último dia mostrados (os dois contam). */
 export function periodoDa(
   visao: Visao,
   ancora: string,
+  semanaComeca = 1,
 ): { inicio: string; fim: string } {
   if (visao === "semana") {
-    const inicio = segundaDaSemana(ancora);
+    const inicio = inicioDaSemana(ancora, semanaComeca);
     return { inicio, fim: somarDias(inicio, 6) };
   }
   return { inicio: `${ancora.slice(0, 7)}-01`, fim: ultimoDiaDoMes(ancora) };
 }
 
 /** A âncora do período seguinte (`+1`) ou anterior (`-1`). */
-export function deslocar(visao: Visao, ancora: string, passo: 1 | -1): string {
-  if (visao === "semana") return somarDias(segundaDaSemana(ancora), 7 * passo);
+export function deslocar(
+  visao: Visao,
+  ancora: string,
+  passo: 1 | -1,
+  semanaComeca = 1,
+): string {
+  if (visao === "semana") {
+    return somarDias(inicioDaSemana(ancora, semanaComeca), 7 * passo);
+  }
   const ano = Number(ancora.slice(0, 4));
   const mes = Number(ancora.slice(5, 7)) - 1 + passo;
   const d = new Date(Date.UTC(ano, mes, 1));
@@ -359,9 +375,12 @@ export function turnoDaPessoa(
 export function metaDoPeriodo(
   p: PessoaDoQuadroApi,
   dias: readonly string[],
+  inicioTransicao?: string,
 ): number {
   let total = 0;
-  for (const dia of dias) total += jornadaPorSemana(p.jornadaSemanalHoras, dia);
+  for (const dia of dias) {
+    total += jornadaPorSemana(p.jornadaSemanalHoras, dia, inicioTransicao);
+  }
   return Math.round(total / 7);
 }
 

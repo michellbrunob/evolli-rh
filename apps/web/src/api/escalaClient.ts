@@ -72,7 +72,7 @@ const rota = (colaboradorId: string) =>
   `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/escalas`;
 
 async function enviar<T>(
-  metodo: "GET" | "POST" | "PUT",
+  metodo: "GET" | "POST" | "PUT" | "DELETE",
   url: string,
   corpo?: unknown,
 ): Promise<T> {
@@ -154,6 +154,8 @@ export interface PessoaDoQuadroApi {
   genero: string | null;
   escalaDoCadastro: string | null;
   jornadaSemanalHoras: number | null;
+  /** Para o aviso de menor de 18 anos em turno noturno. */
+  dataNascimento?: string | null;
   /** Do mais novo ao mais antigo. */
   escalas: EscalaApi[];
   /** Os dias gravados no período (rascunho e publicado). */
@@ -284,6 +286,8 @@ export interface QuadroDaEscalaApi {
   fim: string;
   /** A publicação mais recente que toca o período, ou `null`. */
   publicacao?: PublicacaoDaEscalaApi | null;
+  /** As Regras da escala (avisos, convenção, transição, feriados locais). */
+  regras?: RegrasDaEscalaApi;
   pessoas: PessoaDoQuadroApi[];
 }
 
@@ -294,4 +298,92 @@ export function consultarQuadro(
 ): Promise<QuadroDaEscalaApi> {
   const q = new URLSearchParams({ inicio, fim });
   return enviar("GET", `${BASE}/escala/quadro?${q.toString()}`);
+}
+
+/** T215 — o que a convenção ou o acordo coletivo permite. */
+export const CHAVES_DA_CONVENCAO = [
+  "6x1_autorizada",
+  "jornada_ampliada",
+  "12x36_acordo",
+  "revezamento_8h",
+  "intervalo_30min",
+  "comercio",
+  "feriado_convencao",
+  "portaria_1316",
+] as const;
+export type ChaveDaConvencao = (typeof CHAVES_DA_CONVENCAO)[number];
+
+/** T215 — os avisos da CLT que as Regras ligam ou desligam. */
+export const CHAVES_DOS_AVISOS = [
+  "interjornada",
+  "dois_descansos",
+  "seis_dias",
+  "dez_horas",
+  "jornada_semanal",
+  "revezamento",
+  "intervalo",
+  "sobrepostos",
+  "plantao_descanso",
+  "ausencia",
+  "domingo",
+  "feriado_comercio",
+  "feriado",
+  "6x1_transicao",
+  "aprendiz_estagio",
+  "menor_noturno",
+  "tempo_parcial",
+  "intermitente",
+  "noturno",
+  "sobreaviso",
+  "12x36_2027",
+] as const;
+export type ChaveDoAviso = (typeof CHAVES_DOS_AVISOS)[number];
+
+export interface FeriadoLocalApi {
+  id: string;
+  data: string;
+  nome: string;
+  tipo: "municipal" | "ponto_facultativo";
+  /** Vazio = todas as unidades. */
+  unidadeIds: string[];
+}
+
+export interface RegrasDaEscalaApi {
+  personalizadas: boolean;
+  inicioTransicao: string;
+  semanaComeca: number;
+  convencao: Record<ChaveDaConvencao, boolean>;
+  avisos: Record<ChaveDoAviso, boolean>;
+  antecedenciaDias: number;
+  avisarPadrao: boolean;
+  feriados: FeriadoLocalApi[];
+}
+
+export type SalvarRegrasDto = Omit<
+  RegrasDaEscalaApi,
+  "personalizadas" | "feriados" | "inicioTransicao"
+> & { inicioTransicao: string | null };
+
+const ROTA_DAS_REGRAS = `${BASE}/escala/regras`;
+const ROTA_DOS_FERIADOS = `${BASE}/escala/feriados`;
+
+export function consultarRegras(): Promise<RegrasDaEscalaApi> {
+  return enviar("GET", ROTA_DAS_REGRAS);
+}
+
+export function salvarRegras(dto: SalvarRegrasDto): Promise<RegrasDaEscalaApi> {
+  return enviar("PUT", ROTA_DAS_REGRAS, dto);
+}
+
+export function criarFeriadoLocal(dto: {
+  data: string;
+  nome: string;
+  tipo: FeriadoLocalApi["tipo"];
+  unidadeIds: string[];
+}): Promise<RegrasDaEscalaApi> {
+  return enviar("POST", ROTA_DOS_FERIADOS, dto);
+}
+
+export function removerFeriadoLocal(id: string): Promise<RegrasDaEscalaApi> {
+  return enviar("DELETE", `${ROTA_DOS_FERIADOS}/${encodeURIComponent(id)}`);
 }

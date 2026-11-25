@@ -95,8 +95,12 @@ import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import {
   CadastrosScreen,
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
+  PlanejarTransicaoScreen,
   QUADRO_ESCALA_TITULO_ID,
   QuadroDaEscalaScreen,
+  REGRAS_ESCALA_TITULO_ID,
+  RegrasDaEscalaScreen,
+  TRANSICAO_TITULO_ID,
   TURNOS_TITULO_ID,
   TurnosScreen,
 } from "../screens/horarios";
@@ -308,6 +312,8 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
   "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
   "turnos-escala": TURNOS_TITULO_ID,
+  "regras-escala": REGRAS_ESCALA_TITULO_ID,
+  "transicao-escala": TRANSICAO_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
   "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
@@ -605,9 +611,31 @@ function conteudoDoDestino(
       <QuadroDaEscalaScreen
         onVoltar={() => onNavegar("pessoas")}
         onAbrirTurnos={() => onNavegar("turnos-escala")}
+        onAbrirRegras={() => onNavegar("regras-escala")}
+        {...(podeOperarEscala(admissao.papelDoAtor)
+          ? { onAbrirTransicao: () => onNavegar("transicao-escala") }
+          : {})}
         colaboradorEmFoco={escala.colaboradorEmFoco}
         // T215 — gravar no rascunho do quadro é de RH e DP.
         podeOperar={podeOperarEscala(admissao.papelDoAtor)}
+      />
+    );
+  }
+  if (destinoId === "regras-escala") {
+    return (
+      <RegrasDaEscalaScreen
+        podeOperar={podeOperarEscala(admissao.papelDoAtor)}
+        onVoltar={() => onNavegar("jornadas-trabalho")}
+        {...(podeOperarEscala(admissao.papelDoAtor)
+          ? { onAbrirTransicao: () => onNavegar("transicao-escala") }
+          : {})}
+      />
+    );
+  }
+  if (destinoId === "transicao-escala") {
+    return (
+      <PlanejarTransicaoScreen
+        onVoltar={() => onNavegar("jornadas-trabalho")}
       />
     );
   }

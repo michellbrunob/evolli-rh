@@ -52,6 +52,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // sub-página dele.
   "jornadas-trabalho": "#/pessoas/escala",
   "turnos-escala": "#/pessoas/escala/turnos",
+  "regras-escala": "#/pessoas/escala/regras",
+  "transicao-escala": "#/pessoas/escala/transicao",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
   configuracoes: "#/configuracoes/meu-perfil",
   // T210 — Configurações › Aparência (o tema da própria conta).

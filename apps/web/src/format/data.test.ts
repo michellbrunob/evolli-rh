@@ -12,6 +12,8 @@ import {
   AUSENTE,
   diaDaSemanaEDiaMes,
   diaMesCurto,
+  numeroDoDia,
+  umAnoDepois,
   diaPorExtensoComSemana,
   intervaloCurtoDeDias,
   FUSO_DE_NEGOCIO,
@@ -686,5 +688,12 @@ describe("T215 — diaMesCurto", () => {
     expect(diaMesCurto("2027-03-02")).toBe("2/3");
     expect(diaMesCurto("2026-11-24")).toBe("24/11");
     expect(diaMesCurto("")).toBe(diaMesCurto(null));
+  });
+});
+
+describe("T215 — numeroDoDia e umAnoDepois", () => {
+  it("dia do mês e a mesma data no ano seguinte", () => {
+    expect(numeroDoDia("2026-11-05")).toBe(5);
+    expect(umAnoDepois("2026-12-16")).toBe("2027-12-16");
   });
 });

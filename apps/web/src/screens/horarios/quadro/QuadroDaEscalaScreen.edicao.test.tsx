@@ -1034,6 +1034,86 @@ describe("T215 — ações em massa", () => {
     ]);
   });
 
+  it("seleção ⋯: avisos, mês e Limpar o rascunho só das pessoas selecionadas", async () => {
+    pessoas = [
+      ana([gravado("2026-11-24")]),
+      pessoa("Bruno Reis", {
+        colaboradorId: "c-bruno",
+        escalas: [escala()],
+        dias: [gravado("2026-11-25")],
+      }),
+    ];
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    const barra = screen.getByRole("toolbar", {
+      name: "Ações para as pessoas selecionadas",
+    });
+    expect(within(barra).getByText("Esc")).toBeInTheDocument();
+    const gatilho = within(barra).getByRole("button", {
+      name: "Mais ações para as pessoas selecionadas",
+    });
+    fireEvent.keyDown(gatilho, { key: "Enter" });
+    let menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual([
+      "Ver avisos dessas pessoasAbre o painel de avisos filtrado",
+      "Abrir no mêsMesmo filtro, visão mensal",
+      "Limpar o rascunho do períodoSó o que ainda não foi publicado",
+    ]);
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Limpar o rascunho/ }),
+    );
+    const dialogo = screen.getByRole("dialog", {
+      name: "Limpar o rascunho do período",
+    });
+    expect(dialogo).toHaveTextContent("para as pessoas selecionadas.");
+    expect(dialogo).toHaveTextContent("1 mudança será desfeita.");
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Limpar rascunho" }),
+    );
+    await screen.findByRole("status", { name: "1 mudança desfeita" });
+    expect(limparDias).toHaveBeenCalledWith([
+      { colaboradorId: "c-ana", dia: "2026-11-24" },
+    ]);
+    // Ver avisos: o painel só das selecionadas.
+    fireEvent.keyDown(gatilho, { key: "Enter" });
+    menu = await screen.findByRole("menu");
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Ver avisos dessas pessoas/ }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Avisos de 1 pessoa" }),
+    ).toBeInTheDocument();
+  });
+
+  it("seleção ⋯: Abrir no mês troca a visão e mantém a seleção", async () => {
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: "Mais ações para as pessoas selecionadas",
+      }),
+      { key: "Enter" },
+    );
+    const menu = await screen.findByRole("menu");
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: /Abrir no mês/ }),
+    );
+    await screen.findByRole("region", { name: "Quadro de escala do mês" });
+    expect(
+      screen.getByRole("toolbar", {
+        name: "Ações para as pessoas selecionadas",
+      }),
+    ).toHaveTextContent("1 pessoa selecionada");
+  });
+
   it("sem permissão: sem seleção nem menu ⋯", async () => {
     await montar(false);
     expect(screen.queryByRole("checkbox")).toBeNull();

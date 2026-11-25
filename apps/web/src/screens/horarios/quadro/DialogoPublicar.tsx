@@ -8,6 +8,8 @@ import { useId, useState } from "react";
 import { ApiError } from "../../../api/colaboradoresClient";
 import { Button, Dialog } from "../../../ui";
 import { plural } from "../../../format/plural";
+import { diaDaSemanaEDiaMes } from "../../../format/data";
+import type { AvisoDaEscala } from "./avisosDaEscala";
 
 export interface ResumoDaPublicacao {
   readonly novas: number;
@@ -20,15 +22,26 @@ export function DialogoPublicar({
   resumo,
   onPublicar,
   onFechar,
+  avisos = [],
+  onVerAvisos,
+  avisarPadrao = true,
+  antecedenciaFaltando = null,
 }: {
   /** "Semana de 23 a 29 de novembro de 2026" ou "Novembro de 2026". */
   readonly periodo: string;
   readonly resumo: ResumoDaPublicacao;
   readonly onPublicar: (avisar: boolean) => Promise<void>;
   readonly onFechar: () => void;
+  /** Avisos de atenção da CLT que continuam no período. */
+  readonly avisos?: readonly AvisoDaEscala[];
+  readonly onVerAvisos?: () => void;
+  /** O aviso às pessoas vem marcado? (Regras › Publicação) */
+  readonly avisarPadrao?: boolean;
+  /** Antecedência mínima das Regras, quando o período começa antes dela. */
+  readonly antecedenciaFaltando?: number | null;
 }) {
   const id = useId();
-  const [avisar, setAvisar] = useState(true);
+  const [avisar, setAvisar] = useState(avisarPadrao);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -61,7 +74,7 @@ export function DialogoPublicar({
             Cancelar
           </Button>
           <Button variant="primary" onClick={publicar} disabled={enviando}>
-            Publicar
+            {avisos.length > 0 ? "Publicar mesmo assim" : "Publicar"}
           </Button>
         </>
       }
@@ -84,6 +97,32 @@ export function DialogoPublicar({
           <dd>{resumo.pessoas}</dd>
         </div>
       </dl>
+      {avisos.length > 0 ? (
+        <div role="note" className="dialogo-publicar__clt">
+          <p className="painel-dia__subtitulo">
+            {avisos.length === 1
+              ? "1 aviso da CLT continua no período"
+              : `${avisos.length} avisos da CLT continuam no período`}
+          </p>
+          <ul>
+            {avisos.slice(0, 3).map((a, i) => (
+              <li
+                key={i}
+              >{`${a.nome}, ${diaDaSemanaEDiaMes(a.dia)}: ${a.titulo}`}</li>
+            ))}
+          </ul>
+          {onVerAvisos ? (
+            <Button variant="subtle" onClick={onVerAvisos}>
+              Ver avisos
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {antecedenciaFaltando !== null ? (
+        <p role="note" className="dialogo-publicar__ajuda">
+          {`As Regras pedem publicar ${plural(antecedenciaFaltando, "dia", "dias")} antes do início; este período começa antes disso.`}
+        </p>
+      ) : null}
       <div className="dialogo-publicar__aviso">
         <input
           id={`${id}-avisar`}

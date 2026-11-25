@@ -311,6 +311,24 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         agrupadoEm: "jornadas-trabalho",
       },
       {
+        // T215 — Regras da escala: sub-página do quadro (menu ⋯).
+        id: "regras-escala",
+        label: "Regras da escala",
+        subRotulo: "Jornada, convenção, feriados locais e avisos",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
+        // T215 — Planejar a transição da EC 141/2026 (quem opera a escala).
+        id: "transicao-escala",
+        label: "Planejar a transição",
+        subRotulo: "EC 141/2026: 6x1 para 2 descansos por semana",
+        estado: "funcional",
+        papeis: PAPEIS_OPERACAO_ESCALA,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
         // T182 — sem a aba Horários, o contêiner abre na Estrutura
         // organizacional. T211 — no submenu de Colaboradores, como
         // "Organograma" (rótulo de navegação; a tela mantém o título dela).
@@ -644,6 +662,8 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `cadastros`               | `unidade_organizacional`| `rh`, `dp`, `master_tecnico`     |
  * | `jornadas-trabalho` (T215)| `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
  * | `turnos-escala` (T215)    | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
+ * | `regras-escala` (T215)    | `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
+ * | `transicao-escala` (T215) | `escala_colaborador` alter | `rh`, `dp`                     |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
@@ -692,6 +712,8 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
+    "regras-escala",
+    "transicao-escala",
     "ponto",
     "equipe",
     "administracao-lideranca",
@@ -710,6 +732,8 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
+    "regras-escala",
+    "transicao-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",
@@ -723,6 +747,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
+    "regras-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",

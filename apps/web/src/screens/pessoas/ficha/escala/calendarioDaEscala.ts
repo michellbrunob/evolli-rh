@@ -209,11 +209,26 @@ export const TRANSICAO_EC_141: readonly {
   { desde: "2027-12-16", horas: 40 },
 ];
 
-/** Limite legal da jornada semanal (horas) no dia. */
-export function limiteLegalSemanal(dia: string): number {
+/**
+ * Limite legal da jornada semanal (horas) no dia. T215 — `inicioTransicao`
+ * vem das Regras da escala (a 2ª etapa é um ano depois); sem ele, as datas
+ * padrão.
+ */
+export function limiteLegalSemanal(
+  dia: string,
+  inicioTransicao?: string,
+): number {
+  const etapas = inicioTransicao
+    ? [
+        { desde: inicioTransicao, horas: 42 },
+        {
+          desde: `${Number(inicioTransicao.slice(0, 4)) + 1}${inicioTransicao.slice(4)}`,
+          horas: 40,
+        },
+      ]
+    : TRANSICAO_EC_141;
   let horas = 44;
-  for (const etapa of TRANSICAO_EC_141)
-    if (dia >= etapa.desde) horas = etapa.horas;
+  for (const etapa of etapas) if (dia >= etapa.desde) horas = etapa.horas;
   return horas;
 }
 
@@ -224,8 +239,9 @@ export function limiteLegalSemanal(dia: string): number {
 export function jornadaPorSemana(
   jornadaContratoHoras: number | null | undefined,
   dia: string,
+  inicioTransicao?: string,
 ): number {
-  const legal = limiteLegalSemanal(dia);
+  const legal = limiteLegalSemanal(dia, inicioTransicao);
   const contrato =
     jornadaContratoHoras != null && jornadaContratoHoras > 0
       ? jornadaContratoHoras

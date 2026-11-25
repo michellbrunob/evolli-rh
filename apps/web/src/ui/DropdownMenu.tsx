@@ -165,3 +165,10 @@ export function DropdownMenuItem({
     />
   );
 }
+
+/** T215 — linha entre grupos de itens (ex.: antes de uma ação destrutiva). */
+export function DropdownMenuSeparator() {
+  return (
+    <RadixMenu.Separator className="ev:my-1 ev:h-px ev:bg-[var(--divisor-cor)]" />
+  );
+}

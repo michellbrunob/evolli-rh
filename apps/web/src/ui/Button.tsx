@@ -40,7 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         type={type}
         data-variant={variant}
-        className={cn(BASE, "ev:px-5", VARIANTS[variant], className)}
+        className={cn(BASE, "ev:px-4", VARIANTS[variant], className)}
         {...props}
       />
     );

@@ -463,6 +463,7 @@ export function DialogoRepetir({
 /** "Limpar o rascunho do período". */
 export function DialogoLimparRascunho({
   periodo,
+  deQuem = "as pessoas do filtro",
   quantas,
   onConfirmar,
   onFechar,
@@ -470,6 +471,8 @@ export function DialogoLimparRascunho({
   /** "23 a 29 de novembro de 2026". */
   readonly periodo: string;
   readonly quantas: number;
+  /** De quem: "as pessoas do filtro" (padrão) ou "as pessoas selecionadas". */
+  readonly deQuem?: string;
   readonly onConfirmar: () => Promise<void>;
   readonly onFechar: () => void;
 }) {
@@ -489,7 +492,7 @@ export function DialogoLimparRascunho({
     <Dialog
       aberto
       titulo="Limpar o rascunho do período"
-      descricao={`Desfaz as mudanças não publicadas de ${periodo} para as pessoas do filtro. O que já foi publicado continua igual.`}
+      descricao={`Desfaz as mudanças não publicadas de ${periodo} para ${deQuem}. O que já foi publicado continua igual.`}
       onFechar={onFechar}
       bloqueado={enviando}
       className="dialogo-massa"

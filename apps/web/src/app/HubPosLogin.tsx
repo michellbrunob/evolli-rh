@@ -124,6 +124,10 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Quadro da escala por semana e por mês: quem trabalha em cada dia, com o turno, as folgas e as horas.",
   "turnos-escala":
     "Turnos da empresa: nome, cor, sigla e os dias e horários de cada um, usados no quadro de escala.",
+  "regras-escala":
+    "Regras da escala: transição da EC 141/2026, convenção, feriados locais, avisos da CLT e publicação.",
+  "transicao-escala":
+    "Planejar a transição da EC 141/2026: quem está em 6x1 e o novo padrão a partir da data da transição.",
   ponto: "Registros de ponto do período e conferência das folhas apuradas.",
   equipe:
     "Consulta da sua equipe: quem responde a você hoje, pela atribuição vigente.",

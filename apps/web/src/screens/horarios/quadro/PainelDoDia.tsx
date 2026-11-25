@@ -423,10 +423,12 @@ export function PainelDoDia({
   );
 
   const local = (
-    <label className="painel-dia__campo painel-dia__campo--largo">
-      <span>Local</span>
+    <div className="painel-dia__campo painel-dia__campo--largo">
+      <label htmlFor={`${id}-local`}>Local</label>
       <select
+        id={`${id}-local`}
         value={f.unidadeId}
+        aria-describedby={`${id}-local-ajuda`}
         onChange={(e) => mudar({ unidadeId: e.target.value })}
       >
         <option value="">Unidade do colaborador</option>
@@ -436,8 +438,8 @@ export function PainelDoDia({
           </option>
         ))}
       </select>
-      <small>Padrão: unidade do colaborador</small>
-    </label>
+      <small id={`${id}-local-ajuda`}>Padrão: unidade do colaborador</small>
+    </div>
   );
 
   return (

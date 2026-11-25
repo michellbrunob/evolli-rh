@@ -240,12 +240,72 @@ Segunda fatia do quadro: quem opera (`rh`, `dp`) edita o dia no RASCUNHO.
   - Cada ação mostra o aviso com Desfazer (regrava o rascunho de antes, ou o
     limpa) e o quadro recarrega.
   - Ficam para as próximas fases: Aplicar modelo e Exportar (na barra e no
-    menu), Regras da escala e Planejar a transição (menu e aviso da EC 141).
+    menu). Regras e transição: seção abaixo.
     "Quem já tem ausência aprovada nesse dia não muda" depende da
     integração com Férias e ausências.
-- Ainda não: Avisos,
-  Regras, Aplicar modelo, Exportar, menu ⋯ e o aviso da transição da EC
-  141/2026 ("Já temos convenção" / "Planejar a transição").
+- Ainda não: Aplicar modelo e Exportar (próximas fases).
+
+## Regras da escala, avisos da CLT e transição da EC 141/2026 (25/11/2026)
+
+Conferido na referência por simulação (pessoa de teste); textos e desenho
+próprios.
+
+- API: `GET`/`PUT /v1/escala/regras` (por empresa: início da transição,
+  dia em que a semana começa, 8 chaves da convenção, 21 avisos ligados ou
+  desligados, antecedência mínima entre 0 e 30 dias, "avisar as pessoas"
+  marcado por padrão) e `POST`/`DELETE /v1/escala/feriados` (feriado local
+  municipal ou estadual, de todas as unidades ou de unidades ativas
+  escolhidas). Sem linha gravada valem os padrões (`personalizadas: false`;
+  transição em 16/12/2026, 12x36 por acordo marcada, aviso noturno
+  desligado). Chave desconhecida ou valor não lógico: 400 por campo. Cada
+  gravação é um evento de trilha. Migration `20261125170000_escala_regras`.
+- O quadro traz as regras e a data de nascimento de cada pessoa (aviso de
+  menor de idade).
+- Avisos (calculados no navegador, sobre o rascunho): Atenção, Conferir e
+  Informativos. PJ e autônomo só recebem informativos. 6x1 depois da
+  transição sem convenção; jornada da semana (44 h antes, 42 h depois; 40 h
+  um ano depois); 2 descansos por semana; mais de 10 h no dia; intervalo
+  (art. 71; 30 min com convenção); 11 h entre jornadas (fora do plantão);
+  36 h depois do plantão 12x36; 12x36 depois da 2ª etapa; 7 dias seguidos;
+  domingo; feriado (comércio sem convenção vai para Atenção); feriado local
+  da unidade; aprendiz e estágio acima de 6 h; menor de 18 anos à noite;
+  revezamento (turno de noite = metade ou mais das horas entre 22 h e 5 h);
+  noturno e sobreaviso informativos. Cada regra pode ser desligada.
+- Quadro: botão Avisos com a contagem (vermelho com Atenção), marca na
+  célula, descrição para leitor de tela, atalho "Com aviso da CLT" na gaveta
+  Filtrar e o painel de avisos (abas por categoria; cada item leva à célula,
+  trocando de página se preciso). Publicar com avisos de Atenção pede
+  "Publicar mesmo assim"; com menos antecedência que a mínima, mostra a
+  nota.
+- Faixa da EC 141: aparece com gente em 6x1 no período; "Já temos
+  convenção" grava a 6x1 autorizada nas Regras (com Desfazer); "Planejar a
+  transição" abre a página.
+- Regras da escala (sub-página, consulta para quem vê o quadro; edição para
+  RH e DP): linha do tempo da transição com "Agora", convenção, feriados
+  locais, avisos e publicação; Descartar e Salvar regras no rodapé, com a
+  guarda de saída.
+- Planejar a transição (RH e DP): quem está em 6x1, caminho (5x2,
+  convenção ou outra escala) e horário de 8h24 ou 8 h; aplica pelo padrão da
+  escala e cria a tabela "Nome 8h24" quando precisa.
+- Semana: o dia de início das Regras guia o período do quadro.
+- Barra da seleção (pedido da proprietária): ícones nos botões, dica "Esc" e
+  menu ⋯ com Ver avisos dessas pessoas (painel só delas), Abrir no mês /
+  Abrir na semana (mesmo filtro e seleção) e Limpar o rascunho do período
+  só das selecionadas. Aplicar modelo e Exportar entram nas fases deles,
+  também na barra.
+- Menu da célula: ícone por item e o atalho à direita ("Abrir detalhes ·
+  Enter", "Limpar · Del"); "+" na célula vazia ao passar o mouse.
+
+## Controles padrão do sistema (25/11/2026)
+
+- Decisão da proprietária: caixa de seleção e botões seguem um padrão único
+  no sistema inteiro, registrado em
+  [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md) ("Controles
+  padrão").
+- Caixa de seleção global em `app/tokens.css` (`:where`, especificidade
+  zero): marcada na cor de ação do tema com visto e halo; contorno
+  `--borda-controle` (3:1).
+- Botão: respiro lateral de 16 px (antes 24 px) nos dois componentes.
 
 ## Botões quadrados e design próprio (2026-11-25)
 

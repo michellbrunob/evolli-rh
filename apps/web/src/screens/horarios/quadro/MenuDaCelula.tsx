@@ -10,6 +10,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TabelaHorarioApi } from "../../../api/horariosClient";
 import { corDoTurno, rotuloDoIntervalo } from "../turnos/turnos";
+import {
+  IconeCalendario,
+  IconeComentario,
+  IconeEditar,
+  IconeMais,
+  IconeRelogio,
+  IconeRemover,
+} from "../../../ui/icones";
 import type { CelulaDoQuadro } from "./quadroDaEscala";
 import { periodosNoDia } from "./quadroDaEscala";
 
@@ -51,9 +59,24 @@ export function sobreavisoDepoisDoTurno(
   return { inicio: fim, fim: inicio };
 }
 
+type IconeDoItem =
+  "calendario" | "relogio" | "mais" | "editar" | "comentario" | "remover";
+
+const ICONES: Readonly<Record<IconeDoItem, typeof IconeCalendario>> = {
+  calendario: IconeCalendario,
+  relogio: IconeRelogio,
+  mais: IconeMais,
+  editar: IconeEditar,
+  comentario: IconeComentario,
+  remover: IconeRemover,
+};
+
 interface ItemDoMenu {
   readonly chave: string;
   readonly rotulo: string;
+  readonly icone?: IconeDoItem;
+  /** Tecla de atalho, à direita (Enter, Del). */
+  readonly atalho?: string;
   readonly detalhe?: string;
   readonly cor?: string;
   readonly marcado?: boolean;
@@ -101,12 +124,14 @@ export function MenuDaCelula({
         {
           chave: "folga",
           rotulo: "Folga",
+          icone: "calendario",
           marcado: celula.tipo === "folga",
           acao: { tipo: "folga" },
         },
         {
           chave: "dsr",
           rotulo: "DSR",
+          icone: "calendario",
           detalhe: "Descanso semanal remunerado",
           marcado: celula.tipo === "dsr",
           acao: { tipo: "dsr" },
@@ -114,6 +139,7 @@ export function MenuDaCelula({
         {
           chave: "sobreaviso",
           rotulo: "Sobreaviso",
+          icone: "calendario",
           detalhe: "Fora do trabalho, esperando chamado · 1/3 da hora",
           marcado: celula.tipo === "sobreaviso",
           acao: { tipo: "sobreaviso" },
@@ -123,6 +149,7 @@ export function MenuDaCelula({
               {
                 chave: "sobreaviso-depois",
                 rotulo: "Sobreaviso depois do turno",
+                icone: "relogio" as const,
                 detalhe: `${depois.inicio}–${depois.fim} · 1/3 da hora`,
                 acao: { tipo: "sobreaviso-depois" } as const,
               },
@@ -131,6 +158,7 @@ export function MenuDaCelula({
         {
           chave: "dois-turnos",
           rotulo: "Dois turnos no dia",
+          icone: "mais",
           detalhe: "Turno partido, sem sobreposição",
           acao: { tipo: "dois-turnos" },
         },
@@ -142,11 +170,13 @@ export function MenuDaCelula({
         {
           chave: "detalhes",
           rotulo: "Abrir detalhes",
-          detalhe: "Enter",
+          icone: "editar",
+          atalho: "Enter",
           acao: { tipo: "detalhes" },
         },
         {
           chave: "observacao",
+          icone: "comentario",
           rotulo: celula.observacao
             ? "Editar observação"
             : "Adicionar observação",
@@ -157,7 +187,8 @@ export function MenuDaCelula({
               {
                 chave: "limpar",
                 rotulo: "Limpar",
-                detalhe: "Del",
+                icone: "remover" as const,
+                atalho: "Del",
                 acao: { tipo: "limpar" } as const,
               },
             ]
@@ -262,6 +293,13 @@ export function MenuDaCelula({
                     style={{ background: i.cor }}
                     aria-hidden="true"
                   />
+                ) : i.icone ? (
+                  <span className="menu-celula__icone" aria-hidden="true">
+                    {(() => {
+                      const Icone = ICONES[i.icone];
+                      return <Icone tamanho={16} />;
+                    })()}
+                  </span>
                 ) : (
                   <span
                     className="menu-celula__ponto--vazio"
@@ -274,6 +312,14 @@ export function MenuDaCelula({
                     <span className="menu-celula__detalhe">{i.detalhe}</span>
                   ) : null}
                 </span>
+                {i.atalho ? (
+                  <kbd
+                    className="menu-celula__atalho"
+                    aria-label={`atalho: ${i.atalho}`}
+                  >
+                    {i.atalho}
+                  </kbd>
+                ) : null}
                 {i.marcado ? (
                   <span className="menu-celula__marca" aria-hidden="true">
                     ✓

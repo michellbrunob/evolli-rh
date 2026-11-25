@@ -885,4 +885,246 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
       ).expect(200);
     });
   });
+
+  describe("regras da escala", () => {
+    const putRegras = (
+      corpo: Record<string, unknown>,
+      cred: Credencial = rhA,
+    ) =>
+      agent()
+        .put("/v1/escala/regras")
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken)
+        .send(corpo);
+    const BASE_REGRAS = {
+      inicioTransicao: null,
+      semanaComeca: 1,
+      convencao: {},
+      avisos: {},
+      antecedenciaDias: 7,
+      avisarPadrao: true,
+    };
+
+    it("sem regras salvas: as padrão (transição em 16/12/2026, 12x36 por acordo, noturno desligado)", async () => {
+      const r = await get("/v1/escala/regras", rhB).expect(200);
+      expect(r.body).toMatchObject({
+        personalizadas: false,
+        inicioTransicao: "2026-12-16",
+        semanaComeca: 1,
+        antecedenciaDias: 7,
+        avisarPadrao: true,
+        feriados: [],
+      });
+      expect(r.body.convencao).toMatchObject({
+        "6x1_autorizada": false,
+        "12x36_acordo": true,
+        comercio: false,
+      });
+      expect(r.body.avisos).toMatchObject({
+        interjornada: true,
+        noturno: false,
+        sobreaviso: true,
+      });
+      expect(Object.keys(r.body.avisos)).toHaveLength(21);
+      expect(Object.keys(r.body.convencao)).toHaveLength(8);
+    });
+
+    it("salva, mescla com as padrão e o quadro traz as regras; a trilha só com a empresa", async () => {
+      const r = await putRegras({
+        ...BASE_REGRAS,
+        inicioTransicao: "2026-12-15",
+        semanaComeca: 7,
+        convencao: { "6x1_autorizada": true, comercio: true },
+        avisos: { noturno: true, domingo: false },
+        antecedenciaDias: 14,
+        avisarPadrao: false,
+      }).expect(200);
+      expect(r.body).toMatchObject({
+        personalizadas: true,
+        inicioTransicao: "2026-12-15",
+        semanaComeca: 7,
+        antecedenciaDias: 14,
+        avisarPadrao: false,
+      });
+      expect(r.body.convencao).toMatchObject({
+        "6x1_autorizada": true,
+        comercio: true,
+        "12x36_acordo": true,
+      });
+      expect(r.body.avisos).toMatchObject({
+        noturno: true,
+        domingo: false,
+        feriado: true,
+      });
+      const q = (await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200)).body as {
+        regras: { inicioTransicao: string };
+      };
+      expect(q.regras.inicioTransicao).toBe("2026-12-15");
+      const eventos = await prisma.auditEvent.findMany({
+        where: { action: "pessoas_escala_regras_salvas" },
+      });
+      expect(eventos).toHaveLength(1);
+      expect(JSON.stringify(eventos)).not.toContain("6x1");
+      // Voltar a "nulo" devolve o início padrão.
+      const r2 = await putRegras(BASE_REGRAS).expect(200);
+      expect(r2.body.inicioTransicao).toBe("2026-12-16");
+    });
+
+    it("valor gravado que não é verdadeiro/falso cai no padrão ao ler", async () => {
+      await putRegras(BASE_REGRAS, rhB).expect(200);
+      await prisma.escalaRegras.update({
+        where: { empresaId: empresaB },
+        data: {
+          convencao: { "12x36_acordo": "sim", comercio: true },
+          avisos: { noturno: 1 },
+        },
+      });
+      const r = await get("/v1/escala/regras", rhB).expect(200);
+      expect(r.body.convencao).toMatchObject({
+        "12x36_acordo": true,
+        comercio: true,
+      });
+      expect(r.body.avisos).toMatchObject({ noturno: false });
+      await prisma.escalaRegras.delete({ where: { empresaId: empresaB } });
+    });
+
+    it("recusa chave desconhecida, valor que não é verdadeiro/falso e formas inválidas", async () => {
+      expect(
+        (
+          await putRegras({
+            ...BASE_REGRAS,
+            convencao: { inventada: true },
+          }).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "convencao", motivo: "invalido" }]);
+      expect(
+        (
+          await putRegras({
+            ...BASE_REGRAS,
+            avisos: { noturno: "sim" },
+          }).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "avisos", motivo: "invalido" }]);
+      await putRegras({ ...BASE_REGRAS, semanaComeca: 8 }).expect(400);
+      await putRegras({ ...BASE_REGRAS, antecedenciaDias: 4 }).expect(400);
+      await putRegras({ ...BASE_REGRAS, inicioTransicao: "15/12/2026" }).expect(
+        400,
+      );
+    });
+
+    it("feriados locais: cria em todas ou em algumas unidades, recusa unidade de outra empresa, remove", async () => {
+      const unidadeA = (await lotacaoMinima(appUrl, empresaA))
+        .unidadeOrganizacionalId;
+      const unidadeB = (await lotacaoMinima(appUrl, empresaB))
+        .unidadeOrganizacionalId;
+      const criar = (corpo: Record<string, unknown>, cred: Credencial = rhA) =>
+        post("/v1/escala/feriados", cred).send(corpo);
+      const r = await criar({
+        data: `${ANO - 1}-03-04`,
+        nome: "  Aniversario da cidade sintetica  ",
+        tipo: "municipal",
+        unidadeIds: [],
+      }).expect(201);
+      expect(r.body.feriados).toEqual([
+        {
+          id: expect.any(String),
+          data: `${ANO - 1}-03-04`,
+          nome: "Aniversario da cidade sintetica",
+          tipo: "municipal",
+          unidadeIds: [],
+        },
+      ]);
+      await criar({
+        data: `${ANO - 1}-03-05`,
+        nome: "Ponto sintetico",
+        tipo: "ponto_facultativo",
+        unidadeIds: [unidadeA],
+      }).expect(201);
+      expect(
+        (
+          await criar({
+            data: `${ANO - 1}-03-06`,
+            nome: "X",
+            tipo: "municipal",
+            unidadeIds: [unidadeB],
+          }).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "unidadeOrganizacionalId", motivo: "indisponivel" }]);
+      // Unidade inativa da própria empresa: indisponível.
+      const inativa = await prisma.unidadeOrganizacional.create({
+        data: {
+          empresaId: empresaA,
+          codigo: "UNI-INATIVA-SINTETICA",
+          nome: "Unidade inativa sintetica",
+          status: "inativo",
+        },
+      });
+      expect(
+        (
+          await criar({
+            data: `${ANO - 1}-03-06`,
+            nome: "X",
+            tipo: "municipal",
+            unidadeIds: [inativa.id],
+          }).expect(422)
+        ).body.erros,
+      ).toEqual([{ campo: "unidadeOrganizacionalId", motivo: "indisponivel" }]);
+      await criar({
+        data: `${ANO - 1}-03-06`,
+        nome: "",
+        tipo: "municipal",
+        unidadeIds: [],
+      }).expect(400);
+      await criar({
+        data: `${ANO - 1}-03-06`,
+        nome: "X",
+        tipo: "estadual",
+        unidadeIds: [],
+      }).expect(400);
+
+      // O quadro do período traz os feriados nas regras.
+      const q = (await quadro(SEMANA_INICIO, SEMANA_FIM).expect(200)).body as {
+        regras: { feriados: { nome: string }[] };
+      };
+      expect(q.regras.feriados.map((f) => f.nome)).toEqual([
+        "Aniversario da cidade sintetica",
+        "Ponto sintetico",
+      ]);
+
+      const id = r.body.feriados[0].id as string;
+      // Outra empresa não remove: 404.
+      await agent()
+        .delete(`/v1/escala/feriados/${id}`)
+        .set("Cookie", rhB.cookie)
+        .set("x-csrf-token", rhB.csrfToken)
+        .expect(404);
+      const rem = await agent()
+        .delete(`/v1/escala/feriados/${id}`)
+        .set("Cookie", rhA.cookie)
+        .set("x-csrf-token", rhA.csrfToken)
+        .expect(200);
+      expect(rem.body.feriados.map((f: { nome: string }) => f.nome)).toEqual([
+        "Ponto sintetico",
+      ]);
+      const trilha = await prisma.auditEvent.findMany({
+        where: { resourceId: id },
+      });
+      expect(trilha.map((e) => e.action)).toEqual([
+        "pessoas_escala_feriado_criado",
+        "pessoas_escala_feriado_removido",
+      ]);
+    });
+
+    it("permissões: DP salva; master lê só com empresa ativa (sem ela, 403); demais negados", async () => {
+      await get("/v1/escala/regras", dpA).expect(200);
+      await putRegras(BASE_REGRAS, dpA).expect(200);
+      await get("/v1/escala/regras", master).expect(403);
+      await putRegras(BASE_REGRAS, master).expect(403);
+      for (const cred of outros) {
+        await get("/v1/escala/regras", cred).expect(403);
+        await putRegras(BASE_REGRAS, cred).expect(403);
+      }
+      await agent().get("/v1/escala/regras").expect(401);
+    });
+  });
 });

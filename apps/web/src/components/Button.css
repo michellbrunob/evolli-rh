@@ -10,7 +10,8 @@
   gap: var(--space-xs);
   min-height: var(--touch-target);
   min-width: var(--touch-target);
-  padding: 0 var(--space-lg);
+  /* Respiro lateral enxuto (16px), como nos botões de ação da referência. */
+  padding: 0 var(--space-md);
   border: 1px solid transparent;
   border-radius: var(--radius-botao);
   font: inherit;

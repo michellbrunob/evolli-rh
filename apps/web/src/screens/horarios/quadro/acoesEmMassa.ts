@@ -119,11 +119,11 @@ export function copiarDias(
   return { gravar, limpar };
 }
 
-/** As semanas (segunda a domingo) depois de `segunda`, até o dia `ate`. */
-export function semanasAte(segunda: string, ate: string): string[][] {
+/** As semanas depois da que começa em `inicioDaSemana`, até o dia `ate`. */
+export function semanasAte(inicioDaSemana: string, ate: string): string[][] {
   const semanas: string[][] = [];
   for (
-    let inicio = somarDias(segunda, 7);
+    let inicio = somarDias(inicioDaSemana, 7);
     inicio <= ate;
     inicio = somarDias(inicio, 7)
   ) {

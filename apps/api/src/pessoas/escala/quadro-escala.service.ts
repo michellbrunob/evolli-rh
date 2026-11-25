@@ -21,6 +21,10 @@ import {
   PROJECAO_DA_PUBLICACAO,
   projetarPublicacao,
 } from "./escala-publicacao.service";
+import {
+  EscalaRegrasService,
+  type RegrasDaEscala,
+} from "./escala-regras.service";
 
 /** Até seis semanas: o mês inteiro com as semanas das pontas. */
 export const DIAS_NO_QUADRO = 42;
@@ -54,6 +58,8 @@ export interface PessoaDoQuadro {
   genero: string | null;
   /** A escala do contrato (código do modelo), ou `null`. */
   escalaDoCadastro: string | null;
+  /** Para o aviso de menor de 18 anos em turno noturno (CLT, art. 404). */
+  dataNascimento: string | null;
   jornadaSemanalHoras: number | null;
   /** Os padrões que tocam o período, do mais novo ao mais antigo. */
   escalas: EscalaProjetada[];
@@ -67,6 +73,8 @@ export interface QuadroDaEscala {
   fim: string;
   /** A publicação mais recente que toca o período, ou `null`. */
   publicacao: PublicacaoDaEscala | null;
+  /** As Regras da escala (avisos, convenção, transição, feriados locais). */
+  regras: RegrasDaEscala;
   pessoas: PessoaDoQuadro[];
 }
 
@@ -92,7 +100,10 @@ function diaCivil(data: Date): string {
  */
 @Injectable()
 export class QuadroEscalaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly regras: EscalaRegrasService,
+  ) {}
 
   async consultar(
     dto: ConsultarQuadroDto,
@@ -139,7 +150,7 @@ export class QuadroEscalaService {
             perfisPessoais: {
               where: { empresaId },
               take: 1,
-              select: { genero: true },
+              select: { genero: true, dataNascimento: true },
             },
           },
         },
@@ -233,6 +244,9 @@ export class QuadroEscalaService {
           gestor: v.contrato?.gestorDireto ?? null,
           nivel: v.contrato?.nivel ?? null,
           genero: v.colaborador.perfisPessoais[0]?.genero ?? null,
+          dataNascimento: v.colaborador.perfisPessoais[0]?.dataNascimento
+            ? diaCivil(v.colaborador.perfisPessoais[0].dataNascimento)
+            : null,
           escalaDoCadastro: v.contrato?.escala ?? null,
           jornadaSemanalHoras: v.contrato?.jornadaSemanalHoras ?? null,
           escalas: escalasPorColaborador.get(colaboradorId) ?? [],
@@ -257,6 +271,7 @@ export class QuadroEscalaService {
       inicio: dto.inicio,
       fim: dto.fim,
       publicacao: publicacao ? projetarPublicacao(publicacao) : null,
+      regras: await this.regras.montar(this.prisma, empresaId),
       pessoas,
     };
   }

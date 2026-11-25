@@ -135,6 +135,9 @@ model AccessUser {
   diasDeEscalaAtualizados   EscalaDia[]         @relation("EscalaDiaAtualizadoPor")
   /// T215 — publicações do quadro da escala feitas por esta conta.
   publicacoesDeEscala       EscalaPublicacao[]  @relation("EscalaPublicacaoPor")
+  /// T215 — regras da escala salvas e feriados locais criados por esta conta.
+  regrasDeEscalaSalvas      EscalaRegras[]       @relation("EscalaRegrasPor")
+  feriadosLocaisCriados     EscalaFeriadoLocal[] @relation("EscalaFeriadoLocalPor")
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -542,6 +545,10 @@ enum AuditAction {
   pessoas_escala_dia_limpo   @map("pessoas.escala.dia_limpo")
   // T215 — o rascunho do período publicado (id da publicação e a empresa).
   pessoas_escala_publicada   @map("pessoas.escala.publicada")
+  // T215 — Regras da escala e feriados locais (id e empresa, sem conteúdo).
+  pessoas_escala_regras_salvas   @map("pessoas.escala.regras_salvas")
+  pessoas_escala_feriado_criado  @map("pessoas.escala.feriado_criado")
+  pessoas_escala_feriado_removido @map("pessoas.escala.feriado_removido")
 
   // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
   // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
@@ -843,6 +850,8 @@ model Empresa {
   escalasColaborador EscalaColaborador[]
   diasDeEscala       EscalaDia[]
   publicacoesDeEscala EscalaPublicacao[]
+  regrasDeEscala      EscalaRegras?
+  feriadosLocais      EscalaFeriadoLocal[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -3188,4 +3197,45 @@ model EscalaPublicacao {
 
   @@index([empresaId, inicio, fim])
   @@map("escala_publicacao")
+}
+
+/// T215 — as Regras da escala da empresa (uma linha; sem linha, valem as
+/// regras padrão): início da transição da EC 141/2026 (nulo = o padrão),
+/// dia em que a semana começa, o que a convenção ou o acordo permite, quais
+/// avisos da CLT ficam ligados, a antecedência mínima da publicação e se o
+/// aviso às pessoas vem marcado. Chaves conferidas pelo serviço.
+model EscalaRegras {
+  empresaId           String    @id @map("empresa_id")
+  inicioTransicao     DateTime? @map("inicio_transicao") @db.Date
+  semanaComeca        Int       @default(1) @map("semana_comeca")
+  convencao           Json      @default("{}")
+  avisos              Json      @default("{}")
+  antecedenciaDias    Int       @default(7) @map("antecedencia_dias")
+  avisarPadrao        Boolean   @default(true) @map("avisar_padrao")
+  atualizadoPorUserId String    @map("atualizado_por_user_id")
+  atualizadoEm        DateTime  @updatedAt @map("atualizado_em")
+
+  empresa       Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser @relation("EscalaRegrasPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("escala_regras")
+}
+
+/// T215 — feriado local da empresa (municipal ou ponto facultativo), em
+/// todas as unidades (lista vazia) ou só em algumas.
+model EscalaFeriadoLocal {
+  id               String   @id @default(uuid())
+  empresaId        String   @map("empresa_id")
+  data             DateTime @db.Date
+  nome             String   @db.VarChar(80)
+  tipo             String
+  unidadeIds       String[] @default([]) @map("unidade_ids")
+  criadoPorUserId  String   @map("criado_por_user_id")
+  criadoEm         DateTime @default(now()) @map("criado_em")
+
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("EscalaFeriadoLocalPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, data])
+  @@map("escala_feriado_local")
 }

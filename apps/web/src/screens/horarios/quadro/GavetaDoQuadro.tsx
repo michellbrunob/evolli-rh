@@ -42,6 +42,8 @@ export interface GavetaDoQuadroProps {
   readonly filtros: FiltrosDoQuadro;
   readonly referencia: string;
   readonly rotulos: RotulosDosCodigos;
+  /** Quem tem aviso da CLT no período. */
+  readonly idsComAviso?: ReadonlySet<string>;
   readonly onMudar: (filtros: FiltrosDoQuadro) => void;
   readonly onFechar: () => void;
 }
@@ -53,6 +55,7 @@ export function GavetaDoQuadro({
   filtros,
   referencia,
   rotulos,
+  idsComAviso = new Set(),
   onMudar,
   onFechar,
 }: GavetaDoQuadroProps) {
@@ -88,6 +91,19 @@ export function GavetaDoQuadro({
         <fieldset className="gaveta-quadro__grupo">
           <legend className="gaveta-quadro__legenda">Atalhos</legend>
           <div className="gaveta-quadro__atalhos">
+            <button
+              type="button"
+              className="gaveta-quadro__atalho"
+              aria-pressed={filtros.comAviso}
+              onClick={() =>
+                onMudar({ ...filtros, comAviso: !filtros.comAviso })
+              }
+            >
+              <span>Com aviso da CLT</span>
+              <span className="gaveta-quadro__numero">
+                {pessoas.filter((p) => idsComAviso.has(p.colaboradorId)).length}
+              </span>
+            </button>
             <button
               type="button"
               className="gaveta-quadro__atalho"

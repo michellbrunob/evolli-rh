@@ -22,6 +22,8 @@ export type GrupoDeSeletor =
   "gestor" | "cargo" | "area" | "centroCusto" | "nivel" | "genero";
 
 export interface FiltrosDoQuadro {
+  /** Atalho "Com aviso da CLT". */
+  readonly comAviso: boolean;
   readonly semEscala: boolean;
   readonly unidades: readonly string[];
   readonly departamentos: readonly string[];
@@ -37,6 +39,7 @@ export interface FiltrosDoQuadro {
 }
 
 export const FILTROS_DO_QUADRO_VAZIOS: FiltrosDoQuadro = {
+  comAviso: false,
   semEscala: false,
   unidades: [],
   departamentos: [],
@@ -53,6 +56,7 @@ export const FILTROS_DO_QUADRO_VAZIOS: FiltrosDoQuadro = {
 /** Quantos filtros estão ligados (cada opção marcada conta um). */
 export function quantosFiltros(f: FiltrosDoQuadro): number {
   return (
+    (f.comAviso ? 1 : 0) +
     (f.semEscala ? 1 : 0) +
     f.unidades.length +
     f.departamentos.length +
@@ -175,6 +179,8 @@ export function filtrar(
   pessoas: readonly PessoaDoQuadroApi[],
   f: FiltrosDoQuadro,
   referencia: string,
+  /** Quem tem aviso da CLT no período (atalho "Com aviso da CLT"). */
+  comAviso: ReadonlySet<string> = new Set(),
 ): PessoaDoQuadroApi[] {
   const listas: GrupoDeLista[] = [
     "unidades",
@@ -192,6 +198,7 @@ export function filtrar(
   ];
   return pessoas.filter(
     (p) =>
+      (!f.comAviso || comAviso.has(p.colaboradorId)) &&
       (!f.semEscala || semEscala(p)) &&
       listas.every(
         (g) => f[g].length === 0 || f[g].includes(valorDe(p, g, referencia)),

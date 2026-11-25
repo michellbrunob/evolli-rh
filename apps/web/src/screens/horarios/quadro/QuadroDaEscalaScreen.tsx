@@ -21,6 +21,7 @@ import {
   limparDia,
   limparDias,
   publicarEscala,
+  salvarRegras,
   type DiaGravadoApi,
   type GravarDiaDto,
   type PessoaDoQuadroApi,
@@ -43,19 +44,27 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../../ui";
 import {
   diaCivilDeHoje,
   diaDaSemanaEDiaMes,
   diaMesCurto,
+  numeroDoDia,
 } from "../../../format/data";
 import { plural } from "../../../format/plural";
 import {
   IconeAbrir,
   IconeAvancar,
+  IconeAviso,
   IconeBuscar,
+  IconeCalendario,
   IconeComentario,
+  IconeCopiar,
+  IconeRemover,
+  IconeTentarDeNovo,
+  IconeInformacao,
   IconeFiltrar,
   IconeFechar,
   IconeMaisAcoes,
@@ -72,6 +81,13 @@ import {
 } from "./MenuDaCelula";
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import { DialogoPublicar } from "./DialogoPublicar";
+import { PainelDeAvisos } from "./PainelDeAvisos";
+import {
+  type AvisoDaEscala,
+  avisosPorCelula,
+  calcularAvisos,
+  pessoasEm6x1NaTransicao,
+} from "./avisosDaEscala";
 import {
   DialogoDarFolga,
   DialogoLimparRascunho,
@@ -123,7 +139,6 @@ import {
   ordenar,
   periodoDa,
   periodosNoDia,
-  segundaDaSemana,
   rotuloDaEscala,
   tituloDoPeriodo,
 } from "./quadroDaEscala";
@@ -156,6 +171,10 @@ export interface QuadroDaEscalaScreenProps {
   /** "← Colaboradores". */
   readonly onVoltar?: () => void;
   readonly onAbrirTurnos?: () => void;
+  /** Regras da escala (sub-página). */
+  readonly onAbrirRegras?: () => void;
+  /** Planejar a transição da EC 141/2026 (sub-página). */
+  readonly onAbrirTransicao?: () => void;
   /**
    * Aberto pela ficha ("Abrir no quadro"): já filtra o departamento da
    * pessoa (na gaveta "Filtros", removível).
@@ -234,7 +253,10 @@ function siglaDe(t: TurnoDaCelula): string {
 }
 
 /** "Comercial, 09:00–18:00" etc. — o que a célula diz a quem lê pela tela. */
-export function descricaoDaCelula(c: CelulaDoQuadro): string {
+export function descricaoDaCelula(
+  c: CelulaDoQuadro,
+  avisos: readonly AvisoDaEscala[] = [],
+): string {
   const partes: string[] = [];
   switch (c.tipo) {
     case "trabalho":
@@ -267,13 +289,40 @@ export function descricaoDaCelula(c: CelulaDoQuadro): string {
   }
   if (c.observacao) partes.push(`observação: ${c.observacao}`);
   if (c.origem === "rascunho") partes.push("mudança não publicada");
+  if (avisos.length > 0) {
+    partes.push(
+      `${avisos.length === 1 ? "1 aviso" : `${avisos.length} avisos`}: ${avisos
+        .map((a) => a.titulo)
+        .join("; ")}`,
+    );
+  }
   return partes.join(", ");
 }
 
 /** O ponto âmbar de "mudança não publicada" e o sinal de observação. */
-function Marcas({ c }: { c: CelulaDoQuadro }) {
+function Marcas({
+  c,
+  avisos,
+}: {
+  c: CelulaDoQuadro;
+  avisos: readonly AvisoDaEscala[];
+}) {
+  const categoria = avisos.some((a) => a.categoria === "atencao")
+    ? "atencao"
+    : avisos.some((a) => a.categoria === "conferir")
+      ? "conferir"
+      : "informativo";
   return (
     <>
+      {avisos.length > 0 ? (
+        <span
+          className={`quadro__marca-aviso quadro__marca-aviso--${categoria}`}
+          aria-hidden="true"
+          title={avisos.map((a) => a.titulo).join("\n")}
+        >
+          <IconeInformacao tamanho={12} />
+        </span>
+      ) : null}
       {c.origem === "rascunho" ? (
         <span className="quadro__marca-rascunho" aria-hidden="true" />
       ) : null}
@@ -290,7 +339,13 @@ function Marcas({ c }: { c: CelulaDoQuadro }) {
   );
 }
 
-function CelulaDaSemana({ c }: { c: CelulaDoQuadro }) {
+function CelulaDaSemana({
+  c,
+  avisos,
+}: {
+  c: CelulaDoQuadro;
+  avisos: readonly AvisoDaEscala[];
+}) {
   let conteudo: React.ReactNode = null;
   if (c.tipo === "trabalho") {
     conteudo = (
@@ -333,19 +388,28 @@ function CelulaDaSemana({ c }: { c: CelulaDoQuadro }) {
     );
   } else if (c.tipo === "folga") {
     conteudo = <span className="quadro__descanso-nome">Folga</span>;
+  } else if (c.tipo === "sem-escala") {
+    // O "+" do dia vazio, ao passar o mouse ou no foco (só em quem edita).
+    conteudo = <span className="quadro__mais">+</span>;
   }
   return (
     <>
       <span aria-hidden="true" className="quadro__conteudo">
         {conteudo}
       </span>
-      <Marcas c={c} />
-      <span className="sr-only">{descricaoDaCelula(c)}</span>
+      <Marcas c={c} avisos={avisos} />
+      <span className="sr-only">{descricaoDaCelula(c, avisos)}</span>
     </>
   );
 }
 
-function CelulaDoMes({ c }: { c: CelulaDoQuadro }) {
+function CelulaDoMes({
+  c,
+  avisos,
+}: {
+  c: CelulaDoQuadro;
+  avisos: readonly AvisoDaEscala[];
+}) {
   let sigla: React.ReactNode = null;
   if (c.tipo === "trabalho") {
     const t = c.turno;
@@ -361,21 +425,68 @@ function CelulaDoMes({ c }: { c: CelulaDoQuadro }) {
     sigla = <span className="quadro__sigla quadro__sigla--sobreaviso">SA</span>;
   } else if (c.tipo === "dsr") {
     sigla = <span className="quadro__sigla quadro__sigla--dsr">D</span>;
+  } else if (c.tipo === "sem-escala") {
+    sigla = <span className="quadro__mais">+</span>;
   }
   return (
     <>
-      <span aria-hidden="true" title={descricaoDaCelula(c)}>
+      <span aria-hidden="true" title={descricaoDaCelula(c, avisos)}>
         {sigla}
       </span>
-      <Marcas c={c} />
-      <span className="sr-only">{descricaoDaCelula(c)}</span>
+      <Marcas c={c} avisos={avisos} />
+      <span className="sr-only">{descricaoDaCelula(c, avisos)}</span>
     </>
+  );
+}
+
+/** T215 — a faixa da EC 141/2026 sobre o quadro (pessoas em 6x1). */
+function FaixaDaTransicao({
+  quantas,
+  inicio,
+  periodo,
+  onTemosConvencao,
+  onPlanejar,
+}: {
+  readonly quantas: number;
+  readonly inicio: string;
+  readonly periodo: string;
+  readonly onTemosConvencao?: () => void;
+  readonly onPlanejar?: () => void;
+}) {
+  return (
+    <section
+      className="quadro__faixa-transicao"
+      aria-labelledby="quadro-faixa-transicao"
+    >
+      <div>
+        <p id="quadro-faixa-transicao" className="quadro__faixa-titulo">
+          {`A partir de ${diaMesCurto(inicio)}, a 6x1 só vale com convenção coletiva`}
+        </p>
+        <p className="quadro__faixa-texto">
+          {`${quantas === 1 ? "1 pessoa está" : `${quantas} pessoas estão`} em 6x1 ${periodo}. A EC 141/2026 pede 2 descansos por semana e até 42 h.`}
+        </p>
+      </div>
+      {onTemosConvencao ? (
+        <div className="quadro__faixa-acoes">
+          <Button type="button" variant="secondary" onClick={onTemosConvencao}>
+            Já temos convenção
+          </Button>
+          {onPlanejar ? (
+            <Button type="button" variant="primary" onClick={onPlanejar}>
+              Planejar a transição
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
 export function QuadroDaEscalaScreen({
   onVoltar,
   onAbrirTurnos,
+  onAbrirRegras,
+  onAbrirTransicao,
   colaboradorEmFoco = null,
   hoje: hojeFixo,
   podeOperar = false,
@@ -414,6 +525,11 @@ export function QuadroDaEscalaScreen({
   const [falha, setFalha] = useState<string | null>(null);
   const [ativa, setAtiva] = useState<string | null>(null);
   const [publicando, setPublicando] = useState(false);
+  /** O painel de avisos: de todo o filtro ou só das pessoas selecionadas. */
+  const [vendoAvisos, setVendoAvisos] = useState<false | "todos" | "selecao">(
+    false,
+  );
+  const focoPendente = useRef<string | null>(null);
   const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -421,14 +537,16 @@ export function QuadroDaEscalaScreen({
     | { tipo: "trocar"; alvo: "selecao" }
     | { tipo: "folga"; alvo: "selecao" }
     | { tipo: "repetir" }
-    | { tipo: "limpar" }
+    | { tipo: "limpar"; alvo?: "selecao" }
     | null
   >(null);
   const tabelaRef = useRef<HTMLTableElement | null>(null);
   const focoAplicado = useRef(false);
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
 
-  const { inicio, fim } = periodoDa(visao, ancora);
+  // T215 — a semana começa no dia das Regras (vem com o quadro).
+  const [semanaComeca, setSemanaComeca] = useState(1);
+  const { inicio, fim } = periodoDa(visao, ancora, semanaComeca);
 
   useEffect(() => {
     tituloRef.current?.focus();
@@ -778,6 +896,25 @@ export function QuadroDaEscalaScreen({
     setMenu(null);
   }, [inicio, fim, tentativa]);
 
+  // Depois de ir a um aviso: o foco vai à célula quando ela aparecer.
+  useEffect(() => {
+    const chave = focoPendente.current;
+    if (!chave) return;
+    const alvo = document.querySelector<HTMLElement>(
+      `[data-celula="${chave}"]`,
+    );
+    if (alvo) {
+      focoPendente.current = null;
+      alvo.focus();
+    }
+  });
+
+  useEffect(() => {
+    if (carga.estado !== "pronto") return;
+    const comeca = carga.dados.regras?.semanaComeca ?? 1;
+    if (comeca !== semanaComeca) setSemanaComeca(comeca);
+  }, [carga, semanaComeca]);
+
   // Aberto pela ficha: o departamento da pessoa, uma vez.
   useEffect(() => {
     if (focoAplicado.current || carga.estado !== "pronto") return;
@@ -801,10 +938,27 @@ export function QuadroDaEscalaScreen({
     [carga],
   );
 
-  const filtradas = useMemo(
-    () => buscar(filtrar(todas, filtros, referencia), busca),
-    [todas, filtros, referencia, busca],
+  const regras =
+    carga.estado === "pronto" ? (carga.dados.regras ?? undefined) : undefined;
+  const avisosTodos = useMemo(
+    () => calcularAvisos(todas, dias, regras),
+    [todas, dias, regras],
   );
+  const idsComAviso = useMemo(
+    () => new Set(avisosTodos.map((a) => a.colaboradorId)),
+    [avisosTodos],
+  );
+
+  const filtradas = useMemo(
+    () => buscar(filtrar(todas, filtros, referencia, idsComAviso), busca),
+    [todas, filtros, referencia, busca, idsComAviso],
+  );
+  // Os avisos das pessoas filtradas (os do painel, das células e do botão).
+  const visiveis = useMemo(() => {
+    const ids = new Set(filtradas.map((p) => p.colaboradorId));
+    return avisosTodos.filter((a) => ids.has(a.colaboradorId));
+  }, [avisosTodos, filtradas]);
+  const porCelula = useMemo(() => avisosPorCelula(visiveis), [visiveis]);
   const ligados = quantosFiltros(filtros);
 
   const celulas = useMemo(() => {
@@ -857,6 +1011,50 @@ export function QuadroDaEscalaScreen({
   }
 
   const filtrando = ligados > 0 || busca.trim() !== "";
+  const em6x1 = pessoasEm6x1NaTransicao(filtradas, dias, regras);
+  const avisosDeAtencao = avisosTodos.filter((a) => a.categoria === "atencao");
+
+  /** "Já temos convenção": marca a 6x1 autorizada nas Regras, com Desfazer. */
+  const temosConvencao = async () => {
+    if (!regras) return;
+    const base = {
+      inicioTransicao: regras.personalizadas ? regras.inicioTransicao : null,
+      semanaComeca: regras.semanaComeca,
+      convencao: regras.convencao,
+      avisos: regras.avisos,
+      antecedenciaDias: regras.antecedenciaDias,
+      avisarPadrao: regras.avisarPadrao,
+    };
+    await salvarRegras({
+      ...base,
+      convencao: { ...regras.convencao, "6x1_autorizada": true },
+    });
+    setTentativa((n) => n + 1);
+    setAviso({
+      id: Date.now(),
+      titulo: "6x1 autorizada por convenção nas Regras",
+      acao: {
+        rotulo: "Desfazer",
+        onClick: () =>
+          void tentar(async () => {
+            await salvarRegras(base);
+            setTentativa((n) => n + 1);
+          }),
+      },
+    });
+  };
+
+  /** Leva à célula de um aviso (troca de página se preciso). */
+  const irParaAviso = (a: AvisoDaEscala) => {
+    setVendoAvisos(false);
+    const indice = emOrdem.findIndex(
+      (p) => p.colaboradorId === a.colaboradorId,
+    );
+    if (indice >= 0) setPagina(Math.floor(indice / porPagina) + 1);
+    const chave = `${a.colaboradorId}|${a.dia}`;
+    setAtiva(chave);
+    focoPendente.current = chave;
+  };
   // Mudanças não publicadas no período (o quadro só traz os dias dele).
   const mudancas = todas.reduce(
     (t, p) => t + (p.dias ?? []).filter((d) => d.camada === "rascunho").length,
@@ -1035,9 +1233,15 @@ export function QuadroDaEscalaScreen({
                     const chave = `${p.colaboradorId}|${c.dia}`;
                     const conteudo =
                       visao === "semana" ? (
-                        <CelulaDaSemana c={c} />
+                        <CelulaDaSemana
+                          c={c}
+                          avisos={porCelula.get(chave) ?? []}
+                        />
                       ) : (
-                        <CelulaDoMes c={c} />
+                        <CelulaDoMes
+                          c={c}
+                          avisos={porCelula.get(chave) ?? []}
+                        />
                       );
                     return (
                       <td
@@ -1083,7 +1287,7 @@ export function QuadroDaEscalaScreen({
                     ) : (
                       <HorasDoMes
                         minutos={minutos}
-                        meta={metaDoPeriodo(p, dias)}
+                        meta={metaDoPeriodo(p, dias, regras?.inicioTransicao)}
                         diasDeTrabalho={
                           cs.filter((c) => c.tipo === "trabalho").length
                         }
@@ -1182,7 +1386,7 @@ export function QuadroDaEscalaScreen({
               type="button"
               className="quadro__icone-botao"
               aria-label="Período anterior"
-              onClick={() => irPara(deslocar(visao, ancora, -1))}
+              onClick={() => irPara(deslocar(visao, ancora, -1, semanaComeca))}
             >
               <IconeVoltar tamanho={16} />
             </button>
@@ -1193,7 +1397,7 @@ export function QuadroDaEscalaScreen({
               type="button"
               className="quadro__icone-botao"
               aria-label="Próximo período"
-              onClick={() => irPara(deslocar(visao, ancora, 1))}
+              onClick={() => irPara(deslocar(visao, ancora, 1, semanaComeca))}
             >
               <IconeAvancar tamanho={16} />
             </button>
@@ -1206,6 +1410,24 @@ export function QuadroDaEscalaScreen({
           >
             Hoje
           </Button>
+          {carga.estado === "pronto" ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setVendoAvisos("todos")}
+            >
+              Avisos
+              <span
+                className={`quadro__avisos-numero${
+                  visiveis.some((a) => a.categoria === "atencao")
+                    ? " quadro__avisos-numero--atencao"
+                    : ""
+                }`}
+              >
+                {visiveis.length}
+              </span>
+            </Button>
+          ) : null}
           {onAbrirTurnos ? (
             <Button type="button" variant="secondary" onClick={onAbrirTurnos}>
               Turnos
@@ -1220,11 +1442,29 @@ export function QuadroDaEscalaScreen({
                 <IconeMaisAcoes tamanho={18} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                {onAbrirRegras ? (
+                  <DropdownMenuItem onSelect={onAbrirRegras}>
+                    <span className="quadro__item-menu">
+                      Regras da escala
+                      <small>
+                        Jornada, convenção, feriados locais e avisos
+                      </small>
+                    </span>
+                  </DropdownMenuItem>
+                ) : null}
                 {onAbrirTurnos ? (
                   <DropdownMenuItem onSelect={onAbrirTurnos}>
                     <span className="quadro__item-menu">
                       Turnos
                       <small>Horários da empresa</small>
+                    </span>
+                  </DropdownMenuItem>
+                ) : null}
+                {onAbrirTransicao && em6x1.length > 0 ? (
+                  <DropdownMenuItem onSelect={onAbrirTransicao}>
+                    <span className="quadro__item-menu">
+                      Planejar a transição
+                      <small>EC 141/2026: 6x1 → 2 descansos por semana</small>
                     </span>
                   </DropdownMenuItem>
                 ) : null}
@@ -1329,6 +1569,19 @@ export function QuadroDaEscalaScreen({
           ) : null}
         </div>
 
+        {carga.estado === "pronto" && em6x1.length > 0 ? (
+          <FaixaDaTransicao
+            quantas={em6x1.length}
+            inicio={regras?.inicioTransicao ?? "2026-12-16"}
+            periodo={visao === "semana" ? "nesta semana" : "neste mês"}
+            {...(podeOperar
+              ? { onTemosConvencao: () => void tentar(temosConvencao) }
+              : {})}
+            {...(podeOperar && onAbrirTransicao
+              ? { onPlanejar: onAbrirTransicao }
+              : {})}
+          />
+        ) : null}
         {carga.estado === "carregando" ? (
           <Esqueleto rotulo="Carregando o quadro…" linhas={5} />
         ) : carga.estado === "erro" ? (
@@ -1388,7 +1641,10 @@ export function QuadroDaEscalaScreen({
                       </button>
                     </th>
                     {dias.map((d) => {
-                      const feriado = feriadoDe(d);
+                      const feriado =
+                        feriadoDe(d) ??
+                        regras?.feriados.find((x) => x.data === d)?.nome ??
+                        null;
                       const semana = diaDaSemana(d) - 1;
                       return (
                         <th
@@ -1405,13 +1661,13 @@ export function QuadroDaEscalaScreen({
                                 {DIAS_CURTOS[semana]}
                               </span>
                               <span className="quadro__dia-numero">
-                                {Number(d.slice(8, 10))}
+                                {numeroDoDia(d)}
                               </span>
                             </>
                           ) : (
                             <>
                               <span className="quadro__dia-numero">
-                                {Number(d.slice(8, 10))}
+                                {numeroDoDia(d)}
                               </span>
                               <span className="quadro__dia-nome">
                                 {LETRAS_DOS_DIAS[semana]}
@@ -1625,6 +1881,19 @@ export function QuadroDaEscalaScreen({
           <DialogoPublicar
             periodo={visao === "semana" ? `Semana de ${titulo}` : titulo}
             resumo={resumoDaPublicacao}
+            avisos={avisosDeAtencao}
+            onVerAvisos={() => {
+              setPublicando(false);
+              setVendoAvisos("todos");
+            }}
+            avisarPadrao={regras?.avisarPadrao ?? true}
+            antecedenciaFaltando={
+              regras &&
+              regras.antecedenciaDias > 0 &&
+              inicio < somarDiasLocal(hoje, regras.antecedenciaDias)
+                ? regras.antecedenciaDias
+                : null
+            }
             onFechar={() => setPublicando(false)}
             onPublicar={async (avisar) => {
               const r = await publicarEscala(inicio, fim, avisar);
@@ -1658,6 +1927,7 @@ export function QuadroDaEscalaScreen({
               onClick={() => setDialogo({ tipo: "trocar", alvo: "selecao" })}
               disabled={turnos.length === 0}
             >
+              <IconeTentarDeNovo tamanho={16} />
               Trocar turno
             </Button>
             <Button
@@ -1665,6 +1935,7 @@ export function QuadroDaEscalaScreen({
               variant="secondary"
               onClick={() => setDialogo({ tipo: "folga", alvo: "selecao" })}
             >
+              <IconeCalendario tamanho={16} />
               Dar folga
             </Button>
             {visao === "semana" ? (
@@ -1679,9 +1950,68 @@ export function QuadroDaEscalaScreen({
                   )
                 }
               >
+                <IconeCopiar tamanho={16} />
                 Copiar semana anterior
               </Button>
             ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="quadro__icone-botao"
+                aria-label="Mais ações para as pessoas selecionadas"
+              >
+                <IconeMaisAcoes tamanho={18} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top">
+                <DropdownMenuItem onSelect={() => setVendoAvisos("selecao")}>
+                  <span className="quadro__item-menu quadro__item-menu--icone">
+                    <IconeAviso tamanho={16} />
+                    <span>
+                      Ver avisos dessas pessoas
+                      <small>Abre o painel de avisos filtrado</small>
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    trocarVisao(visao === "semana" ? "mes" : "semana")
+                  }
+                >
+                  <span className="quadro__item-menu quadro__item-menu--icone">
+                    <IconeCalendario tamanho={16} />
+                    <span>
+                      {visao === "semana" ? "Abrir no mês" : "Abrir na semana"}
+                      <small>
+                        {visao === "semana"
+                          ? "Mesmo filtro, visão mensal"
+                          : "Mesmo filtro, visão semanal"}
+                      </small>
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={
+                    rascunhosDe(
+                      todas.filter((p) => selecionados.has(p.colaboradorId)),
+                    ).length === 0
+                  }
+                  onSelect={() =>
+                    setDialogo({ tipo: "limpar", alvo: "selecao" })
+                  }
+                >
+                  <span className="quadro__item-menu quadro__item-menu--icone quadro__item-menu--perigo">
+                    <IconeRemover tamanho={16} />
+                    <span>
+                      Limpar o rascunho do período
+                      <small>Só o que ainda não foi publicado</small>
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <kbd className="quadro__dica-tecla" aria-hidden="true">
+              Esc
+            </kbd>
             <button
               type="button"
               className="quadro__icone-botao"
@@ -1743,7 +2073,7 @@ export function QuadroDaEscalaScreen({
                 fimDaSemana={fim}
                 onFechar={() => setDialogo(null)}
                 onAplicar={async (ate) => {
-                  const semanas = semanasAte(segundaDaSemana(inicio), ate);
+                  const semanas = semanasAte(inicio, ate);
                   const destino = await pessoasDoPeriodo(
                     somarDiasLocal(fim, 1),
                     ate,
@@ -1777,16 +2107,20 @@ export function QuadroDaEscalaScreen({
             );
           }
           if (dialogo?.tipo === "limpar") {
-            const itens = rascunhosDe(filtradas);
+            const alvo = dialogo.alvo === "selecao" ? sel : filtradas;
+            const itens = rascunhosDe(alvo);
             return (
               <DialogoLimparRascunho
                 periodo={titulo}
                 quantas={itens.length}
+                {...(dialogo.alvo === "selecao"
+                  ? { deQuem: "as pessoas selecionadas" }
+                  : {})}
                 onFechar={() => setDialogo(null)}
                 onConfirmar={async () => {
                   await executarLote(
                     { gravar: [], limpar: itens },
-                    rascunhosPorChave(filtradas),
+                    rascunhosPorChave(alvo),
                     itens.length === 1
                       ? "1 mudança desfeita"
                       : `${itens.length} mudanças desfeitas`,
@@ -1798,6 +2132,26 @@ export function QuadroDaEscalaScreen({
           }
           return null;
         })()}
+        {vendoAvisos ? (
+          <PainelDeAvisos
+            titulo={
+              vendoAvisos === "selecao"
+                ? `Avisos de ${plural(selecionados.size, "pessoa", "pessoas")}`
+                : visao === "semana"
+                  ? "Avisos da semana"
+                  : "Avisos do mês"
+            }
+            subtitulo={`${titulo} · calculados no rascunho`}
+            avisos={
+              vendoAvisos === "selecao"
+                ? visiveis.filter((a) => selecionados.has(a.colaboradorId))
+                : visiveis
+            }
+            onIrParaCelula={irParaAviso}
+            {...(onAbrirRegras ? { onAbrirRegras } : {})}
+            onFechar={() => setVendoAvisos(false)}
+          />
+        ) : null}
         <AvisoFlutuante aviso={aviso} onFechar={() => setAviso(null)} />
         <GavetaDoQuadro
           aberta={gaveta}
@@ -1806,6 +2160,7 @@ export function QuadroDaEscalaScreen({
           filtros={filtros}
           referencia={referencia}
           rotulos={ROTULOS}
+          idsComAviso={idsComAviso}
           onMudar={(f) => {
             setFiltros(f);
             setPagina(1);

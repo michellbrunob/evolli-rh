@@ -463,3 +463,23 @@ export function diaMesCurto(valor: string | null | undefined): string {
     return AUSENTE;
   return `${Number(valor.slice(8, 10))}/${Number(valor.slice(5, 7))}`;
 }
+
+/** T215 — o número do dia no mês de uma data civil (`2026-11-05` → 5). */
+export function numeroDoDia(valor: string): number {
+  return Number(valor.slice(8, 10));
+}
+
+/**
+ * T215 — a mesma data um ano depois (`2026-12-16` → `2027-12-16`): a 2ª
+ * etapa da transição da EC 141/2026.
+ */
+export function umAnoDepois(valor: string): string {
+  return `${Number(valor.slice(0, 4)) + 1}${valor.slice(4)}`;
+}
+
+/** T215 — idade em anos completos numa data civil (aviso de menor de idade). */
+export function idadeEmAnos(nascimento: string, dia: string): number {
+  let anos = Number(dia.slice(0, 4)) - Number(nascimento.slice(0, 4));
+  if (dia.slice(5) < nascimento.slice(5)) anos -= 1;
+  return anos;
+}

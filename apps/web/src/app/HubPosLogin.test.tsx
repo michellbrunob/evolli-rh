@@ -125,6 +125,9 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Escala de trabalho",
         // T215 — os turnos, sub-página do quadro.
         "Turnos",
+        // T215 — Regras da escala e Planejar a transição.
+        "Regras da escala",
+        "Planejar a transição",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -153,6 +156,9 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Escala de trabalho",
         // T215 — os turnos, sub-página do quadro.
         "Turnos",
+        // T215 — Regras da escala e Planejar a transição.
+        "Regras da escala",
+        "Planejar a transição",
         "Organograma",
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
@@ -172,8 +178,9 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Colaboradores",
         // T211 — Escala de trabalho e Organograma, no grupo de Colaboradores.
         "Escala de trabalho",
-        // T215 — os turnos, sub-página do quadro.
+        // T215 — os turnos e as Regras (só consulta), sub-páginas do quadro.
         "Turnos",
+        "Regras da escala",
         "Organograma",
         "Jornada",
         "Segurança",
@@ -547,7 +554,8 @@ describe("T162 — acessibilidade e estrutura", () => {
     montar({ papel: "rh" });
     // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança e 15
     // com Turnos (sub-página do quadro da escala).
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(15));
+    // T215 — mais Regras da escala e Planejar a transição: 17.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(17));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",
