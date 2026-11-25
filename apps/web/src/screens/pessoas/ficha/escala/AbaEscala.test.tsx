@@ -669,6 +669,64 @@ describe("T215 — Escala atual e gaveta como na referência (regras e explicaç
   });
 });
 
+describe("T215 — refazer o rascunho do quadro", () => {
+  it("vem marcado: linha no O que muda; ao salvar, refaz a partir da data e o aviso conta os dias", async () => {
+    const servico = {
+      ...servicoCom([escala("e1", "5x2", "2026-02-02", null)]),
+      refazerRascunho: vi.fn().mockResolvedValue(28),
+    };
+    montar(servico);
+    const g = await abrirGaveta("Alterar padrão");
+    const opcao = within(g).getByRole("checkbox", {
+      name: "Refazer o rascunho do quadro a partir de 24/11",
+    });
+    expect(opcao).toBeChecked();
+    expect(opcao).toHaveAccessibleDescription(
+      "Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam quando a escala for publicada.",
+    );
+    expect(muda(g)).toHaveTextContent(
+      "Rascunho do quadro—› passa a 28 dias refeitos",
+    );
+    await escolher(g, "Escala", /^6x1/);
+    fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
+    const aviso = await screen.findByRole("status", {
+      name: "Padrão de escala alterado",
+    });
+    expect(aviso).toHaveTextContent(
+      "Vale a partir de 24/11/2026. 28 dias refeitos no rascunho do quadro.",
+    );
+    expect(servico.refazerRascunho).toHaveBeenCalledWith(COLAB, "2026-11-24");
+    expect(servico.definir.mock.invocationCallOrder[0]!).toBeLessThan(
+      servico.refazerRascunho.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("desmarcado: some a linha e não refaz; falha ao refazer avisa sem perder o padrão", async () => {
+    const servico = {
+      ...servicoCom([escala("e1", "5x2", "2026-02-02", null)]),
+      refazerRascunho: vi.fn().mockRejectedValue(new Error("rede")),
+    };
+    montar(servico);
+    let g = await abrirGaveta("Alterar padrão");
+    fireEvent.click(
+      within(g).getByRole("checkbox", { name: /^Refazer o rascunho/ }),
+    );
+    expect(muda(g)).not.toHaveTextContent("Rascunho do quadro");
+    await escolher(g, "Escala", /^6x1/);
+    fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
+    await screen.findByRole("status", { name: "Padrão de escala alterado" });
+    expect(servico.refazerRascunho).not.toHaveBeenCalled();
+
+    g = await abrirGaveta("Alterar padrão");
+    await escolher(g, "Escala", /^6x1/);
+    fireEvent.click(within(g).getByRole("button", { name: "Salvar padrão" }));
+    await waitFor(() => expect(servico.refazerRascunho).toHaveBeenCalled());
+    expect(
+      await screen.findByText(/Não foi possível refazer o rascunho do quadro/),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("T215 — aviso de legislação na gaveta", () => {
   it("6x1 com turno de 8 h: avisa na gaveta que passa do limite semanal, sem impedir salvar", async () => {
     const servico = servicoCom([escala("e1", "5x2", "2026-02-02", null)]);

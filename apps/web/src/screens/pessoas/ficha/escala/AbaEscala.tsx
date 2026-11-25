@@ -48,7 +48,11 @@ import {
   IconeRemover,
 } from "../../../../ui/icones";
 import { Esqueleto, Revelar } from "../../../../ui/movimento";
-import { formatarDiaCivil } from "../../../../format/data";
+import { diaMesCurto, formatarDiaCivil } from "../../../../format/data";
+import {
+  DIAS_DO_REFAZER,
+  refazerRascunhoDoQuadro,
+} from "../../../horarios/quadro/refazerRascunho";
 import {
   diaAnteriorCivil,
   diaDeHoje,
@@ -98,6 +102,11 @@ export interface ServicoDeEscala {
     escalaId: string,
     vigenciaFim: string,
   ): Promise<EscalasDoColaboradorApi>;
+  /**
+   * T215 — refaz o rascunho do quadro pelo padrão novo, nos 28 dias a partir
+   * da data; devolve quantos dias mudaram. Sem ela, a gaveta não oferece.
+   */
+  refazerRascunho?(colaboradorId: string, inicio: string): Promise<number>;
 }
 
 export const servicoDeEscalaDoServidor: ServicoDeEscala = {
@@ -106,6 +115,7 @@ export const servicoDeEscalaDoServidor: ServicoDeEscala = {
     (await listarTabelasHorario({ ativo: true, tamanhoPagina: 100 })).itens,
   definir: definirEscala,
   encerrar: encerrarEscala,
+  refazerRascunho: refazerRascunhoDoQuadro,
 };
 
 interface Props {
@@ -1175,6 +1185,9 @@ function GavetaDoPadrao({
   const [dias, setDias] = useState<number[]>([...inicial.dias]);
   const [ciclo, setCiclo] = useState(inicial.ciclo);
   const [vale, setVale] = useState(inicial.vale);
+  // Como a referência: refazer o rascunho do quadro vem marcado.
+  const podeRefazer = servico.refazerRascunho !== undefined;
+  const [refazer, setRefazer] = useState(true);
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
   const focoRef = useRef<string | null>(null);
@@ -1280,11 +1293,23 @@ function GavetaDoPadrao({
     setErros({});
     try {
       await servico.definir(colaboradorId, dto);
+      let texto = `Vale a partir de ${formatarDiaCivil(vale)}.`;
+      if (podeRefazer && refazer) {
+        try {
+          const n = await servico.refazerRascunho!(colaboradorId, vale);
+          if (n > 0) {
+            texto += ` ${plural(n, "dia refeito", "dias refeitos")} no rascunho do quadro.`;
+          }
+        } catch {
+          texto +=
+            " Não foi possível refazer o rascunho do quadro: use Aplicar modelo no quadro.";
+        }
+      }
       onGravado(
         modo === "alterar"
           ? "Padrão de escala alterado"
           : "Padrão de escala definido",
-        `Vale a partir de ${formatarDiaCivil(vale)}.`,
+        texto,
       );
     } catch (erro) {
       const recusa = errosDaRecusa(erro);
@@ -1348,6 +1373,15 @@ function GavetaDoPadrao({
       plural(diasNoMes(modeloAntes, mesDe(dataBase)), "dia", "dias"),
       plural(diasNoMes(modelo, mesDe(dataBase)), "dia", "dias"),
     ],
+    ...(podeRefazer && refazer
+      ? ([
+          [
+            "Rascunho do quadro",
+            VAZIO,
+            plural(DIAS_DO_REFAZER, "dia refeito", "dias refeitos"),
+          ],
+        ] as [string, string, string][])
+      : []),
   ];
   // Como na referência: a escala sai do quadro quando não muda.
   const visiveis = linhas.filter(
@@ -1655,7 +1689,27 @@ function GavetaDoPadrao({
             </ul>
           </div>
         ) : null}
-        <p className="escala-ficha__ajuda">
+        {podeRefazer ? (
+          <label className="escala-gaveta__refazer">
+            <input
+              type="checkbox"
+              checked={refazer}
+              onChange={(e) => setRefazer(e.target.checked)}
+              aria-labelledby={`${base}-refazer`}
+              aria-describedby={`${base}-refazer-ajuda`}
+            />
+            <span>
+              <strong
+                id={`${base}-refazer`}
+              >{`Refazer o rascunho do quadro a partir de ${diaMesCurto(vale)}`}</strong>
+              <small id={`${base}-refazer-ajuda`}>
+                Dias com férias ou ausência aprovada não mudam. Os benefícios só
+                mudam quando a escala for publicada.
+              </small>
+            </span>
+          </label>
+        ) : null}
+        <p className="escala-ficha__ajuda" hidden={podeRefazer}>
           Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam
           quando a escala for publicada.
         </p>

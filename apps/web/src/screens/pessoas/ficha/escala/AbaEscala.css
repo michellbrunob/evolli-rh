@@ -958,3 +958,33 @@
 .escala-gaveta__legislacao li + li {
   margin-top: var(--space-xs);
 }
+
+/* T215 — "Refazer o rascunho do quadro", abaixo do "O que muda". */
+.escala-gaveta__refazer {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  margin-top: var(--space-md);
+  cursor: pointer;
+}
+
+.escala-gaveta__refazer input {
+  flex: none;
+  margin-top: 2px;
+}
+
+.escala-gaveta__refazer span {
+  display: grid;
+  gap: 2px;
+}
+
+.escala-gaveta__refazer strong {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 500;
+}
+
+.escala-gaveta__refazer small {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
