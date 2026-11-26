@@ -21,9 +21,11 @@ import { PessoasAuditContext } from "../pessoas.types";
 import { escolherVinculoPrincipal } from "../colaborador/vinculo-principal";
 import {
   type AusenciaDoSaldo,
+  type AvisoClt,
   type Dia,
   type PeriodoAquisitivo,
   STATUS_QUE_OCUPAM,
+  avisosDaClt,
   dataDoDia,
   diaDaVolta,
   diaDe,
@@ -112,6 +114,10 @@ export interface SimulacaoDeAusencia {
   prazoAbono: Dia | null;
   /** T215 — a regra de férias do vínculo da pessoa. */
   regraDeFerias: RegraDeFerias;
+  /** T215 — "Regras da CLT" (só aviso), nas férias com saldo calculado. */
+  avisosClt: AvisoClt[];
+  /** T215 — os períodos com saldo de que as férias podem descontar ("trocar"). */
+  periodosDisponiveis: { inicio: Dia; fim: Dia; disponiveis: number }[];
 }
 
 export interface FeriasDoColaborador {
@@ -825,6 +831,12 @@ export class AusenciasService {
       diasUteis: fim ? diasUteis(query.inicio, fim) : null,
       volta: fim ? diaDaVolta(fim) : null,
       regraDeFerias,
+      avisosClt: [] as AvisoClt[],
+      periodosDisponiveis: [] as {
+        inicio: Dia;
+        fim: Dia;
+        disponiveis: number;
+      }[],
     };
     if (query.tipo !== "ferias" || !fim || regraDeFerias !== "calculada") {
       return {
@@ -859,9 +871,22 @@ export class AusenciasService {
       query.periodoAquisitivoInicio ?? null,
     );
     const usados = base.dias! + (query.diasVendidos ?? 0);
+    const periodosDisponiveis = periodos
+      .filter(
+        (p) =>
+          p.fim < query.inicio &&
+          query.inicio <= p.prazoGozo &&
+          p.disponiveis > 0,
+      )
+      .map((p) => ({
+        inicio: p.inicio,
+        fim: p.fim,
+        disponiveis: p.disponiveis,
+      }));
     if (!periodo) {
       return {
         ...base,
+        periodosDisponiveis,
         periodo: null,
         saldoAntes: 0,
         saldoDepois: -usados,
@@ -869,8 +894,24 @@ export class AusenciasService {
         prazoAbono: null,
       };
     }
+    const outrasFerias = existentes
+      .filter(
+        (a) =>
+          a.tipo === "ferias" &&
+          a.fim !== null &&
+          a.periodoAquisitivoInicio !== null &&
+          diaDe(a.periodoAquisitivoInicio) === periodo.inicio,
+      )
+      .map((a) => ({ inicio: diaDe(a.inicio), fim: diaDe(a.fim!) }));
     return {
       ...base,
+      avisosClt: avisosDaClt({
+        inicio: query.inicio,
+        fim,
+        periodo,
+        outrasFerias,
+      }),
+      periodosDisponiveis,
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
       saldoAntes: periodo.disponiveis,
       saldoDepois: periodo.disponiveis - usados,

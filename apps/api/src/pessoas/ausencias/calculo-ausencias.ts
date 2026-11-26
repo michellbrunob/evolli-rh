@@ -316,6 +316,65 @@ export function periodoParaFerias(
   return periodos.find((p) => serve(p) && p.disponiveis > 0) ?? null;
 }
 
+/**
+ * T215 — "Regras da CLT" no registro de férias (como a referência, só
+ * aviso: quem registra decide):
+ * - cada período com pelo menos 5 dias corridos, e um deles com 14 ou mais;
+ *   até 3 períodos no mesmo período aquisitivo (art. 134, § 1º);
+ * - o início não cai nos 2 dias antes do domingo (repouso semanal) nem de
+ *   feriado (art. 134, § 3º; feriados nacionais de data fixa).
+ */
+export type AvisoClt =
+  | { regra: "minimo_5"; dias: number }
+  | { regra: "um_com_14" }
+  | { regra: "ate_3_periodos"; ordem: number }
+  | {
+      regra: "inicio_antes_de_descanso";
+      antesDe: "domingo" | "feriado";
+      dia: Dia;
+    };
+
+export function avisosDaClt(entrada: {
+  inicio: Dia;
+  fim: Dia;
+  /** O período aquisitivo de que as férias descontam (antes delas). */
+  periodo: PeriodoAquisitivo;
+  /** As outras férias já lançadas nesse período (sem as vendas). */
+  outrasFerias: readonly { inicio: Dia; fim: Dia }[];
+}): AvisoClt[] {
+  const avisos: AvisoClt[] = [];
+  for (const d of [1, 2]) {
+    const dia = somarDias(entrada.inicio, d);
+    if (dataDoDia(dia).getUTCDay() === 0) {
+      avisos.push({
+        regra: "inicio_antes_de_descanso",
+        antesDe: "domingo",
+        dia,
+      });
+      break;
+    }
+    if (ehFeriadoNacional(dia)) {
+      avisos.push({
+        regra: "inicio_antes_de_descanso",
+        antesDe: "feriado",
+        dia,
+      });
+      break;
+    }
+  }
+  const dias = diasCorridos(entrada.inicio, entrada.fim);
+  if (dias < 5) avisos.push({ regra: "minimo_5", dias });
+  const ordem = entrada.outrasFerias.length + 1;
+  if (ordem > 3) avisos.push({ regra: "ate_3_periodos", ordem });
+  const jaHouve14 = entrada.outrasFerias.some(
+    (f) => diasCorridos(f.inicio, f.fim) >= 14,
+  );
+  if (dias < 14 && !jaHouve14 && entrada.periodo.disponiveis - dias < 14) {
+    avisos.push({ regra: "um_com_14" });
+  }
+  return avisos;
+}
+
 /** Até 1/3 do direito, no máximo 10 dias (CLT, art. 143). */
 export function maxVendaveis(direito: number): number {
   return Math.min(10, Math.floor(direito / 3));

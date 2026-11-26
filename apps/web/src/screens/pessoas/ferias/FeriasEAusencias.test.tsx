@@ -430,6 +430,117 @@ describe("T215 — Registrar ausência (gaveta)", () => {
     ).toBeDisabled();
   });
 
+  async function feriasDaMaria(inicio: string, fim: string) {
+    await escolherMaria();
+    fireEvent.click(screen.getByRole("radio", { name: "Férias" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: inicio },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: fim },
+    });
+  }
+
+  it("Regras da CLT: os avisos do servidor aparecem e não travam o registro", async () => {
+    const simular = vi.mocked(servico.simular);
+    simular.mockImplementation(async () => ({
+      dias: 3,
+      diasUteis: 1,
+      volta: "2026-12-07",
+      periodo: { inicio: "2025-01-05", fim: "2026-01-04" },
+      saldoAntes: 30,
+      saldoDepois: 27,
+      maxVendaveis: 10,
+      prazoAbono: "2025-12-20",
+      avisosClt: [
+        {
+          regra: "inicio_antes_de_descanso" as const,
+          antesDe: "domingo" as const,
+          dia: "2026-12-06",
+        },
+        { regra: "minimo_5" as const, dias: 3 },
+        { regra: "ate_3_periodos" as const, ordem: 4 },
+        { regra: "um_com_14" as const },
+        {
+          regra: "inicio_antes_de_descanso" as const,
+          antesDe: "feriado" as const,
+          dia: "2026-12-25",
+        },
+      ],
+      periodosDisponiveis: [
+        { inicio: "2025-01-05", fim: "2026-01-04", disponiveis: 30 },
+      ],
+    }));
+    montarGaveta();
+    await feriasDaMaria("2026-12-04", "2026-12-06");
+    const regras = await screen.findByRole("note", { name: "Regras da CLT" });
+    expect(
+      within(regras)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "Início em 04/12, nos 2 dias antes de domingo (CLT art. 134, § 3º).",
+      "3 dias corridos; a lei pede pelo menos 5 por período (CLT art. 134, § 1º).",
+      "Seria o 4º período de férias deste período aquisitivo; a lei permite até 3 (CLT art. 134, § 1º).",
+      "Nenhum período chegaria a 14 dias; a lei pede um com pelo menos 14 (CLT art. 134, § 1º).",
+      "Início em 04/12, nos 2 dias antes do feriado de 25/12 (CLT art. 134, § 3º).",
+    ]);
+    // Com um período só, não há o que trocar.
+    expect(screen.queryByRole("button", { name: "trocar" })).toBeNull();
+  });
+
+  it("trocar: escolhe outro período com saldo e a simulação desconta dele", async () => {
+    const simular = vi.mocked(servico.simular);
+    simular.mockImplementation(async (c) => ({
+      dias: 20,
+      diasUteis: 14,
+      volta: "2027-01-25",
+      periodo:
+        c.periodoAquisitivoInicio === "2025-01-05"
+          ? { inicio: "2025-01-05", fim: "2026-01-04" }
+          : { inicio: "2024-01-05", fim: "2025-01-04" },
+      saldoAntes: 30,
+      saldoDepois: 10,
+      maxVendaveis: 10,
+      prazoAbono: "2025-12-20",
+      avisosClt: [],
+      periodosDisponiveis: [
+        { inicio: "2024-01-05", fim: "2025-01-04", disponiveis: 12 },
+        { inicio: "2025-01-05", fim: "2026-01-04", disponiveis: 30 },
+      ],
+    }));
+    montarGaveta();
+    await feriasDaMaria("2027-01-05", "2027-01-24");
+    expect(
+      await screen.findByText("Desconta do período 2025 (automático)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("note", { name: "Regras da CLT" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "trocar" }));
+    const escolha = screen.getByRole("radiogroup", {
+      name: "De que período descontar",
+    });
+    expect(
+      within(escolha)
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual([
+      "Período 2025 · 05/01/2024 – 04/01/2025 · 12 dias",
+      "Período 2026 · 05/01/2025 – 04/01/2026 · 30 dias",
+    ]);
+    fireEvent.click(
+      within(escolha).getByRole("radio", { name: /^Período 2026/ }),
+    );
+    await waitFor(() =>
+      expect(simular).toHaveBeenLastCalledWith(
+        expect.objectContaining({ periodoAquisitivoInicio: "2025-01-05" }),
+        expect.anything(),
+      ),
+    );
+    expect(
+      await screen.findByText("Desconta do período 2026 (escolhido)"),
+    ).toBeInTheDocument();
+  });
+
   it("férias: o resumo do servidor, a venda de dias e o registro", async () => {
     const { onRegistrada } = montarGaveta();
     await escolherMaria();

@@ -1,4 +1,5 @@
 import {
+  avisosDaClt,
   diaDaVolta,
   diasCorridos,
   diasUteis,
@@ -331,6 +332,147 @@ describe("T215 — cálculos de ausências", () => {
         ],
       });
       expect(indiceDoPeriodoAtual(tirado, "2026-11-23")).toBe(1);
+    });
+  });
+
+  describe("Regras da CLT no registro de férias (só aviso, como a referência)", () => {
+    const periodo = {
+      inicio: "2025-01-01",
+      fim: "2025-12-31",
+      direito: 30,
+      solicitados: 0,
+      disponiveis: 30,
+      prazoGozo: "2026-12-31",
+      situacao: "disponivel" as const,
+      encurtado: null,
+    };
+
+    it("período com menos de 5 dias corridos (art. 134, § 1º)", () => {
+      // Terça a quinta.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-01",
+          fim: "2026-12-03",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toContainEqual({ regra: "minimo_5", dias: 3 });
+      // 4 dias (terça a sexta) ainda é pouco.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-01",
+          fim: "2026-12-04",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toContainEqual({ regra: "minimo_5", dias: 4 });
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-01",
+          fim: "2026-12-05",
+          periodo,
+          outrasFerias: [],
+        }).some((a) => a.regra === "minimo_5"),
+      ).toBe(false);
+    });
+
+    it("início nos 2 dias antes do domingo ou de feriado (art. 134, § 3º)", () => {
+      // 04/12/2026 é sexta.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-04",
+          fim: "2026-12-17",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toEqual([
+        {
+          regra: "inicio_antes_de_descanso",
+          antesDe: "domingo",
+          dia: "2026-12-06",
+        },
+      ]);
+      // Sábado também (véspera do domingo).
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-05",
+          fim: "2026-12-18",
+          periodo,
+          outrasFerias: [],
+        })[0],
+      ).toEqual({
+        regra: "inicio_antes_de_descanso",
+        antesDe: "domingo",
+        dia: "2026-12-06",
+      });
+      // 23/12/2026 (quarta): dois dias antes do Natal.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-23",
+          fim: "2027-01-05",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toContainEqual({
+        regra: "inicio_antes_de_descanso",
+        antesDe: "feriado",
+        dia: "2026-12-25",
+      });
+      // Segunda-feira comum: nada.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-07",
+          fim: "2026-12-20",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toEqual([]);
+    });
+
+    it("até 3 períodos no mesmo período aquisitivo (art. 134, § 1º)", () => {
+      const outras = [
+        { inicio: "2026-02-02", fim: "2026-02-15" },
+        { inicio: "2026-04-06", fim: "2026-04-10" },
+        { inicio: "2026-06-01", fim: "2026-06-05" },
+      ];
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-07",
+          periodo: { ...periodo, solicitados: 24, disponiveis: 6 },
+          outrasFerias: outras,
+        }),
+      ).toContainEqual({ regra: "ate_3_periodos", ordem: 4 });
+    });
+
+    it("um dos períodos com 14 dias ou mais (art. 134, § 1º)", () => {
+      // 10 dias agora, sobram 20: ainda cabe um de 14 — sem aviso.
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-12",
+          periodo,
+          outrasFerias: [],
+        }).some((a) => a.regra === "um_com_14"),
+      ).toBe(false);
+      // 10 já tirados (nenhum de 14) e 10 agora: sobram 10 — aviso.
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-12",
+          periodo: { ...periodo, solicitados: 10, disponiveis: 20 },
+          outrasFerias: [{ inicio: "2026-02-02", fim: "2026-02-11" }],
+        }),
+      ).toContainEqual({ regra: "um_com_14" });
+      // Já houve um de 14: sem aviso.
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-12",
+          periodo: { ...periodo, solicitados: 14, disponiveis: 16 },
+          outrasFerias: [{ inicio: "2026-02-02", fim: "2026-02-15" }],
+        }).some((a) => a.regra === "um_com_14"),
+      ).toBe(false);
     });
   });
 

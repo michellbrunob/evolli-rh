@@ -8,6 +8,7 @@
  */
 import { formatarIntervaloDeDias } from "../../../format/data";
 import type {
+  AvisoCltApi,
   MotivoReinicio,
   NovoReinicioDto,
   ReinicioApi,
@@ -136,6 +137,14 @@ export interface SimulacaoDeAusencia {
    * sem_ferias (PJ, Freelancer) ou sem_regra (Aprendiz e demais).
    */
   readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
+  /** T215 — "Regras da CLT" (só aviso, como a referência). */
+  readonly avisosClt?: readonly AvisoCltApi[];
+  /** T215 — os períodos com saldo de que as férias podem descontar. */
+  readonly periodosDisponiveis?: readonly {
+    readonly inicio: string;
+    readonly fim: string;
+    readonly disponiveis: number;
+  }[];
 }
 
 export interface ConsultaDeSimulacao {

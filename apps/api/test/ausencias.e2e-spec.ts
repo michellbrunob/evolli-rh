@@ -1529,6 +1529,45 @@ describe("T215 — Férias e ausências (e2e)", () => {
     });
   });
 
+  describe("regras da CLT e troca de período na simulação (como a referência)", () => {
+    // A próxima sexta-feira daqui a pelo menos 10 dias.
+    let sexta = somarDias(HOJE, 10);
+    while (new Date(`${sexta}T00:00:00Z`).getUTCDay() !== 5) {
+      sexta = somarDias(sexta, 1);
+    }
+
+    it("férias: avisos (início antes do domingo, menos de 5 dias) e os períodos que podem ser escolhidos", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const r = await get(
+        `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${sexta}&fim=${somarDias(sexta, 2)}`,
+        rhA,
+      ).expect(200);
+      expect(r.body.avisosClt).toEqual(
+        expect.arrayContaining([
+          {
+            regra: "inicio_antes_de_descanso",
+            antesDe: "domingo",
+            dia: somarDias(sexta, 2),
+          },
+          { regra: "minimo_5", dias: 3 },
+        ]),
+      );
+      expect(r.body.periodosDisponiveis).toEqual([
+        { inicio: ADMISSAO, fim: FIM_DO_PERIODO_1, disponiveis: 30 },
+      ]);
+    });
+
+    it("outros tipos: sem avisos nem períodos", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const r = await get(
+        `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=day_off&inicio=${sexta}&fim=${sexta}`,
+        rhA,
+      ).expect(200);
+      expect(r.body.avisosClt).toEqual([]);
+      expect(r.body.periodosDisponiveis).toEqual([]);
+    });
+  });
+
   describe("anexo da ausência (atestado ou documento)", () => {
     /** PDF sintético mínimo, com o fim de arquivo. */
     const pdf = (conteudo = "documento sintetico") =>

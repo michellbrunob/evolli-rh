@@ -806,3 +806,30 @@
 .ausencias__menu-perigo {
   color: var(--status-danger-ink);
 }
+
+/* T215 — "Regras da CLT" no registro de férias: só aviso (como a
+   referência), em tom de atenção. */
+.ausencias-gaveta__clt {
+  display: grid;
+  gap: var(--space-xxs);
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+.ausencias-gaveta__clt-titulo {
+  margin: 0;
+  color: var(--status-warning-ink);
+  font-weight: var(--weight-strong);
+}
+
+.ausencias-gaveta__clt ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 1.1rem;
+}

@@ -21,7 +21,29 @@ import {
   IconeSucesso,
 } from "../../../ui/icones";
 import { ICONE_DO_TIPO } from "./aparenciaDoTipo";
-import { anoDoDiaCivil, formatarDiaCivil } from "../../../format/data";
+import {
+  anoDoDiaCivil,
+  diaMesComZero,
+  formatarDiaCivil,
+  formatarIntervaloDeDias,
+} from "../../../format/data";
+import type { AvisoCltApi } from "../../../api/ausenciasClient";
+
+/** T215 — o texto de cada aviso das "Regras da CLT" (como a referência). */
+function textoDoAvisoClt(a: AvisoCltApi, inicio: string): string {
+  switch (a.regra) {
+    case "inicio_antes_de_descanso":
+      return a.antesDe === "domingo"
+        ? `Início em ${diaMesComZero(inicio)}, nos 2 dias antes de domingo (CLT art. 134, § 3º).`
+        : `Início em ${diaMesComZero(inicio)}, nos 2 dias antes do feriado de ${diaMesComZero(a.dia)} (CLT art. 134, § 3º).`;
+    case "minimo_5":
+      return `${a.dias === 1 ? "1 dia corrido" : `${a.dias} dias corridos`}; a lei pede pelo menos 5 por período (CLT art. 134, § 1º).`;
+    case "ate_3_periodos":
+      return `Seria o ${a.ordem}º período de férias deste período aquisitivo; a lei permite até 3 (CLT art. 134, § 1º).`;
+    case "um_com_14":
+      return "Nenhum período chegaria a 14 dias; a lei pede um com pelo menos 14 (CLT art. 134, § 1º).";
+  }
+}
 import {
   type AusenciaApi,
   type MotivoAfastamento,
@@ -180,6 +202,9 @@ export function RegistrarAusenciaGaveta({
   const [aprovada, setAprovada] = useState(true);
   const [observacao, setObservacao] = useState("");
   const [simulacao, setSimulacao] = useState<SimulacaoDeAusencia | null>(null);
+  // "trocar": o período de que as férias descontam (nulo = automático).
+  const [periodoEscolhido, setPeriodoEscolhido] = useState<string | null>(null);
+  const [trocandoPeriodo, setTrocandoPeriodo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -205,6 +230,8 @@ export function RegistrarAusenciaGaveta({
     setTipo(r?.tipo ?? tipoInicial ?? null);
     setMotivo(r?.motivo ?? null);
     setInicio(r?.inicio ?? "");
+    setPeriodoEscolhido(null);
+    setTrocandoPeriodo(false);
     setFim(r?.fim ?? "");
     setComVolta(r?.comVolta ?? false);
     setVender(r?.vender ?? false);
@@ -263,6 +290,9 @@ export function RegistrarAusenciaGaveta({
             fim: fimEfetivo,
             ...(vendidos > 0 ? { diasVendidos: vendidos } : {}),
             ...(editando ? { ignorar: editando.id } : {}),
+            ...(periodoEscolhido
+              ? { periodoAquisitivoInicio: periodoEscolhido }
+              : {}),
           },
           { signal: controle.signal },
         )
@@ -273,7 +303,16 @@ export function RegistrarAusenciaGaveta({
       window.clearTimeout(espera);
       controle.abort();
     };
-  }, [pessoa, tipo, inicio, fimEfetivo, vendidos, servico, editando]);
+  }, [
+    pessoa,
+    tipo,
+    inicio,
+    fimEfetivo,
+    vendidos,
+    servico,
+    editando,
+    periodoEscolhido,
+  ]);
 
   const completo =
     pessoa !== null &&
@@ -652,9 +691,66 @@ export function RegistrarAusenciaGaveta({
               </p>
               {ferias && ano ? (
                 <p className="ausencias-gaveta__ajuda">
-                  {`Desconta do período ${ano} (automático)`}
+                  <span>
+                    {`Desconta do período ${ano} (${periodoEscolhido ? "escolhido" : "automático"})`}
+                  </span>
+                  {(simulacao.periodosDisponiveis?.length ?? 0) > 1 ? (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="ausencias-gaveta__link"
+                        aria-expanded={trocandoPeriodo}
+                        onClick={() => setTrocandoPeriodo((v) => !v)}
+                      >
+                        trocar
+                      </button>
+                    </>
+                  ) : null}
                 </p>
               ) : null}
+              {ferias && trocandoPeriodo && simulacao.periodosDisponiveis ? (
+                <div
+                  role="radiogroup"
+                  aria-label="De que período descontar"
+                  className="ausencias-gaveta__escolhas"
+                >
+                  {simulacao.periodosDisponiveis.map((p) => (
+                    <button
+                      key={p.inicio}
+                      type="button"
+                      role="radio"
+                      aria-checked={simulacao.periodo?.inicio === p.inicio}
+                      className="ausencias-gaveta__escolha-opcao"
+                      onClick={() => {
+                        setPeriodoEscolhido(p.inicio);
+                        setTrocandoPeriodo(false);
+                      }}
+                    >
+                      {`Período ${anoDoDiaCivil(p.fim)} · ${formatarIntervaloDeDias(p.inicio, p.fim)} · ${plural(p.disponiveis, "dia", "dias")}`}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {ferias && simulacao?.avisosClt && simulacao.avisosClt.length > 0 ? (
+            <div
+              className="ausencias-gaveta__clt"
+              role="note"
+              aria-labelledby={`${base}-clt`}
+            >
+              <p className="ausencias-gaveta__clt-titulo" id={`${base}-clt`}>
+                Regras da CLT
+              </p>
+              <ul>
+                {simulacao.avisosClt.map((a) => (
+                  <li key={`${a.regra}-${"dia" in a ? a.dia : ""}`}>
+                    {textoDoAvisoClt(a, inicio)}
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
 

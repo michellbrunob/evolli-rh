@@ -159,7 +159,22 @@ export interface SimulacaoDeAusenciaApi {
   prazoAbono: string | null;
   /** T215 — a regra de férias do vínculo da pessoa. */
   regraDeFerias?: RegraDeFerias;
+  /** T215 — "Regras da CLT" (só aviso). */
+  avisosClt?: AvisoCltApi[];
+  /** T215 — os períodos com saldo de que as férias podem descontar. */
+  periodosDisponiveis?: { inicio: string; fim: string; disponiveis: number }[];
 }
+
+/** T215 — um aviso das regras da CLT no registro de férias. */
+export type AvisoCltApi =
+  | { regra: "minimo_5"; dias: number }
+  | { regra: "um_com_14" }
+  | { regra: "ate_3_periodos"; ordem: number }
+  | {
+      regra: "inicio_antes_de_descanso";
+      antesDe: "domingo" | "feriado";
+      dia: string;
+    };
 
 export type SituacaoDoPeriodoAquisitivo =
   "em_aquisicao" | "disponivel" | "vencido";
