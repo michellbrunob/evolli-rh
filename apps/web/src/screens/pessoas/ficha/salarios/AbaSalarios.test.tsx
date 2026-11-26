@@ -103,7 +103,11 @@ function servico(
   };
 }
 
-function montar(s: ServicoDeSalarios, podeEditar = true) {
+function montar(
+  s: ServicoDeSalarios,
+  podeEditar = true,
+  cargoAtual: string | null = null,
+) {
   return render(
     <AbaSalarios
       colaboradorId="c1"
@@ -111,6 +115,7 @@ function montar(s: ServicoDeSalarios, podeEditar = true) {
       podeEditar={podeEditar}
       hoje={HOJE}
       servico={s}
+      cargoAtual={cargoAtual}
     />,
   );
 }
@@ -300,6 +305,34 @@ describe("T215 — aba Salários", () => {
       ).toBe("true");
     },
   );
+
+  it("Nova alteração: o cargo vem preenchido com o cargo atual (sem ele, o do último registro)", async () => {
+    const { unmount } = montar(servico(SO_ADMISSAO), true, "Analista de RH");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Nova alteração" }),
+    );
+    let gaveta = await screen.findByRole("dialog", {
+      name: "Adicionar alteração salarial",
+    });
+    expect(
+      (within(gaveta).getByLabelText("Cargo") as HTMLInputElement).value,
+    ).toBe("Analista de RH");
+    // Só o cargo preenchido não é mudança: Escape fecha sem perguntar.
+    fireEvent.keyDown(gaveta, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    unmount();
+
+    montar(servico(COM_REAJUSTES));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Nova alteração" }),
+    );
+    gaveta = await screen.findByRole("dialog", {
+      name: "Adicionar alteração salarial",
+    });
+    expect(
+      (within(gaveta).getByLabelText("Cargo") as HTMLInputElement).value,
+    ).toBe("Coordenadora");
+  });
 
   it("sem data ou sem salário, o botão de registrar fica desabilitado", async () => {
     montar(servico(SO_ADMISSAO));

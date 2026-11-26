@@ -1046,6 +1046,7 @@ export function FichaDoColaborador({
                 colaboradorId={colaboradorId}
                 deQuem={trato.doNome}
                 podeEditar={podeEditar}
+                cargoAtual={lotacao.cargo || null}
               />
             ) : null
           ) : aba === "escala" ? (

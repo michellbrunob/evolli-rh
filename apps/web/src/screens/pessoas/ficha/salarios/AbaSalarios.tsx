@@ -104,6 +104,8 @@ interface Props {
   /** "da Ana", "do João", "de Sam" — o trato da ficha. */
   readonly deQuem: string;
   readonly podeEditar: boolean;
+  /** Cargo vigente (lotação): vem preenchido em "Nova alteração". */
+  readonly cargoAtual?: string | null;
   /** Dia civil de hoje (`AAAA-MM-DD`); padrão, o de São Paulo. */
   readonly hoje?: string;
   readonly servico?: ServicoDeSalarios;
@@ -136,6 +138,7 @@ export function AbaSalarios({
   colaboradorId,
   deQuem,
   podeEditar,
+  cargoAtual = null,
   hoje: hojeInformado,
   servico = servicoDeSalariosDoServidor,
 }: Props) {
@@ -274,6 +277,7 @@ export function AbaSalarios({
             colaboradorId={colaboradorId}
             dataAdmissao={historico.vinculo.dataAdmissao}
             primeiroSalario={historico.alteracoes.length === 0}
+            cargoAtual={cargoAtual || historico.alteracoes[0]?.cargo || ""}
             modeloPadrao={
               historico.alteracoes[0]?.modeloContrato ?? modeloPadrao
             }
@@ -717,7 +721,7 @@ function LinhaDoTempo({
                   {podeEditar ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        className="ficha-ref__botao-icone salarios__mais"
+                        className="salarios__mais"
                         aria-label={`Ações do registro de ${formatarDiaCivil(a.vigenciaInicio)}`}
                       >
                         <IconeMaisAcoes tamanho={16} />
@@ -731,7 +735,7 @@ function LinhaDoTempo({
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="ficha-ref__menu-item salarios__menu-item salarios__menu-perigo"
+                          className="ficha-ref__menu-item ficha-ref__menu-item--perigo salarios__menu-item"
                           disabled={a.origem === "admissao"}
                           onSelect={() => onExcluir(a)}
                         >
@@ -788,6 +792,7 @@ function GavetaDeAlteracao({
   dataAdmissao,
   primeiroSalario,
   modeloPadrao,
+  cargoAtual,
   servico,
   onFechar,
   onGravado,
@@ -798,6 +803,8 @@ function GavetaDeAlteracao({
   /** Sem nenhum período: o primeiro salário é o da admissão, na data dela. */
   readonly primeiroSalario: boolean;
   readonly modeloPadrao: string;
+  /** Cargo que vem preenchido numa alteração nova. */
+  readonly cargoAtual: string;
   readonly servico: ServicoDeSalarios;
   readonly onFechar: () => void;
   readonly onGravado: (historico: HistoricoSalarialApi) => void;
@@ -811,7 +818,8 @@ function GavetaDeAlteracao({
   const [salario, setSalario] = useState(
     editando ? formatarReais(Number(editando.salarioBruto)) : "",
   );
-  const [cargo, setCargo] = useState(editando?.cargo ?? "");
+  const cargoInicial = editando ? (editando.cargo ?? "") : cargoAtual;
+  const [cargo, setCargo] = useState(cargoInicial);
   const [modelo, setModelo] = useState(
     editando ? (editando.modeloContrato ?? modeloPadrao) : modeloPadrao,
   );
@@ -824,9 +832,11 @@ function GavetaDeAlteracao({
   const alterado = editando
     ? data !== editando.vigenciaInicio ||
       salario !== formatarReais(Number(editando.salarioBruto)) ||
-      cargo !== (editando.cargo ?? "") ||
+      cargo !== cargoInicial ||
       modelo !== (editando.modeloContrato ?? modeloPadrao)
-    : (!primeiroSalario && data !== "") || salario !== "" || cargo !== "";
+    : (!primeiroSalario && data !== "") ||
+      salario !== "" ||
+      cargo !== cargoInicial;
 
   async function gravar(evento?: FormEvent) {
     evento?.preventDefault();
