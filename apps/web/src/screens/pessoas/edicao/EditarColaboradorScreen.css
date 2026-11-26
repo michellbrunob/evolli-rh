@@ -108,6 +108,7 @@
 .editar-colaborador__item {
   display: flex;
   align-items: center;
+  gap: var(--space-xs);
   min-height: var(--touch-target);
   padding: 0 var(--space-sm);
   border-radius: var(--radius-sm);
@@ -117,8 +118,17 @@
   white-space: nowrap;
 }
 
+.editar-colaborador__item svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
 .editar-colaborador__item:hover {
   background: var(--surface-canvas);
+}
+
+.editar-colaborador__item--atual svg {
+  color: var(--color-ink);
 }
 
 .editar-colaborador__item--atual {

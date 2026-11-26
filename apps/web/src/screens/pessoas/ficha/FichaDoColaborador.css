@@ -107,9 +107,10 @@
   overflow-wrap: anywhere;
 }
 
-.ficha-ref__nome:focus-visible {
-  outline: var(--focus-width) solid var(--color-action);
-  outline-offset: var(--focus-offset);
+/* O título recebe o foco ao abrir a ficha (leitor de tela), fora da ordem
+   do Tab: sem contorno. */
+.ficha-ref__nome:focus {
+  outline: none;
 }
 
 .ficha-ref__contrato {
@@ -228,6 +229,13 @@
   overflow-wrap: anywhere;
 }
 
+/* E-mail longo: uma linha, com reticências (o endereço inteiro na dica). */
+.ficha-ref__resumo-valor--linha {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- portal -------------------------------------------------------------- */
 .ficha-ref__portal {
   display: flex;
@@ -303,6 +311,7 @@
 .ficha-ref__portal-botao {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-xs);
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
   border: 0;
@@ -359,7 +368,27 @@
 }
 
 .ficha-ref__menu-item--destaque {
+  background: color-mix(in srgb, var(--color-action) 6%, transparent);
   color: var(--color-action);
+}
+
+.ficha-ref__menu-item svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.ficha-ref__menu-item--destaque svg {
+  color: var(--color-action);
+}
+
+.ficha-ref__menu-item--perigo svg {
+  color: var(--status-danger-ink);
+}
+
+.ficha-ref__menu-divisor {
+  height: 1px;
+  margin: var(--space-xs) var(--space-xxs);
+  background: var(--divider-soft);
 }
 
 .ficha-ref__menu-item--perigo {
@@ -412,6 +441,12 @@
   gap: var(--space-lg);
   overflow-x: auto;
   border-bottom: var(--divisor);
+  /* Rola com o dedo, o trackpad ou as setas; sem a barra de rolagem. */
+  scrollbar-width: none;
+}
+
+.ficha-ref__abas::-webkit-scrollbar {
+  display: none;
 }
 
 .ficha-ref__aba {
@@ -514,9 +549,16 @@
 }
 
 .ficha-ref__editar {
-  min-height: 2.25rem;
-  padding: 0 var(--space-sm);
+  flex: none;
+  min-height: 2rem;
+  padding: 0 var(--space-sm) 0 var(--space-xs);
   font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-muted);
+}
+
+.ficha-ref__editar svg {
+  color: var(--color-ink-subtle);
 }
 
 .ficha-ref__campos {
@@ -529,12 +571,24 @@
 @container (min-width: 60rem) {
   .ficha-ref__cartao--inteiro .ficha-ref__campos {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: var(--space-lg);
   }
 
   .ficha-ref__cartao--largo .ficha-ref__campos {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--space-lg);
+  }
+
+  /* A linha separa as linhas da grade, de ponta a ponta; a última, sem. */
+  .ficha-ref__cartao--inteiro
+    .ficha-ref__campo:nth-child(3n + 1):nth-last-child(-n + 3),
+  .ficha-ref__cartao--inteiro
+    .ficha-ref__campo:nth-child(3n + 1):nth-last-child(-n + 3)
+    ~ .ficha-ref__campo,
+  .ficha-ref__cartao--largo
+    .ficha-ref__campo:nth-child(2n + 1):nth-last-child(-n + 2),
+  .ficha-ref__cartao--largo
+    .ficha-ref__campo:nth-child(2n + 1):nth-last-child(-n + 2)
+    ~ .ficha-ref__campo {
+    border-bottom: 0;
   }
 }
 
@@ -543,8 +597,13 @@
   grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr);
   align-items: baseline;
   gap: var(--space-sm);
-  padding: var(--space-sm) 0;
+  padding: calc(var(--space-sm) + var(--space-xxs)) var(--space-lg)
+    calc(var(--space-sm) + var(--space-xxs)) 0;
   border-bottom: 1px solid var(--divider-soft);
+}
+
+.ficha-ref__campo:last-child {
+  border-bottom: 0;
 }
 
 .ficha-ref__campo-rotulo {
@@ -557,6 +616,11 @@
   font-weight: var(--weight-strong);
   color: var(--color-ink);
   overflow-wrap: anywhere;
+}
+
+.ficha-ref__campo-valor--vazio {
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
 }
 
 .ficha-ref__detalhe {

@@ -268,6 +268,11 @@ describe("T215 — ficha: cabeçalho, faixa e Portal", () => {
     expect(faixa).toHaveTextContent("(11) 99999-8888");
     expect(faixa).toHaveTextContent("Tempo de casa2 anos e 10 meses");
     expect(faixa).toHaveTextContent("Carga horária e escala44h semanais · 5x2");
+    // E-mail longo fica numa linha, com o endereço inteiro na dica.
+    expect(within(faixa).getByText("maria.teste@example.test")).toHaveAttribute(
+      "title",
+      "maria.teste@example.test",
+    );
   });
 
   it("Portal: com e-mail, não convidada e o convite (em breve)", async () => {
@@ -364,6 +369,25 @@ describe("T215 — ficha: aba Dados do colaborador", () => {
     expect(emergencia).toHaveTextContent("Acionado em caso de urgência");
     expect(emergencia).toHaveTextContent("NomeJoão Teste");
     expect(emergencia).toHaveTextContent("Telefone(11) 98888-7777");
+  });
+
+  it("campo vazio: o traço fica apagado, sem o peso do valor", async () => {
+    const atual = await vi.mocked(consultarDadosPessoaisDoColaborador)(ID);
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      ...atual,
+      perfilPessoal: { ...atual.perfilPessoal!, rg: null },
+    } as never);
+    montar();
+    const pessoais = await screen.findByRole("region", {
+      name: "Dados pessoais",
+    });
+    await waitFor(() => expect(pessoais).toHaveTextContent("RG—"));
+    expect(within(pessoais).getByText("—")).toHaveClass(
+      "ficha-ref__campo-valor--vazio",
+    );
+    expect(within(pessoais).getByText("Maria Teste Santos")).not.toHaveClass(
+      "ficha-ref__campo-valor--vazio",
+    );
   });
 
   it("cada Editar leva à seção certa; sem permissão, nenhum Editar", async () => {

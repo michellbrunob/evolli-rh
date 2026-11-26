@@ -67,7 +67,13 @@ import {
   Warning2,
   type Icon,
   Briefcase,
+  Bank,
+  CalendarAdd,
   Call,
+  Forbidden2,
+  Setting4,
+  Status,
+  UserRemove,
   Home2,
   Location,
   MessageText1,
@@ -165,6 +171,13 @@ export const IconePresente = decorativo(Gift, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
 export const IconeAparencia = decorativo(ColorSwatch, "Bulk");
+/** T215 — ficha: menu ⋯ e seções da edição do colaborador. */
+export const IconeRegistrarAusencia = decorativo(CalendarAdd, "Bulk");
+export const IconeStatus = decorativo(Status, "Bulk");
+export const IconeDesligar = decorativo(UserRemove, "Bulk");
+export const IconeDesativar = decorativo(Forbidden2, "Bulk");
+export const IconeBanco = decorativo(Bank, "Bulk");
+export const IconeCamposExtras = decorativo(Setting4, "Bulk");
 
 // ---- Ações (Bulk) --------------------------------------------------------
 export const IconeEditar = decorativo(Edit2, "Bulk");

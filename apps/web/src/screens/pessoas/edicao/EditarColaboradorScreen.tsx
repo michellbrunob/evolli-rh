@@ -77,7 +77,19 @@ import {
 import { formatarInstante } from "../../../format/data";
 import { exibirTelefone } from "../../../format/mascaras";
 import { Dialog, IconButton } from "../../../ui";
-import { IconeRemover, IconeVoltar } from "../../../ui/icones";
+import {
+  IconeBanco,
+  IconeCamposExtras,
+  IconeDocumento,
+  IconeEquipe,
+  IconeFormacao,
+  IconeLocal,
+  IconeMaleta,
+  IconePerfil,
+  IconeRemover,
+  IconeVoltar,
+  type IconeDoEcossistema,
+} from "../../../ui/icones";
 import {
   type ChaveEndereco,
   type ValoresEndereco,
@@ -126,6 +138,17 @@ const ROTULO_DA_SECAO: Readonly<Record<SecaoDaEdicao, string>> = {
   "dados-bancarios": "Dados bancários",
   "formacao-academica": "Formação acadêmica",
   "campos-extras": "Campos extras",
+};
+
+const ICONE_DA_SECAO: Readonly<Record<SecaoDaEdicao, IconeDoEcossistema>> = {
+  "dados-basicos": IconePerfil,
+  "dados-profissionais": IconeMaleta,
+  endereco: IconeLocal,
+  dependentes: IconeEquipe,
+  documentos: IconeDocumento,
+  "dados-bancarios": IconeBanco,
+  "formacao-academica": IconeFormacao,
+  "campos-extras": IconeCamposExtras,
 };
 
 type Status = StatusDoColaboradorValor;
@@ -958,6 +981,10 @@ export function EditarColaboradorScreen({
                     if (s !== secao) onTrocarSecao(s);
                   }}
                 >
+                  {(() => {
+                    const Icone = ICONE_DA_SECAO[s];
+                    return <Icone tamanho={18} />;
+                  })()}
                   {ROTULO_DA_SECAO[s]}
                 </a>
               </li>

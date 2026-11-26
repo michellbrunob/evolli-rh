@@ -65,8 +65,14 @@ import {
 import {
   IconeBaixarArquivo,
   IconeCalendario,
+  IconeDesativar,
+  IconeDesligar,
   IconeEditar,
+  IconeEnviar,
   IconeMaisAcoes,
+  IconeRegistrarAusencia,
+  IconeStatus,
+  IconeSucesso,
 } from "../../../ui/icones";
 import { formatarDiaCivil } from "../../../format/data";
 import { exibirTelefone } from "../../../format/mascaras";
@@ -241,7 +247,15 @@ function Campo({
   return (
     <div className="ficha-ref__campo">
       <dt className="ficha-ref__campo-rotulo">{rotulo}</dt>
-      <dd className="ficha-ref__campo-valor">{children}</dd>
+      <dd
+        className={
+          children === VAZIO
+            ? "ficha-ref__campo-valor ficha-ref__campo-valor--vazio"
+            : "ficha-ref__campo-valor"
+        }
+      >
+        {children}
+      </dd>
     </div>
   );
 }
@@ -633,6 +647,7 @@ export function FichaDoColaborador({
                     aria-disabled="true"
                     onSelect={(e) => e.preventDefault()}
                   >
+                    <IconeEnviar tamanho={18} />
                     <span className="ficha-ref__menu-textos">
                       <span>Enviar convite do portal</span>
                       <span className="ficha-ref__menu-ajuda">
@@ -642,17 +657,20 @@ export function FichaDoColaborador({
                       </span>
                     </span>
                   </DropdownMenuItem>
+                  <RadixMenu.Separator className="ficha-ref__menu-divisor" />
                   <p className="ficha-ref__menu-grupo">Colaborador</p>
                   <DropdownMenuItem
                     className="ficha-ref__menu-item"
                     onSelect={() => setRegistrarAberto(true)}
                   >
+                    <IconeRegistrarAusencia tamanho={18} />
                     Registrar ausência
                   </DropdownMenuItem>
                   {podeEditar ? (
                     <>
                       <RadixMenu.Sub>
                         <RadixMenu.SubTrigger className="ficha-ref__menu-item">
+                          <IconeStatus tamanho={18} />
                           <span className="ficha-ref__menu-textos">
                             <span>Alterar status</span>
                             <span className="ficha-ref__menu-ajuda">
@@ -697,11 +715,13 @@ export function FichaDoColaborador({
                           </RadixMenu.SubContent>
                         </RadixMenu.Portal>
                       </RadixMenu.Sub>
+                      <RadixMenu.Separator className="ficha-ref__menu-divisor" />
                       <DropdownMenuItem
                         className="ficha-ref__menu-item ficha-ref__menu-item--perigo"
                         disabled={status === "desligado"}
                         onSelect={() => setJanela("desligar")}
                       >
+                        <IconeDesligar tamanho={18} />
                         Desligar colaborador
                       </DropdownMenuItem>
                       {desativado ? (
@@ -709,6 +729,7 @@ export function FichaDoColaborador({
                           className="ficha-ref__menu-item"
                           onSelect={() => setJanela("reativar")}
                         >
+                          <IconeSucesso tamanho={18} />
                           Reativar colaborador
                         </DropdownMenuItem>
                       ) : (
@@ -716,6 +737,7 @@ export function FichaDoColaborador({
                           className="ficha-ref__menu-item ficha-ref__menu-item--perigo"
                           onSelect={() => setJanela("desativar")}
                         >
+                          <IconeDesativar tamanho={18} />
                           Desativar colaborador
                         </DropdownMenuItem>
                       )}
@@ -748,7 +770,10 @@ export function FichaDoColaborador({
               <IconeResumoEmail />
               <span className="ficha-ref__resumo-textos">
                 <span className="ficha-ref__resumo-rotulo">E-mail</span>
-                <span className="ficha-ref__resumo-valor">
+                <span
+                  className="ficha-ref__resumo-valor ficha-ref__resumo-valor--linha"
+                  title={email ?? undefined}
+                >
                   {email ?? VAZIO}
                 </span>
               </span>
@@ -830,6 +855,7 @@ export function FichaDoColaborador({
                 title="O Portal do colaborador chega em uma próxima versão."
                 onClick={(e) => e.preventDefault()}
               >
+                <IconeEnviar tamanho={16} />
                 Enviar convite
               </button>
             ) : podeEditar && onEditar ? (
