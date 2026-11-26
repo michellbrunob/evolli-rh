@@ -760,3 +760,14 @@
   background: var(--status-info-surface);
   color: var(--status-info-ink);
 }
+
+/* O submenu (Alterar status) usa o conteúdo cru do Radix: o fundo, a borda,
+   o raio e a camada são os mesmos do menu (antes, transparente). */
+.ficha-ref__submenu {
+  z-index: 20;
+  display: grid;
+  min-width: 13rem;
+  border: var(--borda-espessura) solid var(--divisor-cor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
