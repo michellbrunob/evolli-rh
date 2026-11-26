@@ -94,6 +94,11 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_alterada",
   "pessoas_ausencia_excluida",
   "pessoas_ausencia_ajuste_sugerido",
+  // T215 — Políticas de férias: o `resourceId` é o id da POLÍTICA.
+  "pessoas_politica_ferias_criada",
+  "pessoas_politica_ferias_alterada",
+  "pessoas_politica_ferias_desativada",
+  "pessoas_politica_ferias_reativada",
   // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
   "pessoas_periodo_reiniciado",
   "pessoas_periodo_reinicio_removido",
@@ -349,7 +354,10 @@ export type AuditResource =
   | "escala_colaborador"
   // T215 — reinício do período aquisitivo: o `resourceId` é o id do
   // REINÍCIO (ou do COLABORADOR nas negações). Nunca data, motivo ou dias.
-  | "reinicio_periodo";
+  | "reinicio_periodo"
+  // T215 — política de férias: o `resourceId` é o id da POLÍTICA. Nunca
+  // nome, regras ou pessoas.
+  | "politica_ferias";
 
 export type RecordAuditEventInput =
   | {

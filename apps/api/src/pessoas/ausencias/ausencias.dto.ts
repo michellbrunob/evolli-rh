@@ -173,6 +173,17 @@ export class RegistrarAusenciaDto {
   @IsBoolean()
   feriasColetivas?: boolean;
 
+  /**
+   * T215 — fora da política de férias da pessoa: o porquê (obrigatório
+   * quando o pedido não segue alguma regra; fica no histórico).
+   */
+  @Transform(({ value }) => textoOpcional(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  motivoForaDaPolitica?: string;
+
   @Transform(({ value }) => textoOpcional(value))
   @IsOptional()
   @IsString()

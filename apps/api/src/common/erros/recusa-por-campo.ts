@@ -93,6 +93,9 @@ export type CampoPublico =
   | "diasPeriodoAnterior"
   // T215 — férias coletivas de quem tem menos de 12 meses de casa.
   | "feriasColetivas"
+  // T215 — Políticas de férias: quem entra e o motivo de registrar fora.
+  | "alvos"
+  | "motivoForaDaPolitica"
   // T215 — Salários: o salário do contrato com linha do tempo.
   | "salarioBruto"
   // T215 — férias para quem não tem férias (PJ e Freelancer).

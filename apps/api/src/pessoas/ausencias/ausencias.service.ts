@@ -17,6 +17,8 @@ import {
 } from "../../common/erros/recusa-por-campo";
 import { escaparCuringas } from "../../common/busca.util";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
+import { PoliticasFeriasService } from "./politicas-ferias.service";
+import type { ViolacaoDaPolitica } from "./politica-ferias";
 import { PessoasAuditContext } from "../pessoas.types";
 import { escolherVinculoPrincipal } from "../colaborador/vinculo-principal";
 import {
@@ -122,6 +124,12 @@ export interface SimulacaoDeAusencia {
   podeSerColetiva: boolean;
   /** T215 — simulada como coletiva: os dias proporcionais e o novo período. */
   coletiva: { dias: number; novoPeriodo: Dia } | null;
+  /** T215 — a política de férias da pessoa e o que o pedido não segue. */
+  politica: {
+    id: string;
+    nome: string;
+    violacoes: ViolacaoDaPolitica[];
+  } | null;
 }
 
 export interface FeriasDoColaborador {
@@ -270,6 +278,7 @@ export class AusenciasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: PessoasAuditoriaService,
+    private readonly politicas: PoliticasFeriasService,
   ) {}
 
   // ---- lista ---------------------------------------------------------------
@@ -428,6 +437,23 @@ export class AusenciasService {
             removidoEm: null,
           },
         })) > 0;
+      const avaliacao =
+        dto.tipo === "ferias" && dto.fim
+          ? await this.avaliarPolitica(tx, {
+              ...dto,
+              fim: dto.fim,
+              empresaId,
+              principal,
+              regra,
+            })
+          : null;
+      const foraDaPolitica =
+        avaliacao !== null && avaliacao.violacoes.length > 0;
+      if (foraDaPolitica && !dto.motivoForaDaPolitica) {
+        throw new CamposRecusadosException([
+          { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
+        ]);
+      }
       if (coletiva && !jaReiniciado) {
         const reinicio = await tx.reinicioPeriodoAquisitivo.create({
           data: {
@@ -466,6 +492,12 @@ export class AusenciasService {
             : null,
           status: aprovada ? "aprovada" : "aguardando_rh",
           observacao: dto.observacao ?? null,
+          ...(foraDaPolitica
+            ? {
+                politicaFeriasId: avaliacao.id,
+                motivoForaDaPolitica: dto.motivoForaDaPolitica ?? null,
+              }
+            : {}),
           registradoPorId: ctx.actor.id,
           ...(aprovada
             ? { decididoPorId: ctx.actor.id, decididoEm: agora }
@@ -903,6 +935,16 @@ export class AusenciasService {
         regraDeFerias === "calculada" &&
         podeSerColetiva(principal, query.inicio),
       coletiva: null as { dias: number; novoPeriodo: Dia } | null,
+      politica:
+        query.tipo === "ferias" && fim
+          ? await this.avaliarPolitica(this.prisma, {
+              ...query,
+              fim,
+              empresaId,
+              principal,
+              regra: regraDeFerias,
+            })
+          : null,
     };
     if (query.tipo !== "ferias" || !fim || regraDeFerias !== "calculada") {
       return {
@@ -1251,6 +1293,87 @@ export class AusenciasService {
         alvo.id,
         empresaId,
       );
+    });
+  }
+
+  /**
+   * T215 — confere as férias contra a política da pessoa: o período de que
+   * descontam (com a coletiva, se pedida), o saldo depois e as outras férias
+   * do mesmo período. Sem política, `null`.
+   */
+  private async avaliarPolitica(
+    db: Prisma.TransactionClient,
+    a: {
+      colaboradorId: string;
+      inicio: Dia;
+      fim: Dia;
+      diasVendidos?: number;
+      periodoAquisitivoInicio?: string;
+      feriasColetivas?: boolean;
+      ignorar?: string;
+      empresaId: string;
+      principal: VinculoDoSaldo;
+      regra: RegraDeFerias;
+    },
+  ): Promise<{
+    id: string;
+    nome: string;
+    violacoes: ViolacaoDaPolitica[];
+  } | null> {
+    let saldoDepois = Number.POSITIVE_INFINITY;
+    let outrasFerias: { inicio: Dia; fim: Dia }[] = [];
+    if (a.regra === "calculada") {
+      const existentes = await db.ausencia.findMany({
+        where: {
+          colaboradorId: a.colaboradorId,
+          empresaId: a.empresaId,
+          status: { in: [...STATUS_QUE_OCUPAM] },
+          excluidaEm: null,
+          ...(a.ignorar ? { id: { not: a.ignorar } } : {}),
+        },
+      });
+      const hoje = hojeEmSaoPaulo();
+      const coletiva =
+        a.feriasColetivas === true && podeSerColetiva(a.principal, a.inicio);
+      const periodos = this.periodosDoVinculo(
+        a.principal,
+        existentes.map(paraSaldo),
+        hoje,
+        a.inicio > hoje ? a.inicio : hoje,
+        [
+          ...(await this.reiniciosDoVinculo(db, a.principal.id, a.empresaId)),
+          ...(coletiva ? [reinicioDaColetiva(a.inicio)] : []),
+        ],
+      );
+      const periodo = periodoParaFerias(
+        periodos,
+        a.inicio,
+        a.periodoAquisitivoInicio ?? null,
+      );
+      const usados = diasCorridos(a.inicio, a.fim) + (a.diasVendidos ?? 0);
+      saldoDepois = (periodo?.disponiveis ?? 0) - usados;
+      outrasFerias = periodo
+        ? existentes
+            .filter(
+              (x) =>
+                x.tipo === "ferias" &&
+                x.fim !== null &&
+                x.periodoAquisitivoInicio !== null &&
+                diaDe(x.periodoAquisitivoInicio) === periodo.inicio,
+            )
+            .map((x) => ({ inicio: diaDe(x.inicio), fim: diaDe(x.fim!) }))
+        : [];
+    }
+    return this.politicas.avaliar(db, {
+      empresaId: a.empresaId,
+      colaboradorId: a.colaboradorId,
+      tipo: a.principal.tipo,
+      vinculoId: a.principal.id,
+      inicio: a.inicio,
+      fim: a.fim,
+      saldoDepois,
+      outrasFerias,
+      ignorar: a.ignorar ?? null,
     });
   }
 

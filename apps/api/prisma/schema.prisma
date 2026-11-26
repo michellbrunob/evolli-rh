@@ -186,6 +186,8 @@ model AccessUser {
   ausenciasExcluidas             Ausencia[]                   @relation("AusenciaExcluidaPor")
   reiniciosPeriodoRegistrados    ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRegistradoPor")
   reiniciosPeriodoRemovidos      ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRemovidoPor")
+  politicasFeriasCriadas         PoliticaFerias[]             @relation("PoliticaFeriasCriadaPor")
+  politicasFeriasDesativadas     PoliticaFerias[]             @relation("PoliticaFeriasDesativadaPor")
   // T215 — anexos de ausência: quem enviou e quem removeu.
   anexosAusenciaEnviados         AnexoAusencia[]              @relation("AnexoAusenciaEnviadoPor")
   anexosAusenciaRemovidos        AnexoAusencia[]              @relation("AnexoAusenciaRemovidoPor")
@@ -523,22 +525,26 @@ enum AuditAction {
 
   // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
   // ausência e a empresa (nunca tipo, datas, motivo ou observação).
-  pessoas_ausencia_registrada       @map("pessoas.ausencia.registrada")
-  pessoas_ausencia_aprovada         @map("pessoas.ausencia.aprovada")
-  pessoas_ausencia_recusada         @map("pessoas.ausencia.recusada")
-  pessoas_ausencia_cancelada        @map("pessoas.ausencia.cancelada")
+  pessoas_ausencia_registrada        @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada          @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada          @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada         @map("pessoas.ausencia.cancelada")
   /// T215 — editar e excluir (a exclusão marca; nada é apagado).
-  pessoas_ausencia_alterada         @map("pessoas.ausencia.alterada")
-  pessoas_ausencia_excluida         @map("pessoas.ausencia.excluida")
-  pessoas_ausencia_ajuste_sugerido  @map("pessoas.ausencia.ajuste_sugerido")
-  pessoas_periodo_reiniciado        @map("pessoas.periodo_aquisitivo.reiniciado")
-  pessoas_periodo_reinicio_removido @map("pessoas.periodo_aquisitivo.reinicio_removido")
+  pessoas_ausencia_alterada          @map("pessoas.ausencia.alterada")
+  pessoas_ausencia_excluida          @map("pessoas.ausencia.excluida")
+  pessoas_ausencia_ajuste_sugerido   @map("pessoas.ausencia.ajuste_sugerido")
+  pessoas_politica_ferias_criada     @map("pessoas.politica_ferias.criada")
+  pessoas_politica_ferias_alterada   @map("pessoas.politica_ferias.alterada")
+  pessoas_politica_ferias_desativada @map("pessoas.politica_ferias.desativada")
+  pessoas_politica_ferias_reativada  @map("pessoas.politica_ferias.reativada")
+  pessoas_periodo_reiniciado         @map("pessoas.periodo_aquisitivo.reiniciado")
+  pessoas_periodo_reinicio_removido  @map("pessoas.periodo_aquisitivo.reinicio_removido")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
   // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
-  pessoas_ausencia_consultada       @map("pessoas.ausencia.consultada")
-  pessoas_ausencia_anexo_enviado    @map("pessoas.ausencia.anexo_enviado")
-  pessoas_ausencia_anexo_baixado    @map("pessoas.ausencia.anexo_baixado")
-  pessoas_ausencia_anexo_removido   @map("pessoas.ausencia.anexo_removido")
+  pessoas_ausencia_consultada        @map("pessoas.ausencia.consultada")
+  pessoas_ausencia_anexo_enviado     @map("pessoas.ausencia.anexo_enviado")
+  pessoas_ausencia_anexo_baixado     @map("pessoas.ausencia.anexo_baixado")
+  pessoas_ausencia_anexo_removido    @map("pessoas.ausencia.anexo_removido")
 
   // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
   // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
@@ -903,6 +909,7 @@ model Empresa {
   // T215 — Férias e ausências.
   ausencias                   Ausencia[]
   reiniciosPeriodoAquisitivo  ReinicioPeriodoAquisitivo[]
+  politicasFerias             PoliticaFerias[]
   limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
   // T213 — documentos do colaborador.
   documentosColaborador       DocumentoColaborador[]
@@ -2829,18 +2836,22 @@ model Ausencia {
   /// T215 — "Sugerir outras datas": o período proposto a quem pediu.
   sugestaoInicio          DateTime?          @map("sugestao_inicio") @db.Date
   sugestaoFim             DateTime?          @map("sugestao_fim") @db.Date
+  /// T215 — registrado fora da política de férias: qual e por quê.
+  politicaFeriasId        String?            @map("politica_ferias_id")
+  motivoForaDaPolitica    String?            @map("motivo_fora_da_politica")
   /// T215 — excluída (como a referência): sai de tudo, o registro fica.
   excluidaEm              DateTime?          @map("excluida_em")
   excluidaPorId           String?            @map("excluida_por_id")
   criadoEm                DateTime           @default(now()) @map("criado_em")
   atualizadoEm            DateTime           @updatedAt @map("atualizado_em")
 
-  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  colaborador   Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
-  registradoPor AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  decididoPor   AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  excluidaPor   AccessUser?      @relation("AusenciaExcluidaPor", fields: [excluidaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa        Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador    Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo        VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor  AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  decididoPor    AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  excluidaPor    AccessUser?      @relation("AusenciaExcluidaPor", fields: [excluidaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  politicaFerias PoliticaFerias?  @relation(fields: [politicaFeriasId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   /// T215 — o atestado ou documento da ausência (um vivo por vez).
   anexos AnexoAusencia[]
@@ -2849,6 +2860,46 @@ model Ausencia {
   @@index([empresaId, status])
   @@index([colaboradorId, empresaId])
   @@map("ausencia")
+}
+
+/// T215 — quem entra numa política de férias.
+enum AbrangenciaPoliticaFerias {
+  todos
+  algumas
+}
+
+/// T215 — Políticas de férias (como a referência, 2026-11-26): as regras que
+/// a empresa confere em cada registro de férias, além dos pisos da CLT. Só
+/// apontam o que não segue (o RH registra mesmo assim, com motivo). Regras e
+/// aprovação em JSON (validados na entrada); desativar é lógico.
+model PoliticaFerias {
+  id               String                    @id @default(uuid())
+  empresaId        String                    @map("empresa_id")
+  nome             String
+  descricao        String?
+  textoColaborador String?                   @map("texto_colaborador")
+  tiposVinculo     TipoVinculo[]             @map("tipos_vinculo")
+  abrangencia      AbrangenciaPoliticaFerias
+  /// Só em "algumas": [{ tipo: "departamento" | "unidade" | "pessoa", id }].
+  alvos            Json                      @default("[]")
+  valeAPartirDe    DateTime                  @map("vale_a_partir_de") @db.Date
+  regras           Json
+  aprovacao        Json
+  rascunho         Boolean                   @default(false)
+  ativa            Boolean                   @default(true)
+  criadoPorId      String                    @map("criado_por_id")
+  desativadaEm     DateTime?                 @map("desativada_em")
+  desativadaPorId  String?                   @map("desativada_por_id")
+  criadoEm         DateTime                  @default(now()) @map("criado_em")
+  atualizadoEm     DateTime                  @updatedAt @map("atualizado_em")
+
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser  @relation("PoliticaFeriasCriadaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  desativadaPor AccessUser? @relation("PoliticaFeriasDesativadaPor", fields: [desativadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ausencias     Ausencia[]
+
+  @@index([empresaId])
+  @@map("politica_ferias")
 }
 
 /// T215 — por que a contagem do período aquisitivo recomeçou.

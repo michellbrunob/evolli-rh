@@ -13,6 +13,8 @@ import {
   FeriasDoColaboradorController,
 } from "./ausencias/ausencias.controller";
 import { AusenciasService } from "./ausencias/ausencias.service";
+import { PoliticasFeriasService } from "./ausencias/politicas-ferias.service";
+import { PoliticasFeriasController } from "./ausencias/politicas-ferias.controller";
 import { AnexoAusenciaController } from "./ausencias/anexo-ausencia.controller";
 import { AnexoAusenciaService } from "./ausencias/anexo-ausencia.service";
 import { HistoricoSalarialController } from "./salarios/historico-salarial.controller";
@@ -69,6 +71,7 @@ import {
 @Module({
   imports: [AuthModule, AuditModule],
   controllers: [
+    PoliticasFeriasController,
     ColaboradorController,
     VinculoController,
     MovimentacaoController,
@@ -109,6 +112,7 @@ import {
     ContratoColaboradorService,
     DesativacaoColaboradorService,
     AusenciasService,
+    PoliticasFeriasService,
     AnexoAusenciaService,
     HistoricoSalarialService,
     EscalaColaboradorService,

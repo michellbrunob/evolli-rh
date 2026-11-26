@@ -1650,6 +1650,223 @@ describe("T215 — Férias e ausências (e2e)", () => {
     });
   });
 
+  describe("políticas de férias (como a referência)", () => {
+    function put(rota: string, cred: Credencial) {
+      return agent()
+        .put(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    const REGRAS = {
+      antecedenciaMinimaDias: 30,
+      antecedenciaMaximaMeses: null,
+      alemDoSaldo: "nao_aceitar",
+      duracaoMinimaDias: 10,
+      duracaoMaximaDias: null,
+      periodosPorAno: 2,
+      periodoMaiorDias: null,
+      intervaloDias: null,
+      inicioNaoAntesDeDescanso: false,
+      inicioNaoNoFimDeSemana: false,
+      voltaNaoNaSexta: false,
+      voltaNaoNaVespera: false,
+      bloqueios: [],
+      foraAoMesmoTempo: null,
+    };
+    const APROVACAO = { quem: "rh", lembreteDias: null, foraDaPolitica: "avisar" };
+    const politica = (extra: Record<string, unknown> = {}) => ({
+      nome: "Política sintética",
+      tiposVinculo: ["clt"],
+      abrangencia: "todos",
+      alvos: [],
+      valeAPartirDe: HOJE,
+      regras: REGRAS,
+      aprovacao: APROVACAO,
+      ...extra,
+    });
+    const inicio = somarDias(HOJE, 10);
+    const fim = somarDias(inicio, 3);
+    const simular = (id: string) =>
+      get(
+        `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${inicio}&fim=${fim}`,
+        rhA,
+      ).expect(200);
+
+    it("criar, listar e conferir: a simulação aponta o que não segue; registrar pede o motivo", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const criada = await post("/v1/politicas-ferias", rhA)
+        .send(
+          politica({
+            nome: "Só a pessoa sintética",
+            abrangencia: "algumas",
+            alvos: [{ tipo: "pessoa", id: pessoa }],
+          }),
+        )
+        .expect(201);
+      expect(criada.headers["cache-control"]).toBe("no-store");
+      expect(criada.body).toMatchObject({
+        nome: "Só a pessoa sintética",
+        ativa: true,
+      });
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: criada.body.id, resource: "politica_ferias" },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_politica_ferias_criada",
+      ]);
+
+      const lista = (await get("/v1/politicas-ferias", rhA).expect(200)).body;
+      const linha = lista.politicas.find(
+        (p: { id: string }) => p.id === criada.body.id,
+      );
+      expect(linha).toMatchObject({
+        nome: "Só a pessoa sintética",
+        ativa: true,
+        tiposVinculo: ["clt"],
+        abrangencia: "algumas",
+        pessoas: 1,
+        principaisRegras: {
+          primeira: "Antecedência de 30 dias",
+          segunda: "Até 2 períodos",
+        },
+        foraDaPolitica: "avisar",
+      });
+      expect(lista.semPolitica.total).toEqual(expect.any(Number));
+      expect(
+        lista.semPolitica.pessoas.some((p: { id: string }) => p.id === pessoa),
+      ).toBe(false);
+
+      const s = (await simular(pessoa)).body;
+      expect(s.politica).toMatchObject({
+        id: criada.body.id,
+        nome: "Só a pessoa sintética",
+      });
+      expect(s.politica.violacoes).toEqual(
+        expect.arrayContaining([
+          { regra: "antecedencia_minima", dias: 10, minimo: 30 },
+          { regra: "duracao_minima", dias: 4, minimo: 10 },
+        ]),
+      );
+
+      const sem = await post("/v1/ausencias", rhA)
+        .send({ colaboradorId: pessoa, tipo: "ferias", inicio, fim, aprovada: true })
+        .expect(422);
+      expect(sem.body.erros).toEqual([
+        { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
+      ]);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: pessoa,
+          tipo: "ferias",
+          inicio,
+          fim,
+          aprovada: true,
+          motivoForaDaPolitica: "  Combinado com a gestão  ",
+        })
+        .expect(201);
+      const linhaDaAusencia = await prisma.ausencia.findUniqueOrThrow({
+        where: { id: r.body.id },
+      });
+      expect(linhaDaAusencia.politicaFeriasId).toBe(criada.body.id);
+      expect(linhaDaAusencia.motivoForaDaPolitica).toBe(
+        "Combinado com a gestão",
+      );
+    });
+
+    it("a mais específica vale: pessoa antes do contrato; desativar e reativar", async () => {
+      const { id: escolhida } = await admitir(rhA, empresaA);
+      const { id: outra } = await admitir(rhA, empresaA);
+      const especifica = await post("/v1/politicas-ferias", rhA)
+        .send(
+          politica({
+            nome: "Específica",
+            abrangencia: "algumas",
+            alvos: [{ tipo: "pessoa", id: escolhida }],
+            regras: { ...REGRAS, antecedenciaMinimaDias: 5, duracaoMinimaDias: null, periodosPorAno: null },
+          }),
+        )
+        .expect(201);
+      // A geral nasce depois: mesmo assim a específica vale para quem ela cita.
+      const geral = await post("/v1/politicas-ferias", rhA)
+        .send(politica({ nome: "Geral CLT" }))
+        .expect(201);
+      expect((await simular(escolhida)).body.politica.id).toBe(
+        especifica.body.id,
+      );
+      expect((await simular(outra)).body.politica.id).toBe(geral.body.id);
+
+      await post(`/v1/politicas-ferias/${especifica.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+      expect((await simular(escolhida)).body.politica.id).toBe(geral.body.id);
+      const lista = (await get("/v1/politicas-ferias", rhA).expect(200)).body;
+      expect(
+        lista.politicas.find((p: { id: string }) => p.id === especifica.body.id)
+          .ativa,
+      ).toBe(false);
+      await post(`/v1/politicas-ferias/${especifica.body.id}/reativar`, rhA)
+        .send()
+        .expect(200);
+      expect((await simular(escolhida)).body.politica.id).toBe(
+        especifica.body.id,
+      );
+      // Desativar a geral para não pesar nos outros testes.
+      await post(`/v1/politicas-ferias/${geral.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+      await post(`/v1/politicas-ferias/${especifica.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+    });
+
+    it("alterar, detalhe e validação; outra empresa 404; master só lê", async () => {
+      const criada = await post("/v1/politicas-ferias", rhA)
+        .send(politica({ nome: "Para alterar", rascunho: true }))
+        .expect(201);
+      const detalhe = (
+        await get(`/v1/politicas-ferias/${criada.body.id}`, rhA).expect(200)
+      ).body;
+      expect(detalhe).toMatchObject({
+        nome: "Para alterar",
+        rascunho: true,
+        regras: REGRAS,
+        aprovacao: APROVACAO,
+      });
+      await put(`/v1/politicas-ferias/${criada.body.id}`, rhA)
+        .send(politica({ nome: "Alterada", rascunho: false }))
+        .expect(200);
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: criada.body.id, resource: "politica_ferias" },
+        orderBy: { occurredAt: "asc" },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_politica_ferias_criada",
+        "pessoas_politica_ferias_alterada",
+      ]);
+      await post("/v1/politicas-ferias", rhA)
+        .send(politica({ nome: "" }))
+        .expect(400);
+      await post("/v1/politicas-ferias", rhA)
+        .send(politica({ tiposVinculo: [] }))
+        .expect(400);
+      const semAlvo = await post("/v1/politicas-ferias", rhA)
+        .send(politica({ abrangencia: "algumas", alvos: [] }))
+        .expect(422);
+      expect(semAlvo.body.erros).toEqual([
+        { campo: "alvos", motivo: "obrigatorio" },
+      ]);
+      await get(`/v1/politicas-ferias/${criada.body.id}`, rhB).expect(404);
+      await post(`/v1/politicas-ferias/${criada.body.id}/desativar`, rhB)
+        .send()
+        .expect(404);
+      await get("/v1/politicas-ferias", masterA).expect(200);
+      await post("/v1/politicas-ferias", masterA).send(politica()).expect(403);
+      await post(`/v1/politicas-ferias/${criada.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+    });
+  });
+
   describe("anexo da ausência (atestado ou documento)", () => {
     /** PDF sintético mínimo, com o fim de arquivo. */
     const pdf = (conteudo = "documento sintetico") =>
