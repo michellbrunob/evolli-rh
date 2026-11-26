@@ -721,7 +721,7 @@ function LinhaDoTempo({
                   {podeEditar ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        className="salarios__mais"
+                        className="ficha-ref__mais"
                         aria-label={`Ações do registro de ${formatarDiaCivil(a.vigenciaInicio)}`}
                       >
                         <IconeMaisAcoes tamanho={16} />

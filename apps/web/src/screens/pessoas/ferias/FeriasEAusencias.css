@@ -278,6 +278,16 @@
   color: var(--color-ink);
 }
 
+/* As respostas ficam alinhadas ao texto da pergunta, depois do número: a
+   pergunta recua e o título (com o número) volta à margem. */
+.ausencias-gaveta__pergunta {
+  padding-left: calc(1.5rem + var(--space-sm));
+}
+
+.ausencias-gaveta__pergunta > .ausencias-gaveta__titulo {
+  margin-left: calc(-1 * (1.5rem + var(--space-sm)));
+}
+
 .ausencias-gaveta__titulo::before {
   content: counter(pergunta);
   display: inline-grid;
@@ -369,12 +379,16 @@
 .ausencias-gaveta__avatar {
   display: inline-grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   flex: none;
   border-radius: 50%;
-  background: var(--surface-neutral);
-  color: var(--color-ink-muted);
+  background: color-mix(
+    in srgb,
+    var(--color-action) 10%,
+    var(--surface-canvas)
+  );
+  color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
 }
@@ -435,6 +449,68 @@
   border-color: var(--color-action);
   background: color-mix(in srgb, var(--color-action) 6%, var(--surface-canvas));
   font-weight: var(--weight-strong);
+}
+
+/* Tipo: ícone num quadrado, o nome e, no escolhido, o visto à direita. */
+.ausencias-gaveta__tipo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 3.5rem;
+}
+
+.ausencias-gaveta__tipo-icone {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+}
+
+.ausencias-gaveta__tipo[aria-checked="true"] .ausencias-gaveta__tipo-icone {
+  background: color-mix(
+    in srgb,
+    var(--color-action) 12%,
+    var(--surface-canvas)
+  );
+  color: var(--color-action);
+}
+
+.ausencias-gaveta__tipo-rotulo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ausencias-gaveta__visto {
+  display: inline-grid;
+  flex: none;
+  color: var(--color-action);
+}
+
+/* Escolha de uma opção: o círculo do rádio antes do texto. */
+.ausencias-gaveta__escolha-opcao {
+  position: relative;
+  padding-left: calc(var(--space-sm) + 1.75rem);
+}
+
+.ausencias-gaveta__escolha-opcao::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-sm) + 0.125rem);
+  left: var(--space-sm);
+  width: 1.125rem;
+  height: 1.125rem;
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-ink-subtle);
+  border-radius: 50%;
+  background: var(--surface-canvas);
+}
+
+.ausencias-gaveta__escolha-opcao[aria-checked="true"]::before {
+  border: 5px solid var(--color-action);
 }
 
 .ausencias-gaveta__tipo:focus-visible,

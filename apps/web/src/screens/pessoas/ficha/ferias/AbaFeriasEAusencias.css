@@ -146,12 +146,13 @@
 .ferias-ficha__calendario-mes {
   width: 100%;
   padding: var(--space-xxs) 0;
-  background: color-mix(in srgb, var(--color-action) 12%, transparent);
-  color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
   text-align: center;
-  text-transform: lowercase;
+  text-transform: uppercase;
 }
 
 .ferias-ficha__calendario-dia {
@@ -177,12 +178,45 @@
   padding: var(--space-sm) var(--space-lg) var(--space-lg);
 }
 
+/* O ano, a linha e a contagem do ano à direita. */
+.ferias-ficha__ano-cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
 .ferias-ficha__ano-titulo {
-  margin: 0 0 var(--space-xs);
-  color: var(--color-ink-subtle);
+  margin: 0;
+  color: var(--color-ink-muted);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
   font-variant-numeric: tabular-nums;
+}
+
+.ferias-ficha__ano-linha {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--divider-soft);
+}
+
+.ferias-ficha__ano-total {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+/* O ponto com a cor do tipo, antes do nome. */
+.ferias-ficha__com-ponto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ferias-ficha__ponto {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
 }
 
 .ferias-ficha__lista {
@@ -209,10 +243,18 @@
   place-items: center;
   grid-row: span 3;
   align-self: start;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: var(--divisor);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-action) 10%, transparent);
+  background: var(--surface-canvas);
+  color: var(--color-ink-subtle);
+}
+
+/* A próxima ausência: o ícone em destaque. */
+.ferias-ficha__item-icone--proxima {
+  border-color: color-mix(in srgb, var(--color-action) 35%, transparent);
+  background: color-mix(in srgb, var(--color-action) 8%, transparent);
   color: var(--color-action);
 }
 
@@ -223,6 +265,8 @@
 }
 
 .ferias-ficha__item-dias {
+  display: grid;
+  gap: var(--space-xxs);
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
 }
@@ -236,7 +280,9 @@
 
 @container (min-width: 48rem) {
   .ferias-ficha__item {
-    grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) auto;
+    /* O nome com largura fixa: as datas começam no mesmo ponto em todas as
+       linhas. */
+    grid-template-columns: auto minmax(0, 17rem) minmax(0, 1fr) auto;
   }
 
   .ferias-ficha__item-icone {
@@ -268,11 +314,6 @@
 .ferias-ficha__anexo:focus-visible {
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
-}
-
-.ferias-ficha__mais {
-  width: var(--botao-icone);
-  height: var(--botao-icone);
 }
 
 .ferias-ficha__nota {

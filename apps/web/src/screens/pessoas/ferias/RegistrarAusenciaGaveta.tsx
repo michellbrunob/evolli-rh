@@ -11,10 +11,12 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button, FormActions } from "../../../components";
 import { Sheet } from "../../../ui";
 import {
-  IconeCalendario,
   IconeEnviarArquivo,
   IconeFechar,
+  IconeRegistrarAusencia,
+  IconeSucesso,
 } from "../../../ui/icones";
+import { ICONE_DO_TIPO } from "./aparenciaDoTipo";
 import { anoDoDiaCivil, formatarDiaCivil } from "../../../format/data";
 import {
   type AusenciaApi,
@@ -284,8 +286,8 @@ export function RegistrarAusenciaGaveta({
     <Sheet
       aberto={aberta}
       titulo="Registrar ausência"
-      descricao="Responda as perguntas abaixo."
-      icone={<IconeCalendario tamanho={20} />}
+      subtitulo="Responda as perguntas abaixo."
+      icone={<IconeRegistrarAusencia tamanho={20} />}
       onFechar={onFechar}
       bloqueado={enviando}
       alterado={alterado}
@@ -408,23 +410,42 @@ export function RegistrarAusenciaGaveta({
             aria-labelledby={`${base}-tipo`}
             className="ausencias-gaveta__tipos"
           >
-            {TIPOS_DE_AUSENCIA.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="radio"
-                aria-checked={tipo === t}
-                aria-disabled={t === "ferias" && semFerias ? true : undefined}
-                className="ausencias-gaveta__tipo"
-                onClick={() => {
-                  if (t === "ferias" && semFerias) return;
-                  setTipo(t);
-                  if (t !== "ferias") setVender(false);
-                }}
-              >
-                {ROTULO_DO_TIPO[t]}
-              </button>
-            ))}
+            {TIPOS_DE_AUSENCIA.map((t) => {
+              const Icone = ICONE_DO_TIPO[t];
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={tipo === t}
+                  aria-disabled={t === "ferias" && semFerias ? true : undefined}
+                  className="ausencias-gaveta__tipo"
+                  onClick={() => {
+                    if (t === "ferias" && semFerias) return;
+                    setTipo(t);
+                    if (t !== "ferias") setVender(false);
+                  }}
+                >
+                  <span
+                    className="ausencias-gaveta__tipo-icone"
+                    aria-hidden="true"
+                  >
+                    <Icone tamanho={18} />
+                  </span>
+                  <span className="ausencias-gaveta__tipo-rotulo">
+                    {ROTULO_DO_TIPO[t]}
+                  </span>
+                  {tipo === t ? (
+                    <span
+                      className="ausencias-gaveta__visto"
+                      aria-hidden="true"
+                    >
+                      <IconeSucesso tamanho={20} />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
           {semFerias ? (
             <p className="ausencias-gaveta__ajuda" role="note">

@@ -67,7 +67,14 @@ import {
   Warning2,
   type Icon,
   Briefcase,
+  Airplane,
   Bank,
+  Cake,
+  ClipboardClose,
+  ClipboardText,
+  Health,
+  Hospital,
+  Lovely,
   CalendarAdd,
   Call,
   Forbidden2,
@@ -178,6 +185,14 @@ export const IconeDesligar = decorativo(UserRemove, "Bulk");
 export const IconeDesativar = decorativo(Forbidden2, "Bulk");
 export const IconeBanco = decorativo(Bank, "Bulk");
 export const IconeCamposExtras = decorativo(Setting4, "Bulk");
+/** T215 — os tipos de ausência (histórico, próxima ausência e registro). */
+export const IconeAviao = decorativo(Airplane, "Bulk");
+export const IconeSaude = decorativo(Health, "Bulk");
+export const IconeFamilia = decorativo(Lovely, "Bulk");
+export const IconeHospital = decorativo(Hospital, "Bulk");
+export const IconeFaltaJustificada = decorativo(ClipboardText, "Bulk");
+export const IconeFaltaSemJustificativa = decorativo(ClipboardClose, "Bulk");
+export const IconeBolo = decorativo(Cake, "Bulk");
 
 // ---- Ações (Bulk) --------------------------------------------------------
 export const IconeEditar = decorativo(Edit2, "Bulk");

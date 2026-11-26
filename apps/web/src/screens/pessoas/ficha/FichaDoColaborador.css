@@ -328,6 +328,36 @@
   opacity: 0.55;
 }
 
+/* ---- ⋯ das linhas (Salários, Férias e ausências): sem moldura ---------- */
+.ficha-ref__mais {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: none;
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+}
+
+.ficha-ref__mais:hover,
+.ficha-ref__mais[data-state="open"] {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.ficha-ref__mais-vago {
+  width: 2rem;
+  flex: none;
+}
+
+.ficha-ref__mais:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
 /* ---- menu ⋯ -------------------------------------------------------------- */
 .ficha-ref__menu {
   min-width: 15rem;

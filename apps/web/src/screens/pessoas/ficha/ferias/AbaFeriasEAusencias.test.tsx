@@ -240,14 +240,16 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     const proxima = await screen.findByRole("region", {
       name: "Próxima ausência",
     });
-    expect(within(proxima).getByText("Em 13 dias")).toBeInTheDocument();
+    // Como a referência: o status no subtítulo; no corpo, o tipo, as datas
+    // e os dias úteis.
+    expect(within(proxima).getByText("Aprovada")).toBeInTheDocument();
     expect(within(proxima).getByText("07")).toBeInTheDocument();
     expect(within(proxima).getByText("dez")).toBeInTheDocument();
     expect(within(proxima).getByText("Férias")).toBeInTheDocument();
     expect(
-      within(proxima).getByText("07/12/2026 a 26/12/2026 · 20 dias"),
+      within(proxima).getByText("07/12/2026 a 26/12/2026"),
     ).toBeInTheDocument();
-    expect(within(proxima).getByText("Aprovada")).toBeInTheDocument();
+    expect(within(proxima).getByText("13 dias úteis")).toBeInTheDocument();
   });
 
   it("próxima ausência vazia: o texto da referência", async () => {
@@ -273,20 +275,28 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     const hist = await screen.findByRole("region", {
       name: "Histórico de ausências",
     });
-    expect(within(hist).getByText("3 registros")).toBeInTheDocument();
+    expect(
+      within(hist).getByText(
+        "3 registros · férias, licenças, faltas e day offs",
+      ),
+    ).toBeInTheDocument();
     const anos = within(hist).getAllByRole("heading", { level: 4 });
     expect(anos.map((a) => a.textContent)).toEqual(["2026", "2025"]);
+    // Cada ano com a sua contagem, à direita da linha.
+    expect(within(hist).getByText("2 registros")).toBeInTheDocument();
+    expect(within(hist).getByText("1 registro")).toBeInTheDocument();
     const itens = within(hist).getAllByRole("listitem");
     expect(itens).toHaveLength(3);
     expect(within(itens[0]!).getByText("Férias")).toBeInTheDocument();
+    // A próxima ausência é dita na própria linha.
+    expect(within(itens[0]!).getByText("Próxima ausência")).toBeInTheDocument();
     expect(
       within(itens[0]!).getByText("07/12/2026 a 26/12/2026"),
     ).toBeInTheDocument();
-    expect(
-      within(itens[0]!).getByText("20 dias · 13 dias úteis"),
-    ).toBeInTheDocument();
-    expect(within(itens[1]!).getByText("Day off")).toBeInTheDocument();
+    expect(within(itens[0]!).getByText("13 dias úteis")).toBeInTheDocument();
+    expect(within(itens[1]!).getAllByText("Day off")).toHaveLength(2);
     expect(within(itens[1]!).getByText("02/03/2026")).toBeInTheDocument();
+    expect(within(itens[1]!).getByText("1 dia útil")).toBeInTheDocument();
     expect(within(itens[1]!).getByText("Aguardando o RH")).toBeInTheDocument();
     expect(
       within(itens[2]!).getByRole("button", {

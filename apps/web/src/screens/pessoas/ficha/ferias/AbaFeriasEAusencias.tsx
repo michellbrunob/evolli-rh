@@ -33,8 +33,8 @@ import {
 import {
   IconeBaixarArquivo,
   IconeCalendario,
-  IconeMais,
   IconeMaisAcoes,
+  IconeRegistrarAusencia,
   IconeTempo,
 } from "../../../../ui/icones";
 import {
@@ -62,6 +62,7 @@ import {
   ROTULO_DO_STATUS,
   ROTULO_DO_TIPO,
 } from "../../ferias/tiposAusencia";
+import { COR_DO_TIPO, ICONE_DO_TIPO } from "../../ferias/aparenciaDoTipo";
 import {
   AvisoAnimado,
   Esqueleto,
@@ -149,8 +150,24 @@ function dias(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
 }
 
+function diasUteis(n: number | null): string {
+  if (n === null) return "";
+  return n === 1 ? "1 dia útil" : `${n} dias úteis`;
+}
+
+/** O ponto com a cor do tipo, ao lado do nome (a cor não é o único sinal). */
+function PontoDoTipo({ a }: { readonly a: AusenciaApi }) {
+  return (
+    <span
+      className="ferias-ficha__ponto"
+      style={{ background: COR_DO_TIPO[a.tipo] }}
+      aria-hidden="true"
+    />
+  );
+}
+
 function datas(a: AusenciaApi): string {
-  if (!a.fim) return `Desde ${formatarDiaCivil(a.inicio)} · sem data de volta`;
+  if (!a.fim) return `Desde ${formatarDiaCivil(a.inicio)}`;
   return a.inicio === a.fim
     ? formatarDiaCivil(a.inicio)
     : `${formatarDiaCivil(a.inicio)} a ${formatarDiaCivil(a.fim)}`;
@@ -663,20 +680,24 @@ function ProximaAusencia({
   return (
     <Cartao
       titulo="Próxima ausência"
-      subtitulo={
-        faltam === null
-          ? "Nada agendado por enquanto"
-          : faltam <= 0
-            ? "Hoje"
-            : faltam === 1
-              ? "Amanhã"
-              : `Em ${faltam} dias`
-      }
+      subtitulo={a ? ROTULO_DO_STATUS[a.status] : "Nada agendado por enquanto"}
       icone={<IconeTempo tamanho={18} />}
       className="ferias-ficha__proxima"
     >
       <div className="ferias-ficha__corpo ferias-ficha__proxima-corpo">
-        <span className="ferias-ficha__calendario" aria-hidden={!a}>
+        <span
+          className="ferias-ficha__calendario"
+          aria-hidden={!a}
+          title={
+            faltam === null
+              ? undefined
+              : faltam <= 0
+                ? "Hoje"
+                : faltam === 1
+                  ? "Amanhã"
+                  : `Em ${faltam} dias`
+          }
+        >
           <span className="ferias-ficha__calendario-mes">
             {data ? data.mes : "— —"}
           </span>
@@ -686,13 +707,16 @@ function ProximaAusencia({
         </span>
         {a ? (
           <span className="ferias-ficha__proxima-textos">
-            <span className="ferias-ficha__forte">{rotuloDoTipo(a)}</span>
-            <span className="ferias-ficha__suave">
-              {a.dias !== null ? `${datas(a)} · ${dias(a.dias)}` : datas(a)}
+            <span className="ferias-ficha__forte ferias-ficha__com-ponto">
+              <PontoDoTipo a={a} />
+              {rotuloDoTipo(a)}
             </span>
-            <StatusBadge variant={VARIANTE_DO_STATUS[a.status]}>
-              {ROTULO_DO_STATUS[a.status]}
-            </StatusBadge>
+            <span className="ferias-ficha__suave">{datas(a)}</span>
+            {a.dias !== null ? (
+              <span className="ferias-ficha__suave">
+                {diasUteis(a.diasUteis)}
+              </span>
+            ) : null}
           </span>
         ) : (
           <span className="ferias-ficha__proxima-textos ferias-ficha__centro">
@@ -746,10 +770,12 @@ function Historico({
   }
   const botaoRegistrar = podeEditar ? (
     <button type="button" className="ficha-ref__editar" onClick={onRegistrar}>
-      <IconeMais tamanho={14} />
+      <IconeRegistrarAusencia tamanho={16} />
       Registrar ausência
     </button>
   ) : null;
+  const registros = (n: number) => (n === 1 ? "1 registro" : `${n} registros`);
+  const proximaId = dados.proximaAusencia?.id ?? null;
 
   return (
     <Cartao
@@ -757,9 +783,7 @@ function Historico({
       subtitulo={
         itens.length === 0
           ? "Nenhum registro até agora"
-          : itens.length === 1
-            ? "1 registro"
-            : `${itens.length} registros`
+          : `${registros(itens.length)} · férias, licenças, faltas e day offs`
       }
       icone={<IconeCalendario tamanho={18} />}
       {...(itens.length > 0 && botaoRegistrar ? { acao: botaoRegistrar } : {})}
@@ -784,12 +808,19 @@ function Historico({
         <div className="ferias-ficha__anos">
           {anos.map((grupo) => (
             <section key={grupo.ano} className="ferias-ficha__ano">
-              <h4 className="ferias-ficha__ano-titulo">{grupo.ano}</h4>
+              <div className="ferias-ficha__ano-cabeca">
+                <h4 className="ferias-ficha__ano-titulo">{grupo.ano}</h4>
+                <span className="ferias-ficha__ano-linha" aria-hidden="true" />
+                <span className="ferias-ficha__ano-total">
+                  {registros(grupo.itens.length)}
+                </span>
+              </div>
               <ul className="ferias-ficha__lista">
                 {grupo.itens.map((a) => (
                   <LinhaDoHistorico
                     key={a.id}
                     a={a}
+                    proxima={a.id === proximaId}
                     podeEditar={podeEditar}
                     servico={servico}
                     onAprovar={onAprovar}
@@ -816,6 +847,7 @@ function Historico({
 
 function LinhaDoHistorico({
   a,
+  proxima,
   podeEditar,
   servico,
   onAprovar,
@@ -826,6 +858,8 @@ function LinhaDoHistorico({
   onRemoverAnexo,
 }: {
   readonly a: AusenciaApi;
+  /** É a próxima ausência (destaque e "Próxima ausência" na linha). */
+  readonly proxima: boolean;
   readonly podeEditar: boolean;
   readonly servico: ServicoDeAusencias;
   readonly onAprovar: (a: AusenciaApi) => void;
@@ -835,6 +869,7 @@ function LinhaDoHistorico({
   readonly onBaixar: (a: AusenciaApi) => void;
   readonly onRemoverAnexo: (a: AusenciaApi) => void;
 }) {
+  const Icone = ICONE_DO_TIPO[a.tipo];
   const decisoes = decisoesDoStatus(a.status);
   const podeAnexar =
     !a.anexo && !ENCERRADAS.has(a.status) && servico.enviarAnexo !== undefined;
@@ -844,20 +879,31 @@ function LinhaDoHistorico({
   const nomeDaLinha = `${ROTULO_DO_TIPO[a.tipo]} de ${formatarDiaCivil(a.inicio)}`;
   return (
     <li className="ferias-ficha__item">
-      <span className="ferias-ficha__item-icone" aria-hidden="true">
-        <IconeCalendario tamanho={16} />
+      <span
+        className={
+          proxima
+            ? "ferias-ficha__item-icone ferias-ficha__item-icone--proxima"
+            : "ferias-ficha__item-icone"
+        }
+        aria-hidden="true"
+      >
+        <Icone tamanho={18} />
       </span>
       <span className="ferias-ficha__item-textos">
-        <span className="ferias-ficha__forte">{rotuloDoTipo(a)}</span>
-        <span className="ferias-ficha__suave">{datas(a)}</span>
+        <span className="ferias-ficha__forte ferias-ficha__com-ponto">
+          <PontoDoTipo a={a} />
+          {rotuloDoTipo(a)}
+        </span>
+        <span className="ferias-ficha__suave">
+          {proxima ? "Próxima ausência" : ROTULO_DO_TIPO[a.tipo]}
+        </span>
       </span>
       <span className="ferias-ficha__item-dias">
-        {a.dias !== null
-          ? `${dias(a.dias)} · ${a.diasUteis === 1 ? "1 dia útil" : `${a.diasUteis} dias úteis`}`
-          : "Sem data de volta"}
-        {a.diasVendidos > 0 ? (
-          <span className="ferias-ficha__suave">{` + ${a.diasVendidos} vendidos`}</span>
-        ) : null}
+        <span>{datas(a)}</span>
+        <span className="ferias-ficha__suave">
+          {a.dias !== null ? diasUteis(a.diasUteis) : "Sem data de volta"}
+          {a.diasVendidos > 0 ? ` + ${a.diasVendidos} vendidos` : null}
+        </span>
       </span>
       <span className="ferias-ficha__item-fim">
         {a.anexo ? (
@@ -877,7 +923,7 @@ function LinhaDoHistorico({
         {temAcoes ? (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="ficha-ref__botao-icone ferias-ficha__mais"
+              className="ficha-ref__mais"
               aria-label={`Ações de ${nomeDaLinha}`}
             >
               <IconeMaisAcoes tamanho={16} />
@@ -925,6 +971,9 @@ function LinhaDoHistorico({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : podeEditar ? (
+          // Sem ações nesta linha: o lugar do ⋯ fica, e o status alinha.
+          <span className="ficha-ref__mais-vago" aria-hidden="true" />
         ) : null}
       </span>
     </li>
