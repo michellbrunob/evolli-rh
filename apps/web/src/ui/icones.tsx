@@ -75,6 +75,7 @@ import {
   Health,
   Hospital,
   Lovely,
+  WalletMoney,
   CalendarAdd,
   Call,
   Forbidden2,
@@ -156,6 +157,8 @@ export const IconeCasa = decorativo(Home2, "Bulk");
 export const IconeLocal = decorativo(Location, "Bulk");
 export const IconeComentario = decorativo(MessageText1, "Bulk");
 export const IconeDinheiro = decorativo(Money2, "Bulk");
+/** T215 — carteira com dinheiro (aba Salários da ficha). */
+export const IconeCarteira = decorativo(WalletMoney, "Bulk");
 export const IconeEmail = decorativo(Sms, "Bulk");
 export const IconeFormacao = decorativo(Teacher, "Bulk");
 export const IconeTempo = decorativo(Timer1, "Bulk");

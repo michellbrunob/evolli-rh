@@ -6,7 +6,7 @@ import {
   IconeCalendario,
   IconeCasa,
   IconeComentario,
-  IconeDinheiro,
+  IconeCarteira,
   IconeEmail,
   IconeFormacao,
   IconeLocal,
@@ -25,7 +25,7 @@ const CARTAO = 18;
 const RESUMO = 18;
 
 export const IconeAbaDados = () => <IconePerfil tamanho={ABA} />;
-export const IconeAbaSalarios = () => <IconeDinheiro tamanho={ABA} />;
+export const IconeAbaSalarios = () => <IconeCarteira tamanho={ABA} />;
 export const IconeAbaFerias = () => <IconeCalendario tamanho={ABA} />;
 export const IconeAbaEscala = () => <IconeRelogio tamanho={ABA} />;
 export const IconeAbaBeneficios = () => <IconePresente tamanho={ABA} />;
