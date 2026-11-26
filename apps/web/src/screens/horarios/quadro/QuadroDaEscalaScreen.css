@@ -380,8 +380,12 @@
   text-align: left;
 }
 
+/* "0 de 1" numa linha só: o número forte e o total em seguida. */
+.quadro__escalados td {
+  white-space: nowrap;
+}
+
 .quadro__escalados strong {
-  display: block;
   color: var(--color-ink);
   font-size: var(--text-ui);
 }
