@@ -140,6 +140,13 @@ em `app/tokens.css` (nunca números soltos na tela):
   ("Unidade: Todas ▾"), numa linha; tabela num cartão com borda.
 - **Período** — `SeletorDePeriodo`: botão com ícone que abre um calendário
   (anterior/próximo, mês, setas do teclado; Esc fecha só o calendário).
+- **Lista de escolha** — `ui/ListaDeEscolha` (desde 2026-11-26): campo com
+  seta que abre a lista logo abaixo (ou acima, sem espaço), a escolhida com
+  visto à direita, segunda linha opcional; teclado completo (setas, Home,
+  End, letras sem acento; Esc fecha só a lista). Telas novas usam esta lista,
+  não o `<select>` nativo; as telas antigas migram quando forem revisitadas.
+- **Prefixo e sufixo** — "R$", "%", "horas por semana" ficam DENTRO da caixa
+  do campo (`cadastro-etapas__com-prefixo` / `__com-sufixo`), em cinza.
 - **Janelas** — altura estável: trocar opções não muda o tamanho nem
   desloca a janela; enquanto carrega, o conteúdo anterior fica, esmaecido.
 - **Movimento** — transições curtas (120–150 ms); quem pede menos movimento

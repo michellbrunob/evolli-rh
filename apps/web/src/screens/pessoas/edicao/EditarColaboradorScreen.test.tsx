@@ -16,9 +16,11 @@ import {
   ApiError,
   buscarColaborador,
   listarColaboradores,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
   retificarColaborador,
   consultarCpfEmUso,
+  type DocumentoColaboradorApi,
 } from "../../../api/colaboradoresClient";
 import {
   consultarContratoDoColaborador,
@@ -52,6 +54,7 @@ vi.mock("../../../api/colaboradoresClient", async () => {
     buscarColaborador: vi.fn(),
     consultarCpfEmUso: vi.fn(),
     listarColaboradores: vi.fn(),
+    listarDocumentosDoColaborador: vi.fn(),
     listarVinculosDoColaborador: vi.fn(),
     retificarColaborador: vi.fn(),
   };
@@ -188,6 +191,7 @@ function respostaDoContrato(
 }
 
 function prepararServidor() {
+  vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([]);
   vi.mocked(desativarColaborador).mockResolvedValue({
     colaboradorId: ID,
     empresaId: EMPRESA,
@@ -371,6 +375,12 @@ function montar(
 const rodape = () => screen.getByRole("region", { name: "Ações da edição" });
 const campo = (nome: string | RegExp) => screen.getByLabelText(nome);
 
+/** Lista de escolha própria: abre e escolhe a opção pelo nome. */
+function escolher(nome: string, opcao: string) {
+  fireEvent.click(campo(nome));
+  fireEvent.click(screen.getByRole("option", { name: opcao }));
+}
+
 describe("T215 — Editar colaborador: moldura", () => {
   it("cabeçalho com título, nome, Status e lixeira; menu com as 8 seções", async () => {
     const { onVoltar } = montar();
@@ -453,6 +463,117 @@ describe("T215 — Editar colaborador: moldura", () => {
   });
 });
 
+describe("T215 — Editar colaborador: como a referência (2026-11-26)", () => {
+  it("Descartar e Salvar só se acendem com alguma alteração", async () => {
+    montar();
+    const nome = await screen.findByDisplayValue("Pedro Teste");
+    const salvar = within(rodape()).getByRole("button", {
+      name: "Salvar alterações",
+    });
+    const descartar = within(rodape()).getByRole("button", {
+      name: "Descartar",
+    });
+    expect(salvar).toBeDisabled();
+    expect(descartar).toBeDisabled();
+    fireEvent.change(nome, { target: { value: "Outro Nome" } });
+    expect(salvar).toBeEnabled();
+    expect(descartar).toBeEnabled();
+    fireEvent.click(descartar);
+    expect(salvar).toBeDisabled();
+    expect(descartar).toBeDisabled();
+  });
+
+  it("cabeçalho da seção: a descrição logo abaixo do título", async () => {
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    const titulo = screen.getByRole("heading", {
+      level: 2,
+      name: "Dados básicos",
+    });
+    expect(titulo.parentElement).toHaveClass("cadastro-etapas__etapa-textos");
+    expect(titulo.nextElementSibling).toHaveTextContent(
+      "Informações pessoais e de contato de Pedro.",
+    );
+  });
+
+  it("R$ e % ficam dentro do campo", async () => {
+    montar("dados-profissionais");
+    await screen.findByDisplayValue("5.000,00");
+    for (const nome of ["Salário bruto", "Salário líquido"]) {
+      const caixa = campo(nome).parentElement!;
+      expect(caixa, nome).toHaveClass("cadastro-etapas__com-prefixo");
+      expect(caixa.firstElementChild, nome).toHaveTextContent("R$");
+    }
+    const pensao = campo("Pensão alimentícia").parentElement!;
+    expect(pensao).toHaveClass("cadastro-etapas__com-sufixo");
+    expect(pensao.lastElementChild).toHaveTextContent("%");
+  });
+
+  it("Endereço: CEP curto e o exemplo do complemento", async () => {
+    montar("endereco");
+    await screen.findByDisplayValue("Sé");
+    expect(campo("CEP").closest(".editar-colaborador__cep")).not.toBeNull();
+    expect(campo("Complemento")).toHaveAttribute(
+      "placeholder",
+      "Apto, bloco, sala…",
+    );
+  });
+
+  it("ponto em Documentos enquanto faltar documento obrigatório", async () => {
+    const enviado = (
+      categoria: DocumentoColaboradorApi["categoria"],
+    ): DocumentoColaboradorApi => ({
+      id: `d-${categoria}`,
+      categoria,
+      nome: null,
+      estado: "aprovado",
+      formato: "pdf",
+      tamanhoBytes: 1024,
+      versao: 1,
+      enviadoEm: "2026-11-19T12:00:00.000Z",
+      verificadoEm: "2026-11-19T12:00:01.000Z",
+    });
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValueOnce([
+      enviado("rg"),
+    ]);
+    const { unmount } = montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    const documentos = () => screen.getByRole("link", { name: "Documentos" });
+    await waitFor(() =>
+      expect(documentos()).toHaveAccessibleDescription(
+        "Documentos obrigatórios pendentes",
+      ),
+    );
+    expect(
+      documentos().querySelector(".editar-colaborador__pendencia"),
+    ).not.toBeNull();
+    unmount();
+
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValueOnce(
+      (
+        [
+          "rg",
+          "cpf",
+          "comprovante_endereco",
+          "carteira_trabalho",
+          "certidoes",
+        ] as const
+      ).map(enviado),
+    );
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    await waitFor(() =>
+      expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(2),
+    );
+    expect(documentos()).not.toHaveAccessibleDescription(
+      "Documentos obrigatórios pendentes",
+    );
+    expect(
+      documentos().querySelector(".editar-colaborador__pendencia"),
+    ).toBeNull();
+  });
+});
+
 describe("T215 — Editar colaborador: Dados básicos", () => {
   it("textos e campos da referência, preenchidos com o gravado", async () => {
     montar();
@@ -480,8 +601,8 @@ describe("T215 — Editar colaborador: Dados básicos", () => {
     expect(campo("CPF")).toHaveValue("529.982.247-25");
     expect(campo("RG")).toHaveValue("12.345.678-9");
     expect(campo("Data de nascimento")).toHaveValue("1990-05-10");
-    expect(campo("Gênero")).toHaveValue("masculino");
-    expect(campo("Estado civil")).toHaveValue("Solteiro(a)");
+    expect(campo("Gênero")).toHaveTextContent("Masculino");
+    expect(campo("Estado civil")).toHaveTextContent("Solteiro(a)");
     expect(campo("E-mail pessoal")).toHaveValue("pedro.teste@example.test");
     expect(campo("Telefone pessoal")).toHaveValue("(11) 91234-5678");
     expect(campo("Nome do contato")).toHaveValue("Ana Teste");
@@ -497,9 +618,7 @@ describe("T215 — Editar colaborador: Dados básicos", () => {
     fireEvent.change(campo("Nome completo"), {
       target: { value: "Pedro Teste Silva" },
     });
-    fireEvent.change(campo("Estado civil"), {
-      target: { value: "Casado(a)" },
-    });
+    escolher("Estado civil", "Casado(a)");
     fireEvent.click(
       within(rodape()).getByRole("button", { name: "Salvar alterações" }),
     );
@@ -673,21 +792,25 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
     expect(campo("Departamento")).toHaveValue("Pessoas");
     expect(campo("Centro de custo")).toHaveValue("Administrativo");
     expect(campo("Unidade")).toHaveValue("Matriz");
-    expect(campo("Nível")).toHaveValue("pleno");
-    await waitFor(() => expect(campo("Gestor direto")).toHaveValue(GESTORA));
+    expect(campo("Nível")).toHaveTextContent("Pleno");
+    await waitFor(() =>
+      expect(campo("Gestor direto")).toHaveTextContent("Gestora Teste"),
+    );
+    fireEvent.click(campo("Gestor direto"));
     expect(
-      within(campo("Gestor direto"))
+      within(screen.getByRole("listbox"))
         .getAllByRole("option")
         .map((o) => o.textContent),
     ).not.toContain("Pedro Teste");
+    fireEvent.keyDown(campo("Gestor direto"), { key: "Escape" });
     expect(campo("Tipo de contratação")).toHaveValue("CLT");
     expect(campo("Data de admissão")).toHaveValue("05/01/2026");
     expect(campo("Jornada de trabalho")).toHaveValue("44");
-    expect(campo("Escala de trabalho")).toHaveValue("5x2");
+    expect(campo("Escala de trabalho")).toHaveTextContent("5x2");
     expect(campo("Matrícula")).toHaveValue("0042");
     expect(campo("Salário bruto")).toHaveValue("5.000,00");
     expect(campo("Salário líquido")).not.toHaveValue("");
-    expect(campo("Conselho")).toHaveValue("crc");
+    expect(campo("Conselho")).toHaveTextContent("CRC");
     expect(campo("Número do registro")).toHaveValue("123456/SP");
     expect(campo("Dependentes (IRRF)")).toHaveValue("1");
   });
@@ -697,7 +820,7 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
     await screen.findByDisplayValue("5.000,00");
     fireEvent.change(campo("Salário bruto"), { target: { value: "600000" } });
     expect(campo("Salário bruto")).toHaveValue("6.000,00");
-    fireEvent.change(campo("Nível"), { target: { value: "senior" } });
+    escolher("Nível", "Sênior");
     fireEvent.change(campo("Pensão alimentícia"), {
       target: { value: "12,5" },
     });

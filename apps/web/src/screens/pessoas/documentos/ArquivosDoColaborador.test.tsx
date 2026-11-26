@@ -104,6 +104,40 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("ArquivosDoColaborador (T215) — textos da referência", () => {
+  it("Documentos obrigatórios com a contagem; Outros com a explicação", async () => {
+    const onDocumentos = vi.fn();
+    render(
+      <ArquivosDoColaborador
+        colaboradorId={COLABORADOR}
+        podeOperar
+        onDocumentos={onDocumentos}
+      />,
+    );
+    await screen.findByText("Contrato sintético");
+    expect(
+      screen.getByRole("heading", { name: "Documentos obrigatórios" }),
+    ).toBeInTheDocument();
+    // RG e CPF contam; a certidão reprovada não.
+    expect(screen.getByText("2 de 5 enviados.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Outros documentos" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Contratos, laudos, atestados e demais arquivos."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Dê um nome e envie o arquivo."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Novo documento")).toHaveAttribute(
+      "placeholder",
+      "Ex.: Atestado médico",
+    );
+    expect(screen.queryByText("Arquivos do colaborador")).toBeNull();
+    expect(onDocumentos).toHaveBeenLastCalledWith(LISTA);
+  });
+});
+
 describe("ArquivosDoColaborador (T213) — lista e estados", () => {
   it("cada estado aparece com texto e ícone; categorias sem arquivo ficam Pendente", async () => {
     montar();

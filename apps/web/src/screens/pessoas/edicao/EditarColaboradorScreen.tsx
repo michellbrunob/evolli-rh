@@ -43,6 +43,7 @@ import {
   type VinculoApi,
   buscarColaborador,
   enviarFotoColaborador,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
   retificarColaborador,
 } from "../../../api/colaboradoresClient";
@@ -76,7 +77,7 @@ import {
 } from "../../../components/cadastro/CadastroEmEtapas";
 import { formatarInstante } from "../../../format/data";
 import { exibirTelefone } from "../../../format/mascaras";
-import { Dialog, IconButton } from "../../../ui";
+import { Dialog, IconButton, ListaDeEscolha } from "../../../ui";
 import {
   IconeBanco,
   IconeCamposExtras,
@@ -110,6 +111,10 @@ import {
   mascararCpf,
 } from "../NovaAdmissaoScreen";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
+import {
+  CATEGORIAS_PRINCIPAIS,
+  principaisEnviados,
+} from "../documentos/documentosDoColaborador";
 import { MENSAGEM_CPF_EM_USO, useCpfEmUso } from "../useCpfEmUso";
 import {
   type CampoProfissional,
@@ -344,6 +349,8 @@ export function EditarColaboradorScreen({
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [falha, setFalha] = useState<string | null>(null);
+  // Como a referência: ponto em "Documentos" enquanto faltar obrigatório.
+  const [docsPendentes, setDocsPendentes] = useState(false);
   const [fotoEnviando, setFotoEnviando] = useState(false);
   const [falhaDaFoto, setFalhaDaFoto] = useState<string | null>(null);
   const focoPendente = useRef<CampoComErro | null>(null);
@@ -388,6 +395,27 @@ export function EditarColaboradorScreen({
     void carregar();
     void carregarContrato();
   }, [carregar, carregarContrato]);
+
+  // A pendência de documentos aparece no menu desde a abertura; sem a lista
+  // (falha ou sem permissão), nada é mostrado.
+  useEffect(() => {
+    let ativo = true;
+    void (async () => {
+      try {
+        const docs = await listarDocumentosDoColaborador(colaboradorId);
+        if (ativo && Array.isArray(docs)) {
+          setDocsPendentes(
+            principaisEnviados(docs) < CATEGORIAS_PRINCIPAIS.length,
+          );
+        }
+      } catch {
+        // Sem a lista, o menu fica sem o ponto.
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [colaboradorId]);
 
   // O aviso de "salvo" é da seção em que se salvou.
   useEffect(() => {
@@ -975,6 +1003,9 @@ export function EditarColaboradorScreen({
                       ? "editar-colaborador__item editar-colaborador__item--atual"
                       : "editar-colaborador__item"
                   }
+                  {...(s === "documentos" && docsPendentes
+                    ? { "aria-describedby": id("docs-pendentes") }
+                    : {})}
                   {...(s === secao ? { "aria-current": "page" as const } : {})}
                   onClick={(e) => {
                     e.preventDefault();
@@ -986,10 +1017,19 @@ export function EditarColaboradorScreen({
                     return <Icone tamanho={18} />;
                   })()}
                   {ROTULO_DA_SECAO[s]}
+                  {s === "documentos" && docsPendentes ? (
+                    <span
+                      className="editar-colaborador__pendencia"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </a>
               </li>
             ))}
           </ul>
+          <span id={id("docs-pendentes")} className="sr-only">
+            Documentos obrigatórios pendentes
+          </span>
         </nav>
 
         <div className="editar-colaborador__conteudo">
@@ -1004,15 +1044,17 @@ export function EditarColaboradorScreen({
               aria-labelledby={id("titulo-secao")}
             >
               <header className="cadastro-etapas__etapa-cabecalho">
-                <h2
-                  id={id("titulo-secao")}
-                  className="cadastro-etapas__etapa-titulo"
-                >
-                  {ROTULO_DA_SECAO[secao]}
-                </h2>
-                <p className="cadastro-etapas__etapa-descricao">
-                  {descricaoDaSecao(secao, primeiroNome(nome))}
-                </p>
+                <div className="cadastro-etapas__etapa-textos">
+                  <h2
+                    id={id("titulo-secao")}
+                    className="cadastro-etapas__etapa-titulo"
+                  >
+                    {ROTULO_DA_SECAO[secao]}
+                  </h2>
+                  <p className="cadastro-etapas__etapa-descricao">
+                    {descricaoDaSecao(secao, primeiroNome(nome))}
+                  </p>
+                </div>
               </header>
               {secao === "dados-basicos" ? (
                 <>
@@ -1144,44 +1186,28 @@ export function EditarColaboradorScreen({
                     <LinhaDoCadastro rotulo="Gênero e estado civil">
                       <div className="cadastro-etapas__linha-par editar-colaborador__par">
                         <div className="cadastro-etapas__linha-celula">
-                          <select
+                          <ListaDeEscolha
                             aria-label="Gênero"
-                            value={basicos.genero}
-                            onChange={(e) =>
-                              atualizarBasicos("genero", e.target.value)
-                            }
-                          >
-                            <option value="">Selecione</option>
-                            {OPCOES_GENERO.map((o) => (
-                              <option key={o.codigo} value={o.codigo}>
-                                {o.rotulo}
-                              </option>
-                            ))}
-                          </select>
+                            vazio="Selecione"
+                            valor={basicos.genero}
+                            opcoes={OPCOES_GENERO.map((o) => ({
+                              valor: o.codigo,
+                              rotulo: o.rotulo,
+                            }))}
+                            onMudar={(v) => atualizarBasicos("genero", v)}
+                          />
                         </div>
                         <div className="cadastro-etapas__linha-celula">
-                          <select
+                          <ListaDeEscolha
                             aria-label="Estado civil"
-                            value={basicos.estadoCivil}
-                            onChange={(e) =>
-                              atualizarBasicos("estadoCivil", e.target.value)
-                            }
-                          >
-                            <option value="">Selecione</option>
-                            {basicos.estadoCivil !== "" &&
-                            !(
-                              OPCOES_ESTADO_CIVIL as readonly string[]
-                            ).includes(basicos.estadoCivil) ? (
-                              <option value={basicos.estadoCivil}>
-                                {basicos.estadoCivil}
-                              </option>
-                            ) : null}
-                            {OPCOES_ESTADO_CIVIL.map((o) => (
-                              <option key={o} value={o}>
-                                {o}
-                              </option>
-                            ))}
-                          </select>
+                            vazio="Selecione"
+                            valor={basicos.estadoCivil}
+                            opcoes={OPCOES_ESTADO_CIVIL.map((o) => ({
+                              valor: o,
+                              rotulo: o,
+                            }))}
+                            onMudar={(v) => atualizarBasicos("estadoCivil", v)}
+                          />
                         </div>
                       </div>
                     </LinhaDoCadastro>
@@ -1278,6 +1304,7 @@ export function EditarColaboradorScreen({
                   <LinhaDoCadastro rotulo="CEP" paraId={id("cep")}>
                     <input
                       type="text"
+                      className="editar-colaborador__cep"
                       inputMode="numeric"
                       autoComplete="off"
                       maxLength={12}
@@ -1359,7 +1386,7 @@ export function EditarColaboradorScreen({
                     <input
                       type="text"
                       maxLength={120}
-                      placeholder="Apto, bloco…"
+                      placeholder="Apto, bloco, sala…"
                       value={endereco.complemento}
                       onChange={(e) =>
                         atualizarEndereco("complemento", e.target.value)
@@ -1397,27 +1424,17 @@ export function EditarColaboradorScreen({
                       </div>
                       <div className="cadastro-etapas__linha-celula">
                         {ehPaisBrasil(endereco.pais) ? (
-                          <select
+                          <ListaDeEscolha
                             aria-label="Estado"
-                            value={endereco.estado}
-                            onChange={(e) =>
-                              atualizarEndereco("estado", e.target.value)
-                            }
+                            vazio="UF"
+                            valor={endereco.estado}
+                            opcoes={UFS.map((u) => ({
+                              valor: u.sigla,
+                              rotulo: u.sigla,
+                            }))}
+                            onMudar={(v) => atualizarEndereco("estado", v)}
                             {...propsDoCampo("estado")}
-                          >
-                            <option value="">UF</option>
-                            {endereco.estado !== "" &&
-                            !UFS.some((u) => u.sigla === endereco.estado) ? (
-                              <option value={endereco.estado}>
-                                {endereco.estado}
-                              </option>
-                            ) : null}
-                            {UFS.map((u) => (
-                              <option key={u.sigla} value={u.sigla}>
-                                {u.sigla}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         ) : (
                           <input
                             type="text"
@@ -1440,6 +1457,11 @@ export function EditarColaboradorScreen({
                   <ArquivosDoColaborador
                     colaboradorId={colaboradorId}
                     podeOperar
+                    onDocumentos={(docs) =>
+                      setDocsPendentes(
+                        principaisEnviados(docs) < CATEGORIAS_PRINCIPAIS.length,
+                      )
+                    }
                   />
                 </div>
               ) : secao === "dados-profissionais" ? (
@@ -1492,14 +1514,14 @@ export function EditarColaboradorScreen({
               type="button"
               variant="subtle"
               onClick={descartar}
-              disabled={salvando || !gravado}
+              disabled={salvando || !gravado || !pendente}
             >
               Descartar
             </Button>
             <Button
               type="submit"
               variant="primary"
-              disabled={salvando || !gravado}
+              disabled={salvando || !gravado || !pendente}
             >
               {salvando ? "Salvando…" : "Salvar alterações"}
             </Button>

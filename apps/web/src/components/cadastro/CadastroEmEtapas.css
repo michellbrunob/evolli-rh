@@ -562,27 +562,57 @@ button.cadastro-etapas__etapa-passo:focus-visible {
 }
 
 /* ---- T209 — etapa 2: prefixo, sufixo, dica e seletores dentro da linha ---- */
+/* T215 — o prefixo ("R$") e o sufixo ("%", "horas por semana") ficam DENTRO
+   da caixa do campo, como a referência: a borda é da caixa; o campo, sem. */
 .cadastro-etapas__com-prefixo,
 .cadastro-etapas__com-sufixo {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
   min-width: 0;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  background: var(--surface-canvas);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-sm);
+}
+
+.cadastro-etapas__com-prefixo:focus-within,
+.cadastro-etapas__com-sufixo:focus-within {
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-action) 18%, transparent);
+}
+
+.cadastro-etapas__com-prefixo:has([aria-invalid="true"]),
+.cadastro-etapas__com-sufixo:has([aria-invalid="true"]) {
+  border-color: var(--status-danger-ink);
 }
 
 .cadastro-etapas__com-prefixo > span,
 .cadastro-etapas__com-sufixo > span {
   flex: none;
   font-size: var(--text-caption);
-  color: var(--color-ink-muted);
-}
-
-.cadastro-etapas__com-sufixo > input {
-  max-width: 8rem;
+  color: var(--color-ink-subtle);
 }
 
 .cadastro-etapas__linha-campos input[readonly] {
   background: var(--status-neutral-surface);
+}
+
+.cadastro-etapas__com-prefixo:has(input[readonly]),
+.cadastro-etapas__com-sufixo:has(input[readonly]) {
+  background: var(--status-neutral-surface);
+}
+
+.cadastro-etapas__linha-campos .cadastro-etapas__com-prefixo > input,
+.cadastro-etapas__linha-campos .cadastro-etapas__com-sufixo > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: calc(var(--touch-target) - 2px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
 }
 
 /* T209 — o rótulo e, ao lado, a dica ("?") quando houver. */

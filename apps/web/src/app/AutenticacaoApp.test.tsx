@@ -1349,7 +1349,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
         entregar([]);
       });
       const main = document.getElementById("conteudo-principal")!;
-      expect(main.textContent).not.toMatch(/Arquivos do colaborador/);
+      expect(main.textContent).not.toMatch(/Documentos obrigatórios/);
       expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(1);
     });
   });

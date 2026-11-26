@@ -7,6 +7,7 @@ import {
   conferirArquivoEscolhido,
   conferirNomeDeOutros,
   estadoDaApi,
+  principaisEnviados,
   rotuloDoDocumento,
   tamanhoLegivel,
 } from "./documentosDoColaborador";
@@ -118,5 +119,26 @@ describe("tamanhoLegivel (T213)", () => {
     expect(tamanhoLegivel(2048)).toBe("2 KB");
     expect(tamanhoLegivel(2.4 * 1024 * 1024)).toBe("2,4 MB");
     expect(tamanhoLegivel(10 * 1024 * 1024)).toBe("10 MB");
+  });
+});
+
+describe('principaisEnviados (T215, como a referência: "N de 5 enviados")', () => {
+  const d = (categoria: string, estado: string) =>
+    ({ categoria, estado }) as Parameters<typeof principaisEnviados>[0][number];
+
+  it("conta as categorias principais com arquivo; reprovado e Outros não contam", () => {
+    expect(principaisEnviados([])).toBe(0);
+    expect(
+      principaisEnviados([
+        d("rg", "aprovado"),
+        d("rg", "em_verificacao"),
+        d("cpf", "em_verificacao"),
+        d("certidoes", "reprovado"),
+        d("outros", "aprovado"),
+      ]),
+    ).toBe(2);
+    expect(
+      principaisEnviados(CATEGORIAS_PRINCIPAIS.map((c) => d(c, "aprovado"))),
+    ).toBe(5);
   });
 });

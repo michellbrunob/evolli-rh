@@ -21,6 +21,7 @@ import {
   conferirArquivoEscolhido,
   conferirNomeDeOutros,
   novaChaveDeEnvio,
+  principaisEnviados,
   rotuloDoDocumento,
   tamanhoLegivel,
 } from "./documentosDoColaborador";
@@ -47,6 +48,8 @@ export interface ArquivosDoColaboradorProps {
   readonly colaboradorId: string;
   /** RH e DP: enviam, baixam, trocam e removem. */
   readonly podeOperar: boolean;
+  /** T215 — a lista a cada carga (o ponto de pendência no menu da edição). */
+  readonly onDocumentos?: (documentos: DocumentoColaboradorApi[]) => void;
 }
 
 type Pedido =
@@ -63,6 +66,7 @@ const dataCurta = (iso: string) => formatarDiaCivil(iso.slice(0, 10));
 export function ArquivosDoColaborador({
   colaboradorId,
   podeOperar,
+  onDocumentos,
 }: ArquivosDoColaboradorProps) {
   const prefixo = useId();
   const [documentos, setDocumentos] = useState<
@@ -114,6 +118,13 @@ export function ArquivosDoColaborador({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Quem mostra a pendência fora daqui recebe cada lista nova.
+  const avisarLista = useRef(onDocumentos);
+  avisarLista.current = onDocumentos;
+  useEffect(() => {
+    if (documentos) avisarLista.current?.(documentos);
+  }, [documentos]);
 
   const marcarErro = (chave: string, erro: string | null) =>
     setErros((atual) => {
@@ -357,11 +368,14 @@ export function ArquivosDoColaborador({
     >
       <div className="documentos__secao">
         <h3 className="documentos__titulo" id={`${prefixo}-titulo`}>
-          Arquivos do colaborador
+          Documentos obrigatórios
         </h3>
-        <p className="documentos__texto">
-          Só arquivos aprovados pelo antivírus podem ser vistos ou baixados.
-        </p>
+        {documentos ? (
+          <p className="documentos__texto">
+            {principaisEnviados(documentos)} de {CATEGORIAS_PRINCIPAIS.length}{" "}
+            enviados.
+          </p>
+        ) : null}
         <p className="documentos__texto" role="status" aria-live="polite">
           {aviso}
         </p>
@@ -400,14 +414,15 @@ export function ArquivosDoColaborador({
           </ul>
 
           <div className="documentos__secao">
-            <h4 className="documentos__titulo">Outros documentos</h4>
+            <h3 className="documentos__titulo">Outros documentos</h3>
+            <p className="documentos__texto">
+              Contratos, laudos, atestados e demais arquivos.
+            </p>
             {outros.length > 0 ? (
               <ul className="documentos__lista" aria-label="Outros documentos">
                 {outros.map(linhaDoDocumento)}
               </ul>
-            ) : (
-              <p className="documentos__texto">Nenhum outro documento.</p>
-            )}
+            ) : null}
             {podeOperar ? (
               <div className="documentos__novo">
                 <div className="documentos__identificacao">
@@ -421,7 +436,7 @@ export function ArquivosDoColaborador({
                     className="documentos__detalhe"
                     id={`${prefixo}-novo-ajuda`}
                   >
-                    Dê um nome e escolha o arquivo.
+                    Dê um nome e envie o arquivo.
                   </span>
                 </div>
                 <Input
@@ -429,7 +444,7 @@ export function ArquivosDoColaborador({
                   type="text"
                   value={novoNome}
                   maxLength={NOME_DE_OUTROS_MAXIMO}
-                  placeholder="Ex.: Contrato de experiência"
+                  placeholder="Ex.: Atestado médico"
                   aria-describedby={`${prefixo}-novo-ajuda`}
                   aria-invalid={
                     erroDoNome || erros["outros-novo"] ? true : undefined

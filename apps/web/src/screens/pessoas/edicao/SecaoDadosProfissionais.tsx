@@ -30,6 +30,7 @@ import {
   SecaoDoCadastro,
 } from "../../../components/cadastro/CadastroEmEtapas";
 import { formatarDiaCivil } from "../../../format/data";
+import { ListaDeEscolha } from "../../../ui";
 import {
   OPCOES_CONSELHO,
   OPCOES_ESCALA,
@@ -191,18 +192,16 @@ export function SecaoDadosProfissionais({
               />
             </div>
             <div className="cadastro-etapas__linha-celula">
-              <select
+              <ListaDeEscolha
                 aria-label="Nível"
-                value={valores.nivel}
-                onChange={(e) => onAlterar("nivel", e.target.value)}
-              >
-                <option value="">Nível</option>
-                {OPCOES_NIVEL.map((o) => (
-                  <option key={o.codigo} value={o.codigo}>
-                    {o.rotulo}
-                  </option>
-                ))}
-              </select>
+                vazio="Nível"
+                valor={valores.nivel}
+                opcoes={OPCOES_NIVEL.map((o) => ({
+                  valor: o.codigo,
+                  rotulo: o.rotulo,
+                }))}
+                onMudar={(v) => onAlterar("nivel", v)}
+              />
             </div>
           </div>
         </LinhaDoCadastro>
@@ -262,21 +261,19 @@ export function SecaoDadosProfissionais({
           ajuda="Recebe as solicitações da pessoa."
           paraId={propsDoCampo("gestorDiretoId").id}
         >
-          <select
-            value={valores.gestorDiretoId}
-            onChange={(e) => onAlterar("gestorDiretoId", e.target.value)}
+          <ListaDeEscolha
+            vazio="Selecione"
+            valor={valores.gestorDiretoId}
+            opcoes={[
+              { valor: "", rotulo: "Sem gestor direto" },
+              ...(gestorGravadoForaDaLista
+                ? [{ valor: valores.gestorDiretoId, rotulo: "Gestor atual" }]
+                : []),
+              ...gestores.map((g) => ({ valor: g.id, rotulo: g.nome })),
+            ]}
+            onMudar={(v) => onAlterar("gestorDiretoId", v)}
             {...propsDoCampo("gestorDiretoId")}
-          >
-            <option value="">Selecione</option>
-            {gestorGravadoForaDaLista ? (
-              <option value={valores.gestorDiretoId}>Gestor atual</option>
-            ) : null}
-            {gestores.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.nome}
-              </option>
-            ))}
-          </select>
+          />
           {erroDe("gestorDiretoId")}
         </LinhaDoCadastro>
       </SecaoDoCadastro>
@@ -328,7 +325,7 @@ export function SecaoDadosProfissionais({
           rotulo="Jornada de trabalho"
           paraId={propsDoCampo("jornadaSemanalHoras").id}
         >
-          <div className="editar-colaborador__com-sufixo">
+          <div className="cadastro-etapas__com-sufixo">
             <input
               type="text"
               inputMode="numeric"
@@ -352,18 +349,17 @@ export function SecaoDadosProfissionais({
           ajuda="Sem escala, os benefícios usam os dias úteis do mês."
           paraId={propsDoCampo("escala").id}
         >
-          <select
-            value={valores.escala}
-            onChange={(e) => onAlterar("escala", e.target.value)}
+          <ListaDeEscolha
+            vazio="Selecione a escala"
+            valor={valores.escala}
+            opcoes={OPCOES_ESCALA.map((o) => ({
+              valor: o.codigo,
+              rotulo: o.nome,
+              ...(o.descricao ? { descricao: o.descricao } : {}),
+            }))}
+            onMudar={(v) => onAlterar("escala", v)}
             {...propsDoCampo("escala")}
-          >
-            <option value="">Selecione a escala</option>
-            {OPCOES_ESCALA.map((o) => (
-              <option key={o.codigo} value={o.codigo}>
-                {o.descricao ? `${o.nome} — ${o.descricao}` : o.nome}
-              </option>
-            ))}
-          </select>
+          />
         </LinhaDoCadastro>
         <LinhaDoCadastro
           rotulo="Matrícula"
@@ -392,7 +388,7 @@ export function SecaoDadosProfissionais({
           rotulo="Salário bruto"
           paraId={propsDoCampo("salarioBruto").id}
         >
-          <div className="editar-colaborador__com-prefixo">
+          <div className="cadastro-etapas__com-prefixo">
             <span aria-hidden="true">R$</span>
             <input
               type="text"
@@ -412,7 +408,7 @@ export function SecaoDadosProfissionais({
           ajuda="Calculado a partir do bruto."
           paraId={`${propsDoCampo("salarioBruto").id}-liquido`}
         >
-          <div className="editar-colaborador__com-prefixo">
+          <div className="cadastro-etapas__com-prefixo">
             <span aria-hidden="true">R$</span>
             <input
               id={`${propsDoCampo("salarioBruto").id}-liquido`}
@@ -435,23 +431,21 @@ export function SecaoDadosProfissionais({
         >
           <div className="editar-colaborador__par">
             <div className="cadastro-etapas__linha-celula">
-              <select
+              <ListaDeEscolha
                 aria-label="Conselho"
-                value={valores.conselhoProfissional}
-                onChange={(e) => {
-                  onAlterar("conselhoProfissional", e.target.value);
-                  if (!e.target.value || e.target.value === "nenhum") {
+                vazio="Selecione"
+                valor={valores.conselhoProfissional}
+                opcoes={OPCOES_CONSELHO.map((o) => ({
+                  valor: o.codigo,
+                  rotulo: o.rotulo,
+                }))}
+                onMudar={(v) => {
+                  onAlterar("conselhoProfissional", v);
+                  if (!v || v === "nenhum") {
                     onAlterar("registroProfissional", "");
                   }
                 }}
-              >
-                <option value="">Selecione</option>
-                {OPCOES_CONSELHO.map((o) => (
-                  <option key={o.codigo} value={o.codigo}>
-                    {o.rotulo}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div className="cadastro-etapas__linha-celula">
               <input
@@ -492,7 +486,7 @@ export function SecaoDadosProfissionais({
           rotulo="Pensão alimentícia"
           paraId={propsDoCampo("pensaoAlimenticiaPercentual").id}
         >
-          <div className="editar-colaborador__com-sufixo">
+          <div className="cadastro-etapas__com-sufixo">
             <input
               type="text"
               inputMode="decimal"

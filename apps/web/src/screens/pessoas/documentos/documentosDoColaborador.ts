@@ -29,6 +29,22 @@ export const ROTULO_DA_CATEGORIA: Readonly<
   outros: "Outros",
 };
 
+/**
+ * T215 — quantas categorias principais já têm arquivo ("N de 5 enviados",
+ * como a referência). Reprovado não conta; "outros" fica fora.
+ */
+export function principaisEnviados(
+  documentos: readonly {
+    readonly categoria: CategoriaDocumentoColaborador;
+    readonly estado: EstadoDocumentoColaborador;
+  }[],
+): number {
+  const comArquivo = new Set(
+    documentos.filter((d) => d.estado !== "reprovado").map((d) => d.categoria),
+  );
+  return CATEGORIAS_PRINCIPAIS.filter((c) => comArquivo.has(c)).length;
+}
+
 /** O nome mostrado: o dado em "outros", ou o rótulo da categoria. */
 export function rotuloDoDocumento(
   categoria: CategoriaDocumentoColaborador,

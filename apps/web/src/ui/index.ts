@@ -11,6 +11,8 @@ export { Button, IconButton } from "./Button";
 export type { ButtonProps, ButtonVariant, IconButtonProps } from "./Button";
 export { Card, CardSection, CardTitle } from "./Card";
 export { Input, Select } from "./Field";
+export { ListaDeEscolha } from "./ListaDeEscolha";
+export type { ListaDeEscolhaProps, OpcaoDaLista } from "./ListaDeEscolha";
 export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
 export { TabsList, TabsPanel, TabsTrigger } from "./Tabs";
