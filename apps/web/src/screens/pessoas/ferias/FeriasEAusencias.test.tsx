@@ -602,6 +602,124 @@ describe("T215 — Registrar ausência (gaveta)", () => {
     ).toBeNull();
   });
 
+  it("fora da política: o quadro, o motivo obrigatório e 'Registrar mesmo assim'", async () => {
+    const simular = vi.mocked(servico.simular);
+    simular.mockImplementation(async () => ({
+      dias: 4,
+      diasUteis: 4,
+      volta: "2026-12-04",
+      periodo: { inicio: "2025-01-05", fim: "2026-01-04" },
+      saldoAntes: 30,
+      saldoDepois: 26,
+      maxVendaveis: 10,
+      prazoAbono: null,
+      avisosClt: [],
+      periodosDisponiveis: [],
+      podeSerColetiva: false,
+      coletiva: null,
+      politica: {
+        id: "p-1",
+        nome: "Política do time",
+        violacoes: [
+          { regra: "antecedencia_minima" as const, dias: 4, minimo: 30 },
+          { regra: "duracao_minima" as const, dias: 4, minimo: 10 },
+          { regra: "volta_na_sexta" as const, dia: "2026-12-04" },
+          {
+            regra: "bloqueio" as const,
+            nome: "Fechamento",
+            inicio: "2026-12-20",
+            fim: "2026-12-31",
+          },
+          { regra: "antecedencia_maxima" as const, meses: 7, maximo: 6 },
+          { regra: "duracao_maxima" as const, dias: 25, maximo: 20 },
+          { regra: "periodos_por_ano" as const, ordem: 3, maximo: 2 },
+          { regra: "periodo_maior" as const, minimo: 14 },
+          { regra: "intervalo" as const, dias: 9, minimo: 30 },
+          {
+            regra: "inicio_antes_de_descanso" as const,
+            antesDe: "domingo" as const,
+            dia: "2026-12-06",
+          },
+          { regra: "inicio_no_descanso" as const, dia: "2026-12-05" },
+          { regra: "volta_na_vespera" as const, dia: "2026-12-24" },
+          { regra: "alem_do_saldo" as const },
+          { regra: "equipe" as const, fora: 2, maximo: 2 },
+        ],
+      },
+    }));
+    montarGaveta();
+    await feriasDaMaria("2026-11-30", "2026-12-03");
+    const quadro = await screen.findByRole("note", {
+      name: "Fora da política Política do time",
+    });
+    expect(
+      within(quadro)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "Pedido com 4 dias de antecedência; a política pede 30.",
+      "4 dias corridos; a política pede pelo menos 10 por período.",
+      "Volta numa sexta-feira (04/12); a política pede outro dia.",
+      "Encosta no bloqueio Fechamento (20/12 a 31/12).",
+      "Pedido com 7 meses de antecedência; a política aceita até 6.",
+      "25 dias corridos; a política aceita até 20 por período.",
+      "Seria o 3º período; a política aceita até 2.",
+      "Nenhum período chegaria a 14 dias; a política pede um com pelo menos 14.",
+      "9 dias desde as outras férias; a política pede 30 entre um período e outro.",
+      "Início em 30/11, nos 2 dias antes de domingo; a política pede outro dia.",
+      "Início num fim de semana ou feriado (05/12); a política pede outro dia.",
+      "Volta na véspera de feriado (24/12); a política pede outro dia.",
+      "Passa do saldo do período; a política não aceita.",
+      "2 pessoas do mesmo departamento já estão fora nessas datas; a política aceita até 2.",
+    ]);
+    expect(
+      within(quadro).getByText(
+        "Dá para registrar mesmo assim, com o motivo abaixo.",
+      ),
+    ).toBeInTheDocument();
+    const botao = screen.getByRole("button", { name: "Registrar mesmo assim" });
+    expect(botao).toBeDisabled();
+    const motivo = screen.getByLabelText("Por que registrar fora da política?");
+    fireEvent.change(motivo, { target: { value: "   " } });
+    expect(botao).toBeDisabled();
+    fireEvent.change(motivo, { target: { value: " Combinado com a gestão " } });
+    expect(botao).toBeEnabled();
+    fireEvent.click(botao);
+    await waitFor(() =>
+      expect(servico.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          motivoForaDaPolitica: "Combinado com a gestão",
+        }),
+      ),
+    );
+  });
+
+  it("dentro da política: sem quadro, sem a pergunta do motivo", async () => {
+    vi.mocked(servico.simular).mockImplementation(async () => ({
+      dias: 20,
+      diasUteis: 14,
+      volta: "2027-01-25",
+      periodo: { inicio: "2026-01-01", fim: "2026-12-31" },
+      saldoAntes: 30,
+      saldoDepois: 10,
+      maxVendaveis: 10,
+      prazoAbono: null,
+      politica: { id: "p-1", nome: "Política do time", violacoes: [] },
+    }));
+    montarGaveta();
+    await feriasDaMaria("2027-01-05", "2027-01-24");
+    await screen.findByText("20 dias de férias (14 dias úteis)");
+    expect(
+      screen.queryByRole("note", { name: /^Fora da política/ }),
+    ).toBeNull();
+    expect(
+      screen.queryByLabelText("Por que registrar fora da política?"),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Registrar ausência" }),
+    ).toBeInTheDocument();
+  });
+
   it("férias: o resumo do servidor, a venda de dias e o registro", async () => {
     const { onRegistrada } = montarGaveta();
     await escolherMaria();

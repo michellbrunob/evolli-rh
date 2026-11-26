@@ -9,6 +9,7 @@
 import { formatarIntervaloDeDias } from "../../../format/data";
 import type {
   AvisoCltApi,
+  ViolacaoDaPoliticaApi,
   MotivoReinicio,
   NovoReinicioDto,
   ReinicioApi,
@@ -123,6 +124,8 @@ export interface NovaAusencia {
   readonly observacao?: string;
   /** T215 — férias coletivas de quem tem menos de 12 meses (art. 140). */
   readonly feriasColetivas?: boolean;
+  /** T215 — por que registrar fora da política de férias. */
+  readonly motivoForaDaPolitica?: string;
 }
 
 export interface SimulacaoDeAusencia {
@@ -152,6 +155,12 @@ export interface SimulacaoDeAusencia {
   readonly coletiva?: {
     readonly dias: number;
     readonly novoPeriodo: string;
+  } | null;
+  /** T215 — a política de férias da pessoa e o que o pedido não segue. */
+  readonly politica?: {
+    readonly id: string;
+    readonly nome: string;
+    readonly violacoes: readonly ViolacaoDaPoliticaApi[];
   } | null;
 }
 

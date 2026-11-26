@@ -27,7 +27,45 @@ import {
   formatarDiaCivil,
   formatarIntervaloDeDias,
 } from "../../../format/data";
-import type { AvisoCltApi } from "../../../api/ausenciasClient";
+import type {
+  AvisoCltApi,
+  ViolacaoDaPoliticaApi,
+} from "../../../api/ausenciasClient";
+
+/** T215 — o texto de cada ponto fora da política (como a referência). */
+function textoDaViolacao(v: ViolacaoDaPoliticaApi, inicio: string): string {
+  const dias = (n: number) => (n === 1 ? "1 dia" : `${n} dias`);
+  switch (v.regra) {
+    case "antecedencia_minima":
+      return `Pedido com ${dias(v.dias)} de antecedência; a política pede ${v.minimo}.`;
+    case "antecedencia_maxima":
+      return `Pedido com ${v.meses} ${v.meses === 1 ? "mês" : "meses"} de antecedência; a política aceita até ${v.maximo}.`;
+    case "duracao_minima":
+      return `${v.dias === 1 ? "1 dia corrido" : `${v.dias} dias corridos`}; a política pede pelo menos ${v.minimo} por período.`;
+    case "duracao_maxima":
+      return `${v.dias} dias corridos; a política aceita até ${v.maximo} por período.`;
+    case "periodos_por_ano":
+      return `Seria o ${v.ordem}º período; a política aceita até ${v.maximo}.`;
+    case "periodo_maior":
+      return `Nenhum período chegaria a ${v.minimo} dias; a política pede um com pelo menos ${v.minimo}.`;
+    case "intervalo":
+      return `${dias(v.dias)} desde as outras férias; a política pede ${v.minimo} entre um período e outro.`;
+    case "inicio_antes_de_descanso":
+      return `Início em ${diaMesComZero(inicio)}, nos 2 dias antes de ${v.antesDe === "domingo" ? "domingo" : "feriado"}; a política pede outro dia.`;
+    case "inicio_no_descanso":
+      return `Início num fim de semana ou feriado (${diaMesComZero(v.dia)}); a política pede outro dia.`;
+    case "volta_na_sexta":
+      return `Volta numa sexta-feira (${diaMesComZero(v.dia)}); a política pede outro dia.`;
+    case "volta_na_vespera":
+      return `Volta na véspera de feriado (${diaMesComZero(v.dia)}); a política pede outro dia.`;
+    case "bloqueio":
+      return `Encosta no bloqueio ${v.nome} (${diaMesComZero(v.inicio)} a ${diaMesComZero(v.fim)}).`;
+    case "alem_do_saldo":
+      return "Passa do saldo do período; a política não aceita.";
+    case "equipe":
+      return `${v.fora === 1 ? "1 pessoa" : `${v.fora} pessoas`} do mesmo departamento já ${v.fora === 1 ? "está" : "estão"} fora nessas datas; a política aceita até ${v.maximo}.`;
+  }
+}
 
 /** T215 — o nome do período como a referência: "2025" ou "2025/2026". */
 function nomeDoPeriodo(p: { readonly inicio: string; readonly fim: string }) {
@@ -214,6 +252,8 @@ export function RegistrarAusenciaGaveta({
   const [trocandoPeriodo, setTrocandoPeriodo] = useState(false);
   // "São férias coletivas?" (menos de 12 meses de casa, art. 140).
   const [coletiva, setColetiva] = useState(false);
+  // Fora da política: o porquê (obrigatório para registrar mesmo assim).
+  const [motivoFora, setMotivoFora] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -242,6 +282,7 @@ export function RegistrarAusenciaGaveta({
     setPeriodoEscolhido(null);
     setTrocandoPeriodo(false);
     setColetiva(false);
+    setMotivoFora("");
     setFim(r?.fim ?? "");
     setComVolta(r?.comVolta ?? false);
     setVender(r?.vender ?? false);
@@ -326,6 +367,9 @@ export function RegistrarAusenciaGaveta({
     coletiva,
   ]);
 
+  // Como a referência: fora da política, registra mesmo assim com o motivo.
+  const foraDaPolitica =
+    ferias && (simulacao?.politica?.violacoes.length ?? 0) > 0;
   const completo =
     pessoa !== null &&
     tipo !== null &&
@@ -333,7 +377,8 @@ export function RegistrarAusenciaGaveta({
     inicio !== "" &&
     (afastamento
       ? motivo !== null && (!comVolta || (fim !== "" && fim >= inicio))
-      : fim !== "" && fim >= inicio);
+      : fim !== "" && fim >= inicio) &&
+    (!foraDaPolitica || motivoFora.trim() !== "");
 
   // Editando: só salva com alguma resposta diferente da gravada.
   const original = editando ? respostasDe(editando) : null;
@@ -366,6 +411,7 @@ export function RegistrarAusenciaGaveta({
       aprovada: afastamento ? true : aprovada,
       ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
       ...(ferias && coletivaValida ? { feriasColetivas: true } : {}),
+      ...(foraDaPolitica ? { motivoForaDaPolitica: motivoFora.trim() } : {}),
     };
     try {
       const nova =
@@ -428,7 +474,9 @@ export function RegistrarAusenciaGaveta({
                 : "Salvar alterações"
               : enviando
                 ? "Registrando…"
-                : "Registrar ausência"}
+                : foraDaPolitica
+                  ? "Registrar mesmo assim"
+                  : "Registrar ausência"}
           </Button>
         </FormActions>
       }
@@ -769,6 +817,26 @@ export function RegistrarAusenciaGaveta({
             </div>
           ) : null}
 
+          {foraDaPolitica && simulacao?.politica ? (
+            <div
+              className="ausencias-gaveta__clt"
+              role="note"
+              aria-labelledby={`${base}-fora`}
+            >
+              <p className="ausencias-gaveta__clt-titulo" id={`${base}-fora`}>
+                {`Fora da política ${simulacao.politica.nome}`}
+              </p>
+              <ul>
+                {simulacao.politica.violacoes.map((v, i) => (
+                  <li key={`${v.regra}-${i}`}>{textoDaViolacao(v, inicio)}</li>
+                ))}
+              </ul>
+              <p className="ausencias-gaveta__ajuda">
+                Dá para registrar mesmo assim, com o motivo abaixo.
+              </p>
+            </div>
+          ) : null}
+
           {ferias && semRegra ? (
             <p className="ausencias-gaveta__ajuda" role="note">
               Contrato sem regra automática de férias: o saldo não é calculado.
@@ -905,6 +973,23 @@ export function RegistrarAusenciaGaveta({
                 </span>
               </button>
             </div>
+          </li>
+        ) : null}
+
+        {/* Fora da política: o porquê, antes da observação */}
+        {foraDaPolitica ? (
+          <li className="ausencias-gaveta__pergunta">
+            <h3 className="ausencias-gaveta__titulo">
+              Por que registrar fora da política?{" "}
+              <span className="ausencias-gaveta__opcional">Obrigatório</span>
+            </h3>
+            <textarea
+              className="ausencias-gaveta__campo ausencias-gaveta__observacao"
+              aria-label="Por que registrar fora da política?"
+              maxLength={500}
+              value={motivoFora}
+              onChange={(e) => setMotivoFora(e.target.value)}
+            />
           </li>
         ) : null}
 

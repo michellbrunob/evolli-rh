@@ -167,7 +167,34 @@ export interface SimulacaoDeAusenciaApi {
   podeSerColetiva?: boolean;
   /** T215 — simulada como coletiva: os dias proporcionais e o novo período. */
   coletiva?: { dias: number; novoPeriodo: string } | null;
+  /** T215 — a política de férias da pessoa e o que o pedido não segue. */
+  politica?: {
+    id: string;
+    nome: string;
+    violacoes: ViolacaoDaPoliticaApi[];
+  } | null;
 }
+
+/** T215 — o que o pedido de férias não segue na política. */
+export type ViolacaoDaPoliticaApi =
+  | { regra: "antecedencia_minima"; dias: number; minimo: number }
+  | { regra: "antecedencia_maxima"; meses: number; maximo: number }
+  | { regra: "duracao_minima"; dias: number; minimo: number }
+  | { regra: "duracao_maxima"; dias: number; maximo: number }
+  | { regra: "periodos_por_ano"; ordem: number; maximo: number }
+  | { regra: "periodo_maior"; minimo: number }
+  | { regra: "intervalo"; dias: number; minimo: number }
+  | {
+      regra: "inicio_antes_de_descanso";
+      antesDe: "domingo" | "feriado";
+      dia: string;
+    }
+  | { regra: "inicio_no_descanso"; dia: string }
+  | { regra: "volta_na_sexta"; dia: string }
+  | { regra: "volta_na_vespera"; dia: string }
+  | { regra: "bloqueio"; nome: string; inicio: string; fim: string }
+  | { regra: "alem_do_saldo" }
+  | { regra: "equipe"; fora: number; maximo: number };
 
 /** T215 — um aviso das regras da CLT no registro de férias. */
 export type AvisoCltApi =
