@@ -6,6 +6,10 @@
  *
  * Afastamento troca a terceira pergunta pelo motivo, deixa a volta em aberto
  * e não pergunta pela aprovação (entra registrado).
+ *
+ * Editar (`editando`), como a referência: a mesma janela, "Editar
+ * ausência", com as respostas da ausência, a pessoa fixa e "Salvar
+ * alterações" (só com alguma mudança). A simulação não conta a própria.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { Button, FormActions } from "../../../components";
@@ -43,7 +47,11 @@ function iniciais(nome: string): string {
 }
 
 /** Recusa do servidor, na voz da tela (sem repetir valor). */
-function mensagemDaRecusa(erro: unknown, nome: string): string {
+function mensagemDaRecusa(
+  erro: unknown,
+  nome: string,
+  editando = false,
+): string {
   const detalhe = erro as {
     status?: number;
     erros?: readonly { campo: string; motivo: string }[];
@@ -59,8 +67,25 @@ function mensagemDaRecusa(erro: unknown, nome: string): string {
     case "fim_antes_do_inicio":
       return "O último dia não pode ser antes do primeiro.";
     default:
-      return "Não foi possível registrar a ausência. Confira os dados e tente de novo.";
+      return editando
+        ? "Não foi possível salvar a ausência. Confira os dados e tente de novo."
+        : "Não foi possível registrar a ausência. Confira os dados e tente de novo.";
   }
+}
+
+/** As respostas de uma ausência gravada (para editar). */
+function respostasDe(a: AusenciaApi) {
+  return {
+    tipo: a.tipo,
+    motivo: a.motivoAfastamento,
+    inicio: a.inicio,
+    fim: a.fim ?? "",
+    comVolta: a.fim !== null,
+    vender: a.diasVendidos > 0,
+    diasVendidos: a.diasVendidos > 0 ? String(a.diasVendidos) : "",
+    aprovada: a.status === "aprovada" || a.status === "cancelamento_pedido",
+    observacao: a.observacao ?? "",
+  };
 }
 
 /** T215 — o anexo (atestado ou documento): os formatos da referência. */
@@ -119,6 +144,8 @@ export function RegistrarAusenciaGaveta({
   onRegistrada,
   pessoaInicial,
   regraDeFerias: regraDaFicha,
+  editando = null,
+  onAlterada,
 }: {
   readonly aberta: boolean;
   readonly servico: ServicoDeAusencias;
@@ -129,6 +156,9 @@ export function RegistrarAusenciaGaveta({
   readonly pessoaInicial?: PessoaParaAusencia;
   /** Da ficha: a regra de férias do vínculo já é conhecida. */
   readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
+  /** Editar esta ausência (a pessoa não muda). */
+  readonly editando?: AusenciaApi | null;
+  readonly onAlterada?: (ausencia: AusenciaApi, aviso?: string) => void;
 }) {
   const base = useId();
   const [pessoa, setPessoa] = useState<PessoaParaAusencia | null>(
@@ -154,26 +184,35 @@ export function RegistrarAusenciaGaveta({
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
   const campoArquivoRef = useRef<HTMLInputElement | null>(null);
 
-  // Abrir de novo começa do zero.
+  // Abrir de novo começa do zero (ou, editando, das respostas gravadas).
   useEffect(() => {
     if (!aberta) return;
-    setPessoa(pessoaInicial ?? null);
+    const r = editando ? respostasDe(editando) : null;
+    setPessoa(
+      editando
+        ? {
+            id: editando.colaborador.id,
+            nome: editando.colaborador.nome,
+            cargo: editando.colaborador.cargo,
+          }
+        : (pessoaInicial ?? null),
+    );
     setEscolhendo(false);
     setTermo("");
-    setTipo(null);
-    setMotivo(null);
-    setInicio("");
-    setFim("");
-    setComVolta(false);
-    setVender(false);
-    setDiasVendidos("");
-    setAprovada(true);
-    setObservacao("");
+    setTipo(r?.tipo ?? null);
+    setMotivo(r?.motivo ?? null);
+    setInicio(r?.inicio ?? "");
+    setFim(r?.fim ?? "");
+    setComVolta(r?.comVolta ?? false);
+    setVender(r?.vender ?? false);
+    setDiasVendidos(r?.diasVendidos ?? "");
+    setAprovada(r?.aprovada ?? true);
+    setObservacao(r?.observacao ?? "");
     setSimulacao(null);
     setFalha(null);
     setArquivo(null);
     setRecusaDoAnexo(null);
-  }, [aberta, pessoaInicial]);
+  }, [aberta, pessoaInicial, editando]);
 
   // A lista de pessoas, pela busca.
   useEffect(() => {
@@ -220,6 +259,7 @@ export function RegistrarAusenciaGaveta({
             inicio,
             fim: fimEfetivo,
             ...(vendidos > 0 ? { diasVendidos: vendidos } : {}),
+            ...(editando ? { ignorar: editando.id } : {}),
           },
           { signal: controle.signal },
         )
@@ -230,7 +270,7 @@ export function RegistrarAusenciaGaveta({
       window.clearTimeout(espera);
       controle.abort();
     };
-  }, [pessoa, tipo, inicio, fimEfetivo, vendidos, servico]);
+  }, [pessoa, tipo, inicio, fimEfetivo, vendidos, servico, editando]);
 
   const completo =
     pessoa !== null &&
@@ -241,51 +281,74 @@ export function RegistrarAusenciaGaveta({
       ? motivo !== null && (!comVolta || (fim !== "" && fim >= inicio))
       : fim !== "" && fim >= inicio);
 
+  // Editando: só salva com alguma resposta diferente da gravada.
+  const original = editando ? respostasDe(editando) : null;
+  const mudou =
+    original === null ||
+    original.tipo !== tipo ||
+    original.motivo !== motivo ||
+    original.inicio !== inicio ||
+    original.fim !== fimEfetivo ||
+    original.diasVendidos !== (vendidos > 0 ? String(vendidos) : "") ||
+    original.aprovada !== aprovada ||
+    original.observacao !== observacao.trim() ||
+    arquivo !== null;
+
   async function registrar() {
-    if (!completo || !pessoa || !tipo || enviando) return;
+    if (!completo || !mudou || !pessoa || !tipo || enviando) return;
     setEnviando(true);
     setFalha(null);
+    const periodoDasFerias =
+      simulacao?.periodo?.inicio ?? editando?.periodoAquisitivo?.inicio;
+    const respostas = {
+      tipo,
+      ...(afastamento && motivo ? { motivoAfastamento: motivo } : {}),
+      inicio,
+      ...(fimEfetivo ? { fim: fimEfetivo } : {}),
+      ...(vendidos > 0 ? { diasVendidos: vendidos } : {}),
+      ...(ferias && periodoDasFerias
+        ? { periodoAquisitivoInicio: periodoDasFerias }
+        : {}),
+      aprovada: afastamento ? true : aprovada,
+      ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+    };
     try {
-      const nova = await servico.registrar({
-        colaboradorId: pessoa.id,
-        tipo,
-        ...(afastamento && motivo ? { motivoAfastamento: motivo } : {}),
-        inicio,
-        ...(fimEfetivo ? { fim: fimEfetivo } : {}),
-        ...(vendidos > 0 ? { diasVendidos: vendidos } : {}),
-        ...(ferias && simulacao?.periodo
-          ? { periodoAquisitivoInicio: simulacao.periodo.inicio }
-          : {}),
-        aprovada: afastamento ? true : aprovada,
-        ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
-      });
+      const nova =
+        editando && servico.alterar
+          ? await servico.alterar(editando.id, respostas)
+          : await servico.registrar({ colaboradorId: pessoa.id, ...respostas });
       // O anexo vai depois do registro; se falhar, a ausência fica.
       let aviso: string | undefined;
       if (arquivo && servico.enviarAnexo) {
         try {
           await servico.enviarAnexo(nova.id, arquivo);
         } catch (erro) {
-          aviso = `Ausência registrada, mas o anexo não foi enviado: ${motivoDoAnexo(
+          aviso = `${editando ? "Ausência alterada" : "Ausência registrada"}, mas o anexo não foi enviado: ${motivoDoAnexo(
             erro,
           )}. Anexe outro arquivo pelo histórico.`;
         }
       }
-      onRegistrada(nova, aviso);
+      if (editando) onAlterada?.(nova, aviso);
+      else onRegistrada(nova, aviso);
     } catch (erro) {
-      setFalha(mensagemDaRecusa(erro, primeiroNome(pessoa.nome)));
+      setFalha(
+        mensagemDaRecusa(erro, primeiroNome(pessoa.nome), editando !== null),
+      );
     } finally {
       setEnviando(false);
     }
   }
 
-  const alterado = pessoa !== null || tipo !== null || inicio !== "";
+  const alterado = editando
+    ? mudou
+    : pessoa !== null || tipo !== null || inicio !== "";
   const nome = pessoa ? primeiroNome(pessoa.nome) : "";
   const ano = simulacao?.periodo ? anoDoDiaCivil(simulacao.periodo.fim) : null;
 
   return (
     <Sheet
       aberto={aberta}
-      titulo="Registrar ausência"
+      titulo={editando ? "Editar ausência" : "Registrar ausência"}
       subtitulo="Responda as perguntas abaixo."
       icone={<IconeRegistrarAusencia tamanho={20} />}
       onFechar={onFechar}
@@ -299,10 +362,16 @@ export function RegistrarAusenciaGaveta({
           </Button>
           <Button
             type="button"
-            disabled={!completo || enviando}
+            disabled={!completo || !mudou || enviando}
             onClick={() => void registrar()}
           >
-            {enviando ? "Registrando…" : "Registrar ausência"}
+            {editando
+              ? enviando
+                ? "Salvando…"
+                : "Salvar alterações"
+              : enviando
+                ? "Registrando…"
+                : "Registrar ausência"}
           </Button>
         </FormActions>
       }
@@ -326,13 +395,15 @@ export function RegistrarAusenciaGaveta({
                   </span>
                 ) : null}
               </span>
-              <button
-                type="button"
-                className="ausencias-gaveta__link"
-                onClick={() => setEscolhendo(true)}
-              >
-                Trocar
-              </button>
+              {editando ? null : (
+                <button
+                  type="button"
+                  className="ausencias-gaveta__link"
+                  onClick={() => setEscolhendo(true)}
+                >
+                  Trocar
+                </button>
+              )}
             </div>
           ) : escolhendo ? (
             <div className="ausencias-gaveta__escolha">

@@ -258,6 +258,7 @@ export class QuadroEscalaService {
               empresaId,
               colaboradorId: { in: ids },
               status: { in: [...STATUS_QUE_VALEM] },
+              excluidaEm: null,
               tipo: { notIn: TIPOS_FORA_DO_QUADRO },
               inicio: { lte: fim },
               OR: [{ fim: null }, { fim: { gte: inicio } }],

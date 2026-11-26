@@ -136,6 +136,8 @@ export interface ConsultaDeSimulacao {
   readonly fim?: string;
   readonly diasVendidos?: number;
   readonly periodoAquisitivoInicio?: string;
+  /** Editando: a própria ausência não conta (sobreposição e saldo). */
+  readonly ignorar?: string;
 }
 
 /** Pessoa que pode ser escolhida na gaveta. */
@@ -159,6 +161,12 @@ export interface ServicoDeAusencias {
   readonly aprovar: (id: string) => Promise<AusenciaApi>;
   readonly recusar: (id: string, motivo?: string) => Promise<AusenciaApi>;
   readonly cancelar: (id: string) => Promise<AusenciaApi>;
+  /** T215 — editar e excluir, como a referência. */
+  readonly alterar?: (
+    id: string,
+    alteracao: Omit<NovaAusencia, "colaboradorId">,
+  ) => Promise<AusenciaApi>;
+  readonly excluir?: (id: string) => Promise<void>;
   readonly buscarPessoas: (
     termo: string,
     opcoes?: { readonly signal?: AbortSignal },

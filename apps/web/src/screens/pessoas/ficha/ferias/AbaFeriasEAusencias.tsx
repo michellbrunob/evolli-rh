@@ -30,10 +30,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../../../ui";
+import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import {
   IconeBaixarArquivo,
   IconeCalendario,
+  IconeEditar,
   IconeMaisAcoes,
+  IconeRemover,
   IconeRegistrarAusencia,
   IconeTempo,
 } from "../../../../ui/icones";
@@ -61,6 +64,8 @@ import {
   MOTIVOS_DE_AFASTAMENTO,
   ROTULO_DO_STATUS,
   ROTULO_DO_TIPO,
+  TIPO_NA_FRASE,
+  type TipoAusencia,
 } from "../../ferias/tiposAusencia";
 import { COR_DO_TIPO, ICONE_DO_TIPO } from "../../ferias/aparenciaDoTipo";
 import {
@@ -105,6 +110,7 @@ type Carga =
   | { estado: "pronto"; dados: FeriasDoColaboradorApi };
 
 type Janela =
+  | { tipo: "excluir"; ausencia: AusenciaApi }
   | { tipo: "recusar"; ausencia: AusenciaApi }
   | { tipo: "cancelar"; ausencia: AusenciaApi }
   | { tipo: "remover-anexo"; ausencia: AusenciaApi }
@@ -148,6 +154,26 @@ const ENCERRADAS: ReadonlySet<StatusAusencia> = new Set([
 
 function dias(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
+}
+
+/** "As férias … serão removidas", "O day off … será removido". */
+const EXCLUSAO_NA_FRASE: Readonly<
+  Record<TipoAusencia, { readonly artigo: string; readonly verbo: string }>
+> = {
+  ferias: { artigo: "As", verbo: "serão removidas" },
+  licenca_medica: { artigo: "A", verbo: "será removida" },
+  licenca_maternidade: { artigo: "A", verbo: "será removida" },
+  licenca_paternidade: { artigo: "A", verbo: "será removida" },
+  afastamento: { artigo: "O", verbo: "será removido" },
+  falta_justificada: { artigo: "A", verbo: "será removida" },
+  falta_sem_justificativa: { artigo: "A", verbo: "será removida" },
+  day_off: { artigo: "O", verbo: "será removido" },
+  home_office: { artigo: "O", verbo: "será removido" },
+};
+
+function textoDaExclusao(a: AusenciaApi, nome: string): string {
+  const { artigo, verbo } = EXCLUSAO_NA_FRASE[a.tipo];
+  return `${artigo} ${TIPO_NA_FRASE[a.tipo]} de ${nome} (${datas(a)}) ${verbo} do histórico e do calendário. Essa ação não pode ser desfeita.`;
 }
 
 function diasUteis(n: number | null): string {
@@ -215,6 +241,7 @@ export function AbaFeriasEAusencias({
     [consultar, pessoa.id],
   );
   const [gaveta, setGaveta] = useState(false);
+  const [editando, setEditando] = useState<AusenciaApi | null>(null);
   const [janela, setJanela] = useState<Janela>(null);
   const [motivo, setMotivo] = useState("");
   const [trabalhando, setTrabalhando] = useState(false);
@@ -345,6 +372,8 @@ export function AbaFeriasEAusencias({
             setJanela({ tipo: "recusar", ausencia: a });
           }}
           onCancelar={(a) => setJanela({ tipo: "cancelar", ausencia: a })}
+          onEditar={(a) => setEditando(a)}
+          onExcluir={(a) => setJanela({ tipo: "excluir", ausencia: a })}
           onAnexar={pedirArquivo}
           onBaixar={(a) => void baixar(a)}
           onRemoverAnexo={(a) =>
@@ -383,6 +412,62 @@ export function AbaFeriasEAusencias({
             carregar(true);
           }}
         />
+
+        <RegistrarAusenciaGaveta
+          aberta={editando !== null}
+          editando={editando}
+          servico={servico}
+          regraDeFerias={dados.regraDeFerias}
+          onFechar={() => setEditando(null)}
+          onRegistrada={() => undefined}
+          onAlterada={(_alterada, avisoDoAnexo) => {
+            setEditando(null);
+            setAviso(avisoDoAnexo ?? "Ausência alterada.");
+            carregar(true);
+          }}
+        />
+
+        <Dialog
+          aberto={janela?.tipo === "excluir"}
+          titulo="Excluir esta ausência?"
+          icone={<IconeRemover tamanho={20} />}
+          descricao={
+            janela?.tipo === "excluir"
+              ? textoDaExclusao(janela.ausencia, pessoa.nome)
+              : ""
+          }
+          onFechar={() => setJanela(null)}
+          bloqueado={trabalhando}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setJanela(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="ficha-ref__botao-perigo"
+                disabled={trabalhando}
+                onClick={() => {
+                  const alvo = janela?.ausencia;
+                  if (!alvo || !servico.excluir) return;
+                  void executar(
+                    () => servico.excluir!(alvo.id),
+                    "Ausência excluída.",
+                    "Não foi possível excluir. Tente de novo.",
+                  );
+                }}
+              >
+                Excluir
+              </Button>
+            </FormActions>
+          }
+        >
+          {null}
+        </Dialog>
 
         <Dialog
           aberto={janela?.tipo === "recusar"}
@@ -742,6 +827,8 @@ function Historico({
   onAprovar,
   onRecusar,
   onCancelar,
+  onEditar,
+  onExcluir,
   onAnexar,
   onBaixar,
   onRemoverAnexo,
@@ -754,6 +841,8 @@ function Historico({
   readonly onAprovar: (a: AusenciaApi) => void;
   readonly onRecusar: (a: AusenciaApi) => void;
   readonly onCancelar: (a: AusenciaApi) => void;
+  readonly onEditar: (a: AusenciaApi) => void;
+  readonly onExcluir: (a: AusenciaApi) => void;
   readonly onAnexar: (a: AusenciaApi) => void;
   readonly onBaixar: (a: AusenciaApi) => void;
   readonly onRemoverAnexo: (a: AusenciaApi) => void;
@@ -826,6 +915,8 @@ function Historico({
                     onAprovar={onAprovar}
                     onRecusar={onRecusar}
                     onCancelar={onCancelar}
+                    onEditar={onEditar}
+                    onExcluir={onExcluir}
                     onAnexar={onAnexar}
                     onBaixar={onBaixar}
                     onRemoverAnexo={onRemoverAnexo}
@@ -853,6 +944,8 @@ function LinhaDoHistorico({
   onAprovar,
   onRecusar,
   onCancelar,
+  onEditar,
+  onExcluir,
   onAnexar,
   onBaixar,
   onRemoverAnexo,
@@ -865,17 +958,29 @@ function LinhaDoHistorico({
   readonly onAprovar: (a: AusenciaApi) => void;
   readonly onRecusar: (a: AusenciaApi) => void;
   readonly onCancelar: (a: AusenciaApi) => void;
+  readonly onEditar: (a: AusenciaApi) => void;
+  readonly onExcluir: (a: AusenciaApi) => void;
   readonly onAnexar: (a: AusenciaApi) => void;
   readonly onBaixar: (a: AusenciaApi) => void;
   readonly onRemoverAnexo: (a: AusenciaApi) => void;
 }) {
   const Icone = ICONE_DO_TIPO[a.tipo];
+  // Como a referência: Editar e Excluir em toda linha (editar, só a que
+  // ainda vale; cancelada e recusada só saem).
+  const podeAlterar =
+    !ENCERRADAS.has(a.status) && servico.alterar !== undefined;
+  const podeExcluir = servico.excluir !== undefined;
   const decisoes = decisoesDoStatus(a.status);
   const podeAnexar =
     !a.anexo && !ENCERRADAS.has(a.status) && servico.enviarAnexo !== undefined;
   const podeRemover = Boolean(a.anexo) && servico.removerAnexo !== undefined;
   const temAcoes =
-    podeEditar && (decisoes.length > 0 || podeAnexar || podeRemover);
+    podeEditar &&
+    (podeAlterar ||
+      podeExcluir ||
+      decisoes.length > 0 ||
+      podeAnexar ||
+      podeRemover);
   const nomeDaLinha = `${ROTULO_DO_TIPO[a.tipo]} de ${formatarDiaCivil(a.inicio)}`;
   return (
     <li className="ferias-ficha__item">
@@ -929,6 +1034,15 @@ function LinhaDoHistorico({
               <IconeMaisAcoes tamanho={16} />
             </DropdownMenuTrigger>
             <DropdownMenuContent className="ficha-ref__menu">
+              {podeAlterar ? (
+                <DropdownMenuItem
+                  className="ficha-ref__menu-item"
+                  onSelect={() => onEditar(a)}
+                >
+                  <IconeEditar tamanho={18} />
+                  Editar
+                </DropdownMenuItem>
+              ) : null}
               {decisoes.includes("aprovar") ? (
                 <DropdownMenuItem
                   className="ficha-ref__menu-item"
@@ -968,6 +1082,18 @@ function LinhaDoHistorico({
                 >
                   Remover anexo
                 </DropdownMenuItem>
+              ) : null}
+              {podeExcluir ? (
+                <>
+                  <RadixMenu.Separator className="ficha-ref__menu-divisor" />
+                  <DropdownMenuItem
+                    className="ficha-ref__menu-item ficha-ref__menu-item--perigo"
+                    onSelect={() => onExcluir(a)}
+                  >
+                    <IconeRemover tamanho={18} />
+                    Excluir
+                  </DropdownMenuItem>
+                </>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>

@@ -172,6 +172,49 @@ export class RegistrarAusenciaDto {
   observacao?: string;
 }
 
+/**
+ * T215 — editar a ausência (como a referência): as mesmas respostas do
+ * registro, menos a pessoa (que não muda).
+ */
+export class AlterarAusenciaDto {
+  @IsIn(TIPOS_AUSENCIA)
+  tipo!: TipoAusencia;
+
+  @IsOptional()
+  @IsIn(MOTIVOS_AFASTAMENTO)
+  motivoAfastamento?: MotivoAfastamento;
+
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  inicio!: string;
+
+  @IsOptional()
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  fim?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  diasVendidos?: number;
+
+  @IsOptional()
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  periodoAquisitivoInicio?: string;
+
+  @IsBoolean()
+  aprovada!: boolean;
+
+  @Transform(({ value }) => textoOpcional(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  observacao?: string;
+}
+
 export class RecusarAusenciaDto {
   @Transform(({ value }) => textoOpcional(value))
   @IsOptional()
@@ -208,4 +251,9 @@ export class SimularAusenciaQueryDto {
   @Matches(DIA_CIVIL)
   @IsDateString({ strict: true })
   periodoAquisitivoInicio?: string;
+
+  /** Editando: a própria ausência não conta (sobreposição e saldo). */
+  @IsOptional()
+  @IsUUID()
+  ignorar?: string;
 }

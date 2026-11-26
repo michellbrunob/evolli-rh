@@ -4,9 +4,11 @@
  * Colaboradores (só quem está ativo, pela busca de sempre).
  */
 import {
+  alterarAusencia,
   aprovarAusencia,
   cancelarAusencia,
   enviarAnexoDaAusencia,
+  excluirAusencia,
   listarAusencias,
   obterAnexoDaAusencia,
   removerAnexoDaAusencia,
@@ -24,6 +26,8 @@ export const servicoDeAusenciasDoServidor: ServicoDeAusencias = {
   aprovar: (id) => aprovarAusencia(id),
   recusar: (id, motivo) => recusarAusencia(id, motivo),
   cancelar: (id) => cancelarAusencia(id),
+  alterar: (id, alteracao) => alterarAusencia(id, alteracao),
+  excluir: (id) => excluirAusencia(id),
   enviarAnexo: async (id, arquivo) => {
     await enviarAnexoDaAusencia(id, arquivo);
   },

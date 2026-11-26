@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -21,6 +23,7 @@ import { RequirePermission } from "../../auth/authorization/require-permission.d
 import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import {
+  AlterarAusenciaDto,
   ListarAusenciasQueryDto,
   RecusarAusenciaDto,
   RegistrarAusenciaDto,
@@ -86,6 +89,42 @@ export class AusenciasController {
     @Req() req: Request,
   ) {
     return this.service.registrar(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Patch(":ausenciaId")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("ausencia", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Edita a ausência (as mesmas regras do registro)" })
+  async alterar(
+    @Param("ausenciaId", ParseUUIDPipe) ausenciaId: string,
+    @Body() dto: AlterarAusenciaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.alterar(ausenciaId, dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Delete(":ausenciaId")
+  @HttpCode(204)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("ausencia", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Exclui a ausência: sai de tudo; o registro fica marcado",
+  })
+  async excluir(
+    @Param("ausenciaId", ParseUUIDPipe) ausenciaId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.service.excluir(ausenciaId, {
       actor,
       metadata: extractRequestMetadata(req),
     });

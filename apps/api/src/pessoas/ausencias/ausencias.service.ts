@@ -42,6 +42,7 @@ import {
   somarMeses,
 } from "./calculo-ausencias";
 import {
+  AlterarAusenciaDto,
   GrupoDeTipo,
   ListarAusenciasQueryDto,
   PeriodoDaLista,
@@ -216,7 +217,7 @@ export class AusenciasService {
   ): Promise<ListagemDeAusencias> {
     const empresaId = this.empresaDaSessao(ctx, "leitura");
     const hoje = hojeEmSaoPaulo();
-    const where: Prisma.AusenciaWhereInput = { empresaId };
+    const where: Prisma.AusenciaWhereInput = { empresaId, excluidaEm: null };
     const e: Prisma.AusenciaWhereInput[] = [];
     if (query.busca) {
       e.push({
@@ -264,7 +265,9 @@ export class AusenciasService {
     hoje: Dia,
   ): Promise<IndicadoresDeAusencias> {
     const conta = (filtro: Prisma.AusenciaWhereInput) =>
-      this.prisma.ausencia.count({ where: { empresaId, ...filtro } });
+      this.prisma.ausencia.count({
+        where: { empresaId, excluidaEm: null, ...filtro },
+      });
     const [
       emFeriasAgora,
       licencasEAfastamentos,
@@ -318,14 +321,78 @@ export class AusenciasService {
 
     const aprovada = dto.tipo === "afastamento" || dto.aprovada;
     const linha = await this.prisma.$transaction(async (tx) => {
-      // Um registro por vez para a mesma pessoa: a sobreposição e o saldo
-      // são conferidos sem corrida com outra aba.
+      const periodoInicio = await this.conferirNoBanco(
+        tx,
+        dto,
+        empresaId,
+        principal,
+        regra,
+        null,
+      );
+
+      const agora = new Date();
+      const criada = await tx.ausencia.create({
+        data: {
+          empresaId,
+          colaboradorId: dto.colaboradorId,
+          vinculoId: principal.id,
+          tipo: dto.tipo,
+          motivoAfastamento:
+            dto.tipo === "afastamento" ? dto.motivoAfastamento! : null,
+          inicio: dataDoDia(dto.inicio),
+          fim: dto.fim ? dataDoDia(dto.fim) : null,
+          diasVendidos: dto.tipo === "ferias" ? (dto.diasVendidos ?? 0) : 0,
+          periodoAquisitivoInicio: periodoInicio
+            ? dataDoDia(periodoInicio)
+            : null,
+          status: aprovada ? "aprovada" : "aguardando_rh",
+          observacao: dto.observacao ?? null,
+          registradoPorId: ctx.actor.id,
+          ...(aprovada
+            ? { decididoPorId: ctx.actor.id, decididoEm: agora }
+            : {}),
+        },
+        include: INCLUSAO,
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_ausencia_registrada",
+        "ausencia",
+        criada.id,
+        empresaId,
+      );
+      return criada;
+    });
+    const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
+    return paraApi(linha, fotos, veAnexo(ctx));
+  }
+
+  /**
+   * A conferência que olha o banco, comum ao registro e à edição: a
+   * sobreposição com outra ausência da pessoa e o saldo de férias. Na
+   * edição, a própria ausência (`ignorar`) não conta. Devolve o início do
+   * período aquisitivo das férias (ou `null`).
+   */
+  private async conferirNoBanco(
+    tx: Prisma.TransactionClient,
+    dto: RegistrarAusenciaDto,
+    empresaId: string,
+    principal: Awaited<ReturnType<AusenciasService["vinculoPrincipal"]>>,
+    regra: ReturnType<typeof regraDeFeriasDoTipo>,
+    ignorar: string | null,
+  ): Promise<Dia | null> {
+    // Um registro por vez para a mesma pessoa: a sobreposição e o saldo
+    // são conferidos sem corrida com outra aba.
+    {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ausencia:${dto.colaboradorId}:${empresaId}`}))`;
       const existentes = await tx.ausencia.findMany({
         where: {
           colaboradorId: dto.colaboradorId,
           empresaId,
           status: { in: [...STATUS_QUE_OCUPAM] },
+          excluidaEm: null,
+          ...(ignorar ? { id: { not: ignorar } } : {}),
         },
       });
       const nova = { inicio: dto.inicio, fim: dto.fim ?? null };
@@ -381,13 +448,86 @@ export class AusenciasService {
         }
         if (recusas.length > 0) throw new CamposRecusadosException(recusas);
       }
+      return periodoInicio;
+    }
+  }
 
-      const agora = new Date();
-      const criada = await tx.ausencia.create({
-        data: {
+  // ---- editar e excluir (como a referência) ---------------------------------
+
+  /**
+   * Edita a ausência com as mesmas regras do registro (forma, sobreposição
+   * e saldo, sem contar a própria). "Já aprovada" decide de novo (quem e
+   * quando); "ainda não" volta a aguardar o RH. Cancelada ou recusada não
+   * muda (409); excluída ou de outra empresa, 404.
+   */
+  async alterar(
+    ausenciaId: string,
+    dto: AlterarAusenciaDto,
+    ctx: PessoasAuditContext,
+  ): Promise<AusenciaApi> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const atual = await this.prisma.ausencia.findFirst({
+      where: { id: ausenciaId, empresaId, excluidaEm: null },
+      select: { colaboradorId: true, status: true },
+    });
+    if (!atual) {
+      return this.auditoria.negarAcesso(ctx, "ausencia", ausenciaId, empresaId);
+    }
+    if (atual.status === "cancelada" || atual.status === "recusada") {
+      throw new ConflictException();
+    }
+    const completo: RegistrarAusenciaDto = {
+      ...dto,
+      colaboradorId: atual.colaboradorId,
+    };
+    const principal = await this.vinculoPrincipal(
+      atual.colaboradorId,
+      empresaId,
+      ctx,
+    );
+    const erros = validarForma(completo);
+    const regra = regraDeFeriasDoTipo(principal.tipo);
+    if (dto.tipo === "ferias" && regra === "sem_ferias") {
+      erros.push({ campo: "tipo", motivo: "nao_se_aplica" });
+    }
+    if (
+      dto.tipo === "ferias" &&
+      regra === "sem_regra" &&
+      (dto.diasVendidos ?? 0) > 0
+    ) {
+      erros.push({ campo: "diasVendidos", motivo: "nao_se_aplica" });
+    }
+    if (erros.length > 0) throw new CamposRecusadosException(erros);
+
+    const aprovada = dto.tipo === "afastamento" || dto.aprovada;
+    const linha = await this.prisma.$transaction(async (tx) => {
+      const periodoInicio = await this.conferirNoBanco(
+        tx,
+        completo,
+        empresaId,
+        principal,
+        regra,
+        ausenciaId,
+      );
+      // Relida sob a trava: outra aba pode ter cancelado ou excluído.
+      const agora = await tx.ausencia.findFirst({
+        where: { id: ausenciaId, empresaId, excluidaEm: null },
+        select: { status: true },
+      });
+      if (!agora) {
+        return this.auditoria.negarAcesso(
+          ctx,
+          "ausencia",
+          ausenciaId,
           empresaId,
-          colaboradorId: dto.colaboradorId,
-          vinculoId: principal.id,
+        );
+      }
+      if (agora.status === "cancelada" || agora.status === "recusada") {
+        throw new ConflictException();
+      }
+      const atualizada = await tx.ausencia.update({
+        where: { id: ausenciaId },
+        data: {
           tipo: dto.tipo,
           motivoAfastamento:
             dto.tipo === "afastamento" ? dto.motivoAfastamento! : null,
@@ -397,27 +537,65 @@ export class AusenciasService {
           periodoAquisitivoInicio: periodoInicio
             ? dataDoDia(periodoInicio)
             : null,
-          status: aprovada ? "aprovada" : "aguardando_rh",
           observacao: dto.observacao ?? null,
-          registradoPorId: ctx.actor.id,
+          motivoDecisao: null,
           ...(aprovada
-            ? { decididoPorId: ctx.actor.id, decididoEm: agora }
-            : {}),
+            ? {
+                status: "aprovada",
+                decididoPorId: ctx.actor.id,
+                decididoEm: new Date(),
+              }
+            : {
+                status: "aguardando_rh",
+                decididoPorId: null,
+                decididoEm: null,
+              }),
         },
         include: INCLUSAO,
       });
       await this.auditoria.registrarMutacao(
         tx,
         ctx,
-        "pessoas_ausencia_registrada",
+        "pessoas_ausencia_alterada",
         "ausencia",
-        criada.id,
+        ausenciaId,
         empresaId,
       );
-      return criada;
+      return atualizada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
     return paraApi(linha, fotos, veAnexo(ctx));
+  }
+
+  /**
+   * Exclui a ausência, como a referência: ela sai do histórico, da lista,
+   * do quadro e do saldo. O registro fica, marcado (quem e quando): a
+   * aplicação não tem DELETE na tabela (histórico imutável).
+   */
+  async excluir(ausenciaId: string, ctx: PessoasAuditContext): Promise<void> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    await this.prisma.$transaction(async (tx) => {
+      const marcadas = await tx.ausencia.updateMany({
+        where: { id: ausenciaId, empresaId, excluidaEm: null },
+        data: { excluidaEm: new Date(), excluidaPorId: ctx.actor.id },
+      });
+      if (marcadas.count === 0) {
+        return this.auditoria.negarAcesso(
+          ctx,
+          "ausencia",
+          ausenciaId,
+          empresaId,
+        );
+      }
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_ausencia_excluida",
+        "ausencia",
+        ausenciaId,
+        empresaId,
+      );
+    });
   }
 
   // ---- decisões ------------------------------------------------------------
@@ -431,7 +609,7 @@ export class AusenciasService {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const linha = await this.prisma.$transaction(async (tx) => {
       const atual = await tx.ausencia.findFirst({
-        where: { id: ausenciaId, empresaId },
+        where: { id: ausenciaId, empresaId, excluidaEm: null },
         include: INCLUSAO,
       });
       if (!atual) {
@@ -513,6 +691,8 @@ export class AusenciasService {
         colaboradorId: query.colaboradorId,
         empresaId,
         status: { in: [...STATUS_QUE_OCUPAM] },
+        excluidaEm: null,
+        ...(query.ignorar ? { id: { not: query.ignorar } } : {}),
       },
     });
     const hoje = hojeEmSaoPaulo();
@@ -561,7 +741,7 @@ export class AusenciasService {
       ctx,
     );
     const linhas = await this.prisma.ausencia.findMany({
-      where: { colaboradorId, empresaId },
+      where: { colaboradorId, empresaId, excluidaEm: null },
       include: INCLUSAO,
       orderBy: [{ inicio: "desc" }, { criadoEm: "desc" }],
     });

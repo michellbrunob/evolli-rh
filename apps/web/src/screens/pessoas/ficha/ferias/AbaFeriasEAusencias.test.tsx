@@ -127,6 +127,8 @@ function servico(extra: Partial<ServicoDeAusencias> = {}): ServicoDeAusencias {
     cancelar: vi.fn(async (id: string) =>
       ausencia({ id, status: "cancelada" }),
     ),
+    alterar: vi.fn(async (id: string) => ausencia({ id })),
+    excluir: vi.fn(async () => undefined),
     buscarPessoas: vi.fn(async () => [PESSOA]),
     enviarAnexo: vi.fn(async () => undefined),
     removerAnexo: vi.fn(async () => undefined),
@@ -485,6 +487,117 @@ describe("T215 — aba Férias e ausências da ficha", () => {
   ])("falha %i ao carregar: %s", async (status, texto) => {
     montar(new ApiError(status, "x"));
     expect(await screen.findByText(texto)).toBeInTheDocument();
+  });
+
+  it("⋯ Editar: a mesma janela, como 'Editar ausência', com a pessoa fixa e as respostas; salvar altera e relê", async () => {
+    const { s, consultar } = montar();
+    fireEvent.pointerDown(
+      await screen.findByRole("button", {
+        name: "Ações de Férias de 07/12/2026",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    const gaveta = await screen.findByRole("dialog", {
+      name: "Editar ausência",
+    });
+    expect(within(gaveta).getByText("Ana Teste Lima")).toBeInTheDocument();
+    // A pessoa não muda na edição.
+    expect(within(gaveta).queryByRole("button", { name: "Trocar" })).toBeNull();
+    expect(
+      within(gaveta).getByRole("radio", { name: "Férias" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      (within(gaveta).getByLabelText("Primeiro dia") as HTMLInputElement).value,
+    ).toBe("2026-12-07");
+    expect(
+      (within(gaveta).getByLabelText("Último dia") as HTMLInputElement).value,
+    ).toBe("2026-12-26");
+    expect(
+      within(gaveta).getByRole("radio", { name: /^Sim, já aprovada/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    // Sem mudança, nada a salvar; mudando o fim, salva.
+    const salvar = within(gaveta).getByRole("button", {
+      name: "Salvar alterações",
+    });
+    expect(salvar).toBeDisabled();
+    fireEvent.change(within(gaveta).getByLabelText("Último dia"), {
+      target: { value: "2026-12-20" },
+    });
+    // A simulação da edição não conta a própria ausência.
+    await waitFor(() =>
+      expect(s.simular).toHaveBeenCalledWith(
+        expect.objectContaining({ fim: "2026-12-20", ignorar: "a-1" }),
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(salvar);
+    await waitFor(() =>
+      expect(s.alterar).toHaveBeenCalledWith("a-1", {
+        tipo: "ferias",
+        inicio: "2026-12-07",
+        fim: "2026-12-20",
+        periodoAquisitivoInicio: "2025-01-05",
+        aprovada: true,
+      }),
+    );
+    await waitFor(() => expect(consultar).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Ausência alterada.")).toBeInTheDocument();
+  });
+
+  it("⋯ Excluir: confirma com o tipo, o nome e a data; Cancelar não exclui; Excluir exclui e relê", async () => {
+    const { s, consultar } = montar();
+    const abrir = async () => {
+      fireEvent.pointerDown(
+        await screen.findByRole("button", {
+          name: "Ações de Férias de 07/12/2026",
+        }),
+        { button: 0, ctrlKey: false },
+      );
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Excluir" }));
+      return screen.findByRole("dialog", { name: "Excluir esta ausência?" });
+    };
+    let janela = await abrir();
+    expect(
+      within(janela).getByText(
+        "As férias de Ana Teste Lima (07/12/2026 a 26/12/2026) serão removidas do histórico e do calendário. Essa ação não pode ser desfeita.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(within(janela).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(s.excluir).not.toHaveBeenCalled();
+
+    janela = await abrir();
+    fireEvent.click(within(janela).getByRole("button", { name: "Excluir" }));
+    await waitFor(() => expect(s.excluir).toHaveBeenCalledWith("a-1"));
+    await waitFor(() => expect(consultar).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Ausência excluída.")).toBeInTheDocument();
+  });
+
+  it("cancelada: só sai (Excluir), não se edita", async () => {
+    montar(
+      ferias({
+        proximaAusencia: null,
+        historico: [
+          ausencia({
+            id: "a-9",
+            status: "cancelada",
+            inicio: "2027-01-05",
+            fim: "2027-01-10",
+          }),
+        ],
+      }),
+    );
+    fireEvent.pointerDown(
+      await screen.findByRole("button", {
+        name: "Ações de Férias de 05/01/2027",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    expect(
+      await screen.findByRole("menuitem", { name: "Excluir" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Editar" })).toBeNull();
   });
 
   it("registrar: abre a gaveta com a pessoa já escolhida e, ao registrar, relê", async () => {

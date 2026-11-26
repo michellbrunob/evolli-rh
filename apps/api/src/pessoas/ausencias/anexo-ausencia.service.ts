@@ -241,7 +241,7 @@ export class AnexoAusenciaService {
     ctx: PessoasAuditContext,
   ) {
     const ausencia = await this.prisma.ausencia.findFirst({
-      where: { id: ausenciaId, empresaId },
+      where: { id: ausenciaId, empresaId, excluidaEm: null },
       select: { id: true, colaboradorId: true, status: true },
     });
     if (!ausencia) {

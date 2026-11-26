@@ -140,6 +140,8 @@ export interface SimularAusenciaQuery {
   fim?: string;
   diasVendidos?: number;
   periodoAquisitivoInicio?: string;
+  /** Editando: a própria ausência não conta (sobreposição e saldo). */
+  ignorar?: string;
 }
 
 export interface SimulacaoDeAusenciaApi {
@@ -283,8 +285,62 @@ export function simularAusencia(
       fim: query.fim,
       diasVendidos: query.diasVendidos,
       periodoAquisitivoInicio: query.periodoAquisitivoInicio,
+      ignorar: query.ignorar,
     }),
   );
+}
+
+/** T215 — edita a ausência (as mesmas respostas do registro, menos a pessoa). */
+export async function alterarAusencia(
+  ausenciaId: string,
+  dto: Omit<RegistrarAusenciaDto, "colaboradorId">,
+): Promise<AusenciaApi> {
+  const res = await fetch(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}`,
+    {
+      method: "PATCH",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": await tokenCsrfParaGravacao(),
+      },
+      body: JSON.stringify(dto),
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
+  return res.json() as Promise<AusenciaApi>;
+}
+
+/**
+ * T215 — exclui a ausência: sai do histórico, da lista, do quadro e do
+ * saldo (o servidor guarda o registro, marcado).
+ */
+export async function excluirAusencia(ausenciaId: string): Promise<void> {
+  const res = await fetch(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "x-csrf-token": await tokenCsrfParaGravacao(),
+      },
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
 }
 
 /** Saldo de férias, próxima ausência e histórico do colaborador. */

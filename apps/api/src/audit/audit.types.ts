@@ -91,6 +91,8 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_aprovada",
   "pessoas_ausencia_recusada",
   "pessoas_ausencia_cancelada",
+  "pessoas_ausencia_alterada",
+  "pessoas_ausencia_excluida",
   // T215 — ficha: leitura (dados de saúde) e anexo, sem conteúdo.
   "pessoas_ausencia_consultada",
   "pessoas_ausencia_anexo_enviado",
@@ -111,6 +113,8 @@ export const AUDIT_ACTIONS = [
   "pessoas_escala_regras_salvas",
   "pessoas_escala_feriado_criado",
   "pessoas_escala_feriado_removido",
+  "pessoas_escala_feriado_alterado",
+  "pessoas_escala_feriado_arquivado",
   // T213 — documentos do colaborador (ADR 0021).
   "pessoas_documento_colaborador_enviado",
   "pessoas_documento_colaborador_substituido",

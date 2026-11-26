@@ -946,6 +946,194 @@ describe("T215 — Férias e ausências (e2e)", () => {
     });
   });
 
+  describe("editar e excluir (como a referência)", () => {
+    function patch(rota: string, cred: Credencial) {
+      return agent()
+        .patch(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    function del(rota: string, cred: Credencial) {
+      return agent()
+        .delete(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    async function registrar(
+      colaboradorId: string,
+      corpo: Record<string, unknown>,
+    ): Promise<string> {
+      const r = await post("/v1/ausencias", rhA)
+        .send({ colaboradorId, aprovada: true, ...corpo })
+        .expect(201);
+      return r.body.id as string;
+    }
+
+    it("editar: tipo, datas, aprovação e observação; 200 e trilha sem valores", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 70);
+      const id = await registrar(pessoa, {
+        tipo: "falta_justificada",
+        inicio: dia,
+        fim: dia,
+      });
+      const r = await patch(`/v1/ausencias/${id}`, rhA)
+        .send({
+          tipo: "day_off",
+          inicio: somarDias(dia, 1),
+          fim: somarDias(dia, 2),
+          aprovada: false,
+          observacao: "  troca de data  ",
+        })
+        .expect(200);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toMatchObject({
+        id,
+        colaborador: { id: pessoa },
+        tipo: "day_off",
+        inicio: somarDias(dia, 1),
+        fim: somarDias(dia, 2),
+        dias: 2,
+        status: "aguardando_rh",
+        observacao: "troca de data",
+      });
+      const eventos = await trilha(id);
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_ausencia_registrada",
+        "pessoas_ausencia_alterada",
+      ]);
+      expect(JSON.stringify(eventos[1])).not.toContain("troca de data");
+      // Voltar a "já aprovada" decide de novo, com quem e quando.
+      const aprovada = await patch(`/v1/ausencias/${id}`, dpA)
+        .send({
+          tipo: "day_off",
+          inicio: somarDias(dia, 1),
+          fim: somarDias(dia, 2),
+          aprovada: true,
+        })
+        .expect(200);
+      expect(aprovada.body).toMatchObject({
+        status: "aprovada",
+        decididoEm: expect.any(String),
+        observacao: null,
+      });
+    });
+
+    it("editar: a própria ausência não conta como sobreposição nem gasta o saldo duas vezes", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const inicio = somarDias(HOJE, 80);
+      const ferias = await registrar(pessoa, {
+        tipo: "ferias",
+        inicio,
+        fim: somarDias(inicio, 19),
+      });
+      // 20 → 30 dias: cabe no saldo de 30 (os 20 de antes não somam).
+      await patch(`/v1/ausencias/${ferias}`, rhA)
+        .send({
+          tipo: "ferias",
+          inicio,
+          fim: somarDias(inicio, 29),
+          aprovada: true,
+        })
+        .expect(200);
+      // 31 dias: passa do saldo.
+      const acima = await patch(`/v1/ausencias/${ferias}`, rhA)
+        .send({
+          tipo: "ferias",
+          inicio,
+          fim: somarDias(inicio, 30),
+          aprovada: true,
+        })
+        .expect(422);
+      expect(acima.body.erros).toEqual([
+        { campo: "fim", motivo: "saldo_insuficiente" },
+      ]);
+      // Para cima de outra ausência da pessoa: 409.
+      const outra = somarDias(inicio, 40);
+      await registrar(pessoa, { tipo: "day_off", inicio: outra, fim: outra });
+      const sobre = await patch(`/v1/ausencias/${ferias}`, rhA)
+        .send({ tipo: "ferias", inicio: outra, fim: outra, aprovada: true })
+        .expect(409);
+      expect(sobre.body.erros).toEqual([
+        { campo: "inicio", motivo: "sobreposicao" },
+      ]);
+    });
+
+    it("editar cancelada ou recusada: 409; sem CSRF: 403", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 90);
+      const id = await registrar(pessoa, {
+        tipo: "day_off",
+        inicio: dia,
+        fim: dia,
+      });
+      await agent()
+        .patch(`/v1/ausencias/${id}`)
+        .set("Cookie", rhA.cookie)
+        .send({ tipo: "day_off", inicio: dia, fim: dia, aprovada: true })
+        .expect(403);
+      await post(`/v1/ausencias/${id}/cancelar`, rhA).send().expect(200);
+      await patch(`/v1/ausencias/${id}`, rhA)
+        .send({ tipo: "day_off", inicio: dia, fim: dia, aprovada: true })
+        .expect(409);
+    });
+
+    it("excluir: sai do histórico, da lista, da próxima ausência e do saldo; o registro fica marcado no banco", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const inicio = somarDias(HOJE, 5);
+      const ferias = await registrar(pessoa, {
+        tipo: "ferias",
+        inicio,
+        fim: somarDias(inicio, 9),
+      });
+      await del(`/v1/ausencias/${ferias}`, rhA).expect(204);
+      const ficha = await get(`/v1/colaboradores/${pessoa}/ferias`, rhA).expect(
+        200,
+      );
+      expect(ficha.body.historico).toEqual([]);
+      expect(ficha.body.proximaAusencia).toBeNull();
+      expect(ficha.body.periodos[0].disponiveis).toBe(30);
+      const lista = await get(
+        `/v1/ausencias?busca=${encodeURIComponent("Pessoa Ausencia")}`,
+        rhA,
+      ).expect(200);
+      expect(lista.body.itens.map((a: { id: string }) => a.id)).not.toContain(
+        ferias,
+      );
+      const linha = await prisma.ausencia.findUnique({ where: { id: ferias } });
+      expect(linha?.excluidaEm).toBeInstanceOf(Date);
+      expect(linha?.excluidaPorId).toEqual(expect.any(String));
+      expect((await trilha(ferias)).map((e) => e.action)).toEqual([
+        "pessoas_ausencia_registrada",
+        "pessoas_ausencia_excluida",
+      ]);
+      // O dia ficou livre para outra ausência; a excluída não volta.
+      await registrar(pessoa, { tipo: "day_off", inicio, fim: inicio });
+      await del(`/v1/ausencias/${ferias}`, rhA).expect(404);
+      await patch(`/v1/ausencias/${ferias}`, rhA)
+        .send({ tipo: "ferias", inicio, fim: inicio, aprovada: true })
+        .expect(404);
+      await post(`/v1/ausencias/${ferias}/aprovar`, rhA).send().expect(404);
+    });
+
+    it("outra empresa: editar e excluir respondem 404; master técnico: 403", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 100);
+      const id = await registrar(pessoa, {
+        tipo: "day_off",
+        inicio: dia,
+        fim: dia,
+      });
+      await patch(`/v1/ausencias/${id}`, rhB)
+        .send({ tipo: "day_off", inicio: dia, fim: dia, aprovada: true })
+        .expect(404);
+      await del(`/v1/ausencias/${id}`, rhB).expect(404);
+      await del(`/v1/ausencias/${id}`, masterA).expect(403);
+      const linha = await prisma.ausencia.findUnique({ where: { id } });
+      expect(linha?.excluidaEm).toBeNull();
+    });
+  });
+
   describe("anexo da ausência (atestado ou documento)", () => {
     /** PDF sintético mínimo, com o fim de arquivo. */
     const pdf = (conteudo = "documento sintetico") =>

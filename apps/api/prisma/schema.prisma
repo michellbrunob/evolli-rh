@@ -183,6 +183,7 @@ model AccessUser {
   // T215 — Férias e ausências: quem registrou e quem decidiu.
   ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
   ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
+  ausenciasExcluidas             Ausencia[]                   @relation("AusenciaExcluidaPor")
   // T215 — anexos de ausência: quem enviou e quem removeu.
   anexosAusenciaEnviados         AnexoAusencia[]              @relation("AnexoAusenciaEnviadoPor")
   anexosAusenciaRemovidos        AnexoAusencia[]              @relation("AnexoAusenciaRemovidoPor")
@@ -524,6 +525,9 @@ enum AuditAction {
   pessoas_ausencia_aprovada       @map("pessoas.ausencia.aprovada")
   pessoas_ausencia_recusada       @map("pessoas.ausencia.recusada")
   pessoas_ausencia_cancelada      @map("pessoas.ausencia.cancelada")
+  /// T215 — editar e excluir (a exclusão marca; nada é apagado).
+  pessoas_ausencia_alterada       @map("pessoas.ausencia.alterada")
+  pessoas_ausencia_excluida       @map("pessoas.ausencia.excluida")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
   // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
   pessoas_ausencia_consultada     @map("pessoas.ausencia.consultada")
@@ -2813,6 +2817,9 @@ model Ausencia {
   decididoPorId           String?            @map("decidido_por_id")
   decididoEm              DateTime?          @map("decidido_em")
   motivoDecisao           String?            @map("motivo_decisao")
+  /// T215 — excluída (como a referência): sai de tudo, o registro fica.
+  excluidaEm              DateTime?          @map("excluida_em")
+  excluidaPorId           String?            @map("excluida_por_id")
   criadoEm                DateTime           @default(now()) @map("criado_em")
   atualizadoEm            DateTime           @updatedAt @map("atualizado_em")
 
@@ -2821,6 +2828,7 @@ model Ausencia {
   vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
   registradoPor AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   decididoPor   AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  excluidaPor   AccessUser?      @relation("AusenciaExcluidaPor", fields: [excluidaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   /// T215 — o atestado ou documento da ausência (um vivo por vez).
   anexos AnexoAusencia[]
