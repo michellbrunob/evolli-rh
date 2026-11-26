@@ -12,7 +12,8 @@
  * trabalho ou sobreaviso num dia de ausência aprovada (a ausência vence o
  * turno). "Turnos sobrepostos" o servidor já recusa. Não há contrato
  * intermitente no cadastro (nem na referência): o aviso de convocação com
- * menos de 3 dias fica nas Regras, sem quem o dispare.
+ * menos de 3 dias fica nas Regras, sem quem o dispare (ligação pendente:
+ * docs/decisions/ligacoes-pendentes-modulos-futuros.md, item 2).
  */
 import type {
   ChaveDoAviso,

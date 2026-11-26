@@ -84,7 +84,8 @@ function dataDoDia(dia: string): Date {
  * - `rh` e `dp` na empresa ativa (o guard nega os demais).
  * - Sem mudança no rascunho do período: 422 `escala_nada_para_publicar`.
  * - O aviso às pessoas fica registrado; o envio depende do Portal e do
- *   e-mail (fora desta fatia).
+ *   e-mail (fora desta fatia; ligação pendente em
+ *   docs/decisions/ligacoes-pendentes-modulos-futuros.md, item 3).
  * - A trilha leva só ação, recurso, empresa e o id da publicação.
  */
 @Injectable()

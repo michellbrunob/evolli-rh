@@ -457,6 +457,10 @@ desenho próprios.
 - **Benefícios.** A escala já mostra os dias de benefício (ficha, gaveta e
   Aplicar modelo). Não há módulo de Benefícios no Evolli; ligar a escala a
   ele é tarefa futura, só com ordem.
+- **Ligações pendentes** (Benefícios, contrato intermitente e envio do aviso
+  da publicação pelo Portal e por e-mail) ficam registradas em
+  [ligações pendentes com módulos futuros](ligacoes-pendentes-modulos-futuros.md),
+  para entrar na mesma entrega do módulo.
 - **Pente fino:** Publicar com período (semana, mês ou 4 semanas), Removidas
   e "O período já começou"; trabalho em feriado é informativo e o número de
   Avisos não conta informativos; aba Escala da ficha lê o quadro (rascunho,

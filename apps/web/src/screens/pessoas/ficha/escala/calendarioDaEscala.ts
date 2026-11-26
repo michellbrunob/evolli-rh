@@ -363,7 +363,11 @@ export function diasUteisDoMes(mes: string): number {
  * Dias para os benefícios pagos por dia, no mês (`AAAA-MM`). Sem escala, no
  * 5x2 e em "outra": os dias úteis.
  */
-/** Sem escala, 5x2 e "outra" contam os dias úteis (fora do catálogo). */
+/**
+ * Sem escala, 5x2 e "outra" contam os dias úteis (fora do catálogo).
+ * Ligação pendente com o módulo de Benefícios:
+ * docs/decisions/ligacoes-pendentes-modulos-futuros.md (item 1).
+ */
 export function beneficioPelosDiasUteis(modelo: string | null): boolean {
   const m = modeloDe(modelo);
   return !m || m.codigo === "5x2" || m.tipo === "outra";
