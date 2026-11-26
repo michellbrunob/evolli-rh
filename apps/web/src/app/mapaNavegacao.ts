@@ -370,6 +370,16 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         papeis: PAPEIS_NOVA_ADMISSAO,
         agrupadoEm: "pessoas",
       },
+      {
+        // T215 — Políticas de férias: sub-página de Colaboradores (abre pela
+        // engrenagem da aba Férias e ausências); RH e DP, como a ficha.
+        id: "politicas-ferias",
+        label: "Políticas de férias",
+        subRotulo: "Regras dos pedidos de férias",
+        estado: "funcional",
+        papeis: PAPEIS_EDICAO_FICHA,
+        agrupadoEm: "pessoas",
+      },
     ],
   },
   {
@@ -719,6 +729,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "nova-admissao",
     "importar-colaboradores",
+    "politicas-ferias",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
@@ -740,6 +751,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "nova-admissao",
     "importar-colaboradores",
+    "politicas-ferias",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",

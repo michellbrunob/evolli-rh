@@ -250,4 +250,18 @@ describe("T215 — política de férias: principais regras (a coluna da lista)",
       principaisRegras({ ...REGRAS_VAZIAS, alemDoSaldo: "aceitar" }),
     ).toEqual({ primeira: "Só os pisos da lei", segunda: null, mais: 0 });
   });
+
+  it("a duração e a antecedência máxima dizem o número, no singular e no plural", () => {
+    const so = (r: Partial<typeof REGRAS_VAZIAS>) =>
+      principaisRegras({ ...REGRAS_VAZIAS, alemDoSaldo: "aceitar", ...r })
+        .primeira;
+    expect(so({ duracaoMinimaDias: 10, duracaoMaximaDias: 20 })).toBe(
+      "Períodos de 10 a 20 dias",
+    );
+    expect(so({ duracaoMinimaDias: 5 })).toBe("Períodos de 5 dias ou mais");
+    expect(so({ duracaoMaximaDias: 1 })).toBe("Períodos de até 1 dia");
+    expect(so({ antecedenciaMaximaMeses: 1 })).toBe("Pedido até 1 mês antes");
+    expect(so({ antecedenciaMaximaMeses: 6 })).toBe("Pedido até 6 meses antes");
+    expect(so({ intervaloDias: 1 })).toBe("Intervalo de 1 dia");
+  });
 });

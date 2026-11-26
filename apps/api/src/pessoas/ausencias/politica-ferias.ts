@@ -255,15 +255,20 @@ export function principaisRegras(r: RegrasDaPolitica): {
     );
   }
   if (r.antecedenciaMaximaMeses !== null) {
-    t.push(`Pedido até ${r.antecedenciaMaximaMeses} meses antes`);
+    const m = r.antecedenciaMaximaMeses;
+    t.push(`Pedido até ${m} ${m === 1 ? "mês" : "meses"} antes`);
   }
-  if (r.duracaoMinimaDias !== null || r.duracaoMaximaDias !== null) {
-    t.push("Duração de cada período");
-  }
+  const min = r.duracaoMinimaDias;
+  const max = r.duracaoMaximaDias;
+  if (min !== null && max !== null) t.push(`Períodos de ${min} a ${max} dias`);
+  else if (min !== null) t.push(`Períodos de ${diasNoTexto(min)} ou mais`);
+  else if (max !== null) t.push(`Períodos de até ${diasNoTexto(max)}`);
   if (r.periodoMaiorDias !== null) {
     t.push(`Um período com ${r.periodoMaiorDias} dias ou mais`);
   }
-  if (r.intervaloDias !== null) t.push(`Intervalo de ${r.intervaloDias} dias`);
+  if (r.intervaloDias !== null) {
+    t.push(`Intervalo de ${diasNoTexto(r.intervaloDias)}`);
+  }
   if (r.alemDoSaldo === "nao_aceitar") t.push("Não aceita além do saldo");
   if (r.inicioNaoAntesDeDescanso || r.inicioNaoNoFimDeSemana) {
     t.push("Dia do início");
@@ -278,4 +283,9 @@ export function principaisRegras(r: RegrasDaPolitica): {
     segunda: t[1] ?? null,
     mais: Math.max(0, t.length - 2),
   };
+}
+
+/** "1 dia" ou "N dias". */
+function diasNoTexto(n: number): string {
+  return `${n} ${n === 1 ? "dia" : "dias"}`;
 }

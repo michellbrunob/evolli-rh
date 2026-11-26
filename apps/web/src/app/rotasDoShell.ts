@@ -47,6 +47,9 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "nova-admissao": "#/pessoas/nova-admissao",
   // T209 (Bloco C) — importação por planilha, sub-página de Colaboradores.
   "importar-colaboradores": "#/pessoas/importar",
+  // T215 — Políticas de férias, sub-página de Colaboradores (engrenagem da
+  // aba Férias e ausências).
+  "politicas-ferias": "#/pessoas/politicas-ferias",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
   // sub-página dele.
@@ -745,6 +748,8 @@ const DESTINO_SEGURO_APOS_TROCA: Readonly<Record<string, string>> = {
   "nova-admissao": "pessoas",
   // T209 (Bloco C) — a planilha conferida é da empresa anterior: descartada.
   "importar-colaboradores": "pessoas",
+  // T215 — a política em edição é da empresa anterior: volta à lista.
+  "politicas-ferias": "pessoas",
   // T209 — um CNPJ pela metade não segue para a empresa nova: volta à lista.
   "nova-empresa": "configuracoes-empresas",
 };

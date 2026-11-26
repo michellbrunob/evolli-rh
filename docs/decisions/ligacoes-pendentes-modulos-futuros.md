@@ -69,6 +69,31 @@ o módulo for implementado.
   - mostrar na publicação se o aviso saiu, com falha e reenvio;
   - testes do envio e da trilha de auditoria (sem dado pessoal no log).
 
+### 4. Férias e políticas de férias ↔ Portal do colaborador e do gestor
+
+- **Hoje:** o RH registra e responde ausências (aprovar, sugerir outras
+  datas, recusar) e cadastra políticas de férias. Fica gravado, mas sem quem
+  use do outro lado: a aprovação pelo gestor (`aprovacao.quem` = gestor ou
+  gestor e RH) e o lembrete (`aprovacao.lembreteDias`); o texto da política
+  para o colaborador (`textoColaborador`); o bloqueio de pedido fora da
+  política (`aprovacao.foraDaPolitica` = bloquear), que vale para o pedido
+  do colaborador; e a sugestão de datas (`sugestao_inicio`/`sugestao_fim`),
+  que o colaborador ainda não tem onde aceitar.
+- **Ponto de ligação:** `apps/api/src/pessoas/ausencias/politicas-ferias.service.ts`
+  (`politicaDaPessoa`, `avaliar`), `apps/api/src/pessoas/ausencias/ausencias.service.ts`
+  (registrar, sugerir, aprovar, recusar) e
+  `apps/web/src/screens/pessoas/ferias/ResponderAusenciaJanela.tsx`.
+- **Ao implementar o Portal:**
+  - pedido de férias pelo colaborador, conferido pela política (avisar ou
+    bloquear) e com o texto da política à vista;
+  - fila do gestor quando a política manda o pedido para ele, com o
+    lembrete depois dos dias definidos;
+  - aceitar ou recusar a sugestão de datas do RH;
+  - "Pedido além do saldo: aceitar" segue sem efeito para CLT: o servidor
+    recusa férias acima do saldo (regra da lei mantida). Decidir com o RH se
+    a opção sai da política ou ganha regra própria (antecipação);
+  - testes de cada caminho e da trilha de auditoria.
+
 ## Ligados
 
 Nenhum ainda.

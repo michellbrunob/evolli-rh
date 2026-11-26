@@ -1006,6 +1006,54 @@ describe("T215 — Registrar ausência: anexo e regra de férias do vínculo", (
       screen.queryByRole("switch", { name: "Vender dias destas férias?" }),
     ).not.toBeInTheDocument();
   });
+
+  it("pente fino: diz quanto passa do saldo e não oferece venda com limite zero", async () => {
+    servico = {
+      ...servico,
+      simular: vi.fn(async () => ({
+        dias: 10,
+        diasUteis: 8,
+        volta: "2026-12-17",
+        periodo: null,
+        saldoAntes: 0,
+        saldoDepois: -10,
+        maxVendaveis: 0,
+        prazoAbono: null,
+        regraDeFerias: "calculada" as const,
+        politica: {
+          id: "pol-1",
+          nome: "Política teste",
+          violacoes: [{ regra: "alem_do_saldo" as const }],
+        },
+      })),
+    };
+    montar();
+    fireEvent.click(screen.getByRole("radio", { name: "Férias" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2026-12-07" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2026-12-16" },
+    });
+    expect(
+      await screen.findByText(
+        "Volta ao trabalho em 17/12/2026 · passa 10 dias do saldo",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Vender dias destas férias?" }),
+    ).not.toBeInTheDocument();
+    // A CLT não deixa passar do saldo: a gaveta avisa antes e trava o botão;
+    // a política não entra (não há "registrar mesmo assim").
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Esses dias passam do saldo de férias do período. Escolha menos dias.",
+    );
+    expect(screen.queryByText(/Fora da política/)).not.toBeInTheDocument();
+    const gaveta = screen.getByRole("dialog", { name: "Registrar ausência" });
+    expect(
+      within(gaveta).getByRole("button", { name: "Registrar ausência" }),
+    ).toBeDisabled();
+  });
 });
 
 describe("T215 — resumo da gaveta no singular", () => {

@@ -234,6 +234,8 @@ export interface PessoasScreenProps {
   podeVerSolicitacoes?: boolean;
   /** T215 — a aba "Organograma" da listagem leva à estrutura. */
   onAbrirOrganograma?: ColaboradoresScreenProps["onAbrirOrganograma"];
+  /** T215 — a engrenagem de Férias e ausências leva às Políticas de férias. */
+  onAbrirPoliticasDeFerias?: () => void;
   /**
    * T199 — o estado do dashboard de Colaboradores (aba, página e ids de
    * filtros), guardado pelo shell na URL. Sem ele, o dashboard guarda o
@@ -268,6 +270,7 @@ export function PessoasScreen({
   onAbrirJornadas,
   podeVerSolicitacoes: _podeVerSolicitacoes = false,
   onAbrirOrganograma,
+  onAbrirPoliticasDeFerias,
   listagem,
   onListagemChange,
 }: PessoasScreenProps) {
@@ -494,6 +497,9 @@ export function PessoasScreen({
                   {...(onImportarPlanilha ? { onImportarPlanilha } : {})}
                   {...(onImportarArquivo ? { onImportarArquivo } : {})}
                   {...(onAbrirOrganograma ? { onAbrirOrganograma } : {})}
+                  {...(onAbrirPoliticasDeFerias
+                    ? { onPoliticasDeFerias: onAbrirPoliticasDeFerias }
+                    : {})}
                   {...(onAbrirFicha ? { onAbrirFicha: abrirFicha } : {})}
                   {...(onAbrirEdicao && podeEditarFicha
                     ? {

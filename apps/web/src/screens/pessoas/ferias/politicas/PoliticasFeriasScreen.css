@@ -1,0 +1,421 @@
+/* T215 — Políticas de férias: a lista e o assistente (o assistente usa o
+   cadastro em etapas; aqui só o que é dele). */
+.politicas {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.politicas__cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.politicas__titulos {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.politicas__titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+}
+
+.politicas__subtitulo,
+.politicas__suave {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.politicas__aviso {
+  margin: 0;
+  color: var(--status-success-ink);
+}
+
+.politicas__falha {
+  margin: 0;
+  color: var(--status-danger-ink);
+}
+
+/* Faixa de quem fica sem política. */
+.politicas__faixa {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.politicas__avatares {
+  display: flex;
+  flex: none;
+}
+
+.politicas__avatares .politicas__avatar + .politicas__avatar {
+  margin-left: -0.5rem;
+}
+
+.politicas__avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--surface-canvas);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-bold);
+}
+
+.politicas__faixa-textos {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.politicas__faixa-titulo {
+  color: var(--color-ink);
+}
+
+.politicas__faixa-titulo::before {
+  content: "";
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-right: var(--space-xs);
+  border-radius: 50%;
+  background: var(--status-danger-ink);
+  vertical-align: middle;
+}
+
+.politicas__faixa-texto {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+/* Tabela. */
+.politicas__tabela-caixa {
+  overflow-x: auto;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.politicas__tabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.politicas__tabela th {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--divisor-cor);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-align: left;
+}
+
+.politicas__tabela td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--divisor-cor);
+  vertical-align: middle;
+}
+
+.politicas__tabela tr:last-child td {
+  border-bottom: 0;
+}
+
+.politicas__linha--inativa td {
+  color: var(--color-ink-muted);
+}
+
+.politicas__nome {
+  margin-right: var(--space-xs);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.politicas__duas-linhas {
+  display: grid;
+  gap: 2px;
+}
+
+.politicas__quando {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  white-space: nowrap;
+}
+
+.politicas__ponto {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+}
+
+.politicas__ponto--avisar {
+  background: var(--status-warning-ink);
+}
+
+.politicas__ponto--bloquear {
+  background: var(--status-danger-ink);
+}
+
+.politicas__acoes {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.politicas__menu-divisor {
+  height: 1px;
+  margin: var(--space-xxs) 0;
+  background: var(--divisor-cor);
+}
+
+.politicas__menu-perigo {
+  color: var(--status-danger-ink);
+}
+
+.politicas__rodape {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.politicas__so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* "Ver pessoas". */
+.politicas__pessoas {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.politicas__pessoa {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.politicas__pessoa-nome {
+  flex: 1 1 auto;
+  color: var(--color-ink);
+}
+
+/* Assistente. */
+.politicas__etapa {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.politicas__nota {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.politicas__caixas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.politicas__caixas--coluna {
+  flex-direction: column;
+}
+
+.politicas__caixa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+}
+
+.politicas__opcoes {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.politicas__opcoes--linha {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.politicas__opcao {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.politicas__opcao[aria-checked="true"] {
+  border-color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 6%, var(--surface-canvas));
+}
+
+.politicas__opcao-titulo {
+  font-weight: var(--weight-strong);
+}
+
+.politicas__com-sufixo {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+}
+
+.cadastro-etapas__linha-campos .politicas__numero {
+  width: 5rem;
+}
+
+.politicas__alvos {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.politicas__alvos-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: var(--space-xs);
+}
+
+.politicas__alvos-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.politicas__alvo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  font-size: var(--text-caption);
+}
+
+.politicas__alvo-remover {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.politicas__bloqueios {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.politicas__bloqueio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(
+      0,
+      1fr
+    ) auto auto;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.politicas__revisao {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.politicas__revisao-bloco {
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+.politicas__revisao-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.politicas__revisao-titulo {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.politicas__revisao-lista {
+  display: grid;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+}
+
+.politicas__revisao-lista > div {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.politicas__revisao-lista dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.politicas__revisao-lista dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+@media (max-width: 640px) {
+  .politicas__faixa,
+  .politicas__cabecalho {
+    flex-wrap: wrap;
+  }
+
+  .politicas__alvos-linha,
+  .politicas__bloqueio,
+  .politicas__opcoes--linha,
+  .politicas__revisao-lista > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

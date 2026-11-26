@@ -142,6 +142,11 @@ import {
   NovaAdmissaoScreen,
   PessoasScreen,
 } from "../screens/pessoas";
+import {
+  POLITICAS_FERIAS_TITULO_ID,
+  PoliticasFeriasScreen,
+} from "../screens/pessoas/ferias/politicas/PoliticasFeriasScreen";
+import { servicoDePoliticasDoServidor } from "../screens/pessoas/ferias/politicas/servicoDePoliticas";
 import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
@@ -311,6 +316,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
+  "politicas-ferias": POLITICAS_FERIAS_TITULO_ID,
   // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
   "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
   "turnos-escala": TURNOS_TITULO_ID,
@@ -704,6 +710,25 @@ function conteudoDoDestino(
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
         // T215 — a aba Organograma da listagem abre a estrutura.
         onAbrirOrganograma={() => onNavegar("cadastros")}
+        // T215 — a engrenagem de Férias e ausências abre as políticas.
+        {...(podeEditarFicha(admissao.papelDoAtor)
+          ? { onAbrirPoliticasDeFerias: () => onNavegar("politicas-ferias") }
+          : {})}
+      />
+    );
+  }
+  if (destinoId === "politicas-ferias") {
+    return (
+      <PoliticasFeriasScreen
+        servico={servicoDePoliticasDoServidor}
+        podeEditar={podeEditarFicha(admissao.papelDoAtor)}
+        // Volta à aba de onde a engrenagem abriu: Férias e ausências.
+        onVoltar={() =>
+          dashboard.onAbrirListagem({
+            ...ESTADO_INICIAL_DA_LISTAGEM,
+            aba: "ferias",
+          })
+        }
       />
     );
   }

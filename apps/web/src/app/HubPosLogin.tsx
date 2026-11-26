@@ -115,6 +115,8 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Consulta de colaboradores por nome ou matrícula, ficha, vida funcional e vínculo com horário de trabalho.",
   "nova-admissao":
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
+  "politicas-ferias":
+    "Regras que o sistema confere nos pedidos e registros de férias: antecedência, períodos, datas bloqueadas e aprovação.",
   "importar-colaboradores":
     "Várias admissões de uma vez, por planilha CSV conferida linha a linha na empresa ativa.",
   cadastros:

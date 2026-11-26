@@ -367,9 +367,16 @@ export function RegistrarAusenciaGaveta({
     coletiva,
   ]);
 
+  // A CLT não deixa passar do saldo (o servidor recusa): a gaveta avisa antes
+  // e trava o registro. Aí a política não entra — não há "mesmo assim".
+  const estouraSaldo =
+    ferias &&
+    simulacao?.saldoDepois !== null &&
+    simulacao?.saldoDepois !== undefined &&
+    simulacao.saldoDepois < 0;
   // Como a referência: fora da política, registra mesmo assim com o motivo.
   const foraDaPolitica =
-    ferias && (simulacao?.politica?.violacoes.length ?? 0) > 0;
+    ferias && !estouraSaldo && (simulacao?.politica?.violacoes.length ?? 0) > 0;
   const completo =
     pessoa !== null &&
     tipo !== null &&
@@ -378,6 +385,7 @@ export function RegistrarAusenciaGaveta({
     (afastamento
       ? motivo !== null && (!comVolta || (fim !== "" && fim >= inicio))
       : fim !== "" && fim >= inicio) &&
+    !estouraSaldo &&
     (!foraDaPolitica || motivoFora.trim() !== "");
 
   // Editando: só salva com alguma resposta diferente da gravada.
@@ -748,7 +756,9 @@ export function RegistrarAusenciaGaveta({
               <p className="ausencias-gaveta__ajuda">
                 {`Volta ao trabalho em ${formatarDiaCivil(simulacao.volta ?? "")}${
                   ferias && simulacao.saldoDepois !== null
-                    ? ` · ${simulacao.saldoDepois === 1 ? "resta" : "restam"} ${plural(simulacao.saldoDepois, "dia", "dias")} de saldo`
+                    ? simulacao.saldoDepois < 0
+                      ? ` · passa ${plural(-simulacao.saldoDepois, "dia", "dias")} do saldo`
+                      : ` · ${simulacao.saldoDepois === 1 ? "resta" : "restam"} ${plural(simulacao.saldoDepois, "dia", "dias")} de saldo`
                     : ""
                 }`}
               </p>
@@ -817,6 +827,13 @@ export function RegistrarAusenciaGaveta({
             </div>
           ) : null}
 
+          {estouraSaldo ? (
+            <p className="ausencias-gaveta__falha" role="alert">
+              Esses dias passam do saldo de férias do período. Escolha menos
+              dias.
+            </p>
+          ) : null}
+
           {foraDaPolitica && simulacao?.politica ? (
             <div
               className="ausencias-gaveta__clt"
@@ -875,60 +892,62 @@ export function RegistrarAusenciaGaveta({
                   </div>
                 </div>
               ) : null}
-              <div className="ausencias-gaveta__venda">
-                <div className="ausencias-gaveta__venda-cabeca">
-                  <span className="ausencias-gaveta__venda-texto">
-                    <span
-                      className="ausencias-gaveta__escolha-titulo"
-                      id={`${base}-vender`}
+              {(simulacao?.maxVendaveis ?? 10) > 0 ? (
+                <div className="ausencias-gaveta__venda">
+                  <div className="ausencias-gaveta__venda-cabeca">
+                    <span className="ausencias-gaveta__venda-texto">
+                      <span
+                        className="ausencias-gaveta__escolha-titulo"
+                        id={`${base}-vender`}
+                      >
+                        Vender dias destas férias?
+                      </span>
+                      <span className="ausencias-gaveta__ajuda">
+                        {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${
+                          simulacao?.maxVendaveis ?? 10
+                        } dias por dinheiro (CLT art. 143, 1/3 das férias).`}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={vender}
+                      aria-labelledby={`${base}-vender`}
+                      className="ausencias-gaveta__interruptor"
+                      onClick={() => setVender((v) => !v)}
                     >
-                      Vender dias destas férias?
-                    </span>
-                    <span className="ausencias-gaveta__ajuda">
-                      {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${
-                        simulacao?.maxVendaveis ?? 10
-                      } dias por dinheiro (CLT art. 143, 1/3 das férias).`}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={vender}
-                    aria-labelledby={`${base}-vender`}
-                    className="ausencias-gaveta__interruptor"
-                    onClick={() => setVender((v) => !v)}
-                  >
-                    <span aria-hidden="true" />
-                  </button>
-                </div>
-                {vender ? (
-                  <div className="ausencias-gaveta__venda-corpo">
-                    <label className="ausencias-gaveta__data">
-                      <span>Dias vendidos</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={simulacao?.maxVendaveis ?? 10}
-                        className="ausencias-gaveta__campo"
-                        value={diasVendidos}
-                        onChange={(e) => setDiasVendidos(e.target.value)}
-                      />
-                    </label>
-                    <p className="ausencias-gaveta__ajuda">
-                      {`Pela CLT, dá para vender até ${
-                        simulacao?.maxVendaveis ?? 10
-                      } dias deste período (1/3 do direito).`}
-                    </p>
-                    {simulacao?.prazoAbono ? (
-                      <p className="ausencias-gaveta__ajuda">
-                        {`Se ${nome} pedir até ${formatarDiaCivil(
-                          simulacao.prazoAbono,
-                        )}, a empresa não pode negar (CLT art. 143, § 1º). Férias e abono são pagos até 2 dias antes do início (art. 145).`}
-                      </p>
-                    ) : null}
+                      <span aria-hidden="true" />
+                    </button>
                   </div>
-                ) : null}
-              </div>
+                  {vender ? (
+                    <div className="ausencias-gaveta__venda-corpo">
+                      <label className="ausencias-gaveta__data">
+                        <span>Dias vendidos</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={simulacao?.maxVendaveis ?? 10}
+                          className="ausencias-gaveta__campo"
+                          value={diasVendidos}
+                          onChange={(e) => setDiasVendidos(e.target.value)}
+                        />
+                      </label>
+                      <p className="ausencias-gaveta__ajuda">
+                        {`Pela CLT, dá para vender até ${
+                          simulacao?.maxVendaveis ?? 10
+                        } dias deste período (1/3 do direito).`}
+                      </p>
+                      {simulacao?.prazoAbono ? (
+                        <p className="ausencias-gaveta__ajuda">
+                          {`Se ${nome} pedir até ${formatarDiaCivil(
+                            simulacao.prazoAbono,
+                          )}, a empresa não pode negar (CLT art. 143, § 1º). Férias e abono são pagos até 2 dias antes do início (art. 145).`}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           ) : null}
         </li>

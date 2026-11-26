@@ -134,6 +134,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
+        // T215 — Políticas de férias, a mesma capacidade da ficha.
+        "Políticas de férias",
         "Jornada",
         "Minha equipe",
         "Administração da liderança",
@@ -167,6 +169,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Novo colaborador",
         // T209 (Bloco C) — importação por planilha: a mesma capacidade.
         "Importar planilha",
+        // T215 — Políticas de férias, a mesma capacidade da ficha.
+        "Políticas de férias",
         "Jornada",
         "Segurança",
         "Permissões de acesso",
@@ -558,8 +562,9 @@ describe("T162 — acessibilidade e estrutura", () => {
     montar({ papel: "rh" });
     // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança e 15
     // com Turnos (sub-página do quadro da escala).
-    // T215 — mais Regras da escala, Planejar a transição e Aplicar modelo: 18.
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(18));
+    // T215 — mais Regras da escala, Planejar a transição, Aplicar modelo e
+    // Políticas de férias: 19.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(19));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",

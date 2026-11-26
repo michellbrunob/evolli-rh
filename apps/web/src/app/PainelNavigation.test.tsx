@@ -168,6 +168,8 @@ describe("o estado declarado bate com o código", () => {
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     "importar-colaboradores":
       "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
+    "politicas-ferias":
+      "src/screens/pessoas/ferias/politicas/PoliticasFeriasScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
     // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
     "jornadas-trabalho": "src/screens/horarios/quadro/QuadroDaEscalaScreen.tsx",
