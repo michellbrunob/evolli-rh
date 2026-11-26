@@ -15,6 +15,12 @@ import {
 import { AusenciasService } from "./ausencias/ausencias.service";
 import { PoliticasFeriasService } from "./ausencias/politicas-ferias.service";
 import { PoliticasFeriasController } from "./ausencias/politicas-ferias.controller";
+import {
+  BeneficiosController,
+  BeneficiosDoColaboradorController,
+} from "./beneficios/beneficios.controller";
+import { BeneficiosService } from "./beneficios/beneficios.service";
+import { DependentesService } from "./beneficios/dependentes.service";
 import { AnexoAusenciaController } from "./ausencias/anexo-ausencia.controller";
 import { AnexoAusenciaService } from "./ausencias/anexo-ausencia.service";
 import { HistoricoSalarialController } from "./salarios/historico-salarial.controller";
@@ -90,6 +96,8 @@ import {
     DesativacaoColaboradorController,
     // T215 — Férias e ausências.
     AusenciasController,
+    BeneficiosController,
+    BeneficiosDoColaboradorController,
     AnexoAusenciaController,
     HistoricoSalarialController,
     EscalaColaboradorController,
@@ -112,6 +120,8 @@ import {
     ContratoColaboradorService,
     DesativacaoColaboradorService,
     AusenciasService,
+    BeneficiosService,
+    DependentesService,
     PoliticasFeriasService,
     AnexoAusenciaService,
     HistoricoSalarialService,

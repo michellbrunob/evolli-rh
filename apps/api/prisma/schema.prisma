@@ -126,18 +126,24 @@ model AccessUser {
   // T038 — Cadastros: Horarios. Quem cadastrou uma tabela de horario e quem
   // criou um vinculo horario<->colaborador. Mesma natureza das relacoes acima:
   // identifica o ATOR da operacao, nunca a pessoa cujo horario foi vinculado.
-  tabelasHorarioCriadas     TabelaHorario[]      @relation("HorarioTabelaCriadaPor")
-  vinculosHorarioCriados    VinculoHorario[]     @relation("HorarioVinculoCriadoPor")
+  tabelasHorarioCriadas     TabelaHorario[]         @relation("HorarioTabelaCriadaPor")
+  vinculosHorarioCriados    VinculoHorario[]        @relation("HorarioVinculoCriadoPor")
   /// T215 — escalas de colaborador definidas por esta conta.
-  escalasColaboradorCriadas EscalaColaborador[]  @relation("EscalaColaboradorCriadaPor")
+  escalasColaboradorCriadas EscalaColaborador[]     @relation("EscalaColaboradorCriadaPor")
+  beneficiosCriados         Beneficio[]             @relation("BeneficioCriadoPor")
+  beneficiosExcluidos       Beneficio[]             @relation("BeneficioExcluidoPor")
+  beneficioPessoasCriadas   BeneficioPessoa[]       @relation("BeneficioPessoaCriadaPor")
+  beneficioAjustes          BeneficioAjuste[]       @relation("BeneficioAjustePor")
+  beneficioHistorico        BeneficioHistorico[]    @relation("BeneficioHistoricoPor")
+  dependentesCriados        DependenteColaborador[] @relation("DependenteCriadoPor")
   /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
-  diasDeEscalaCriados       EscalaDia[]          @relation("EscalaDiaCriadoPor")
-  diasDeEscalaAtualizados   EscalaDia[]          @relation("EscalaDiaAtualizadoPor")
+  diasDeEscalaCriados       EscalaDia[]             @relation("EscalaDiaCriadoPor")
+  diasDeEscalaAtualizados   EscalaDia[]             @relation("EscalaDiaAtualizadoPor")
   /// T215 — publicações do quadro da escala feitas por esta conta.
-  publicacoesDeEscala       EscalaPublicacao[]   @relation("EscalaPublicacaoPor")
+  publicacoesDeEscala       EscalaPublicacao[]      @relation("EscalaPublicacaoPor")
   /// T215 — regras da escala salvas e feriados locais criados por esta conta.
-  regrasDeEscalaSalvas      EscalaRegras[]       @relation("EscalaRegrasPor")
-  feriadosLocaisCriados     EscalaFeriadoLocal[] @relation("EscalaFeriadoLocalPor")
+  regrasDeEscalaSalvas      EscalaRegras[]          @relation("EscalaRegrasPor")
+  feriadosLocaisCriados     EscalaFeriadoLocal[]    @relation("EscalaFeriadoLocalPor")
   /// T215 — visões salvas do quadro da escala (só desta conta).
   visoesDeEscala            EscalaVisao[]
 
@@ -525,26 +531,37 @@ enum AuditAction {
 
   // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
   // ausência e a empresa (nunca tipo, datas, motivo ou observação).
-  pessoas_ausencia_registrada        @map("pessoas.ausencia.registrada")
-  pessoas_ausencia_aprovada          @map("pessoas.ausencia.aprovada")
-  pessoas_ausencia_recusada          @map("pessoas.ausencia.recusada")
-  pessoas_ausencia_cancelada         @map("pessoas.ausencia.cancelada")
+  pessoas_ausencia_registrada         @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada           @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada           @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada          @map("pessoas.ausencia.cancelada")
   /// T215 — editar e excluir (a exclusão marca; nada é apagado).
-  pessoas_ausencia_alterada          @map("pessoas.ausencia.alterada")
-  pessoas_ausencia_excluida          @map("pessoas.ausencia.excluida")
-  pessoas_ausencia_ajuste_sugerido   @map("pessoas.ausencia.ajuste_sugerido")
-  pessoas_politica_ferias_criada     @map("pessoas.politica_ferias.criada")
-  pessoas_politica_ferias_alterada   @map("pessoas.politica_ferias.alterada")
-  pessoas_politica_ferias_desativada @map("pessoas.politica_ferias.desativada")
-  pessoas_politica_ferias_reativada  @map("pessoas.politica_ferias.reativada")
-  pessoas_periodo_reiniciado         @map("pessoas.periodo_aquisitivo.reiniciado")
-  pessoas_periodo_reinicio_removido  @map("pessoas.periodo_aquisitivo.reinicio_removido")
+  pessoas_ausencia_alterada           @map("pessoas.ausencia.alterada")
+  pessoas_ausencia_excluida           @map("pessoas.ausencia.excluida")
+  pessoas_ausencia_ajuste_sugerido    @map("pessoas.ausencia.ajuste_sugerido")
+  pessoas_politica_ferias_criada      @map("pessoas.politica_ferias.criada")
+  pessoas_beneficio_criado            @map("pessoas.beneficio.criado")
+  pessoas_beneficio_alterado          @map("pessoas.beneficio.alterado")
+  pessoas_beneficio_pausado           @map("pessoas.beneficio.pausado")
+  pessoas_beneficio_encerrado         @map("pessoas.beneficio.encerrado")
+  pessoas_beneficio_reativado         @map("pessoas.beneficio.reativado")
+  pessoas_beneficio_excluido          @map("pessoas.beneficio.excluido")
+  pessoas_beneficio_pessoas_alteradas @map("pessoas.beneficio.pessoas_alteradas")
+  pessoas_beneficio_valores_alterados @map("pessoas.beneficio.valores_alterados")
+  pessoas_dependente_criado           @map("pessoas.dependente.criado")
+  pessoas_dependente_alterado         @map("pessoas.dependente.alterado")
+  pessoas_dependente_removido         @map("pessoas.dependente.removido")
+  pessoas_politica_ferias_alterada    @map("pessoas.politica_ferias.alterada")
+  pessoas_politica_ferias_desativada  @map("pessoas.politica_ferias.desativada")
+  pessoas_politica_ferias_reativada   @map("pessoas.politica_ferias.reativada")
+  pessoas_periodo_reiniciado          @map("pessoas.periodo_aquisitivo.reiniciado")
+  pessoas_periodo_reinicio_removido   @map("pessoas.periodo_aquisitivo.reinicio_removido")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
   // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
-  pessoas_ausencia_consultada        @map("pessoas.ausencia.consultada")
-  pessoas_ausencia_anexo_enviado     @map("pessoas.ausencia.anexo_enviado")
-  pessoas_ausencia_anexo_baixado     @map("pessoas.ausencia.anexo_baixado")
-  pessoas_ausencia_anexo_removido    @map("pessoas.ausencia.anexo_removido")
+  pessoas_ausencia_consultada         @map("pessoas.ausencia.consultada")
+  pessoas_ausencia_anexo_enviado      @map("pessoas.ausencia.anexo_enviado")
+  pessoas_ausencia_anexo_baixado      @map("pessoas.ausencia.anexo_baixado")
+  pessoas_ausencia_anexo_removido     @map("pessoas.ausencia.anexo_removido")
 
   // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
   // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
@@ -863,15 +880,21 @@ model Empresa {
   // (fronteira `empresa_id`); o vinculo horario<->colaborador carrega
   // `empresa_id` redundante por desenho, para que a FK COMPOSTA garanta, no
   // banco, que o vinculo nunca aponte para tabela de outra empresa.
-  tabelasHorario      TabelaHorario[]
-  vinculosHorario     VinculoHorario[]
+  tabelasHorario       TabelaHorario[]
+  vinculosHorario      VinculoHorario[]
   /// T215 — padrões de escala (aba Escala da ficha).
-  escalasColaborador  EscalaColaborador[]
-  diasDeEscala        EscalaDia[]
-  publicacoesDeEscala EscalaPublicacao[]
-  regrasDeEscala      EscalaRegras?
-  feriadosLocais      EscalaFeriadoLocal[]
-  visoesDeEscala      EscalaVisao[]
+  escalasColaborador   EscalaColaborador[]
+  beneficios           Beneficio[]
+  beneficioPessoas     BeneficioPessoa[]
+  beneficioAjustes     BeneficioAjuste[]
+  beneficioDependentes BeneficioDependente[]
+  beneficioHistorico   BeneficioHistorico[]
+  dependentes          DependenteColaborador[]
+  diasDeEscala         EscalaDia[]
+  publicacoesDeEscala  EscalaPublicacao[]
+  regrasDeEscala       EscalaRegras?
+  feriadosLocais       EscalaFeriadoLocal[]
+  visoesDeEscala       EscalaVisao[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -1232,10 +1255,14 @@ model Colaborador {
   // `empresa_id` proprio, a coerencia empresa<->colaborador (o colaborador
   // precisa ter vinculo funcional na empresa do horario) e garantida por
   // CONSTRAINT TRIGGER na migration, alem da checagem na aplicacao.
-  vinculosHorario    VinculoHorario[]
+  vinculosHorario      VinculoHorario[]
   /// T215 — padrões de escala (aba Escala da ficha).
-  escalasColaborador EscalaColaborador[]
-  diasDeEscala       EscalaDia[]
+  escalasColaborador   EscalaColaborador[]
+  beneficios           BeneficioPessoa[]
+  beneficioAjustes     BeneficioAjuste[]
+  beneficioDependentes BeneficioDependente[]
+  dependentes          DependenteColaborador[]
+  diasDeEscala         EscalaDia[]
 
   // T151 — Gestor consultivo. `contasDeAcesso` e o elo DP-23 (quem acessa o
   // sistema como esta pessoa); `equipesQueGerencia` e `excecoesDeAcesso`
@@ -3371,4 +3398,211 @@ model EscalaVisao {
 
   @@unique([empresaId, userId, nome])
   @@map("escala_visao")
+}
+
+/// T215 — Benefícios (como a referência, 2026-11-26): categoria (as regras
+/// da lei que valem), como entra na folha e o tipo de valor.
+enum CategoriaBeneficio {
+  alimentacao
+  mobilidade
+  saude
+  odontologico
+  seguro_vida
+  bem_estar
+  saude_mental
+  educacao
+  trabalho_remoto
+  multibeneficios
+  antecipacao
+  outros
+}
+
+enum FolhaBeneficio {
+  desconto
+  adicional
+  fora_da_folha
+}
+
+enum TipoValorBeneficio {
+  fixo
+  dia_util
+  individual
+  faixa_etaria
+  antecipacao
+}
+
+enum SituacaoBeneficio {
+  ativo
+  pausado
+  encerrado
+}
+
+/// T215 — um benefício da empresa. As regras de valor (valores, dias, planos,
+/// faixas da ANS, quem paga, vale-transporte, antecipação) ficam em `regras`,
+/// conferidas pelo serviço. Competências são o 1º dia do mês. Pausar e
+/// encerrar valem a partir de uma competência; excluir é lógico (nada se
+/// apaga: as folhas futuras precisarão do histórico).
+model Beneficio {
+  id                String             @id @default(uuid())
+  empresaId         String             @map("empresa_id")
+  nome              String             @db.VarChar(120)
+  categoria         CategoriaBeneficio
+  folha             FolhaBeneficio
+  tipoValor         TipoValorBeneficio @map("tipo_valor")
+  inicio            DateTime           @db.Date
+  fim               DateTime?          @db.Date
+  observacao        String?            @db.VarChar(500)
+  regras            Json
+  situacao          SituacaoBeneficio  @default(ativo)
+  /// Competência (1º dia) a partir da qual o benefício sai das folhas.
+  suspensoAPartirDe DateTime?          @map("suspenso_a_partir_de") @db.Date
+  excluidoEm        DateTime?          @map("excluido_em")
+  excluidoPorId     String?            @map("excluido_por_id")
+  criadoPorId       String             @map("criado_por_id")
+  criadoEm          DateTime           @default(now()) @map("criado_em")
+  atualizadoEm      DateTime           @updatedAt @map("atualizado_em")
+
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser            @relation("BeneficioCriadoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  excluidoPor AccessUser?           @relation("BeneficioExcluidoPor", fields: [excluidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  pessoas     BeneficioPessoa[]
+  ajustes     BeneficioAjuste[]
+  dependentes BeneficioDependente[]
+  historico   BeneficioHistorico[]
+
+  @@index([empresaId])
+  @@map("beneficio")
+}
+
+/// T215 — quem recebe o benefício, a partir de uma competência (e até a
+/// competência de saída, exclusiva). Plano (valor individual por plano) ou
+/// valor livre da pessoa. Um vínculo vivo por benefício e pessoa (índice
+/// parcial na migration); remover é lógico.
+model BeneficioPessoa {
+  id              String    @id @default(uuid())
+  beneficioId     String    @map("beneficio_id")
+  empresaId       String    @map("empresa_id")
+  colaboradorId   String    @map("colaborador_id")
+  aPartirDe       DateTime  @map("a_partir_de") @db.Date
+  ate             DateTime? @db.Date
+  planoId         String?   @map("plano_id") @db.VarChar(40)
+  valorIndividual Decimal?  @map("valor_individual") @db.Decimal(12, 2)
+  removidoEm      DateTime? @map("removido_em")
+  criadoPorId     String    @map("criado_por_id")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+
+  beneficio   Beneficio   @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser  @relation("BeneficioPessoaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId])
+  @@index([empresaId, colaboradorId])
+  @@map("beneficio_pessoa")
+}
+
+/// T215 — o que o RH digitou para a pessoa num mês (dias, valor do dia,
+/// valor do mês, coparticipação, valor antecipado), por cima da regra.
+model BeneficioAjuste {
+  id              String   @id @default(uuid())
+  beneficioId     String   @map("beneficio_id")
+  empresaId       String   @map("empresa_id")
+  colaboradorId   String   @map("colaborador_id")
+  competencia     DateTime @db.Date
+  dias            Int?
+  valorDia        Decimal? @map("valor_dia") @db.Decimal(12, 2)
+  valorMes        Decimal? @map("valor_mes") @db.Decimal(12, 2)
+  coparticipacao  Decimal? @db.Decimal(12, 2)
+  antecipado      Decimal? @db.Decimal(12, 2)
+  atualizadoPorId String   @map("atualizado_por_id")
+  criadoEm        DateTime @default(now()) @map("criado_em")
+  atualizadoEm    DateTime @updatedAt @map("atualizado_em")
+
+  beneficio     Beneficio   @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser  @relation("BeneficioAjustePor", fields: [atualizadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([beneficioId, colaboradorId, competencia])
+  @@index([empresaId])
+  @@map("beneficio_ajuste")
+}
+
+/// T215 — dependente no plano (faixa etária), a partir de uma competência e
+/// até a de saída (exclusiva).
+model BeneficioDependente {
+  id            String    @id @default(uuid())
+  beneficioId   String    @map("beneficio_id")
+  empresaId     String    @map("empresa_id")
+  colaboradorId String    @map("colaborador_id")
+  dependenteId  String    @map("dependente_id")
+  aPartirDe     DateTime  @map("a_partir_de") @db.Date
+  ate           DateTime? @db.Date
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  beneficio   Beneficio             @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador           @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dependente  DependenteColaborador @relation(fields: [dependenteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, colaboradorId])
+  @@index([empresaId])
+  @@map("beneficio_dependente")
+}
+
+/// T215 — histórico de alterações do benefício (só se cria).
+model BeneficioHistorico {
+  id          String   @id @default(uuid())
+  beneficioId String   @map("beneficio_id")
+  empresaId   String   @map("empresa_id")
+  tipo        String   @db.VarChar(40)
+  aPartirDe   DateTime @map("a_partir_de") @db.Date
+  descricao   String   @db.VarChar(300)
+  criadoPorId String   @map("criado_por_id")
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioHistoricoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, criadoEm])
+  @@map("beneficio_historico")
+}
+
+/// T215 — grau de parentesco do dependente (como a referência).
+enum ParentescoDependente {
+  conjuge
+  filho
+  pai_mae
+  irmao
+  grau_1
+  grau_2
+  grau_3
+  outro
+}
+
+/// T215 — dependente do colaborador (Editar colaborador › Dependentes): para
+/// plano de saúde e benefícios. Remover é lógico.
+model DependenteColaborador {
+  id             String               @id @default(uuid())
+  empresaId      String               @map("empresa_id")
+  colaboradorId  String               @map("colaborador_id")
+  nome           String               @db.VarChar(160)
+  parentesco     ParentescoDependente
+  dataNascimento DateTime?            @map("data_nascimento") @db.Date
+  cpf            String?              @db.VarChar(11)
+  telefone       String?              @db.VarChar(20)
+  email          String?              @db.VarChar(254)
+  removidoEm     DateTime?            @map("removido_em")
+  criadoPorId    String               @map("criado_por_id")
+  criadoEm       DateTime             @default(now()) @map("criado_em")
+  atualizadoEm   DateTime             @updatedAt @map("atualizado_em")
+
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador           @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser            @relation("DependenteCriadoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  planos      BeneficioDependente[]
+
+  @@index([empresaId, colaboradorId])
+  @@map("dependente_colaborador")
 }

@@ -99,6 +99,19 @@ export const AUDIT_ACTIONS = [
   "pessoas_politica_ferias_alterada",
   "pessoas_politica_ferias_desativada",
   "pessoas_politica_ferias_reativada",
+  // T215 — Benefícios: o `resourceId` é o id do BENEFÍCIO; dependentes, o
+  // do DEPENDENTE. Nunca nome, valores, pessoas ou datas.
+  "pessoas_beneficio_criado",
+  "pessoas_beneficio_alterado",
+  "pessoas_beneficio_pausado",
+  "pessoas_beneficio_encerrado",
+  "pessoas_beneficio_reativado",
+  "pessoas_beneficio_excluido",
+  "pessoas_beneficio_pessoas_alteradas",
+  "pessoas_beneficio_valores_alterados",
+  "pessoas_dependente_criado",
+  "pessoas_dependente_alterado",
+  "pessoas_dependente_removido",
   // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
   "pessoas_periodo_reiniciado",
   "pessoas_periodo_reinicio_removido",
@@ -357,7 +370,10 @@ export type AuditResource =
   | "reinicio_periodo"
   // T215 — política de férias: o `resourceId` é o id da POLÍTICA. Nunca
   // nome, regras ou pessoas.
-  | "politica_ferias";
+  | "politica_ferias"
+  // T215 — benefício e dependente: o `resourceId` é o id do registro.
+  | "beneficio"
+  | "dependente_colaborador";
 
 export type RecordAuditEventInput =
   | {

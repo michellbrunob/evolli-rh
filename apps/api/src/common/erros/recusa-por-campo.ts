@@ -56,7 +56,11 @@ export type MotivoDoCampo =
   | "abaixo_das_ferias"
   | "ferias_sem_periodo"
   // T215 — Visões salvas: o teto de visões por pessoa.
-  | "limite";
+  | "limite"
+  // T215 — Benefícios: tabela da ANS fora das regras (RN 63/2003).
+  | "fora_das_regras_ans"
+  // T215 — Benefícios: a pessoa já recebe o benefício.
+  | "ja_recebe";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -119,7 +123,28 @@ export type CampoPublico =
   | "avisos"
   // T215 — Visões salvas do quadro.
   | "nome"
-  | "filtros";
+  | "filtros"
+  // T215 — Benefícios e dependentes.
+  | "categoria"
+  | "folha"
+  | "tipoValor"
+  | "competencia"
+  | "aPartirDe"
+  | "pessoas"
+  | "regras.valorMensal"
+  | "regras.valorDia"
+  | "regras.planos"
+  | "regras.faixas"
+  | "regras.quemPaga"
+  | "regras.colaboradorPaga"
+  | "regras.vt"
+  | "regras.antecipacao"
+  | "dependenteIds"
+  | "parentesco"
+  | "dataNascimento"
+  | "cpf"
+  | "telefone"
+  | "email";
 
 export interface ErroDeCampo {
   campo: CampoPublico;

@@ -22,6 +22,7 @@ import {
   isContratoResource,
   isAusenciaResource,
   isEscalaResource,
+  isBeneficioResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -87,6 +88,10 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // T215 — a escala do colaborador.
   if (isEscalaResource(resource)) {
     return resource;
+  }
+  // T215 — Benefícios e dependentes.
+  if (isBeneficioResource(resource)) {
+    return resource === "dependente" ? "dependente_colaborador" : resource;
   }
   return "access_user";
 }

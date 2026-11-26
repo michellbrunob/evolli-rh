@@ -181,6 +181,15 @@ export const ESCALA_RESOURCES = ["escala_colaborador"] as const;
 export type EscalaResource = (typeof ESCALA_RESOURCES)[number];
 
 /**
+ * T215 — Benefícios (módulo e aba da ficha) e dependentes do colaborador.
+ * Mesma matriz das ausências: `rh` e `dp` leem e operam na empresa ativa;
+ * o `master_tecnico` só lê; os demais papéis são negados.
+ */
+export const BENEFICIO_RESOURCES = ["beneficio", "dependente"] as const;
+
+export type BeneficioResource = (typeof BENEFICIO_RESOURCES)[number];
+
+/**
  * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
  * metadados da Etapa 2 (`documento_metadado`):
  *
@@ -226,7 +235,8 @@ export type AuthorizationResource =
   | DocumentosColaboradorResource
   | ContratoResource
   | AusenciaResource
-  | EscalaResource;
+  | EscalaResource
+  | BeneficioResource;
 
 export type AuthorizationAction =
   | "read"
@@ -319,6 +329,12 @@ export function isEscalaResource(
   resource: AuthorizationResource,
 ): resource is EscalaResource {
   return (ESCALA_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isBeneficioResource(
+  resource: AuthorizationResource,
+): resource is BeneficioResource {
+  return (BENEFICIO_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isAusenciaResource(
