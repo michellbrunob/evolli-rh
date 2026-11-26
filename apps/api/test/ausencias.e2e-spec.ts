@@ -1134,6 +1134,267 @@ describe("T215 — Férias e ausências (e2e)", () => {
     });
   });
 
+  describe("ajustar período: reinício da contagem (como a referência)", () => {
+    function del(rota: string, cred: Credencial) {
+      return agent()
+        .delete(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    // Admissão há 18 meses: o 2º período está em curso; o reinício cai 3
+    // meses depois do início dele (3 meses → 7,5 → 8 dias).
+    const INICIO_2 = somarMeses(ADMISSAO, 12);
+    const NOVO = somarMeses(ADMISSAO, 15);
+    const rota = (id: string) => `/v1/colaboradores/${id}/ferias/reinicios`;
+    const ficha = async (id: string) =>
+      (await get(`/v1/colaboradores/${id}/ferias`, rhA).expect(200)).body;
+
+    it("simular: os períodos de hoje e como vão ficar, com o calculado", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const hoje = await get(`${rota(id)}/simulacao`, rhA).expect(200);
+      expect(hoje.headers["cache-control"]).toBe("no-store");
+      // O período que a ficha mostra (o 1º, com saldo) e o seguinte.
+      expect(
+        hoje.body.periodos.map((p: { inicio: string }) => p.inicio),
+      ).toEqual([ADMISSAO, INICIO_2]);
+      expect(hoje.body.diasCalculados).toBeNull();
+
+      const coletivas = await get(
+        `${rota(id)}/simulacao?inicio=${NOVO}&motivo=ferias_coletivas`,
+        rhA,
+      ).expect(200);
+      expect(coletivas.body.diasCalculados).toBe(8);
+      const encurtado = coletivas.body.periodos.find(
+        (p: { inicio: string }) => p.inicio === INICIO_2,
+      );
+      expect(encurtado).toMatchObject({
+        fim: somarDias(NOVO, -1),
+        direito: 8,
+        encurtado: { motivo: "ferias_coletivas", novoInicio: NOVO },
+      });
+      const perda = await get(
+        `${rota(id)}/simulacao?inicio=${NOVO}&motivo=perda_direito`,
+        rhA,
+      ).expect(200);
+      expect(
+        perda.body.periodos.find(
+          (p: { inicio: string }) => p.inicio === INICIO_2,
+        ),
+      ).toMatchObject({ direito: 0 });
+      const informado = await get(
+        `${rota(id)}/simulacao?inicio=${NOVO}&motivo=outro&dias=12`,
+        rhA,
+      ).expect(200);
+      expect(
+        informado.body.periodos.find(
+          (p: { inicio: string }) => p.inicio === INICIO_2,
+        ),
+      ).toMatchObject({ direito: 12 });
+      // Simular não grava nada.
+      expect(
+        await prisma.reinicioPeriodoAquisitivo.count({
+          where: { colaboradorId: id },
+        }),
+      ).toBe(0);
+    });
+
+    it("salvar: 201, a ficha recalcula e lista o reinício; trilha sem valores", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const r = await post(rota(id), rhA)
+        .send({
+          inicio: NOVO,
+          motivo: "ferias_coletivas",
+          observacao: "  coletiva sintética  ",
+        })
+        .expect(201);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toEqual({
+        id: expect.any(String),
+        inicio: NOVO,
+        motivo: "ferias_coletivas",
+        diasPeriodoAnterior: null,
+        observacao: "coletiva sintética",
+      });
+      const f = await ficha(id);
+      expect(f.reinicios).toEqual([r.body]);
+      expect(
+        f.periodos.map(
+          (p: { inicio: string; fim: string; direito: number }) => [
+            p.inicio,
+            p.fim,
+            p.direito,
+          ],
+        ),
+      ).toEqual([
+        [ADMISSAO, somarDias(INICIO_2, -1), 30],
+        [INICIO_2, somarDias(NOVO, -1), 8],
+        [NOVO, somarDias(somarMeses(NOVO, 12), -1), 30],
+      ]);
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: r.body.id, resource: "reinicio_periodo" },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_periodo_reiniciado",
+      ]);
+      expect(JSON.stringify(eventos)).not.toContain(NOVO);
+      expect(JSON.stringify(eventos)).not.toContain("coletiva");
+    });
+
+    it("validação: na admissão ou antes, data repetida, dias e observação fora do limite, sem CSRF", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const antes = await post(rota(id), rhA)
+        .send({ inicio: ADMISSAO, motivo: "outro" })
+        .expect(422);
+      expect(antes.body.erros).toEqual([
+        { campo: "inicio", motivo: "antes_da_admissao" },
+      ]);
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "outro", diasPeriodoAnterior: 31 })
+        .expect(400);
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "outro", observacao: "x".repeat(301) })
+        .expect(400);
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "ferias_vencidas" })
+        .expect(400);
+      await agent()
+        .post(rota(id))
+        .set("Cookie", rhA.cookie)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(403);
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(201);
+      const repetida = await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "perda_direito" })
+        .expect(409);
+      expect(repetida.body.erros).toEqual([
+        { campo: "inicio", motivo: "ja_existe" },
+      ]);
+    });
+
+    it("PJ não tem saldo calculado: o reinício é recusado", async () => {
+      const { id } = await admitir(rhA, empresaA, "ativo", "pj");
+      const r = await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "inicio", motivo: "sem_saldo_calculado" },
+      ]);
+      const simulacao = await get(`${rota(id)}/simulacao`, rhA).expect(200);
+      expect(simulacao.body).toEqual({ periodos: [], diasCalculados: null });
+    });
+
+    it("férias lançadas que ficariam sem período ou acima do novo direito: 409", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      // Férias do 1º período (completo), lançadas para depois de hoje.
+      const inicioFerias = somarDias(HOJE, 20);
+      await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio: inicioFerias,
+          fim: somarDias(inicioFerias, 19),
+          periodoAquisitivoInicio: ADMISSAO,
+          aprovada: true,
+        })
+        .expect(201);
+      // Encurtar o 1º período para 5 dias deixaria 20 dias de férias nele.
+      const menor = await post(rota(id), rhA)
+        .send({
+          inicio: somarMeses(ADMISSAO, 6),
+          motivo: "outro",
+          diasPeriodoAnterior: 5,
+        })
+        .expect(409);
+      expect(menor.body.erros).toEqual([
+        { campo: "diasPeriodoAnterior", motivo: "abaixo_das_ferias" },
+      ]);
+      // Recomeçar antes do 1º período terminar faz o 2º começar em outra
+      // data: as férias lançadas no 1º seguem nele (ele só encurta).
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "ferias_coletivas" })
+        .expect(201);
+    });
+
+    it("reinício que tiraria o período de férias já lançadas: 409, e remover também", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      // Férias no 2º período (termina em ~6 meses), para depois dele.
+      const fim2 = somarDias(somarMeses(ADMISSAO, 24), -1);
+      const inicioFerias = somarDias(fim2, 10);
+      await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio: inicioFerias,
+          fim: somarDias(inicioFerias, 9),
+          periodoAquisitivoInicio: INICIO_2,
+          aprovada: true,
+        })
+        .expect(201);
+      // Recomeçar no meio do 1º período faz o 2º começar em outra data.
+      const r = await post(rota(id), rhA)
+        .send({ inicio: somarMeses(ADMISSAO, 6), motivo: "outro" })
+        .expect(409);
+      expect(r.body.erros).toEqual([
+        { campo: "inicio", motivo: "ferias_sem_periodo" },
+      ]);
+      expect(
+        await prisma.reinicioPeriodoAquisitivo.count({
+          where: { colaboradorId: id },
+        }),
+      ).toBe(0);
+    });
+
+    it("remover: 204, a ficha volta ao cálculo normal; trilha; de novo, 404", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const r = await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "perda_direito" })
+        .expect(201);
+      await del(`${rota(id)}/${r.body.id}`, rhA).expect(204);
+      const f = await ficha(id);
+      expect(f.reinicios).toEqual([]);
+      expect(f.periodos.map((p: { direito: number }) => p.direito)).toEqual([
+        30, 30,
+      ]);
+      const linha = await prisma.reinicioPeriodoAquisitivo.findUnique({
+        where: { id: r.body.id },
+      });
+      expect(linha?.removidoEm).toBeInstanceOf(Date);
+      expect(linha?.removidoPorId).toEqual(expect.any(String));
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: r.body.id, resource: "reinicio_periodo" },
+        orderBy: { occurredAt: "asc" },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_periodo_reiniciado",
+        "pessoas_periodo_reinicio_removido",
+      ]);
+      await del(`${rota(id)}/${r.body.id}`, rhA).expect(404);
+      // A mesma data pode ser registrada de novo.
+      await post(rota(id), rhA)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(201);
+    });
+
+    it("acesso: outra empresa 404; master técnico lê a simulação mas não grava; DP grava", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      await get(`${rota(id)}/simulacao`, rhB).expect(404);
+      await post(rota(id), rhB)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(404);
+      await get(`${rota(id)}/simulacao`, masterA).expect(200);
+      await post(rota(id), masterA)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(403);
+      const r = await post(rota(id), dpA)
+        .send({ inicio: NOVO, motivo: "outro" })
+        .expect(201);
+      await del(`${rota(id)}/${r.body.id}`, rhB).expect(404);
+      await del(`${rota(id)}/${r.body.id}`, masterA).expect(403);
+    });
+  });
+
   describe("anexo da ausência (atestado ou documento)", () => {
     /** PDF sintético mínimo, com o fim de arquivo. */
     const pdf = (conteudo = "documento sintetico") =>

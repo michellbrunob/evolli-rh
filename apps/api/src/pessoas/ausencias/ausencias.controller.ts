@@ -27,7 +27,9 @@ import {
   ListarAusenciasQueryDto,
   RecusarAusenciaDto,
   RegistrarAusenciaDto,
+  RegistrarReinicioDto,
   SimularAusenciaQueryDto,
+  SimularReinicioQueryDto,
 } from "./ausencias.dto";
 import { AusenciasService } from "./ausencias.service";
 
@@ -203,6 +205,65 @@ export class FeriasDoColaboradorController {
     @Req() req: Request,
   ) {
     return this.service.feriasDoColaborador(colaboradorId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Get("reinicios/simulacao")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("ausencia", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary:
+      "Ajustar período: os períodos de hoje, ou como ficam com um reinício",
+  })
+  async simularReinicio(
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Query() query: SimularReinicioQueryDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.simularReinicio(colaboradorId, query, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Post("reinicios")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("ausencia", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Ajustar período: recomeça a contagem do período aquisitivo",
+  })
+  async registrarReinicio(
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Body() dto: RegistrarReinicioDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.registrarReinicio(colaboradorId, dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Delete("reinicios/:reinicioId")
+  @HttpCode(204)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("ausencia", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Ajustar período: remove um reinício (o registro fica marcado)",
+  })
+  async removerReinicio(
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Param("reinicioId", ParseUUIDPipe) reinicioId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.service.removerReinicio(colaboradorId, reinicioId, {
       actor,
       metadata: extractRequestMetadata(req),
     });

@@ -14,7 +14,14 @@
  *
  * Os números vêm do servidor. Quem não edita (RH e DP editam) só lê e baixa.
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import {
   consultarFeriasDoColaborador,
@@ -35,6 +42,7 @@ import {
   IconeBaixarArquivo,
   IconeCalendario,
   IconeEditar,
+  IconeInformacao,
   IconeMaisAcoes,
   IconeRemover,
   IconeRegistrarAusencia,
@@ -47,6 +55,11 @@ import {
   formatarDiaCivil,
 } from "../../../../format/data";
 import { baixarArquivo } from "../../../dashboard/exportacao";
+import {
+  AjustarPeriodoGaveta,
+  MOTIVOS_DE_REINICIO,
+  type ServicoDeReinicio,
+} from "./AjustarPeriodoGaveta";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../edicao/dadosProfissionais";
 import { VARIANTE_DO_STATUS } from "../../ferias/FeriasEAusenciasAba";
 import {
@@ -243,6 +256,21 @@ export function AbaFeriasEAusencias({
   const [gaveta, setGaveta] = useState(false);
   // "Agendar férias" abre a mesma janela já em Férias.
   const [agendarFerias, setAgendarFerias] = useState(false);
+  // "Ajustar período": a janela do reinício da contagem.
+  const [ajustando, setAjustando] = useState(false);
+  const reinicio = useMemo<ServicoDeReinicio | null>(
+    () =>
+      servico.simularReinicio &&
+      servico.registrarReinicio &&
+      servico.removerReinicio
+        ? {
+            simularReinicio: servico.simularReinicio,
+            registrarReinicio: servico.registrarReinicio,
+            removerReinicio: servico.removerReinicio,
+          }
+        : null,
+    [servico],
+  );
   const [editando, setEditando] = useState<AusenciaApi | null>(null);
   const [janela, setJanela] = useState<Janela>(null);
   const [motivo, setMotivo] = useState("");
@@ -361,6 +389,9 @@ export function AbaFeriasEAusencias({
               setAgendarFerias(true);
               setGaveta(true);
             }}
+            {...(podeEditar && reinicio
+              ? { onAjustar: () => setAjustando(true) }
+              : {})}
           />
           <ProximaAusencia dados={dados} hoje={hoje} quem={quem} />
         </div>
@@ -413,6 +444,23 @@ export function AbaFeriasEAusencias({
           mensagem={aviso}
           tipo={ehAvisoDeFalha(aviso) ? "neutro" : "sucesso"}
         />
+
+        {reinicio ? (
+          <AjustarPeriodoGaveta
+            aberta={ajustando}
+            colaboradorId={pessoa.id}
+            primeiroNome={pessoa.nome.split(" ")[0] ?? pessoa.nome}
+            dataAdmissao={dados.vinculo.dataAdmissao}
+            reinicios={dados.reinicios ?? []}
+            servico={reinicio}
+            onFechar={() => setAjustando(false)}
+            onAlterado={(mensagem, fechar) => {
+              if (fechar) setAjustando(false);
+              setAviso(mensagem);
+              carregar(true);
+            }}
+          />
+        ) : null}
 
         <RegistrarAusenciaGaveta
           aberta={gaveta}
@@ -687,12 +735,15 @@ function Saldo({
   hoje,
   podeAgendar,
   onAgendar,
+  onAjustar,
 }: {
   readonly dados: FeriasDoColaboradorApi;
   readonly tipoDoVinculo: string;
   readonly hoje: string;
   readonly podeAgendar: boolean;
   readonly onAgendar: () => void;
+  /** "Ajustar período" (só quem edita e com saldo calculado). */
+  readonly onAjustar?: () => void;
 }) {
   const indiceAtual = dados.periodoAtual;
   const atual = indiceAtual !== null ? dados.periodos[indiceAtual] : undefined;
@@ -718,8 +769,32 @@ function Saldo({
       subtitulo={subtitulo}
       icone={<IconeCalendario tamanho={18} />}
       className="ferias-ficha__saldo"
+      {...(onAjustar && dados.regraDeFerias === "calculada"
+        ? {
+            acao: (
+              <Button
+                type="button"
+                variant="secondary"
+                className="ferias-ficha__ajustar"
+                onClick={onAjustar}
+              >
+                <IconeCalendario tamanho={16} />
+                Ajustar período
+              </Button>
+            ),
+          }
+        : {})}
     >
       <div className="ferias-ficha__corpo">
+        {calculada && atual.encurtado ? (
+          <p className="ferias-ficha__nota">
+            <IconeInformacao tamanho={16} />
+            <span>
+              <strong>Período encurtado:</strong>
+              {` ${MOTIVOS_DE_REINICIO.find((m) => m.valor === atual.encurtado!.motivo)?.naFrase ?? ""} · novo período a partir de ${formatarDiaCivil(atual.encurtado.novoInicio)}.`}
+            </span>
+          </p>
+        ) : null}
         {dados.regraDeFerias !== "calculada" ? (
           <>
             <p className="ferias-ficha__forte">
@@ -764,13 +839,14 @@ function Saldo({
                 <p className="ferias-ficha__prazo">
                   {atual.situacao === "vencido" ? (
                     <StatusBadge variant="danger">Vencido</StatusBadge>
-                  ) : (
+                  ) : atual.disponiveis === 0 ? null : (
                     <StatusBadge
                       variant={
-                        // Perto do prazo, atenção; o "×" fica para Vencido.
+                        // Como a referência: vermelho perto do prazo
+                        // (até 90 dias), amarelo antes disso.
                         diasAte(hoje, atual.prazoGozo) <= 90
-                          ? "warning"
-                          : "neutral"
+                          ? "danger"
+                          : "warning"
                       }
                     >
                       {textoDoVencimento(hoje, atual.prazoGozo)}

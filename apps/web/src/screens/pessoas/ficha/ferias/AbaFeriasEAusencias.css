@@ -431,3 +431,30 @@
   outline: var(--focus-width) solid var(--color-action);
   outline-offset: var(--focus-offset);
 }
+
+/* Como a referência: a nota do período encurtado por um reinício. */
+.ferias-ficha__nota {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.ferias-ficha__nota svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.ferias-ficha__nota strong {
+  color: var(--color-ink);
+}
+
+.ferias-ficha__ajustar {
+  margin-left: auto;
+}

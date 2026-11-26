@@ -28,14 +28,17 @@ import {
   diaDaVolta,
   diaDe,
   diasCorridos,
+  diasProporcionais,
   diasUteis,
   direitoDoTipo,
+  indiceDoPeriodoAtual,
   hojeEmSaoPaulo,
   maxVendaveis,
   periodoParaFerias,
   periodosAquisitivos,
   prazoDoAbono,
   type RegraDeFerias,
+  type ReinicioDoSaldo,
   regraDeFeriasDoTipo,
   seSobrepoem,
   somarDias,
@@ -47,7 +50,9 @@ import {
   ListarAusenciasQueryDto,
   PeriodoDaLista,
   RegistrarAusenciaDto,
+  RegistrarReinicioDto,
   SimularAusenciaQueryDto,
+  SimularReinicioQueryDto,
 } from "./ausencias.dto";
 
 /** A ausência como a tela a recebe. */
@@ -113,6 +118,39 @@ export interface FeriasDoColaborador {
   periodoAtual: number | null;
   proximaAusencia: AusenciaApi | null;
   historico: AusenciaApi[];
+  /** T215 — reinícios da contagem ("Ajustar período"), do mais antigo. */
+  reinicios: ReinicioApi[];
+}
+
+/** T215 — um reinício da contagem do período aquisitivo. */
+export interface ReinicioApi {
+  id: string;
+  inicio: Dia;
+  motivo: ReinicioDoSaldo["motivo"];
+  diasPeriodoAnterior: number | null;
+  observacao: string | null;
+}
+
+/** T215 — "Períodos hoje" / "Como os períodos vão ficar". */
+export interface SimulacaoDeReinicio {
+  periodos: PeriodoAquisitivo[];
+  diasCalculados: number | null;
+}
+
+function reinicioParaApi(l: {
+  id: string;
+  inicio: Date;
+  motivo: ReinicioDoSaldo["motivo"];
+  diasPeriodoAnterior: number | null;
+  observacao: string | null;
+}): ReinicioApi {
+  return {
+    id: l.id,
+    inicio: diaDe(l.inicio),
+    motivo: l.motivo,
+    diasPeriodoAnterior: l.diasPeriodoAnterior,
+    observacao: l.observacao,
+  };
 }
 
 export type DecisaoDeAusencia = "aprovar" | "recusar" | "cancelar";
@@ -417,6 +455,7 @@ export class AusenciasService {
           existentes.map(paraSaldo),
           hoje,
           dto.inicio > hoje ? dto.inicio : hoje,
+          await this.reiniciosDoVinculo(tx, principal.id, empresaId),
         );
         const periodo = periodoParaFerias(
           periodos,
@@ -701,6 +740,7 @@ export class AusenciasService {
       existentes.map(paraSaldo),
       hoje,
       query.inicio > hoje ? query.inicio : hoje,
+      await this.reiniciosDoVinculo(this.prisma, principal.id, empresaId),
     );
     const periodo = periodoParaFerias(
       periodos,
@@ -747,9 +787,23 @@ export class AusenciasService {
     });
     const hoje = hojeEmSaoPaulo();
     const regraDeFerias = regraDeFeriasDoTipo(principal.tipo);
+    const reinicios = await this.prisma.reinicioPeriodoAquisitivo.findMany({
+      where: { vinculoId: principal.id, empresaId, removidoEm: null },
+      orderBy: { inicio: "asc" },
+    });
     const periodos =
       regraDeFerias === "calculada"
-        ? this.periodosDoVinculo(principal, linhas.map(paraSaldo), hoje, hoje)
+        ? this.periodosDoVinculo(
+            principal,
+            linhas.map(paraSaldo),
+            hoje,
+            hoje,
+            reinicios.map((r) => ({
+              inicio: diaDe(r.inicio),
+              motivo: r.motivo,
+              dias: r.diasPeriodoAnterior,
+            })),
+          )
         : [];
     // A leitura da ficha alcança dados de saúde (licenças): fica na trilha,
     // só com o id do colaborador — nunca tipo, datas ou observação.
@@ -760,15 +814,7 @@ export class AusenciasService {
       colaboradorId,
       empresaId,
     );
-    const disponivel = periodos.findIndex(
-      (p) => p.situacao === "disponivel" && p.disponiveis > 0,
-    );
-    const periodoAtual =
-      disponivel >= 0
-        ? disponivel
-        : periodos.length > 0
-          ? periodos.length - 1
-          : null;
+    const periodoAtual = indiceDoPeriodoAtual(periodos, hoje);
     const fotos = await this.fotos(empresaId, [colaboradorId]);
     const proxima = [...linhas]
       .filter(
@@ -785,7 +831,276 @@ export class AusenciasService {
       periodoAtual,
       proximaAusencia: proxima ? paraApi(proxima, fotos, veAnexo(ctx)) : null,
       historico: linhas.map((l) => paraApi(l, fotos, veAnexo(ctx))),
+      reinicios:
+        regraDeFerias === "calculada" ? reinicios.map(reinicioParaApi) : [],
     };
+  }
+
+  // ---- ajustar período (reinício da contagem) ------------------------------
+
+  /**
+   * "Períodos hoje" (sem `inicio`) ou "Como os períodos vão ficar": o período
+   * que a ficha mostraria e o seguinte. `diasCalculados`: o proporcional do
+   * período que a data encurta (o "Calculado: N" do campo de dias).
+   */
+  async simularReinicio(
+    colaboradorId: string,
+    query: SimularReinicioQueryDto,
+    ctx: PessoasAuditContext,
+  ): Promise<SimulacaoDeReinicio> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const principal = await this.vinculoPrincipal(
+      colaboradorId,
+      empresaId,
+      ctx,
+    );
+    if (regraDeFeriasDoTipo(principal.tipo) !== "calculada") {
+      return { periodos: [], diasCalculados: null };
+    }
+    const [ausencias, gravados] = await Promise.all([
+      this.ausenciasDoSaldo(this.prisma, colaboradorId, empresaId),
+      this.reiniciosDoVinculo(this.prisma, principal.id, empresaId),
+    ]);
+    const hoje = hojeEmSaoPaulo();
+    const novo: ReinicioDoSaldo | null =
+      query.inicio && query.inicio > diaDe(principal.dataAdmissao)
+        ? {
+            inicio: query.inicio,
+            motivo: query.motivo ?? "ferias_coletivas",
+            dias: query.dias ?? null,
+          }
+        : null;
+    const reinicios = novo
+      ? [...gravados.filter((r) => r.inicio !== novo.inicio), novo]
+      : gravados;
+    const ate = somarMeses(
+      novo && novo.inicio > hoje ? somarDias(novo.inicio, -1) : hoje,
+      12,
+    );
+    const periodos = this.periodosDoVinculo(
+      principal,
+      ausencias,
+      hoje,
+      ate,
+      reinicios,
+    );
+    const i = indiceDoPeriodoAtual(periodos, hoje) ?? 0;
+    const encurtado = novo
+      ? periodos.find((p) => p.encurtado?.novoInicio === novo.inicio)
+      : undefined;
+    return {
+      periodos: periodos.slice(i, i + 2),
+      diasCalculados: encurtado
+        ? diasProporcionais(
+            encurtado.inicio,
+            encurtado.fim,
+            direitoDoTipo(principal.tipo),
+          )
+        : null,
+    };
+  }
+
+  async registrarReinicio(
+    colaboradorId: string,
+    dto: RegistrarReinicioDto,
+    ctx: PessoasAuditContext,
+  ): Promise<ReinicioApi> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const principal = await this.vinculoPrincipal(
+      colaboradorId,
+      empresaId,
+      ctx,
+    );
+    if (regraDeFeriasDoTipo(principal.tipo) !== "calculada") {
+      throw new CamposRecusadosException([
+        { campo: "inicio", motivo: "sem_saldo_calculado" },
+      ]);
+    }
+    if (dto.inicio <= diaDe(principal.dataAdmissao)) {
+      throw new CamposRecusadosException([
+        { campo: "inicio", motivo: "antes_da_admissao" },
+      ]);
+    }
+    const linha = await this.prisma.$transaction(async (tx) => {
+      await this.travarSaldo(tx, colaboradorId, empresaId);
+      const gravados = await this.reiniciosDoVinculo(
+        tx,
+        principal.id,
+        empresaId,
+      );
+      if (gravados.some((r) => r.inicio === dto.inicio)) {
+        throw new ConflitoDeCamposException([
+          { campo: "inicio", motivo: "ja_existe" },
+        ]);
+      }
+      await this.conferirFeriasLancadas(
+        tx,
+        principal,
+        colaboradorId,
+        empresaId,
+        [
+          ...gravados,
+          {
+            inicio: dto.inicio,
+            motivo: dto.motivo,
+            dias: dto.diasPeriodoAnterior ?? null,
+          },
+        ],
+      );
+      const criado = await tx.reinicioPeriodoAquisitivo.create({
+        data: {
+          empresaId,
+          colaboradorId,
+          vinculoId: principal.id,
+          inicio: dataDoDia(dto.inicio),
+          motivo: dto.motivo,
+          diasPeriodoAnterior: dto.diasPeriodoAnterior ?? null,
+          observacao: dto.observacao ?? null,
+          registradoPorId: ctx.actor.id,
+        },
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_periodo_reiniciado",
+        "reinicio_periodo",
+        criado.id,
+        empresaId,
+      );
+      return criado;
+    });
+    return reinicioParaApi(linha);
+  }
+
+  async removerReinicio(
+    colaboradorId: string,
+    reinicioId: string,
+    ctx: PessoasAuditContext,
+  ): Promise<void> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    await this.prisma.$transaction(async (tx) => {
+      await this.travarSaldo(tx, colaboradorId, empresaId);
+      const alvo = await tx.reinicioPeriodoAquisitivo.findFirst({
+        where: { id: reinicioId, colaboradorId, empresaId, removidoEm: null },
+      });
+      if (!alvo) {
+        return this.auditoria.negarAcesso(
+          ctx,
+          "reinicio_periodo",
+          reinicioId,
+          empresaId,
+        );
+      }
+      const vinculo = await tx.vinculoFuncional.findFirstOrThrow({
+        where: { id: alvo.vinculoId, empresaId },
+        select: VINCULO_DO_SALDO,
+      });
+      const restantes = (
+        await this.reiniciosDoVinculo(tx, alvo.vinculoId, empresaId)
+      ).filter((r) => r.inicio !== diaDe(alvo.inicio));
+      await this.conferirFeriasLancadas(
+        tx,
+        vinculo,
+        colaboradorId,
+        empresaId,
+        restantes,
+      );
+      await tx.reinicioPeriodoAquisitivo.update({
+        where: { id: alvo.id },
+        data: { removidoEm: new Date(), removidoPorId: ctx.actor.id },
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_periodo_reinicio_removido",
+        "reinicio_periodo",
+        alvo.id,
+        empresaId,
+      );
+    });
+  }
+
+  /** Um ajuste por vez para a mesma pessoa (a mesma trava do registro). */
+  private async travarSaldo(
+    tx: Prisma.TransactionClient,
+    colaboradorId: string,
+    empresaId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ausencia:${colaboradorId}:${empresaId}`}))`;
+  }
+
+  /**
+   * Com os reinícios propostos, toda férias lançada precisa continuar num
+   * período (o início dele não pode sumir) e nenhum período pode ficar com
+   * menos direito do que as férias já lançadas nele.
+   */
+  private async conferirFeriasLancadas(
+    tx: Prisma.TransactionClient,
+    vinculo: VinculoDoSaldo,
+    colaboradorId: string,
+    empresaId: string,
+    reinicios: readonly ReinicioDoSaldo[],
+  ): Promise<void> {
+    const ausencias = await this.ausenciasDoSaldo(tx, colaboradorId, empresaId);
+    const lancadas = ausencias.filter(
+      (a) => a.tipo === "ferias" && a.periodoAquisitivoInicio !== null,
+    );
+    if (lancadas.length === 0) return;
+    const ultimo = lancadas
+      .map((a) => a.periodoAquisitivoInicio!)
+      .reduce((m, d) => (d > m ? d : m));
+    const hoje = hojeEmSaoPaulo();
+    const periodos = this.periodosDoVinculo(
+      vinculo,
+      ausencias,
+      hoje,
+      ultimo > hoje ? ultimo : hoje,
+      reinicios,
+    );
+    const inicios = new Set(periodos.map((p) => p.inicio));
+    if (lancadas.some((a) => !inicios.has(a.periodoAquisitivoInicio!))) {
+      throw new ConflitoDeCamposException([
+        { campo: "inicio", motivo: "ferias_sem_periodo" },
+      ]);
+    }
+    if (periodos.some((p) => p.solicitados > p.direito)) {
+      throw new ConflitoDeCamposException([
+        { campo: "diasPeriodoAnterior", motivo: "abaixo_das_ferias" },
+      ]);
+    }
+  }
+
+  private async ausenciasDoSaldo(
+    db: Prisma.TransactionClient,
+    colaboradorId: string,
+    empresaId: string,
+  ): Promise<AusenciaDoSaldo[]> {
+    const linhas = await db.ausencia.findMany({
+      where: {
+        colaboradorId,
+        empresaId,
+        status: { in: [...STATUS_QUE_OCUPAM] },
+        excluidaEm: null,
+      },
+    });
+    return linhas.map(paraSaldo);
+  }
+
+  /** Os reinícios vivos do vínculo, na forma do cálculo. */
+  private async reiniciosDoVinculo(
+    db: Prisma.TransactionClient,
+    vinculoId: string,
+    empresaId: string,
+  ): Promise<ReinicioDoSaldo[]> {
+    const linhas = await db.reinicioPeriodoAquisitivo.findMany({
+      where: { vinculoId, empresaId, removidoEm: null },
+      orderBy: { inicio: "asc" },
+    });
+    return linhas.map((l) => ({
+      inicio: diaDe(l.inicio),
+      motivo: l.motivo,
+      dias: l.diasPeriodoAnterior,
+    }));
   }
 
   // ---- peças ---------------------------------------------------------------
@@ -841,6 +1156,7 @@ export class AusenciasService {
     ausencias: readonly AusenciaDoSaldo[],
     hoje: Dia,
     ate: Dia,
+    reinicios: readonly ReinicioDoSaldo[],
   ): PeriodoAquisitivo[] {
     const desligamento = vinculo.dataDesligamento
       ? diaDe(vinculo.dataDesligamento)
@@ -851,6 +1167,7 @@ export class AusenciasService {
       hoje,
       direito: direitoDoTipo(vinculo.tipo),
       ausencias,
+      reinicios,
     });
   }
 

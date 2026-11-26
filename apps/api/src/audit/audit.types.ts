@@ -93,6 +93,9 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_cancelada",
   "pessoas_ausencia_alterada",
   "pessoas_ausencia_excluida",
+  // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
+  "pessoas_periodo_reiniciado",
+  "pessoas_periodo_reinicio_removido",
   // T215 — ficha: leitura (dados de saúde) e anexo, sem conteúdo.
   "pessoas_ausencia_consultada",
   "pessoas_ausencia_anexo_enviado",
@@ -342,7 +345,10 @@ export type AuditResource =
   | "anexo_ausencia"
   // T215 — escala do colaborador: o `resourceId` é o id da ESCALA (ou do
   // COLABORADOR nas negações). Nunca modelo, turno ou datas.
-  | "escala_colaborador";
+  | "escala_colaborador"
+  // T215 — reinício do período aquisitivo: o `resourceId` é o id do
+  // REINÍCIO (ou do COLABORADOR nas negações). Nunca data, motivo ou dias.
+  | "reinicio_periodo";
 
 export type RecordAuditEventInput =
   | {

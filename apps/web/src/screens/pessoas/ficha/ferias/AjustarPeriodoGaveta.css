@@ -1,0 +1,70 @@
+/* T215 — "Ajustar período": reinícios registrados, a lista dos períodos e
+   os avisos de campo. As perguntas usam o padrão da janela de ausência. */
+.ajustar-periodo__registrados,
+.ajustar-periodo__periodos {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ajustar-periodo__registrados {
+  padding-bottom: var(--space-md);
+  margin-bottom: var(--space-md);
+  border-bottom: var(--divisor);
+}
+
+.ajustar-periodo__periodos {
+  padding-top: var(--space-md);
+  margin-top: var(--space-md);
+  border-top: var(--divisor);
+}
+
+.ajustar-periodo__subtitulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.ajustar-periodo__reinicios,
+.ajustar-periodo__lista {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ajustar-periodo__reinicio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+.ajustar-periodo__reinicio-textos {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ajustar-periodo__periodo {
+  display: grid;
+  gap: 2px;
+}
+
+.ajustar-periodo__forte {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ajustar-periodo__dias {
+  max-width: 12rem;
+}
+
+.ajustar-periodo__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}

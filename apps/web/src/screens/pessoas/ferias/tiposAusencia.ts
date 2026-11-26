@@ -6,6 +6,12 @@
  * A tela recebe as chamadas ao servidor por parâmetro (`ServicoDeAusencias`):
  * o shell liga o cliente real; os testes, um falso.
  */
+import type {
+  MotivoReinicio,
+  NovoReinicioDto,
+  ReinicioApi,
+  SimulacaoDeReinicioApi,
+} from "../../../api/ausenciasClient";
 
 export type TipoAusencia =
   | "ferias"
@@ -167,6 +173,19 @@ export interface ServicoDeAusencias {
     alteracao: Omit<NovaAusencia, "colaboradorId">,
   ) => Promise<AusenciaApi>;
   readonly excluir?: (id: string) => Promise<void>;
+  /** T215 — "Ajustar período": reinício da contagem de férias. */
+  readonly simularReinicio?: (
+    colaboradorId: string,
+    proposta?: { inicio?: string; motivo?: MotivoReinicio; dias?: number },
+  ) => Promise<SimulacaoDeReinicioApi>;
+  readonly registrarReinicio?: (
+    colaboradorId: string,
+    dto: NovoReinicioDto,
+  ) => Promise<ReinicioApi>;
+  readonly removerReinicio?: (
+    colaboradorId: string,
+    reinicioId: string,
+  ) => Promise<void>;
   readonly buscarPessoas: (
     termo: string,
     opcoes?: { readonly signal?: AbortSignal },

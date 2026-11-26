@@ -170,6 +170,33 @@ export interface PeriodoAquisitivoApi {
   disponiveis: number;
   prazoGozo: string;
   situacao: SituacaoDoPeriodoAquisitivo;
+  /** T215 — encurtado por um reinício ("Ajustar período"). */
+  encurtado: { motivo: MotivoReinicio; novoInicio: string } | null;
+}
+
+/** T215 — por que a contagem do período aquisitivo recomeçou. */
+export type MotivoReinicio = "ferias_coletivas" | "perda_direito" | "outro";
+
+/** T215 — um reinício da contagem ("Ajustar período"). */
+export interface ReinicioApi {
+  id: string;
+  inicio: string;
+  motivo: MotivoReinicio;
+  diasPeriodoAnterior: number | null;
+  observacao: string | null;
+}
+
+/** T215 — "Períodos hoje" / "Como os períodos vão ficar". */
+export interface SimulacaoDeReinicioApi {
+  periodos: PeriodoAquisitivoApi[];
+  diasCalculados: number | null;
+}
+
+export interface NovoReinicioDto {
+  inicio: string;
+  motivo: MotivoReinicio;
+  diasPeriodoAnterior?: number;
+  observacao?: string;
 }
 
 export interface FeriasDoColaboradorApi {
@@ -182,6 +209,8 @@ export interface FeriasDoColaboradorApi {
   periodoAtual: number | null;
   proximaAusencia: AusenciaApi | null;
   historico: AusenciaApi[];
+  /** T215 — reinícios da contagem, do mais antigo. */
+  reinicios: ReinicioApi[];
 }
 
 function comConsulta(
@@ -436,4 +465,50 @@ export async function obterAnexoDaAusencia(
       res.headers.get("content-disposition") ?? "",
     )?.[1] ?? "atestado";
   return { blob: await res.blob(), nome };
+}
+
+const rotaDosReinicios = (colaboradorId: string) =>
+  `${BASE}/colaboradores/${encodeURIComponent(colaboradorId)}/ferias/reinicios`;
+
+/** T215 — os períodos de hoje, ou como ficam com o reinício proposto. */
+export function simularReinicio(
+  colaboradorId: string,
+  proposta: { inicio?: string; motivo?: MotivoReinicio; dias?: number } = {},
+): Promise<SimulacaoDeReinicioApi> {
+  return ler(
+    comConsulta(`${rotaDosReinicios(colaboradorId)}/simulacao`, proposta),
+  );
+}
+
+/** T215 — "Salvar reinício". */
+export function registrarReinicio(
+  colaboradorId: string,
+  dto: NovoReinicioDto,
+): Promise<ReinicioApi> {
+  return gravar(rotaDosReinicios(colaboradorId), dto);
+}
+
+/** T215 — remove um reinício (o registro fica marcado no servidor). */
+export async function removerReinicio(
+  colaboradorId: string,
+  reinicioId: string,
+): Promise<void> {
+  const res = await fetch(
+    `${rotaDosReinicios(colaboradorId)}/${encodeURIComponent(reinicioId)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "x-csrf-token": await tokenCsrfParaGravacao(),
+      },
+    },
+  );
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) {
+    const erro: unknown = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, "Erro na requisição.", erro);
+  }
 }

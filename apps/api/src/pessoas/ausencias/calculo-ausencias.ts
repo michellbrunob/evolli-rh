@@ -152,6 +152,21 @@ export interface AusenciaDoSaldo {
 
 export type SituacaoDoPeriodo = "em_aquisicao" | "disponivel" | "vencido";
 
+/**
+ * T215 — por que a contagem recomeçou (como a referência, 2026-11-26):
+ * férias coletivas (CLT, art. 140), perda do direito (art. 133) ou outro
+ * motivo combinado com a contabilidade.
+ */
+export type MotivoReinicio = "ferias_coletivas" | "perda_direito" | "outro";
+
+export interface ReinicioDoSaldo {
+  /** Primeiro dia do novo período. */
+  inicio: Dia;
+  motivo: MotivoReinicio;
+  /** Dias que o período encurtado deu; nulo = calculado. */
+  dias: number | null;
+}
+
 export interface PeriodoAquisitivo {
   inicio: Dia;
   fim: Dia;
@@ -160,12 +175,33 @@ export interface PeriodoAquisitivo {
   disponiveis: number;
   prazoGozo: Dia;
   situacao: SituacaoDoPeriodo;
+  /** Encurtado por um reinício: o motivo e quando começa o novo. */
+  encurtado: { motivo: MotivoReinicio; novoInicio: Dia } | null;
+}
+
+/**
+ * Férias proporcionais (CLT, art. 146, parágrafo único): 1/12 do direito por
+ * mês trabalhado; a fração de 15 dias ou mais conta como mês inteiro.
+ */
+export function diasProporcionais(
+  inicio: Dia,
+  fim: Dia,
+  direito: number,
+): number {
+  const fimExclusivo = somarDias(fim, 1);
+  let meses = 0;
+  while (somarMeses(inicio, meses + 1) <= fimExclusivo) meses += 1;
+  const sobra = somarMeses(inicio, meses);
+  if (sobra <= fim && diasCorridos(sobra, fim) >= 15) meses += 1;
+  return Math.min(direito, Math.round((meses * direito) / 12));
 }
 
 /**
  * Os períodos aquisitivos desde a admissão até o que contém `ate` (inclusive
  * o em aquisição). Solicitados: dias das férias que ocupam saldo naquele
- * período, mais os dias vendidos.
+ * período, mais os dias vendidos. Cada reinício encurta o período em que cai
+ * (o direito vira o informado, ou o proporcional; na perda do direito, 0) e a
+ * contagem de 12 meses recomeça dele.
  */
 export function periodosAquisitivos(entrada: {
   admissao: Dia;
@@ -173,12 +209,43 @@ export function periodosAquisitivos(entrada: {
   hoje: Dia;
   direito: number;
   ausencias: readonly AusenciaDoSaldo[];
+  reinicios?: readonly ReinicioDoSaldo[];
 }): PeriodoAquisitivo[] {
+  const reinicios = [...(entrada.reinicios ?? [])]
+    .filter((r) => r.inicio > entrada.admissao)
+    .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   const periodos: PeriodoAquisitivo[] = [];
-  for (let k = 0; ; k += 1) {
-    const inicio = somarMeses(entrada.admissao, 12 * k);
+  let ancora = entrada.admissao;
+  let k = 0;
+  let r = 0;
+  for (;;) {
+    let inicio = somarMeses(ancora, 12 * k);
+    // Reinício no próprio início de um período: só recomeça dali.
+    while (r < reinicios.length && reinicios[r]!.inicio <= inicio) {
+      if (reinicios[r]!.inicio === inicio) {
+        ancora = inicio;
+        k = 0;
+      }
+      r += 1;
+    }
+    inicio = somarMeses(ancora, 12 * k);
     if (inicio > entrada.ate) break;
-    const fim = somarDias(somarMeses(entrada.admissao, 12 * (k + 1)), -1);
+    let fim = somarDias(somarMeses(ancora, 12 * (k + 1)), -1);
+    let direito = entrada.direito;
+    let encurtado: PeriodoAquisitivo["encurtado"] = null;
+    const reinicio = reinicios[r];
+    if (reinicio && reinicio.inicio <= fim) {
+      fim = somarDias(reinicio.inicio, -1);
+      direito =
+        reinicio.dias ??
+        (reinicio.motivo === "perda_direito"
+          ? 0
+          : diasProporcionais(inicio, fim, entrada.direito));
+      encurtado = { motivo: reinicio.motivo, novoInicio: reinicio.inicio };
+      ancora = reinicio.inicio;
+      k = -1;
+      r += 1;
+    }
     const prazoGozo = somarMeses(fim, 12);
     const solicitados = entrada.ausencias
       .filter(
@@ -189,7 +256,7 @@ export function periodosAquisitivos(entrada: {
           a.fim !== null,
       )
       .reduce((s, a) => s + diasCorridos(a.inicio, a.fim!) + a.diasVendidos, 0);
-    const disponiveis = Math.max(0, entrada.direito - solicitados);
+    const disponiveis = Math.max(0, direito - solicitados);
     const situacao: SituacaoDoPeriodo =
       entrada.hoje <= fim
         ? "em_aquisicao"
@@ -199,14 +266,35 @@ export function periodosAquisitivos(entrada: {
     periodos.push({
       inicio,
       fim,
-      direito: entrada.direito,
+      direito,
       solicitados,
       disponiveis,
       prazoGozo,
       situacao,
+      encurtado,
     });
+    k += 1;
   }
   return periodos;
+}
+
+/**
+ * O período que a ficha mostra: o mais antigo já completo com saldo
+ * (disponível ou vencido); senão, o encurtado logo antes do período em curso
+ * (como a referência mostra a perda do direito); senão, o em curso.
+ */
+export function indiceDoPeriodoAtual(
+  periodos: readonly PeriodoAquisitivo[],
+  hoje: Dia,
+): number | null {
+  if (periodos.length === 0) return null;
+  const comSaldo = periodos.findIndex(
+    (p) => p.situacao !== "em_aquisicao" && p.disponiveis > 0,
+  );
+  if (comSaldo >= 0) return comSaldo;
+  const emCurso = periodos.findIndex((p) => p.inicio <= hoje && hoje <= p.fim);
+  if (emCurso > 0 && periodos[emCurso - 1]!.encurtado) return emCurso - 1;
+  return emCurso >= 0 ? emCurso : periodos.length - 1;
 }
 
 /**

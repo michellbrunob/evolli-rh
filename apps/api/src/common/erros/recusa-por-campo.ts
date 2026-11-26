@@ -48,6 +48,11 @@ export type MotivoDoCampo =
   | "antes_da_admissao"
   // T215 — Quadro da escala: dia fora do vínculo da pessoa na empresa.
   | "fora_do_vinculo"
+  // T215 — Ajustar período (reinício da contagem de férias).
+  | "ja_existe"
+  | "sem_saldo_calculado"
+  | "abaixo_das_ferias"
+  | "ferias_sem_periodo"
   // T215 — Visões salvas: o teto de visões por pessoa.
   | "limite";
 
@@ -82,6 +87,8 @@ export type CampoPublico =
   | "fim"
   | "diasVendidos"
   | "periodoAquisitivoInicio"
+  // T215 — Ajustar período: os dias que o período encurtado deu.
+  | "diasPeriodoAnterior"
   // T215 — Salários: o salário do contrato com linha do tempo.
   | "salarioBruto"
   // T215 — férias para quem não tem férias (PJ e Freelancer).

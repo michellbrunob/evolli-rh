@@ -14,7 +14,10 @@ import {
   removerAnexoDaAusencia,
   recusarAusencia,
   registrarAusencia,
+  registrarReinicio,
+  removerReinicio,
   simularAusencia,
+  simularReinicio,
 } from "../../../api/ausenciasClient";
 import { listarColaboradores } from "../../../api/colaboradoresClient";
 import type { ServicoDeAusencias } from "./tiposAusencia";
@@ -28,6 +31,12 @@ export const servicoDeAusenciasDoServidor: ServicoDeAusencias = {
   cancelar: (id) => cancelarAusencia(id),
   alterar: (id, alteracao) => alterarAusencia(id, alteracao),
   excluir: (id) => excluirAusencia(id),
+  simularReinicio: (colaboradorId, proposta) =>
+    simularReinicio(colaboradorId, proposta),
+  registrarReinicio: (colaboradorId, dto) =>
+    registrarReinicio(colaboradorId, dto),
+  removerReinicio: (colaboradorId, reinicioId) =>
+    removerReinicio(colaboradorId, reinicioId),
   enviarAnexo: async (id, arquivo) => {
     await enviarAnexoDaAusencia(id, arquivo);
   },

@@ -1,5 +1,6 @@
 import {
   MotivoAfastamento,
+  MotivoReinicioPeriodo,
   StatusAusencia,
   TipoAusencia,
 } from "@prisma/client";
@@ -256,4 +257,54 @@ export class SimularAusenciaQueryDto {
   @IsOptional()
   @IsUUID()
   ignorar?: string;
+}
+
+/** T215 — "Ajustar período": por que a contagem recomeça. */
+export const MOTIVOS_REINICIO: readonly MotivoReinicioPeriodo[] = [
+  "ferias_coletivas",
+  "perda_direito",
+  "outro",
+];
+
+/** T215 — reinício da contagem do período aquisitivo (como a referência). */
+export class RegistrarReinicioDto {
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  inicio!: string;
+
+  @IsIn(MOTIVOS_REINICIO)
+  motivo!: MotivoReinicioPeriodo;
+
+  /** Em branco, o proporcional (2,5 dias por mês); na perda, 0. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(30)
+  diasPeriodoAnterior?: number;
+
+  @Transform(({ value }) => textoOpcional(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  observacao?: string;
+}
+
+/** Sem `inicio`: os períodos de hoje; com ele, como vão ficar. */
+export class SimularReinicioQueryDto {
+  @IsOptional()
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  inicio?: string;
+
+  @IsOptional()
+  @IsIn(MOTIVOS_REINICIO)
+  motivo?: MotivoReinicioPeriodo;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(30)
+  dias?: number;
 }

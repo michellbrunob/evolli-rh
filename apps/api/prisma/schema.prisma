@@ -184,6 +184,8 @@ model AccessUser {
   ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
   ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
   ausenciasExcluidas             Ausencia[]                   @relation("AusenciaExcluidaPor")
+  reiniciosPeriodoRegistrados    ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRegistradoPor")
+  reiniciosPeriodoRemovidos      ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRemovidoPor")
   // T215 — anexos de ausência: quem enviou e quem removeu.
   anexosAusenciaEnviados         AnexoAusencia[]              @relation("AnexoAusenciaEnviadoPor")
   anexosAusenciaRemovidos        AnexoAusencia[]              @relation("AnexoAusenciaRemovidoPor")
@@ -521,19 +523,21 @@ enum AuditAction {
 
   // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
   // ausência e a empresa (nunca tipo, datas, motivo ou observação).
-  pessoas_ausencia_registrada     @map("pessoas.ausencia.registrada")
-  pessoas_ausencia_aprovada       @map("pessoas.ausencia.aprovada")
-  pessoas_ausencia_recusada       @map("pessoas.ausencia.recusada")
-  pessoas_ausencia_cancelada      @map("pessoas.ausencia.cancelada")
+  pessoas_ausencia_registrada       @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada         @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada         @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada        @map("pessoas.ausencia.cancelada")
   /// T215 — editar e excluir (a exclusão marca; nada é apagado).
-  pessoas_ausencia_alterada       @map("pessoas.ausencia.alterada")
-  pessoas_ausencia_excluida       @map("pessoas.ausencia.excluida")
+  pessoas_ausencia_alterada         @map("pessoas.ausencia.alterada")
+  pessoas_ausencia_excluida         @map("pessoas.ausencia.excluida")
+  pessoas_periodo_reiniciado        @map("pessoas.periodo_aquisitivo.reiniciado")
+  pessoas_periodo_reinicio_removido @map("pessoas.periodo_aquisitivo.reinicio_removido")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
   // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
-  pessoas_ausencia_consultada     @map("pessoas.ausencia.consultada")
-  pessoas_ausencia_anexo_enviado  @map("pessoas.ausencia.anexo_enviado")
-  pessoas_ausencia_anexo_baixado  @map("pessoas.ausencia.anexo_baixado")
-  pessoas_ausencia_anexo_removido @map("pessoas.ausencia.anexo_removido")
+  pessoas_ausencia_consultada       @map("pessoas.ausencia.consultada")
+  pessoas_ausencia_anexo_enviado    @map("pessoas.ausencia.anexo_enviado")
+  pessoas_ausencia_anexo_baixado    @map("pessoas.ausencia.anexo_baixado")
+  pessoas_ausencia_anexo_removido   @map("pessoas.ausencia.anexo_removido")
 
   // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
   // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
@@ -897,6 +901,7 @@ model Empresa {
   desativacoesColaborador     DesativacaoColaborador[]
   // T215 — Férias e ausências.
   ausencias                   Ausencia[]
+  reiniciosPeriodoAquisitivo  ReinicioPeriodoAquisitivo[]
   limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
   // T213 — documentos do colaborador.
   documentosColaborador       DocumentoColaborador[]
@@ -1249,13 +1254,14 @@ model Colaborador {
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
 
   // T209 — foto do colaborador, por empresa (ADR 0020).
-  fotos        FotoColaborador[]
+  fotos                      FotoColaborador[]
   /// T215 — desativações NA EMPRESA (lixeira do Editar colaborador).
-  desativacoes DesativacaoColaborador[]
+  desativacoes               DesativacaoColaborador[]
   // T213 — documentos do colaborador.
-  documentos   DocumentoColaborador[]
+  documentos                 DocumentoColaborador[]
   /// T215 — Férias e ausências.
-  ausencias    Ausencia[]
+  ausencias                  Ausencia[]
+  reiniciosPeriodoAquisitivo ReinicioPeriodoAquisitivo[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1308,7 +1314,9 @@ model VinculoFuncional {
   contrato ContratoVinculo?
 
   /// T215 — ausências registradas com este vínculo como o principal.
-  ausencias Ausencia[]
+  ausencias                  Ausencia[]
+  /// T215 — reinícios da contagem do período aquisitivo (Ajustar período).
+  reiniciosPeriodoAquisitivo ReinicioPeriodoAquisitivo[]
 
   /// T215 — a linha do tempo salarial do vínculo (aba Salários da ficha).
   alteracoesSalariais AlteracaoSalarial[]
@@ -2837,6 +2845,42 @@ model Ausencia {
   @@index([empresaId, status])
   @@index([colaboradorId, empresaId])
   @@map("ausencia")
+}
+
+/// T215 — por que a contagem do período aquisitivo recomeçou.
+enum MotivoReinicioPeriodo {
+  ferias_coletivas
+  perda_direito
+  outro
+}
+
+/// T215 — "Ajustar período" (como a referência, 2026-11-26): a contagem de
+/// férias recomeça numa data (férias coletivas, CLT art. 140; perda do
+/// direito, art. 133; ou outro motivo). O período em que a data cai é
+/// encurtado (dias informados ou proporcionais; na perda, 0). Remover é
+/// lógico: o registro fica, com quem removeu e quando.
+model ReinicioPeriodoAquisitivo {
+  id                  String                @id @default(uuid())
+  empresaId           String                @map("empresa_id")
+  colaboradorId       String                @map("colaborador_id")
+  vinculoId           String                @map("vinculo_id")
+  inicio              DateTime              @db.Date
+  motivo              MotivoReinicioPeriodo
+  diasPeriodoAnterior Int?                  @map("dias_periodo_anterior")
+  observacao          String?
+  registradoPorId     String                @map("registrado_por_id")
+  removidoEm          DateTime?             @map("removido_em")
+  removidoPorId       String?               @map("removido_por_id")
+  criadoEm            DateTime              @default(now()) @map("criado_em")
+
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser       @relation("ReinicioPeriodoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor   AccessUser?      @relation("ReinicioPeriodoRemovidoPor", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([vinculoId, empresaId])
+  @@map("reinicio_periodo_aquisitivo")
 }
 
 /// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela

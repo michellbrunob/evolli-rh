@@ -5,6 +5,7 @@
  * Dados sintéticos.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -63,6 +64,7 @@ function ferias(
         disponiveis: 10,
         prazoGozo: "2027-01-04",
         situacao: "disponivel",
+        encurtado: null,
       },
       {
         inicio: "2026-01-05",
@@ -72,9 +74,11 @@ function ferias(
         disponiveis: 30,
         prazoGozo: "2028-01-04",
         situacao: "em_aquisicao",
+        encurtado: null,
       },
     ],
     periodoAtual: 0,
+    reinicios: [],
     proximaAusencia: ausencia(),
     historico: [
       ausencia(),
@@ -128,6 +132,18 @@ function servico(extra: Partial<ServicoDeAusencias> = {}): ServicoDeAusencias {
       ausencia({ id, status: "cancelada" }),
     ),
     alterar: vi.fn(async (id: string) => ausencia({ id })),
+    simularReinicio: vi.fn(async () => ({
+      periodos: [],
+      diasCalculados: null,
+    })),
+    registrarReinicio: vi.fn(async () => ({
+      id: "r-1",
+      inicio: "2026-11-01",
+      motivo: "ferias_coletivas" as const,
+      diasPeriodoAnterior: null,
+      observacao: null,
+    })),
+    removerReinicio: vi.fn(async () => undefined),
     excluir: vi.fn(async () => undefined),
     buscarPessoas: vi.fn(async () => [PESSOA]),
     enviarAnexo: vi.fn(async () => undefined),
@@ -291,6 +307,125 @@ describe("T215 — aba Férias e ausências da ficha", () => {
       name: "Saldo de férias",
     });
     expect(within(saldo).getByText(texto)).toBeInTheDocument();
+  });
+
+  it("vencimento: amarelo longe do prazo, vermelho perto (como a referência)", async () => {
+    const base = ferias();
+    montar(
+      ferias({
+        periodos: [
+          { ...base.periodos[0]!, prazoGozo: "2027-10-31" },
+          base.periodos[1]!,
+        ],
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).getByText("Vence em 11 meses").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--warning");
+  });
+
+  it("vencimento perto (1 mês): vermelho", async () => {
+    montar();
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).getByText("Vence em 1 mês").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--danger");
+  });
+
+  it("período encurtado por reinício: a nota no cartão", async () => {
+    const base = ferias();
+    montar(
+      ferias({
+        periodos: [
+          {
+            ...base.periodos[0]!,
+            fim: "2025-10-31",
+            encurtado: { motivo: "ferias_coletivas", novoInicio: "2025-11-01" },
+          },
+          base.periodos[1]!,
+        ],
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).getByText(
+        (_, el) =>
+          el?.classList.contains("ferias-ficha__nota") === true &&
+          el.textContent ===
+            "Período encurtado: férias coletivas · novo período a partir de 01/11/2025.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Ajustar período: abre a janela; ao salvar, avisa e recarrega", async () => {
+    const { consultar, s } = montar();
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    fireEvent.click(
+      within(saldo).getByRole("button", { name: "Ajustar período" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Período aquisitivo",
+    });
+    fireEvent.change(
+      within(janela).getByLabelText("Primeiro dia do novo período"),
+      { target: { value: "2026-11-01" } },
+    );
+    await act(async () => {
+      fireEvent.click(
+        within(janela).getByRole("button", { name: "Salvar reinício" }),
+      );
+    });
+    expect(s.registrarReinicio).toHaveBeenCalledWith(PESSOA.id, {
+      inicio: "2026-11-01",
+      motivo: "ferias_coletivas",
+    });
+    expect(
+      await screen.findByText(
+        "Período aquisitivo ajustado. O saldo já foi recalculado.",
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(consultar).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Período aquisitivo" }),
+      ).toBeNull(),
+    );
+  });
+
+  it("Ajustar período só para quem edita e com saldo calculado", async () => {
+    montar(ferias(), { podeEditar: false });
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).queryByRole("button", { name: "Ajustar período" }),
+    ).toBeNull();
+  });
+
+  it("PJ (sem férias): sem Ajustar período", async () => {
+    montar(
+      ferias({
+        regraDeFerias: "sem_ferias",
+        vinculo: { tipo: "pj", dataAdmissao: "2025-01-05" },
+        periodos: [],
+        periodoAtual: null,
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).queryByRole("button", { name: "Ajustar período" }),
+    ).toBeNull();
   });
 
   it("período vencido: a etiqueta Vencido e o prazo que passou", async () => {
