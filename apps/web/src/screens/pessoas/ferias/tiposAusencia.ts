@@ -121,6 +121,8 @@ export interface NovaAusencia {
   readonly periodoAquisitivoInicio?: string;
   readonly aprovada: boolean;
   readonly observacao?: string;
+  /** T215 — férias coletivas de quem tem menos de 12 meses (art. 140). */
+  readonly feriasColetivas?: boolean;
 }
 
 export interface SimulacaoDeAusencia {
@@ -145,6 +147,12 @@ export interface SimulacaoDeAusencia {
     readonly fim: string;
     readonly disponiveis: number;
   }[];
+  /** T215 — menos de 12 meses de casa: cabe "férias coletivas". */
+  readonly podeSerColetiva?: boolean;
+  readonly coletiva?: {
+    readonly dias: number;
+    readonly novoPeriodo: string;
+  } | null;
 }
 
 export interface ConsultaDeSimulacao {
@@ -156,6 +164,8 @@ export interface ConsultaDeSimulacao {
   readonly periodoAquisitivoInicio?: string;
   /** Editando: a própria ausência não conta (sobreposição e saldo). */
   readonly ignorar?: string;
+  /** T215 — simular como férias coletivas (art. 140). */
+  readonly feriasColetivas?: boolean;
 }
 
 /** Pessoa que pode ser escolhida na gaveta. */

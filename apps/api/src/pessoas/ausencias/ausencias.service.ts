@@ -118,6 +118,10 @@ export interface SimulacaoDeAusencia {
   avisosClt: AvisoClt[];
   /** T215 — os períodos com saldo de que as férias podem descontar ("trocar"). */
   periodosDisponiveis: { inicio: Dia; fim: Dia; disponiveis: number }[];
+  /** T215 — menos de 12 meses de casa no início: cabe "férias coletivas". */
+  podeSerColetiva: boolean;
+  /** T215 — simulada como coletiva: os dias proporcionais e o novo período. */
+  coletiva: { dias: number; novoPeriodo: Dia } | null;
 }
 
 export interface FeriasDoColaborador {
@@ -214,6 +218,16 @@ const VINCULO_DO_SALDO = {
 type VinculoDoSaldo = Prisma.VinculoFuncionalGetPayload<{
   select: typeof VINCULO_DO_SALDO;
 }>;
+
+/** T215 — menos de 12 meses de casa no dia: cabe "férias coletivas" (art. 140). */
+function podeSerColetiva(vinculo: { dataAdmissao: Date }, dia: Dia): boolean {
+  return somarMeses(diaDe(vinculo.dataAdmissao), 12) > dia;
+}
+
+/** T215 — o reinício que as férias coletivas trazem (no início delas). */
+function reinicioDaColetiva(inicio: Dia): ReinicioDoSaldo {
+  return { inicio, motivo: "ferias_coletivas", dias: null };
+}
 
 function fimDoPeriodo(inicio: Dia): Dia {
   return somarDias(somarMeses(inicio, 12), -1);
@@ -379,6 +393,17 @@ export class AusenciasService {
     ) {
       erros.push({ campo: "diasVendidos", motivo: "nao_se_aplica" });
     }
+    const coletiva = dto.feriasColetivas === true;
+    if (
+      coletiva &&
+      !(
+        dto.tipo === "ferias" &&
+        regra === "calculada" &&
+        podeSerColetiva(principal, dto.inicio)
+      )
+    ) {
+      erros.push({ campo: "feriasColetivas", motivo: "nao_se_aplica" });
+    }
     if (erros.length > 0) throw new CamposRecusadosException(erros);
 
     const aprovada = dto.tipo === "afastamento" || dto.aprovada;
@@ -390,7 +415,39 @@ export class AusenciasService {
         principal,
         regra,
         null,
+        coletiva,
       );
+      // Já há reinício nessa data (ajustado antes): não cria outro.
+      const jaReiniciado =
+        coletiva &&
+        (await tx.reinicioPeriodoAquisitivo.count({
+          where: {
+            vinculoId: principal.id,
+            empresaId,
+            inicio: dataDoDia(dto.inicio),
+            removidoEm: null,
+          },
+        })) > 0;
+      if (coletiva && !jaReiniciado) {
+        const reinicio = await tx.reinicioPeriodoAquisitivo.create({
+          data: {
+            empresaId,
+            colaboradorId: dto.colaboradorId,
+            vinculoId: principal.id,
+            inicio: dataDoDia(dto.inicio),
+            motivo: "ferias_coletivas",
+            registradoPorId: ctx.actor.id,
+          },
+        });
+        await this.auditoria.registrarMutacao(
+          tx,
+          ctx,
+          "pessoas_periodo_reiniciado",
+          "reinicio_periodo",
+          reinicio.id,
+          empresaId,
+        );
+      }
 
       const agora = new Date();
       const criada = await tx.ausencia.create({
@@ -443,6 +500,7 @@ export class AusenciasService {
     principal: Awaited<ReturnType<AusenciasService["vinculoPrincipal"]>>,
     regra: ReturnType<typeof regraDeFeriasDoTipo>,
     ignorar: string | null,
+    coletiva = false,
   ): Promise<Dia | null> {
     // Um registro por vez para a mesma pessoa: a sobreposição e o saldo
     // são conferidos sem corrida com outra aba.
@@ -479,7 +537,10 @@ export class AusenciasService {
           existentes.map(paraSaldo),
           hoje,
           dto.inicio > hoje ? dto.inicio : hoje,
-          await this.reiniciosDoVinculo(tx, principal.id, empresaId),
+          [
+            ...(await this.reiniciosDoVinculo(tx, principal.id, empresaId)),
+            ...(coletiva ? [reinicioDaColetiva(dto.inicio)] : []),
+          ],
         );
         const periodo = periodoParaFerias(
           periodos,
@@ -837,6 +898,11 @@ export class AusenciasService {
         fim: Dia;
         disponiveis: number;
       }[],
+      podeSerColetiva:
+        query.tipo === "ferias" &&
+        regraDeFerias === "calculada" &&
+        podeSerColetiva(principal, query.inicio),
+      coletiva: null as { dias: number; novoPeriodo: Dia } | null,
     };
     if (query.tipo !== "ferias" || !fim || regraDeFerias !== "calculada") {
       return {
@@ -858,18 +924,34 @@ export class AusenciasService {
       },
     });
     const hoje = hojeEmSaoPaulo();
+    const coletiva = query.feriasColetivas === true && base.podeSerColetiva;
     const periodos = this.periodosDoVinculo(
       principal,
       existentes.map(paraSaldo),
       hoje,
       query.inicio > hoje ? query.inicio : hoje,
-      await this.reiniciosDoVinculo(this.prisma, principal.id, empresaId),
+      [
+        ...(await this.reiniciosDoVinculo(
+          this.prisma,
+          principal.id,
+          empresaId,
+        )),
+        ...(coletiva ? [reinicioDaColetiva(query.inicio)] : []),
+      ],
     );
     const periodo = periodoParaFerias(
       periodos,
       query.inicio,
       query.periodoAquisitivoInicio ?? null,
     );
+    if (coletiva) {
+      const encurtado = periodos.find(
+        (p) => p.encurtado?.novoInicio === query.inicio,
+      );
+      base.coletiva = encurtado
+        ? { dias: encurtado.direito, novoPeriodo: query.inicio }
+        : null;
+    }
     const usados = base.dias! + (query.diasVendidos ?? 0);
     const periodosDisponiveis = periodos
       .filter(

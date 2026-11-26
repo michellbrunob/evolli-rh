@@ -163,6 +163,10 @@ export interface SimulacaoDeAusenciaApi {
   avisosClt?: AvisoCltApi[];
   /** T215 — os períodos com saldo de que as férias podem descontar. */
   periodosDisponiveis?: { inicio: string; fim: string; disponiveis: number }[];
+  /** T215 — menos de 12 meses de casa: cabe "férias coletivas" (art. 140). */
+  podeSerColetiva?: boolean;
+  /** T215 — simulada como coletiva: os dias proporcionais e o novo período. */
+  coletiva?: { dias: number; novoPeriodo: string } | null;
 }
 
 /** T215 — um aviso das regras da CLT no registro de férias. */

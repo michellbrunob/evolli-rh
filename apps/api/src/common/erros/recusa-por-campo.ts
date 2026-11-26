@@ -91,6 +91,8 @@ export type CampoPublico =
   | "periodoAquisitivoInicio"
   // T215 — Ajustar período: os dias que o período encurtado deu.
   | "diasPeriodoAnterior"
+  // T215 — férias coletivas de quem tem menos de 12 meses de casa.
+  | "feriasColetivas"
   // T215 — Salários: o salário do contrato com linha do tempo.
   | "salarioBruto"
   // T215 — férias para quem não tem férias (PJ e Freelancer).

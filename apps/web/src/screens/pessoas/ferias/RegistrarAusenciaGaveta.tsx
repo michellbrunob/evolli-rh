@@ -29,6 +29,13 @@ import {
 } from "../../../format/data";
 import type { AvisoCltApi } from "../../../api/ausenciasClient";
 
+/** T215 — o nome do período como a referência: "2025" ou "2025/2026". */
+function nomeDoPeriodo(p: { readonly inicio: string; readonly fim: string }) {
+  const de = anoDoDiaCivil(p.inicio);
+  const ate = anoDoDiaCivil(p.fim);
+  return de === ate ? ate : `${de}/${ate}`;
+}
+
 /** T215 — o texto de cada aviso das "Regras da CLT" (como a referência). */
 function textoDoAvisoClt(a: AvisoCltApi, inicio: string): string {
   switch (a.regra) {
@@ -205,6 +212,8 @@ export function RegistrarAusenciaGaveta({
   // "trocar": o período de que as férias descontam (nulo = automático).
   const [periodoEscolhido, setPeriodoEscolhido] = useState<string | null>(null);
   const [trocandoPeriodo, setTrocandoPeriodo] = useState(false);
+  // "São férias coletivas?" (menos de 12 meses de casa, art. 140).
+  const [coletiva, setColetiva] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -232,6 +241,7 @@ export function RegistrarAusenciaGaveta({
     setInicio(r?.inicio ?? "");
     setPeriodoEscolhido(null);
     setTrocandoPeriodo(false);
+    setColetiva(false);
     setFim(r?.fim ?? "");
     setComVolta(r?.comVolta ?? false);
     setVender(r?.vender ?? false);
@@ -293,6 +303,7 @@ export function RegistrarAusenciaGaveta({
             ...(periodoEscolhido
               ? { periodoAquisitivoInicio: periodoEscolhido }
               : {}),
+            ...(coletiva ? { feriasColetivas: true } : {}),
           },
           { signal: controle.signal },
         )
@@ -312,6 +323,7 @@ export function RegistrarAusenciaGaveta({
     servico,
     editando,
     periodoEscolhido,
+    coletiva,
   ]);
 
   const completo =
@@ -353,6 +365,7 @@ export function RegistrarAusenciaGaveta({
         : {}),
       aprovada: afastamento ? true : aprovada,
       ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+      ...(ferias && coletivaValida ? { feriasColetivas: true } : {}),
     };
     try {
       const nova =
@@ -385,7 +398,9 @@ export function RegistrarAusenciaGaveta({
     ? mudou
     : pessoa !== null || tipo !== null || inicio !== "";
   const nome = pessoa ? primeiroNome(pessoa.nome) : "";
-  const ano = simulacao?.periodo ? anoDoDiaCivil(simulacao.periodo.fim) : null;
+  const ano = simulacao?.periodo ? nomeDoPeriodo(simulacao.periodo) : null;
+  // A coletiva só vale enquanto o servidor diz que cabe.
+  const coletivaValida = coletiva && simulacao?.podeSerColetiva === true;
 
   return (
     <Sheet
@@ -727,7 +742,7 @@ export function RegistrarAusenciaGaveta({
                         setTrocandoPeriodo(false);
                       }}
                     >
-                      {`Período ${anoDoDiaCivil(p.fim)} · ${formatarIntervaloDeDias(p.inicio, p.fim)} · ${plural(p.disponiveis, "dia", "dias")}`}
+                      {`Período ${nomeDoPeriodo(p)} · ${formatarIntervaloDeDias(p.inicio, p.fim)} · ${plural(p.disponiveis, "dia", "dias")}`}
                     </button>
                   ))}
                 </div>
@@ -762,60 +777,91 @@ export function RegistrarAusenciaGaveta({
           ) : null}
 
           {ferias && !semRegra && !semFerias ? (
-            <div className="ausencias-gaveta__venda">
-              <div className="ausencias-gaveta__venda-cabeca">
-                <span className="ausencias-gaveta__venda-texto">
-                  <span
-                    className="ausencias-gaveta__escolha-titulo"
-                    id={`${base}-vender`}
-                  >
-                    Vender dias destas férias?
-                  </span>
-                  <span className="ausencias-gaveta__ajuda">
-                    {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${
-                      simulacao?.maxVendaveis ?? 10
-                    } dias por dinheiro (CLT art. 143, 1/3 das férias).`}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={vender}
-                  aria-labelledby={`${base}-vender`}
-                  className="ausencias-gaveta__interruptor"
-                  onClick={() => setVender((v) => !v)}
-                >
-                  <span aria-hidden="true" />
-                </button>
-              </div>
-              {vender ? (
-                <div className="ausencias-gaveta__venda-corpo">
-                  <label className="ausencias-gaveta__data">
-                    <span>Dias vendidos</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={simulacao?.maxVendaveis ?? 10}
-                      className="ausencias-gaveta__campo"
-                      value={diasVendidos}
-                      onChange={(e) => setDiasVendidos(e.target.value)}
-                    />
-                  </label>
-                  <p className="ausencias-gaveta__ajuda">
-                    {`Pela CLT, dá para vender até ${
-                      simulacao?.maxVendaveis ?? 10
-                    } dias deste período (1/3 do direito).`}
-                  </p>
-                  {simulacao?.prazoAbono ? (
-                    <p className="ausencias-gaveta__ajuda">
-                      {`Se ${nome} pedir até ${formatarDiaCivil(
-                        simulacao.prazoAbono,
-                      )}, a empresa não pode negar (CLT art. 143, § 1º). Férias e abono são pagos até 2 dias antes do início (art. 145).`}
-                    </p>
-                  ) : null}
+            <>
+              {simulacao?.podeSerColetiva ? (
+                <div className="ausencias-gaveta__venda">
+                  <div className="ausencias-gaveta__venda-cabeca">
+                    <span className="ausencias-gaveta__venda-texto">
+                      <span
+                        className="ausencias-gaveta__escolha-titulo"
+                        id={`${base}-coletiva`}
+                      >
+                        São férias coletivas?
+                      </span>
+                      <span className="ausencias-gaveta__ajuda">
+                        {coletiva && simulacao.coletiva
+                          ? `Pela CLT (art. 140), ${nome || "a pessoa"} tira ${plural(simulacao.coletiva.dias, "dia", "dias")} proporcionais e começa um novo período aquisitivo em ${formatarDiaCivil(simulacao.coletiva.novoPeriodo)}.`
+                          : `${nome || "A pessoa"} tem menos de 12 meses de casa. Na coletiva, a CLT (art. 140) dá férias proporcionais e recomeça o período aquisitivo.`}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={coletiva}
+                      aria-labelledby={`${base}-coletiva`}
+                      className="ausencias-gaveta__interruptor"
+                      onClick={() => setColetiva((v) => !v)}
+                    >
+                      <span aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               ) : null}
-            </div>
+              <div className="ausencias-gaveta__venda">
+                <div className="ausencias-gaveta__venda-cabeca">
+                  <span className="ausencias-gaveta__venda-texto">
+                    <span
+                      className="ausencias-gaveta__escolha-titulo"
+                      id={`${base}-vender`}
+                    >
+                      Vender dias destas férias?
+                    </span>
+                    <span className="ausencias-gaveta__ajuda">
+                      {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${
+                        simulacao?.maxVendaveis ?? 10
+                      } dias por dinheiro (CLT art. 143, 1/3 das férias).`}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={vender}
+                    aria-labelledby={`${base}-vender`}
+                    className="ausencias-gaveta__interruptor"
+                    onClick={() => setVender((v) => !v)}
+                  >
+                    <span aria-hidden="true" />
+                  </button>
+                </div>
+                {vender ? (
+                  <div className="ausencias-gaveta__venda-corpo">
+                    <label className="ausencias-gaveta__data">
+                      <span>Dias vendidos</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={simulacao?.maxVendaveis ?? 10}
+                        className="ausencias-gaveta__campo"
+                        value={diasVendidos}
+                        onChange={(e) => setDiasVendidos(e.target.value)}
+                      />
+                    </label>
+                    <p className="ausencias-gaveta__ajuda">
+                      {`Pela CLT, dá para vender até ${
+                        simulacao?.maxVendaveis ?? 10
+                      } dias deste período (1/3 do direito).`}
+                    </p>
+                    {simulacao?.prazoAbono ? (
+                      <p className="ausencias-gaveta__ajuda">
+                        {`Se ${nome} pedir até ${formatarDiaCivil(
+                          simulacao.prazoAbono,
+                        )}, a empresa não pode negar (CLT art. 143, § 1º). Férias e abono são pagos até 2 dias antes do início (art. 145).`}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </li>
 

@@ -197,6 +197,7 @@ describe("T215 — Férias e ausências (e2e)", () => {
     empresaId: string,
     estado: "ativo" | "previsto" = "ativo",
     tipo = "clt",
+    dataAdmissao = ADMISSAO,
   ): Promise<{ id: string; nome: string }> {
     sequencia += 1;
     const nome = `Pessoa Ausencia ${String.fromCharCode(65 + (sequencia % 26))}${sequencia}`;
@@ -207,7 +208,7 @@ describe("T215 — Férias e ausências (e2e)", () => {
         nome,
         empresaId,
         tipo,
-        dataAdmissao: ADMISSAO,
+        dataAdmissao,
         motivoCodigo: "admissao_inicial",
       })
       .expect(201);
@@ -1565,6 +1566,87 @@ describe("T215 — Férias e ausências (e2e)", () => {
       ).expect(200);
       expect(r.body.avisosClt).toEqual([]);
       expect(r.body.periodosDisponiveis).toEqual([]);
+    });
+  });
+
+  describe("férias coletivas de quem tem menos de 12 meses de casa (CLT art. 140, como a referência)", () => {
+    const NOVATO = somarMeses(HOJE, -6);
+    const inicio = somarDias(HOJE, 20);
+    const fim = somarDias(inicio, 9);
+    const simular = (id: string, extra = "") =>
+      get(
+        `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${inicio}&fim=${fim}${extra}`,
+        rhA,
+      ).expect(200);
+
+    it("simular: pode ser coletiva; ligada, encurta o período (proporcional) e recomeça no início das férias", async () => {
+      const { id } = await admitir(rhA, empresaA, "ativo", "clt", NOVATO);
+      const sem = await simular(id);
+      expect(sem.body).toMatchObject({ podeSerColetiva: true, coletiva: null });
+      expect(sem.body.periodo).toBeNull();
+      const com = await simular(id, "&feriasColetivas=true");
+      expect(com.body.podeSerColetiva).toBe(true);
+      expect(com.body.periodo).toEqual({
+        inicio: NOVATO,
+        fim: somarDias(inicio, -1),
+      });
+      expect(com.body.coletiva).toEqual({
+        dias: expect.any(Number),
+        novoPeriodo: inicio,
+      });
+      expect(com.body.coletiva.dias).toBeGreaterThan(10);
+      expect(com.body.saldoAntes).toBe(com.body.coletiva.dias);
+    });
+
+    it("registrar coletiva: cria o reinício (férias coletivas) junto, com trilha", async () => {
+      const { id } = await admitir(rhA, empresaA, "ativo", "clt", NOVATO);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio,
+          fim,
+          feriasColetivas: true,
+          aprovada: true,
+        })
+        .expect(201);
+      expect(r.body.periodoAquisitivo).toMatchObject({ inicio: NOVATO });
+      const reinicios = await prisma.reinicioPeriodoAquisitivo.findMany({
+        where: { colaboradorId: id },
+      });
+      expect(reinicios).toHaveLength(1);
+      expect(reinicios[0]).toMatchObject({
+        motivo: "ferias_coletivas",
+        diasPeriodoAnterior: null,
+      });
+      const ficha = (
+        await get(`/v1/colaboradores/${id}/ferias`, rhA).expect(200)
+      ).body;
+      expect(ficha.reinicios).toHaveLength(1);
+      const eventos = await prisma.auditEvent.findMany({
+        where: { resourceId: reinicios[0]!.id, resource: "reinicio_periodo" },
+      });
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pessoas_periodo_reiniciado",
+      ]);
+    });
+
+    it("quem já tem 12 meses de casa não tem coletiva por aqui", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      expect((await simular(id)).body.podeSerColetiva).toBe(false);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio,
+          fim,
+          feriasColetivas: true,
+          aprovada: true,
+        })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "feriasColetivas", motivo: "nao_se_aplica" },
+      ]);
     });
   });
 

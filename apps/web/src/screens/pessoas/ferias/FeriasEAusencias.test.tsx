@@ -512,7 +512,7 @@ describe("T215 — Registrar ausência (gaveta)", () => {
     montarGaveta();
     await feriasDaMaria("2027-01-05", "2027-01-24");
     expect(
-      await screen.findByText("Desconta do período 2025 (automático)"),
+      await screen.findByText("Desconta do período 2024/2025 (automático)"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("note", { name: "Regras da CLT" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "trocar" }));
@@ -524,11 +524,11 @@ describe("T215 — Registrar ausência (gaveta)", () => {
         .getAllByRole("radio")
         .map((r) => r.textContent),
     ).toEqual([
-      "Período 2025 · 05/01/2024 – 04/01/2025 · 12 dias",
-      "Período 2026 · 05/01/2025 – 04/01/2026 · 30 dias",
+      "Período 2024/2025 · 05/01/2024 – 04/01/2025 · 12 dias",
+      "Período 2025/2026 · 05/01/2025 – 04/01/2026 · 30 dias",
     ]);
     fireEvent.click(
-      within(escolha).getByRole("radio", { name: /^Período 2026/ }),
+      within(escolha).getByRole("radio", { name: /^Período 2025\/2026/ }),
     );
     await waitFor(() =>
       expect(simular).toHaveBeenLastCalledWith(
@@ -537,8 +537,69 @@ describe("T215 — Registrar ausência (gaveta)", () => {
       ),
     );
     expect(
-      await screen.findByText("Desconta do período 2026 (escolhido)"),
+      await screen.findByText("Desconta do período 2025/2026 (escolhido)"),
     ).toBeInTheDocument();
+  });
+
+  it("São férias coletivas? (menos de 12 meses de casa, CLT art. 140): explica, simula e registra", async () => {
+    const simular = vi.mocked(servico.simular);
+    simular.mockImplementation(async (c) => ({
+      dias: 10,
+      diasUteis: 8,
+      volta: "2026-12-10",
+      periodo: c.feriasColetivas
+        ? { inicio: "2026-02-16", fim: "2026-11-29" }
+        : null,
+      saldoAntes: c.feriasColetivas ? 23 : 0,
+      saldoDepois: c.feriasColetivas ? 13 : -10,
+      maxVendaveis: c.feriasColetivas ? 7 : 0,
+      prazoAbono: null,
+      avisosClt: [],
+      periodosDisponiveis: [],
+      podeSerColetiva: true,
+      coletiva: c.feriasColetivas
+        ? { dias: 23, novoPeriodo: "2026-11-30" }
+        : null,
+    }));
+    const { onRegistrada } = montarGaveta();
+    await feriasDaMaria("2026-11-30", "2026-12-09");
+    expect(
+      await screen.findByText(
+        "Maria tem menos de 12 meses de casa. Na coletiva, a CLT (art. 140) dá férias proporcionais e recomeça o período aquisitivo.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("switch", { name: "São férias coletivas?" }),
+    );
+    expect(
+      await screen.findByText(
+        "Pela CLT (art. 140), Maria tira 23 dias proporcionais e começa um novo período aquisitivo em 30/11/2026.",
+      ),
+    ).toBeInTheDocument();
+    expect(simular).toHaveBeenLastCalledWith(
+      expect.objectContaining({ feriasColetivas: true }),
+      expect.anything(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Registrar ausência" }));
+    await waitFor(() =>
+      expect(servico.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: "ferias",
+          feriasColetivas: true,
+          periodoAquisitivoInicio: "2026-02-16",
+        }),
+      ),
+    );
+    await waitFor(() => expect(onRegistrada).toHaveBeenCalled());
+  });
+
+  it("quem já tem 12 meses de casa não vê a pergunta da coletiva", async () => {
+    montarGaveta();
+    await feriasDaMaria("2027-01-05", "2027-01-24");
+    await screen.findByText("20 dias de férias (14 dias úteis)");
+    expect(
+      screen.queryByRole("switch", { name: "São férias coletivas?" }),
+    ).toBeNull();
   });
 
   it("férias: o resumo do servidor, a venda de dias e o registro", async () => {

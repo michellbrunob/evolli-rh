@@ -165,6 +165,14 @@ export class RegistrarAusenciaDto {
   @IsBoolean()
   aprovada!: boolean;
 
+  /**
+   * T215 — férias coletivas de quem tem menos de 12 meses de casa (CLT,
+   * art. 140): proporcionais, e o período aquisitivo recomeça no início.
+   */
+  @IsOptional()
+  @IsBoolean()
+  feriasColetivas?: boolean;
+
   @Transform(({ value }) => textoOpcional(value))
   @IsOptional()
   @IsString()
@@ -285,6 +293,14 @@ export class SimularAusenciaQueryDto {
   @IsOptional()
   @IsUUID()
   ignorar?: string;
+
+  /** T215 — simular como férias coletivas (art. 140). */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  feriasColetivas?: boolean;
 }
 
 /** T215 — "Ajustar período": por que a contagem recomeça. */
