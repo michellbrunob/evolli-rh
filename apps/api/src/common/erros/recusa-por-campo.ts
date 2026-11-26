@@ -50,6 +50,8 @@ export type MotivoDoCampo =
   | "fora_do_vinculo"
   // T215 — Ajustar período (reinício da contagem de férias).
   | "ja_existe"
+  // T215 — Sugerir outras datas: o mesmo período pedido.
+  | "igual_ao_pedido"
   | "sem_saldo_calculado"
   | "abaixo_das_ferias"
   | "ferias_sem_periodo"

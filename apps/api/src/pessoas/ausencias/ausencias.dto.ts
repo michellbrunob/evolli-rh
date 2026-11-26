@@ -216,13 +216,41 @@ export class AlterarAusenciaDto {
   observacao?: string;
 }
 
+/** T215 — recusar: o motivo é obrigatório (como a referência). */
 export class RecusarAusenciaDto {
+  @Transform(({ value }) => textoOpcional(value))
+  @IsString()
+  @MaxLength(1000)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  motivo!: string;
+}
+
+/** T215 — aprovar: a mensagem para quem pediu é opcional. */
+export class AprovarAusenciaDto {
   @Transform(({ value }) => textoOpcional(value))
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(1000)
   @Matches(SEM_CONTROLE_COM_LINHA)
-  motivo?: string;
+  mensagem?: string;
+}
+
+/** T215 — sugerir outras datas: o novo período e, opcional, o porquê. */
+export class SugerirAusenciaDto {
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  inicio!: string;
+
+  @Matches(DIA_CIVIL)
+  @IsDateString({ strict: true })
+  fim!: string;
+
+  @Transform(({ value }) => textoOpcional(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  mensagem?: string;
 }
 
 export class SimularAusenciaQueryDto {

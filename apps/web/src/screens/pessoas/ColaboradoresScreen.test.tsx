@@ -2853,6 +2853,42 @@ describe("T199 — dashboard de Colaboradores", () => {
       .getAllByRole("columnheader")
       .map((c) => c.textContent ?? "");
 
+  it("T215 — o número de Férias e ausências é quem está fora hoje (como a referência), desde a abertura", async () => {
+    vi.mocked(listarColaboradores).mockResolvedValue({
+      ...paginado([colaborador1]),
+      contadores: CONTADORES,
+    });
+    const listar = vi.fn(async () => ({
+      itens: [],
+      pagina: 1,
+      tamanhoPagina: 1,
+      total: 0,
+      indicadores: {
+        emFeriasAgora: 1,
+        licencasEAfastamentos: 1,
+        faltasEsteMes: 0,
+        proximasFerias: 0,
+        pendentes: 9,
+        ausentesHoje: 3,
+      },
+    }));
+    render(
+      <ColaboradoresScreen
+        empresaAtiva={EMPRESA}
+        servicoDeAusencias={{ listar } as never}
+      />,
+    );
+    await waitFor(() =>
+      expect(aba(/^Férias e ausências/)).toHaveAccessibleName(
+        "Férias e ausências, 3",
+      ),
+    );
+    expect(listar.mock.calls[0]).toEqual([
+      { pagina: 1, tamanhoPagina: 1 },
+      { signal: expect.any(AbortSignal) },
+    ]);
+  });
+
   it("T215 — cartões com os números do servidor e a distribuição por tipo de contrato em texto", async () => {
     vi.mocked(listarColaboradores).mockResolvedValue({
       ...paginado([colaborador1]),

@@ -18,6 +18,7 @@ import {
   intervaloCurtoDeDias,
   FUSO_DE_NEGOCIO,
   formatarDiaCivil,
+  formatarIntervaloDeDias,
   formatarInstante,
   formatarMesReferencia,
 } from "./data";
@@ -695,5 +696,22 @@ describe("T215 — numeroDoDia e umAnoDepois", () => {
   it("dia do mês e a mesma data no ano seguinte", () => {
     expect(numeroDoDia("2026-11-05")).toBe(5);
     expect(umAnoDepois("2026-12-16")).toBe("2027-12-16");
+  });
+});
+
+describe("T215 — formatarIntervaloDeDias (como a referência)", () => {
+  it("um dia, mesmo ano, anos diferentes e sem fim", () => {
+    expect(formatarIntervaloDeDias("2026-11-30", "2026-11-30")).toBe(
+      "30/11/2026",
+    );
+    expect(formatarIntervaloDeDias("2026-11-02", "2026-11-07")).toBe(
+      "02/11 – 07/11/2026",
+    );
+    expect(formatarIntervaloDeDias("2026-12-31", "2027-01-04")).toBe(
+      "31/12/2026 – 04/01/2027",
+    );
+    expect(formatarIntervaloDeDias("2026-11-02", null)).toBe(
+      "Desde 02/11/2026",
+    );
   });
 });

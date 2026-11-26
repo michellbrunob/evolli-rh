@@ -6,6 +6,7 @@
  * A tela recebe as chamadas ao servidor por parâmetro (`ServicoDeAusencias`):
  * o shell liga o cliente real; os testes, um falso.
  */
+import { formatarIntervaloDeDias } from "../../../format/data";
 import type {
   MotivoReinicio,
   NovoReinicioDto,
@@ -84,6 +85,8 @@ export interface AusenciaApi {
 
 export interface IndicadoresDeAusencias {
   readonly emFeriasAgora: number;
+  /** T215 — pessoas fora hoje (o número da aba, como a referência). */
+  readonly ausentesHoje?: number;
   readonly licencasEAfastamentos: number;
   readonly faltasEsteMes: number;
   readonly proximasFerias: number;
@@ -164,7 +167,12 @@ export interface ServicoDeAusencias {
     consulta: ConsultaDeSimulacao,
     opcoes?: { readonly signal?: AbortSignal },
   ) => Promise<SimulacaoDeAusencia>;
-  readonly aprovar: (id: string) => Promise<AusenciaApi>;
+  readonly aprovar: (id: string, mensagem?: string) => Promise<AusenciaApi>;
+  /** T215 — "Sugerir outras datas" (Responder solicitação). */
+  readonly sugerir?: (
+    id: string,
+    sugestao: { inicio: string; fim: string; mensagem?: string },
+  ) => Promise<AusenciaApi>;
   readonly recusar: (id: string, motivo?: string) => Promise<AusenciaApi>;
   readonly cancelar: (id: string) => Promise<AusenciaApi>;
   /** T215 — editar e excluir, como a referência. */
@@ -305,3 +313,47 @@ export const OPCOES_DE_STATUS: readonly {
   { valor: "recusada", rotulo: "Recusada" },
   { valor: "cancelada", rotulo: "Cancelada" },
 ];
+
+/**
+ * T215 — como a referência mostra o tipo nas listas, no histórico e nas
+ * frases (o quadro de escolha da janela segue com `ROTULO_DO_TIPO`).
+ */
+export const ROTULO_NA_LISTA: Readonly<Record<TipoAusencia, string>> = {
+  ...ROTULO_DO_TIPO,
+  falta_sem_justificativa: "Falta injustificada",
+  day_off: "Day off aniversário",
+};
+
+export const NA_FRASE_DA_LISTA: Readonly<Record<TipoAusencia, string>> = {
+  ...TIPO_NA_FRASE,
+  falta_sem_justificativa: "falta injustificada",
+  day_off: "day off aniversário",
+};
+
+/** O status nas linhas e cartões: o que espera o RH é "Pendente". */
+export const ROTULO_DO_STATUS_NA_LISTA: Readonly<
+  Record<StatusAusencia, string>
+> = {
+  ...ROTULO_DO_STATUS,
+  aguardando_rh: "Pendente",
+};
+
+/** "As férias … serão removidas", "O day off … será removido". */
+const EXCLUSAO_NA_FRASE: Readonly<
+  Record<TipoAusencia, { readonly artigo: string; readonly verbo: string }>
+> = {
+  ferias: { artigo: "As", verbo: "serão removidas" },
+  licenca_medica: { artigo: "A", verbo: "será removida" },
+  licenca_maternidade: { artigo: "A", verbo: "será removida" },
+  licenca_paternidade: { artigo: "A", verbo: "será removida" },
+  afastamento: { artigo: "O", verbo: "será removido" },
+  falta_justificada: { artigo: "A", verbo: "será removida" },
+  falta_sem_justificativa: { artigo: "A", verbo: "será removida" },
+  day_off: { artigo: "O", verbo: "será removido" },
+  home_office: { artigo: "O", verbo: "será removido" },
+};
+
+export function textoDaExclusao(a: AusenciaApi, nome: string): string {
+  const { artigo, verbo } = EXCLUSAO_NA_FRASE[a.tipo];
+  return `${artigo} ${NA_FRASE_DA_LISTA[a.tipo]} de ${nome} (${formatarIntervaloDeDias(a.inicio, a.fim)}) ${verbo} do histórico e do calendário. Essa ação não pode ser desfeita.`;
+}

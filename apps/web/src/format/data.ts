@@ -503,3 +503,22 @@ export function periodoDaAusencia(inicio: string, fim: string | null): string {
 export function diaMesComZero(valor: string): string {
   return formatarDiaCivil(valor).slice(0, 5);
 }
+
+/**
+ * T215 — um intervalo de dias civis, como a referência: "30/11/2026" (um
+ * dia), "02/11 – 07/11/2026" (mesmo ano) ou "31/12/2026 – 04/01/2027"; sem
+ * fim, "Desde 02/11/2026". Data inválida: "—".
+ */
+export function formatarIntervaloDeDias(
+  inicio: string,
+  fim: string | null,
+): string {
+  const de = formatarDiaCivil(inicio);
+  if (!fim) return `Desde ${de}`;
+  const ate = formatarDiaCivil(fim);
+  if (inicio === fim) return de;
+  if (anoDoDiaCivil(inicio) === anoDoDiaCivil(fim)) {
+    return `${de.slice(0, 5)} – ${ate}`;
+  }
+  return `${de} – ${ate}`;
+}

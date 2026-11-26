@@ -530,6 +530,7 @@ enum AuditAction {
   /// T215 — editar e excluir (a exclusão marca; nada é apagado).
   pessoas_ausencia_alterada         @map("pessoas.ausencia.alterada")
   pessoas_ausencia_excluida         @map("pessoas.ausencia.excluida")
+  pessoas_ausencia_ajuste_sugerido  @map("pessoas.ausencia.ajuste_sugerido")
   pessoas_periodo_reiniciado        @map("pessoas.periodo_aquisitivo.reiniciado")
   pessoas_periodo_reinicio_removido @map("pessoas.periodo_aquisitivo.reinicio_removido")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
@@ -2825,6 +2826,9 @@ model Ausencia {
   decididoPorId           String?            @map("decidido_por_id")
   decididoEm              DateTime?          @map("decidido_em")
   motivoDecisao           String?            @map("motivo_decisao")
+  /// T215 — "Sugerir outras datas": o período proposto a quem pediu.
+  sugestaoInicio          DateTime?          @map("sugestao_inicio") @db.Date
+  sugestaoFim             DateTime?          @map("sugestao_fim") @db.Date
   /// T215 — excluída (como a referência): sai de tudo, o registro fica.
   excluidaEm              DateTime?          @map("excluida_em")
   excluidaPorId           String?            @map("excluida_por_id")

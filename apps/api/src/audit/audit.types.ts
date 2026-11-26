@@ -93,6 +93,7 @@ export const AUDIT_ACTIONS = [
   "pessoas_ausencia_cancelada",
   "pessoas_ausencia_alterada",
   "pessoas_ausencia_excluida",
+  "pessoas_ausencia_ajuste_sugerido",
   // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
   "pessoas_periodo_reiniciado",
   "pessoas_periodo_reinicio_removido",

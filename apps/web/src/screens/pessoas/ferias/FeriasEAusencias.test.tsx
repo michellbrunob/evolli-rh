@@ -32,6 +32,7 @@ const INDICADORES: IndicadoresDeAusencias = {
   faltasEsteMes: 3,
   proximasFerias: 4,
   pendentes: 1,
+  ausentesHoje: 2,
 };
 
 function ausencia(parcial: Partial<AusenciaApi> = {}): AusenciaApi {
@@ -88,6 +89,8 @@ function servicoFalso(itens: AusenciaApi[] = [ausencia()]): ServicoDeAusencias {
     aprovar: vi.fn(async (id) => ausencia({ id, status: "aprovada" })),
     recusar: vi.fn(async (id) => ausencia({ id, status: "recusada" })),
     cancelar: vi.fn(async (id) => ausencia({ id, status: "cancelada" })),
+    alterar: vi.fn(async (id) => ausencia({ id })),
+    excluir: vi.fn(async () => undefined),
     buscarPessoas: vi.fn(async () => [MARIA]),
   };
 }
@@ -95,6 +98,71 @@ function servicoFalso(itens: AusenciaApi[] = [ausencia()]): ServicoDeAusencias {
 let servico: ServicoDeAusencias;
 beforeEach(() => {
   servico = servicoFalso();
+});
+
+describe("T215 — Férias e ausências: como a referência (2026-11-26)", () => {
+  it("cartões no singular com 1", () => {
+    render(
+      <CartoesDeAusencias
+        indicadores={{
+          ...INDICADORES,
+          emFeriasAgora: 1,
+          faltasEsteMes: 1,
+        }}
+      />,
+    );
+    expect(
+      within(screen.getByRole("group", { name: "Em férias agora" })).getByText(
+        "pessoa",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Faltas este mês" })).getByText(
+        "registrada",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("linha: foto (iniciais), ponto do tipo, datas curtas e dias úteis; Pendente; N registros", async () => {
+    servico = servicoFalso([
+      ausencia(),
+      ausencia({
+        id: "a-2",
+        tipo: "day_off",
+        inicio: "2026-11-30",
+        fim: "2026-11-30",
+        dias: 1,
+        diasUteis: 1,
+        status: "aprovada",
+      }),
+      ausencia({
+        id: "a-3",
+        tipo: "falta_sem_justificativa",
+        inicio: "2026-12-31",
+        fim: "2027-01-04",
+        dias: 5,
+        diasUteis: 2,
+        status: "aprovada",
+      }),
+    ]);
+    render(<FeriasEAusenciasAba servico={servico} podeRegistrar podeDecidir />);
+    const tabela = await screen.findByRole("table", {
+      name: "Férias e ausências",
+    });
+    const [, ferias, dayOff, falta] = within(tabela).getAllByRole("row");
+    expect(ferias!.querySelector(".ausencias__avatar")).toHaveTextContent("MS");
+    expect(ferias!.querySelector(".ausencias__ponto")).not.toBeNull();
+    expect(ferias).toHaveTextContent("05/01 – 24/01/2027");
+    expect(ferias).toHaveTextContent("14 dias úteis");
+    expect(ferias).toHaveTextContent("Pendente");
+    expect(dayOff).toHaveTextContent("Day off aniversário");
+    expect(dayOff).toHaveTextContent("30/11/2026");
+    expect(dayOff).toHaveTextContent("1 dia útil");
+    expect(falta).toHaveTextContent("Falta injustificada");
+    // Anos diferentes: as duas datas completas.
+    expect(falta).toHaveTextContent("31/12/2026 – 04/01/2027");
+    expect(screen.getByText("3 registros")).toBeInTheDocument();
+  });
 });
 
 describe("T215 — Férias e ausências: cartões", () => {
@@ -204,9 +272,9 @@ describe("T215 — Férias e ausências: lista", () => {
     expect(linha).toHaveTextContent("Maria Teste Santos");
     expect(linha).toHaveTextContent("Analista de RH");
     expect(linha).toHaveTextContent("Férias");
-    expect(linha).toHaveTextContent("05/01/2027 – 24/01/2027");
-    expect(linha).toHaveTextContent("20 dias");
-    expect(linha).toHaveTextContent("Aguardando o RH");
+    expect(linha).toHaveTextContent("05/01 – 24/01/2027");
+    expect(linha).toHaveTextContent("14 dias úteis");
+    expect(linha).toHaveTextContent("Pendente");
     fireEvent.keyDown(
       within(linha!).getByRole("button", {
         name: "Ações da ausência de Maria Teste Santos",
@@ -214,14 +282,23 @@ describe("T215 — Férias e ausências: lista", () => {
       { key: "Enter" },
     );
     const menu = await screen.findByRole("menu");
+    // Como a referência: o pendente se responde, edita ou exclui.
     expect(
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Aprovar", "Recusar", "Cancelar"]);
+    ).toEqual(["Responder", "Editar", "Excluir"]);
     const leituras = vi.mocked(servico.listar).mock.calls.length;
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Aprovar" }));
-    await waitFor(() => expect(servico.aprovar).toHaveBeenCalledWith("a-1"));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Responder" }));
+    const janela = await screen.findByRole("dialog", {
+      name: "Responder solicitação",
+    });
+    fireEvent.click(
+      within(janela).getByRole("button", { name: "Aprovar pedido" }),
+    );
+    await waitFor(() =>
+      expect(servico.aprovar).toHaveBeenCalledWith("a-1", undefined),
+    );
     await waitFor(() =>
       expect(vi.mocked(servico.listar).mock.calls.length).toBeGreaterThan(
         leituras,
@@ -229,7 +306,7 @@ describe("T215 — Férias e ausências: lista", () => {
     );
   });
 
-  it("aprovada: só Cancelar; sem permissão de decidir, sem menu", async () => {
+  it("aprovada: Editar e Excluir (sem Responder nem Cancelar); excluir confirma", async () => {
     servico = servicoFalso([ausencia({ status: "aprovada" })]);
     montar();
     const tabela = await screen.findByRole("table", {
@@ -244,7 +321,33 @@ describe("T215 — Férias e ausências: lista", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Cancelar"]);
+    ).toEqual(["Editar", "Excluir"]);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Excluir" }));
+    const confirma = await screen.findByRole("dialog", {
+      name: "Excluir esta ausência?",
+    });
+    expect(confirma).toHaveTextContent(
+      "As férias de Maria Teste Santos (05/01 – 24/01/2027) serão removidas do histórico e do calendário. Essa ação não pode ser desfeita.",
+    );
+    fireEvent.click(within(confirma).getByRole("button", { name: "Excluir" }));
+    await waitFor(() => expect(servico.excluir).toHaveBeenCalledWith("a-1"));
+    expect(await screen.findByText("Ausência excluída.")).toBeInTheDocument();
+  });
+
+  it("sem permissão de decidir: sem o ⋯", async () => {
+    render(
+      <FeriasEAusenciasAba
+        servico={servico}
+        podeRegistrar={false}
+        podeDecidir={false}
+      />,
+    );
+    const tabela = await screen.findByRole("table", {
+      name: "Férias e ausências",
+    });
+    expect(
+      within(tabela).queryByRole("button", { name: /^Ações da ausência/ }),
+    ).toBeNull();
   });
 
   it("vazio: título, texto e o botão de registrar", async () => {

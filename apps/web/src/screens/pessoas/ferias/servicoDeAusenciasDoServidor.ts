@@ -18,6 +18,7 @@ import {
   removerReinicio,
   simularAusencia,
   simularReinicio,
+  sugerirAusencia,
 } from "../../../api/ausenciasClient";
 import { listarColaboradores } from "../../../api/colaboradoresClient";
 import type { ServicoDeAusencias } from "./tiposAusencia";
@@ -26,7 +27,8 @@ export const servicoDeAusenciasDoServidor: ServicoDeAusencias = {
   listar: (consulta) => listarAusencias(consulta),
   registrar: (nova) => registrarAusencia(nova),
   simular: (consulta) => simularAusencia(consulta),
-  aprovar: (id) => aprovarAusencia(id),
+  aprovar: (id, mensagem) => aprovarAusencia(id, mensagem),
+  sugerir: (id, sugestao) => sugerirAusencia(id, sugestao),
   recusar: (id, motivo) => recusarAusencia(id, motivo),
   cancelar: (id) => cancelarAusencia(id),
   alterar: (id, alteracao) => alterarAusencia(id, alteracao),

@@ -24,12 +24,14 @@ import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import {
   AlterarAusenciaDto,
+  AprovarAusenciaDto,
   ListarAusenciasQueryDto,
   RecusarAusenciaDto,
   RegistrarAusenciaDto,
   RegistrarReinicioDto,
   SimularAusenciaQueryDto,
   SimularReinicioQueryDto,
+  SugerirAusenciaDto,
 } from "./ausencias.dto";
 import { AusenciasService } from "./ausencias.service";
 
@@ -140,10 +142,31 @@ export class AusenciasController {
   @ApiOperation({ summary: "Aprova a ausência pendente" })
   async aprovar(
     @Param("ausenciaId", ParseUUIDPipe) ausenciaId: string,
+    @Body() dto: AprovarAusenciaDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.service.decidir(ausenciaId, "aprovar", undefined, {
+    return this.service.decidir(ausenciaId, "aprovar", dto.mensagem, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Post(":ausenciaId/sugerir")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("ausencia", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Sugere outras datas para a ausência pendente (ajuste sugerido)",
+  })
+  async sugerir(
+    @Param("ausenciaId", ParseUUIDPipe) ausenciaId: string,
+    @Body() dto: SugerirAusenciaDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.sugerir(ausenciaId, dto, {
       actor,
       metadata: extractRequestMetadata(req),
     });

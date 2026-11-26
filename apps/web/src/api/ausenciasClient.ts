@@ -92,6 +92,8 @@ export type RegraDeFerias = "calculada" | "sem_ferias" | "sem_regra";
 
 export interface IndicadoresDeAusenciasApi {
   emFeriasAgora: number;
+  /** T215 — pessoas fora hoje (o número da aba). */
+  ausentesHoje?: number;
   licencasEAfastamentos: number;
   faltasEsteMes: number;
   proximasFerias: number;
@@ -284,8 +286,26 @@ export function registrarAusencia(
   return gravar(`${BASE}/ausencias`, dto);
 }
 
-export function aprovarAusencia(ausenciaId: string): Promise<AusenciaApi> {
-  return gravar(`${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/aprovar`);
+/** T215 — aprovar, com a mensagem opcional para quem pediu. */
+export function aprovarAusencia(
+  ausenciaId: string,
+  mensagem?: string,
+): Promise<AusenciaApi> {
+  return gravar(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/aprovar`,
+    ...(mensagem ? [{ mensagem }] : []),
+  );
+}
+
+/** T215 — "Sugerir outras datas": o pedido fica em ajuste sugerido. */
+export function sugerirAusencia(
+  ausenciaId: string,
+  sugestao: { inicio: string; fim: string; mensagem?: string },
+): Promise<AusenciaApi> {
+  return gravar(
+    `${BASE}/ausencias/${encodeURIComponent(ausenciaId)}/sugerir`,
+    sugestao,
+  );
 }
 
 export function recusarAusencia(

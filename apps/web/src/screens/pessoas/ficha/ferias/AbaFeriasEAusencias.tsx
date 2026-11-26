@@ -53,6 +53,7 @@ import {
   diaCivilDeHoje,
   diaEMesAbreviado,
   formatarDiaCivil,
+  formatarIntervaloDeDias,
 } from "../../../../format/data";
 import { baixarArquivo } from "../../../dashboard/exportacao";
 import {
@@ -69,16 +70,16 @@ import {
   recusaDoArquivo,
   tamanhoLegivel,
 } from "../../ferias/RegistrarAusenciaGaveta";
+import { ResponderAusenciaJanela } from "../../ferias/ResponderAusenciaJanela";
 import {
   type AusenciaApi,
   type PessoaParaAusencia,
   type ServicoDeAusencias,
   type StatusAusencia,
   MOTIVOS_DE_AFASTAMENTO,
-  ROTULO_DO_STATUS,
-  ROTULO_DO_TIPO,
-  TIPO_NA_FRASE,
-  type TipoAusencia,
+  ROTULO_DO_STATUS_NA_LISTA,
+  ROTULO_NA_LISTA,
+  textoDaExclusao,
 } from "../../ferias/tiposAusencia";
 import { COR_DO_TIPO, ICONE_DO_TIPO } from "../../ferias/aparenciaDoTipo";
 import {
@@ -124,8 +125,6 @@ type Carga =
 
 type Janela =
   | { tipo: "excluir"; ausencia: AusenciaApi }
-  | { tipo: "recusar"; ausencia: AusenciaApi }
-  | { tipo: "cancelar"; ausencia: AusenciaApi }
   | { tipo: "remover-anexo"; ausencia: AusenciaApi }
   | null;
 
@@ -143,22 +142,11 @@ const VARIANTE_DA_SITUACAO = {
   vencido: "danger",
 } as const;
 
-/** As ações de decisão que cada status permite. */
-function decisoesDoStatus(
-  status: StatusAusencia,
-): readonly ("aprovar" | "recusar" | "cancelar")[] {
-  switch (status) {
-    case "aguardando_rh":
-    case "aguardando_gestor":
-    case "ajuste_sugerido":
-      return ["aprovar", "recusar", "cancelar"];
-    case "cancelamento_pedido":
-    case "aprovada":
-      return ["cancelar"];
-    default:
-      return [];
-  }
-}
+/** Os status que esperam a resposta de quem decide ("Responder"). */
+const ESPERANDO_RESPOSTA: ReadonlySet<StatusAusencia> = new Set([
+  "aguardando_rh",
+  "aguardando_gestor",
+]);
 
 const ENCERRADAS: ReadonlySet<StatusAusencia> = new Set([
   "cancelada",
@@ -167,26 +155,6 @@ const ENCERRADAS: ReadonlySet<StatusAusencia> = new Set([
 
 function dias(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
-}
-
-/** "As férias … serão removidas", "O day off … será removido". */
-const EXCLUSAO_NA_FRASE: Readonly<
-  Record<TipoAusencia, { readonly artigo: string; readonly verbo: string }>
-> = {
-  ferias: { artigo: "As", verbo: "serão removidas" },
-  licenca_medica: { artigo: "A", verbo: "será removida" },
-  licenca_maternidade: { artigo: "A", verbo: "será removida" },
-  licenca_paternidade: { artigo: "A", verbo: "será removida" },
-  afastamento: { artigo: "O", verbo: "será removido" },
-  falta_justificada: { artigo: "A", verbo: "será removida" },
-  falta_sem_justificativa: { artigo: "A", verbo: "será removida" },
-  day_off: { artigo: "O", verbo: "será removido" },
-  home_office: { artigo: "O", verbo: "será removido" },
-};
-
-function textoDaExclusao(a: AusenciaApi, nome: string): string {
-  const { artigo, verbo } = EXCLUSAO_NA_FRASE[a.tipo];
-  return `${artigo} ${TIPO_NA_FRASE[a.tipo]} de ${nome} (${datas(a)}) ${verbo} do histórico e do calendário. Essa ação não pode ser desfeita.`;
 }
 
 function diasUteis(n: number | null): string {
@@ -206,20 +174,17 @@ function PontoDoTipo({ a }: { readonly a: AusenciaApi }) {
 }
 
 function datas(a: AusenciaApi): string {
-  if (!a.fim) return `Desde ${formatarDiaCivil(a.inicio)}`;
-  return a.inicio === a.fim
-    ? formatarDiaCivil(a.inicio)
-    : `${formatarDiaCivil(a.inicio)} a ${formatarDiaCivil(a.fim)}`;
+  return formatarIntervaloDeDias(a.inicio, a.fim);
 }
 
 function rotuloDoTipo(a: AusenciaApi): string {
   if (a.tipo !== "afastamento" || !a.motivoAfastamento) {
-    return ROTULO_DO_TIPO[a.tipo];
+    return ROTULO_NA_LISTA[a.tipo];
   }
   const motivo = MOTIVOS_DE_AFASTAMENTO.find(
     (m) => m.valor === a.motivoAfastamento,
   );
-  return motivo ? `Afastamento · ${motivo.rotulo}` : ROTULO_DO_TIPO[a.tipo];
+  return motivo ? `Afastamento · ${motivo.rotulo}` : ROTULO_NA_LISTA[a.tipo];
 }
 
 /** Dias corridos entre dois dias civis (b − a). */
@@ -273,7 +238,8 @@ export function AbaFeriasEAusencias({
   );
   const [editando, setEditando] = useState<AusenciaApi | null>(null);
   const [janela, setJanela] = useState<Janela>(null);
-  const [motivo, setMotivo] = useState("");
+  // "Responder solicitação" (como a referência).
+  const [respondendo, setRespondendo] = useState<AusenciaApi | null>(null);
   const [trabalhando, setTrabalhando] = useState(false);
   const [aviso, setAviso] = useState("");
   const [anexandoEm, setAnexandoEm] = useState<AusenciaApi | null>(null);
@@ -405,18 +371,7 @@ export function AbaFeriasEAusencias({
             setAgendarFerias(false);
             setGaveta(true);
           }}
-          onAprovar={(a) =>
-            void executar(
-              () => servico.aprovar(a.id),
-              "Ausência aprovada.",
-              "Não foi possível aprovar. Tente de novo.",
-            )
-          }
-          onRecusar={(a) => {
-            setMotivo("");
-            setJanela({ tipo: "recusar", ausencia: a });
-          }}
-          onCancelar={(a) => setJanela({ tipo: "cancelar", ausencia: a })}
+          onResponder={(a) => setRespondendo(a)}
           onEditar={(a) => setEditando(a)}
           onExcluir={(a) => setJanela({ tipo: "excluir", ausencia: a })}
           onAnexar={pedirArquivo}
@@ -532,96 +487,16 @@ export function AbaFeriasEAusencias({
           {null}
         </Dialog>
 
-        <Dialog
-          aberto={janela?.tipo === "recusar"}
-          titulo="Recusar ausência?"
-          descricao={
-            janela
-              ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica recusada e sai do calendário.`
-              : ""
-          }
-          onFechar={() => setJanela(null)}
-          bloqueado={trabalhando}
-          rodape={
-            <FormActions>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setJanela(null)}
-              >
-                Voltar
-              </Button>
-              <Button
-                type="button"
-                className="ficha-ref__botao-perigo"
-                disabled={trabalhando}
-                onClick={() => {
-                  const alvo = janela?.ausencia;
-                  if (!alvo) return;
-                  void executar(
-                    () => servico.recusar(alvo.id, motivo.trim() || undefined),
-                    "Ausência recusada.",
-                    "Não foi possível recusar. Tente de novo.",
-                  );
-                }}
-              >
-                Recusar
-              </Button>
-            </FormActions>
-          }
-        >
-          <label className="ferias-ficha__campo">
-            <span>Motivo (opcional)</span>
-            <textarea
-              maxLength={500}
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-            />
-          </label>
-        </Dialog>
-
-        <Dialog
-          aberto={janela?.tipo === "cancelar"}
-          titulo="Cancelar ausência?"
-          descricao={
-            janela
-              ? `${rotuloDoTipo(janela.ausencia)} de ${datas(janela.ausencia)} fica cancelada. O registro continua no histórico.`
-              : ""
-          }
-          onFechar={() => setJanela(null)}
-          bloqueado={trabalhando}
-          rodape={
-            <FormActions>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setJanela(null)}
-              >
-                Voltar
-              </Button>
-              <Button
-                type="button"
-                className="ficha-ref__botao-perigo"
-                disabled={trabalhando}
-                onClick={() => {
-                  const alvo = janela?.ausencia;
-                  if (!alvo) return;
-                  void executar(
-                    () => servico.cancelar(alvo.id),
-                    "Ausência cancelada.",
-                    "Não foi possível cancelar. Tente de novo.",
-                  );
-                }}
-              >
-                Cancelar ausência
-              </Button>
-            </FormActions>
-          }
-        >
-          <p className="ficha-ref__janela-texto">
-            Se ainda descontava do saldo de férias, os dias voltam ao saldo.
-          </p>
-        </Dialog>
+        <ResponderAusenciaJanela
+          ausencia={respondendo}
+          servico={servico}
+          onFechar={() => setRespondendo(null)}
+          onRespondida={(aviso) => {
+            setRespondendo(null);
+            setAviso(aviso);
+            carregar(true);
+          }}
+        />
 
         <Dialog
           aberto={janela?.tipo === "remover-anexo"}
@@ -952,7 +827,9 @@ function ProximaAusencia({
   return (
     <Cartao
       titulo="Próxima ausência"
-      subtitulo={a ? ROTULO_DO_STATUS[a.status] : "Nada agendado por enquanto"}
+      subtitulo={
+        a ? ROTULO_DO_STATUS_NA_LISTA[a.status] : "Nada agendado por enquanto"
+      }
       icone={<IconeTempo tamanho={18} />}
       className="ferias-ficha__proxima"
     >
@@ -1011,9 +888,7 @@ function Historico({
   podeEditar,
   servico,
   onRegistrar,
-  onAprovar,
-  onRecusar,
-  onCancelar,
+  onResponder,
   onEditar,
   onExcluir,
   onAnexar,
@@ -1025,9 +900,7 @@ function Historico({
   readonly podeEditar: boolean;
   readonly servico: ServicoDeAusencias;
   readonly onRegistrar: () => void;
-  readonly onAprovar: (a: AusenciaApi) => void;
-  readonly onRecusar: (a: AusenciaApi) => void;
-  readonly onCancelar: (a: AusenciaApi) => void;
+  readonly onResponder: (a: AusenciaApi) => void;
   readonly onEditar: (a: AusenciaApi) => void;
   readonly onExcluir: (a: AusenciaApi) => void;
   readonly onAnexar: (a: AusenciaApi) => void;
@@ -1099,9 +972,7 @@ function Historico({
                     proxima={a.id === proximaId}
                     podeEditar={podeEditar}
                     servico={servico}
-                    onAprovar={onAprovar}
-                    onRecusar={onRecusar}
-                    onCancelar={onCancelar}
+                    onResponder={onResponder}
                     onEditar={onEditar}
                     onExcluir={onExcluir}
                     onAnexar={onAnexar}
@@ -1128,9 +999,7 @@ function LinhaDoHistorico({
   proxima,
   podeEditar,
   servico,
-  onAprovar,
-  onRecusar,
-  onCancelar,
+  onResponder,
   onEditar,
   onExcluir,
   onAnexar,
@@ -1142,9 +1011,7 @@ function LinhaDoHistorico({
   readonly proxima: boolean;
   readonly podeEditar: boolean;
   readonly servico: ServicoDeAusencias;
-  readonly onAprovar: (a: AusenciaApi) => void;
-  readonly onRecusar: (a: AusenciaApi) => void;
-  readonly onCancelar: (a: AusenciaApi) => void;
+  readonly onResponder: (a: AusenciaApi) => void;
   readonly onEditar: (a: AusenciaApi) => void;
   readonly onExcluir: (a: AusenciaApi) => void;
   readonly onAnexar: (a: AusenciaApi) => void;
@@ -1157,18 +1024,15 @@ function LinhaDoHistorico({
   const podeAlterar =
     !ENCERRADAS.has(a.status) && servico.alterar !== undefined;
   const podeExcluir = servico.excluir !== undefined;
-  const decisoes = decisoesDoStatus(a.status);
+  // Como a referência: o pedido pendente se responde; o resto edita ou sai.
+  const podeResponder = ESPERANDO_RESPOSTA.has(a.status);
   const podeAnexar =
     !a.anexo && !ENCERRADAS.has(a.status) && servico.enviarAnexo !== undefined;
   const podeRemover = Boolean(a.anexo) && servico.removerAnexo !== undefined;
   const temAcoes =
     podeEditar &&
-    (podeAlterar ||
-      podeExcluir ||
-      decisoes.length > 0 ||
-      podeAnexar ||
-      podeRemover);
-  const nomeDaLinha = `${ROTULO_DO_TIPO[a.tipo]} de ${formatarDiaCivil(a.inicio)}`;
+    (podeAlterar || podeExcluir || podeResponder || podeAnexar || podeRemover);
+  const nomeDaLinha = `${ROTULO_NA_LISTA[a.tipo]} de ${formatarDiaCivil(a.inicio)}`;
   return (
     <li className="ferias-ficha__item">
       <span
@@ -1187,7 +1051,7 @@ function LinhaDoHistorico({
           {rotuloDoTipo(a)}
         </span>
         <span className="ferias-ficha__suave">
-          {proxima ? "Próxima ausência" : ROTULO_DO_TIPO[a.tipo]}
+          {proxima ? "Próxima ausência" : ROTULO_NA_LISTA[a.tipo]}
         </span>
       </span>
       <span className="ferias-ficha__item-dias">
@@ -1210,7 +1074,7 @@ function LinhaDoHistorico({
           </button>
         ) : null}
         <StatusBadge variant={VARIANTE_DO_STATUS[a.status]}>
-          {ROTULO_DO_STATUS[a.status]}
+          {ROTULO_DO_STATUS_NA_LISTA[a.status]}
         </StatusBadge>
         {temAcoes ? (
           <DropdownMenu>
@@ -1221,6 +1085,15 @@ function LinhaDoHistorico({
               <IconeMaisAcoes tamanho={16} />
             </DropdownMenuTrigger>
             <DropdownMenuContent className="ficha-ref__menu">
+              {podeResponder ? (
+                <DropdownMenuItem
+                  className="ficha-ref__menu-item"
+                  onSelect={() => onResponder(a)}
+                >
+                  <IconeRegistrarAusencia tamanho={18} />
+                  Responder
+                </DropdownMenuItem>
+              ) : null}
               {podeAlterar ? (
                 <DropdownMenuItem
                   className="ficha-ref__menu-item"
@@ -1228,30 +1101,6 @@ function LinhaDoHistorico({
                 >
                   <IconeEditar tamanho={18} />
                   Editar
-                </DropdownMenuItem>
-              ) : null}
-              {decisoes.includes("aprovar") ? (
-                <DropdownMenuItem
-                  className="ficha-ref__menu-item"
-                  onSelect={() => onAprovar(a)}
-                >
-                  Aprovar
-                </DropdownMenuItem>
-              ) : null}
-              {decisoes.includes("recusar") ? (
-                <DropdownMenuItem
-                  className="ficha-ref__menu-item"
-                  onSelect={() => onRecusar(a)}
-                >
-                  Recusar
-                </DropdownMenuItem>
-              ) : null}
-              {decisoes.includes("cancelar") ? (
-                <DropdownMenuItem
-                  className="ficha-ref__menu-item"
-                  onSelect={() => onCancelar(a)}
-                >
-                  Cancelar ausência
                 </DropdownMenuItem>
               ) : null}
               {podeAnexar ? (

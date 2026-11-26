@@ -678,3 +678,131 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* T215 — linha como a referência: foto, ponto do tipo e o período em duas
+   linhas (datas e dias úteis). */
+.ausencias__colaborador {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.ausencias__avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+
+.ausencias__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ausencias__tipo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ausencias__ponto {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.ausencias__periodo {
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* T215 — "Responder solicitação": o pedido (calendário, tipo, dias e volta)
+   e os blocos de cada resposta. */
+.responder__pedido {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+.responder__calendario {
+  display: grid;
+  flex: none;
+  width: 3.25rem;
+  overflow: hidden;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.responder__mes {
+  padding: 2px 0;
+  background: var(--color-action);
+  color: var(--surface-canvas);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+}
+
+.responder__dia {
+  padding: var(--space-xxs) 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.responder__pedido-textos {
+  display: grid;
+  gap: 2px;
+}
+
+.responder__tipo {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.responder__pergunta {
+  margin-bottom: var(--space-sm);
+}
+
+.responder__bloco {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.responder__subtitulo,
+.responder__rotulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+/* T215 — o ⋯ da linha: Excluir em vermelho, depois de uma linha. */
+.ausencias__menu-divisor {
+  height: 1px;
+  margin: var(--space-xxs) 0;
+  background: var(--divisor-cor);
+}
+
+.ausencias__menu-perigo {
+  color: var(--status-danger-ink);
+}

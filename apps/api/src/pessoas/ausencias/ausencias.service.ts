@@ -52,6 +52,7 @@ import {
   RegistrarAusenciaDto,
   RegistrarReinicioDto,
   SimularAusenciaQueryDto,
+  SugerirAusenciaDto,
   SimularReinicioQueryDto,
 } from "./ausencias.dto";
 
@@ -72,6 +73,8 @@ export interface AusenciaApi {
   diasUteis: number | null;
   diasVendidos: number;
   periodoAquisitivo: { inicio: Dia; fim: Dia } | null;
+  /** T215 — "Sugerir outras datas": o período proposto, se houver. */
+  sugestao: { inicio: Dia; fim: Dia } | null;
   status: StatusAusencia;
   observacao: string | null;
   registradoEm: string;
@@ -86,6 +89,8 @@ export interface IndicadoresDeAusencias {
   faltasEsteMes: number;
   proximasFerias: number;
   pendentes: number;
+  /** T215 — pessoas fora hoje, com a ausência aprovada (número da aba). */
+  ausentesHoje: number;
 }
 
 export interface ListagemDeAusencias {
@@ -312,12 +317,24 @@ export class AusenciasService {
       faltasEsteMes,
       proximasFerias,
       pendentes,
+      ausentes,
     ] = await Promise.all([
       conta(filtroDoPeriodo("em_ferias_agora", hoje)),
       conta(filtroDoPeriodo("licencas_afastamentos", hoje)),
       conta(filtroDoPeriodo("faltas_mes", hoje)),
       conta(filtroDoPeriodo("proximas_ferias", hoje)),
       conta({ status: "aguardando_rh" }),
+      this.prisma.ausencia.findMany({
+        where: {
+          empresaId,
+          excluidaEm: null,
+          status: { in: ["aprovada", "cancelamento_pedido"] },
+          inicio: { lte: dataDoDia(hoje) },
+          OR: [{ fim: null }, { fim: { gte: dataDoDia(hoje) } }],
+        },
+        select: { colaboradorId: true },
+        distinct: ["colaboradorId"],
+      }),
     ]);
     return {
       emFeriasAgora,
@@ -325,6 +342,7 @@ export class AusenciasService {
       faltasEsteMes,
       proximasFerias,
       pendentes,
+      ausentesHoje: ausentes.length,
     };
   }
 
@@ -668,7 +686,9 @@ export class AusenciasService {
           status: destino,
           decididoPorId: ctx.actor.id,
           decididoEm: new Date(),
-          ...(decisao === "recusar" ? { motivoDecisao: motivo ?? null } : {}),
+          ...(decisao === "recusar" || decisao === "aprovar"
+            ? { motivoDecisao: motivo ?? null }
+            : {}),
         },
         include: INCLUSAO,
       });
@@ -680,6 +700,97 @@ export class AusenciasService {
           : destino === "recusada"
             ? "pessoas_ausencia_recusada"
             : "pessoas_ausencia_cancelada",
+        "ausencia",
+        atual.id,
+        empresaId,
+      );
+      return atualizada;
+    });
+    const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
+    return paraApi(linha, fotos, veAnexo(ctx));
+  }
+
+  /**
+   * "Sugerir outras datas" (como a referência): o pedido pendente fica em
+   * "Ajuste sugerido", com o novo período e a mensagem; quem pediu aceita ou
+   * pede outra data (pelo Portal, quando ele existir).
+   */
+  async sugerir(
+    ausenciaId: string,
+    dto: SugerirAusenciaDto,
+    ctx: PessoasAuditContext,
+  ): Promise<AusenciaApi> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const linha = await this.prisma.$transaction(async (tx) => {
+      const atual = await tx.ausencia.findFirst({
+        where: { id: ausenciaId, empresaId, excluidaEm: null },
+        include: INCLUSAO,
+      });
+      if (!atual) {
+        return this.auditoria.negarAcesso(
+          ctx,
+          "ausencia",
+          ausenciaId,
+          empresaId,
+        );
+      }
+      if (
+        !PENDENTES.includes(atual.status) ||
+        atual.status === "ajuste_sugerido"
+      ) {
+        throw new ConflictException();
+      }
+      if (dto.fim < dto.inicio) {
+        throw new CamposRecusadosException([
+          { campo: "fim", motivo: "fim_antes_do_inicio" },
+        ]);
+      }
+      if (
+        dto.inicio === diaDe(atual.inicio) &&
+        dto.fim === (atual.fim ? diaDe(atual.fim) : null)
+      ) {
+        throw new CamposRecusadosException([
+          { campo: "inicio", motivo: "igual_ao_pedido" },
+        ]);
+      }
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ausencia:${atual.colaboradorId}:${empresaId}`}))`;
+      const outras = await tx.ausencia.findMany({
+        where: {
+          colaboradorId: atual.colaboradorId,
+          empresaId,
+          status: { in: [...STATUS_QUE_OCUPAM] },
+          excluidaEm: null,
+          id: { not: atual.id },
+        },
+      });
+      if (
+        outras.some((a) =>
+          seSobrepoem(
+            { inicio: diaDe(a.inicio), fim: a.fim ? diaDe(a.fim) : null },
+            { inicio: dto.inicio, fim: dto.fim },
+          ),
+        )
+      ) {
+        throw new ConflitoDeCamposException([
+          { campo: "inicio", motivo: "sobreposicao" },
+        ]);
+      }
+      const atualizada = await tx.ausencia.update({
+        where: { id: atual.id },
+        data: {
+          status: "ajuste_sugerido",
+          sugestaoInicio: dataDoDia(dto.inicio),
+          sugestaoFim: dataDoDia(dto.fim),
+          motivoDecisao: dto.mensagem ?? null,
+          decididoPorId: ctx.actor.id,
+          decididoEm: new Date(),
+        },
+        include: INCLUSAO,
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_ausencia_ajuste_sugerido",
         "ausencia",
         atual.id,
         empresaId,
@@ -1312,6 +1423,13 @@ function paraApi(
     periodoAquisitivo: periodo
       ? { inicio: periodo, fim: fimDoPeriodo(periodo) }
       : null,
+    sugestao:
+      linha.sugestaoInicio && linha.sugestaoFim
+        ? {
+            inicio: diaDe(linha.sugestaoInicio),
+            fim: diaDe(linha.sugestaoFim),
+          }
+        : null,
     status: linha.status,
     observacao: linha.observacao,
     registradoEm: linha.criadoEm.toISOString(),

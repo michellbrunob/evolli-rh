@@ -726,6 +726,10 @@ describe("T215 — Férias e ausências (e2e)", () => {
         licencasEAfastamentos: 1,
         faltasEsteMes: 2,
         pendentes: expect.any(Number),
+        // Como a referência (número da aba): pessoas fora hoje, com a
+        // ausência aprovada — a Bia (férias) e o Caio (afastamento); as
+        // faltas ainda pendentes não contam.
+        ausentesHoje: 2,
       });
       expect(corpo.indicadores.pendentes).toBeGreaterThanOrEqual(2);
       const daB = await get("/v1/ausencias", rhB).expect(200);
@@ -767,7 +771,7 @@ describe("T215 — Férias e ausências (e2e)", () => {
         "pessoas_ausencia_aprovada",
       ]);
       await post(`/v1/ausencias/${faltaDaDuda}/recusar`, rhA)
-        .send()
+        .send({ motivo: "Tarde demais" })
         .expect(409);
     });
 
@@ -1392,6 +1396,136 @@ describe("T215 — Férias e ausências (e2e)", () => {
         .expect(201);
       await del(`${rota(id)}/${r.body.id}`, rhB).expect(404);
       await del(`${rota(id)}/${r.body.id}`, masterA).expect(403);
+    });
+  });
+
+  describe("responder solicitação (como a referência)", () => {
+    async function pendente(
+      colaboradorId: string,
+      inicio: string,
+      fim = inicio,
+    ): Promise<string> {
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId,
+          tipo: "day_off",
+          inicio,
+          fim,
+          aprovada: false,
+        })
+        .expect(201);
+      return r.body.id as string;
+    }
+
+    it("aprovar com mensagem: guarda a mensagem; acima de 1000 caracteres, 400", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 130);
+      const id = await pendente(pessoa, dia);
+      await post(`/v1/ausencias/${id}/aprovar`, rhA)
+        .send({ mensagem: "x".repeat(1001) })
+        .expect(400);
+      await post(`/v1/ausencias/${id}/aprovar`, rhA)
+        .send({ mensagem: "  Boa folga!  " })
+        .expect(200);
+      const linha = await prisma.ausencia.findUniqueOrThrow({ where: { id } });
+      expect(linha.status).toBe("aprovada");
+      expect(linha.motivoDecisao).toBe("Boa folga!");
+    });
+
+    it("recusar exige o motivo", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const id = await pendente(pessoa, somarDias(HOJE, 132));
+      await post(`/v1/ausencias/${id}/recusar`, rhA).send().expect(400);
+      await post(`/v1/ausencias/${id}/recusar`, rhA)
+        .send({ motivo: "   " })
+        .expect(400);
+      await post(`/v1/ausencias/${id}/recusar`, rhA)
+        .send({ motivo: "y".repeat(1001) })
+        .expect(400);
+      await post(`/v1/ausencias/${id}/recusar`, rhA)
+        .send({ motivo: "Equipe já desfalcada nesse dia" })
+        .expect(200);
+    });
+
+    it("sugerir outras datas: ajuste sugerido, com o novo período e a mensagem; trilha", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 134);
+      const id = await pendente(pessoa, dia);
+      const r = await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({
+          inicio: somarDias(dia, 1),
+          fim: somarDias(dia, 1),
+          mensagem: "  Pode ser no dia seguinte?  ",
+        })
+        .expect(200);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toMatchObject({
+        id,
+        status: "ajuste_sugerido",
+        inicio: dia,
+        sugestao: { inicio: somarDias(dia, 1), fim: somarDias(dia, 1) },
+      });
+      const linha = await prisma.ausencia.findUniqueOrThrow({ where: { id } });
+      expect(linha.motivoDecisao).toBe("Pode ser no dia seguinte?");
+      expect(linha.decididoPorId).toEqual(expect.any(String));
+      expect((await trilha(id)).map((e) => e.action)).toEqual([
+        "pessoas_ausencia_registrada",
+        "pessoas_ausencia_ajuste_sugerido",
+      ]);
+      // Já respondida: sugerir de novo é 409.
+      await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({ inicio: somarDias(dia, 2), fim: somarDias(dia, 2) })
+        .expect(409);
+    });
+
+    it("sugerir: datas iguais às pedidas, fim antes do início e sobreposição são recusados", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 140);
+      const id = await pendente(pessoa, dia);
+      await pendente(pessoa, somarDias(dia, 3));
+      const igual = await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({ inicio: dia, fim: dia })
+        .expect(422);
+      expect(igual.body.erros).toEqual([
+        { campo: "inicio", motivo: "igual_ao_pedido" },
+      ]);
+      const invertido = await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({ inicio: somarDias(dia, 2), fim: somarDias(dia, 1) })
+        .expect(422);
+      expect(invertido.body.erros).toEqual([
+        { campo: "fim", motivo: "fim_antes_do_inicio" },
+      ]);
+      const cruzada = await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({ inicio: somarDias(dia, 3), fim: somarDias(dia, 3) })
+        .expect(409);
+      expect(cruzada.body.erros).toEqual([
+        { campo: "inicio", motivo: "sobreposicao" },
+      ]);
+      await post(`/v1/ausencias/${id}/sugerir`, rhA)
+        .send({
+          inicio: somarDias(dia, 1),
+          fim: somarDias(dia, 1),
+          mensagem: "z".repeat(1001),
+        })
+        .expect(400);
+    });
+
+    it("sugerir: aprovada é 409; outra empresa 404; master 403; sem CSRF 403", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 150);
+      const id = await pendente(pessoa, dia);
+      const corpo = { inicio: somarDias(dia, 1), fim: somarDias(dia, 1) };
+      await post(`/v1/ausencias/${id}/sugerir`, rhB).send(corpo).expect(404);
+      await post(`/v1/ausencias/${id}/sugerir`, masterA)
+        .send(corpo)
+        .expect(403);
+      await agent()
+        .post(`/v1/ausencias/${id}/sugerir`)
+        .set("Cookie", rhA.cookie)
+        .send(corpo)
+        .expect(403);
+      await post(`/v1/ausencias/${id}/aprovar`, rhA).send().expect(200);
+      await post(`/v1/ausencias/${id}/sugerir`, rhA).send(corpo).expect(409);
     });
   });
 

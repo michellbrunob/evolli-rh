@@ -7,13 +7,20 @@
 import { NumeroSuave } from "../../../ui/movimento";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Button, EmptyState, StatusBadge } from "../../../components";
+import {
+  Button,
+  EmptyState,
+  FormActions,
+  StatusBadge,
+} from "../../../components";
 import type { StatusVariant } from "../../../components";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Button as BotaoUi,
+  Dialog,
   Table,
   TableBody,
   TableCaption,
@@ -29,8 +36,8 @@ import {
   IconeCalendario,
   IconeConfiguracoes,
   IconeMaisAcoes,
+  IconeRemover,
 } from "../../../ui/icones";
-import { formatarDiaCivil } from "../../../format/data";
 import { RegistrarAusenciaGaveta } from "./RegistrarAusenciaGaveta";
 import {
   type AusenciaApi,
@@ -43,9 +50,15 @@ import {
   OPCOES_DE_PERIODO,
   OPCOES_DE_STATUS,
   OPCOES_DE_TIPO,
-  ROTULO_DO_STATUS,
-  ROTULO_DO_TIPO,
+  ROTULO_DO_STATUS_NA_LISTA,
+  ROTULO_NA_LISTA,
+  textoDaExclusao,
 } from "./tiposAusencia";
+import { ResponderAusenciaJanela } from "./ResponderAusenciaJanela";
+import { COR_DO_TIPO } from "./aparenciaDoTipo";
+import { formatarIntervaloDeDias } from "../../../format/data";
+import { FotoDoColaborador } from "../FotoDoColaborador";
+import { iniciaisDe } from "../iniciais";
 import "./FeriasEAusencias.css";
 
 const TAMANHO_DA_PAGINA = 20;
@@ -69,19 +82,31 @@ export function CartoesDeAusencias({
   readonly indicadores: IndicadoresDeAusencias | null;
 }) {
   const base = useId();
+  // O sufixo concorda com o número ("1 pessoa", "2 pessoas").
   const cartoes = [
-    ["Em férias agora", indicadores?.emFeriasAgora, "pessoas"],
+    ["Em férias agora", indicadores?.emFeriasAgora, "pessoa", "pessoas"],
     [
       "Licenças e afastamentos",
       indicadores?.licencasEAfastamentos,
       "em andamento",
+      "em andamento",
     ],
-    ["Faltas este mês", indicadores?.faltasEsteMes, "registradas"],
-    ["Próximas férias", indicadores?.proximasFerias, "nos próximos 30 dias"],
+    [
+      "Faltas este mês",
+      indicadores?.faltasEsteMes,
+      "registrada",
+      "registradas",
+    ],
+    [
+      "Próximas férias",
+      indicadores?.proximasFerias,
+      "nos próximos 30 dias",
+      "nos próximos 30 dias",
+    ],
   ] as const;
   return (
     <div className="ausencias-cartoes">
-      {cartoes.map(([titulo, numero, sufixo], i) => (
+      {cartoes.map(([titulo, numero, singular, plural], i) => (
         <div
           key={titulo}
           className="ausencias-cartoes__cartao"
@@ -95,7 +120,9 @@ export function CartoesDeAusencias({
             <span className="ausencias-cartoes__numero">
               {numero === undefined ? "…" : <NumeroSuave valor={numero} />}
             </span>
-            <span className="ausencias-cartoes__sufixo">{sufixo}</span>
+            <span className="ausencias-cartoes__sufixo">
+              {numero === 1 ? singular : plural}
+            </span>
           </p>
         </div>
       ))}
@@ -152,40 +179,25 @@ function FiltroDaBarra<T extends string>({
   );
 }
 
-function periodoDaLinha(a: AusenciaApi): string {
-  if (!a.fim) return `Desde ${formatarDiaCivil(a.inicio)} · sem data de volta`;
-  const datas =
-    a.inicio === a.fim
-      ? formatarDiaCivil(a.inicio)
-      : `${formatarDiaCivil(a.inicio)} – ${formatarDiaCivil(a.fim)}`;
-  const dias = a.dias === 1 ? "1 dia" : `${a.dias} dias`;
-  return a.diasVendidos > 0
-    ? `${datas} · ${dias} + ${a.diasVendidos} vendidos`
-    : `${datas} · ${dias}`;
+/** A segunda linha do período: os dias úteis (como a referência). */
+function diasDaLinha(a: AusenciaApi): string {
+  if (!a.fim || a.diasUteis === null) return "Sem data de volta";
+  const uteis = a.diasUteis === 1 ? "1 dia útil" : `${a.diasUteis} dias úteis`;
+  if (a.diasVendidos === 0) return uteis;
+  return `${uteis} · ${a.diasVendidos} ${a.diasVendidos === 1 ? "vendido" : "vendidos"}`;
 }
 
-/** As ações que cada status permite a quem decide. */
-function acoesDoStatus(
-  status: StatusAusencia,
-): readonly ("aprovar" | "recusar" | "cancelar")[] {
-  switch (status) {
-    case "aguardando_rh":
-    case "aguardando_gestor":
-    case "ajuste_sugerido":
-      return ["aprovar", "recusar", "cancelar"];
-    case "cancelamento_pedido":
-    case "aprovada":
-      return ["cancelar"];
-    default:
-      return [];
-  }
-}
+/** Os status que esperam a resposta de quem decide ("Responder"). */
+const ESPERANDO_RESPOSTA: ReadonlySet<StatusAusencia> = new Set([
+  "aguardando_rh",
+  "aguardando_gestor",
+]);
 
-const ROTULO_DA_ACAO = {
-  aprovar: "Aprovar",
-  recusar: "Recusar",
-  cancelar: "Cancelar",
-} as const;
+/** Editar: só o que ainda vale (cancelada e recusada só saem). */
+const ENCERRADAS: ReadonlySet<StatusAusencia> = new Set([
+  "cancelada",
+  "recusada",
+]);
 
 export function FeriasEAusenciasAba({
   servico,
@@ -216,6 +228,11 @@ export function FeriasEAusenciasAba({
   const [releitura, setReleitura] = useState(0);
   const [gavetaAberta, setGavetaAberta] = useState(false);
   const [aviso, setAviso] = useState("");
+  // Como a referência: Responder, Editar e Excluir no ⋯ da linha.
+  const [respondendo, setRespondendo] = useState<AusenciaApi | null>(null);
+  const [editando, setEditando] = useState<AusenciaApi | null>(null);
+  const [aExcluir, setAExcluir] = useState<AusenciaApi | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
   const onIndicadoresRef = useRef(onIndicadores);
   onIndicadoresRef.current = onIndicadores;
 
@@ -260,25 +277,18 @@ export function FeriasEAusenciasAba({
 
   const reler = useCallback(() => setReleitura((n) => n + 1), []);
 
-  async function decidir(
-    acao: "aprovar" | "recusar" | "cancelar",
-    a: AusenciaApi,
-  ) {
-    setAviso("");
+  async function excluir(a: AusenciaApi) {
+    if (!servico.excluir) return;
+    setExcluindo(true);
     try {
-      if (acao === "aprovar") await servico.aprovar(a.id);
-      else if (acao === "recusar") await servico.recusar(a.id);
-      else await servico.cancelar(a.id);
-      setAviso(
-        acao === "aprovar"
-          ? "Ausência aprovada."
-          : acao === "recusar"
-            ? "Ausência recusada."
-            : "Ausência cancelada.",
-      );
+      await servico.excluir(a.id);
+      setAExcluir(null);
+      setAviso("Ausência excluída.");
       reler();
     } catch {
-      setAviso("Não foi possível concluir a ação. Tente de novo.");
+      setAviso("Não foi possível excluir. Tente de novo.");
+    } finally {
+      setExcluindo(false);
     }
   }
 
@@ -398,28 +408,61 @@ export function FeriasEAusenciasAba({
             </TableHeader>
             <TableBody>
               {itens.map((a) => {
-                const acoes = podeDecidir ? acoesDoStatus(a.status) : [];
+                const podeResponder =
+                  podeDecidir && ESPERANDO_RESPOSTA.has(a.status);
+                const podeEditar =
+                  podeDecidir &&
+                  !ENCERRADAS.has(a.status) &&
+                  servico.alterar !== undefined;
+                const podeExcluir =
+                  podeDecidir && servico.excluir !== undefined;
                 return (
                   <TableRow key={a.id}>
                     <TableCell>
-                      <span className="ausencias__pessoa">
-                        <span className="ausencias__nome">
-                          {a.colaborador.nome}
-                        </span>
-                        <span className="ausencias__cargo">
-                          {a.colaborador.cargo ?? "Sem cargo"}
+                      <span className="ausencias__colaborador">
+                        <FotoDoColaborador
+                          colaboradorId={a.colaborador.id}
+                          foto={a.colaborador.foto}
+                          tamanho={96}
+                          className="ausencias__avatar"
+                        >
+                          {iniciaisDe(a.colaborador.nome)}
+                        </FotoDoColaborador>
+                        <span className="ausencias__pessoa">
+                          <span className="ausencias__nome">
+                            {a.colaborador.nome}
+                          </span>
+                          <span className="ausencias__cargo">
+                            {a.colaborador.cargo ?? "Sem cargo"}
+                          </span>
                         </span>
                       </span>
                     </TableCell>
-                    <TableCell>{ROTULO_DO_TIPO[a.tipo]}</TableCell>
-                    <TableCell>{periodoDaLinha(a)}</TableCell>
+                    <TableCell>
+                      <span className="ausencias__tipo">
+                        <span
+                          className="ausencias__ponto"
+                          style={{ background: COR_DO_TIPO[a.tipo] }}
+                          aria-hidden="true"
+                        />
+                        {ROTULO_NA_LISTA[a.tipo]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="ausencias__periodo">
+                        <span>{formatarIntervaloDeDias(a.inicio, a.fim)}</span>
+                        <span className="ausencias__cargo">
+                          {diasDaLinha(a)}
+                        </span>
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <StatusBadge variant={VARIANTE_DO_STATUS[a.status]}>
-                        {ROTULO_DO_STATUS[a.status]}
+                        {ROTULO_DO_STATUS_NA_LISTA[a.status]}
                       </StatusBadge>
                     </TableCell>
                     <TableCell>
-                      {acoes.length > 0 ? (
+                      {podeResponder || podeEditar || podeExcluir ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             className="ausencias__acoes"
@@ -428,14 +471,29 @@ export function FeriasEAusenciasAba({
                             <IconeMaisAcoes tamanho={18} />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            {acoes.map((acao) => (
+                            {podeResponder ? (
                               <DropdownMenuItem
-                                key={acao}
-                                onSelect={() => void decidir(acao, a)}
+                                onSelect={() => setRespondendo(a)}
                               >
-                                {ROTULO_DA_ACAO[acao]}
+                                Responder
                               </DropdownMenuItem>
-                            ))}
+                            ) : null}
+                            {podeEditar ? (
+                              <DropdownMenuItem onSelect={() => setEditando(a)}>
+                                Editar
+                              </DropdownMenuItem>
+                            ) : null}
+                            {podeExcluir ? (
+                              <>
+                                <RadixMenu.Separator className="ausencias__menu-divisor" />
+                                <DropdownMenuItem
+                                  className="ausencias__menu-perigo"
+                                  onSelect={() => setAExcluir(a)}
+                                >
+                                  Excluir
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : null}
@@ -451,7 +509,7 @@ export function FeriasEAusenciasAba({
       {itens.length > 0 ? (
         <div className="ausencias__rodape">
           <p className="ausencias__resultados">
-            {total === 1 ? "1 resultado" : `${total} resultados`}
+            {total === 1 ? "1 registro" : `${total} registros`}
           </p>
           {totalPaginas > 1 ? (
             <nav
@@ -477,6 +535,62 @@ export function FeriasEAusenciasAba({
           ) : null}
         </div>
       ) : null}
+
+      <RegistrarAusenciaGaveta
+        aberta={editando !== null}
+        editando={editando}
+        servico={servico}
+        onFechar={() => setEditando(null)}
+        onRegistrada={() => undefined}
+        onAlterada={(_alterada, avisoDoAnexo) => {
+          setEditando(null);
+          setAviso(avisoDoAnexo ?? "Ausência alterada.");
+          reler();
+        }}
+      />
+
+      <ResponderAusenciaJanela
+        ausencia={respondendo}
+        servico={servico}
+        onFechar={() => setRespondendo(null)}
+        onRespondida={(texto) => {
+          setRespondendo(null);
+          setAviso(texto);
+          reler();
+        }}
+      />
+
+      <Dialog
+        aberto={aExcluir !== null}
+        titulo="Excluir esta ausência?"
+        icone={<IconeRemover tamanho={20} />}
+        descricao={
+          aExcluir ? textoDaExclusao(aExcluir, aExcluir.colaborador.nome) : ""
+        }
+        onFechar={() => setAExcluir(null)}
+        bloqueado={excluindo}
+        rodape={
+          <FormActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setAExcluir(null)}
+            >
+              Cancelar
+            </Button>
+            <BotaoUi
+              type="button"
+              variant="danger"
+              disabled={excluindo}
+              onClick={() => aExcluir && void excluir(aExcluir)}
+            >
+              Excluir
+            </BotaoUi>
+          </FormActions>
+        }
+      >
+        {null}
+      </Dialog>
 
       <RegistrarAusenciaGaveta
         aberta={gavetaAberta}

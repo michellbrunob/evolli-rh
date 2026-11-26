@@ -628,6 +628,21 @@ export function ColaboradoresScreen({
   /** T215 — os números da aba Férias e ausências (cartões e aba). */
   const [indicadoresDeAusencias, setIndicadoresDeAusencias] =
     useState<IndicadoresDeAusencias | null>(null);
+  // O número da aba (quem está fora hoje) já na abertura, como a referência.
+  useEffect(() => {
+    if (!servicoDeAusencias) return;
+    const controle = new AbortController();
+    servicoDeAusencias
+      .listar({ pagina: 1, tamanhoPagina: 1 }, { signal: controle.signal })
+      .then(
+        (r) => {
+          if (!controle.signal.aborted)
+            setIndicadoresDeAusencias(r.indicadores);
+        },
+        () => undefined,
+      );
+    return () => controle.abort();
+  }, [servicoDeAusencias]);
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
   const idDoPainel = `${prefixo}-painel`;
@@ -1743,7 +1758,7 @@ export function ColaboradoresScreen({
             const selecionada = a === aba;
             const numero =
               a === "ferias" && indicadoresDeAusencias
-                ? indicadoresDeAusencias.pendentes
+                ? (indicadoresDeAusencias.ausentesHoje ?? 0)
                 : contadores
                   ? totalDaAba(a, contadores)
                   : null;

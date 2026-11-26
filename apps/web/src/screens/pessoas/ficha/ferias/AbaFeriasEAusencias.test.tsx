@@ -492,9 +492,7 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     expect(within(proxima).getByText("07")).toBeInTheDocument();
     expect(within(proxima).getByText("dez")).toBeInTheDocument();
     expect(within(proxima).getByText("Férias")).toBeInTheDocument();
-    expect(
-      within(proxima).getByText("07/12/2026 a 26/12/2026"),
-    ).toBeInTheDocument();
+    expect(within(proxima).getByText("07/12 – 26/12/2026")).toBeInTheDocument();
     expect(within(proxima).getByText("13 dias úteis")).toBeInTheDocument();
   });
 
@@ -537,13 +535,15 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     // A próxima ausência é dita na própria linha.
     expect(within(itens[0]!).getByText("Próxima ausência")).toBeInTheDocument();
     expect(
-      within(itens[0]!).getByText("07/12/2026 a 26/12/2026"),
+      within(itens[0]!).getByText("07/12 – 26/12/2026"),
     ).toBeInTheDocument();
     expect(within(itens[0]!).getByText("13 dias úteis")).toBeInTheDocument();
-    expect(within(itens[1]!).getAllByText("Day off")).toHaveLength(2);
+    expect(within(itens[1]!).getAllByText("Day off aniversário")).toHaveLength(
+      2,
+    );
     expect(within(itens[1]!).getByText("02/03/2026")).toBeInTheDocument();
     expect(within(itens[1]!).getByText("1 dia útil")).toBeInTheDocument();
-    expect(within(itens[1]!).getByText("Aguardando o RH")).toBeInTheDocument();
+    expect(within(itens[1]!).getByText("Pendente")).toBeInTheDocument();
     expect(
       within(itens[2]!).getByRole("button", {
         name: "Baixar anexo de Licença médica de 04/08/2025 (PDF, 120 KB)",
@@ -577,59 +577,53 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     ).not.toHaveLength(0);
   });
 
-  it("aprovar: chama o servidor, avisa e relê a ficha", async () => {
+  it("pendente: ⋯ com Responder, Editar e Excluir; Responder aprova, avisa e relê", async () => {
     const { consultar, s } = montar();
     fireEvent.pointerDown(
       await screen.findByRole("button", {
-        name: "Ações de Day off de 02/03/2026",
+        name: "Ações de Day off aniversário de 02/03/2026",
       }),
       { button: 0, ctrlKey: false },
     );
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Aprovar" }));
-    await waitFor(() => expect(s.aprovar).toHaveBeenCalledWith("a-3"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual([
+      "Responder",
+      "Editar",
+      "Anexar atestado ou documento",
+      "Excluir",
+    ]);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Responder" }));
+    const janela = await screen.findByRole("dialog", {
+      name: "Responder solicitação",
+    });
+    await act(async () => {
+      fireEvent.click(
+        within(janela).getByRole("button", { name: "Aprovar pedido" }),
+      );
+    });
+    expect(s.aprovar).toHaveBeenCalledWith("a-3", undefined);
     expect(await screen.findByText("Ausência aprovada.")).toBeInTheDocument();
     await waitFor(() => expect(consultar).toHaveBeenCalledTimes(2));
   });
 
-  it("recusar: pede confirmação com motivo opcional", async () => {
-    const { s } = montar();
-    fireEvent.pointerDown(
-      await screen.findByRole("button", {
-        name: "Ações de Day off de 02/03/2026",
-      }),
-      { button: 0, ctrlKey: false },
-    );
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Recusar" }));
-    const janela = await screen.findByRole("dialog", {
-      name: "Recusar ausência?",
-    });
-    fireEvent.change(within(janela).getByLabelText("Motivo (opcional)"), {
-      target: { value: "Fora do prazo" },
-    });
-    fireEvent.click(within(janela).getByRole("button", { name: "Recusar" }));
-    await waitFor(() =>
-      expect(s.recusar).toHaveBeenCalledWith("a-3", "Fora do prazo"),
-    );
-  });
-
-  it("cancelar: pede confirmação", async () => {
-    const { s } = montar();
+  it("aprovada: ⋯ sem Responder e sem Cancelar (como a referência)", async () => {
+    montar();
     fireEvent.pointerDown(
       await screen.findByRole("button", {
         name: "Ações de Férias de 07/12/2026",
       }),
       { button: 0, ctrlKey: false },
     );
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Cancelar ausência" }),
-    );
-    const janela = await screen.findByRole("dialog", {
-      name: "Cancelar ausência?",
-    });
-    fireEvent.click(
-      within(janela).getByRole("button", { name: "Cancelar ausência" }),
-    );
-    await waitFor(() => expect(s.cancelar).toHaveBeenCalledWith("a-1"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Editar", "Anexar atestado ou documento", "Excluir"]);
   });
 
   it("anexar pela linha: escolhe o arquivo e envia", async () => {
@@ -804,7 +798,7 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     let janela = await abrir();
     expect(
       within(janela).getByText(
-        "As férias de Ana Teste Lima (07/12/2026 a 26/12/2026) serão removidas do histórico e do calendário. Essa ação não pode ser desfeita.",
+        "As férias de Ana Teste Lima (07/12 – 26/12/2026) serão removidas do histórico e do calendário. Essa ação não pode ser desfeita.",
       ),
     ).toBeInTheDocument();
     fireEvent.click(within(janela).getByRole("button", { name: "Cancelar" }));
