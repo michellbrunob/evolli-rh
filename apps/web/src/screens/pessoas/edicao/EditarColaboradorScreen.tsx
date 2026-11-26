@@ -124,6 +124,8 @@ import {
   profissionaisDe,
   validarProfissionais,
 } from "./dadosProfissionais";
+import { SecaoDependentes } from "./SecaoDependentes";
+import "./SecaoDependentes.css";
 import { SecaoDadosProfissionais } from "./SecaoDadosProfissionais";
 import {
   type StatusDoColaboradorValor,
@@ -1452,6 +1454,8 @@ export function EditarColaboradorScreen({
                     </div>
                   </LinhaDoCadastro>
                 </SecaoDoCadastro>
+              ) : secao === "dependentes" ? (
+                <SecaoDependentes colaboradorId={colaboradorId} podeOperar />
               ) : secao === "documentos" ? (
                 <div className="editar-colaborador__documentos">
                   <ArquivosDoColaborador

@@ -90,6 +90,8 @@ import { RegistrarAusenciaGaveta } from "../ferias/RegistrarAusenciaGaveta";
 import { servicoDeAusenciasDoServidor } from "../ferias/servicoDeAusenciasDoServidor";
 import type { ServicoDeAusencias } from "../ferias/tiposAusencia";
 import { AbaEscala } from "./escala/AbaEscala";
+import { rotaDoDestino } from "../../../app/rotasDoShell";
+import { AbaBeneficios } from "./beneficios/AbaBeneficios";
 import { primeiroNome } from "../tratamento";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
@@ -1068,6 +1070,22 @@ export function FichaDoColaborador({
                 onMudou={() => setVersaoDaEscala((v) => v + 1)}
                 local={lotacao.unidade || null}
                 hoje={hoje}
+              />
+            ) : null
+          ) : aba === "beneficios" ? (
+            // Só com o colaborador confirmado na empresa ativa.
+            dados ? (
+              <AbaBeneficios
+                colaboradorId={colaboradorId}
+                primeiroNome={primeiroNome(nome)}
+                {...(podeEditar
+                  ? {
+                      onAbrirBeneficios: () => {
+                        window.location.hash =
+                          rotaDoDestino("beneficios") ?? "";
+                      },
+                    }
+                  : {})}
               />
             ) : null
           ) : aba === "documentos" ? (

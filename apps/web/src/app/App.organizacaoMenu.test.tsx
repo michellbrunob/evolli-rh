@@ -284,6 +284,8 @@ describe("T211 — árvore do menu", () => {
       "Dashboard",
       "Gestão de Pessoas",
       "Liderança",
+      // T215 — Benefícios (Remuneração).
+      "Benefícios",
       // T215 — Segurança (Sessões ativas e Permissões de acesso).
       "Segurança",
       "Configurações",

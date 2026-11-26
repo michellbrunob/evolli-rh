@@ -147,6 +147,11 @@ import {
   PoliticasFeriasScreen,
 } from "../screens/pessoas/ferias/politicas/PoliticasFeriasScreen";
 import { servicoDePoliticasDoServidor } from "../screens/pessoas/ferias/politicas/servicoDePoliticas";
+import {
+  BENEFICIOS_TITULO_ID,
+  BeneficiosModulo,
+} from "../screens/beneficios/BeneficiosModulo";
+import { servicoDeBeneficiosDoServidor } from "../screens/beneficios/servicoDeBeneficios";
 import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
@@ -317,6 +322,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
   "politicas-ferias": POLITICAS_FERIAS_TITULO_ID,
+  beneficios: BENEFICIOS_TITULO_ID,
   // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
   "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
   "turnos-escala": TURNOS_TITULO_ID,
@@ -714,6 +720,20 @@ function conteudoDoDestino(
         {...(podeEditarFicha(admissao.papelDoAtor)
           ? { onAbrirPoliticasDeFerias: () => onNavegar("politicas-ferias") }
           : {})}
+      />
+    );
+  }
+  if (destinoId === "beneficios") {
+    return (
+      <BeneficiosModulo
+        servico={servicoDeBeneficiosDoServidor}
+        podeEditar={podeEditarFicha(admissao.papelDoAtor)}
+        onAbrirFicha={(colaboradorId) => {
+          window.location.hash = rotaDaFicha({
+            colaboradorId,
+            aba: "beneficios",
+          });
+        }}
       />
     );
   }

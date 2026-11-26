@@ -690,6 +690,11 @@ export class BeneficiosService {
     dto: BeneficioInformado & {
       competencia?: string;
       incluirDesligados?: boolean;
+      pessoas?: {
+        colaboradorId: string;
+        planoId?: string | null;
+        valorIndividual?: number | null;
+      }[];
     },
     ctx: PessoasAuditContext,
   ): Promise<PreviaApi> {
@@ -766,14 +771,19 @@ export class BeneficiosService {
       regras,
       c,
       cal,
-      [...pessoas.values()].map((pessoa) => ({
-        pessoa,
-        planoId: null,
-        valorIndividual: null,
-        ajuste: null,
-        ajustado: false,
-        dependentes: [],
-      })),
+      [...pessoas.values()].map((pessoa) => {
+        const marcada = dto.pessoas?.find(
+          (x) => x.colaboradorId === pessoa.colaboradorId,
+        );
+        return {
+          pessoa,
+          planoId: marcada?.planoId ?? null,
+          valorIndividual: marcada?.valorIndividual ?? null,
+          ajuste: null,
+          ajustado: false,
+          dependentes: [],
+        };
+      }),
     );
     return {
       competencia: c,

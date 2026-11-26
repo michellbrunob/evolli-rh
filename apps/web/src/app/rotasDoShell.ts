@@ -50,6 +50,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T215 — Políticas de férias, sub-página de Colaboradores (engrenagem da
   // aba Férias e ausências).
   "politicas-ferias": "#/pessoas/politicas-ferias",
+  // T215 — o módulo Benefícios (as subtelas vivem dentro dele).
+  beneficios: "#/beneficios",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
   // sub-página dele.

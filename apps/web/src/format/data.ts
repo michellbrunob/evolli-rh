@@ -522,3 +522,39 @@ export function formatarIntervaloDeDias(
   }
   return `${de} – ${ate}`;
 }
+
+/** `AAAA-MM` válido → [ano, mês 1–12]; senão `null`. */
+function competenciaDe(
+  valor: string | null | undefined,
+): [number, number] | null {
+  if (typeof valor !== "string") return null;
+  const casado = MES_EXATO.exec(valor);
+  if (!casado) return null;
+  const mes = Number(casado[2]);
+  const ano = Number(casado[1]);
+  if (mes < 1 || mes > 12 || ano < 1) return null;
+  return [ano, mes];
+}
+
+/**
+ * T215 — competência (`AAAA-MM`) por extenso: `novembro de 2026`; com
+ * `"barra"`, `novembro/2026`. Recusa devolve `AUSENTE`.
+ */
+export function formatarCompetenciaPorExtenso(
+  valor: string | null | undefined,
+  forma: "de" | "barra" = "de",
+): string {
+  const c = competenciaDe(valor);
+  if (!c) return AUSENTE;
+  const nome = MESES_POR_EXTENSO[c[1] - 1];
+  return forma === "de" ? `${nome} de ${c[0]}` : `${nome}/${c[0]}`;
+}
+
+/** T215 — competência (`AAAA-MM`) abreviada: `nov/2026`. */
+export function formatarCompetenciaAbreviada(
+  valor: string | null | undefined,
+): string {
+  const c = competenciaDe(valor);
+  if (!c) return AUSENTE;
+  return `${MESES_ABREVIADOS[c[1] - 1]}/${c[0]}`;
+}

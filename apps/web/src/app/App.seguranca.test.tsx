@@ -139,6 +139,8 @@ describe("T215 — Segurança no menu", () => {
       "Dashboard",
       "Gestão de Pessoas",
       "Liderança",
+      // T215 — Benefícios (Remuneração).
+      "Benefícios",
       "Segurança",
       "Configurações",
     ]);

@@ -51,7 +51,6 @@ const ITENS_EM_DESENVOLVIMENTO = [
   "Pesquisas",
   "Calendário",
   "Folha de Pagamento",
-  "Benefícios",
   "Hub de Benefícios",
   "Suporte",
   "Roadmap",
@@ -305,7 +304,7 @@ describe("T209 — menu completo no desktop (expandido)", () => {
 
   it("o botão 'Fechar' do aviso também devolve o foco ao item", () => {
     render(<App papelDoAtor="rh" />);
-    const botao = item("Benefícios");
+    const botao = item("Folha de Pagamento");
     fireEvent.click(botao);
     fireEvent.click(
       within(aviso()!).getByRole("button", { name: "Fechar aviso" }),

@@ -137,6 +137,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         // T215 — Políticas de férias, a mesma capacidade da ficha.
         "Políticas de férias",
         "Jornada",
+        // T215 — Benefícios (grupo próprio, depois de Jornada).
+        "Benefícios",
         "Minha equipe",
         "Administração da liderança",
         // T215 — Segurança (Sessões ativas) e Permissões de acesso (as
@@ -172,6 +174,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         // T215 — Políticas de férias, a mesma capacidade da ficha.
         "Políticas de férias",
         "Jornada",
+        // T215 — Benefícios (grupo próprio, depois de Jornada).
+        "Benefícios",
         "Segurança",
         "Permissões de acesso",
         "Configurações",
@@ -191,6 +195,8 @@ describe("T162 — o Hub oferece só o que o servidor autoriza", () => {
         "Regras da escala",
         "Organograma",
         "Jornada",
+        // T215 — Benefícios (só leitura).
+        "Benefícios",
         "Segurança",
         "Permissões de acesso",
         "Configurações",
@@ -563,8 +569,8 @@ describe("T162 — acessibilidade e estrutura", () => {
     // T209 — 13 com Empresas e Nova empresa. T215 — 14 com Segurança e 15
     // com Turnos (sub-página do quadro da escala).
     // T215 — mais Regras da escala, Planejar a transição, Aplicar modelo e
-    // Políticas de férias: 19.
-    await waitFor(() => expect(cartoesVisiveis().length).toBe(19));
+    // Políticas de férias e Benefícios: 20.
+    await waitFor(() => expect(cartoesVisiveis().length).toBe(20));
     // T210 — Aparência fica fora do Hub (preferência de conta).
     for (const destino of capacidadeFuncionalDe("rh").filter(
       (d) => d.id !== "configuracoes-aparencia",

@@ -1,0 +1,123 @@
+/* T215 — Editar colaborador › Dependentes. */
+.dependentes {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.dependentes__acao {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dependentes__suave {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.dependentes__aviso {
+  margin: 0;
+  color: var(--status-success-ink);
+}
+
+.dependentes__lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dependentes__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--divisor-cor);
+}
+
+.dependentes__avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: var(--weight-bold);
+}
+
+.dependentes__textos {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.dependentes__selo {
+  display: inline-block;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+.dependentes__menu {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-botao, var(--radius-sm));
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.dependentes__perigo {
+  color: var(--status-danger-ink);
+}
+
+.dependentes__form {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.dependentes__form-cabeca h4 {
+  margin: 0;
+  font-size: var(--text-ui);
+}
+
+.dependentes__campo {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0 var(--space-sm);
+  border: var(--borda-espessura, 1px) solid var(--borda-controle);
+  border-radius: var(--radius-botao, var(--radius-sm));
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.dependentes__com-sufixo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.dependentes__lado-a-lado {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+@media (max-width: 640px) {
+  .dependentes__lado-a-lado {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

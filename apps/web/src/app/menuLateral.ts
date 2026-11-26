@@ -38,7 +38,6 @@
  * não abrem nada.
  */
 import {
-  IconeBeneficios,
   IconeCalendario,
   IconeFolha,
   IconeHubBeneficios,
@@ -207,11 +206,10 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
-        tipo: "em-desenvolvimento",
-        id: "beneficios",
+        // T215 — Benefícios: módulo real (RH e DP, pelo mapa).
+        tipo: "modulo",
+        grupo: "Benefícios",
         rotulo: "Benefícios",
-        icone: IconeBeneficios,
-        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
         tipo: "em-desenvolvimento",

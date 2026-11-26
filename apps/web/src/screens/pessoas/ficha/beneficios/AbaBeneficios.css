@@ -1,0 +1,335 @@
+/* T215 — ficha › aba Benefícios. */
+.aba-beneficios {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.aba-beneficios__topo {
+  display: grid;
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.aba-beneficios__cartao {
+  display: grid;
+  align-content: start;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-lg, var(--radius-md));
+  background: var(--surface-canvas);
+}
+
+.aba-beneficios__cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--divisor-cor);
+}
+
+.aba-beneficios__cabeca > div {
+  flex: 1 1 auto;
+}
+
+.aba-beneficios__cabeca h2 {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.aba-beneficios__suave {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__falha {
+  color: var(--status-danger-ink);
+}
+
+.aba-beneficios__icone,
+.aba-beneficios__mais {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+}
+
+.aba-beneficios__mais {
+  border: 1px dashed var(--borda-controle);
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+
+.aba-beneficios__custo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.aba-beneficios__custo-numeros {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.aba-beneficios__custo-numeros p {
+  margin: 0;
+}
+
+.aba-beneficios__grande {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xxs);
+  color: var(--color-ink);
+  font-size: 2.25rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.aba-beneficios__moeda {
+  color: var(--color-ink-muted);
+  font-size: var(--text-ui);
+  font-weight: 400;
+}
+
+.aba-beneficios__pilula {
+  display: inline-block;
+  padding: 0.1rem var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__dados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: 0;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.aba-beneficios__dados dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__dados dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.aba-beneficios__grafico {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.aba-beneficios__rosca {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 140px;
+  height: 140px;
+}
+
+.aba-beneficios__rosca-centro {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  color: var(--color-ink);
+}
+
+.aba-beneficios__rosca-centro strong {
+  font-size: 1.375rem;
+}
+
+.aba-beneficios__rosca-centro span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__legenda {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__legenda li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.aba-beneficios__legenda li > span:last-child {
+  display: grid;
+}
+
+.aba-beneficios__ponto {
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.2rem;
+  border-radius: 2px;
+}
+
+.aba-beneficios__categorias {
+  display: grid;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aba-beneficios__categoria-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__barra {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-xxs);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.aba-beneficios__barra > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.aba-beneficios__pendencia {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aba-beneficios__lista > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 2fr) auto auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.aba-beneficios__lista > li + li {
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.aba-beneficios__nome,
+.aba-beneficios__valor {
+  display: grid;
+  gap: 2px;
+}
+
+.aba-beneficios__valor {
+  text-align: right;
+}
+
+.aba-beneficios__vincular {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.aba-beneficios__vincular button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aba-beneficios__vazio {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-lg, var(--radius-md));
+  background: var(--surface-canvas);
+}
+
+.aba-beneficios__vazio-textos {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.aba-beneficios__vazio-textos h2 {
+  margin: 0;
+  font-size: var(--text-heading, 1.125rem);
+}
+
+.aba-beneficios__vazio-textos p {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.aba-beneficios__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aba-beneficios__chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 0.25rem var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+}
+
+.aba-beneficios__acoes {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 900px) {
+  .aba-beneficios__topo,
+  .aba-beneficios__custo,
+  .aba-beneficios__vazio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aba-beneficios__lista > li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .aba-beneficios__participacao {
+    display: none;
+  }
+}

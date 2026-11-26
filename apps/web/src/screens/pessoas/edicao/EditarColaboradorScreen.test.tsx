@@ -105,6 +105,16 @@ vi.mock("../../../api/dadosPessoaisClient", async () => {
     registrarDadosPessoaisDoColaborador: vi.fn(),
   };
 });
+// T215 — a seção Dependentes lê do servidor: sem ninguém cadastrado.
+vi.mock("../../../api/beneficiosClient", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../../api/beneficiosClient")
+  >("../../../api/beneficiosClient");
+  return {
+    ...actual,
+    listarDependentes: vi.fn(async () => ({ dependentes: [] })),
+  };
+});
 vi.mock("../../../api/contatosColaboradorClient", async () => {
   const actual = await vi.importActual<
     typeof import("../../../api/contatosColaboradorClient")
@@ -755,7 +765,7 @@ describe("T215 — Editar colaborador: seções ainda sem cadastro", () => {
         screen.getByRole("heading", { level: 2, name: titulo }),
       ).toBeInTheDocument();
       expect(screen.getByText(descricao)).toBeInTheDocument();
-      expect(screen.getByText(vazio)).toBeInTheDocument();
+      expect(await screen.findByText(vazio)).toBeInTheDocument();
     },
   );
 });

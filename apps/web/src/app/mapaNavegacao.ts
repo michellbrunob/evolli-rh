@@ -397,6 +397,23 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
     ],
   },
   {
+    // T215 — Benefícios (Remuneração › Benefícios): o módulo da empresa
+    // (lista por competência, assistente, detalhe com o valor de cada pessoa).
+    // RH e DP operam; o servidor decide cada requisição.
+    titulo: "Benefícios",
+    icone: "beneficios",
+    destinos: [
+      {
+        id: "beneficios",
+        label: "Benefícios",
+        subRotulo: "Quem recebe e quanto entra na folha",
+        estado: "funcional",
+        // RH e DP operam; o master técnico só lê (o servidor decide).
+        papeis: ["rh", "dp", "master_tecnico"],
+      },
+    ],
+  },
+  {
     titulo: "Liderança",
     icone: "lideranca",
     destinos: [
@@ -730,6 +747,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "nova-admissao",
     "importar-colaboradores",
     "politicas-ferias",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
@@ -752,6 +770,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "nova-admissao",
     "importar-colaboradores",
     "politicas-ferias",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
@@ -768,6 +787,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
   master_tecnico: [
     "dashboard",
     "pessoas",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",

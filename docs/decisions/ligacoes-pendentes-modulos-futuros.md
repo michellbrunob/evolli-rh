@@ -16,26 +16,6 @@ o módulo for implementado.
 
 ## Pendentes
 
-### 1. Benefícios ↔ Escala
-
-- **Hoje:** a escala calcula os dias de benefício do mês por pessoa (dias
-  úteis sem escala, no 5x2 e em "outra"; proporção do modelo nos demais) e os
-  mostra na ficha (aba Escala, "Alterar padrão"), na gaveta e no Aplicar
-  modelo. Não há módulo de Benefícios no Evolli (o menu prevê Remuneração ›
-  Benefícios e Hub de Benefícios).
-- **Ponto de ligação:** `diasNoMes` e `beneficioPelosDiasUteis` em
-  `apps/web/src/screens/pessoas/ficha/escala/calendarioDaEscala.ts`; uso em
-  `AbaEscala.tsx` e `AplicarModeloScreen.tsx`.
-- **Ao implementar Benefícios:**
-  - os benefícios pagos por dia (vale-transporte, vale-refeição e
-    semelhantes) passam a ler os dias da escala da pessoa;
-  - decidir com o RH a fonte: o **quadro publicado** (descontando férias e
-    ausências aprovadas e feriados) ou a estimativa do padrão, e se o cálculo
-    sai do navegador para o servidor;
-  - a ficha e o Aplicar modelo passam a mostrar o valor do benefício, não só
-    os dias;
-  - testes do cálculo com ausência, feriado e troca de escala no meio do mês.
-
 ### 2. Contrato intermitente ↔ aviso de convocação (CLT, art. 452-A)
 
 - **Hoje:** o aviso "Intermitente convocado com menos de 3 dias" existe nas
@@ -96,4 +76,16 @@ o módulo for implementado.
 
 ## Ligados
 
-Nenhum ainda.
+### 1. Benefícios ↔ Escala — ligado na T215 (módulo Benefícios)
+
+- O servidor calcula os dias de cada pessoa no mês
+  (`apps/api/src/pessoas/beneficios/dias-beneficio.ts`): dias úteis sem os
+  feriados nacionais, os do estado da empresa e os municipais das Regras da
+  escala; "pela escala" usa os dias de trabalho PUBLICADOS no quadro e, sem
+  publicação no mês, a proporção do modelo do cadastro (12x36 = 15, 6x1 = 26).
+- A ficha (aba Benefícios) mostra o custo de cada benefício; o RH ajusta dias
+  e valor por pessoa no mês, no detalhe do benefício.
+- Fica pendente com a **Folha de pagamento** (módulo futuro): lançar o
+  desconto e o adicional no holerite e fechar a competência ("folhas fechadas
+  não mudam"); hoje toda competência é "valores previstos". E com o
+  **Portal**: mostrar os benefícios da pessoa (Pausado/Encerrado).

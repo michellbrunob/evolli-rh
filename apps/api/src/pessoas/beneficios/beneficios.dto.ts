@@ -138,6 +138,14 @@ export class PreviaBeneficioDto {
   @IsOptional()
   @IsBoolean()
   incluirDesligados?: boolean;
+
+  /** As pessoas marcadas, com o plano ou o valor de cada uma. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5000)
+  @ValidateNested({ each: true })
+  @Type(() => PessoaDoBeneficioDto)
+  pessoas?: PessoaDoBeneficioDto[];
 }
 
 export class CompetenciaQueryDto {
