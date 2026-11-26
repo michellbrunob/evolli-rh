@@ -241,6 +241,8 @@ export function AbaFeriasEAusencias({
     [consultar, pessoa.id],
   );
   const [gaveta, setGaveta] = useState(false);
+  // "Agendar férias" abre a mesma janela já em Férias.
+  const [agendarFerias, setAgendarFerias] = useState(false);
   const [editando, setEditando] = useState<AusenciaApi | null>(null);
   const [janela, setJanela] = useState<Janela>(null);
   const [motivo, setMotivo] = useState("");
@@ -350,7 +352,16 @@ export function AbaFeriasEAusencias({
     <Revelar>
       <div className="ferias-ficha">
         <div className="ferias-ficha__topo">
-          <Saldo dados={dados} tipoDoVinculo={tipoDoVinculo} />
+          <Saldo
+            dados={dados}
+            tipoDoVinculo={tipoDoVinculo}
+            hoje={hoje}
+            podeAgendar={podeEditar}
+            onAgendar={() => {
+              setAgendarFerias(true);
+              setGaveta(true);
+            }}
+          />
           <ProximaAusencia dados={dados} hoje={hoje} quem={quem} />
         </div>
 
@@ -359,7 +370,10 @@ export function AbaFeriasEAusencias({
           deQuem={deQuem}
           podeEditar={podeEditar}
           servico={servico}
-          onRegistrar={() => setGaveta(true)}
+          onRegistrar={() => {
+            setAgendarFerias(false);
+            setGaveta(true);
+          }}
           onAprovar={(a) =>
             void executar(
               () => servico.aprovar(a.id),
@@ -404,6 +418,7 @@ export function AbaFeriasEAusencias({
           aberta={gaveta}
           servico={servico}
           pessoaInicial={pessoa}
+          {...(agendarFerias ? { tipoInicial: "ferias" as const } : {})}
           regraDeFerias={dados.regraDeFerias}
           onFechar={() => setGaveta(false)}
           onRegistrada={(_nova, avisoDoAnexo) => {
@@ -641,22 +656,66 @@ function Cartao({
   );
 }
 
+/** "Vence hoje", "Vence em 16 dias", "Vence em 1 mês", "Vence em 6 meses". */
+function textoDoVencimento(hoje: string, prazo: string): string {
+  const faltam = diasAte(hoje, prazo);
+  if (faltam <= 0) return "Vence hoje";
+  const [a1, m1, d1] = hoje.split("-").map(Number) as [number, number, number];
+  const [a2, m2, d2] = prazo.split("-").map(Number) as [number, number, number];
+  const meses = (a2 - a1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+  if (meses >= 1) return `Vence em ${meses} ${meses === 1 ? "mês" : "meses"}`;
+  return `Vence em ${faltam} ${faltam === 1 ? "dia" : "dias"}`;
+}
+
+/** O dia seguinte (o direito começa quando o período aquisitivo termina). */
+function diaSeguinte(dia: string): string {
+  const t = new Date(
+    Date.UTC(+dia.slice(0, 4), +dia.slice(5, 7) - 1, +dia.slice(8, 10) + 1),
+  );
+  return t.toISOString().slice(0, 10);
+}
+
+/**
+ * Como a referência (2026-11-26): o subtítulo diz o período; em aquisição,
+ * só quando começa o direito (sem número nem etiqueta); com dias, o número,
+ * quando vence, Direito/Solicitados/Disponíveis, um quadradinho por dia e
+ * "Agendar férias".
+ */
 function Saldo({
   dados,
   tipoDoVinculo,
+  hoje,
+  podeAgendar,
+  onAgendar,
 }: {
   readonly dados: FeriasDoColaboradorApi;
   readonly tipoDoVinculo: string;
+  readonly hoje: string;
+  readonly podeAgendar: boolean;
+  readonly onAgendar: () => void;
 }) {
-  const atual =
-    dados.periodoAtual !== null
-      ? dados.periodos[dados.periodoAtual]
-      : undefined;
-  const outros = dados.periodos.filter((p) => p !== atual);
+  const indiceAtual = dados.periodoAtual;
+  const atual = indiceAtual !== null ? dados.periodos[indiceAtual] : undefined;
+  const calculada = dados.regraDeFerias === "calculada" && atual !== undefined;
+  const emAquisicao = atual?.situacao === "em_aquisicao";
+  const primeiro = indiceAtual === 0;
+  // Os demais períodos com algo a dizer (o em aquisição fica de fora).
+  const outros = dados.periodos.filter(
+    (p) => p !== atual && p.situacao !== "em_aquisicao",
+  );
+
+  const subtitulo = !calculada
+    ? "Controle de saldo para contratos CLT e Estágio"
+    : emAquisicao
+      ? primeiro
+        ? "Primeiro período aquisitivo em andamento"
+        : "Período aquisitivo em andamento"
+      : `Período aquisitivo ${formatarDiaCivil(atual.inicio)} – ${formatarDiaCivil(atual.fim)}`;
+
   return (
     <Cartao
       titulo="Saldo de férias"
-      subtitulo="Controle de saldo para contratos CLT e Estágio"
+      subtitulo={subtitulo}
       icone={<IconeCalendario tamanho={18} />}
       className="ferias-ficha__saldo"
     >
@@ -680,51 +739,103 @@ function Saldo({
               {`O primeiro período começa na admissão, em ${formatarDiaCivil(dados.vinculo.dataAdmissao)}.`}
             </p>
           </>
-        ) : (
+        ) : emAquisicao ? (
           <>
-            <p className="ferias-ficha__saldo-valor">
-              {/* Em aquisição, os dias ainda não podem ser tirados. */}
-              <span className="ferias-ficha__saldo-numero">
-                <NumeroSuave
-                  valor={
-                    atual.situacao === "em_aquisicao" ? 0 : atual.disponiveis
-                  }
-                />
-              </span>
-              <span className="ferias-ficha__suave">dias disponíveis</span>
-              <StatusBadge variant={VARIANTE_DA_SITUACAO[atual.situacao]}>
-                {ROTULO_DA_SITUACAO[atual.situacao]}
-              </StatusBadge>
+            <p className="ferias-ficha__forte">
+              {`O direito às ${primeiro ? "primeiras" : "próximas"} férias começa em ${formatarDiaCivil(diaSeguinte(atual.fim))}.`}
             </p>
             <p className="ferias-ficha__suave">
-              {`Período aquisitivo ${formatarDiaCivil(atual.inicio)} a ${formatarDiaCivil(atual.fim)}`}
+              Ausências, folgas e day offs continuam sendo registrados
+              normalmente.
             </p>
-            {atual.situacao === "em_aquisicao" ? (
-              <p className="ferias-ficha__suave">
-                {`Libera ${dias(atual.disponiveis)} quando o período terminar, depois de ${formatarDiaCivil(atual.fim)}.`}
-              </p>
-            ) : null}
-            <span className="ferias-ficha__barra" aria-hidden="true">
-              <span
-                style={{
-                  width: `${atual.direito > 0 ? Math.min(100, (atual.solicitados / atual.direito) * 100) : 0}%`,
-                }}
-              />
+          </>
+        ) : (
+          <>
+            <div className="ferias-ficha__saldo-linha">
+              <div className="ferias-ficha__saldo-principal">
+                <p className="ferias-ficha__saldo-valor">
+                  <span className="ferias-ficha__saldo-numero">
+                    <NumeroSuave valor={atual.disponiveis} />
+                  </span>
+                  <span className="ferias-ficha__saldo-rotulo">
+                    dias disponíveis
+                  </span>
+                </p>
+                <p className="ferias-ficha__prazo">
+                  {atual.situacao === "vencido" ? (
+                    <StatusBadge variant="danger">Vencido</StatusBadge>
+                  ) : (
+                    <StatusBadge
+                      variant={
+                        // Perto do prazo, atenção; o "×" fica para Vencido.
+                        diasAte(hoje, atual.prazoGozo) <= 90
+                          ? "warning"
+                          : "neutral"
+                      }
+                    >
+                      {textoDoVencimento(hoje, atual.prazoGozo)}
+                    </StatusBadge>
+                  )}
+                  <span className="ferias-ficha__suave">
+                    {`prazo para gozo: ${formatarDiaCivil(atual.prazoGozo)}`}
+                  </span>
+                </p>
+              </div>
+              <dl className="ferias-ficha__detalhes">
+                <div>
+                  <dt>Direito</dt>
+                  <dd>{dias(atual.direito)}</dd>
+                </div>
+                <div>
+                  <dt>Solicitados</dt>
+                  <dd>{dias(atual.solicitados)}</dd>
+                </div>
+                <div>
+                  <dt>Disponíveis</dt>
+                  <dd className="ferias-ficha__destaque">
+                    {dias(atual.disponiveis)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <span className="ferias-ficha__dias" aria-hidden="true">
+              {Array.from({ length: atual.direito }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    i < atual.solicitados
+                      ? "ferias-ficha__dia ferias-ficha__dia--solicitado"
+                      : "ferias-ficha__dia"
+                  }
+                />
+              ))}
             </span>
-            <dl className="ferias-ficha__detalhes">
-              <div>
-                <dt>Direito</dt>
-                <dd>{dias(atual.direito)}</dd>
-              </div>
-              <div>
-                <dt>Usados</dt>
-                <dd>{dias(atual.solicitados)}</dd>
-              </div>
-              <div>
-                <dt>Tirar até</dt>
-                <dd>{formatarDiaCivil(atual.prazoGozo)}</dd>
-              </div>
-            </dl>
+            <div className="ferias-ficha__legenda">
+              {atual.solicitados > 0 ? (
+                <span className="ferias-ficha__legenda-item">
+                  <span
+                    className="ferias-ficha__amostra ferias-ficha__amostra--solicitado"
+                    aria-hidden="true"
+                  />
+                  Solicitados
+                </span>
+              ) : null}
+              <span className="ferias-ficha__legenda-item">
+                <span className="ferias-ficha__amostra" aria-hidden="true" />
+                Disponíveis para agendar
+              </span>
+              {podeAgendar && atual.disponiveis > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="ferias-ficha__agendar"
+                  onClick={onAgendar}
+                >
+                  <IconeCalendario tamanho={16} />
+                  Agendar férias
+                </Button>
+              ) : null}
+            </div>
             {outros.length > 0 ? (
               <ul
                 className="ferias-ficha__periodos"
@@ -732,7 +843,7 @@ function Saldo({
               >
                 {outros.map((p) => (
                   <li key={p.inicio} className="ferias-ficha__periodo">
-                    <span>{`${formatarDiaCivil(p.inicio)} a ${formatarDiaCivil(p.fim)}`}</span>
+                    <span>{`${formatarDiaCivil(p.inicio)} – ${formatarDiaCivil(p.fim)}`}</span>
                     <span className="ferias-ficha__suave">
                       {`${dias(p.disponiveis)} de ${p.direito}`}
                     </span>

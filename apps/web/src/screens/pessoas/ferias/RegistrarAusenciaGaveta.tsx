@@ -143,6 +143,7 @@ export function RegistrarAusenciaGaveta({
   onFechar,
   onRegistrada,
   pessoaInicial,
+  tipoInicial,
   regraDeFerias: regraDaFicha,
   editando = null,
   onAlterada,
@@ -156,6 +157,8 @@ export function RegistrarAusenciaGaveta({
   readonly pessoaInicial?: PessoaParaAusencia;
   /** Da ficha: a regra de férias do vínculo já é conhecida. */
   readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
+  /** O tipo já escolhido ao abrir ("Agendar férias" do saldo). */
+  readonly tipoInicial?: TipoAusencia;
   /** Editar esta ausência (a pessoa não muda). */
   readonly editando?: AusenciaApi | null;
   readonly onAlterada?: (ausencia: AusenciaApi, aviso?: string) => void;
@@ -199,7 +202,7 @@ export function RegistrarAusenciaGaveta({
     );
     setEscolhendo(false);
     setTermo("");
-    setTipo(r?.tipo ?? null);
+    setTipo(r?.tipo ?? tipoInicial ?? null);
     setMotivo(r?.motivo ?? null);
     setInicio(r?.inicio ?? "");
     setFim(r?.fim ?? "");
@@ -212,7 +215,7 @@ export function RegistrarAusenciaGaveta({
     setFalha(null);
     setArquivo(null);
     setRecusaDoAnexo(null);
-  }, [aberta, pessoaInicial, editando]);
+  }, [aberta, pessoaInicial, editando, tipoInicial]);
 
   // A lista de pessoas, pela busca.
   useEffect(() => {

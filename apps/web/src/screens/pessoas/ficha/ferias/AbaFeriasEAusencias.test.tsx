@@ -164,46 +164,155 @@ function montar(
 }
 
 describe("T215 — aba Férias e ausências da ficha", () => {
-  it("saldo (CLT): disponíveis, período aquisitivo, usados, prazo e situação", async () => {
+  it("saldo disponível, como a referência: período no subtítulo, prazo, números, dias e Agendar férias", async () => {
     montar();
     const saldo = await screen.findByRole("region", {
       name: "Saldo de férias",
     });
     expect(
-      within(saldo).getByText("Controle de saldo para contratos CLT e Estágio"),
+      within(saldo).getByText("Período aquisitivo 05/01/2025 – 04/01/2026"),
     ).toBeInTheDocument();
     expect(within(saldo).getByText("10")).toBeInTheDocument();
     expect(within(saldo).getByText("dias disponíveis")).toBeInTheDocument();
+    // Hoje 24/11/2026, prazo 04/01/2027: vence em 1 mês.
+    expect(within(saldo).getByText("Vence em 1 mês")).toBeInTheDocument();
     expect(
-      within(saldo).getByText("Período aquisitivo 05/01/2025 a 04/01/2026"),
+      within(saldo).getByText("prazo para gozo: 04/01/2027"),
     ).toBeInTheDocument();
     const linha = (rotulo: string) =>
-      within(saldo).getByText(rotulo).closest("div")!;
+      within(saldo).getByText(rotulo, { selector: "dt" }).closest("div")!;
     expect(within(linha("Direito")).getByText("30 dias")).toBeInTheDocument();
-    expect(within(linha("Usados")).getByText("20 dias")).toBeInTheDocument();
     expect(
-      within(linha("Tirar até")).getByText("04/01/2027"),
+      within(linha("Solicitados")).getByText("20 dias"),
     ).toBeInTheDocument();
-    expect(within(saldo).getByText("Disponível")).toBeInTheDocument();
-    // Os demais períodos.
     expect(
-      within(saldo).getByText("05/01/2026 a 04/01/2027"),
+      within(linha("Disponíveis")).getByText("10 dias"),
     ).toBeInTheDocument();
-    expect(within(saldo).getByText("Em aquisição")).toBeInTheDocument();
+    // Um quadradinho por dia do direito; os solicitados marcados.
+    expect(saldo.querySelectorAll(".ferias-ficha__dia")).toHaveLength(30);
+    expect(
+      saldo.querySelectorAll(".ferias-ficha__dia--solicitado"),
+    ).toHaveLength(20);
+    expect(
+      within(saldo).getByText("Solicitados", { selector: "span" }),
+    ).toBeInTheDocument();
+    expect(
+      within(saldo).getByText("Disponíveis para agendar"),
+    ).toBeInTheDocument();
+    // Sem a etiqueta de situação; o período em aquisição não aparece.
+    expect(within(saldo).queryByText("Disponível")).toBeNull();
+    expect(within(saldo).queryByText("Em aquisição")).toBeNull();
+    expect(within(saldo).queryByText("05/01/2026 – 04/01/2027")).toBeNull();
+
+    fireEvent.click(
+      within(saldo).getByRole("button", { name: "Agendar férias" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Registrar ausência",
+    });
+    expect(
+      within(janela).getByRole("radio", { name: "Férias" }),
+    ).toHaveAttribute("aria-checked", "true");
   });
 
-  it("período ainda em aquisição: 0 disponíveis e quando libera", async () => {
+  it("Agendar férias só para quem edita e com dias a tirar", async () => {
+    montar(ferias(), { podeEditar: false });
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).queryByRole("button", { name: "Agendar férias" }),
+    ).toBeNull();
+  });
+
+  it("primeiro período em andamento: só quando começa o direito, sem número nem etiqueta", async () => {
     const base = ferias();
     montar(ferias({ periodos: [base.periodos[1]!], periodoAtual: 0 }));
     const saldo = await screen.findByRole("region", {
       name: "Saldo de férias",
     });
-    expect(within(saldo).getByText("0")).toBeInTheDocument();
-    expect(within(saldo).getByText("Em aquisição")).toBeInTheDocument();
+    expect(
+      within(saldo).getByText("Primeiro período aquisitivo em andamento"),
+    ).toBeInTheDocument();
     expect(
       within(saldo).getByText(
-        "Libera 30 dias quando o período terminar, depois de 04/01/2027.",
+        "O direito às primeiras férias começa em 05/01/2027.",
       ),
+    ).toBeInTheDocument();
+    expect(
+      within(saldo).getByText(
+        "Ausências, folgas e day offs continuam sendo registrados normalmente.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(saldo).queryByText("dias disponíveis")).toBeNull();
+    expect(within(saldo).queryByText("Em aquisição")).toBeNull();
+    expect(
+      within(saldo).queryByRole("button", { name: "Agendar férias" }),
+    ).toBeNull();
+  });
+
+  it("período seguinte em andamento (o anterior já tirado): as próximas férias", async () => {
+    const base = ferias();
+    montar(
+      ferias({
+        periodos: [
+          { ...base.periodos[0]!, solicitados: 30, disponiveis: 0 },
+          base.periodos[1]!,
+        ],
+        periodoAtual: 1,
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(
+      within(saldo).getByText("Período aquisitivo em andamento"),
+    ).toBeInTheDocument();
+    expect(
+      within(saldo).getByText(
+        "O direito às próximas férias começa em 05/01/2027.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["2026-12-10", "Vence em 16 dias"],
+    ["2026-11-25", "Vence em 1 dia"],
+    ["2026-11-24", "Vence hoje"],
+    ["2027-05-30", "Vence em 6 meses"],
+  ])("prazo %s: %s", async (prazoGozo, texto) => {
+    const base = ferias();
+    montar(
+      ferias({
+        periodos: [{ ...base.periodos[0]!, prazoGozo }, base.periodos[1]!],
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(within(saldo).getByText(texto)).toBeInTheDocument();
+  });
+
+  it("período vencido: a etiqueta Vencido e o prazo que passou", async () => {
+    const base = ferias();
+    montar(
+      ferias({
+        periodos: [
+          {
+            ...base.periodos[0]!,
+            prazoGozo: "2026-10-01",
+            situacao: "vencido",
+          },
+          base.periodos[1]!,
+        ],
+      }),
+    );
+    const saldo = await screen.findByRole("region", {
+      name: "Saldo de férias",
+    });
+    expect(within(saldo).getByText("Vencido")).toBeInTheDocument();
+    expect(
+      within(saldo).getByText("prazo para gozo: 01/10/2026"),
     ).toBeInTheDocument();
   });
 
