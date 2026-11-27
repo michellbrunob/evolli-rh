@@ -94,6 +94,7 @@ import type { ServicoDeAusencias } from "../ferias/tiposAusencia";
 import { AbaEscala } from "./escala/AbaEscala";
 import { rotaDoDestino } from "../../../app/rotasDoShell";
 import { AbaBeneficios } from "./beneficios/AbaBeneficios";
+import { AbaPesquisas } from "./pesquisas/AbaPesquisas";
 import { primeiroNome } from "../tratamento";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
@@ -1186,6 +1187,21 @@ export function FichaDoColaborador({
                     }
                   : {})}
               />
+            ) : null
+          ) : aba === "pesquisas" ? (
+            // T216 — só as identificadas que a pessoa respondeu; leitura de
+            // RH e DP (o servidor decide e audita).
+            dados ? (
+              podeEditar ? (
+                <AbaPesquisas
+                  colaboradorId={colaboradorId}
+                  primeiroNome={primeiroNome(nome)}
+                />
+              ) : (
+                <p className="ficha-ref__em-breve-texto" role="status">
+                  As respostas de pesquisas ficam visíveis só para o RH e o DP.
+                </p>
+              )
             ) : null
           ) : aba === "documentos" ? (
             // Os arquivos só são lidos com o colaborador confirmado na
