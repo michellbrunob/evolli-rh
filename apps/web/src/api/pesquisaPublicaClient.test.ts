@@ -45,6 +45,15 @@ describe("T216 — cliente público de pesquisas", () => {
     });
   });
 
+  it("finalizada pelo RH é um motivo próprio, separado do prazo", async () => {
+    const cliente = criarClientePesquisaPublica(
+      vi.fn().mockResolvedValue(resposta(200, { indisponivel: "finalizada" })),
+    );
+    await expect(cliente.abrir("t")).resolves.toEqual({
+      indisponivel: "finalizada",
+    });
+  });
+
   it("404 vira pesquisa inexistente; 410 usa o motivo do servidor", async () => {
     const buscar = vi
       .fn()

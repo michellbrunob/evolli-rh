@@ -78,7 +78,20 @@ export interface GrupoPublico {
   readonly opcoes: readonly { readonly id: string; readonly nome: string }[];
 }
 
+/** Modelo da pesquisa: a Personalizada mostra uma seção por vez. */
+export type ModeloPublico =
+  | "pulso"
+  | "clima"
+  | "enps"
+  | "onboarding"
+  | "desligamento"
+  | "beneficios"
+  | "treinamento"
+  | "personalizada";
+
 export interface PesquisaPublica {
+  /** Ausente numa API que ainda não o devolve: uma pergunta por tela. */
+  readonly modelo?: ModeloPublico;
   readonly empresa: string;
   readonly nome: string;
   readonly boasVindas: string | null;
@@ -90,8 +103,12 @@ export interface PesquisaPublica {
   readonly grupos?: readonly GrupoPublico[];
 }
 
+/**
+ * Por que o link não aceita resposta. `encerrada`: o prazo (`encerraEm`)
+ * terminou; `finalizada`: o RH finalizou a pesquisa.
+ */
 export type MotivoIndisponivel =
-  "pausada" | "encerrada" | "cancelada" | "inexistente";
+  "pausada" | "encerrada" | "finalizada" | "cancelada" | "inexistente";
 
 export type AberturaPublica =
   PesquisaPublica | { readonly indisponivel: MotivoIndisponivel };
@@ -164,6 +181,7 @@ const BASE = "/v1/publico/pesquisas";
 const MOTIVOS: readonly MotivoIndisponivel[] = [
   "pausada",
   "encerrada",
+  "finalizada",
   "cancelada",
   "inexistente",
 ];
