@@ -175,7 +175,7 @@ export interface DepartamentoDoResultado {
   nome: string;
   respostas: number;
   visivel: boolean;
-  oculto?: MotivoOculto;
+  oculto?: MotivoOculto | null;
 }
 
 interface ResultadoBase {
@@ -252,11 +252,14 @@ export interface ResultadosPesquisa {
   /** `visivel: false`: abaixo do mínimo por grupo (sem números). */
   filtro: {
     departamentoId: string | null;
+    campo?: CampoGrupo | null;
+    grupoId?: string | null;
     visivel: boolean;
-    /** Respostas do recorte (a API ampliada manda). */
+    /** Respostas do recorte (sem filtro, o total). */
     respostas?: number;
-    oculto?: MotivoOculto;
   };
+  /** Os grupos de cada recorte disponível (com o motivo do oculto). */
+  grupos?: Partial<Record<CampoGrupo, DepartamentoDoResultado[]>>;
   /** Vazio quando `filtro.visivel` é `false`. */
   perguntas: ResultadoPergunta[];
   indicadores?: IndicadoresDosResultados;
@@ -289,7 +292,7 @@ export interface AnalisesPesquisa {
     nome: string;
     respostas: number;
     visivel: boolean;
-    oculto?: MotivoOculto;
+    oculto?: MotivoOculto | null;
     media: number | null;
     medias: (number | null)[];
   }[];
@@ -310,9 +313,15 @@ export interface RespostaResumo {
   departamento: string | null;
   respondidaEm: string;
   media: number | null;
-  /** Anônima com separação: o grupo escolhido (ou oculto pela regra). */
-  grupo?: string | null;
-  grupoOculto?: MotivoOculto;
+  /**
+   * Anônima com separar por: o grupo escolhido em cada campo, ou `null` com
+   * o motivo quando o grupo está oculto (sem motivo: não informou).
+   */
+  grupos?: {
+    campo: CampoGrupo;
+    grupo: string | null;
+    oculto: MotivoOculto | null;
+  }[];
 }
 
 /** `GET /pesquisas/:id/respostas/:respostaId`. */
@@ -414,6 +423,19 @@ export function listarPesquisas(
   const qs = params.toString();
   return pedir(`/pesquisas${qs ? `?${qs}` : ""}`, "GET");
 }
+
+/** `GET /pesquisas/candidatos/contagem`: "Todo o time" sem baixar a lista. */
+export interface ContagemDoTime {
+  total: number;
+  departamentos: {
+    departamentoId: string | null;
+    departamento: string | null;
+    quantidade: number;
+  }[];
+}
+
+export const contagemDoTime = () =>
+  pedir<ContagemDoTime>("/pesquisas/candidatos/contagem", "GET");
 
 /** `GET /pesquisas/candidatos`: um colaborador ativo e a lotação vigente. */
 export interface CandidatoPesquisa {

@@ -16,7 +16,15 @@
  * RH e DP operam; o master técnico só lê; sem empresa ativa (acesso global),
  * a tela pede que se escolha uma empresa.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   ModeloPesquisa,
   PesquisaDetalhe,
@@ -64,11 +72,20 @@ import { EntradaPersonalizada } from "./EntradaPersonalizada";
 import { estadoDaCopia } from "./estadoDaPesquisa";
 import { GaleriaDeModelos, semAcento } from "./GaleriaDeModelos";
 import { ehModeloPronto, modeloDaGaleria } from "./modelosDePesquisa";
-import { PreviaDaPesquisa } from "./PreviaDaPesquisa";
-import {
-  RelatorioDaPesquisa,
-  RelatorioDaResposta,
-} from "./RelatorioImprimivel";
+// T216 — relatório e prévia abrem em aba própria: pacotes sob demanda.
+const PreviaDaPesquisa = lazy(() =>
+  import("./PreviaDaPesquisa").then((m) => ({ default: m.PreviaDaPesquisa })),
+);
+const RelatorioDaPesquisa = lazy(() =>
+  import("./RelatorioImprimivel").then((m) => ({
+    default: m.RelatorioDaPesquisa,
+  })),
+);
+const RelatorioDaResposta = lazy(() =>
+  import("./RelatorioImprimivel").then((m) => ({
+    default: m.RelatorioDaResposta,
+  })),
+);
 import { esquecerRascunho } from "./rascunhosLocais";
 import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
@@ -473,16 +490,26 @@ function Modulo({
         />
       );
     case "previa":
-      return <PreviaDaPesquisa servico={servico} pesquisaId={atual.id} />;
+      return (
+        <Suspense fallback={<Esqueleto rotulo="Carregando…" linhas={3} />}>
+          <PreviaDaPesquisa servico={servico} pesquisaId={atual.id} />
+        </Suspense>
+      );
     case "relatorio":
-      return <RelatorioDaPesquisa servico={servico} pesquisaId={atual.id} />;
+      return (
+        <Suspense fallback={<Esqueleto rotulo="Carregando…" linhas={3} />}>
+          <RelatorioDaPesquisa servico={servico} pesquisaId={atual.id} />
+        </Suspense>
+      );
     case "relatorioDaResposta":
       return (
-        <RelatorioDaResposta
-          servico={servico}
-          pesquisaId={atual.id}
-          respostaId={atual.respostaId}
-        />
+        <Suspense fallback={<Esqueleto rotulo="Carregando…" linhas={3} />}>
+          <RelatorioDaResposta
+            servico={servico}
+            pesquisaId={atual.id}
+            respostaId={atual.respostaId}
+          />
+        </Suspense>
       );
     case "nova":
       return (

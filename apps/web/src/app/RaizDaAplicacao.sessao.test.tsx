@@ -7,15 +7,21 @@
  * do papel RH, como fica depois do login.
  */
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { configure } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { App } from "./App";
 import { RaizDaAplicacao } from "./RaizDaAplicacao";
 
-vi.mock("./AutenticacaoApp", async () => {
-  const { App } = await import("./App");
-  return {
-    AutenticacaoApp: () => <App papelDoAtor="rh" destinoInicial="pessoas" />,
-  };
-});
+// T216 — a raiz carrega a página pública e o shell sob demanda (pacotes
+// separados): a primeira importação do shell é lenta no ambiente de teste.
+configure({ asyncUtilTimeout: 10_000 });
+vi.setConfig({ testTimeout: 30_000 });
+
+// O shell entra pelo import estático abaixo; o portão (carregado sob demanda
+// pela raiz) só o monta, sem importar o `App` de dentro do próprio mock.
+vi.mock("./AutenticacaoApp", () => ({
+  AutenticacaoApp: () => <App papelDoAtor="rh" destinoInicial="pessoas" />,
+}));
 
 vi.mock("../api/contextoEmpresarialClient", async () => {
   const actual = await vi.importActual<

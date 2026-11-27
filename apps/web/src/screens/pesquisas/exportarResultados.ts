@@ -8,6 +8,7 @@
  * identificada, numeradas na anônima e nunca na confidencial. Nada leva CPF.
  */
 import type {
+  CampoGrupo,
   Identificacao,
   Pergunta,
   PesquisaDetalhe,
@@ -29,6 +30,7 @@ import {
   type RelatorioDeResultados,
 } from "./dadosDoRelatorio";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { ehDeEscala } from "./indicadores";
 import {
   ROTULO_DA_IDENTIFICACAO,
@@ -435,14 +437,32 @@ export function planilhaDosResultados(
     const ocultos = new Set(
       geral.departamentos.filter((d) => !d.visivel).map((d) => d.nome),
     );
-    const departamentoDe = (r: RespostaDetalhe) => {
-      if (!identificada && r.grupoOculto) return "Oculto";
-      const grupo = identificada ? r.departamento : (r.grupo ?? r.departamento);
-      if (!grupo) return "—";
-      return !identificada && ocultos.has(grupo) ? "Oculto" : grupo;
+    // Anônima: uma coluna por campo de "separar por", com o grupo escolhido
+    // ou "Oculto" (abaixo do mínimo ou protegendo um grupo menor).
+    const campos = identificada
+      ? []
+      : (detalhe.separarPor ?? []).filter((c) =>
+          CAMPOS_DE_GRUPO.some((x) => x.campo === c),
+        );
+    const grupoDe = (r: RespostaDetalhe, campo: CampoGrupo) => {
+      const g = r.grupos?.find((x) => x.campo === campo);
+      if (g?.oculto) return "Oculto";
+      if (g?.grupo) return ocultos.has(g.grupo) ? "Oculto" : g.grupo;
+      return "—";
     };
+    const colunasDeGrupo = identificada
+      ? ["Departamento"]
+      : campos.length > 0
+        ? campos.map((c) => CAMPOS_DE_GRUPO.find((x) => x.campo === c)!.rotulo)
+        : ["Departamento"];
+    const gruposDa = (r: RespostaDetalhe): CelulaXlsx[] =>
+      identificada
+        ? [r.departamento ?? "—"]
+        : campos.length > 0
+          ? campos.map((c) => grupoDe(r, c))
+          : ["—"];
     const formatos: Record<number, "data" | "dataHora"> = {};
-    const fixas = identificada ? 3 : 2;
+    const fixas = identificada ? 3 : 1 + colunasDeGrupo.length;
     if (identificada) formatos[2] = "dataHora";
     todas.forEach((p, i) => {
       if (p.tipo === "data") formatos[fixas + i] = "data";
@@ -451,7 +471,7 @@ export function planilhaDosResultados(
       ...cabecalhoDaAba("Participantes", rel),
       [
         identificada ? "Nome" : "Participante",
-        "Departamento",
+        ...colunasDeGrupo,
         ...(identificada ? ["Respondida em"] : []),
         ...todas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
         "Média",
@@ -460,7 +480,7 @@ export function planilhaDosResultados(
         const valores = new Map(r.valores.map((v) => [v.perguntaId, v.valor]));
         return [
           identificada ? (r.nome ?? "") : `Participante ${r.numero}`,
-          departamentoDe(r),
+          ...gruposDa(r),
           ...(identificada
             ? [
                 serialDoInstante(r.respondidaEm) ??

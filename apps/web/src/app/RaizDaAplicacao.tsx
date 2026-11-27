@@ -6,10 +6,19 @@
  * o sistema, troca a árvore inteira — a página pública e o shell nunca
  * convivem.
  */
-import { useEffect, useState } from "react";
-import { AutenticacaoApp } from "./AutenticacaoApp";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { tokenDaPesquisaPublica } from "./rotaPublica";
-import { ResponderPesquisa } from "../screens/publico/ResponderPesquisa";
+
+// T216 — cada lado num pacote próprio: o link público baixa só a página de
+// resposta (leve), sem o shell autenticado e as telas do sistema.
+const AutenticacaoApp = lazy(() =>
+  import("./AutenticacaoApp").then((m) => ({ default: m.AutenticacaoApp })),
+);
+const ResponderPesquisa = lazy(() =>
+  import("../screens/publico/ResponderPesquisa").then((m) => ({
+    default: m.ResponderPesquisa,
+  })),
+);
 
 export function RaizDaAplicacao() {
   const [token, setToken] = useState(() =>
@@ -29,6 +38,13 @@ export function RaizDaAplicacao() {
     };
   }, []);
 
-  if (token !== null) return <ResponderPesquisa key={token} token={token} />;
-  return <AutenticacaoApp />;
+  return (
+    <Suspense fallback={null}>
+      {token !== null ? (
+        <ResponderPesquisa key={token} token={token} />
+      ) : (
+        <AutenticacaoApp />
+      )}
+    </Suspense>
+  );
 }

@@ -429,6 +429,15 @@ export function servicoFalso(
     listarAtivos: vi.fn(() => Promise.resolve(ATIVOS)),
     listarCandidatos: vi.fn(listarCandidatosFalso()),
     listarTodosCandidatos: vi.fn(() => Promise.resolve(CANDIDATOS)),
+    contagemDoTime: vi.fn(() =>
+      Promise.resolve({
+        total: 2,
+        departamentos: [
+          { departamentoId: "d-1", departamento: "Operações", quantidade: 1 },
+          { departamentoId: "d-2", departamento: "Financeiro", quantidade: 1 },
+        ],
+      }),
+    ),
     listarTodosAtivos: vi.fn(() => Promise.resolve(ATIVOS.itens)),
     listarGrupos: vi.fn(() => Promise.resolve(GRUPOS)),
     listarEmpresas: vi.fn(() =>

@@ -12,7 +12,10 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ColaboradorListadoApi } from "../../api/colaboradoresClient";
-import type { CandidatoPesquisa } from "../../api/pesquisasClient";
+import type {
+  CandidatoPesquisa,
+  ContagemDoTime,
+} from "../../api/pesquisasClient";
 import { Button } from "../../components";
 import { plural } from "../../format/plural";
 import { ListaDeEscolha, Sheet } from "../../ui";
@@ -85,6 +88,10 @@ export function EtapaColaboradores({
   readonly onTotalDoTime?: (n: number) => void;
 }) {
   const base = useId();
+  // "Todo o time": a contagem (rápida) e alguns nomes para os avatares; a
+  // lista inteira só quando alguém abre "Ver lista".
+  const [contagem, setContagem] = useState<ContagemDoTime | null>(null);
+  const [amostra, setAmostra] = useState<readonly string[]>([]);
   const [time, setTime] = useState<readonly CandidatoPesquisa[] | null>(null);
   const [verLista, setVerLista] = useState(false);
   const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
@@ -100,15 +107,21 @@ export function EtapaColaboradores({
 
   useEffect(() => {
     let vivo = true;
-    Promise.resolve(servico.listarTodosCandidatos())
-      .then((t) => {
+    Promise.resolve(servico.contagemDoTime())
+      .then((c) => {
         if (!vivo) return;
-        setTime(t ?? []);
-        onTotalDoTime?.((t ?? []).length);
+        const lida = c ?? { total: 0, departamentos: [] };
+        setContagem(lida);
+        onTotalDoTime?.(lida.total);
       })
       .catch(() => {
-        if (vivo) setTime([]);
+        if (vivo) setContagem({ total: 0, departamentos: [] });
       });
+    Promise.resolve(servico.listarCandidatos({ pagina: 1, tamanhoPagina: 5 }))
+      .then((r) => {
+        if (vivo) setAmostra((r?.itens ?? []).map((c) => c.nome));
+      })
+      .catch(() => undefined);
     Promise.resolve(servico.listarGrupos())
       .then((g) => {
         if (vivo && g) setGrupos(g);
@@ -165,14 +178,31 @@ export function EtapaColaboradores({
       geralRef.current.indeterminate = marcadosNoFiltro > 0 && !todosMarcados;
   }, [marcadosNoFiltro, todosMarcados]);
 
-  const porDepartamento = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of time ?? []) {
-      const d = c.departamento ?? "Sem departamento";
-      m.set(d, (m.get(d) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [time]);
+  // A lista inteira, só ao abrir "Ver lista".
+  useEffect(() => {
+    if (!verLista || time !== null) return;
+    let vivo = true;
+    Promise.resolve(servico.listarTodosCandidatos())
+      .then((t) => {
+        if (vivo) setTime(t ?? []);
+      })
+      .catch(() => {
+        if (vivo) setTime([]);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [verLista, time, servico]);
+
+  const porDepartamento = useMemo(
+    () =>
+      [...(contagem?.departamentos ?? [])]
+        .map(
+          (d) => [d.departamento ?? "Sem departamento", d.quantidade] as const,
+        )
+        .sort((a, b) => b[1] - a[1]),
+    [contagem],
+  );
   const departamentosComGente = porDepartamento.filter(
     ([d]) => d !== "Sem departamento",
   ).length;
@@ -225,7 +255,7 @@ export function EtapaColaboradores({
     </div>
   );
 
-  const nTime = time?.length ?? null;
+  const nTime = contagem?.total ?? null;
   const total = doFiltro.length;
 
   return (
@@ -289,15 +319,15 @@ export function EtapaColaboradores({
 
       {todos ? (
         <div className="pesquisas__time">
-          {time === null ? (
+          {contagem === null ? (
             <p className="pesquisas__suave">Contando o time…</p>
           ) : (
             <>
               <div className="pesquisas__time-cabeca">
-                <PilhaDeAvatares nomes={time.map((c) => c.nome)} />
+                <PilhaDeAvatares nomes={amostra} />
                 <div>
                   <p className="pesquisas__forte" role="status">
-                    {`${plural(time.length, "pessoa vai", "pessoas vão")} receber a pesquisa`}
+                    {`${plural(contagem.total, "pessoa vai", "pessoas vão")} receber a pesquisa`}
                   </p>
                   <p className="pesquisas__suave">
                     {`Todos os colaboradores ativos, de ${plural(departamentosComGente, "departamento", "departamentos")}`}

@@ -631,12 +631,24 @@ function ResultadosInterno({
 export const intervalo = (de: number, ate: number) =>
   de === ate ? String(de) : `${de} a ${ate}`;
 
+/** Por que o recorte escolhido não mostra números. */
+function motivoDoRecorte(
+  geral: ResultadosPesquisa,
+  recorte: { campo: CampoGrupo; grupoId: string } | null,
+): MotivoOculto | null | undefined {
+  if (!recorte) return undefined;
+  const lista =
+    geral.grupos?.[recorte.campo] ??
+    (recorte.campo === "departamento" ? geral.departamentos : []);
+  return lista.find((g) => g.id === recorte.grupoId)?.oculto;
+}
+
 function PoucasRespostas({
   minimo,
   motivo,
 }: {
   readonly minimo: number;
-  readonly motivo?: MotivoOculto | undefined;
+  readonly motivo?: MotivoOculto | null | undefined;
 }) {
   return (
     <div className="pesquisas__aba-vazia">
@@ -687,6 +699,8 @@ function opcoesDoCampo(
   geral: ResultadosPesquisa,
   grupos: GruposDaEmpresa | null,
 ): readonly { id: string; nome: string }[] {
+  const doResultado = geral.grupos?.[campo];
+  if (doResultado && doResultado.length > 0) return doResultado;
   if (campo === "departamento" && geral.departamentos.length > 0)
     return geral.departamentos;
   return grupos?.[campo] ?? [];
@@ -907,7 +921,7 @@ function VisaoGeral({
         {!atual.filtro.visivel ? (
           <PoucasRespostas
             minimo={detalhe.minimoPorGrupo}
-            motivo={atual.filtro.oculto}
+            motivo={motivoDoRecorte(geral, recorte)}
           />
         ) : atual.respostas === 0 ? (
           <div className="pesquisas__aba-vazia">

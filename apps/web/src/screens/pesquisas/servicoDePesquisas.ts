@@ -47,6 +47,7 @@ export type ServicoDePesquisas = Pick<
   | "analisesDaPesquisa"
   | "respostaDaPesquisa"
   | "listarCandidatos"
+  | "contagemDoTime"
 > & {
   /** Todos os candidatos (para "Todo o time": contagem, grupos e lista). */
   readonly listarTodosCandidatos: () => Promise<
@@ -115,6 +116,7 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   analisesDaPesquisa: cliente.analisesDaPesquisa,
   respostaDaPesquisa: cliente.respostaDaPesquisa,
   listarCandidatos: cliente.listarCandidatos,
+  contagemDoTime: cliente.contagemDoTime,
   listarTodosCandidatos: () => todosOsCandidatos(cliente.listarCandidatos),
   listarAtivos: ativos,
   listarTodosAtivos: async () => {

@@ -11,9 +11,18 @@ import { Dialog } from "../../ui";
 import { IconeAviso } from "../../ui/icones";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 
-const ehNinguemIdentificavel = (erro: unknown) =>
-  (erro as { status?: unknown } | null)?.status === 422 &&
-  (erro as { codigo?: unknown } | null)?.codigo === "ninguem_identificavel";
+function ehNinguemIdentificavel(erro: unknown): boolean {
+  const e = erro as {
+    status?: unknown;
+    codigo?: unknown;
+    erros?: readonly { campo?: unknown; motivo?: unknown }[];
+  } | null;
+  if (e?.status !== 422) return false;
+  return (
+    e.codigo === "ninguem_identificavel" ||
+    (e.erros ?? []).some((x) => x.motivo === "ninguem_identificavel")
+  );
+}
 
 /**
  * `publicar(id)` devolve a pesquisa publicada ou `null` (a pessoa desistiu

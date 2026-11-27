@@ -116,11 +116,7 @@ describe("A1 — grupo oculto para proteger um grupo menor", () => {
           recorte === "d-1"
             ? ({
                 ...RESULTADOS,
-                filtro: {
-                  departamentoId: "d-1",
-                  visivel: false,
-                  oculto: "protege_grupo_menor",
-                },
+                filtro: { departamentoId: "d-1", visivel: false },
                 perguntas: [],
               } as ResultadosPesquisa)
             : recorte
@@ -132,7 +128,26 @@ describe("A1 — grupo oculto para proteger um grupo menor", () => {
                     respostas: 3,
                   },
                 } as ResultadosPesquisa)
-              : RESULTADOS,
+              : ({
+                  ...RESULTADOS,
+                  // O motivo do oculto vem nos grupos do resultado geral.
+                  departamentos: [
+                    {
+                      id: "d-1",
+                      nome: "Operações",
+                      respostas: 6,
+                      visivel: false,
+                      oculto: "protege_grupo_menor",
+                    },
+                    {
+                      id: "d-2",
+                      nome: "Financeiro",
+                      respostas: 2,
+                      visivel: true,
+                      oculto: null,
+                    },
+                  ],
+                } as ResultadosPesquisa),
         ),
       ),
     });
@@ -167,7 +182,7 @@ describe("A2, A3, C5 e C6 — exportações", () => {
       ...RESPOSTA_DETALHE,
       nome: null,
       departamento: null,
-      grupo: "Financeiro",
+      grupos: [{ campo: "departamento", grupo: "Financeiro", oculto: null }],
     },
     {
       ...RESPOSTA_DETALHE,
@@ -175,8 +190,9 @@ describe("A2, A3, C5 e C6 — exportações", () => {
       numero: 2,
       nome: null,
       departamento: null,
-      grupo: null,
-      grupoOculto: "protege_grupo_menor",
+      grupos: [
+        { campo: "departamento", grupo: null, oculto: "protege_grupo_menor" },
+      ],
     },
     {
       ...RESPOSTA_DETALHE,
@@ -282,7 +298,7 @@ describe("A2, A3, C5 e C6 — exportações", () => {
 describe("A4 — publicar sem ninguém identificável", () => {
   it("pede confirmação e reenvia com a confirmação; desistir não publica", async () => {
     const recusa = new ApiError(422, "Erro na requisição.", {
-      codigo: "ninguem_identificavel",
+      erros: [{ campo: "participantes", motivo: "ninguem_identificavel" }],
     });
     const base = servicoFalso();
     const publicar = vi

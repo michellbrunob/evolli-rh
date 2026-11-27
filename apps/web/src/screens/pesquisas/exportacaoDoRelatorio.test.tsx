@@ -233,8 +233,9 @@ describe("planilha (.xlsx)", () => {
     const anon = (await abasDe("anonima"))["Participantes"]!;
     expect(anon[3]![0]).toBe("Participante");
     expect(anon[3]).not.toContain("Respondida em");
-    expect(anon[4]!.slice(0, 2)).toEqual(["Participante 1", "Operações"]);
-    expect(anon[5]!.slice(0, 2)).toEqual(["Participante 2", "Oculto"]);
+    // Sem "separar por", a anônima não leva grupo nenhum (só "—").
+    expect(anon[4]!.slice(0, 2)).toEqual(["Participante 1", "—"]);
+    expect(anon[5]!.slice(0, 2)).toEqual(["Participante 2", "—"]);
     expect(JSON.stringify(anon)).not.toContain("Exemplo");
   });
 

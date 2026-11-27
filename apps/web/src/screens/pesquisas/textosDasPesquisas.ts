@@ -57,7 +57,7 @@ export const IDENTIFICACOES: readonly {
 
 /** "Oculto · menos de 3 respostas" ou "Oculto · protege um grupo menor". */
 export function textoDoOculto(
-  motivo: "minimo" | "protege_grupo_menor" | undefined,
+  motivo: "minimo" | "protege_grupo_menor" | null | undefined,
   minimo: number,
 ): string {
   return motivo === "protege_grupo_menor"

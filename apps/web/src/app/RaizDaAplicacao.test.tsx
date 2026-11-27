@@ -1,7 +1,13 @@
 import { act, render, screen } from "@testing-library/react";
+import { configure } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RaizDaAplicacao } from "./RaizDaAplicacao";
 import { tokenDaPesquisaPublica } from "./rotaPublica";
+
+// T216 — a raiz carrega a página pública e o shell sob demanda (pacotes
+// separados): a primeira importação do shell é lenta no ambiente de teste.
+configure({ asyncUtilTimeout: 10_000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 const PESQUISA = {
   empresa: "Empresa Exemplo Ltda",

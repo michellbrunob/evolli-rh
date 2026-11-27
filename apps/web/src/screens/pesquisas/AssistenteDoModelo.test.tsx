@@ -263,7 +263,7 @@ describe("Assistente do modelo — Configurar", () => {
 
 describe("Assistente do modelo — Colaboradores e Enviar", () => {
   it("todo o time: contagem, departamentos e lista", async () => {
-    montar();
+    const { servico } = montar();
     proximo(/Próximo: Colaboradores/);
     expect(
       await screen.findByText("2 pessoas vão receber a pesquisa"),
@@ -276,6 +276,9 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
     });
     expect(chips).toHaveTextContent("Operações1");
     expect(screen.getByText("2 pessoas vão receber")).toBeInTheDocument();
+    // A contagem vem do servidor; a lista inteira só ao abrir "Ver lista".
+    expect(servico.contagemDoTime).toHaveBeenCalled();
+    expect(servico.listarTodosCandidatos).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Ver lista" }));
     expect(
       await screen.findByRole("dialog", { name: "Quem vai receber" }),
