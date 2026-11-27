@@ -78,6 +78,9 @@ import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { carregarRelatorio, respostasCompletas } from "./carregarRelatorio";
 import { nomeDaExportacao, planilhaDosResultados } from "./exportarResultados";
 import { enderecoDaRota } from "./rotasDePesquisas";
+import { ResultadosDisc } from "./modelos/disc/ResultadosDisc";
+import { planilhaDisc } from "./modelos/disc/exportarDisc";
+import { perfilComportamental } from "./modelos/disc/tiposDisc";
 import {
   BarraEmpilhada,
   BarrasPorNota,
@@ -251,6 +254,19 @@ function ResultadosInterno({
           enderecoDaRota({ tela: "relatorio", id: pesquisaId }),
           "_blank",
           "noopener",
+        );
+        return;
+      }
+      if (detalhe.modelo === "disc") {
+        // Perfil comportamental: planilha própria (7 abas).
+        const [disc, empresa] = await Promise.all([
+          (servico.perfilComportamental ?? perfilComportamental)(pesquisaId),
+          Promise.resolve(servico.empresaAtiva()).catch(() => null),
+        ]);
+        baixarArquivo(
+          planilhaDisc(detalhe, disc, empresa?.nome ?? "", hoje),
+          nomeDaExportacao(detalhe.nome, "xlsx"),
+          TIPO_MIME_XLSX,
         );
         return;
       }
@@ -534,7 +550,17 @@ function ResultadosInterno({
       </div>
 
       <div role="tabpanel" className="pesquisas__resultados">
-        {aba === "geral" ? (
+        {detalhe.modelo === "disc" && !(aba === "geral" && semRespostas) ? (
+          <ResultadosDisc
+            detalhe={detalhe}
+            aba={aba}
+            {...(servico.perfilComportamental
+              ? { carregar: servico.perfilComportamental }
+              : {})}
+            onAbrirResposta={(id) => onAbrirResposta?.(id)}
+            onIrParaAnalises={() => setAba("analises")}
+          />
+        ) : aba === "geral" ? (
           semRespostas ? (
             <section
               className="pesquisas__sem-respostas"

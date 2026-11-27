@@ -365,7 +365,7 @@ export const ANALISES: AnalisesPesquisa = {
 
 /** Serviço falso: tudo resolve (nunca `undefined` em efeito). */
 export type ServicoFalso = {
-  [K in keyof ServicoDePesquisas]: Mock<ServicoDePesquisas[K]>;
+  [K in keyof ServicoDePesquisas]: Mock<NonNullable<ServicoDePesquisas[K]>>;
 };
 
 export function servicoFalso(

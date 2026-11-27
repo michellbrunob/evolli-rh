@@ -139,8 +139,12 @@ export function secoesDoModelo(m: ModeloDaGaleria): Secao[] {
     perguntas: s.perguntas.map((p) => {
       const config: Pergunta["config"] = { ...(p.config ?? {}) };
       if (p.opcoes) {
-        config.opcoes = p.opcoes.map((texto) => ({ id: novoId(), texto }));
-        config.outro = config.outro ?? false;
+        config.opcoes = p.opcoes.map((o) =>
+          typeof o === "string"
+            ? { id: novoId(), texto: o }
+            : { id: novoId(), texto: o.texto, fator: o.fator },
+        );
+        if (p.tipo !== "escolha_forcada") config.outro = config.outro ?? false;
       }
       let condicao: Pergunta["condicao"] = null;
       if (p.condicao) {

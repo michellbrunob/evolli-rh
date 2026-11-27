@@ -1,9 +1,11 @@
 /**
  * T216 — Perfil comportamental (DISC): card, gaveta e página "Sobre o
- * modelo". Os 28 blocos de escolha forçada e o cálculo dos perfis ficam com
- * a frente deste modelo: ela preenche `secoes` e tira `grupos`.
+ * modelo", com os 28 blocos de escolha forçada (`blocos.ts`, textos do
+ * Evolli): cada bloco é um item fixo (`Pergunta.chave` `disc_01`…`disc_28`)
+ * com 4 frases, uma por fator.
  */
 import type { ModeloDaGaleria } from "../tipos";
+import { BLOCOS_DISC, PERGUNTA_DO_BLOCO, chaveDoBloco } from "./blocos";
 
 export const FATORES_DISC = [
   {
@@ -58,13 +60,27 @@ export const PERFIL_COMPORTAMENTAL: ModeloDaGaleria = {
   sobre:
     "28 blocos de 4 frases; em cada um, a pessoa escolhe a que mais combina com ela. O resultado é o % de cada fator.",
   nomeBase: "Perfil comportamental",
-  boasVindas: null,
-  secoes: [],
-  grupos: [
-    { titulo: "Blocos de frases", cor: "--modelo-ambar", quantidade: 28 },
+  boasVindas:
+    "Em cada bloco, escolha a frase que mais combina com você. Não há resposta certa: responda pelo que você faz no dia a dia.",
+  secoes: [
+    {
+      titulo: "Blocos de frases",
+      cor: "--modelo-ambar",
+      perguntas: BLOCOS_DISC.map((b, i) => ({
+        chave: chaveDoBloco(i),
+        tipo: "escolha_forcada" as const,
+        texto: PERGUNTA_DO_BLOCO,
+        rotulo: b.tema,
+        obrigatoria: true,
+        opcoes: b.frases.map((texto, j) => ({
+          texto,
+          fator: (["D", "I", "S", "C"] as const)[j]!,
+        })),
+      })),
+    },
   ],
   comentarioFinal: null,
-  perguntaPadrao: { tipo: "escolha_unica", config: {} },
+  perguntaPadrao: { tipo: "escolha_forcada", config: {} },
   limite: 28,
   fixo: true,
   pagina: {

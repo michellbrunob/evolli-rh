@@ -69,6 +69,8 @@ import {
 } from "../../format/dataDigitada";
 import { minutosEstimados } from "../pesquisas/tempoEstimado";
 import { CampoDaPergunta } from "./CampoDaPergunta";
+import { perfilDasEscolhas } from "../pesquisas/modelos/disc/perfilLocal";
+import { ResultadoPublicoDisc } from "../pesquisas/modelos/disc/ResultadoPublicoDisc";
 import {
   cpfValido,
   erroDaPergunta,
@@ -1069,7 +1071,25 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
       );
       break;
 
-    case "enviado":
+    case "enviado": {
+      // Perfil comportamental (DISC): o resultado da própria pessoa.
+      const perfilDisc =
+        pesquisa?.modelo === "disc"
+          ? perfilDasEscolhas(secoes, respostas)
+          : null;
+      if (perfilDisc) {
+        conteudo = (
+          <ResultadoPublicoDisc
+            perfil={perfilDisc}
+            previa={previa !== null}
+            titulo={titulo(
+              "Respostas enviadas!",
+              "pesquisa-publica__titulo pesquisa-publica__titulo--grande",
+            )}
+          />
+        );
+        break;
+      }
       conteudo = (
         <div className="pesquisa-publica__centro">
           <span
@@ -1090,6 +1110,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
         </div>
       );
       break;
+    }
   }
 
   const limpa = etapa.tipo === "tela";

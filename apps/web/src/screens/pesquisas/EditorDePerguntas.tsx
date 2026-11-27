@@ -117,6 +117,7 @@ const ICONE_DO_TIPO: Readonly<Record<TipoPergunta, IconeDoEcossistema>> = {
   estrelas: IconeEstrela,
   data: IconeCalendario,
   numero: IconeNumero,
+  escolha_forcada: IconeEscolhaUnica,
 };
 
 const SEMPRE = "__sempre__";

@@ -43,6 +43,7 @@ import {
   mediaNa10,
 } from "./indicadores";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
+import { ResultadoIndividualDisc } from "./modelos/disc/ResultadoIndividualDisc";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { umaCasa } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
@@ -111,6 +112,18 @@ export function ResultadoIndividual({
       </p>
     );
   if (!pesquisa) return <Esqueleto rotulo="Carregando resposta…" linhas={5} />;
+  if (pesquisa.modelo === "disc")
+    return (
+      <ResultadoIndividualDisc
+        pesquisa={pesquisa}
+        respostaId={respostaId}
+        {...(servico.perfilComportamental
+          ? { carregar: servico.perfilComportamental }
+          : {})}
+        onVoltar={onVoltar}
+        onIr={onIr}
+      />
+    );
   return (
     <PaginaDaResposta
       nomeDaPesquisa={pesquisa.nome}

@@ -250,6 +250,25 @@ export function errosDaSecao(
   return erros;
 }
 
+/**
+ * As frases de um bloco de escolha forçada numa ordem própria do bloco
+ * (estável: a mesma a cada visita), para a posição não sugerir a resposta.
+ */
+export function frasesEmbaralhadas<T>(
+  perguntaId: string,
+  frases: readonly T[],
+): T[] {
+  let semente = 0;
+  for (const c of perguntaId) semente = (semente * 31 + c.charCodeAt(0)) >>> 0;
+  const saida = [...frases];
+  for (let i = saida.length - 1; i > 0; i -= 1) {
+    semente = (semente * 1103515245 + 12345) >>> 0;
+    const j = semente % (i + 1);
+    [saida[i], saida[j]] = [saida[j]!, saida[i]!];
+  }
+  return saida;
+}
+
 // ------------------------------------------------------------------- envio
 
 function valorDoEnvio(p: Pergunta, valor: ValorRascunho): ValorResposta | null {
@@ -274,6 +293,8 @@ function valorDoEnvio(p: Pergunta, valor: ValorRascunho): ValorResposta | null {
       return lerNumero(String(valor));
     case "sim_nao":
       return valor === "sim" || valor === "nao" ? valor : null;
+    case "escolha_forcada":
+      return typeof valor === "string" && valor ? { opcao: valor } : null;
     default:
       return typeof valor === "number" ? valor : null;
   }

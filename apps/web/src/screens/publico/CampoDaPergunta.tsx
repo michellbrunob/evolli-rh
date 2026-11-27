@@ -12,6 +12,7 @@
 import type { CSSProperties, ReactNode, Ref } from "react";
 import type { Pergunta } from "../../api/pesquisaPublicaClient";
 import {
+  frasesEmbaralhadas,
   LIMITE_OUTRO,
   LIMITE_PARAGRAFO,
   LIMITE_TEXTO_CURTO,
@@ -473,6 +474,22 @@ export function CampoDaPergunta({
       );
       break;
     }
+
+    case "escolha_forcada":
+      controle = (
+        <GrupoDeRadios
+          base={base}
+          descritores={descritores}
+          erro={erro}
+          disposicao="lista"
+          marcado={typeof valor === "string" ? valor : null}
+          aoMarcar={aoMudar}
+          opcoes={frasesEmbaralhadas(pergunta.id, config.opcoes ?? []).map(
+            (o) => ({ valor: o.id, rotulo: o.texto }),
+          )}
+        />
+      );
+      break;
 
     case "escolha_unica": {
       const v: EscolhaRascunho =

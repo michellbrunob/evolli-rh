@@ -62,6 +62,8 @@ import { modeloDaGaleria, type ModeloDaGaleria } from "./modelosDePesquisa";
 import { PerguntasFixas } from "./modelos/PerguntasFixas";
 import { seloDoTipoDaPergunta } from "./modelos/selos";
 import { textoParaOPainel } from "./modelos/empresa";
+import { CartaoDosBlocos } from "./modelos/disc/CartaoDosBlocos";
+import { MINUTOS_DO_DISC } from "./modelos/disc/blocos";
 import { lembrarRascunho } from "./rascunhosLocais";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { TelaDeGerada } from "./TelaDeGerada";
@@ -387,7 +389,11 @@ function AssistenteDoModeloInterno({
             ? `Editar ${estado.nome}`
             : tituloDoAssistente(m)}
         </h1>
-        <p className="pesquisas__subtitulo">{m.descricao}</p>
+        <p className="pesquisas__subtitulo">
+          {m.modelo === "disc"
+            ? `${principais.length} blocos · cerca de ${MINUTOS_DO_DISC} minutos para responder.`
+            : m.descricao}
+        </p>
       </div>
       {publicadaAntes && !gerada ? null : (
         <p className="pesquisas__salvo" role="status">
@@ -689,7 +695,9 @@ function EtapaConfigurar({
         />
       ) : null}
 
-      {m.fixo ? (
+      {m.modelo === "disc" ? (
+        <CartaoDosBlocos blocos={principais} />
+      ) : m.fixo ? (
         <PerguntasFixas modelo={m} secoes={estado.secoes} />
       ) : (
         <CartaoDeSecao
@@ -973,7 +981,11 @@ function EtapaEnviar({
           </div>
           <div>
             <dt>Perguntas</dt>
-            <dd>{`${principais.length} · ${tipos.join(" + ")}`}</dd>
+            <dd>
+              {estado.modelo === "disc"
+                ? `${principais.length} blocos de frases do DISC`
+                : `${principais.length} · ${tipos.join(" + ")}`}
+            </dd>
           </div>
           <div>
             <dt>Participantes</dt>

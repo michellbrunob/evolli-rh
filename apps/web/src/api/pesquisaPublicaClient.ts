@@ -31,11 +31,17 @@ export type TipoPergunta =
   | "data"
   | "numero"
   | "concordancia_4"
-  | "satisfacao_4";
+  | "satisfacao_4"
+  /** Perfil comportamental (DISC): escolher 1 de 4 frases. */
+  | "escolha_forcada";
+
+/** O fator DISC de uma frase (só nos blocos de escolha forçada). */
+export type FatorDisc = "D" | "I" | "S" | "C";
 
 export interface Opcao {
   readonly id: string;
   readonly texto: string;
+  readonly fator?: FatorDisc;
 }
 
 export interface ConfigPergunta {

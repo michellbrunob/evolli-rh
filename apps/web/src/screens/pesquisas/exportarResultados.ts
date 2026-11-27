@@ -99,7 +99,8 @@ export function textoDoValor(p: Pergunta, valor: unknown): string {
     case "texto_curto":
     case "paragrafo":
       return String(valor);
-    case "escolha_unica": {
+    case "escolha_unica":
+    case "escolha_forcada": {
       const v = valor as { opcao?: string; outro?: string };
       if (typeof v.outro === "string") return `Outro: ${v.outro}`;
       return v.opcao ? opcao(v.opcao) : SEM_RESPOSTA;

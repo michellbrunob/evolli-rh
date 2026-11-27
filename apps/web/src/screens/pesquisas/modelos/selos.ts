@@ -21,6 +21,8 @@ export function seloDoTipoDaPergunta(p: Pergunta): string {
       return "Estrelas 1–5";
     case "escolha_unica":
       return "Escolha única";
+    case "escolha_forcada":
+      return "Bloco de frases";
     case "multipla_escolha":
       return "Múltipla escolha";
     case "sim_nao":

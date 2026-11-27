@@ -121,8 +121,9 @@ function JeitoDeResponder({ pergunta: p }: { readonly pergunta: Pergunta }) {
         />
       );
     case "escolha_unica":
+    case "escolha_forcada":
     case "multipla_escolha": {
-      const tipo = p.tipo === "escolha_unica" ? "radio" : "checkbox";
+      const tipo = p.tipo === "multipla_escolha" ? "checkbox" : "radio";
       const opcoes = [
         ...(p.config.opcoes ?? []).map((o) => o.texto),
         ...(p.config.outro ? ["Outro"] : []),

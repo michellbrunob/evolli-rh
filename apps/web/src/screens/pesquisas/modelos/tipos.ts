@@ -7,6 +7,7 @@
  */
 import type {
   ConfigPergunta,
+  FatorDisc,
   ModeloPesquisa,
   TipoPergunta,
 } from "../../../api/pesquisasClient";
@@ -78,8 +79,14 @@ export interface PerguntaDoModelo {
   readonly rotulo?: string;
   readonly descricao?: string;
   readonly obrigatoria?: boolean;
-  /** Opções por texto (os ids nascem no uso). */
-  readonly opcoes?: readonly string[];
+  /**
+   * Opções por texto (os ids nascem no uso); nos blocos do DISC, com o
+   * fator de cada frase.
+   */
+  readonly opcoes?: readonly (
+    | string
+    | { readonly texto: string; readonly fator: FatorDisc }
+  )[];
   readonly config?: Omit<ConfigPergunta, "opcoes">;
   /** Só aparece para quem marcou a opção (índice, ou "sim"/"nao"). */
   readonly condicao?: {

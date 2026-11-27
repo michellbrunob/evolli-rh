@@ -20,6 +20,10 @@ import { listarEmpresasDoContexto } from "../../api/contextoEmpresarialClient";
 import { listarEmpresas } from "../../api/organizacaoClient";
 import * as cliente from "../../api/pesquisasClient";
 import type { CampoGrupo } from "../../api/pesquisasClient";
+import {
+  perfilComportamental,
+  type CarregarPerfil,
+} from "./modelos/disc/tiposDisc";
 
 /** Uma opção de recorte (departamento, centro de custo, unidade ou área). */
 export interface OpcaoDeGrupo {
@@ -78,6 +82,8 @@ export type ServicoDePesquisas = Pick<
   >;
   /** A empresa ativa (para cadastrar um grupo na hora). */
   readonly empresaAtiva: () => Promise<{ id: string; nome: string } | null>;
+  /** Perfil comportamental (DISC); sem ele, a tela usa o cliente real. */
+  readonly perfilComportamental?: CarregarPerfil;
 };
 
 const TETO_DE_PESSOAS = 5000;
@@ -117,6 +123,7 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   respostaDaPesquisa: cliente.respostaDaPesquisa,
   listarCandidatos: cliente.listarCandidatos,
   contagemDoTime: cliente.contagemDoTime,
+  perfilComportamental,
   listarTodosCandidatos: () => todosOsCandidatos(cliente.listarCandidatos),
   listarAtivos: ativos,
   listarTodosAtivos: async () => {

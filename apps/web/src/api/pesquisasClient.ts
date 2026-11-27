@@ -57,12 +57,18 @@ export type TipoPergunta =
   | "data"
   | "numero"
   | "concordancia_4"
-  | "satisfacao_4";
+  | "satisfacao_4"
+  /** Perfil comportamental (DISC): bloco de 4 frases, uma por fator. */
+  | "escolha_forcada";
+
+/** O fator DISC de uma frase (só nos blocos de escolha forçada). */
+export type FatorDisc = "D" | "I" | "S" | "C";
 
 /** `id` gerado no navegador (até 40 caracteres). */
 export interface Opcao {
   id: string;
   texto: string;
+  fator?: FatorDisc;
 }
 
 export interface ConfigPergunta {
@@ -408,7 +414,7 @@ export interface PesquisaDaFicha {
 
 type Metodo = "GET" | "POST" | "PUT" | "DELETE";
 
-async function pedir<T>(
+export async function pedir<T>(
   rota: string,
   metodo: Metodo,
   corpo?: unknown,
