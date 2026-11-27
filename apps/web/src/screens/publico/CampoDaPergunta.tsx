@@ -1,13 +1,15 @@
 /**
- * T216 — o controle de cada um dos 11 tipos de pergunta, na página pública.
+ * T216 — uma pergunta por tela, na página pública: o texto em destaque (o
+ * título da tela, que recebe o foco a cada troca) e o controle próprio de
+ * cada um dos 11 tipos, ligado a esse título por `aria-labelledby`.
  *
  * Escalas, notas, estrelas, sim/não e escolha única são `input type="radio"`
- * nativos num `fieldset` com `legend` (o teclado do navegador vale: Tab entra
- * no grupo, as setas trocam a opção). A aparência de botão vem do rótulo; o
- * círculo nativo fica só para o leitor de tela. Múltipla escolha usa caixas de
- * seleção do padrão do sistema.
+ * nativos num `role="radiogroup"` (o teclado do navegador vale: Tab entra no
+ * grupo, as setas trocam a opção). A aparência de botão vem do rótulo; o
+ * círculo nativo fica só para o leitor de tela. Múltipla escolha usa caixas
+ * de seleção do padrão do sistema.
  */
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import type { Pergunta } from "../../api/pesquisaPublicaClient";
 import {
   LIMITE_OUTRO,
@@ -34,12 +36,18 @@ export interface CampoDaPerguntaProps {
   readonly valor: ValorRascunho | undefined;
   readonly erro: string | null;
   readonly aoMudar: (valor: ValorRascunho) => void;
+  /** O título da pergunta: recebe o foco a cada troca de tela. */
+  readonly tituloRef?: Ref<HTMLHeadingElement>;
 }
 
 function intervalo(de: number, ate: number): number[] {
   const saida: number[] = [];
   for (let n = de; n <= ate; n++) saida.push(n);
   return saida;
+}
+
+function textoDoNumero(n: number): string {
+  return String(n).replace(".", ",");
 }
 
 function MarcaObrigatoria({ obrigatoria }: { readonly obrigatoria: boolean }) {
@@ -79,62 +87,58 @@ interface OpcaoDoGrupo {
   readonly valor: string;
   /** O que aparece no botão. */
   readonly rotulo: ReactNode;
-  /** Complemento só para o leitor de tela (ex.: "estrelas"). */
+  /** Complemento só para o leitor de tela (ex.: "3 estrelas"). */
   readonly complemento?: string;
 }
 
 /** Grupo de botões rádio (escala, nota, estrelas, sim/não, escolha única). */
 function GrupoDeRadios({
-  pergunta,
+  base,
+  descritores,
   erro,
   opcoes,
   marcado,
   aoMarcar,
   disposicao,
-  ajuda,
   extremos,
-  depois,
 }: {
-  readonly pergunta: Pergunta;
+  readonly base: string;
+  readonly descritores: string | undefined;
   readonly erro: string | null;
   readonly opcoes: readonly OpcaoDoGrupo[];
   readonly marcado: string | null;
   readonly aoMarcar: (valor: string) => void;
   readonly disposicao: "linha" | "lista" | "estrelas";
-  readonly ajuda?: string | null;
   readonly extremos?: readonly [string, string] | null;
-  readonly depois?: ReactNode;
 }) {
-  const base = `q-${pergunta.id}`;
-  const descritores = [
-    pergunta.descricao ? `${base}-desc` : null,
-    ajuda ? `${base}-ajuda` : null,
-    extremos ? `${base}-extremos` : null,
-    erro ? `${base}-erro` : null,
-  ].filter(Boolean);
   const valorMarcado = marcado === null ? null : Number(marcado);
+  const descricao = [descritores, extremos ? `${base}-extremos` : null]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <fieldset
-      className="pesquisa-pergunta"
-      data-pergunta={pergunta.id}
-      aria-describedby={descritores.length ? descritores.join(" ") : undefined}
+    <div
+      role="radiogroup"
+      aria-labelledby={`${base}-titulo`}
+      aria-describedby={descricao || undefined}
       aria-invalid={erro ? true : undefined}
+      className="pesquisa-grupo"
     >
-      <legend className="pesquisa-pergunta__texto">
-        {pergunta.texto}
-        <MarcaObrigatoria obrigatoria={pergunta.obrigatoria} />
-      </legend>
-      {pergunta.descricao ? (
-        <p id={`${base}-desc`} className="pesquisa-pergunta__descricao">
-          {pergunta.descricao}
-        </p>
-      ) : null}
-      {ajuda ? (
-        <p id={`${base}-ajuda`} className="pesquisa-pergunta__descricao">
-          {ajuda}
-        </p>
-      ) : null}
-      <div className={`pesquisa-opcoes pesquisa-opcoes--${disposicao}`}>
+      <div
+        className={`pesquisa-opcoes pesquisa-opcoes--${disposicao}`}
+        style={
+          disposicao === "linha"
+            ? ({
+                // Todos os quadrados numa linha; no celular, em duas
+                // linhas iguais quando passam de 6 (alvo de toque de 44 px).
+                "--colunas": opcoes.length,
+                "--colunas-celular":
+                  opcoes.length > 6
+                    ? Math.ceil(opcoes.length / 2)
+                    : opcoes.length,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         {opcoes.map((o) => {
           const ativo =
             disposicao === "estrelas"
@@ -173,23 +177,21 @@ function GrupoDeRadios({
           <span>{extremos[1]}</span>
         </p>
       ) : null}
-      {depois}
-      <MensagemDeErro id={`${base}-erro`} erro={erro} />
-    </fieldset>
+    </div>
   );
 }
 
 /** Campo de texto livre para "Outro". */
 function CampoOutro({
-  pergunta,
+  base,
   valor,
   aoMudar,
 }: {
-  readonly pergunta: Pergunta;
+  readonly base: string;
   readonly valor: string;
   readonly aoMudar: (texto: string) => void;
 }) {
-  const id = `q-${pergunta.id}-outro`;
+  const id = `${base}-outro`;
   return (
     <div className="pesquisa-outro">
       <label htmlFor={id} className="pesquisa-pergunta__rotulo-menor">
@@ -207,136 +209,27 @@ function CampoOutro({
   );
 }
 
-function CampoDeTexto({
-  pergunta,
-  valor,
-  erro,
-  aoMudar,
-  ajuda,
-  children,
-}: {
-  readonly pergunta: Pergunta;
-  readonly valor: string;
-  readonly erro: string | null;
-  readonly aoMudar: (v: string) => void;
-  readonly ajuda?: string | null;
-  readonly children: (props: {
-    id: string;
-    value: string;
-    onChange: (v: string) => void;
-    "aria-describedby"?: string;
-    "aria-invalid"?: true;
-    "aria-required"?: true;
-    className: string;
-  }) => ReactNode;
-}) {
-  const base = `q-${pergunta.id}`;
-  const descritores = [
-    pergunta.descricao ? `${base}-desc` : null,
-    ajuda ? `${base}-ajuda` : null,
-    erro ? `${base}-erro` : null,
-  ].filter(Boolean);
-  const props: Parameters<typeof children>[0] = {
-    id: base,
-    value: valor,
-    onChange: aoMudar,
-    className: "pesquisa-campo",
-  };
-  if (descritores.length) props["aria-describedby"] = descritores.join(" ");
-  if (erro) props["aria-invalid"] = true;
-  if (pergunta.obrigatoria) props["aria-required"] = true;
-  return (
-    <div className="pesquisa-pergunta" data-pergunta={pergunta.id}>
-      <label htmlFor={base} className="pesquisa-pergunta__texto">
-        {pergunta.texto}
-        <MarcaObrigatoria obrigatoria={pergunta.obrigatoria} />
-      </label>
-      {pergunta.descricao ? (
-        <p id={`${base}-desc`} className="pesquisa-pergunta__descricao">
-          {pergunta.descricao}
-        </p>
-      ) : null}
-      {ajuda ? (
-        <p id={`${base}-ajuda`} className="pesquisa-pergunta__descricao">
-          {ajuda}
-        </p>
-      ) : null}
-      {children(props)}
-      <MensagemDeErro id={`${base}-erro`} erro={erro} />
-    </div>
-  );
-}
-
-function textoDoNumero(n: number): string {
-  return String(n).replace(".", ",");
-}
-
-export function CampoDaPergunta({
-  pergunta,
-  valor,
-  erro,
-  aoMudar,
-}: CampoDaPerguntaProps) {
+/** A ajuda fixa de cada tipo (formato, limite, quantas escolhas). */
+function ajudaDoTipo(
+  pergunta: Pergunta,
+  valor: ValorRascunho | undefined,
+): string | null {
   const { tipo, config } = pergunta;
-
   switch (tipo) {
     case "texto_curto":
-    case "paragrafo": {
-      const limite =
-        tipo === "texto_curto" ? LIMITE_TEXTO_CURTO : LIMITE_PARAGRAFO;
-      const texto = typeof valor === "string" ? valor : "";
-      return (
-        <CampoDeTexto
-          pergunta={pergunta}
-          valor={texto}
-          erro={erro}
-          aoMudar={aoMudar}
-          ajuda={`Até ${limite} caracteres.`}
-        >
-          {({ onChange, ...p }) =>
-            tipo === "texto_curto" ? (
-              <input
-                type="text"
-                maxLength={limite}
-                onChange={(e) => onChange(e.target.value)}
-                {...p}
-              />
-            ) : (
-              <textarea
-                rows={5}
-                maxLength={limite}
-                onChange={(e) => onChange(e.target.value)}
-                {...p}
-              />
-            )
-          }
-        </CampoDeTexto>
-      );
-    }
-
+      return `Até ${LIMITE_TEXTO_CURTO} caracteres.`;
+    case "paragrafo":
+      return `Até ${LIMITE_PARAGRAFO} caracteres.`;
     case "data":
-      return (
-        <CampoDeTexto
-          pergunta={pergunta}
-          valor={typeof valor === "string" ? valor : ""}
-          erro={erro}
-          aoMudar={(v) => aoMudar(mascararDataDigitada(v))}
-          ajuda="No formato dd/mm/aaaa."
-        >
-          {({ onChange, ...p }) => (
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="dd/mm/aaaa"
-              maxLength={10}
-              onChange={(e) => onChange(e.target.value)}
-              {...p}
-            />
-          )}
-        </CampoDeTexto>
-      );
-
+      return "No formato dd/mm/aaaa.";
+    case "estrelas":
+      return typeof valor === "number"
+        ? `Você deu ${valor} de 5 estrelas.`
+        : "De 1 a 5 estrelas.";
+    case "multipla_escolha":
+      return config.maximo !== undefined
+        ? `Escolha até ${config.maximo === 1 ? "1 opção" : `${config.maximo} opções`}.`
+        : "Escolha quantas opções quiser.";
     case "numero": {
       const { minimo, maximo, inteiro } = config;
       const partes = [
@@ -349,34 +242,103 @@ export function CampoDaPergunta({
               ? `até ${textoDoNumero(maximo)}`
               : null,
       ].filter(Boolean);
-      const ajuda = partes.length
+      return partes.length
         ? `${partes.join(", ")}.`.replace(/^./, (c) => c.toUpperCase())
         : null;
-      return (
-        <CampoDeTexto
-          pergunta={pergunta}
-          valor={typeof valor === "string" ? valor : ""}
-          erro={erro}
-          aoMudar={aoMudar}
-          ajuda={ajuda}
-        >
-          {({ onChange, ...p }) => (
-            <input
-              type="text"
-              inputMode={inteiro ? "numeric" : "decimal"}
-              autoComplete="off"
-              onChange={(e) => onChange(e.target.value)}
-              {...p}
-            />
-          )}
-        </CampoDeTexto>
-      );
     }
+    default:
+      return null;
+  }
+}
+
+export function CampoDaPergunta({
+  pergunta,
+  valor,
+  erro,
+  aoMudar,
+  tituloRef,
+}: CampoDaPerguntaProps) {
+  const { tipo, config } = pergunta;
+  const base = `q-${pergunta.id}`;
+  const ajuda = ajudaDoTipo(pergunta, valor);
+  const descritores =
+    [
+      pergunta.descricao ? `${base}-desc` : null,
+      ajuda ? `${base}-ajuda` : null,
+      erro ? `${base}-erro` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
+  /** Props comuns dos campos de texto (rótulo = o título da pergunta). */
+  const doCampo = {
+    id: base,
+    className: "pesquisa-campo",
+    "aria-labelledby": `${base}-titulo`,
+    "aria-describedby": descritores,
+    "aria-invalid": erro ? true : undefined,
+    "aria-required": pergunta.obrigatoria ? true : undefined,
+  } as const;
+
+  let controle: ReactNode;
+  switch (tipo) {
+    case "texto_curto":
+      controle = (
+        <input
+          type="text"
+          maxLength={LIMITE_TEXTO_CURTO}
+          value={typeof valor === "string" ? valor : ""}
+          onChange={(e) => aoMudar(e.target.value)}
+          {...doCampo}
+        />
+      );
+      break;
+
+    case "paragrafo":
+      controle = (
+        <textarea
+          rows={6}
+          maxLength={LIMITE_PARAGRAFO}
+          value={typeof valor === "string" ? valor : ""}
+          onChange={(e) => aoMudar(e.target.value)}
+          {...doCampo}
+        />
+      );
+      break;
+
+    case "data":
+      controle = (
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="dd/mm/aaaa"
+          maxLength={10}
+          value={typeof valor === "string" ? valor : ""}
+          onChange={(e) => aoMudar(mascararDataDigitada(e.target.value))}
+          {...doCampo}
+        />
+      );
+      break;
+
+    case "numero":
+      controle = (
+        <input
+          type="text"
+          inputMode={config.inteiro ? "numeric" : "decimal"}
+          autoComplete="off"
+          value={typeof valor === "string" ? valor : ""}
+          onChange={(e) => aoMudar(e.target.value)}
+          {...doCampo}
+        />
+      );
+      break;
 
     case "sim_nao":
-      return (
+      controle = (
         <GrupoDeRadios
-          pergunta={pergunta}
+          base={base}
+          descritores={descritores}
           erro={erro}
           disposicao="linha"
           marcado={typeof valor === "string" ? valor : null}
@@ -387,11 +349,13 @@ export function CampoDaPergunta({
           ]}
         />
       );
+      break;
 
     case "concordancia":
-      return (
+      controle = (
         <GrupoDeRadios
-          pergunta={pergunta}
+          base={base}
+          descritores={descritores}
           erro={erro}
           disposicao="lista"
           marcado={typeof valor === "number" ? String(valor) : null}
@@ -402,20 +366,17 @@ export function CampoDaPergunta({
           }))}
         />
       );
+      break;
 
     case "estrelas":
-      return (
+      controle = (
         <GrupoDeRadios
-          pergunta={pergunta}
+          base={base}
+          descritores={descritores}
           erro={erro}
           disposicao="estrelas"
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
-          ajuda={
-            typeof valor === "number"
-              ? `Você deu ${valor} de 5 estrelas.`
-              : "De 1 a 5 estrelas."
-          }
           opcoes={intervalo(1, 5).map((n) => ({
             valor: String(n),
             rotulo: <span aria-hidden="true">★</span>,
@@ -423,34 +384,34 @@ export function CampoDaPergunta({
           }))}
         />
       );
+      break;
 
     case "nota_0_10":
     case "escala": {
       const de = tipo === "escala" ? (config.minimo ?? 1) : 0;
       const ate = tipo === "escala" ? (config.maximo ?? 5) : 10;
-      const extremos: readonly [string, string] | null =
+      const extremos: readonly [string, string] =
         tipo === "escala"
-          ? config.rotuloMinimo || config.rotuloMaximo
-            ? [
-                config.rotuloMinimo ? `${de}: ${config.rotuloMinimo}` : "",
-                config.rotuloMaximo ? `${ate}: ${config.rotuloMaximo}` : "",
-              ]
-            : null
-          : ["0: nada provável", "10: muito provável"];
-      return (
+          ? [config.rotuloMinimo || "Mínimo", config.rotuloMaximo || "Máximo"]
+          : config.enps
+            ? ["Nada provável", "Muito provável"]
+            : ["Mínimo", "Máximo"];
+      controle = (
         <GrupoDeRadios
-          pergunta={pergunta}
+          base={base}
+          descritores={descritores}
           erro={erro}
           disposicao="linha"
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
-          extremos={tipo === "nota_0_10" && !config.enps ? null : extremos}
+          extremos={extremos}
           opcoes={intervalo(de, ate).map((n) => ({
             valor: String(n),
             rotulo: String(n),
           }))}
         />
       );
+      break;
     }
 
     case "escolha_unica": {
@@ -463,31 +424,33 @@ export function CampoDaPergunta({
         rotulo: o.texto,
       }));
       if (config.outro) opcoes.push({ valor: OUTRO, rotulo: "Outro" });
-      return (
-        <GrupoDeRadios
-          pergunta={pergunta}
-          erro={erro}
-          disposicao="lista"
-          marcado={v.outro !== null ? OUTRO : v.opcao}
-          aoMarcar={(id) =>
-            aoMudar(
-              id === OUTRO
-                ? { opcao: null, outro: v.outro ?? "" }
-                : { opcao: id, outro: null },
-            )
-          }
-          opcoes={opcoes}
-          depois={
-            v.outro !== null ? (
-              <CampoOutro
-                pergunta={pergunta}
-                valor={v.outro}
-                aoMudar={(t) => aoMudar({ opcao: null, outro: t })}
-              />
-            ) : null
-          }
-        />
+      controle = (
+        <>
+          <GrupoDeRadios
+            base={base}
+            descritores={descritores}
+            erro={erro}
+            disposicao="lista"
+            marcado={v.outro !== null ? OUTRO : v.opcao}
+            aoMarcar={(id) =>
+              aoMudar(
+                id === OUTRO
+                  ? { opcao: null, outro: v.outro ?? "" }
+                  : { opcao: id, outro: null },
+              )
+            }
+            opcoes={opcoes}
+          />
+          {v.outro !== null ? (
+            <CampoOutro
+              base={base}
+              valor={v.outro}
+              aoMudar={(t) => aoMudar({ opcao: null, outro: t })}
+            />
+          ) : null}
+        </>
       );
+      break;
     }
 
     case "multipla_escolha": {
@@ -495,19 +458,9 @@ export function CampoDaPergunta({
         valor && typeof valor === "object" && "opcoes" in valor
           ? valor
           : { opcoes: [], outro: null };
-      const base = `q-${pergunta.id}`;
       const maximo = config.maximo;
       const total = v.opcoes.length + (v.outro !== null ? 1 : 0);
       const cheio = maximo !== undefined && total >= maximo;
-      const ajuda =
-        maximo !== undefined
-          ? `Escolha até ${maximo === 1 ? "1 opção" : `${maximo} opções`}.`
-          : "Escolha quantas opções quiser.";
-      const descritores = [
-        pergunta.descricao ? `${base}-desc` : null,
-        `${base}-ajuda`,
-        erro ? `${base}-erro` : null,
-      ].filter(Boolean);
       const itens = [
         ...(config.opcoes ?? []).map((o) => ({ id: o.id, texto: o.texto })),
         ...(config.outro ? [{ id: OUTRO, texto: "Outro" }] : []),
@@ -522,26 +475,15 @@ export function CampoDaPergunta({
           outro: v.outro,
         });
       };
-      return (
-        <fieldset
-          className="pesquisa-pergunta"
-          data-pergunta={pergunta.id}
-          aria-describedby={descritores.join(" ")}
-          aria-invalid={erro ? true : undefined}
-        >
-          <legend className="pesquisa-pergunta__texto">
-            {pergunta.texto}
-            <MarcaObrigatoria obrigatoria={pergunta.obrigatoria} />
-          </legend>
-          {pergunta.descricao ? (
-            <p id={`${base}-desc`} className="pesquisa-pergunta__descricao">
-              {pergunta.descricao}
-            </p>
-          ) : null}
-          <p id={`${base}-ajuda`} className="pesquisa-pergunta__descricao">
-            {ajuda}
-          </p>
-          <div className="pesquisa-opcoes pesquisa-opcoes--lista">
+      controle = (
+        <>
+          <div
+            role="group"
+            aria-labelledby={`${base}-titulo`}
+            aria-describedby={descritores}
+            aria-invalid={erro ? true : undefined}
+            className="pesquisa-opcoes pesquisa-opcoes--lista"
+          >
             {itens.map((o) => {
               const marcado =
                 o.id === OUTRO ? v.outro !== null : v.opcoes.includes(o.id);
@@ -568,14 +510,40 @@ export function CampoDaPergunta({
           </div>
           {v.outro !== null ? (
             <CampoOutro
-              pergunta={pergunta}
+              base={base}
               valor={v.outro}
               aoMudar={(t) => aoMudar({ opcoes: v.opcoes, outro: t })}
             />
           ) : null}
-          <MensagemDeErro id={`${base}-erro`} erro={erro} />
-        </fieldset>
+        </>
       );
+      break;
     }
   }
+
+  return (
+    <div className="pesquisa-pergunta" data-pergunta={pergunta.id}>
+      <h1
+        id={`${base}-titulo`}
+        ref={tituloRef}
+        tabIndex={-1}
+        className="pesquisa-pergunta__texto"
+      >
+        {pergunta.texto}
+        <MarcaObrigatoria obrigatoria={pergunta.obrigatoria} />
+      </h1>
+      {pergunta.descricao ? (
+        <p id={`${base}-desc`} className="pesquisa-pergunta__descricao">
+          {pergunta.descricao}
+        </p>
+      ) : null}
+      {ajuda ? (
+        <p id={`${base}-ajuda`} className="pesquisa-pergunta__ajuda">
+          {ajuda}
+        </p>
+      ) : null}
+      {controle}
+      <MensagemDeErro id={`${base}-erro`} erro={erro} />
+    </div>
+  );
 }

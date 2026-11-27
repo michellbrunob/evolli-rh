@@ -126,6 +126,38 @@ function vazio(valor: ValorRascunho | undefined): boolean {
   return valor.opcao === null && valor.outro === null;
 }
 
+/** A pergunta tem resposta (texto não vazio, opção marcada, número…). */
+export function respondida(valor: ValorRascunho | undefined): boolean {
+  return !vazio(valor);
+}
+
+export interface PerguntaNaOrdem {
+  readonly pergunta: Pergunta;
+  readonly secao: Secao;
+  /** É a primeira pergunta VISÍVEL da seção (mostra a descrição dela). */
+  readonly primeiraDaSecao: boolean;
+}
+
+/**
+ * As perguntas visíveis em ordem, uma por tela. A escondida pela condição
+ * não entra na contagem nem no progresso.
+ */
+export function perguntasEmOrdem(
+  secoes: readonly Secao[],
+  visiveis: ReadonlySet<string>,
+): PerguntaNaOrdem[] {
+  const saida: PerguntaNaOrdem[] = [];
+  for (const secao of secoes) {
+    let primeira = true;
+    for (const pergunta of secao.perguntas) {
+      if (!visiveis.has(pergunta.id)) continue;
+      saida.push({ pergunta, secao, primeiraDaSecao: primeira });
+      primeira = false;
+    }
+  }
+  return saida;
+}
+
 /**
  * O erro da pergunta (texto para a tela) ou `null`. Só vale para perguntas
  * visíveis — a tela não chama para as escondidas.

@@ -1,11 +1,15 @@
 /**
  * T216 — página pública de resposta. Celular primeiro: uma coluna, alvos de
- * toque de 44 px, sem largura fixa; a partir de 640 px o cartão ganha
- * respiro. Só tokens (cor, espaço, raio, tipografia); botões pelo
- * componente do sistema (`--radius-botao`).
+ * toque de 44 px, sem largura fixa. Cartão centrado sobre fundo neutro;
+ * abertura, identificação e agradecimento centralizados; uma pergunta por
+ * tela com a barra de progresso fina no topo da página. Só tokens (cor,
+ * espaço, raio, tipografia); botões pelo componente do sistema
+ * (`--radius-botao`).
  */
 
 .pesquisa-publica {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--surface-neutral);
@@ -14,22 +18,60 @@
   font-size: var(--text-body);
 }
 
+/* Barra de progresso fina, de ponta a ponta, no topo da página. */
+.pesquisa-progresso {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--space-xxs);
+  background: var(--divider-soft);
+}
+
+.pesquisa-progresso__preenchido {
+  display: block;
+  height: 100%;
+  background: var(--color-action);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pesquisa-progresso__preenchido {
+    transition: width var(--movimento-curto) ease-out;
+  }
+
+  .pesquisa-publica__cartao > * {
+    animation: pesquisa-entrada var(--movimento-curto) ease-out;
+  }
+}
+
+@keyframes pesquisa-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-xxs));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .pesquisa-publica__topo {
   display: flex;
   justify-content: center;
-  padding: var(--space-lg) var(--space-md) var(--space-sm);
+  padding: var(--space-lg) var(--space-md) var(--space-md);
 }
 
 .pesquisa-publica__principal {
   display: flex;
+  flex: 1 0 auto;
   justify-content: center;
-  padding: 0 var(--space-md) var(--space-2xl);
+  align-items: flex-start;
+  padding: 0 var(--space-md) var(--space-xl);
 }
 
 .pesquisa-publica__cartao {
   width: 100%;
   max-width: 40rem;
-  padding: var(--space-lg) var(--space-md);
+  padding: var(--space-xl) var(--space-md);
   background: var(--surface-canvas);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
@@ -37,8 +79,24 @@
 
 @media (min-width: 640px) {
   .pesquisa-publica__cartao {
-    padding: var(--space-xl) var(--space-2xl);
+    padding: var(--space-2xl) var(--space-2xl);
   }
+}
+
+.pesquisa-publica__rodape {
+  padding: 0 var(--space-md) var(--space-lg);
+  text-align: center;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+/* Telas centralizadas: abertura, identificação, avisos, agradecimento. */
+.pesquisa-publica__centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  text-align: center;
 }
 
 .pesquisa-publica__formulario {
@@ -47,55 +105,91 @@
   gap: var(--space-md);
 }
 
-.pesquisa-publica__empresa {
-  margin: 0 0 var(--space-xs);
+.pesquisa-publica__selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
-  color: var(--color-ink-muted);
+}
+
+.pesquisa-publica__simbolo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--touch-target) + var(--space-md));
+  height: calc(var(--touch-target) + var(--space-md));
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+.pesquisa-publica__simbolo--sucesso {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
 }
 
 .pesquisa-publica__titulo {
-  margin: 0 0 var(--space-sm);
+  margin: 0;
   font-size: var(--text-title);
   font-weight: var(--weight-strong);
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--color-ink);
 }
 
-.pesquisa-publica__formulario .pesquisa-publica__titulo {
-  margin: 0;
+.pesquisa-publica__titulo--grande {
+  font-size: var(--text-display);
 }
 
-.pesquisa-publica__titulo:focus {
+.pesquisa-publica__titulo:focus,
+.pesquisa-pergunta__texto:focus {
   outline: none;
 }
 
-.pesquisa-publica__titulo:focus-visible {
+.pesquisa-publica__titulo:focus-visible,
+.pesquisa-pergunta__texto:focus-visible {
   outline: var(--foco-anel);
   outline-offset: var(--space-xxs);
 }
 
 .pesquisa-publica__texto {
-  margin: 0 0 var(--space-sm);
-  line-height: 1.6;
-  color: var(--color-ink);
-}
-
-.pesquisa-publica__formulario .pesquisa-publica__texto {
   margin: 0;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
 }
 
-.pesquisa-publica__resumo {
-  margin: var(--space-md) 0 var(--space-sm);
+.pesquisa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
   font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.pesquisa-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
 }
 
 .pesquisa-publica__nota,
 .pesquisa-publica__aviso {
-  margin: var(--space-sm) 0 0;
+  margin: 0;
   padding: var(--space-sm);
+  width: 100%;
   line-height: 1.5;
+  text-align: left;
   border-radius: var(--radius-sm);
   border: 1px solid var(--status-info-border);
   background: var(--status-info-surface);
@@ -106,11 +200,6 @@
   border-color: var(--status-warning-border);
   background: var(--status-warning-surface);
   color: var(--status-warning-ink);
-}
-
-.pesquisa-publica__formulario .pesquisa-publica__nota,
-.pesquisa-publica__formulario .pesquisa-publica__aviso {
-  margin: 0;
 }
 
 .pesquisa-publica__legenda {
@@ -131,38 +220,34 @@
 
 .pesquisa-publica__status {
   margin: 0;
+  text-align: center;
   color: var(--color-ink-muted);
 }
 
-.pesquisa-publica__acoes {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-lg);
-}
-
-.pesquisa-publica__acoes > * {
-  flex: 1 1 auto;
+/* Botão largo da abertura, da identificação e da nova tentativa. */
+.pesquisa-publica__largo {
+  width: 100%;
   min-height: var(--touch-target);
+  margin-top: var(--space-sm);
 }
 
-@media (min-width: 640px) {
-  .pesquisa-publica__acoes {
-    justify-content: flex-end;
-  }
-
-  .pesquisa-publica__acoes > * {
-    flex: 0 0 auto;
-  }
-}
-
-/* Progresso */
-.pesquisa-progresso {
+/* Separação por grupo (anônima). */
+.pesquisa-grupos {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: left;
 }
 
-.pesquisa-progresso__texto {
+.pesquisa-grupos__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/* Uma pergunta por tela. */
+.pesquisa-contador {
   margin: 0;
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
@@ -170,56 +255,53 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pesquisa-progresso__barra {
-  height: var(--space-xs);
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--divider-soft);
-}
-
-.pesquisa-progresso__preenchido {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-pill);
-  background: var(--color-action);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pesquisa-progresso__preenchido {
-    transition: width var(--movimento-curto) ease-out;
-  }
-}
-
-/* Perguntas */
-.pesquisa-publica__perguntas {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
+.pesquisa-contador__secao {
+  font-weight: var(--weight-regular);
 }
 
 .pesquisa-pergunta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   min-width: 0;
-  margin: 0;
-  padding: 0 0 var(--space-lg);
-  border: 0;
-  border-bottom: 1px solid var(--divider-soft);
-}
-
-.pesquisa-pergunta:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
 }
 
 .pesquisa-pergunta__texto {
-  padding: 0;
-  margin-bottom: var(--space-xxs);
-  font-size: var(--text-lead);
+  margin: 0 0 var(--space-xxs);
+  font-size: var(--text-title);
   font-weight: var(--weight-strong);
-  line-height: 1.4;
+  line-height: 1.3;
   color: var(--color-ink);
+}
+
+.pesquisa-pergunta__ajuda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pesquisa-publica__navegacao {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.pesquisa-publica__navegacao > * {
+  min-height: var(--touch-target);
+}
+
+.pesquisa-publica__navegacao > :last-child {
+  flex: 0 1 auto;
 }
 
 .pesquisa-pergunta__obrigatoria {
@@ -305,7 +387,13 @@ textarea.pesquisa-campo {
 
 .pesquisa-opcoes--linha {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--touch-target), 1fr));
+  grid-template-columns: repeat(var(--colunas-celular, 5), minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .pesquisa-opcoes--linha {
+    grid-template-columns: repeat(var(--colunas, 5), minmax(0, 1fr));
+  }
 }
 
 .pesquisa-opcoes--estrelas {

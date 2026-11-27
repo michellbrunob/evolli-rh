@@ -7,7 +7,9 @@ import {
   lerRascunho,
   mascararCpf,
   montarRespostas,
+  perguntasEmOrdem,
   perguntasVisiveis,
+  respondida,
 } from "./regrasDaPesquisa";
 
 function p(id: string, extra: Partial<Pergunta> = {}): Pergunta {
@@ -121,5 +123,25 @@ describe("T216 — regras da resposta", () => {
       c: { opcoes: ["x"], outro: "o" },
       d: { opcao: "m", outro: null },
     });
+  });
+
+  it("uma por tela: só as visíveis, na ordem, com a primeira de cada seção", () => {
+    const comY = { a: { opcoes: ["y"], outro: null } };
+    const ordem = perguntasEmOrdem(SECOES, perguntasVisiveis(SECOES, comY));
+    expect(ordem.map((o) => [o.pergunta.id, o.primeiraDaSecao])).toEqual([
+      ["a", true],
+      ["b", false],
+    ]);
+    expect(
+      perguntasEmOrdem(SECOES, perguntasVisiveis(SECOES, {})),
+    ).toHaveLength(1);
+  });
+
+  it("respondida: vazio, espaço e escolha sem nada não contam", () => {
+    expect(respondida(undefined)).toBe(false);
+    expect(respondida("  ")).toBe(false);
+    expect(respondida({ opcoes: [], outro: null })).toBe(false);
+    expect(respondida({ opcao: null, outro: "" })).toBe(true);
+    expect(respondida(0)).toBe(true);
   });
 });

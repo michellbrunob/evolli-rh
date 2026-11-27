@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ErroPesquisaPublica,
@@ -88,9 +82,9 @@ function pesquisaDeTeste(
             obrigatoria: true,
             config: {
               minimo: 1,
-              maximo: 5,
+              maximo: 10,
               rotuloMinimo: "Muito ruim",
-              rotuloMaximo: "Excelente",
+              rotuloMaximo: "",
             },
           }),
           pergunta("q-est", "estrelas", "Que nota dá para o refeitório?"),
@@ -134,6 +128,22 @@ function pesquisaDeTeste(
   };
 }
 
+const GRUPOS: NonNullable<PesquisaPublica["grupos"]> = [
+  {
+    campo: "departamento",
+    rotulo: "Departamento",
+    opcoes: [
+      { id: "d1", nome: "Financeiro" },
+      { id: "d2", nome: "Operações" },
+    ],
+  },
+  {
+    campo: "unidade",
+    rotulo: "Unidade",
+    opcoes: [{ id: "u1", nome: "Matriz" }],
+  },
+];
+
 function criarCliente(
   abertura: AberturaPublica | Promise<AberturaPublica> = pesquisaDeTeste(),
 ) {
@@ -157,22 +167,35 @@ async function abrir(cliente?: ClientePesquisaPublica) {
   return r;
 }
 
-function grupo(nome: RegExp) {
-  return screen.getByRole("group", { name: nome });
+function iniciar() {
+  fireEvent.click(screen.getByRole("button", { name: "Iniciar pesquisa" }));
 }
 
-function marcar(nomeDoGrupo: RegExp, opcao: string) {
-  fireEvent.click(
-    within(grupo(nomeDoGrupo)).getByRole("radio", { name: opcao }),
-  );
-}
-
-function continuar() {
-  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+function proximo() {
+  fireEvent.click(screen.getByRole("button", { name: "Próximo" }));
 }
 
 function enviar() {
   fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+}
+
+function radios(nome: RegExp) {
+  return screen.getByRole("radiogroup", { name: nome });
+}
+
+function marcar(nome: RegExp, opcao: string) {
+  fireEvent.click(within(radios(nome)).getByRole("radio", { name: opcao }));
+}
+
+/** O título da pergunta na tela (h1 com o texto dela). */
+function tituloAtual() {
+  return screen.getByRole("heading", { level: 1 });
+}
+
+function idAtual(): string {
+  return tituloAtual()
+    .closest("[data-pergunta]")!
+    .getAttribute("data-pergunta")!;
 }
 
 /** O texto está dentro de uma região role=alert. */
@@ -180,16 +203,31 @@ function emAlerta(texto: string) {
   return screen.getByText(texto).closest("[role='alert']");
 }
 
-/** Preenche a seção 1 válida (sem treinamento). */
-function preencherSecao1() {
-  marcar(/Tenho clareza/, "Concordo");
-  marcar(/Participou de algum treinamento/, "Não");
-  marcar(/De 0 a 10/, "9");
+/** Resposta válida padrão de cada pergunta (opcional: deixa em branco). */
+const PADRAO: Record<string, () => void> = {
+  "q-conc": () => marcar(/Tenho clareza/, "Concordo"),
+  "q-sn": () => marcar(/Participou de algum treinamento/, "Não"),
+  "q-cond": () =>
+    fireEvent.change(screen.getByLabelText(/Qual treinamento/), {
+      target: { value: "Primeiros socorros" },
+    }),
+  "q-nota": () => marcar(/De 0 a 10/, "9"),
+  "q-esc": () => marcar(/comunicação interna/, "4"),
+  "q-uni": () => marcar(/Qual o seu turno/, "Tarde"),
+};
+
+/** Responde do jeito padrão até chegar à pergunta `alvo` (sem respondê-la). */
+function irAte(alvo: string) {
+  for (let i = 0; i < 20 && idAtual() !== alvo; i++) {
+    PADRAO[idAtual()]?.();
+    proximo();
+  }
+  expect(idAtual()).toBe(alvo);
 }
 
-function preencherSecao2() {
-  marcar(/comunicação interna/, "4");
-  marcar(/Qual o seu turno/, "Tarde");
+/** Responde tudo do jeito padrão e para na última (botão Enviar). */
+function irAoFim() {
+  irAte("q-par");
 }
 
 beforeEach(() => {
@@ -202,20 +240,27 @@ afterEach(() => {
 });
 
 describe("T216 — abertura", () => {
-  it("mostra empresa, nome, boas-vindas em parágrafos, perguntas, tempo e Começar", async () => {
+  it("cartão com empresa, nome, boas-vindas, metadados e Iniciar pesquisa", async () => {
     const { cliente } = await abrir();
     expect(cliente.abrir).toHaveBeenCalledWith(TOKEN);
     expect(screen.getByText("Empresa Exemplo Ltda")).toBeInTheDocument();
     expect(screen.getByText("Queremos ouvir você.")).toBeInTheDocument();
     expect(screen.getByText("Leva poucos minutos.")).toBeInTheDocument();
+    const meta = screen.getByRole("list", { name: "Sobre esta pesquisa" });
     expect(
-      screen.getByText("11 perguntas · cerca de 5 minutos"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Começar" })).toBeEnabled();
+      within(meta)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["11 perguntas", "cerca de 5 minutos", "Anônima"]);
+    expect(
+      screen.getByRole("button", { name: "Iniciar pesquisa" }),
+    ).toBeEnabled();
     expect(screen.getByRole("img", { name: "Evolli" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "Pulso do trimestre" }),
     ).toHaveFocus();
+    // Sem barra de progresso fora das perguntas.
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("concorda no singular: 1 pergunta, cerca de 1 minuto", async () => {
@@ -224,8 +269,16 @@ describe("T216 — abertura", () => {
         pesquisaDeTeste("anonima", { totalPerguntas: 1, minutosEstimados: 1 }),
       ),
     );
+    expect(screen.getByText("1 pergunta")).toBeInTheDocument();
+    expect(screen.getByText("cerca de 1 minuto")).toBeInTheDocument();
+  });
+
+  it("mostra a identificação certa nos metadados", async () => {
+    await abrir(criarCliente(pesquisaDeTeste("confidencial")));
+    const meta = screen.getByRole("list", { name: "Sobre esta pesquisa" });
+    expect(within(meta).getByText("Confidencial")).toBeInTheDocument();
     expect(
-      screen.getByText("1 pergunta · cerca de 1 minuto"),
+      screen.getByText(/as respostas não ficam ligadas ao seu nome/),
     ).toBeInTheDocument();
   });
 
@@ -267,10 +320,62 @@ describe("T216 — pesquisa indisponível", () => {
         await screen.findByRole("heading", { level: 1, name: titulo }),
       ).toHaveFocus();
       expect(
-        screen.queryByRole("button", { name: "Começar" }),
+        screen.queryByRole("button", { name: "Iniciar pesquisa" }),
       ).not.toBeInTheDocument();
     },
   );
+});
+
+describe("T216 — separação por grupo (anônima)", () => {
+  it("escolhe os grupos antes de começar; o padrão é não informar", async () => {
+    const cliente = criarCliente(
+      pesquisaDeTeste("anonima", { grupos: GRUPOS }),
+    );
+    await abrir(cliente);
+    const depto = screen.getByRole("combobox", { name: "Departamento" });
+    const unidade = screen.getByRole("combobox", { name: "Unidade" });
+    expect(depto).toHaveTextContent("Prefiro não informar");
+    expect(unidade).toHaveTextContent("Prefiro não informar");
+    expect(depto).toHaveAccessibleDescription(
+      expect.stringContaining("A resposta continua anônima."),
+    );
+    fireEvent.click(depto);
+    fireEvent.click(screen.getByRole("option", { name: "Operações" }));
+    expect(depto).toHaveTextContent("Operações");
+
+    iniciar();
+    irAoFim();
+    enviar();
+    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    expect(cliente.enviarRespostas).toHaveBeenCalledWith(
+      TOKEN,
+      expect.objectContaining({
+        grupos: { departamento: "d2", unidade: null },
+      }),
+    );
+  });
+
+  it("sem grupos no contrato, não mostra a escolha nem envia o campo", async () => {
+    const cliente = criarCliente();
+    await abrir(cliente);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    iniciar();
+    irAoFim();
+    enviar();
+    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(envio).not.toHaveProperty("grupos");
+  });
+
+  it("fora da anônima, grupos vindos da API são ignorados", async () => {
+    await abrir(
+      criarCliente(pesquisaDeTeste("identificada", { grupos: GRUPOS })),
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
 });
 
 describe("T216 — identificação", () => {
@@ -279,7 +384,7 @@ describe("T216 — identificação", () => {
     cliente = criarCliente(pesquisaDeTeste(identificacao)),
   ) {
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     expect(
       screen.getByRole("heading", { level: 1, name: "Confirme seus dados" }),
     ).toHaveFocus();
@@ -295,7 +400,11 @@ describe("T216 — identificação", () => {
     });
   }
 
-  it("aplica as máscaras e identifica com CPF em dígitos e data ISO", async () => {
+  function continuar() {
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  }
+
+  it("aplica as máscaras, identifica e foca a primeira pergunta", async () => {
     const cliente = await irParaIdentificacao();
     preencher();
     expect(screen.getByLabelText("CPF")).toHaveValue("207.431.958-41");
@@ -304,10 +413,7 @@ describe("T216 — identificação", () => {
     );
     continuar();
     expect(
-      await screen.findByRole("heading", {
-        level: 1,
-        name: "Sobre o trabalho",
-      }),
+      await screen.findByRole("heading", { level: 1, name: /Tenho clareza/ }),
     ).toHaveFocus();
     expect(cliente.identificar).toHaveBeenCalledWith(TOKEN, {
       cpf: CPF_TESTE,
@@ -382,129 +488,133 @@ describe("T216 — identificação", () => {
   it("confidencial: explica que as respostas não ficam ligadas ao nome", async () => {
     await irParaIdentificacao("confidencial");
     expect(
-      screen.getByText(/as respostas não ficam ligadas ao seu nome/),
-    ).toBeInTheDocument();
-  });
-
-  it("identificada: avisa na abertura que o RH vê o nome", async () => {
-    await abrir(criarCliente(pesquisaDeTeste("identificada")));
-    expect(
-      screen.getByText(
-        /o RH da empresa vê as suas respostas junto com o seu nome/,
-      ),
+      screen.getByText(/depois da confirmação, as respostas não ficam ligadas/),
     ).toBeInTheDocument();
   });
 });
 
-describe("T216 — seções, progresso e obrigatórias", () => {
-  async function comecarAnonima(cliente = criarCliente()) {
+describe("T216 — uma pergunta por tela", () => {
+  async function comecar(cliente = criarCliente()) {
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     return cliente;
   }
 
-  it("uma seção por vez, com progresso e foco no título", async () => {
-    await comecarAnonima();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Sobre o trabalho" }),
-    ).toHaveFocus();
+  it("contador, progresso fino, título focado e só a pergunta atual", async () => {
+    await comecar();
+    expect(tituloAtual()).toHaveAccessibleName(
+      /Tenho clareza sobre o que se espera do meu trabalho/,
+    );
+    expect(tituloAtual()).toHaveFocus();
+    expect(screen.getByText(/Pergunta 1 de 10/)).toBeInTheDocument();
+    expect(screen.getByText(/Sobre o trabalho/)).toBeInTheDocument();
     expect(screen.getByText("Pense nas últimas semanas.")).toBeInTheDocument();
     const barra = screen.getByRole("progressbar");
     expect(barra).toHaveAttribute("aria-valuenow", "1");
-    expect(barra).toHaveAttribute("aria-valuemax", "3");
-    expect(screen.getByText("Seção 1 de 3")).toBeInTheDocument();
+    expect(barra).toHaveAttribute("aria-valuemax", "10");
+    expect(screen.getAllByRole("radiogroup")).toHaveLength(1);
     expect(
-      screen.queryByRole("button", { name: "Voltar" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Como avalia a comunicação interna?"),
+      screen.queryByText(/Participou de algum treinamento/),
     ).not.toBeInTheDocument();
   });
 
-  it("não avança sem as obrigatórias e mostra cada erro com role=alert", async () => {
-    await comecarAnonima();
-    continuar();
-    expect(
-      screen.getByText("Revise as perguntas indicadas antes de continuar."),
-    ).toHaveAttribute("role", "alert");
-    expect(
-      screen.getAllByText("Escolha uma opção para continuar."),
-    ).toHaveLength(3);
-    expect(grupo(/Tenho clareza/)).toHaveAttribute("aria-invalid", "true");
-    // O foco vai ao primeiro campo com erro.
-    expect(
-      within(grupo(/Tenho clareza/)).getByRole("radio", {
-        name: "Discordo totalmente",
-      }),
-    ).toHaveFocus();
-    expect(screen.getByText("Seção 1 de 3")).toBeInTheDocument();
-  });
-
-  it("o erro some ao responder a pergunta", async () => {
-    await comecarAnonima();
-    continuar();
+  it("Próximo fica desabilitado até responder a obrigatória", async () => {
+    await comecar();
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
     marcar(/Tenho clareza/, "Concordo");
-    expect(grupo(/Tenho clareza/)).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeEnabled();
+    proximo();
+    expect(tituloAtual()).toHaveAccessibleName(/Participou de algum/);
+    expect(tituloAtual()).toHaveFocus();
+    expect(screen.getByText(/Pergunta 2 de 10/)).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "2",
+    );
+    // A descrição da seção aparece só na primeira pergunta dela.
     expect(
-      screen.getAllByText("Escolha uma opção para continuar."),
-    ).toHaveLength(2);
+      screen.queryByText("Pense nas últimas semanas."),
+    ).not.toBeInTheDocument();
   });
 
-  it("avança, volta e mantém o que foi preenchido", async () => {
-    await comecarAnonima();
-    preencherSecao1();
-    continuar();
+  it("opcional: mostra (opcional) e deixa avançar em branco", async () => {
+    await comecar();
+    irAte("q-est");
+    expect(tituloAtual()).toHaveTextContent("(opcional)");
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeEnabled();
+    proximo();
+    expect(idAtual()).toBe("q-uni");
+    expect(tituloAtual()).not.toHaveTextContent("(opcional)");
+  });
+
+  it("Anterior volta e mantém o que foi respondido", async () => {
+    await comecar();
+    irAte("q-nota");
+    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    expect(idAtual()).toBe("q-sn");
+    expect(tituloAtual()).toHaveFocus();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Detalhes" }),
-    ).toHaveFocus();
-    expect(screen.getByText("Seção 2 de 3")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Sobre o trabalho" }),
-    ).toHaveFocus();
-    expect(
-      within(grupo(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
-    ).toBeChecked();
-    expect(
-      within(grupo(/De 0 a 10/)).getByRole("radio", { name: "9" }),
+      within(radios(/Participou/)).getByRole("radio", { name: "Não" }),
     ).toBeChecked();
   });
 
-  it("seção sem título usa 'Seção N' e a última envia", async () => {
-    await comecarAnonima();
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Seção 3" }),
-    ).toBeInTheDocument();
+  it("Enter avança quando a resposta é válida", async () => {
+    await comecar();
+    marcar(/Tenho clareza/, "Concordo");
+    fireEvent.keyDown(
+      within(radios(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
+      { key: "Enter" },
+    );
+    expect(idAtual()).toBe("q-sn");
+  });
+
+  it("Enter sem resposta válida mostra o erro e não avança", async () => {
+    await comecar();
+    fireEvent.keyDown(
+      within(radios(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
+      { key: "Enter" },
+    );
+    expect(idAtual()).toBe("q-conc");
+    expect(emAlerta("Escolha uma opção para continuar.")).not.toBeNull();
+    expect(radios(/Tenho clareza/)).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("Enter no parágrafo não avança (é quebra de linha)", async () => {
+    await comecar();
+    irAoFim();
+    const campo = screen.getByLabelText(/comentário/);
+    fireEvent.change(campo, { target: { value: "Linha" } });
+    fireEvent.keyDown(campo, { key: "Enter" });
+    expect(idAtual()).toBe("q-par");
+  });
+
+  it("a última pergunta envia", async () => {
+    await comecar();
+    irAoFim();
+    expect(screen.getByText(/Pergunta 10 de 10/)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Enviar respostas" }),
-    ).toBeInTheDocument();
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Próximo" }),
+    ).not.toBeInTheDocument();
   });
 });
 
 describe("T216 — tipos de pergunta", () => {
-  async function irParaSecao(n: 1 | 2 | 3) {
+  async function irPara(id: string) {
     const cliente = criarCliente();
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    if (n >= 2) {
-      preencherSecao1();
-      continuar();
-    }
-    if (n === 3) {
-      preencherSecao2();
-      continuar();
-    }
+    iniciar();
+    irAte(id);
     return cliente;
   }
 
   it("concordância: cinco opções, de discordo totalmente a concordo totalmente", async () => {
-    await irParaSecao(1);
-    const radios = within(grupo(/Tenho clareza/)).getAllByRole("radio");
-    expect(radios.map((r) => r.getAttribute("value"))).toEqual([
+    await irPara("q-conc");
+    const opcoes = within(radios(/Tenho clareza/)).getAllByRole("radio");
+    expect(opcoes.map((r) => r.getAttribute("value"))).toEqual([
       "1",
       "2",
       "3",
@@ -512,66 +622,61 @@ describe("T216 — tipos de pergunta", () => {
       "5",
     ]);
     expect(
-      within(grupo(/Tenho clareza/)).getByRole("radio", {
+      within(radios(/Tenho clareza/)).getByRole("radio", {
         name: "Concordo totalmente",
       }),
     ).toBeInTheDocument();
   });
 
   it("nota 0–10 (eNPS): onze opções e os extremos explicados", async () => {
-    await irParaSecao(1);
-    const g = grupo(/De 0 a 10/);
+    await irPara("q-nota");
+    const g = radios(/De 0 a 10/);
     expect(within(g).getAllByRole("radio")).toHaveLength(11);
     expect(g).toHaveAccessibleDescription(
-      expect.stringContaining("0: nada provável"),
+      expect.stringContaining("Nada provável"),
     );
   });
 
-  it("escala: do mínimo ao máximo, com os rótulos dos extremos", async () => {
-    await irParaSecao(2);
-    const g = grupo(/comunicação interna/);
+  it("escala: quadrados do mínimo ao máximo, com os extremos", async () => {
+    await irPara("q-esc");
+    const g = radios(/comunicação interna/);
     expect(
       within(g)
         .getAllByRole("radio")
         .map((r) => r.getAttribute("value")),
-    ).toEqual(["1", "2", "3", "4", "5"]);
-    expect(within(g).getByText("1: Muito ruim")).toBeInTheDocument();
-    expect(within(g).getByText("5: Excelente")).toBeInTheDocument();
+    ).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
+    expect(within(g).getByText("Muito ruim")).toBeInTheDocument();
+    // Sem rótulo próprio, o extremo diz "Máximo".
+    expect(within(g).getByText("Máximo")).toBeInTheDocument();
   });
 
   it("estrelas: de 1 a 5, com nome acessível e resumo da escolha", async () => {
-    await irParaSecao(2);
-    const g = grupo(/refeitório/);
+    await irPara("q-est");
+    const g = radios(/refeitório/);
     fireEvent.click(within(g).getByRole("radio", { name: "3 estrelas" }));
     expect(within(g).getByRole("radio", { name: "3 estrelas" })).toBeChecked();
-    expect(
-      within(g).getByText("Você deu 3 de 5 estrelas."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Você deu 3 de 5 estrelas.")).toBeInTheDocument();
     expect(
       within(g).getByRole("radio", { name: "1 estrela" }),
     ).toBeInTheDocument();
   });
 
   it("escolha única com Outro: pede o texto da outra opção", async () => {
-    await irParaSecao(2);
-    marcar(/comunicação interna/, "4");
+    await irPara("q-uni");
     marcar(/Qual o seu turno/, "Outro");
     const campo = screen.getByLabelText("Qual é a outra opção?");
-    continuar();
-    expect(
-      within(grupo(/Qual o seu turno/)).getByRole("alert"),
-    ).toHaveTextContent("Escreva qual é a outra opção.");
+    proximo();
+    expect(emAlerta("Escreva qual é a outra opção.")).not.toBeNull();
+    expect(idAtual()).toBe("q-uni");
     fireEvent.change(campo, { target: { value: "Noite" } });
-    continuar();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Seção 3" }),
-    ).toBeInTheDocument();
+    proximo();
+    expect(idAtual()).toBe("q-mul");
   });
 
   it("múltipla escolha respeita o máximo (Outro conta como escolha)", async () => {
-    await irParaSecao(2);
-    const g = grupo(/benefícios/);
-    expect(within(g).getByText("Escolha até 2 opções.")).toBeInTheDocument();
+    await irPara("q-mul");
+    const g = screen.getByRole("group", { name: /benefícios/ });
+    expect(screen.getByText("Escolha até 2 opções.")).toBeInTheDocument();
     fireEvent.click(within(g).getByRole("checkbox", { name: "Vale-refeição" }));
     fireEvent.click(within(g).getByRole("checkbox", { name: "Outro" }));
     expect(
@@ -587,19 +692,20 @@ describe("T216 — tipos de pergunta", () => {
   });
 
   it("data: valida dd/mm/aaaa e dia que existe", async () => {
-    await irParaSecao(3);
+    await irPara("q-data");
     const campo = screen.getByLabelText(/última avaliação/);
     fireEvent.change(campo, { target: { value: "3102202" } });
     expect(campo).toHaveValue("31/02/202");
-    enviar();
+    proximo();
     expect(
       emAlerta("Informe uma data válida, no formato dd/mm/aaaa."),
     ).not.toBeNull();
     fireEvent.change(campo, { target: { value: "31022024" } });
-    enviar();
-    expect(
-      screen.getByText("Informe uma data válida, no formato dd/mm/aaaa."),
-    ).toBeInTheDocument();
+    fireEvent.keyDown(campo, { key: "Enter" });
+    expect(idAtual()).toBe("q-data");
+    fireEvent.change(campo, { target: { value: "29022024" } });
+    fireEvent.keyDown(campo, { key: "Enter" });
+    expect(idAtual()).toBe("q-num");
   });
 
   it.each([
@@ -608,58 +714,65 @@ describe("T216 — tipos de pergunta", () => {
     ["41", "Informe um número entre 0 e 40."],
     ["-1", "Informe um número entre 0 e 40."],
   ])("número %s: %s", async (digitado, mensagem) => {
-    await irParaSecao(3);
+    await irPara("q-num");
     const campo = screen.getByLabelText(/horas de treinamento/);
     expect(
       screen.getByText("Número inteiro, entre 0 e 40."),
     ).toBeInTheDocument();
     fireEvent.change(campo, { target: { value: digitado } });
-    enviar();
+    proximo();
     expect(emAlerta(mensagem)).not.toBeNull();
     expect(campo).toHaveAttribute("aria-invalid", "true");
     expect(campo).toHaveFocus();
+    expect(idAtual()).toBe("q-num");
   });
 
-  it("textos têm limite de caracteres no campo", async () => {
-    await irParaSecao(3);
-    expect(screen.getByLabelText(/comentário/)).toHaveAttribute(
-      "maxlength",
-      "3000",
-    );
-    expect(screen.getByLabelText(/comentário/).tagName).toBe("TEXTAREA");
+  it("parágrafo tem limite de caracteres", async () => {
+    await irPara("q-par");
+    const campo = screen.getByLabelText(/comentário/);
+    expect(campo.tagName).toBe("TEXTAREA");
+    expect(campo).toHaveAttribute("maxlength", "3000");
   });
 
   it("envia cada tipo na forma do contrato", async () => {
-    const cliente = await irParaSecao(1);
-    preencherSecao1();
-    // Troca para Sim: a condicional aparece e é respondida.
-    marcar(/Participou de algum treinamento/, "Sim");
+    const cliente = await irPara("q-conc");
+    marcar(/Tenho clareza/, "Concordo");
+    proximo();
+    marcar(/Participou/, "Sim");
+    proximo();
     fireEvent.change(screen.getByLabelText(/Qual treinamento/), {
       target: { value: "  Segurança no trabalho  " },
     });
-    continuar();
+    proximo();
+    marcar(/De 0 a 10/, "9");
+    proximo();
     marcar(/comunicação interna/, "2");
+    proximo();
     fireEvent.click(
-      within(grupo(/refeitório/)).getByRole("radio", { name: "5 estrelas" }),
+      within(radios(/refeitório/)).getByRole("radio", { name: "5 estrelas" }),
     );
+    proximo();
     marcar(/Qual o seu turno/, "Manhã");
-    const g = grupo(/benefícios/);
+    proximo();
+    const g = screen.getByRole("group", { name: /benefícios/ });
     fireEvent.click(within(g).getByRole("checkbox", { name: "Academia" }));
     fireEvent.click(within(g).getByRole("checkbox", { name: "Outro" }));
     fireEvent.change(screen.getByLabelText("Qual é a outra opção?"), {
       target: { value: "Creche" },
     });
-    continuar();
+    proximo();
     fireEvent.change(screen.getByLabelText(/última avaliação/), {
       target: { value: "29022024" },
     });
+    proximo();
     fireEvent.change(screen.getByLabelText(/horas de treinamento/), {
       target: { value: "12" },
     });
+    proximo();
     fireEvent.change(screen.getByLabelText(/comentário/), {
       target: { value: "Tudo certo." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     await screen.findByRole("heading", { name: "Respostas enviadas" });
     expect(cliente.enviarRespostas).toHaveBeenCalledWith(TOKEN, {
       respostas: [
@@ -683,28 +796,32 @@ describe("T216 — tipos de pergunta", () => {
 });
 
 describe("T216 — lógica condicional", () => {
-  it("a pergunta aparece com Sim, some com Não, e escondida não é exigida nem enviada", async () => {
+  it("Sim inclui a pergunta na contagem; Não a tira, e o valor não é enviado", async () => {
     const cliente = criarCliente();
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    expect(screen.queryByLabelText(/Qual treinamento/)).not.toBeInTheDocument();
-
-    marcar(/Tenho clareza/, "Concordo");
-    marcar(/De 0 a 10/, "9");
-    marcar(/Participou de algum treinamento/, "Sim");
-    const campo = screen.getByLabelText(/Qual treinamento/);
-    fireEvent.change(campo, { target: { value: "Primeiros socorros" } });
-
-    marcar(/Participou de algum treinamento/, "Não");
-    expect(screen.queryByLabelText(/Qual treinamento/)).not.toBeInTheDocument();
-    continuar();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Detalhes" }),
-    ).toBeInTheDocument();
-
-    preencherSecao2();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    iniciar();
+    irAte("q-sn");
+    expect(screen.getByText(/Pergunta 2 de 10/)).toBeInTheDocument();
+    marcar(/Participou/, "Sim");
+    expect(screen.getByText(/Pergunta 2 de 11/)).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuemax",
+      "11",
+    );
+    proximo();
+    expect(idAtual()).toBe("q-cond");
+    // Obrigatória e visível: Próximo espera a resposta.
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Qual treinamento/), {
+      target: { value: "Primeiros socorros" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    marcar(/Participou/, "Não");
+    expect(screen.getByText(/Pergunta 2 de 10/)).toBeInTheDocument();
+    proximo();
+    expect(idAtual()).toBe("q-nota");
+    irAoFim();
+    enviar();
     await screen.findByRole("heading", { name: "Respostas enviadas" });
     const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
       string,
@@ -712,42 +829,29 @@ describe("T216 — lógica condicional", () => {
     ];
     expect(envio.respostas.map((r) => r.perguntaId)).not.toContain("q-cond");
   });
-
-  it("visível e obrigatória, a condicional é exigida", async () => {
-    await abrir();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    marcar(/Tenho clareza/, "Concordo");
-    marcar(/De 0 a 10/, "9");
-    marcar(/Participou de algum treinamento/, "Sim");
-    continuar();
-    expect(emAlerta("Escreva uma resposta para continuar.")).not.toBeNull();
-    expect(screen.getByLabelText(/Qual treinamento/)).toHaveFocus();
-  });
 });
 
 describe("T216 — envio", () => {
   async function ateOFim(cliente = criarCliente()) {
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
+    iniciar();
+    irAoFim();
     return cliente;
   }
 
-  it("sucesso: agradece, foca o título e limpa o rascunho", async () => {
+  it("sucesso: cartão de agradecimento focado e rascunho limpo", async () => {
     await ateOFim();
     expect(
       window.sessionStorage.getItem(`evolli.pesquisa.${TOKEN}.rascunho`),
     ).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     expect(
       await screen.findByRole("heading", {
         level: 1,
         name: "Respostas enviadas",
       }),
     ).toHaveFocus();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(
       window.sessionStorage.getItem(`evolli.pesquisa.${TOKEN}.rascunho`),
     ).toBeNull();
@@ -759,16 +863,19 @@ describe("T216 — envio", () => {
       .mockImplementationOnce(() => Promise.reject(new Error("rede")))
       .mockImplementationOnce(() => Promise.resolve());
     await ateOFim(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Não foi possível enviar suas respostas agora. Elas continuam preenchidas; tente de novo.",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    for (let i = 0; i < 6; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    }
+    expect(idAtual()).toBe("q-esc");
     expect(
-      within(grupo(/comunicação interna/)).getByRole("radio", { name: "4" }),
+      within(radios(/comunicação interna/)).getByRole("radio", { name: "4" }),
     ).toBeChecked();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    irAoFim();
+    enviar();
     await screen.findByRole("heading", { name: "Respostas enviadas" });
     expect(cliente.enviarRespostas).toHaveBeenCalledTimes(2);
     expect(cliente.enviarRespostas.mock.calls[1]).toEqual(
@@ -779,20 +886,17 @@ describe("T216 — envio", () => {
   it("identificada: envia o passe da identificação", async () => {
     const cliente = criarCliente(pesquisaDeTeste("identificada"));
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     fireEvent.change(screen.getByLabelText("CPF"), {
       target: { value: CPF_TESTE },
     });
     fireEvent.change(screen.getByLabelText("Data de nascimento"), {
       target: { value: "15041990" },
     });
-    continuar();
-    await screen.findByRole("heading", { name: "Sobre o trabalho" });
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByRole("heading", { name: /Tenho clareza/ });
+    irAoFim();
+    enviar();
     await screen.findByRole("heading", { name: "Respostas enviadas" });
     expect(cliente.enviarRespostas).toHaveBeenCalledWith(
       TOKEN,
@@ -800,7 +904,7 @@ describe("T216 — envio", () => {
     );
   });
 
-  it("422: volta à seção da pergunta recusada e a marca", async () => {
+  it("422: volta à pergunta recusada e a marca", async () => {
     const cliente = criarCliente();
     cliente.enviarRespostas.mockImplementationOnce(() =>
       Promise.reject(
@@ -808,15 +912,15 @@ describe("T216 — envio", () => {
       ),
     );
     await ateOFim(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Detalhes" }),
+      await screen.findByRole("heading", { name: /comunicação interna/ }),
     ).toBeInTheDocument();
-    expect(grupo(/comunicação interna/)).toHaveAttribute(
+    expect(radios(/comunicação interna/)).toHaveAttribute(
       "aria-invalid",
       "true",
     );
-    expect(screen.getByText("Revise esta resposta.")).toBeInTheDocument();
+    expect(emAlerta("Revise esta resposta.")).not.toBeNull();
   });
 
   it("409 no envio: já respondeu", async () => {
@@ -825,7 +929,7 @@ describe("T216 — envio", () => {
       Promise.reject(new ErroPesquisaPublica(409)),
     );
     await ateOFim(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     expect(
       await screen.findByRole("heading", {
         name: "Você já respondeu esta pesquisa",
@@ -839,7 +943,7 @@ describe("T216 — envio", () => {
       Promise.reject(new ErroPesquisaPublica(410, [], "pausada")),
     );
     await ateOFim(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    enviar();
     expect(
       await screen.findByRole("heading", {
         name: "Esta pesquisa está pausada",
@@ -847,7 +951,7 @@ describe("T216 — envio", () => {
     ).toBeInTheDocument();
   });
 
-  it("passe vencido (401): pede os dados de novo e volta ao fim com as respostas", async () => {
+  it("passe vencido (401): pede os dados de novo e volta à última pergunta", async () => {
     const cliente = criarCliente(pesquisaDeTeste("confidencial"));
     cliente.enviarRespostas
       .mockImplementationOnce(() =>
@@ -869,16 +973,13 @@ describe("T216 — envio", () => {
       fireEvent.change(screen.getByLabelText("Data de nascimento"), {
         target: { value: "15041990" },
       });
-      continuar();
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     };
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     identificar();
-    await screen.findByRole("heading", { name: "Sobre o trabalho" });
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    await screen.findByRole("heading", { name: /Tenho clareza/ });
+    irAoFim();
+    enviar();
     expect(
       await screen.findByText(/confirme seus dados de novo para enviar/),
     ).toBeInTheDocument();
@@ -897,17 +998,14 @@ describe("T216 — envio", () => {
 describe("T216 — anônima", () => {
   const CHAVE = `evolli.pesquisa.${TOKEN}.respondida`;
 
-  it("avisa que é anônima, não pede identificação e marca o navegador ao enviar", async () => {
+  it("não pede identificação e marca o navegador ao enviar", async () => {
     const cliente = criarCliente();
     await abrir(cliente);
-    expect(screen.getByText(/Esta pesquisa é anônima/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    expect(screen.getByText(/Ninguém pede seus dados/)).toBeInTheDocument();
+    iniciar();
     expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    irAoFim();
+    enviar();
     await screen.findByRole("heading", { name: "Respostas enviadas" });
     expect(cliente.identificar).not.toHaveBeenCalled();
     expect(window.localStorage.getItem(CHAVE)).toBe("1");
@@ -924,10 +1022,8 @@ describe("T216 — anônima", () => {
     expect(
       screen.getByText(/Este navegador já enviou uma resposta/),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    expect(
-      screen.getByRole("heading", { name: "Sobre o trabalho" }),
-    ).toBeInTheDocument();
+    iniciar();
+    expect(idAtual()).toBe("q-conc");
   });
 
   it("identificada não mostra o aviso do navegador", async () => {
@@ -949,12 +1045,9 @@ describe("T216 — anônima", () => {
       throw new Error("bloqueado");
     });
     await abrir();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
-    preencherSecao1();
-    continuar();
-    preencherSecao2();
-    continuar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar respostas" }));
+    iniciar();
+    irAoFim();
+    enviar();
     expect(
       await screen.findByRole("heading", { name: "Respostas enviadas" }),
     ).toBeInTheDocument();
@@ -962,19 +1055,19 @@ describe("T216 — anônima", () => {
 });
 
 describe("T216 — rascunho no sessionStorage", () => {
-  it("recarregar a página mantém as respostas (e nunca guarda o CPF)", async () => {
+  it("recarregar mantém as respostas (e nunca guarda o CPF)", async () => {
     const cliente = criarCliente(pesquisaDeTeste("identificada"));
     const primeira = renderizar(cliente);
     await screen.findByRole("heading", { name: "Pulso do trimestre" });
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     fireEvent.change(screen.getByLabelText("CPF"), {
       target: { value: CPF_TESTE },
     });
     fireEvent.change(screen.getByLabelText("Data de nascimento"), {
       target: { value: "15041990" },
     });
-    continuar();
-    await screen.findByRole("heading", { name: "Sobre o trabalho" });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByRole("heading", { name: /Tenho clareza/ });
     marcar(/Tenho clareza/, "Concordo totalmente");
     const guardado = window.sessionStorage.getItem(
       `evolli.pesquisa.${TOKEN}.rascunho`,
@@ -985,39 +1078,45 @@ describe("T216 — rascunho no sessionStorage", () => {
     primeira.unmount();
 
     await abrir(cliente);
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     fireEvent.change(screen.getByLabelText("CPF"), {
       target: { value: CPF_TESTE },
     });
     fireEvent.change(screen.getByLabelText("Data de nascimento"), {
       target: { value: "15041990" },
     });
-    continuar();
-    await screen.findByRole("heading", { name: "Sobre o trabalho" });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByRole("heading", { name: /Tenho clareza/ });
     expect(
-      within(grupo(/Tenho clareza/)).getByRole("radio", {
+      within(radios(/Tenho clareza/)).getByRole("radio", {
         name: "Concordo totalmente",
       }),
     ).toBeChecked();
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeEnabled();
+  });
+
+  it("a escolha de grupo também volta ao recarregar", async () => {
+    const cliente = criarCliente(
+      pesquisaDeTeste("anonima", { grupos: GRUPOS }),
+    );
+    const primeira = renderizar(cliente);
+    await screen.findByRole("heading", { name: "Pulso do trimestre" });
+    fireEvent.click(screen.getByRole("combobox", { name: "Unidade" }));
+    fireEvent.click(screen.getByRole("option", { name: "Matriz" }));
+    primeira.unmount();
+    await abrir(cliente);
+    expect(screen.getByRole("combobox", { name: "Unidade" })).toHaveTextContent(
+      "Matriz",
+    );
   });
 
   it("rascunho corrompido é ignorado", async () => {
     window.sessionStorage.setItem(`evolli.pesquisa.${TOKEN}.rascunho`, "{x");
+    window.sessionStorage.setItem(`evolli.pesquisa.${TOKEN}.grupos`, "[1]");
     await abrir();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    iniciar();
     expect(
-      within(grupo(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
+      within(radios(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
     ).not.toBeChecked();
-  });
-});
-
-describe("T216 — sem chamadas autenticadas", () => {
-  it("a página só usa o cliente público", async () => {
-    const espiao = vi.spyOn(globalThis, "fetch");
-    await abrir();
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Começar" })).toBeEnabled(),
-    );
-    expect(espiao).not.toHaveBeenCalled();
   });
 });

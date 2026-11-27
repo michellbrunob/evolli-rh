@@ -1,31 +1,54 @@
 /**
  * T216 — responder uma pesquisa pelo link (`#/p/<token>`), sem login.
  *
- * Etapas: abertura → identificação (só identificada e confidencial) → uma
- * seção por vez → agradecimento. Nada aqui chama API autenticada: o único
- * cliente é o público (`pesquisaPublicaClient`), sem cookie nem CSRF.
+ * Etapas: abertura (na anônima com separação, a escolha dos grupos) →
+ * identificação (só identificada e confidencial) → UMA PERGUNTA POR TELA →
+ * agradecimento. Nada aqui chama API autenticada: o único cliente é o público
+ * (`pesquisaPublicaClient`), sem cookie nem CSRF.
+ *
+ * Uma pergunta por tela: a contagem ("Pergunta N de M") e a barra de
+ * progresso contam só as perguntas VISÍVEIS — a escondida pela condição não
+ * entra. "Próximo" fica desabilitado enquanto a obrigatória não tem resposta;
+ * Enter avança quando a resposta é válida (e mostra o erro quando não é).
  *
  * Guardado no navegador, sempre com try/catch (modo privado, armazenamento
  * cheio ou bloqueado não quebram a página):
- * - `sessionStorage` — o rascunho das respostas, para não perder ao
- *   recarregar; nunca o CPF, a data de nascimento nem o passe;
+ * - `sessionStorage` — o rascunho das respostas e dos grupos, para não perder
+ *   ao recarregar; nunca o CPF, a data de nascimento nem o passe;
  * - `localStorage` — só na anônima: "este navegador já respondeu" (aviso,
  *   não trava).
  *
- * Foco: a cada etapa nova o foco vai ao título dela; ao barrar o avanço, vai
- * ao primeiro campo com erro.
+ * Foco: a cada tela nova o foco vai ao título dela (na pergunta, o texto da
+ * pergunta); ao barrar o avanço, vai ao campo com erro.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import "../../app/tokens.css";
 import "../../components/FormField.css";
 import "./ResponderPesquisa.css";
 import { Button } from "../../components/Button";
 import { MarcaEvolli } from "../../app/marca/MarcaEvolli";
+import { ListaDeEscolha } from "../../ui/ListaDeEscolha";
+import {
+  IconeAvancar,
+  IconeAviso,
+  IconeCadeado,
+  IconeDocumento,
+  IconeEmpresa,
+  IconeInformacao,
+  IconePerfil,
+  IconeRelogio,
+  IconeSeguranca,
+  IconeSucesso,
+  IconeVoltar,
+} from "../../ui/icones";
 import {
   ErroPesquisaPublica,
   clientePesquisaPublica,
+  type CampoGrupo,
   type ClientePesquisaPublica,
+  type EnvioDeRespostas,
+  type Identificacao,
   type MotivoIndisponivel,
   type PesquisaPublica,
 } from "../../api/pesquisaPublicaClient";
@@ -37,11 +60,13 @@ import {
 import { CampoDaPergunta } from "./CampoDaPergunta";
 import {
   cpfValido,
-  errosDaSecao,
+  erroDaPergunta,
   lerRascunho,
   mascararCpf,
   montarRespostas,
+  perguntasEmOrdem,
   perguntasVisiveis,
+  respondida,
   somenteDigitos,
   type Respostas,
   type ValorRascunho,
@@ -59,7 +84,7 @@ type Etapa =
   | { readonly tipo: "indisponivel"; readonly motivo: MotivoIndisponivel }
   | { readonly tipo: "abertura" }
   | { readonly tipo: "identificacao" }
-  | { readonly tipo: "secao"; readonly indice: number }
+  | { readonly tipo: "pergunta"; readonly id: string }
   | { readonly tipo: "ja-respondeu" }
   | { readonly tipo: "enviado" };
 
@@ -67,6 +92,9 @@ export const MENSAGEM_NAO_ENCONTRADO =
   "Não encontramos você nesta pesquisa. Confira o CPF e a data de nascimento.";
 export const MENSAGEM_MUITAS_TENTATIVAS =
   "Muitas tentativas. Tente de novo em alguns minutos.";
+
+/** Valor do "Prefiro não informar" na escolha de grupo (vai como `null`). */
+const NAO_INFORMAR = "";
 
 const INDISPONIVEL: Record<
   MotivoIndisponivel,
@@ -92,18 +120,32 @@ const INDISPONIVEL: Record<
   },
 };
 
-function chaveRascunho(token: string): string {
-  return `evolli.pesquisa.${token}.rascunho`;
+const IDENTIFICACAO: Record<
+  Identificacao,
+  { readonly rotulo: string; readonly nota: string }
+> = {
+  anonima: {
+    rotulo: "Anônima",
+    nota: "Ninguém pede seus dados, e as respostas não mostram quem respondeu.",
+  },
+  confidencial: {
+    rotulo: "Confidencial",
+    nota: "Vamos confirmar que você participa, mas as respostas não ficam ligadas ao seu nome. O RH vê só o resultado do grupo.",
+  },
+  identificada: {
+    rotulo: "Identificada",
+    nota: "O RH da empresa vê as suas respostas junto com o seu nome.",
+  },
+};
+
+function chave(token: string, qual: "rascunho" | "grupos" | "respondida") {
+  return `evolli.pesquisa.${token}.${qual}`;
 }
 
-function chaveRespondida(token: string): string {
-  return `evolli.pesquisa.${token}.respondida`;
-}
-
-function lerArmazenado(qual: "local" | "sessao", chave: string): string | null {
+function lerArmazenado(qual: "local" | "sessao", nome: string): string | null {
   try {
     const area = qual === "local" ? window.localStorage : window.sessionStorage;
-    return area.getItem(chave);
+    return area.getItem(nome);
   } catch {
     return null;
   }
@@ -111,15 +153,32 @@ function lerArmazenado(qual: "local" | "sessao", chave: string): string | null {
 
 function gravarArmazenado(
   qual: "local" | "sessao",
-  chave: string,
+  nome: string,
   valor: string | null,
 ): void {
   try {
     const area = qual === "local" ? window.localStorage : window.sessionStorage;
-    if (valor === null) area.removeItem(chave);
-    else area.setItem(chave, valor);
+    if (valor === null) area.removeItem(nome);
+    else area.setItem(nome, valor);
   } catch {
     // Sem armazenamento (modo privado, bloqueado, cheio): segue sem guardar.
+  }
+}
+
+/** Grupos guardados: só texto por campo; o resto é descartado. */
+function lerGrupos(texto: string | null): Partial<Record<CampoGrupo, string>> {
+  if (!texto) return {};
+  try {
+    const dados: unknown = JSON.parse(texto);
+    if (!dados || typeof dados !== "object" || Array.isArray(dados)) return {};
+    const saida: Partial<Record<CampoGrupo, string>> = {};
+    for (const campo of ["departamento", "centroCusto", "unidade"] as const) {
+      const v = (dados as Record<string, unknown>)[campo];
+      if (typeof v === "string") saida[campo] = v;
+    }
+    return saida;
+  } catch {
+    return {};
   }
 }
 
@@ -145,10 +204,13 @@ export function ResponderPesquisa({
   const [tentativa, setTentativa] = useState(0);
 
   const [respostas, setRespostas] = useState<Respostas>(() =>
-    lerRascunho(lerArmazenado("sessao", chaveRascunho(token))),
+    lerRascunho(lerArmazenado("sessao", chave(token, "rascunho"))),
   );
-  const [errosSecao, setErrosSecao] = useState<Record<string, string>>({});
-  const [alertaSecao, setAlertaSecao] = useState<string | null>(null);
+  const [grupos, setGrupos] = useState(() =>
+    lerGrupos(lerArmazenado("sessao", chave(token, "grupos"))),
+  );
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const [alerta, setAlerta] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   const [cpf, setCpf] = useState("");
@@ -162,11 +224,11 @@ export function ResponderPesquisa({
   const [identificando, setIdentificando] = useState(false);
   const passeRef = useRef<string | null>(null);
   const [primeiroNome, setPrimeiroNome] = useState("");
-  /** Depois de reidentificar (passe vencido), volta à última seção. */
+  /** Depois de reidentificar (passe vencido), volta à última pergunta. */
   const voltarAoFimRef = useRef(false);
 
   const [jaRespondeuAqui] = useState(
-    () => lerArmazenado("local", chaveRespondida(token)) === "1",
+    () => lerArmazenado("local", chave(token, "respondida")) === "1",
   );
 
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
@@ -197,52 +259,60 @@ export function ResponderPesquisa({
   }, [cliente, token, tentativa]);
 
   // Rascunho: a cada mudança, no sessionStorage desta aba.
+  const encerrada = etapa.tipo === "enviado" || etapa.tipo === "ja-respondeu";
   useEffect(() => {
-    if (etapa.tipo === "enviado" || etapa.tipo === "ja-respondeu") return;
+    if (encerrada) return;
     gravarArmazenado(
       "sessao",
-      chaveRascunho(token),
+      chave(token, "rascunho"),
       Object.keys(respostas).length ? JSON.stringify(respostas) : null,
     );
-  }, [respostas, token, etapa.tipo]);
+    gravarArmazenado(
+      "sessao",
+      chave(token, "grupos"),
+      Object.keys(grupos).length ? JSON.stringify(grupos) : null,
+    );
+  }, [respostas, grupos, token, encerrada]);
 
-  // Foco no título de cada etapa nova.
+  // Foco no título de cada tela nova.
   const chaveDaEtapa =
-    etapa.tipo === "secao" ? `secao-${etapa.indice}` : etapa.tipo;
+    etapa.tipo === "pergunta" ? `pergunta-${etapa.id}` : etapa.tipo;
   useEffect(() => {
     tituloRef.current?.focus();
   }, [chaveDaEtapa]);
 
-  // Foco no primeiro campo com erro.
+  // Foco no campo com erro.
   useEffect(() => {
     if (focarErro === 0) return;
     const alvo = formularioRef.current?.querySelector<HTMLElement>(
-      "[aria-invalid='true'] input:not(:disabled), [aria-invalid='true'] textarea, input[aria-invalid='true'], textarea[aria-invalid='true']",
+      "[aria-invalid='true'] input:not(:disabled), input[aria-invalid='true'], textarea[aria-invalid='true']",
     );
     alvo?.focus();
   }, [focarErro]);
 
   const secoes = useMemo(() => pesquisa?.secoes ?? [], [pesquisa]);
+  const gruposDaPesquisa = useMemo(
+    () =>
+      pesquisa?.identificacao === "anonima" ? (pesquisa.grupos ?? []) : [],
+    [pesquisa],
+  );
   const visiveis = useMemo(
     () => perguntasVisiveis(secoes, respostas),
     [secoes, respostas],
   );
-  /** Índices das seções com alguma pergunta visível. */
   const ordem = useMemo(
-    () =>
-      secoes.flatMap((s, i) =>
-        s.perguntas.some((p) => visiveis.has(p.id)) ? [i] : [],
-      ),
+    () => perguntasEmOrdem(secoes, visiveis),
     [secoes, visiveis],
   );
 
-  const irParaSecao = useCallback((indice: number) => {
-    setErrosSecao({});
-    setAlertaSecao(null);
-    setEtapa({ tipo: "secao", indice });
-  }, []);
+  function irParaPergunta(id: string | undefined) {
+    if (id === undefined) return;
+    setErros({});
+    setAlerta(null);
+    setEtapa({ tipo: "pergunta", id });
+  }
 
-  function comecar() {
+  function iniciar() {
     if (!pesquisa) return;
     if (pesquisa.identificacao !== "anonima" && passeRef.current === null) {
       setErroIdent(null);
@@ -250,12 +320,12 @@ export function ResponderPesquisa({
       setEtapa({ tipo: "identificacao" });
       return;
     }
-    if (ordem.length) irParaSecao(ordem[0]!);
+    irParaPergunta(ordem[0]?.pergunta.id);
   }
 
   function mudarResposta(id: string, valor: ValorRascunho) {
     setRespostas((r) => ({ ...r, [id]: valor }));
-    setErrosSecao((e) => {
+    setErros((e) => {
       if (!(id in e)) return e;
       const resto = { ...e };
       delete resto[id];
@@ -268,15 +338,17 @@ export function ResponderPesquisa({
     if (identificando) return;
     const digitos = somenteDigitos(cpf);
     const iso = dataDigitadaParaIso(nascimento);
-    const erros: { cpf?: string; nascimento?: string } = {};
-    if (!cpfValido(digitos))
-      erros.cpf = "Informe um CPF válido, com 11 números.";
-    if (iso === null) {
-      erros.nascimento = "Informe a data de nascimento no formato dd/mm/aaaa.";
+    const errosNovos: { cpf?: string; nascimento?: string } = {};
+    if (!cpfValido(digitos)) {
+      errosNovos.cpf = "Informe um CPF válido, com 11 números.";
     }
-    setErrosIdent(erros);
+    if (iso === null) {
+      errosNovos.nascimento =
+        "Informe a data de nascimento no formato dd/mm/aaaa.";
+    }
+    setErrosIdent(errosNovos);
     setErroIdent(null);
-    if (erros.cpf || erros.nascimento) {
+    if (errosNovos.cpf || errosNovos.nascimento) {
       setFocarErro((n) => n + 1);
       return;
     }
@@ -295,22 +367,24 @@ export function ResponderPesquisa({
         ? ordem[ordem.length - 1]
         : ordem[0];
       voltarAoFimRef.current = false;
-      if (destino !== undefined) irParaSecao(destino);
+      irParaPergunta(destino?.pergunta.id);
     } catch (e) {
-      const status = e instanceof ErroPesquisaPublica ? e.status : 0;
+      const erro = e instanceof ErroPesquisaPublica ? e : null;
+      const status = erro?.status ?? 0;
       if (status === 409) {
         // Já respondeu: o rascunho desta aba não serve mais.
-        gravarArmazenado("sessao", chaveRascunho(token), null);
+        gravarArmazenado("sessao", chave(token, "rascunho"), null);
         setEtapa({ tipo: "ja-respondeu" });
-      } else if (status === 410 && e instanceof ErroPesquisaPublica) {
+      } else if (status === 410) {
         setEtapa({
           tipo: "indisponivel",
-          motivo: e.indisponivel ?? "encerrada",
+          motivo: erro?.indisponivel ?? "encerrada",
         });
       } else if (status === 404) {
         setEtapa({ tipo: "indisponivel", motivo: "inexistente" });
-      } else if (status === 429) setErroIdent(MENSAGEM_MUITAS_TENTATIVAS);
-      else if (status === 401 || status === 422) {
+      } else if (status === 429) {
+        setErroIdent(MENSAGEM_MUITAS_TENTATIVAS);
+      } else if (status === 401 || status === 422) {
         setErroIdent(MENSAGEM_NAO_ENCONTRADO);
       } else {
         setErroIdent(
@@ -325,25 +399,33 @@ export function ResponderPesquisa({
   async function enviar() {
     if (!pesquisa || enviando) return;
     setEnviando(true);
-    setAlertaSecao(null);
+    setAlerta(null);
     try {
       const envio: {
-        passe?: string;
-        respostas: ReturnType<typeof montarRespostas>;
+        -readonly [K in keyof EnvioDeRespostas]: EnvioDeRespostas[K];
       } = { respostas: montarRespostas(secoes, respostas) };
       if (passeRef.current !== null) envio.passe = passeRef.current;
+      if (gruposDaPesquisa.length) {
+        const escolhidos: Partial<Record<CampoGrupo, string | null>> = {};
+        for (const g of gruposDaPesquisa) {
+          const v = grupos[g.campo] ?? NAO_INFORMAR;
+          escolhidos[g.campo] = g.opcoes.some((o) => o.id === v) ? v : null;
+        }
+        envio.grupos = escolhidos;
+      }
       await cliente.enviarRespostas(token, envio);
       passeRef.current = null;
-      gravarArmazenado("sessao", chaveRascunho(token), null);
+      gravarArmazenado("sessao", chave(token, "rascunho"), null);
+      gravarArmazenado("sessao", chave(token, "grupos"), null);
       if (pesquisa.identificacao === "anonima") {
-        gravarArmazenado("local", chaveRespondida(token), "1");
+        gravarArmazenado("local", chave(token, "respondida"), "1");
       }
       setEtapa({ tipo: "enviado" });
     } catch (e) {
       const erro = e instanceof ErroPesquisaPublica ? e : null;
       const status = erro?.status ?? 0;
       if (status === 409) {
-        gravarArmazenado("sessao", chaveRascunho(token), null);
+        gravarArmazenado("sessao", chave(token, "rascunho"), null);
         setEtapa({ tipo: "ja-respondeu" });
       } else if (status === 410) {
         setEtapa({
@@ -363,18 +445,15 @@ export function ResponderPesquisa({
         for (const { campo } of erro.erros) {
           porPergunta[campo] = "Revise esta resposta.";
         }
-        const primeira = ordem.find((i) =>
-          secoes[i]!.perguntas.some((p) => p.id in porPergunta),
-        );
-        if (primeira !== undefined)
-          setEtapa({ tipo: "secao", indice: primeira });
-        setErrosSecao(porPergunta);
-        setAlertaSecao(
-          "Algumas respostas precisam de ajuste antes do envio. Revise as perguntas indicadas.",
+        const primeira = ordem.find((o) => o.pergunta.id in porPergunta);
+        if (primeira) setEtapa({ tipo: "pergunta", id: primeira.pergunta.id });
+        setErros(porPergunta);
+        setAlerta(
+          "Algumas respostas precisam de ajuste antes do envio. Revise e envie de novo.",
         );
         setFocarErro((n) => n + 1);
       } else {
-        setAlertaSecao(
+        setAlerta(
           "Não foi possível enviar suas respostas agora. Elas continuam preenchidas; tente de novo.",
         );
       }
@@ -383,40 +462,61 @@ export function ResponderPesquisa({
     }
   }
 
-  function continuar(evento: FormEvent) {
-    evento.preventDefault();
-    if (etapa.tipo !== "secao") return;
-    const secao = secoes[etapa.indice];
-    if (!secao) return;
-    const erros = errosDaSecao(secao, visiveis, respostas);
-    if (Object.keys(erros).length) {
-      setErrosSecao(erros);
-      setAlertaSecao(
-        Object.keys(erros).length === 1
-          ? "Revise a pergunta indicada antes de continuar."
-          : "Revise as perguntas indicadas antes de continuar.",
-      );
+  /** Avança (ou envia, na última) se a resposta atual for válida. */
+  function avancar() {
+    if (etapa.tipo !== "pergunta" || enviando) return;
+    const posicao = ordem.findIndex((o) => o.pergunta.id === etapa.id);
+    const atual = ordem[posicao];
+    if (!atual) return;
+    const erro = erroDaPergunta(atual.pergunta, respostas[atual.pergunta.id]);
+    if (erro) {
+      setErros({ [atual.pergunta.id]: erro });
       setFocarErro((n) => n + 1);
       return;
     }
-    const posicao = ordem.indexOf(etapa.indice);
     const proxima = ordem[posicao + 1];
     if (proxima === undefined) {
       void enviar();
       return;
     }
-    irParaSecao(proxima);
+    irParaPergunta(proxima.pergunta.id);
   }
 
-  function voltar() {
-    if (etapa.tipo !== "secao") return;
-    const anterior = ordem[ordem.indexOf(etapa.indice) - 1];
-    if (anterior !== undefined) irParaSecao(anterior);
+  function aoEnviarFormulario(evento: FormEvent) {
+    evento.preventDefault();
+    avancar();
+  }
+
+  /**
+   * Enter num campo de resposta (texto, número, data, opção) avança quando a
+   * resposta é válida. No parágrafo, Enter continua sendo quebra de linha;
+   * num botão, vale o próprio botão.
+   */
+  function aoTeclar(evento: KeyboardEvent<HTMLFormElement>) {
+    if (evento.key !== "Enter" || evento.shiftKey || evento.altKey) return;
+    const alvo = evento.target as HTMLElement;
+    if (alvo.tagName !== "INPUT") return;
+    evento.preventDefault();
+    avancar();
+  }
+
+  function anterior() {
+    if (etapa.tipo !== "pergunta") return;
+    const posicao = ordem.findIndex((o) => o.pergunta.id === etapa.id);
+    irParaPergunta(ordem[posicao - 1]?.pergunta.id);
   }
 
   // ------------------------------------------------------------- desenho
 
+  const titulo = (texto: string, className = "pesquisa-publica__titulo") => (
+    <h1 ref={tituloRef} tabIndex={-1} className={className}>
+      {texto}
+    </h1>
+  );
+
   let conteudo: JSX.Element;
+  let progresso: { posicao: number; total: number } | null = null;
+
   switch (etapa.tipo) {
     case "carregando":
       conteudo = (
@@ -428,81 +528,122 @@ export function ResponderPesquisa({
 
     case "falha-carga":
       conteudo = (
-        <>
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            Não foi possível abrir a pesquisa
-          </h1>
+        <div className="pesquisa-publica__centro">
+          {titulo("Não foi possível abrir a pesquisa")}
           <p role="alert" className="pesquisa-publica__texto">
             Verifique sua conexão e tente de novo.
           </p>
-          <div className="pesquisa-publica__acoes">
-            <Button onClick={() => setTentativa((n) => n + 1)}>
-              Tentar de novo
-            </Button>
-          </div>
-        </>
+          <Button
+            className="pesquisa-publica__largo"
+            onClick={() => setTentativa((n) => n + 1)}
+          >
+            Tentar de novo
+          </Button>
+        </div>
       );
       break;
 
     case "indisponivel": {
-      const { titulo, texto } = INDISPONIVEL[etapa.motivo];
+      const { titulo: t, texto } = INDISPONIVEL[etapa.motivo];
       conteudo = (
-        <>
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            {titulo}
-          </h1>
+        <div className="pesquisa-publica__centro">
+          <span className="pesquisa-publica__simbolo" aria-hidden="true">
+            <IconeAviso tamanho={28} />
+          </span>
+          {titulo(t)}
           <p className="pesquisa-publica__texto">{texto}</p>
-        </>
+        </div>
       );
       break;
     }
 
     case "abertura": {
       const p = pesquisa!;
+      const ident = IDENTIFICACAO[p.identificacao];
+      const IconeIdent =
+        p.identificacao === "anonima"
+          ? IconeCadeado
+          : p.identificacao === "confidencial"
+            ? IconeSeguranca
+            : IconePerfil;
       conteudo = (
-        <>
-          <p className="pesquisa-publica__empresa">{p.empresa}</p>
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            {p.nome}
-          </h1>
+        <div className="pesquisa-publica__centro">
+          <p className="pesquisa-publica__selo">
+            <IconeEmpresa tamanho={16} />
+            <span>{p.empresa}</span>
+          </p>
+          {titulo(
+            p.nome,
+            "pesquisa-publica__titulo pesquisa-publica__titulo--grande",
+          )}
           {paragrafos(p.boasVindas).map((texto, i) => (
             <p key={i} className="pesquisa-publica__texto">
               {texto}
             </p>
           ))}
-          <p className="pesquisa-publica__resumo">
-            {plural(p.totalPerguntas, "pergunta", "perguntas")} ·{" "}
-            {tempoEstimado(p.minutosEstimados)}
-          </p>
-          <p className="pesquisa-publica__nota">
-            {p.identificacao === "anonima"
-              ? "Esta pesquisa é anônima: não pedimos seus dados e as respostas não mostram quem respondeu."
-              : p.identificacao === "confidencial"
-                ? "Esta pesquisa é confidencial: vamos confirmar que você participa dela, mas as respostas não ficam ligadas ao seu nome. O RH vê só o resultado do grupo."
-                : "Esta pesquisa é identificada: o RH da empresa vê as suas respostas junto com o seu nome."}
-          </p>
+          <ul className="pesquisa-meta" aria-label="Sobre esta pesquisa">
+            <li>
+              <IconeDocumento tamanho={16} />
+              <span>{plural(p.totalPerguntas, "pergunta", "perguntas")}</span>
+            </li>
+            <li>
+              <IconeRelogio tamanho={16} />
+              <span>{tempoEstimado(p.minutosEstimados)}</span>
+            </li>
+            <li>
+              <IconeIdent tamanho={16} />
+              <span>{ident.rotulo}</span>
+            </li>
+          </ul>
+          <p className="pesquisa-publica__nota">{ident.nota}</p>
+          {gruposDaPesquisa.length ? (
+            <div className="pesquisa-grupos">
+              {gruposDaPesquisa.map((g) => {
+                const idRotulo = `grupo-${g.campo}-rotulo`;
+                return (
+                  <div key={g.campo} className="pesquisa-grupos__campo">
+                    <span
+                      id={idRotulo}
+                      className="pesquisa-pergunta__rotulo-menor"
+                    >
+                      {g.rotulo}
+                    </span>
+                    <ListaDeEscolha
+                      id={`grupo-${g.campo}`}
+                      aria-labelledby={idRotulo}
+                      aria-describedby="grupos-nota"
+                      vazio="Prefiro não informar"
+                      valor={grupos[g.campo] ?? NAO_INFORMAR}
+                      onMudar={(v) =>
+                        setGrupos((atual) => ({ ...atual, [g.campo]: v }))
+                      }
+                      opcoes={[
+                        { valor: NAO_INFORMAR, rotulo: "Prefiro não informar" },
+                        ...g.opcoes.map((o) => ({
+                          valor: o.id,
+                          rotulo: o.nome,
+                        })),
+                      ]}
+                    />
+                  </div>
+                );
+              })}
+              <p id="grupos-nota" className="pesquisa-publica__legenda">
+                Serve só para ver os resultados por grupo, somados. A resposta
+                continua anônima.
+              </p>
+            </div>
+          ) : null}
           {p.identificacao === "anonima" && jaRespondeuAqui ? (
             <p className="pesquisa-publica__aviso" role="status">
               Este navegador já enviou uma resposta para esta pesquisa. Se outra
               pessoa usa este aparelho, ela pode responder normalmente.
             </p>
           ) : null}
-          <div className="pesquisa-publica__acoes">
-            <Button onClick={comecar}>Começar</Button>
-          </div>
-        </>
+          <Button className="pesquisa-publica__largo" onClick={iniciar}>
+            Iniciar pesquisa
+          </Button>
+        </div>
       );
       break;
     }
@@ -520,17 +661,16 @@ export function ResponderPesquisa({
           onSubmit={identificar}
           className="pesquisa-publica__formulario"
         >
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            Confirme seus dados
-          </h1>
-          <p className="pesquisa-publica__texto">
-            Use o CPF e a data de nascimento do seu cadastro na empresa. Eles
-            servem só para confirmar que você participa desta pesquisa.
-          </p>
+          <div className="pesquisa-publica__centro">
+            <span className="pesquisa-publica__simbolo" aria-hidden="true">
+              <IconeSeguranca tamanho={28} />
+            </span>
+            {titulo("Confirme seus dados")}
+            <p className="pesquisa-publica__texto">
+              Use o CPF e a data de nascimento do seu cadastro na empresa. Eles
+              servem só para confirmar que você participa desta pesquisa.
+            </p>
+          </div>
           {confidencial ? (
             <p className="pesquisa-publica__nota">
               Esta pesquisa é confidencial: depois da confirmação, as respostas
@@ -619,102 +759,91 @@ export function ResponderPesquisa({
               {erroIdent}
             </p>
           ) : null}
-          <div className="pesquisa-publica__acoes">
-            <Button type="submit" disabled={identificando}>
-              {identificando ? "Confirmando…" : "Continuar"}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            className="pesquisa-publica__largo"
+            disabled={identificando}
+          >
+            {identificando ? "Confirmando…" : "Continuar"}
+          </Button>
         </form>
       );
       break;
     }
 
-    case "secao": {
-      const secao = secoes[etapa.indice]!;
-      const posicao = ordem.indexOf(etapa.indice) + 1;
-      const total = ordem.length;
-      const ultima = posicao === total;
-      const temObrigatoria = secao.perguntas.some(
-        (p) => p.obrigatoria && visiveis.has(p.id),
+    case "pergunta": {
+      const posicao = Math.max(
+        0,
+        ordem.findIndex((o) => o.pergunta.id === etapa.id),
       );
+      const atual = ordem[posicao]!;
+      const total = ordem.length;
+      const ultima = posicao === total - 1;
+      const valor = respostas[atual.pergunta.id];
+      const bloqueado = atual.pergunta.obrigatoria && !respondida(valor);
+      progresso = { posicao: posicao + 1, total };
       conteudo = (
         <form
           ref={formularioRef}
           noValidate
-          onSubmit={continuar}
+          onSubmit={aoEnviarFormulario}
+          onKeyDown={aoTeclar}
           className="pesquisa-publica__formulario"
         >
-          <div className="pesquisa-progresso">
-            <p className="pesquisa-progresso__texto" id="pesquisa-progresso">
-              Seção {posicao} de {total}
-            </p>
-            <div
-              className="pesquisa-progresso__barra"
-              role="progressbar"
-              aria-labelledby="pesquisa-progresso"
-              aria-valuemin={1}
-              aria-valuemax={total}
-              aria-valuenow={posicao}
-              aria-valuetext={`Seção ${posicao} de ${total}`}
-            >
-              <span
-                className="pesquisa-progresso__preenchido"
-                style={{ width: `${(posicao / Math.max(total, 1)) * 100}%` }}
-              />
-            </div>
-          </div>
-          {posicao === 1 && primeiroNome ? (
+          <p className="pesquisa-contador">
+            Pergunta {posicao + 1} de {total}
+            {atual.secao.titulo ? (
+              <span className="pesquisa-contador__secao">
+                {" "}
+                · {atual.secao.titulo}
+              </span>
+            ) : null}
+          </p>
+          {atual.primeiraDaSecao && atual.secao.descricao ? (
+            <p className="pesquisa-publica__legenda">{atual.secao.descricao}</p>
+          ) : null}
+          {posicao === 0 && primeiroNome ? (
             <p className="pesquisa-publica__nota">
               {pesquisa?.identificacao === "confidencial"
                 ? `Olá, ${primeiroNome}. Identificação confirmada; suas respostas não ficam ligadas ao seu nome.`
                 : `Olá, ${primeiroNome}. Você está respondendo com a sua identificação.`}
             </p>
           ) : null}
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            {secao.titulo ?? `Seção ${posicao}`}
-          </h1>
-          {secao.descricao ? (
-            <p className="pesquisa-publica__texto">{secao.descricao}</p>
-          ) : null}
-          {temObrigatoria ? (
-            <p className="pesquisa-publica__legenda">
-              As perguntas marcadas com * são obrigatórias.
-            </p>
-          ) : null}
-          {alertaSecao ? (
+          {alerta ? (
             <p className="pesquisa-publica__erro" role="alert">
-              {alertaSecao}
+              {alerta}
             </p>
           ) : null}
-          <div className="pesquisa-publica__perguntas">
-            {secao.perguntas
-              .filter((p) => visiveis.has(p.id))
-              .map((p) => (
-                <CampoDaPergunta
-                  key={p.id}
-                  pergunta={p}
-                  valor={respostas[p.id]}
-                  erro={errosSecao[p.id] ?? null}
-                  aoMudar={(v) => mudarResposta(p.id, v)}
-                />
-              ))}
-          </div>
-          <div className="pesquisa-publica__acoes pesquisa-publica__acoes--navegacao">
-            {posicao > 1 ? (
-              <Button variant="secondary" onClick={voltar} disabled={enviando}>
-                Voltar
-              </Button>
-            ) : null}
-            <Button type="submit" disabled={enviando}>
-              {ultima
-                ? enviando
-                  ? "Enviando…"
-                  : "Enviar respostas"
-                : "Continuar"}
+          <CampoDaPergunta
+            key={atual.pergunta.id}
+            pergunta={atual.pergunta}
+            valor={valor}
+            erro={erros[atual.pergunta.id] ?? null}
+            aoMudar={(v) => mudarResposta(atual.pergunta.id, v)}
+            tituloRef={tituloRef}
+          />
+          <div className="pesquisa-publica__navegacao">
+            <Button
+              variant="subtle"
+              onClick={anterior}
+              disabled={posicao === 0 || enviando}
+            >
+              <IconeVoltar tamanho={16} />
+              Anterior
+            </Button>
+            <Button type="submit" disabled={bloqueado || enviando}>
+              {ultima ? (
+                enviando ? (
+                  "Enviando…"
+                ) : (
+                  "Enviar respostas"
+                )
+              ) : (
+                <>
+                  Próximo
+                  <IconeAvancar tamanho={16} />
+                </>
+              )}
             </Button>
           </div>
         </form>
@@ -724,48 +853,66 @@ export function ResponderPesquisa({
 
     case "ja-respondeu":
       conteudo = (
-        <>
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
-          >
-            Você já respondeu esta pesquisa
-          </h1>
+        <div className="pesquisa-publica__centro">
+          <span className="pesquisa-publica__simbolo" aria-hidden="true">
+            <IconeInformacao tamanho={28} />
+          </span>
+          {titulo("Você já respondeu esta pesquisa")}
           <p className="pesquisa-publica__texto">
             Sua resposta já está registrada e cada participante responde uma vez
             só. Agradecemos a participação.
           </p>
-        </>
+        </div>
       );
       break;
 
     case "enviado":
       conteudo = (
-        <>
-          <h1
-            ref={tituloRef}
-            tabIndex={-1}
-            className="pesquisa-publica__titulo"
+        <div className="pesquisa-publica__centro">
+          <span
+            className="pesquisa-publica__simbolo pesquisa-publica__simbolo--sucesso"
+            aria-hidden="true"
           >
-            Respostas enviadas
-          </h1>
+            <IconeSucesso tamanho={32} />
+          </span>
+          {titulo("Respostas enviadas")}
           <p className="pesquisa-publica__texto">
             Agradecemos a participação. Você já pode fechar esta página.
           </p>
-        </>
+        </div>
       );
       break;
   }
 
   return (
     <div className="pesquisa-publica">
+      {progresso ? (
+        <div
+          className="pesquisa-progresso"
+          role="progressbar"
+          aria-label="Progresso da pesquisa"
+          aria-valuemin={1}
+          aria-valuemax={progresso.total}
+          aria-valuenow={progresso.posicao}
+          aria-valuetext={`Pergunta ${progresso.posicao} de ${progresso.total}`}
+        >
+          <span
+            className="pesquisa-progresso__preenchido"
+            style={{
+              width: `${(progresso.posicao / Math.max(progresso.total, 1)) * 100}%`,
+            }}
+          />
+        </div>
+      ) : null}
       <header className="pesquisa-publica__topo">
         <MarcaEvolli variante="horizontal" altura={32} />
       </header>
       <main className="pesquisa-publica__principal">
         <div className="pesquisa-publica__cartao">{conteudo}</div>
       </main>
+      <footer className="pesquisa-publica__rodape">
+        Pesquisa aplicada pelo Evolli RH em nome da empresa.
+      </footer>
     </div>
   );
 }
