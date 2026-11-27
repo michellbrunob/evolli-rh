@@ -68,6 +68,16 @@ export interface Secao {
   readonly perguntas: readonly Pergunta[];
 }
 
+/** Campo pelo qual a anônima separa as respostas (ampliação de 27/11). */
+export type CampoGrupo = "departamento" | "centroCusto" | "unidade";
+
+/** Um campo de separação que quem responde escolhe antes das perguntas. */
+export interface GrupoPublico {
+  readonly campo: CampoGrupo;
+  readonly rotulo: string;
+  readonly opcoes: readonly { readonly id: string; readonly nome: string }[];
+}
+
 export interface PesquisaPublica {
   readonly empresa: string;
   readonly nome: string;
@@ -76,6 +86,8 @@ export interface PesquisaPublica {
   readonly totalPerguntas: number;
   readonly minutosEstimados: number;
   readonly secoes: readonly Secao[];
+  /** Só na anônima com separação; ausente numa API anterior à ampliação. */
+  readonly grupos?: readonly GrupoPublico[];
 }
 
 export type MotivoIndisponivel =
@@ -111,6 +123,8 @@ export interface RespostaDaPergunta {
 
 export interface EnvioDeRespostas {
   readonly passe?: string;
+  /** Escolha de cada grupo; `null` = prefere não informar. */
+  readonly grupos?: Partial<Record<CampoGrupo, string | null>>;
   readonly respostas: readonly RespostaDaPergunta[];
 }
 
@@ -250,9 +264,11 @@ export function criarClientePesquisaPublica(
     async enviarRespostas(token, envio) {
       const corpo: {
         passe?: string;
+        grupos?: Partial<Record<CampoGrupo, string | null>>;
         respostas: readonly RespostaDaPergunta[];
       } = { respostas: envio.respostas };
       if (envio.passe !== undefined) corpo.passe = envio.passe;
+      if (envio.grupos !== undefined) corpo.grupos = envio.grupos;
       const res = await buscar(
         rota(token, "/respostas"),
         opcoes("POST", corpo),

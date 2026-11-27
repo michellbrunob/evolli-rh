@@ -134,6 +134,19 @@ describe("T216 — cliente público de pesquisas", () => {
     expect(JSON.parse(init.body as string)).toEqual({ respostas: [] });
   });
 
+  it("anônima com separação: o corpo leva os grupos escolhidos", async () => {
+    const buscar = vi.fn().mockResolvedValue(resposta(201, { ok: true }));
+    await criarClientePesquisaPublica(buscar).enviarRespostas("tok", {
+      grupos: { departamento: "d1", unidade: null },
+      respostas: [],
+    });
+    const [, init] = buscar.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      grupos: { departamento: "d1", unidade: null },
+      respostas: [],
+    });
+  });
+
   it("422 traz os erros por pergunta", async () => {
     const cliente = criarClientePesquisaPublica(
       vi.fn().mockResolvedValue(
