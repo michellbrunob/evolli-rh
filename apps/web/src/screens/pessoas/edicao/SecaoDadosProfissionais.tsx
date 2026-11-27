@@ -143,14 +143,24 @@ export function SecaoDadosProfissionais({
   // Gestor direto: as pessoas da empresa ativa, menos a própria.
   useEffect(() => {
     let vivo = true;
-    void Promise.resolve(listarColaboradores({ tamanhoPagina: 100 }))
-      .then((pagina) => {
+    void (async () => {
+      // Só pessoas ativas, todas as páginas (sem o teto de 100).
+      const todos: { id: string; nome: string }[] = [];
+      for (let pagina = 1; pagina <= 50; pagina += 1) {
+        const r = await listarColaboradores({
+          grupo: "ativos",
+          pagina,
+          tamanhoPagina: 100,
+        });
+        const itens = r?.itens ?? [];
+        todos.push(...itens.map((c) => ({ id: c.id, nome: c.nome })));
+        if (itens.length < 100) break;
+      }
+      return todos;
+    })()
+      .then((lista) => {
         if (!vivo) return;
-        setGestores(
-          (pagina?.itens ?? [])
-            .filter((c) => c.id !== colaboradorId)
-            .map((c) => ({ id: c.id, nome: c.nome })),
-        );
+        setGestores(lista.filter((c) => c.id !== colaboradorId));
       })
       .catch(() => {
         if (vivo) setGestores([]);
@@ -310,7 +320,7 @@ export function SecaoDadosProfissionais({
         </LinhaDoCadastro>
         <LinhaDoCadastro
           rotulo="Data de desligamento"
-          ajuda="Deixe vazio se a pessoa trabalha na empresa. Apagar a data de quem está desligado volta a situação para Ativo."
+          ajuda="Preenchida pelo desligamento, na ficha: Mais ações › Desligar colaborador."
           paraId={`${propsDoCampo("nivel").id}-desligamento`}
         >
           <input
@@ -334,7 +344,7 @@ export function SecaoDadosProfissionais({
               type="text"
               inputMode="numeric"
               maxLength={2}
-              placeholder="44"
+              placeholder="Ex.: 44"
               value={valores.jornadaSemanalHoras}
               onChange={(e) =>
                 onAlterar(
@@ -344,13 +354,17 @@ export function SecaoDadosProfissionais({
               }
               {...propsDoCampo("jornadaSemanalHoras")}
             />
-            <span aria-hidden="true">horas por semana</span>
+            <span aria-hidden="true">
+              {Number(valores.jornadaSemanalHoras) === 1
+                ? "hora por semana"
+                : "horas por semana"}
+            </span>
           </div>
           {erroDe("jornadaSemanalHoras")}
         </LinhaDoCadastro>
         <LinhaDoCadastro
           rotulo="Escala de trabalho"
-          ajuda="Sem escala, os benefícios usam os dias úteis do mês."
+          ajuda="Vale só quando não há escala definida na aba Escala da ficha (lá ela manda no quadro e nos benefícios). Sem nenhuma, os benefícios usam os dias úteis do mês."
           paraId={propsDoCampo("escala").id}
         >
           <ListaDeEscolha

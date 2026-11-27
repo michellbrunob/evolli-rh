@@ -867,7 +867,7 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
       "Filial, loja ou local de trabalho.",
       "Recebe as solicitações da pessoa.",
       "Tipo de vínculo, admissão, jornada, escala e matrícula.",
-      "Sem escala, os benefícios usam os dias úteis do mês.",
+      "Vale só quando não há escala definida na aba Escala da ficha (lá ela manda no quadro e nos benefícios). Sem nenhuma, os benefícios usam os dias úteis do mês.",
       "Remuneração",
       "Valores mensais usados na folha.",
       "Calculado a partir do bruto.",
@@ -876,6 +876,10 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
       "Obrigatório para algumas profissões.",
     ]) {
       expect(screen.getByText(texto), texto).toBeInTheDocument();
+      // Gestor direto: só pessoas ativas (desligado não vira gestor).
+      expect(listarColaboradores).toHaveBeenCalledWith(
+        expect.objectContaining({ grupo: "ativos", pagina: 1 }),
+      );
     }
     expect(
       await screen.findByDisplayValue("Analista de RH"),
