@@ -1318,6 +1318,11 @@ model Colaborador {
   /// IDENTIFICADAS dela (confidencial e anônima não guardam a pessoa).
   participacoesPesquisa      PesquisaParticipante[]
   respostasPesquisa          PesquisaResposta[]
+  /// T216 — Avaliação 90°/180° (quem avalia e quem é avaliado) e os convites
+  /// do onboarding.
+  avaliacoesFeitas           PesquisaAvaliacaoPar[]      @relation("AvaliadorDaPesquisa")
+  avaliacoesRecebidas        PesquisaAvaliacaoPar[]      @relation("AvaliadoDaPesquisa")
+  enviosPesquisa             PesquisaEnvio[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -3744,6 +3749,10 @@ model Pesquisa {
   /// Só na anônima: até 2 campos (`departamento`, `centroCusto`, `unidade`)
   /// que quem responde escolhe antes das perguntas.
   separarPor     String[]              @default([]) @map("separar_por")
+  /// Configuração própria do modelo: na avaliação 90°/180°, comentários,
+  /// prazos, lembretes e quem vê o quê; no onboarding, o envio (agora,
+  /// agendado ou automático), o público e o e-mail. Conferida pela aplicação.
+  configModelo   Json?                 @map("config_modelo")
   token          String                @unique @db.VarChar(64)
   publicadaEm    DateTime?             @map("publicada_em")
   excluidaEm     DateTime?             @map("excluida_em")
@@ -3757,6 +3766,8 @@ model Pesquisa {
   respostas     PesquisaResposta[]
   passes        PesquisaPasse[]
   tentativas    PesquisaTentativa[]
+  pares         PesquisaAvaliacaoPar[]
+  envios        PesquisaEnvio[]
 
   @@unique([id, empresaId])
   @@index([empresaId])
@@ -3800,11 +3811,16 @@ model PesquisaResposta {
   unidadeId      String?  @map("unidade_id")
   valores        Json
   respondidaEm   DateTime @map("respondida_em")
+  /// Onboarding: a rodada (30, 60 ou 90 dias de casa); 0 = envio único (e
+  /// todas as demais pesquisas). Na identificada, uma resposta por pessoa e
+  /// rodada.
+  rodada         Int      @default(0)
 
-  pesquisa    Pesquisa     @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
-  colaborador Colaborador? @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  pesquisa    Pesquisa              @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador?          @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  par         PesquisaAvaliacaoPar?
 
-  @@unique([pesquisaId, colaboradorId])
+  @@unique([pesquisaId, colaboradorId, rodada])
   @@index([colaboradorId])
   @@map("pesquisa_resposta")
 }
@@ -3826,6 +3842,63 @@ model PesquisaPasse {
   @@index([participanteId])
   @@index([pesquisaId])
   @@map("pesquisa_passe")
+}
+
+/// T216 — Avaliação 90°/180°: quem avalia quem. `papel` = `gestor` (o gestor
+/// avalia a pessoa do time) ou `autoavaliacao` (a pessoa se avalia; só na
+/// 180°). Uma avaliação por pessoa avaliada e papel. A resposta fica em
+/// `pesquisa_resposta` (sem a pessoa); o par liga a resposta ao avaliado e ao
+/// avaliador — a avaliação é sempre nominal.
+model PesquisaAvaliacaoPar {
+  id           String    @id @default(uuid())
+  pesquisaId   String    @map("pesquisa_id")
+  empresaId    String    @map("empresa_id")
+  avaliadorId  String    @map("avaliador_id")
+  avaliadoId   String    @map("avaliado_id")
+  papel        String    @db.VarChar(20)
+  respostaId   String?   @unique @map("resposta_id")
+  respondidaEm DateTime? @map("respondida_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+
+  pesquisa  Pesquisa          @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  avaliador Colaborador       @relation("AvaliadorDaPesquisa", fields: [avaliadorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  avaliado  Colaborador       @relation("AvaliadoDaPesquisa", fields: [avaliadoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  resposta  PesquisaResposta? @relation(fields: [respostaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([pesquisaId, avaliadoId, papel])
+  @@index([avaliadorId])
+  @@index([avaliadoId])
+  @@map("pesquisa_avaliacao_par")
+}
+
+/// T216 — convites por pessoa. Onboarding: um por pessoa e rodada (30, 60 ou
+/// 90 dias de casa; 0 = envio único). Avaliação: `rodada` é o marco do aviso
+/// (0 convite; 1, 2 e 3 os lembretes de 7 dias, 3 dias e do dia; 4 o de
+/// depois do prazo). `situacao`: agendado, aguardando_email (o Evolli ainda
+/// não envia e-mail), enviado, sem_email, respondido ou pulado. Na
+/// confidencial, `respondido_em` guarda só o dia e nada liga o convite à
+/// resposta.
+model PesquisaEnvio {
+  id            String    @id @default(uuid())
+  pesquisaId    String    @map("pesquisa_id")
+  empresaId     String    @map("empresa_id")
+  colaboradorId String    @map("colaborador_id")
+  rodada        Int
+  dataPrevista  DateTime  @map("data_prevista") @db.Date
+  situacao      String    @default("agendado") @db.VarChar(20)
+  enviadoEm     DateTime? @map("enviado_em")
+  lembreteEm    DateTime? @map("lembrete_em")
+  respondidoEm  DateTime? @map("respondido_em") @db.Date
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+
+  pesquisa    Pesquisa    @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([pesquisaId, colaboradorId, rodada])
+  @@index([colaboradorId])
+  @@index([situacao, dataPrevista])
+  @@map("pesquisa_envio")
 }
 
 /// T216 — tentativa ERRADA de identificação no link, para o limite de 5 por

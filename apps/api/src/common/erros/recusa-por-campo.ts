@@ -73,7 +73,14 @@ export type MotivoDoCampo =
   | "ninguem_identificavel"
   // T216 — modelo de metodologia fixa (Pulso e Clima, Clima, TAD): os itens
   // do modelo precisam estar todos, com o tipo e a escala do modelo.
-  | "estrutura_do_modelo";
+  | "estrutura_do_modelo"
+  // T216 — Avaliação 90°/180° e Onboarding automático: time sem pessoas,
+  // gestor que não entra pelo link (sem CPF e nascimento), pessoa em dois
+  // times, prazo que não cabe e convite fora da rodada.
+  | "sem_pessoas"
+  | "gestor_nao_identificavel"
+  | "repetida"
+  | "fora_do_prazo";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -176,7 +183,23 @@ export type CampoPublico =
   | "separarPor"
   | "grupos"
   | "campo"
-  | CampoDePergunta;
+  | CampoDePergunta
+  // T216 — Avaliação 90°/180° (times, comentários, prazos, lembretes) e o
+  // envio automático do Onboarding.
+  | "times"
+  | "comentarios"
+  | "liberarNoPortal"
+  | "visibilidade"
+  | "prazoAutoavaliacao"
+  | "lembretes"
+  | "envio"
+  | "rodadas"
+  | "horario"
+  | "prazoDias"
+  | "lembreteDias"
+  | "agendadoPara"
+  | "publico"
+  | "rodada";
 
 /**
  * T216 — o id de uma pergunta da pesquisa como campo do erro (o contrato

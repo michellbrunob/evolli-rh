@@ -264,6 +264,59 @@ describe("T216 — rótulo curto da pergunta", () => {
       { campo: "p1", motivo: "limite" },
     ]);
   });
+
+  it("escala: guarda o rótulo de cada ponto, aparado e na ordem", () => {
+    const r = conferirSecoes([
+      secao("s1", [
+        pergunta("e4", {
+          tipo: "escala",
+          config: {
+            minimo: 1,
+            maximo: 4,
+            rotulos: [
+              " Discordo ",
+              "Discordo um pouco",
+              "Concordo um pouco",
+              "Concordo",
+            ],
+          },
+        }),
+      ]),
+    ]);
+    expect(r.erros).toEqual([]);
+    expect(r.secoes[0]!.perguntas[0]!.config.rotulos).toEqual([
+      "Discordo",
+      "Discordo um pouco",
+      "Concordo um pouco",
+      "Concordo",
+    ]);
+  });
+
+  it("escala: sem rótulos por ponto, a configuração fica como antes", () => {
+    const r = conferirSecoes([
+      secao("s1", [pergunta("e5", { tipo: "escala", config: { maximo: 5 } })]),
+    ]);
+    expect(r.erros).toEqual([]);
+    expect(r.secoes[0]!.perguntas[0]!.config).not.toHaveProperty("rotulos");
+  });
+
+  it.each([
+    ["quantidade diferente dos pontos", ["a", "b", "c"]],
+    ["rótulo vazio", ["a", "", "c", "d"]],
+    ["rótulo longo demais", ["a", "b", "c", "x".repeat(LIMITES.rotulo + 1)]],
+    ["não é lista", "a,b,c,d"],
+    ["item que não é texto", ["a", 2, "c", "d"]],
+  ])("escala: recusa rótulos por ponto inválidos (%s)", (_caso, rotulos) => {
+    const r = conferirSecoes([
+      secao("s1", [
+        pergunta("e6", {
+          tipo: "escala",
+          config: { minimo: 1, maximo: 4, rotulos },
+        }),
+      ]),
+    ]);
+    expect(r.erros).toEqual([{ campo: "e6", motivo: "invalido" }]);
+  });
 });
 
 describe("T216 — modelos: chave, LNPS, rótulos dos pontos e escalas de 4 pontos", () => {
