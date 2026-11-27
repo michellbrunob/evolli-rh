@@ -29,7 +29,12 @@ import {
   listarCandidatosFalso,
   servicoFalso,
 } from "./dadosDeTeste";
+import {
+  ProvedorDeTrilhaComplementar,
+  useComplementoDaTrilha,
+} from "../../app/trilhaComplementar";
 import { EditarPesquisa } from "./EditarPesquisa";
+import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { SepararRespostasPor } from "./SepararRespostasPor";
@@ -572,5 +577,54 @@ describe("B13 — Editar pesquisa em duas colunas", () => {
     expect(css).toMatch(
       /:has\(\.pesquisas__rodape\)\s+\.aviso-flutuante\s*\{[^}]*bottom:\s*calc\(var\(--altura-rodape-pagina\)/,
     );
+  });
+});
+
+describe("B21 — trilha do resultado individual", () => {
+  function Leitor() {
+    const c = useComplementoDaTrilha();
+    return (
+      <nav aria-label="Trilha">
+        <button type="button" onClick={c?.onVoltar}>
+          Pesquisas
+        </button>
+        {c?.niveis.map((n, i) =>
+          n.onSelecionar ? (
+            <button key={i} type="button" onClick={n.onSelecionar}>
+              {n.rotulo}
+            </button>
+          ) : (
+            <span key={i} aria-current="page">
+              {n.rotulo}
+            </span>
+          ),
+        )}
+      </nav>
+    );
+  }
+
+  it("Pesquisas › nome da pesquisa › a resposta; o nome leva aos resultados", async () => {
+    const onVoltar = vi.fn();
+    const onLista = vi.fn();
+    render(
+      <ProvedorDeTrilhaComplementar>
+        <ResultadoIndividual
+          servico={servicoFalso()}
+          pesquisaId="p-1"
+          respostaId="r-1"
+          onVoltar={onVoltar}
+          onLista={onLista}
+          onIr={vi.fn()}
+        />
+        <Leitor />
+      </ProvedorDeTrilhaComplementar>,
+    );
+    const trilha = screen.getByRole("navigation", { name: "Trilha" });
+    const atual = await within(trilha).findByText(/^Resposta anônima #/);
+    expect(atual).toHaveAttribute("aria-current", "page");
+    fireEvent.click(within(trilha).getByRole("button", { name: DETALHE.nome }));
+    expect(onVoltar).toHaveBeenCalled();
+    fireEvent.click(within(trilha).getByRole("button", { name: "Pesquisas" }));
+    expect(onLista).toHaveBeenCalled();
   });
 });

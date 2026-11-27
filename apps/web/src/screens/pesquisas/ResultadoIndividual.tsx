@@ -6,6 +6,7 @@
  * respondido). Também abre pela aba Pesquisas da ficha.
  */
 import { useEffect, useState } from "react";
+import { useTrilhaComplementar } from "../../app/trilhaComplementar";
 import type {
   Identificacao,
   PesquisaDetalhe,
@@ -57,22 +58,38 @@ function grupoDoEnps(v: number): string {
   return v >= 9 ? "Promotor" : v >= 7 ? "Neutro" : "Detrator";
 }
 
-/** A página na tela do módulo: carrega a pesquisa e a resposta. */
+/**
+ * A página na tela do módulo: carrega a pesquisa e a resposta. A trilha
+ * ganha dois níveis: o nome da pesquisa (leva aos resultados) e a resposta.
+ */
 export function ResultadoIndividual({
   servico,
   pesquisaId,
   respostaId,
   onVoltar,
+  onLista,
   onIr,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly pesquisaId: string;
   readonly respostaId: string;
   readonly onVoltar: () => void;
+  /** O "Pesquisas" da trilha: a lista. */
+  readonly onLista: () => void;
   readonly onIr: (respostaId: string) => void;
 }) {
   const [pesquisa, setPesquisa] = useState<PesquisaDetalhe | null>(null);
   const [falhou, setFalhou] = useState(false);
+  const [tituloDaResposta, setTituloDaResposta] = useState<string | null>(null);
+  useTrilhaComplementar(
+    pesquisa
+      ? [
+          { rotulo: pesquisa.nome, onSelecionar: onVoltar },
+          { rotulo: tituloDaResposta ?? "Resultado individual" },
+        ]
+      : [{ rotulo: "Resultado individual" }],
+    onLista,
+  );
   useEffect(() => {
     let vivo = true;
     Promise.resolve(servico.obterPesquisa(pesquisaId))
@@ -105,6 +122,7 @@ export function ResultadoIndividual({
       rotuloVoltar="Voltar para os resultados"
       onVoltar={onVoltar}
       onIr={onIr}
+      onTitulo={setTituloDaResposta}
     />
   );
 }
@@ -120,6 +138,7 @@ export function PaginaDaResposta({
   rotuloVoltar,
   onVoltar,
   onIr,
+  onTitulo,
 }: {
   readonly nomeDaPesquisa: string;
   readonly identificacao: Identificacao;
@@ -134,6 +153,8 @@ export function PaginaDaResposta({
   readonly onVoltar: () => void;
   /** Sem `onIr`, não há paginação (ex.: ficha). */
   readonly onIr?: (respostaId: string) => void;
+  /** O título da resposta, quando carregada (o nível atual da trilha). */
+  readonly onTitulo?: (titulo: string) => void;
 }) {
   const [r, setR] = useState<RespostaDetalhe | null>(null);
   const [falhou, setFalhou] = useState(false);
@@ -178,6 +199,17 @@ export function PaginaDaResposta({
     // `carregar` muda a cada render do pai; a resposta é o que importa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [respostaId]);
+
+  const tituloCarregado = r
+    ? identificacao === "identificada" && r.nome
+      ? r.nome
+      : `Resposta anônima #${r.numero}`
+    : null;
+  useEffect(() => {
+    if (tituloCarregado) onTitulo?.(tituloCarregado);
+    // `onTitulo` muda a cada render do pai; o título é o que importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tituloCarregado]);
 
   if (falhou)
     return (

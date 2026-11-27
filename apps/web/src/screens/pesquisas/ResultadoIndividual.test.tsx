@@ -31,6 +31,7 @@ describe("Resultado individual", () => {
         pesquisaId="p-1"
         respostaId="r-1"
         onVoltar={vi.fn()}
+        onLista={vi.fn()}
         onIr={vi.fn()}
       />,
     );
@@ -77,6 +78,7 @@ describe("Resultado individual", () => {
         pesquisaId="p-1"
         respostaId="r-1"
         onVoltar={vi.fn()}
+        onLista={vi.fn()}
         onIr={onIr}
       />,
     );

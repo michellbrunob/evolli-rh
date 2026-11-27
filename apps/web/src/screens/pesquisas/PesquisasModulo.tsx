@@ -206,7 +206,11 @@ function Modulo({
         irPara(ROTA_DA_LISTA);
     }
   }, [atual, irPara]);
-  useTrilhaComplementar(rotuloDaTrilha(atual), voltarNaTrilha);
+  // O resultado individual declara a própria trilha (pesquisa › resposta).
+  useTrilhaComplementar(
+    atual.tela === "resposta" ? undefined : rotuloDaTrilha(atual),
+    voltarNaTrilha,
+  );
 
   const telaAtual = atual.tela;
   const modeloAtual = atual.tela === "modelo" ? atual.modelo : null;
@@ -481,6 +485,7 @@ function Modulo({
           onVoltar={() =>
             irPara({ tela: "resultados", id: atual.id, aba: "respostas" })
           }
+          onLista={() => irPara(ROTA_DA_LISTA)}
           onIr={(respostaId) =>
             irPara(
               { tela: "resposta", id: atual.id, respostaId },
