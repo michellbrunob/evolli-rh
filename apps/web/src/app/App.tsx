@@ -519,6 +519,8 @@ function conteudoDoDestino(
     readonly focarContatos: boolean;
     readonly onAbrir: (colaboradorId: string, aba?: AbaDaFicha) => void;
     readonly onTrocarAba: (aba: AbaDaFicha) => void;
+    /** T216 — abrir (id) ou fechar (`null`) uma pesquisa na aba Pesquisas. */
+    readonly onAbrirPesquisa: (pesquisaId: string | null) => void;
     /** T202 — outra competência da aba de ponto: o shell troca a rota. */
     readonly onTrocarCompetencia: (competencia: string) => void;
     readonly onFechar: () => void;
@@ -716,6 +718,7 @@ function conteudoDoDestino(
         focarContatosNaFicha={fichaDoColaborador.focarContatos}
         onAbrirFicha={fichaDoColaborador.onAbrir}
         onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
+        onAbrirPesquisaDaFicha={fichaDoColaborador.onAbrirPesquisa}
         onTrocarCompetenciaDaFicha={fichaDoColaborador.onTrocarCompetencia}
         onFecharFicha={fichaDoColaborador.onFechar}
         onAbrirEdicao={fichaDoColaborador.onAbrirEdicao}
@@ -1477,7 +1480,24 @@ export function App({
   );
   // T215 — as abas da ficha da referência (sem ponto nem solicitações).
   const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
-    setFicha((atual) => (atual ? { ...atual, aba } : atual));
+    // T216 — trocar de aba fecha a pesquisa aberta (ela é da aba Pesquisas).
+    setFicha((atual) => {
+      if (!atual) return atual;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pesquisa: _pesquisa, ...semPesquisa } = atual;
+      return { ...semPesquisa, aba };
+    });
+  }, []);
+  // T216 — a pesquisa aberta na aba Pesquisas vai à URL (recarregar mantém).
+  const abrirPesquisaDaFicha = useCallback((pesquisaId: string | null) => {
+    setFicha((atual) => {
+      if (!atual) return atual;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pesquisa: _pesquisa, ...semPesquisa } = atual;
+      return pesquisaId === null
+        ? { ...semPesquisa, aba: "pesquisas" }
+        : { ...semPesquisa, aba: "pesquisas", pesquisa: pesquisaId };
+    });
   }, []);
   // T215 — sem a aba de ponto, não há competência na ficha.
   const trocarCompetenciaDaFicha = useCallback((_competencia: string) => {
@@ -2227,6 +2247,7 @@ export function App({
                   focarContatos: focarContatosNaFicha,
                   onAbrir: abrirFicha,
                   onTrocarAba: trocarAbaDaFicha,
+                  onAbrirPesquisa: abrirPesquisaDaFicha,
                   onTrocarCompetencia: trocarCompetenciaDaFicha,
                   onFechar: fecharFicha,
                   onAbrirEdicao: abrirEdicao,

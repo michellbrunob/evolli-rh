@@ -194,6 +194,8 @@ export interface PessoasScreenProps {
   onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
   /** T198 — outra aba da ficha: o shell troca a rota. */
   onTrocarAbaDaFicha?: (aba: AbaDaFicha) => void;
+  /** T216 — abrir ou fechar uma pesquisa na aba Pesquisas (vai à URL). */
+  onAbrirPesquisaDaFicha?: (pesquisaId: string | null) => void;
   /** T202 — outra competência da aba de ponto: o shell troca a rota. */
   onTrocarCompetenciaDaFicha?: (competencia: string) => void;
   /** T198 — volta da ficha à listagem: o shell troca a rota. */
@@ -255,6 +257,7 @@ export function PessoasScreen({
   ficha = null,
   onAbrirFicha,
   onTrocarAbaDaFicha,
+  onAbrirPesquisaDaFicha,
   onTrocarCompetenciaDaFicha: _onTrocarCompetenciaDaFicha,
   onFecharFicha,
   onAbrirEdicao,
@@ -421,6 +424,10 @@ export function PessoasScreen({
           colaboradorId={ficha.colaboradorId}
           aba={ficha.aba}
           onTrocarAba={(aba) => onTrocarAbaDaFicha?.(aba)}
+          pesquisaAberta={ficha.pesquisa ?? null}
+          {...(onAbrirPesquisaDaFicha
+            ? { onAbrirPesquisa: onAbrirPesquisaDaFicha }
+            : {})}
           onVoltar={() =>
             guarda.solicitarSaida({
               area: AREAS_DE_EDICAO.ficha,

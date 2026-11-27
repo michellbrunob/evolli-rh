@@ -126,4 +126,45 @@ describe("AbaPesquisas (T216)", () => {
       "Não foi possível carregar as pesquisas.",
     );
   });
+
+  it("controlada pela URL: abrir avisa a ficha e a pesquisa da URL abre direto", async () => {
+    const onAbrirPesquisa = vi.fn();
+    const { rerender } = render(
+      <AbaPesquisas
+        colaboradorId="c-1"
+        primeiroNome="Ana"
+        carregar={vi.fn(() => Promise.resolve([RESPONDIDA]))}
+        pesquisaAberta={null}
+        onAbrirPesquisa={onAbrirPesquisa}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Onboarding de outubro/ }),
+    );
+    expect(onAbrirPesquisa).toHaveBeenCalledWith("p-1");
+    // Sem a ficha mudar a URL, a lista continua.
+    expect(
+      screen.getByRole("region", { name: "Pesquisas respondidas" }),
+    ).toBeInTheDocument();
+    rerender(
+      <AbaPesquisas
+        colaboradorId="c-1"
+        primeiroNome="Ana"
+        carregar={vi.fn(() => Promise.resolve([RESPONDIDA]))}
+        pesquisaAberta="p-1"
+        onAbrirPesquisa={onAbrirPesquisa}
+      />,
+    );
+    expect(
+      await screen.findByRole("region", {
+        name: "Respostas de Onboarding de outubro",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Voltar para as pesquisas respondidas",
+      }),
+    );
+    expect(onAbrirPesquisa).toHaveBeenLastCalledWith(null);
+  });
 });

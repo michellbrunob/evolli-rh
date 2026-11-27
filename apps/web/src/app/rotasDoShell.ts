@@ -157,6 +157,11 @@ export interface RotaDaFicha {
   readonly aba: AbaDaFicha;
   readonly competencia?: string;
   /**
+   * T216 — a pesquisa aberta na aba Pesquisas (`…/:id/pesquisas/:pesquisaId`):
+   * recarregar reabre a mesma resposta.
+   */
+  readonly pesquisa?: string;
+  /**
    * T215 — a página "Editar colaborador", na seção pedida
    * (`…/:id/editar/:secao`). Presente, ela ocupa o lugar da ficha.
    */
@@ -276,6 +281,11 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
     return { colaboradorId, aba: antiga };
   }
   if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
+  // T216 — a pesquisa aberta na aba Pesquisas (UUID, conferido aqui).
+  if (aba === "pesquisas" && competencia !== undefined)
+    return UUID.test(competencia)
+      ? { colaboradorId, aba: "pesquisas", pesquisa: competencia }
+      : null;
   return competencia === undefined
     ? { colaboradorId, aba: aba as AbaDaFicha }
     : null;
@@ -288,6 +298,9 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
 export function rotaDaFicha(ficha: RotaDaFicha): string {
   if (ficha.edicao !== undefined) {
     return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/editar/${ficha.edicao}`;
+  }
+  if (ficha.aba === "pesquisas" && ficha.pesquisa !== undefined) {
+    return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/pesquisas/${ficha.pesquisa}`;
   }
   return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
 }

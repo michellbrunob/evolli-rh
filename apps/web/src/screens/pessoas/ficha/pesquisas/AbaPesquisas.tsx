@@ -4,6 +4,9 @@
  * abrir uma, o resultado individual da pessoa (o mesmo dos resultados da
  * pesquisa). Confidenciais e anônimas nunca aparecem: a resposta delas não
  * fica ligada à pessoa. Leitura de RH e DP (auditada no servidor).
+ *
+ * Com `onAbrirPesquisa`, a pesquisa aberta vem da URL (`pesquisaAberta`):
+ * abrir e voltar mudam o endereço, e recarregar reabre a mesma resposta.
  */
 import { useEffect, useState } from "react";
 import {
@@ -40,15 +43,27 @@ export function AbaPesquisas({
   primeiroNome,
   carregar = pesquisasDoColaborador,
   carregarResposta = respostaDaPesquisa,
+  pesquisaAberta,
+  onAbrirPesquisa,
 }: {
   readonly colaboradorId: string;
   readonly primeiroNome: string;
   readonly carregar?: CarregarPesquisasDaFicha;
   readonly carregarResposta?: CarregarRespostaDaFicha;
+  /** A pesquisa aberta pela URL (com `onAbrirPesquisa`). */
+  readonly pesquisaAberta?: string | null;
+  /** Abrir (id) ou voltar à lista (`null`): a ficha muda a URL. */
+  readonly onAbrirPesquisa?: (pesquisaId: string | null) => void;
 }) {
   const [dados, setDados] = useState<PesquisaDaFicha[] | null>(null);
   const [falha, setFalha] = useState<Falha | null>(null);
-  const [aberta, setAberta] = useState<PesquisaDaFicha | null>(null);
+  const [abertaLocal, setAbertaLocal] = useState<PesquisaDaFicha | null>(null);
+  const controlada = onAbrirPesquisa !== undefined;
+  const aberta = controlada
+    ? (dados?.find((p) => p.pesquisaId === pesquisaAberta) ?? null)
+    : abertaLocal;
+  const setAberta = (p: PesquisaDaFicha | null) =>
+    controlada ? onAbrirPesquisa(p?.pesquisaId ?? null) : setAbertaLocal(p);
 
   useEffect(() => {
     let vivo = true;

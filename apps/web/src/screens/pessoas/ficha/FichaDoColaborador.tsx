@@ -320,6 +320,10 @@ export interface FichaDoColaboradorProps {
   readonly colaboradorId: string;
   readonly aba: AbaDaFichaDeReferencia;
   readonly onTrocarAba: (aba: AbaDaFichaDeReferencia) => void;
+  /** T216 — a pesquisa aberta na aba Pesquisas, vinda da URL. */
+  readonly pesquisaAberta?: string | null;
+  /** T216 — abrir (id) ou fechar (`null`) uma pesquisa: a URL muda. */
+  readonly onAbrirPesquisa?: (pesquisaId: string | null) => void;
   readonly onVoltar: () => void;
   /** RH e DP: editam, desligam e desativam. */
   readonly podeEditar?: boolean;
@@ -348,6 +352,8 @@ export function FichaDoColaborador({
   colaboradorId,
   aba,
   onTrocarAba,
+  pesquisaAberta,
+  onAbrirPesquisa,
   onVoltar,
   podeEditar = false,
   onEditar,
@@ -1185,6 +1191,12 @@ export function FichaDoColaborador({
                 <AbaPesquisas
                   colaboradorId={colaboradorId}
                   primeiroNome={primeiroNome(nome)}
+                  {...(onAbrirPesquisa
+                    ? {
+                        pesquisaAberta: pesquisaAberta ?? null,
+                        onAbrirPesquisa,
+                      }
+                    : {})}
                 />
               ) : (
                 <p className="ficha-ref__em-breve-texto" role="status">
