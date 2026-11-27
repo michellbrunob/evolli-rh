@@ -2391,4 +2391,226 @@ describe("T216 — Pesquisas (e2e)", () => {
       );
     });
   });
+
+  // -----------------------------------------------------------------------
+  describe("Perfil comportamental (DISC)", () => {
+    /** 28 blocos de 4 frases, uma por fator. */
+    function blocosDisc() {
+      return [
+        {
+          id: "s-disc",
+          titulo: null,
+          descricao: null,
+          perguntas: Array.from({ length: 28 }, (_, i) => ({
+            id: `b${i + 1}`,
+            tipo: "escolha_forcada",
+            texto: "Qual frase combina mais com você?",
+            rotulo: null,
+            descricao: null,
+            obrigatoria: true,
+            config: {
+              opcoes: ["D", "I", "S", "C"].map((fator) => ({
+                id: `b${i + 1}-${fator}`,
+                texto: `Frase sintética ${fator}`,
+                fator,
+              })),
+            },
+            condicao: null,
+          })),
+        },
+      ];
+    }
+
+    const escolhas = (fatores: string) =>
+      [...fatores].map((f, i) => ({
+        perguntaId: `b${i + 1}`,
+        valor: { opcao: `b${i + 1}-${f}` },
+      }));
+
+    const I17 = `${"I".repeat(17)}${"D".repeat(6)}SSSCC`;
+    const S18 = `${"S".repeat(18)}${"C".repeat(7)}DDD`;
+    const DC = `${"D".repeat(14)}${"C".repeat(14)}`;
+
+    it("estrutura: 28 blocos válidos; o bloco não entra em outro modelo", async () => {
+      const faltando = blocosDisc();
+      faltando[0]!.perguntas.pop();
+      const r1 = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "disc", secoes: faltando }))
+        .expect(422);
+      expect(r1.body.erros).toEqual([{ campo: "secoes", motivo: "limite" }]);
+
+      const fatorRepetido = blocosDisc();
+      fatorRepetido[0]!.perguntas[0]!.config.opcoes[3]!.fator = "D";
+      const r2 = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "disc", secoes: fatorRepetido }))
+        .expect(422);
+      expect(r2.body.erros).toContainEqual({ campo: "b1", motivo: "invalido" });
+
+      const r3 = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "personalizada", secoes: blocosDisc() }))
+        .expect(422);
+      expect(r3.body.erros).toContainEqual({
+        campo: "b1",
+        motivo: "nao_se_aplica",
+      });
+
+      // Outro modelo: o resultado DISC não se aplica.
+      const outra = await criarPesquisa();
+      const r4 = await get(
+        `/v1/pesquisas/${outra.id}/perfil-comportamental`,
+        rhA,
+      ).expect(422);
+      expect(r4.body.erros).toEqual([
+        { campo: "modelo", motivo: "nao_se_aplica" },
+      ]);
+    });
+
+    it("anônima: resposta pelo link, o time e as pessoas numeradas", async () => {
+      const { id, token } = await publicada({
+        modelo: "disc",
+        identificacao: "anonima",
+        secoes: blocosDisc(),
+      });
+      const abertura = await agent().get(publico(token)).expect(200);
+      expect(abertura.body.totalPerguntas).toBe(28);
+      expect(
+        abertura.body.secoes[0].perguntas[0].config.opcoes.map(
+          (o: { fator: string }) => o.fator,
+        ),
+      ).toEqual(["D", "I", "S", "C"]);
+
+      // Frase de outro bloco e bloco faltando: 422 por pergunta.
+      const r = await agent()
+        .post(publico(token, "/respostas"))
+        .send({
+          respostas: [
+            { perguntaId: "b1", valor: { opcao: "b2-D" } },
+            ...escolhas(I17).slice(1, 27),
+          ],
+        })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "b1", motivo: "invalido" },
+        { campo: "b28", motivo: "obrigatorio" },
+      ]);
+
+      for (const f of [I17, S18, DC]) {
+        await agent()
+          .post(publico(token, "/respostas"))
+          .send({ respostas: escolhas(f) })
+          .expect(201);
+      }
+      const antes = await prisma.auditEvent.count({
+        where: { action: "pesquisas_respostas_consultadas", resourceId: id },
+      });
+      const res = await get(
+        `/v1/pesquisas/${id}/perfil-comportamental`,
+        rhA,
+      ).expect(200);
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(res.body).toMatchObject({
+        pesquisaId: id,
+        respostas: 3,
+        totalDePessoas: 3,
+        porPredominante: { D: 1, I: 1, S: 1, C: 0 },
+        diversidade: { score: 79, faixa: "equilibrado", ausentes: ["C"] },
+        lacunas: ["C"],
+        filtro: { campo: null, respostas: 3, visivel: true },
+      });
+      expect(res.body.perfil.percentuais).toEqual({
+        D: 27,
+        I: 20,
+        S: 25,
+        C: 27,
+      });
+      expect(res.body.perfil.classe).toEqual({
+        tipo: "tri",
+        fatores: ["D", "C", "S"],
+        codigo: "DCS",
+        intensidade: "equilibrado",
+      });
+      const pessoas = res.body.pessoas as {
+        numero: number;
+        nome: string | null;
+        perfil: { predominante: string };
+      }[];
+      expect(
+        pessoas.map((p) => [p.numero, p.nome, p.perfil.predominante]),
+      ).toEqual([
+        [1, null, "I"],
+        [2, null, "S"],
+        [3, null, "D"],
+      ]);
+      expect(
+        await prisma.auditEvent.count({
+          where: { action: "pesquisas_respostas_consultadas", resourceId: id },
+        }),
+      ).toBe(antes + 1);
+
+      // O master lê o time, sem as pessoas.
+      const doMaster = await get(
+        `/v1/pesquisas/${id}/perfil-comportamental`,
+        masterA,
+      ).expect(200);
+      expect(doMaster.body.totalDePessoas).toBe(3);
+      expect(doMaster.body.pessoas).toEqual([]);
+
+      // Os resultados comuns contam as frases de cada bloco.
+      const geral = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(
+        200,
+      );
+      expect(geral.body.perguntas[0]).toMatchObject({
+        tipo: "escolha_forcada",
+        respondidas: 3,
+      });
+    });
+
+    it("identificada: as pessoas com o nome; confidencial: nunca", async () => {
+      const a = await admitir(rhA, empresaA);
+      const { id, token } = await publicada({
+        modelo: "disc",
+        secoes: blocosDisc(),
+        participantes: { todos: false, colaboradorIds: [a.id] },
+      });
+      await responderComo(token, a, escolhas(S18));
+      const res = await get(
+        `/v1/pesquisas/${id}/perfil-comportamental`,
+        rhA,
+      ).expect(200);
+      expect(res.body.pessoas).toHaveLength(1);
+      expect(res.body.pessoas[0]).toMatchObject({
+        numero: 1,
+        nome: a.nome,
+        perfil: {
+          predominante: "S",
+          classe: { tipo: "mono", codigo: "S", intensidade: "puro" },
+        },
+      });
+
+      const b = await admitir(rhA, empresaA);
+      const conf = await publicada({
+        modelo: "disc",
+        identificacao: "confidencial",
+        secoes: blocosDisc(),
+        participantes: { todos: false, colaboradorIds: [b.id] },
+      });
+      await responderComo(conf.token, b, escolhas(DC));
+      const r = await get(
+        `/v1/pesquisas/${conf.id}/perfil-comportamental`,
+        rhA,
+      ).expect(200);
+      // Abaixo do mínimo na confidencial: nada aparece.
+      expect(r.body).toMatchObject({
+        respostas: 1,
+        totalDePessoas: 0,
+        perfil: null,
+        pessoas: [],
+        filtro: { visivel: false },
+      });
+      // Outra empresa: 404.
+      await get(`/v1/pesquisas/${conf.id}/perfil-comportamental`, rhB).expect(
+        404,
+      );
+    });
+  });
 });
