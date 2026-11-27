@@ -1657,3 +1657,48 @@
     margin-left: 0;
   }
 }
+
+/* Dependentes no plano › impacto antes e depois. */
+.beneficios__impacto {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.beneficios__impacto-cabeca {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.beneficios__impacto-cabeca h3 {
+  margin: 0;
+}
+
+.beneficios__impacto .beneficios__tabela th[scope="row"] {
+  border-bottom: 1px solid var(--divisor-cor);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: inherit;
+}
+
+.beneficios__impacto .beneficios__tabela thead th {
+  background: transparent;
+}
+
+/* Adicionar pessoas › Colar lista de CPFs. */
+.beneficios__colar {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.beneficios__colar-texto {
+  min-height: 10rem;
+  padding: var(--space-sm);
+  resize: vertical;
+  font-variant-numeric: tabular-nums;
+}

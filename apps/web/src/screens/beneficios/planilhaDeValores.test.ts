@@ -11,6 +11,7 @@ import { lerAbasXlsx } from "../pessoas/importacao/planilhaXlsx";
 import {
   baseDoArquivo,
   colunasDaImportacao,
+  cpfsDoTexto,
   formatarCpf,
   lerArquivoDeValores,
   lerCsv,
@@ -139,6 +140,15 @@ describe("planilha de valores", () => {
     expect(
       await lerArquivoDeValores(new File(["x"], "v.pdf"), ["dias"]),
     ).toEqual({ erro: "Envie um arquivo .xlsx ou .csv." });
+  });
+
+  it("CPFs colados: máscara, separadores, repetidos e zeros comidos", () => {
+    expect(
+      cpfsDoTexto(
+        "111.444.777-35\n52998224725;111.444.777-35\t1234567890, 12, abc",
+      ),
+    ).toEqual(["11144477735", "52998224725", "01234567890"]);
+    expect(cpfsDoTexto("")).toEqual([]);
   });
 
   it("formatos auxiliares", () => {

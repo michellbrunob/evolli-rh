@@ -6,20 +6,21 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PessoaDoBeneficioApi } from "../../api/beneficiosClient";
-import { Button } from "../../components";
+import { Button, FormActions } from "../../components";
 import {
   formatarCompetenciaPorExtenso,
   formatarMesReferencia,
 } from "../../format/data";
 import { formatarCentavos } from "../../format/moeda";
-import { IconButton } from "../../ui";
-import { IconeVoltar } from "../../ui/icones";
+import { Dialog, IconButton } from "../../ui";
+import { IconeCopiar, IconeVoltar } from "../../ui/icones";
 import {
   competenciaDoMesAtual,
   competenciaVizinha,
 } from "../../app/rotasDoShell";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../pessoas/edicao/dadosProfissionais";
 import { PessoaNaLinha } from "./comuns";
+import { cpfsDoTexto } from "./planilhaDeValores";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
 import {
   TEXTO_DA_OBSERVACAO,
@@ -58,6 +59,9 @@ export function AdicionarPessoasDoBeneficio({
   const [pilula, setPilula] = useState<"todos" | "marcados" | "nao">("todos");
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const [colar, setColar] = useState(false);
+  const [textoColado, setTextoColado] = useState("");
+  const [avisoColar, setAvisoColar] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -92,7 +96,13 @@ export function AdicionarPessoasDoBeneficio({
     [lista],
   );
   const visiveis = (lista ?? []).filter((p) => {
-    if (busca && !p.nome.toLowerCase().includes(busca.toLowerCase()))
+    const termo = busca.trim().toLowerCase();
+    const digitos = termo.replace(/\D/g, "");
+    if (
+      termo &&
+      !p.nome.toLowerCase().includes(termo) &&
+      !(digitos.length >= 3 && (p.cpf ?? "").includes(digitos))
+    )
       return false;
     if (departamento && p.departamentoId !== departamento) return false;
     if (contrato && p.contrato !== contrato) return false;
@@ -108,6 +118,25 @@ export function AdicionarPessoasDoBeneficio({
   const todos =
     visiveis.length > 0 &&
     visiveis.every((p) => marcados.includes(p.colaboradorId));
+
+  const reconhecidos = cpfsDoTexto(textoColado);
+
+  function marcarColados() {
+    const porCpf = new Map(
+      (lista ?? []).filter((p) => p.cpf).map((p) => [p.cpf!, p.colaboradorId]),
+    );
+    const achados = reconhecidos
+      .map((c) => porCpf.get(c))
+      .filter((x): x is string => !!x);
+    const fora = reconhecidos.length - achados.length;
+    setMarcados((m) => [...new Set([...m, ...achados])]);
+    setPilula(achados.length ? "marcados" : "todos");
+    setColar(false);
+    setTextoColado("");
+    setAvisoColar(
+      `${nPessoas(achados.length)} ${achados.length === 1 ? "marcada" : "marcadas"}.${fora ? ` ${fora === 1 ? "1 CPF não está" : `${fora} CPFs não estão`} entre quem ainda não recebe.` : ""}`,
+    );
+  }
 
   async function adicionar() {
     setSalvando(true);
@@ -146,14 +175,25 @@ export function AdicionarPessoasDoBeneficio({
               : nome}
           </p>
         </div>
+        <div className="beneficios__acoes-topo">
+          <Button variant="secondary" onClick={() => setColar(true)}>
+            <IconeCopiar tamanho={16} />
+            Colar lista de CPFs
+          </Button>
+        </div>
       </header>
+      {avisoColar ? (
+        <p className="beneficios__aviso" role="status">
+          {avisoColar}
+        </p>
+      ) : null}
 
       <div className="beneficios__filtros">
         <input
           type="search"
           className="beneficios__busca"
           aria-label="Buscar colaborador"
-          placeholder="Nome do colaborador"
+          placeholder="Nome ou CPF"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
         />
@@ -324,6 +364,42 @@ export function AdicionarPessoasDoBeneficio({
           </table>
         </div>
       )}
+
+      <Dialog
+        aberto={colar}
+        titulo="Colar lista de CPFs"
+        descricao="Cole os CPFs (um por linha, ou copiados da planilha). As pessoas encontradas ficam marcadas na tabela."
+        onFechar={() => setColar(false)}
+        rodape={
+          <FormActions>
+            <Button variant="secondary" onClick={() => setColar(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={reconhecidos.length === 0}
+              onClick={marcarColados}
+            >
+              Marcar pessoas
+            </Button>
+          </FormActions>
+        }
+      >
+        <div className="beneficios__colar">
+          <textarea
+            aria-label="CPFs"
+            className="beneficios__campo-texto beneficios__colar-texto"
+            rows={8}
+            placeholder={"111.444.777-35\n529.982.247-25"}
+            value={textoColado}
+            onChange={(e) => setTextoColado(e.target.value)}
+          />
+          <span className="beneficios__suave" role="status">
+            {reconhecidos.length === 1
+              ? "1 CPF reconhecido"
+              : `${reconhecidos.length} CPFs reconhecidos`}
+          </span>
+        </div>
+      </Dialog>
 
       <div className="beneficios__rodape-fixo">
         <label className="beneficios__campo-rotulado">

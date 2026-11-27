@@ -312,3 +312,24 @@ export const ICONE_DA_CATEGORIA: Readonly<
 /** O nome da escala (ex.: "Semana espanhola"); sem escala, "—". */
 export const nomeDaEscala = (codigo: string | null) =>
   codigo ? (modeloDe(codigo)?.nome ?? codigo) : "—";
+
+/**
+ * A faixa da ANS do dependente na competência: idade completa no último dia
+ * do mês anterior (a pessoa muda de faixa no mês seguinte ao aniversário).
+ */
+export function faixaNaCompetencia(nascimento: string, competencia: string) {
+  const [a, m] = competencia.split("-").map(Number) as [number, number];
+  const [na, nm, nd] = nascimento.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  // Último dia do mês anterior.
+  const ref = new Date(Date.UTC(a, m - 1, 0));
+  let idade = ref.getUTCFullYear() - na;
+  const mesRef = ref.getUTCMonth() + 1;
+  if (mesRef < nm || (mesRef === nm && ref.getUTCDate() < nd)) idade -= 1;
+  const limites = [18, 23, 28, 33, 38, 43, 48, 53, 58];
+  const i = limites.findIndex((l) => idade <= l);
+  return FAIXAS_DA_ANS[i === -1 ? 9 : i]!;
+}

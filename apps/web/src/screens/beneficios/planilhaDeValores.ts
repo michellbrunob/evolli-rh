@@ -284,3 +284,18 @@ export function baseDoArquivo(nome: string, competencia: string): string {
     .replace(/^-+|-+$/g, "");
   return `${base || "beneficio"}-${competencia}`;
 }
+
+/**
+ * Os CPFs de um texto colado (um por linha, separados por vírgula, ponto e
+ * vírgula ou tabulação, com ou sem máscara), sem repetir; só os de 11
+ * dígitos (9 ou 10: o Excel tirou os zeros da frente).
+ */
+export function cpfsDoTexto(texto: string): string[] {
+  const vistos = new Set<string>();
+  for (const pedaco of texto.split(/[\n\r;,\t ]+/)) {
+    let d = pedaco.replace(/\D/g, "");
+    if (d.length === 9 || d.length === 10) d = d.padStart(11, "0");
+    if (d.length === 11) vistos.add(d);
+  }
+  return [...vistos];
+}

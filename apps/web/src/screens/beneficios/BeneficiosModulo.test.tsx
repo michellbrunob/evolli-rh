@@ -22,6 +22,7 @@ import type {
 import { baixarArquivo } from "../dashboard/exportacao";
 import { lerAbasXlsx } from "../pessoas/importacao/planilhaXlsx";
 import { BeneficiosModulo } from "./BeneficiosModulo";
+import { faixaNaCompetencia } from "./textosDosBeneficios";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
 
 vi.mock("../dashboard/exportacao", async (original) => {
@@ -209,7 +210,10 @@ function servico(
     })),
     candidatosDoBeneficio: vi.fn(async () => ({
       competencia: "2026-11",
-      pessoas: [pessoa("c-3", "Caio Teste")],
+      pessoas: [
+        pessoa("c-3", "Caio Teste", { cpf: "39053344705" }),
+        pessoa("c-4", "Dani Teste", { cpf: "52998224725" }),
+      ],
     })),
     adicionarPessoasAoBeneficio: vi.fn(async () => ({ adicionadas: 1 })),
     removerPessoaDoBeneficio: vi.fn(async () => ({ removida: true as const })),
@@ -928,6 +932,88 @@ describe("Benefícios (T215) — detalhe", () => {
     ).toBeInTheDocument();
   });
 
+  it("dependentes no plano: faixa de cada um e o impacto antes e depois", async () => {
+    const SAUDE = {
+      ...BENEFICIO,
+      id: "b-3",
+      nome: "Saúde teste",
+      categoria: "saude" as const,
+      tipoValor: "faixa_etaria" as const,
+      regras: {
+        ...BENEFICIO.regras,
+        categoria: "saude" as const,
+        tipoValor: "faixa_etaria" as const,
+        faixas: [100, 120, 140, 160, 180, 200, 230, 260, 300, 529],
+        colaboradorPaga: {
+          calculo: "percentual" as const,
+          titular: 20,
+          dependente: 30,
+        },
+      },
+    };
+    const s = servico({
+      obterBeneficio: vi.fn(async () => ({
+        ...DETALHE,
+        beneficio: SAUDE,
+        pessoas: [
+          pessoa("c-1", "Ana Teste", {
+            faixa: "34 a 38",
+            valor: 18000,
+            empresa: 14400,
+            desconto: 3600,
+            dependentesCadastrados: 1,
+          }),
+        ],
+      })),
+      dependentesDaPessoaNoBeneficio: vi.fn(async () => ({
+        dependentes: [
+          {
+            id: "d-1",
+            nome: "Filho Teste",
+            parentesco: "filho",
+            dataNascimento: "2018-05-10",
+            noPlano: false,
+          },
+        ],
+      })),
+    });
+    montar(s);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Ver mais sobre VR teste" }),
+    );
+    await screen.findByRole("table", { name: "Pessoas do benefício" });
+    abrirMenu("Ações de Ana Teste");
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Dependentes no plano" }),
+    );
+    const gaveta = screen.getByRole("dialog", { name: "Dependentes no plano" });
+    expect(
+      await within(gaveta).findByText(/nasceu em 10\/05\/2018 · faixa 0 a 18/),
+    ).toBeInTheDocument();
+    fireEvent.click(within(gaveta).getByRole("checkbox"));
+    await waitFor(() =>
+      expect(s.simularDependentesNoPlano).toHaveBeenLastCalledWith(
+        "b-3",
+        "c-1",
+        ["d-1"],
+        "2026-11",
+      ),
+    );
+    const impacto = await within(gaveta).findByRole("region", {
+      name: "Impacto em novembro/2026",
+    });
+    expect(impacto).toHaveTextContent("MensalidadeR$ 180,00R$ 280,00");
+    expect(impacto).toHaveTextContent("Desconto em folhaR$ 36,00R$ 66,00");
+  });
+
+  it("faixa da ANS: muda no mês seguinte ao aniversário", () => {
+    expect(faixaNaCompetencia("2007-11-15", "2026-11")).toBe("0 a 18 anos");
+    expect(faixaNaCompetencia("2007-11-15", "2026-12")).toBe("19 a 23 anos");
+    expect(faixaNaCompetencia("2007-11-01", "2026-12")).toBe("19 a 23 anos");
+    expect(faixaNaCompetencia("2007-12-01", "2026-12")).toBe("0 a 18 anos");
+    expect(faixaNaCompetencia("1950-01-01", "2026-11")).toBe("59 anos ou mais");
+  });
+
   it("alterar valor por dia: reajuste só no mês", async () => {
     const s = await abrirDetalhe();
     fireEvent.click(
@@ -975,6 +1061,42 @@ describe("Benefícios (T215) — detalhe", () => {
     });
     expect(lista).toHaveTextContent("Benefício criado");
     expect(lista).toHaveTextContent("a partir de 11/2026");
+  });
+
+  it("adicionar pessoas: colar lista de CPFs marca quem foi encontrado", async () => {
+    await abrirDetalhe();
+    fireEvent.click(screen.getByRole("button", { name: /Adicionar pessoas/ }));
+    await screen.findByRole("table", { name: "Pessoas que ainda não recebem" });
+    fireEvent.change(screen.getByLabelText("Buscar colaborador"), {
+      target: { value: "529.98" },
+    });
+    expect(
+      screen.queryByRole("checkbox", { name: "Marcar Caio Teste" }),
+    ).toBeNull();
+    fireEvent.change(screen.getByLabelText("Buscar colaborador"), {
+      target: { value: "" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /Colar lista de CPFs/ }),
+    );
+    const janela = screen.getByRole("dialog", { name: "Colar lista de CPFs" });
+    const marcar = within(janela).getByRole("button", {
+      name: "Marcar pessoas",
+    });
+    expect(marcar).toBeDisabled();
+    fireEvent.change(within(janela).getByLabelText("CPFs"), {
+      target: { value: "390.533.447-05\n111.444.777-35; 390.533.447-05" },
+    });
+    expect(janela).toHaveTextContent("2 CPFs reconhecidos");
+    fireEvent.click(marcar);
+    expect(
+      screen.getByRole("checkbox", { name: "Marcar Caio Teste" }),
+    ).toBeChecked();
+    expect(
+      screen.getByText(
+        "1 pessoa marcada. 1 CPF não está entre quem ainda não recebe.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("adicionar pessoas: marca e adiciona a partir do mês", async () => {

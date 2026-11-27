@@ -24,7 +24,11 @@ import {
   formatarInstante,
   formatarMesReferencia,
 } from "../../format/data";
-import type { OrigemDosDias, TotaisApi } from "../../api/beneficiosClient";
+import type {
+  OrigemDosDias,
+  SimulacaoDeDependentesApi,
+  TotaisApi,
+} from "../../api/beneficiosClient";
 import { formatarCentavos, formatarPercentual } from "../../format/moeda";
 import {
   Dialog,
@@ -78,6 +82,7 @@ import {
   ROTULO_DA_ORIGEM,
   TEXTO_DA_OBSERVACAO,
   TEXTO_DA_PENDENCIA,
+  faixaNaCompetencia,
   maiuscula,
   nomeDaEscala,
   pessoas as nPessoas,
@@ -1592,7 +1597,32 @@ function GavetaDeDependentes({
   const [aPartirDe, setAPartirDe] = useState(competencia);
   const [trabalhando, setTrabalhando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const [impacto, setImpacto] = useState<SimulacaoDeDependentesApi | null>(
+    null,
+  );
   const primeiro = pessoa.nome.split(" ")[0];
+
+  // O impacto no mês escolhido, sem gravar.
+  useEffect(() => {
+    if (lista === null || lista.length === 0) return;
+    let vivo = true;
+    servico
+      .simularDependentesNoPlano(
+        beneficioId,
+        pessoa.colaboradorId,
+        marcados,
+        aPartirDe,
+      )
+      .then((r) => {
+        if (vivo) setImpacto(r);
+      })
+      .catch(() => {
+        if (vivo) setImpacto(null);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [servico, beneficioId, pessoa.colaboradorId, marcados, aPartirDe, lista]);
 
   useEffect(() => {
     servico
@@ -1673,7 +1703,7 @@ function GavetaDeDependentes({
                   <span className="beneficios__pessoa-textos">
                     <span className="beneficios__pessoa-nome">{d.nome}</span>
                     <span className="beneficios__suave">
-                      {`${rotuloDoParentesco(d.parentesco)}${d.dataNascimento ? ` · nasceu em ${formatarDiaCivil(d.dataNascimento)}` : " · sem data de nascimento"}`}
+                      {`${rotuloDoParentesco(d.parentesco)}${d.dataNascimento ? ` · nasceu em ${formatarDiaCivil(d.dataNascimento)} · faixa ${faixaNaCompetencia(d.dataNascimento, aPartirDe)}` : " · sem data de nascimento"}`}
                     </span>
                   </span>
                 </label>
@@ -1709,6 +1739,53 @@ function GavetaDeDependentes({
                 },
               ]}
             />
+          </section>
+        ) : null}
+        {impacto ? (
+          <section
+            className="beneficios__impacto"
+            aria-label={`Impacto em ${formatarCompetenciaPorExtenso(aPartirDe, "barra")}`}
+          >
+            <div className="beneficios__impacto-cabeca">
+              <h3>{`Impacto em ${formatarCompetenciaPorExtenso(aPartirDe, "barra")}`}</h3>
+              <span className="beneficios__suave">{pessoa.nome}</span>
+            </div>
+            <table className="beneficios__tabela">
+              <thead>
+                <tr>
+                  <th scope="col">
+                    <span className="beneficios__so-leitor">Valor</span>
+                  </th>
+                  <th scope="col" className="beneficios__numero">
+                    Antes
+                  </th>
+                  <th scope="col" className="beneficios__numero">
+                    Depois
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ["Mensalidade", "valor"],
+                    ["Empresa paga", "empresa"],
+                    ["Desconto em folha", "desconto"],
+                  ] as const
+                ).map(([rotulo, k]) => (
+                  <tr key={k}>
+                    <th scope="row">{rotulo}</th>
+                    <td className="beneficios__numero">
+                      {formatarCentavos(impacto.antes[k])}
+                    </td>
+                    <td
+                      className={`beneficios__numero${impacto.antes[k] !== impacto.depois[k] ? " beneficios__forte" : ""}`}
+                    >
+                      {formatarCentavos(impacto.depois[k])}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
         ) : null}
         {falha ? (
