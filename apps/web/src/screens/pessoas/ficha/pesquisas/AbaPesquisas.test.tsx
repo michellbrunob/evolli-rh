@@ -1,13 +1,13 @@
 /**
- * T216 — ficha › aba Pesquisas: "Pesquisas respondidas" (só identificadas),
- * as respostas da pessoa ao abrir e o estado vazio que explica por que
- * confidenciais e anônimas nunca aparecem. Dados sintéticos.
+ * T216 — ficha › aba Pesquisas: o cartão "Pesquisas respondidas" (só
+ * identificadas), o resultado individual da pessoa ao abrir e o estado vazio
+ * que explica por que confidenciais e anônimas nunca aparecem.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../../api/colaboradoresClient";
 import type { PesquisaDaFicha } from "../../../../api/pesquisasClient";
-import { SECOES } from "../../../pesquisas/dadosDeTeste";
+import { RESPOSTA_DETALHE, SECOES } from "../../../pesquisas/dadosDeTeste";
 import { AbaPesquisas } from "./AbaPesquisas";
 
 const RESPONDIDA: PesquisaDaFicha = {
@@ -33,18 +33,19 @@ const montar = (carregar: () => Promise<PesquisaDaFicha[]>) =>
   );
 
 describe("AbaPesquisas (T216)", () => {
-  it("lista as pesquisas respondidas e abre as respostas da pessoa", async () => {
+  it("cartão com a lista; abrir sem resultado individual mostra as respostas", async () => {
     montar(() => Promise.resolve([RESPONDIDA]));
-    expect(
-      await screen.findByRole("heading", { name: "Pesquisas respondidas" }),
-    ).toBeInTheDocument();
-    const item = screen.getByRole("button", { name: /Onboarding de outubro/ });
+    const cartao = await screen.findByRole("region", {
+      name: "Pesquisas respondidas",
+    });
+    expect(cartao).toHaveTextContent("1 pesquisa identificada");
+    const item = within(cartao).getByRole("button", {
+      name: /Onboarding de outubro/,
+    });
     expect(item).toHaveTextContent(
       "Onboarding · 30 dias · respondida em 30/10/2026",
     );
-    expect(item).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(item);
-    expect(item).toHaveAttribute("aria-expanded", "true");
     const respostas = screen.getByRole("region", {
       name: "Respostas de Onboarding de outubro",
     });
@@ -52,10 +53,48 @@ describe("AbaPesquisas (T216)", () => {
     expect(respostas).toHaveTextContent("Recomendaria a área?Não");
     expect(respostas).toHaveTextContent("Faltou o crachá.");
     expect(respostas).toHaveTextContent("Qual canal você prefere?Sem resposta");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Voltar para as pesquisas respondidas",
+      }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Pesquisas respondidas" }),
+    ).toBeInTheDocument();
   });
 
-  it("vazio explica que só identificadas aparecem", async () => {
+  it("com o resultado individual da API, abre a mesma página dos resultados", async () => {
+    const carregarResposta = vi.fn(() => Promise.resolve(RESPOSTA_DETALHE));
+    render(
+      <AbaPesquisas
+        colaboradorId="c-1"
+        primeiroNome="Ana"
+        carregar={vi.fn(() =>
+          Promise.resolve([{ ...RESPONDIDA, respostaId: "r-1" }]),
+        )}
+        carregarResposta={carregarResposta}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Onboarding de outubro/ }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Ana Exemplo" }),
+    ).toBeInTheDocument();
+    expect(carregarResposta).toHaveBeenCalledWith("p-1", "r-1");
+    expect(
+      screen.getByRole("region", { name: "Indicadores da resposta" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Outras respostas" }),
+    ).toBeNull();
+  });
+
+  it("vazio dentro do cartão explica que só identificadas aparecem", async () => {
     montar(() => Promise.resolve([]));
+    expect(
+      await screen.findByRole("region", { name: "Pesquisas respondidas" }),
+    ).toHaveTextContent("Nenhuma pesquisa respondida até agora");
     expect(
       await screen.findByText("Nenhuma pesquisa respondida"),
     ).toBeInTheDocument();
