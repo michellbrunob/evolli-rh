@@ -24,6 +24,7 @@ import {
   Clock,
   Copy,
   Danger,
+  ExportSquare,
   HambergerMenu,
   ColorSwatch,
   Cup,
@@ -233,6 +234,8 @@ export const IconeSubir = decorativo(ArrowUp2, "Linear");
 export const IconeDescer = decorativo(ArrowDown2, "Linear");
 /** T216 — o pegador de arrastar (reordenar). */
 export const IconeArrastar = decorativo(HambergerMenu, "Linear");
+/** T216 — abrir em outra aba (link público da pesquisa). */
+export const IconeNovaAba = decorativo(ExportSquare, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");

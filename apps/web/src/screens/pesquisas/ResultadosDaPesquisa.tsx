@@ -35,6 +35,7 @@ import {
 import { Esqueleto } from "../../ui/movimento";
 import { baixarArquivo } from "../dashboard/exportacao";
 import { CampoDoLink } from "./AssistenteDePesquisa";
+import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { csvDasRespostas, csvDoResumo, nomeDoCsv } from "./exportarResultados";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
@@ -325,6 +326,12 @@ export function ResultadosDaPesquisa({
           <CampoDoLink link={detalhe.link} />
         ) : null}
       </section>
+
+      <AvisoNaoIdentificaveis
+        identificacao={detalhe.identificacao}
+        naoIdentificaveis={detalhe.naoIdentificaveis}
+        participantes={detalhe.participantesLista ?? []}
+      />
 
       <div role="tablist" aria-label="Resultados" className="pesquisas__abas">
         {abas.map((a) => (

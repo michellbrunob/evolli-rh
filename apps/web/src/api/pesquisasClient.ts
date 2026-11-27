@@ -120,6 +120,11 @@ export interface ParticipanteDaPesquisa {
   departamento: string | null;
   /** `null` na anônima; na confidencial, só `true`/`false`. */
   respondeu: boolean | null;
+  /**
+   * Tem CPF e data de nascimento na ficha (consegue confirmar quem é no
+   * link); sempre `true` na anônima. Ausente em respostas antigas da API.
+   */
+  identificavel?: boolean;
 }
 
 export interface PesquisaDetalhe extends PesquisaResumo {
@@ -129,6 +134,11 @@ export interface PesquisaDetalhe extends PesquisaResumo {
   todos: boolean;
   participantesLista: ParticipanteDaPesquisa[];
   temRespostas: boolean;
+  /**
+   * Quantos participantes não conseguem se identificar no link (sem CPF ou
+   * sem data de nascimento). Ausente = sem aviso.
+   */
+  naoIdentificaveis?: number;
 }
 
 export type ContagensDePesquisas = Record<"todas" | StatusPesquisa, number>;

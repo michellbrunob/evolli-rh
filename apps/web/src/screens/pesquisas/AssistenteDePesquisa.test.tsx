@@ -12,7 +12,10 @@ import {
   within,
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { PesquisaEntrada } from "../../api/pesquisasClient";
+import type {
+  PesquisaDetalhe,
+  PesquisaEntrada,
+} from "../../api/pesquisasClient";
 import { AssistenteDePesquisa } from "./AssistenteDePesquisa";
 import { DETALHE, servicoFalso, type ServicoFalso } from "./dadosDeTeste";
 
@@ -404,9 +407,28 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     fireEvent.click(within(previa).getByRole("button", { name: "Fechar" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Publicar pesquisa" }));
+    const final = await screen.findByRole("region", {
+      name: "Pesquisa publicada e ativa",
+    });
     expect(
-      await screen.findByRole("heading", { name: "Pesquisa publicada" }),
+      within(final).getByRole("heading", {
+        name: "Pesquisa publicada e ativa",
+      }),
     ).toBeInTheDocument();
+    expect(within(final).getByRole("link", { name: /^Abrir/ })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+    expect(
+      within(final).getByRole("button", { name: "Ver resultados" }),
+    ).toBeInTheDocument();
+    expect(
+      within(final).getByRole("button", { name: "Voltar para Pesquisas" }),
+    ).toBeInTheDocument();
+    // Sem `naoIdentificaveis` na resposta: nenhum aviso.
+    expect(
+      screen.queryByRole("region", { name: /não conseguem se identificar/ }),
+    ).toBeNull();
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
     expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe("2026-12-15");
     expect(
@@ -430,7 +452,100 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       "Não foi possível publicar",
     );
     expect(
-      screen.queryByRole("heading", { name: "Pesquisa publicada" }),
+      screen.queryByRole("heading", { name: "Pesquisa publicada e ativa" }),
+    ).toBeNull();
+  });
+});
+
+describe("Assistente de pesquisa — quem não consegue se identificar", () => {
+  const SEM_CPF = {
+    naoIdentificaveis: 2,
+    participantesLista: [
+      {
+        colaboradorId: "c-1",
+        nome: "Ana Exemplo",
+        departamento: "Operações",
+        respondeu: false,
+        identificavel: false,
+      },
+      {
+        colaboradorId: "c-2",
+        nome: "Bruno Exemplo",
+        departamento: null,
+        respondeu: false,
+        identificavel: false,
+      },
+      {
+        colaboradorId: "c-3",
+        nome: "Caio Exemplo",
+        departamento: null,
+        respondeu: false,
+        identificavel: true,
+      },
+    ],
+  };
+
+  function servicoSemCpf(identificacao: "confidencial" | "anonima") {
+    const comAviso = (d: PesquisaDetalhe) =>
+      Promise.resolve({ ...d, ...SEM_CPF, identificacao } as PesquisaDetalhe);
+    const base = servicoFalso();
+    return servicoFalso({
+      criarPesquisa: vi.fn(async (e) => comAviso(await base.criarPesquisa(e))),
+      alterarPesquisa: vi.fn(async (id, e) =>
+        comAviso(await base.alterarPesquisa(id, e)),
+      ),
+      publicarPesquisa: vi.fn(async (id) =>
+        comAviso(await base.publicarPesquisa(id)),
+      ),
+    });
+  }
+
+  async function ateRevisao(identificacao: "confidencial" | "anonima") {
+    const servico = servicoSemCpf(identificacao);
+    montar({ servico, modelo: "enps" });
+    if (identificacao === "anonima")
+      fireEvent.click(screen.getByRole("radio", { name: /^Anônima/ }));
+    for (let i = 2; i <= 5; i += 1) {
+      avancar();
+      await screen.findByRole("heading", {
+        name: new RegExp(`Etapa ${i} de 5`),
+      });
+    }
+    return servico;
+  }
+
+  it("revisão avisa, lista os nomes com atalho para a ficha e não bloqueia", async () => {
+    await ateRevisao("confidencial");
+    const aviso = screen.getByRole("region", {
+      name: "Pessoas que não conseguem se identificar",
+    });
+    expect(aviso).toHaveTextContent(
+      "2 pessoas não têm CPF ou data de nascimento na ficha e não conseguem confirmar quem são no link. Complete o cadastro antes de enviar.",
+    );
+    const ana = within(aviso).getByRole("link", { name: /Ana Exemplo/ });
+    expect(ana).toHaveAttribute("href", "#/pessoas/colaboradores/c-1/dados");
+    expect(ana).toHaveAttribute("target", "_blank");
+    expect(within(aviso).queryByText(/Caio Exemplo/)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Publicar pesquisa" }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Publicar pesquisa" }));
+    const final = await screen.findByRole("region", {
+      name: "Pesquisa publicada e ativa",
+    });
+    expect(
+      within(final).getByRole("region", {
+        name: "Pessoas que não conseguem se identificar",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("na anônima não há aviso (ninguém confirma quem é)", async () => {
+    await ateRevisao("anonima");
+    expect(
+      screen.queryByRole("region", {
+        name: "Pessoas que não conseguem se identificar",
+      }),
     ).toBeNull();
   });
 });

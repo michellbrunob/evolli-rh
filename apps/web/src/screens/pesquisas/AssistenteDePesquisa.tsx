@@ -19,7 +19,7 @@ import type {
   ModeloPesquisa,
   PesquisaDetalhe,
 } from "../../api/pesquisasClient";
-import { Button, FormActions, PageHeader } from "../../components";
+import { Button, FormActions } from "../../components";
 import {
   CadastroEmEtapas,
   LinhaDoCadastro,
@@ -29,6 +29,8 @@ import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { formatarDiaCivil } from "../../format/data";
 import { plural } from "../../format/plural";
 import { Dialog } from "../../ui";
+import { IconeNovaAba, IconeSucesso } from "../../ui/icones";
+import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { EditorDePerguntas } from "./EditorDePerguntas";
 import { EtapaParticipantes } from "./EtapaParticipantes";
 import { PreVisualizacao } from "./PreVisualizacao";
@@ -118,6 +120,8 @@ export function AssistenteDePesquisa({
   const [sair, setSair] = useState(false);
   const [previa, setPrevia] = useState(false);
   const [publicada, setPublicada] = useState<PesquisaDetalhe | null>(null);
+  /** O que o servidor devolveu na última gravação (quem não se identifica). */
+  const [gravada, setGravada] = useState<PesquisaDetalhe | null>(base ?? null);
 
   const rascunho = estado.status === "rascunho";
   const editando = base !== undefined;
@@ -161,8 +165,10 @@ export function AssistenteDePesquisa({
       const criada = await servico.criarPesquisa(entrada);
       id = criada.id;
       setEstado((e) => ({ ...e, id: criada.id, link: criada.link }));
+      setGravada(criada ?? null);
     } else {
-      await servico.alterarPesquisa(id, entrada);
+      const alterada = await servico.alterarPesquisa(id, entrada);
+      if (alterada) setGravada(alterada);
     }
     setReferencia(JSON.stringify(entrada));
     return id;
@@ -507,6 +513,13 @@ export function AssistenteDePesquisa({
           </LinhaDoResumo>
         </dl>
       </section>
+      {gravada ? (
+        <AvisoNaoIdentificaveis
+          identificacao={estado.identificacao}
+          naoIdentificaveis={gravada.naoIdentificaveis}
+          participantes={gravada.participantesLista ?? []}
+        />
+      ) : null}
       <div className="pesquisas__acoes">
         <Button variant="secondary" onClick={() => setPrevia(true)}>
           Pré-visualizar como quem responde
@@ -687,6 +700,17 @@ export function CampoDoLink({ link }: { readonly link: string }) {
         >
           Copiar link
         </Button>
+        {/* Sempre em outra aba: a página pública não divide a aba com o painel. */}
+        <a
+          className="evolli-button evolli-button--secondary"
+          href={endereco}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <IconeNovaAba tamanho={16} />
+          Abrir
+          <span className="pesquisas__so-leitor"> (em outra aba)</span>
+        </a>
       </div>
       {aviso ? (
         <p className="pesquisas__aviso" role="status">
@@ -711,27 +735,49 @@ function TelaFinal({
   }, []);
   return (
     <div className="pesquisas pesquisas__final">
-      <PageHeader
-        headingLevel={1}
-        titleId={PESQUISAS_TITULO_ID}
-        title="Pesquisa publicada"
-        description={`${pesquisa.nome} está ativa. Envie o link para quem vai responder.`}
-      />
-      {pesquisa.link ? (
-        <CampoDoLink link={pesquisa.link} />
-      ) : (
+      <section
+        className="pesquisas__final-cartao"
+        aria-labelledby={PESQUISAS_TITULO_ID}
+      >
+        <span className="pesquisas__final-icone" aria-hidden="true">
+          <IconeSucesso tamanho={32} />
+        </span>
+        <h1
+          id={PESQUISAS_TITULO_ID}
+          className="pesquisas__final-titulo"
+          tabIndex={-1}
+        >
+          Pesquisa publicada e ativa
+        </h1>
         <p className="pesquisas__suave">
-          O link ainda não chegou. Abra a pesquisa na lista para copiá-lo.
+          {`${pesquisa.nome} já aceita respostas. Envie o link para quem vai responder.`}
         </p>
-      )}
-      <div className="pesquisas__acoes">
-        <Button onClick={() => onVerResultados(pesquisa.id)}>
-          Ver resultados
-        </Button>
-        <Button variant="subtle" onClick={() => onSair("Pesquisa publicada.")}>
-          Voltar para Pesquisas
-        </Button>
-      </div>
+        {pesquisa.link ? (
+          <div className="pesquisas__final-link">
+            <CampoDoLink link={pesquisa.link} />
+          </div>
+        ) : (
+          <p className="pesquisas__suave">
+            O link ainda não chegou. Abra a pesquisa na lista para copiá-lo.
+          </p>
+        )}
+        <AvisoNaoIdentificaveis
+          identificacao={pesquisa.identificacao}
+          naoIdentificaveis={pesquisa.naoIdentificaveis}
+          participantes={pesquisa.participantesLista ?? []}
+        />
+        <div className="pesquisas__final-acoes">
+          <Button
+            variant="secondary"
+            onClick={() => onSair("Pesquisa publicada.")}
+          >
+            Voltar para Pesquisas
+          </Button>
+          <Button onClick={() => onVerResultados(pesquisa.id)}>
+            Ver resultados
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -1027,3 +1027,93 @@ textarea.pesquisas__campo {
   display: grid;
   gap: var(--space-sm);
 }
+
+/* T216 — aviso de quem não consegue se identificar no link. */
+.pesquisas__alerta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-ink);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--color-ink);
+  text-align: left;
+}
+
+.pesquisas__alerta-icone {
+  color: var(--status-warning-ink);
+}
+
+.pesquisas__alerta-corpo {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.pesquisas__alerta-corpo p {
+  margin: 0;
+}
+
+.pesquisas__alerta-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs) var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.pesquisas__alerta-lista a {
+  color: var(--color-action);
+}
+
+/* T216 — tela "Pesquisa publicada": cartão centrado. */
+.pesquisas__final {
+  justify-items: center;
+  max-width: none;
+  padding: var(--space-xl) 0;
+}
+
+.pesquisas__final-cartao {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 40rem;
+  padding: var(--space-xl) var(--space-lg);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-lg, var(--radius-md));
+  background: var(--surface-canvas);
+  text-align: center;
+}
+
+.pesquisas__final-icone {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.pesquisas__final-titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisas__final-link {
+  width: 100%;
+  text-align: left;
+}
+
+.pesquisas__final-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}

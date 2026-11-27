@@ -284,3 +284,47 @@ describe("Resultados — status e CSV", () => {
     expect(String(csv)).toContain("Sim");
   });
 });
+
+describe("Resultados — quem não consegue se identificar", () => {
+  const comAviso = (identificacao: "confidencial" | "anonima") => ({
+    obterPesquisa: vi.fn(() =>
+      Promise.resolve({
+        ...DETALHE,
+        identificacao,
+        naoIdentificaveis: 1,
+        participantesLista: [
+          {
+            colaboradorId: "c-9",
+            nome: "Dora Exemplo",
+            departamento: null,
+            respondeu: false,
+            identificavel: false,
+          },
+        ],
+      }),
+    ),
+  });
+
+  it("o cabeçalho avisa e leva à ficha da pessoa", async () => {
+    montar(comAviso("confidencial"));
+    const aviso = await screen.findByRole("region", {
+      name: "Pessoas que não conseguem se identificar",
+    });
+    expect(aviso).toHaveTextContent(
+      "1 pessoa não tem CPF ou data de nascimento na ficha e não consegue confirmar quem é no link.",
+    );
+    expect(
+      within(aviso).getByRole("link", { name: /Dora Exemplo/ }),
+    ).toHaveAttribute("href", "#/pessoas/colaboradores/c-9/dados");
+  });
+
+  it("sem o campo (API antiga) ou na anônima, nada aparece", async () => {
+    montar(comAviso("anonima"));
+    await screen.findByRole("region", { name: "eNPS" });
+    expect(
+      screen.queryByRole("region", {
+        name: "Pessoas que não conseguem se identificar",
+      }),
+    ).toBeNull();
+  });
+});
