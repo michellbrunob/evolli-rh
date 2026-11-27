@@ -148,3 +148,176 @@ inexistente/excluída/de outra empresa, 409 para transição de status inválida
   aceita a pesquisa personalizada.
 - Análise por IA, evolução entre pesquisas e envio automático por tempo de casa.
 - Banco de perguntas reutilizáveis.
+
+## Apêndice — tipos do contrato (JSON)
+
+```ts
+type Identificacao = "identificada" | "confidencial" | "anonima";
+type StatusPesquisa =
+  "rascunho" | "ativa" | "pausada" | "finalizada" | "cancelada";
+type Modelo =
+  | "pulso"
+  | "clima"
+  | "enps"
+  | "onboarding"
+  | "desligamento"
+  | "beneficios"
+  | "treinamento"
+  | "personalizada";
+type TipoPergunta =
+  | "texto_curto"
+  | "paragrafo"
+  | "escolha_unica"
+  | "multipla_escolha"
+  | "sim_nao"
+  | "concordancia"
+  | "nota_0_10"
+  | "estrelas"
+  | "escala"
+  | "data"
+  | "numero";
+
+interface Opcao {
+  id: string;
+  texto: string;
+} // id: gerado pelo cliente (até 40)
+interface ConfigPergunta {
+  opcoes?: Opcao[];
+  outro?: boolean;
+  maximo?: number; // escolhas
+  respostaBoa?: "sim" | "nao" | null; // sim_nao
+  enps?: boolean; // nota_0_10
+  minimo?: number;
+  rotuloMinimo?: string;
+  rotuloMaximo?: string; // escala/numero (+ maximo)
+  inteiro?: boolean; // numero
+}
+interface Pergunta {
+  id: string; // gerado pelo cliente (uuid); estável entre gravações
+  tipo: TipoPergunta;
+  texto: string; // 1..300
+  descricao: string | null; // até 500
+  obrigatoria: boolean;
+  config: ConfigPergunta;
+  condicao: { perguntaId: string; opcaoId: string } | null;
+}
+interface Secao {
+  id: string;
+  titulo: string | null;
+  descricao: string | null;
+  perguntas: Pergunta[];
+}
+
+// POST/PUT /pesquisas
+interface PesquisaEntrada {
+  nome: string; // 1..120
+  boasVindas: string | null; // até 1000
+  modelo: Modelo;
+  identificacao: Identificacao; // ignorado no PUT depois de publicar (422 se mudar)
+  secoes: Secao[]; // 1..20 seções; 0..60 perguntas no total (publicar exige ≥1)
+  participantes: { todos: true } | { todos: false; colaboradorIds: string[] };
+  encerraEm: string | null; // AAAA-MM-DD, ≥ hoje
+  minimoPorGrupo: number; // 3..10
+}
+
+interface PesquisaResumo {
+  id: string;
+  nome: string;
+  modelo: Modelo;
+  identificacao: Identificacao;
+  status: StatusPesquisa; // já considera encerraEm vencido (finalizada)
+  participantes: number;
+  respostas: number;
+  criadaEm: string; // ISO
+  publicadaEm: string | null;
+  encerraEm: string | null;
+  link: string | null; // caminho público "#/p/<token>" (só depois de publicar)
+}
+interface PesquisaDetalhe extends PesquisaResumo {
+  boasVindas: string | null;
+  secoes: Secao[];
+  minimoPorGrupo: number;
+  todos: boolean; // participantes = todos os ativos (resolvido ao publicar)
+  participantesLista: {
+    colaboradorId: string;
+    nome: string;
+    departamento: string | null;
+    respondeu: boolean | null;
+  }[];
+  // respondeu: null na anônima; na confidencial só true/false
+  temRespostas: boolean;
+}
+// GET /pesquisas → ResultadoPaginado<PesquisaResumo> & { contagens: Record<"todas"|StatusPesquisa, number> }
+
+interface ResultadosPesquisa {
+  pesquisaId: string;
+  respostas: number;
+  participantes: number;
+  departamentos: {
+    id: string;
+    nome: string;
+    respostas: number;
+    visivel: boolean;
+  }[];
+  filtro: { departamentoId: string | null; visivel: boolean }; // visivel=false: abaixo do mínimo
+  perguntas: ResultadoPergunta[]; // vazio quando filtro.visivel=false
+}
+type ResultadoPergunta = {
+  perguntaId: string;
+  tipo: TipoPergunta;
+  respondidas: number;
+  viram: number;
+} & (
+  | {
+      media: number | null;
+      distribuicao: { valor: number; quantidade: number }[];
+    } // escalas/estrelas/nota/numero
+  | {
+      enps: {
+        promotores: number;
+        neutros: number;
+        detratores: number;
+        indice: number | null;
+      };
+    } // + media/distribuicao quando enps
+  | { opcoes: { opcaoId: string; quantidade: number }[]; outros: string[] } // escolhas
+  | { sim: number; nao: number }
+  | { textos: { texto: string; autor: string | null }[] } // autor só na identificada
+  | { datas: { valor: string; quantidade: number }[] }
+);
+
+// GET /pesquisas/:id/respostas (só identificada)
+interface RespostaIndividual {
+  colaboradorId: string;
+  nome: string;
+  departamento: string | null;
+  respondidaEm: string;
+  valores: { perguntaId: string; valor: unknown }[];
+}
+
+// GET /colaboradores/:id/pesquisas
+interface PesquisaDaFicha {
+  pesquisaId: string;
+  nome: string;
+  modelo: Modelo;
+  respondidaEm: string;
+  secoes: Secao[];
+  valores: { perguntaId: string; valor: unknown }[];
+}
+
+// Públicas
+interface PesquisaPublica {
+  empresa: string;
+  nome: string;
+  boasVindas: string | null;
+  identificacao: Identificacao;
+  totalPerguntas: number;
+  minutosEstimados: number;
+  secoes: Secao[];
+}
+type AberturaPublica =
+  | PesquisaPublica
+  | { indisponivel: "pausada" | "encerrada" | "cancelada" | "inexistente" };
+// POST identificar → { passe: string; primeiroNome: string }  (401 genérico; 429 limite; 409 já respondeu)
+// POST respostas   → 201 { ok: true }  (422 erros por perguntaId; 409 já respondeu; 410 indisponível)
+```
