@@ -697,6 +697,91 @@ describe("T215 — Editar colaborador: Dados básicos", () => {
   });
 });
 
+describe("T215 — Editar colaborador: revisão (telefone antigo, recusas, CPF, nascimento)", () => {
+  it("celular antigo, fora do formato, não impede salvar o e-mail e não é enviado", async () => {
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      situacao: "registrado",
+      contatos: {
+        emailPessoal: "pedro.teste@example.test",
+        celular: "33334444",
+        telefone: null,
+        atualizadoEm: "2026-11-02T12:00:00.000Z",
+      },
+    });
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    fireEvent.change(campo("E-mail pessoal"), {
+      target: { value: "pedro.novo@example.test" },
+    });
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    await waitFor(() =>
+      expect(registrarContatosDoColaborador).toHaveBeenCalledWith(ID, {
+        emailPessoal: "pedro.novo@example.test",
+      }),
+    );
+  });
+
+  it("e-mail já usado na empresa: a recusa do servidor aparece no campo", async () => {
+    vi.mocked(registrarContatosDoColaborador).mockRejectedValueOnce(
+      new ApiError(422, "x", {
+        erros: [{ campo: "emailPessoal", motivo: "em_uso" }],
+      }),
+    );
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    fireEvent.change(campo("E-mail pessoal"), {
+      target: { value: "outra.pessoa@example.test" },
+    });
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    expect(
+      await screen.findByText(
+        "Este e-mail já é usado por outra pessoa desta empresa.",
+      ),
+    ).toBeInTheDocument();
+    expect(campo("E-mail pessoal")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("sem CPF gravado (veio da planilha), dá para salvar outro dado sem CPF; nascimento futuro não", async () => {
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      situacao: "registrado",
+      perfilPessoal: { ...PERFIL, cpf: null },
+      endereco: ENDERECO,
+    });
+    montar();
+    await screen.findByDisplayValue("Pedro Teste");
+    fireEvent.change(campo("RG"), { target: { value: "11.222.333-4" } });
+    fireEvent.change(campo("Data de nascimento"), {
+      target: { value: "2999-01-01" },
+    });
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    expect(
+      await screen.findByText(
+        "Informe uma data de nascimento entre 01/01/1900 e hoje.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Informe o CPF.")).toBeNull();
+    fireEvent.change(campo("Data de nascimento"), {
+      target: { value: "1990-05-10" },
+    });
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    await waitFor(() =>
+      expect(registrarDadosPessoaisDoColaborador).toHaveBeenCalled(),
+    );
+  });
+});
+
 describe("T215 — Editar colaborador: Endereço", () => {
   it("textos da referência; salvar grava o bloco do endereço", async () => {
     montar("endereco");
@@ -982,7 +1067,7 @@ describe("T215 — Editar colaborador: desativar e reativar", () => {
       within(menu).getByRole("menuitemradio", { name: "Férias" }),
     );
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Férias e afastamentos serão registrados em Férias e ausências",
+      "Férias e afastamentos são registrados na ficha: Mais ações › Registrar ausência.",
     );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(desativarColaborador).not.toHaveBeenCalled();

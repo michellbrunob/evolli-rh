@@ -527,8 +527,8 @@ function CartaoAtivos({
       <p className="colaboradores-screen__cartao-rodape">
         {c
           ? c.desligadosNoAno !== undefined
-            ? `${c.total} cadastrados · ${c.desligadosNoAno} desligados em ${ano}`
-            : `${c.total} cadastrados`
+            ? `${plural(c.total, "cadastrado", "cadastrados")} · ${plural(c.desligadosNoAno, "desligado", "desligados")} em ${ano}`
+            : plural(c.total, "cadastrado", "cadastrados")
           : "…"}
       </p>
     </div>

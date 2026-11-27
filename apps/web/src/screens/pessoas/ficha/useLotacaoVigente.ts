@@ -48,7 +48,11 @@ async function nomeNoCatalogo(id: string | null, listar: Listar) {
   }
 }
 
-export function useLotacaoVigente(vinculoId: string | null): LotacaoVigente {
+export function useLotacaoVigente(
+  vinculoId: string | null,
+  /** Muda depois de uma efetivação: relê a lotação do mesmo vínculo. */
+  versao = 0,
+): LotacaoVigente {
   const [lotacao, setLotacao] = useState<LotacaoVigente>(VAZIA);
   useEffect(() => {
     setLotacao(VAZIA);
@@ -101,6 +105,6 @@ export function useLotacaoVigente(vinculoId: string | null): LotacaoVigente {
     return () => {
       vivo = false;
     };
-  }, [vinculoId]);
+  }, [vinculoId, versao]);
   return lotacao;
 }

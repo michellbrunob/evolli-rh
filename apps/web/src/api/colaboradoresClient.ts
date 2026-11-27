@@ -563,7 +563,10 @@ export async function buscarColaborador(id: string): Promise<ColaboradorApi> {
 export async function listarVinculosDoColaborador(
   colaboradorId: string,
 ): Promise<VinculoApi[]> {
-  const res = await apiFetch(`/colaboradores/${colaboradorId}/vinculos`);
+  // Sem cache: a situação do vínculo muda na efetivação e no desligamento.
+  const res = await apiFetch(`/colaboradores/${colaboradorId}/vinculos`, {
+    cache: "no-store",
+  });
   return jsonOrThrow(res);
 }
 

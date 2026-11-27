@@ -1703,11 +1703,10 @@ describe("Nova admissão — sucesso", () => {
     expect(
       screen.getByText("Departamento: DEP1 — Departamento Sintético (teste)"),
     ).toBeInTheDocument();
-    // T209 — o cargo gravado veio do nome digitado; a linha dele existe.
+    // T209 — o cargo gravado veio do nome digitado; a linha mostra o nome
+    // (o do cadastro, ou o digitado quando ele acabou de ser criado).
     expect(
-      screen.getByText(
-        /^Cargo(: CAR1 — Cargo Sintético \(teste\)| registrado)$/,
-      ),
+      screen.getByText(/^Cargo: (CAR1 — )?Cargo Sintético \(teste\)$/),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Unidade: UNI1 — Unidade Sintética (teste)"),

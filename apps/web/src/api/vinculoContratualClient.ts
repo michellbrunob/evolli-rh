@@ -46,9 +46,13 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch(path: string): Promise<Response> {
+async function apiFetch(
+  path: string,
+  init: Pick<RequestInit, "cache"> = {},
+): Promise<Response> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: "same-origin",
+    ...init,
     headers: { Accept: "application/json" },
   });
   if (res.status === 401) {
@@ -71,6 +75,7 @@ export async function listarAlocacoesVinculo(
 ): Promise<AlocacaoOrganizacionalApi[]> {
   const res = await apiFetch(
     `/vinculos/${encodeURIComponent(vinculoId)}/alocacoes`,
+    { cache: "no-store" },
   );
   return jsonOrThrow(res, "Não foi possível carregar as alocações do vínculo.");
 }

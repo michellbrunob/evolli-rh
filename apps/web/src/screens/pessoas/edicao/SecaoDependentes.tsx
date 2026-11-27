@@ -41,6 +41,7 @@ import {
   PARENTESCOS,
   rotuloDoParentesco,
 } from "../../beneficios/textosDosBeneficios";
+import { useEdicaoEmAndamento } from "../../../app/edicoesPendentes";
 import { iniciaisDe } from "../iniciais";
 
 export interface ServicoDeDependentes {
@@ -117,6 +118,15 @@ export function SecaoDependentes({
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [aRemover, setARemover] = useState<DependenteApi | null>(null);
+  const [removendo, setRemovendo] = useState(false);
+  const [falhaAoRemover, setFalhaAoRemover] = useState<string | null>(null);
+  const [formInicial, setFormInicial] = useState<DependenteDto>(VAZIO);
+  // Formulário aberto e mexido: sair da página pergunta antes (guarda global).
+  useEdicaoEmAndamento("Dependente", {
+    pendente:
+      editando !== null && JSON.stringify(form) !== JSON.stringify(formInicial),
+    salvando,
+  });
 
   const carregar = useCallback(async () => {
     try {
@@ -135,18 +145,18 @@ export function SecaoDependentes({
     setErros({});
     setAviso(null);
     setEditando(d ? d.id : "novo");
-    setForm(
-      d
-        ? {
-            nome: d.nome,
-            parentesco: d.parentesco,
-            dataNascimento: d.dataNascimento,
-            cpf: d.cpf,
-            telefone: d.telefone ? exibirTelefone(d.telefone) : null,
-            email: d.email,
-          }
-        : VAZIO,
-    );
+    const inicial: DependenteDto = d
+      ? {
+          nome: d.nome,
+          parentesco: d.parentesco,
+          dataNascimento: d.dataNascimento,
+          cpf: d.cpf,
+          telefone: d.telefone ? exibirTelefone(d.telefone) : null,
+          email: d.email,
+        }
+      : VAZIO;
+    setForm(inicial);
+    setFormInicial(inicial);
   };
 
   async function salvar() {
@@ -434,12 +444,23 @@ export function SecaoDependentes({
             </Button>
             <Button
               type="button"
+              disabled={removendo}
               onClick={async () => {
-                if (!aRemover) return;
-                await servico.remover(colaboradorId, aRemover.id);
-                setAviso(`${aRemover.nome} removido.`);
-                setARemover(null);
-                await carregar();
+                if (!aRemover || removendo) return;
+                setRemovendo(true);
+                setFalhaAoRemover(null);
+                try {
+                  await servico.remover(colaboradorId, aRemover.id);
+                  setAviso(`${aRemover.nome} saiu da lista de dependentes.`);
+                  setARemover(null);
+                  await carregar();
+                } catch {
+                  setFalhaAoRemover(
+                    "Não foi possível remover agora. Tente de novo.",
+                  );
+                } finally {
+                  setRemovendo(false);
+                }
               }}
             >
               Remover
@@ -447,7 +468,11 @@ export function SecaoDependentes({
           </FormActions>
         }
       >
-        {null}
+        {falhaAoRemover ? (
+          <p className="secao-dependentes__erro" role="alert">
+            {falhaAoRemover}
+          </p>
+        ) : null}
       </Dialog>
     </div>
   );

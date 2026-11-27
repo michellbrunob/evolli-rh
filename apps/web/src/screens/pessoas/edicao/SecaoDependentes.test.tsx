@@ -189,4 +189,25 @@ describe("SecaoDependentes (T215)", () => {
     });
     expect(s.remover).toHaveBeenCalledWith("c-1", "d-1");
   });
+
+  it("remover que falha: a janela fica e diz o que houve", async () => {
+    const s = servico();
+    s.remover.mockRejectedValueOnce(new Error("rede"));
+    montar(s);
+    fireEvent.pointerDown(
+      await screen.findByRole("button", { name: "Ações de Filho Teste" }),
+      { button: 0, ctrlKey: false, pointerType: "mouse" },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
+    const janela = screen.getByRole("dialog", { name: "Remover Filho Teste?" });
+    await act(async () => {
+      fireEvent.click(within(janela).getByRole("button", { name: "Remover" }));
+    });
+    expect(
+      await within(janela).findByText(
+        "Não foi possível remover agora. Tente de novo.",
+      ),
+    ).toBeInTheDocument();
+    expect(s.listar).toHaveBeenCalledTimes(1);
+  });
 });

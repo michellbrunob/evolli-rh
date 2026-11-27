@@ -34,6 +34,7 @@ import {
 } from "../../../api/organizacaoClient";
 import { consultarEscalas } from "../../../api/escalaClient";
 import {
+  cancelarMovimentacao,
   efetivarMovimentacao,
   listarMovimentacoes,
   registrarMovimentacao,
@@ -460,7 +461,7 @@ describe("T215 — ficha: Mais ações", () => {
     });
     expect(
       within(janela).getByText(
-        "Ela sai da lista de ativos e perde o acesso ao portal. O histórico continua guardado na aba Desligados.",
+        "Ela sai da lista de ativos. O histórico continua guardado na aba Desligados.",
       ),
     ).toBeInTheDocument();
     expect(within(janela).getByLabelText("Data do desligamento")).toHaveValue(
@@ -515,7 +516,7 @@ describe("T215 — ficha: Mais ações", () => {
       name: "Admissão aguardando efetivação",
     });
     expect(aviso).toHaveTextContent(
-      "A admissão foi registrada com início em 03/11/2026. Efetive quando a pessoa começar: ela passa a Ativa e entra nas listas, na escala e nos benefícios.",
+      "A admissão foi registrada com início em 03/11/2026. Efetive quando a pessoa começar: o status passa a Ativo e o cadastro entra nas listas, na escala e nos benefícios.",
     );
     fireEvent.click(
       within(aviso).getByRole("button", { name: "Efetivar admissão" }),
@@ -536,6 +537,92 @@ describe("T215 — ficha: Mais ações", () => {
       expect(efetivarMovimentacao).toHaveBeenCalledWith("adm-1"),
     );
     expect(await screen.findByText("Admissão efetivada.")).toBeInTheDocument();
+    // A ficha relê o vínculo e a lotação (sem recarregar a página).
+    await waitFor(() =>
+      expect(
+        vi.mocked(listarAlocacoesVinculo).mock.calls.length,
+      ).toBeGreaterThan(1),
+    );
+    expect(
+      vi.mocked(listarVinculosDoColaborador).mock.calls.length,
+    ).toBeGreaterThan(1);
+  });
+
+  it("Desligar: se a efetivação falhar, a movimentação é cancelada; data futura não", async () => {
+    vi.mocked(efetivarMovimentacao).mockRejectedValueOnce(new Error("409"));
+    montar();
+    await screen.findByText("Analista de RH");
+    const menu = await abrirMenu();
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: "Desligar colaborador" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Desligar Maria Teste Santos?",
+    });
+    fireEvent.change(within(janela).getByLabelText("Data do desligamento"), {
+      target: { value: "2026-12-10" },
+    });
+    expect(
+      within(janela).getByRole("button", { name: "Desligar colaborador" }),
+    ).toBeDisabled();
+    fireEvent.change(within(janela).getByLabelText("Data do desligamento"), {
+      target: { value: HOJE },
+    });
+    fireEvent.click(
+      within(janela).getByRole("button", { name: "Desligar colaborador" }),
+    );
+    await waitFor(() =>
+      expect(cancelarMovimentacao).toHaveBeenCalledWith("mov-1"),
+    );
+    expect(
+      await screen.findByText(/Não foi possível desligar/),
+    ).toBeInTheDocument();
+  });
+
+  it("desligado: dados bloqueados explicados, sem editar dados pessoais nem adicionar e-mail", async () => {
+    const contrato = await consultarContratoDoColaborador(ID);
+    vi.mocked(consultarContratoDoColaborador).mockResolvedValue({
+      ...contrato,
+      vinculo: {
+        ...contrato.vinculo!,
+        situacao: "encerrado",
+        dataDesligamento: "2026-10-31",
+      },
+    } as never);
+    const vinculos = await listarVinculosDoColaborador(ID);
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculos.map((v) => ({
+        ...v,
+        situacao: "encerrado",
+        dataDesligamento: "2026-10-31",
+      })) as never,
+    );
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      situacao: "bloqueado",
+      perfilPessoal: null,
+      endereco: null,
+    } as never);
+    vi.mocked(consultarContatosDoColaborador).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      situacao: "bloqueado",
+      contatos: null,
+    } as never);
+    montar();
+    const pessoais = await screen.findByRole("region", {
+      name: "Dados pessoais",
+    });
+    expect(await within(pessoais).findByRole("note")).toHaveTextContent(
+      "bloqueados depois do desligamento",
+    );
+    expect(
+      within(pessoais).queryByRole("button", { name: /Editar/ }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Adicionar e-mail/ }),
+    ).toBeNull();
   });
 
   it("Desativar: confirma e desativa (nada é apagado)", async () => {

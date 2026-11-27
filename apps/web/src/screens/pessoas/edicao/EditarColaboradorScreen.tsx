@@ -75,7 +75,7 @@ import {
   LinhaDoCadastro,
   SecaoDoCadastro,
 } from "../../../components/cadastro/CadastroEmEtapas";
-import { formatarInstante } from "../../../format/data";
+import { diaCivilDeHoje, formatarInstante } from "../../../format/data";
 import { exibirTelefone } from "../../../format/mascaras";
 import { Dialog, IconButton, ListaDeEscolha } from "../../../ui";
 import {
@@ -99,7 +99,11 @@ import {
   ehPaisBrasil,
   validarEndereco,
 } from "../dadosPessoais";
-import { normalizarTelefone, validarContatos } from "../contatosColaborador";
+import {
+  normalizarTelefone,
+  telefonesLegados,
+  validarContatos,
+} from "../contatosColaborador";
 import { useCepAssistido } from "../cepAssistido";
 import { UFS } from "../ufs";
 import { vinculoPrincipal } from "../vinculoPrincipal";
@@ -587,9 +591,22 @@ export function EditarColaboradorScreen({
     }
     if (mudou.perfil) {
       const digitos = basicos.cpf.replace(/\D/g, "");
-      if (digitos === "") novos.cpf = "Informe o CPF.";
-      else if (!cpfValido(digitos)) novos.cpf = "Informe um CPF válido.";
+      // Obrigatório só para quem já tinha CPF (quem veio da planilha sem
+      // CPF pode corrigir outros dados sem informar o CPF agora).
+      if (digitos === "") {
+        if (gravado?.perfil?.cpf) novos.cpf = "Informe o CPF.";
+      } else if (!cpfValido(digitos)) novos.cpf = "Informe um CPF válido.";
       else if (cpfEmUso) novos.cpf = MENSAGEM_CPF_EM_USO;
+      const nascimento = basicos.dataNascimento;
+      if (
+        nascimento !== "" &&
+        (!/^\d{4}-\d{2}-\d{2}$/.test(nascimento) ||
+          nascimento < "1900-01-01" ||
+          nascimento > diaCivilDeHoje())
+      ) {
+        novos.dataNascimento =
+          "Informe uma data de nascimento entre 01/01/1900 e hoje.";
+      }
       const telefone = basicos.contatoEmergenciaTelefone.trim();
       if (
         telefone !== "" &&
@@ -608,7 +625,9 @@ export function EditarColaboradorScreen({
       if (errosContatos.emailPessoal) {
         novos.emailPessoal = errosContatos.emailPessoal;
       }
-      if (errosContatos.celular) {
+      // Telefone antigo, gravado fora do formato de hoje e não mexido: não
+      // é conferido nem enviado (não impede salvar o e-mail).
+      if (errosContatos.celular && !celularLegadoIntacto()) {
         novos.telefonePessoal =
           "Informe o telefone com DDD, como (00) 00000-0000.";
       }
@@ -618,6 +637,50 @@ export function EditarColaboradorScreen({
     }
     if (mudou.contrato && profissionais) {
       Object.assign(novos, validarProfissionais(profissionais));
+    }
+    return novos;
+  }
+
+  /** O celular gravado fora do formato de hoje continua igual na tela? */
+  function celularLegadoIntacto(): boolean {
+    if (!gravado || !basicos) return false;
+    const bruto = gravado.contatos?.celular ?? null;
+    if (bruto === null) return false;
+    const legado = telefonesLegados({ celular: bruto, telefone: null }).celular;
+    return (
+      legado !== undefined && basicos.telefonePessoal === exibirTelefone(bruto)
+    );
+  }
+
+  /** Recusa do servidor por campo → mensagem no campo (dados e contatos). */
+  function errosDaRecusa(erro: unknown): Erros {
+    if (!(erro instanceof ApiError)) return {};
+    const novos: Erros = {};
+    if (erro.status === 409 && !erro.erros?.length) {
+      novos.cpf = MENSAGEM_CPF_EM_USO;
+    }
+    for (const e of erro.erros ?? []) {
+      const campo = e.campo.replace(/^(perfilPessoal|contatos)\./, "");
+      if (campo === "emailPessoal") {
+        novos.emailPessoal =
+          e.motivo === "em_uso"
+            ? "Este e-mail já é usado por outra pessoa desta empresa."
+            : "Informe um e-mail válido, como nome@exemplo.com.";
+      } else if (campo === "celular") {
+        novos.telefonePessoal =
+          "Informe o telefone com DDD, como (00) 00000-0000.";
+      } else if (campo === "cpf") {
+        novos.cpf =
+          e.motivo === "em_uso"
+            ? MENSAGEM_CPF_EM_USO
+            : "Informe um CPF válido.";
+      } else if (campo === "dataNascimento") {
+        novos.dataNascimento =
+          "Informe uma data de nascimento entre 01/01/1900 e hoje.";
+      } else if (campo === "contatoEmergenciaTelefone") {
+        novos.contatoEmergenciaTelefone =
+          "Informe o telefone com DDD, como (00) 00000-0000.";
+      }
     }
     return novos;
   }
@@ -709,7 +772,10 @@ export function EditarColaboradorScreen({
         const celular = basicos.telefonePessoal.trim();
         const resposta = await registrarContatosDoColaborador(colaboradorId, {
           emailPessoal: email === "" ? null : email,
-          celular: celular === "" ? null : normalizarTelefone(celular),
+          // Chave ausente mantém o celular antigo gravado.
+          ...(celularLegadoIntacto()
+            ? {}
+            : { celular: celular === "" ? null : normalizarTelefone(celular) }),
         });
         atual = { ...atual, contatos: resposta.contatos };
       }
@@ -743,11 +809,22 @@ export function EditarColaboradorScreen({
       setBasicos(dadosBasicosDe(atual));
       setEndereco(enderecoParaEdicao(atual.endereco));
       setAviso("Alterações salvas.");
-    } catch {
+    } catch (erro) {
       // O que já foi gravado fica como gravado; o resto segue pendente.
       setCarga({ status: "dados", gravado: atual });
+      const porCampo = errosDaRecusa(erro);
+      const primeiroCampo = ORDEM_DOS_ERROS.find((c) => porCampo[c]);
+      if (primeiroCampo) {
+        setErros((e) => ({ ...e, ...porCampo }));
+        focoPendente.current = primeiroCampo;
+        const destino = secaoDoCampo(primeiroCampo);
+        if (destino !== secao) onTrocarSecao(destino);
+        else document.getElementById(id(primeiroCampo))?.focus();
+      }
       setFalha(
-        "Não foi possível salvar todas as alterações. Confira os dados e tente de novo.",
+        primeiroCampo
+          ? "Algumas alterações não foram salvas. Corrija o campo destacado."
+          : "Não foi possível salvar todas as alterações. Confira os dados e tente de novo.",
       );
     } finally {
       setSalvando(false);
@@ -811,8 +888,8 @@ export function EditarColaboradorScreen({
     }
     setAviso(
       novo === "ferias" || novo === "afastado"
-        ? "Férias e afastamentos serão registrados em Férias e ausências, que chega na próxima versão."
-        : "O desligamento é registrado no Histórico funcional, com a data e o motivo.",
+        ? "Férias e afastamentos são registrados na ficha: Mais ações › Registrar ausência."
+        : "O desligamento é feito na ficha: Mais ações › Desligar colaborador.",
     );
   }
 

@@ -2673,6 +2673,7 @@ export function NovaAdmissaoScreen({
     return (
       <ConfirmacaoDaAdmissao
         admissao={admissao}
+        cargoDigitado={campos.cargoNome.trim().replace(/\s+/g, " ")}
         opcoes={opcoes}
         areas={areas}
         tituloRef={sucessoTituloRef}
@@ -3285,7 +3286,7 @@ export function NovaAdmissaoScreen({
                     type="text"
                     inputMode="numeric"
                     maxLength={2}
-                    placeholder="44"
+                    placeholder="Ex.: 44"
                     value={campos.jornadaSemanalHoras}
                     onChange={(e) =>
                       atualizar(
@@ -3830,7 +3831,9 @@ export function NovaAdmissaoScreen({
                     ],
                     [
                       "Cargo",
-                      escolhida(opcoes.cargos, campos.cargoId),
+                      campos.cargoNome.trim()
+                        ? campos.cargoNome.trim().replace(/\s+/g, " ")
+                        : escolhida(opcoes.cargos, campos.cargoId),
                       "Não informado",
                     ],
                     [
@@ -3857,9 +3860,15 @@ export function NovaAdmissaoScreen({
                 ))}
               </ul>
             </dd>
+            <dt>Jornada semanal</dt>
+            <dd>
+              {campos.jornadaSemanalHoras
+                ? `${plural(Number(campos.jornadaSemanalHoras), "hora", "horas")} por semana`
+                : "Não informada"}
+            </dd>
             {papelDoAtor === "rh" ? (
               <>
-                <dt>Jornada de trabalho</dt>
+                <dt>Horário de trabalho</dt>
                 <dd>
                   {campos.tabelaHorarioId
                     ? `${jornadaEscolhida ? rotuloDaJornada(jornadaEscolhida) : "Jornada escolhida"}, a partir de ${formatarDiaCivil(campos.dataAdmissao)}`
@@ -3914,6 +3923,8 @@ export function NovaAdmissaoScreen({
  */
 /** T195 — rótulo e valor, só os preenchidos, sem espaços nas pontas. */
 interface ConfirmacaoProps {
+  /** O cargo digitado na admissão (criado agora, fora da lista carregada). */
+  readonly cargoDigitado?: string;
   admissao: AdmissaoRegistradaApi;
   opcoes: Opcoes;
   areas: AreaApi[];
@@ -3941,6 +3952,8 @@ function lotacaoGravada(
   destino: AdmissaoRegistradaApi["movimentacao"]["destino"],
   opcoes: Opcoes,
   areas: AreaApi[],
+  /** O cargo digitado (criado na admissão, ainda fora da lista carregada). */
+  cargoDigitado = "",
 ): string[] {
   const nomear = (
     lista: readonly Referencia[],
@@ -3959,7 +3972,12 @@ function lotacaoGravada(
       "Departamento",
       "Departamento registrado",
     ),
-    ...nomear(opcoes.cargos, destino.cargoId, "Cargo", "Cargo registrado"),
+    ...nomear(
+      opcoes.cargos,
+      destino.cargoId,
+      "Cargo",
+      cargoDigitado ? `Cargo: ${cargoDigitado}` : "Cargo registrado",
+    ),
     // T179 — a Unidade é opcional: sem ela, a confirmação diz isso.
     ...(destino.unidadeOrganizacionalId
       ? nomear(
@@ -3989,6 +4007,7 @@ function jornadaGravada(tabelaHorarioId: string, opcoes: Opcoes): string {
 
 function ConfirmacaoDaAdmissao({
   admissao,
+  cargoDigitado = "",
   opcoes,
   areas,
   tituloRef,
@@ -4073,11 +4092,14 @@ function ConfirmacaoDaAdmissao({
           <dt>Lotação inicial</dt>
           <dd>
             <ul className="nova-admissao__lista-lotacao">
-              {lotacaoGravada(admissao.movimentacao.destino, opcoes, areas).map(
-                (linha) => (
-                  <li key={linha}>{linha}</li>
-                ),
-              )}
+              {lotacaoGravada(
+                admissao.movimentacao.destino,
+                opcoes,
+                areas,
+                cargoDigitado,
+              ).map((linha) => (
+                <li key={linha}>{linha}</li>
+              ))}
             </ul>
           </dd>
           {/* T183 — a jornada que o SERVIDOR gravou com a admissão. */}

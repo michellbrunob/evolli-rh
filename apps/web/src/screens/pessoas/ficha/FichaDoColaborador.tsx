@@ -48,6 +48,7 @@ import {
   consultarContatosDoColaborador,
 } from "../../../api/contatosColaboradorClient";
 import {
+  cancelarMovimentacao,
   efetivarMovimentacao,
   listarMovimentacoes,
   registrarMovimentacao,
@@ -439,7 +440,14 @@ export function FichaDoColaborador({
     };
   }, [gestorId]);
 
-  const lotacao = useLotacaoVigente(dados?.vinculo?.id ?? null);
+  const [versaoDaLotacao, setVersaoDaLotacao] = useState(0);
+  const [erroDoDesligamento, setErroDoDesligamento] = useState<string | null>(
+    null,
+  );
+  const lotacao = useLotacaoVigente(
+    dados?.vinculo?.id ?? null,
+    versaoDaLotacao,
+  );
   const nome = dados?.colaborador.nome ?? "";
   // A gaveta recomeça quando a pessoa muda: o objeto não pode mudar a cada desenho.
   // A aba Férias relê quando a gaveta do ⋯ registra uma ausência.
@@ -458,6 +466,9 @@ export function FichaDoColaborador({
   );
 
   const perfil = dados?.pessoais?.perfilPessoal ?? null;
+  // Depois do desligamento, o servidor guarda e bloqueia os dados pessoais e
+  // os contatos (não devolve os valores): a tela diz isso, em vez de "—".
+  const dadosBloqueados = dados?.pessoais?.situacao === "bloqueado";
   const endereco = dados?.pessoais?.endereco ?? null;
   const trato = tratamentoDe(perfil?.genero, nome);
   const vinculo = dados?.vinculo ?? null;
@@ -496,9 +507,18 @@ export function FichaDoColaborador({
       perfil.genero)
     : VAZIO;
 
+  /**
+   * Desligar: registra e efetiva a movimentação de desligamento. A data vai
+   * até hoje (não há rotina que efetive uma data futura sozinha). Se a
+   * efetivação falhar, a movimentação registrada é cancelada: nada fica
+   * pendente pela metade.
+   */
   async function desligar() {
     if (!vinculo || trabalhando) return;
+    setErroDoDesligamento(null);
+    if (dataDesligamento > hoje) return;
     setTrabalhando(true);
+    let registrada: string | null = null;
     try {
       const mov = await registrarMovimentacao({
         vinculoId: vinculo.id,
@@ -506,16 +526,24 @@ export function FichaDoColaborador({
         motivoCodigo: "encerramento_de_vinculo",
         vigenciaInicio: dataDesligamento,
       });
-      if (dataDesligamento <= hoje) await efetivarMovimentacao(mov.id);
+      registrada = mov.id;
+      await efetivarMovimentacao(mov.id);
+      registrada = null;
       setJanela(null);
-      setAviso(
-        dataDesligamento <= hoje
-          ? "Colaborador desligado."
-          : `Desligamento programado para ${formatarDiaCivil(dataDesligamento)}.`,
-      );
-      void carregar();
+      setAviso("Colaborador desligado.");
+      setVersaoDaLotacao((v) => v + 1);
+      await carregar();
     } catch {
-      setAviso("Não foi possível desligar agora. Tente de novo.");
+      if (registrada) {
+        try {
+          await cancelarMovimentacao(registrada);
+        } catch {
+          // Fica no histórico como solicitada; a mensagem abaixo orienta.
+        }
+      }
+      setErroDoDesligamento(
+        "Não foi possível desligar. Confira a data (não pode ser antes da última mudança de cargo ou lotação) e tente de novo.",
+      );
     } finally {
       setTrabalhando(false);
     }
@@ -572,7 +600,8 @@ export function FichaDoColaborador({
       await efetivarMovimentacao(aberta.id);
       setJanela(null);
       setAviso("Admissão efetivada.");
-      void carregar();
+      setVersaoDaLotacao((v) => v + 1);
+      await carregar();
     } catch {
       setJanela(null);
       setAviso(
@@ -753,7 +782,9 @@ export function FichaDoColaborador({
                       <RadixMenu.Separator className="ficha-ref__menu-divisor" />
                       <DropdownMenuItem
                         className="ficha-ref__menu-item ficha-ref__menu-item--perigo"
-                        disabled={status === "desligado"}
+                        disabled={
+                          status === "desligado" || status === "em_admissao"
+                        }
                         onSelect={() => setJanela("desligar")}
                       >
                         <IconeDesligar tamanho={18} />
@@ -828,7 +859,14 @@ export function FichaDoColaborador({
                 <span className="ficha-ref__resumo-rotulo">Tempo de casa</span>
                 <span className="ficha-ref__resumo-valor">
                   {vinculo && vinculo.situacao !== "previsto"
-                    ? tempoDeCasa(vinculo.dataAdmissao, hoje)
+                    ? tempoDeCasa(
+                        vinculo.dataAdmissao,
+                        // Desligado: o tempo de casa para na saída.
+                        vinculo.situacao === "encerrado" &&
+                          vinculo.dataDesligamento
+                          ? vinculo.dataDesligamento
+                          : hoje,
+                      )
                     : VAZIO}
                 </span>
               </span>
@@ -852,7 +890,7 @@ export function FichaDoColaborador({
               <span className="ficha-ref__admissao-textos">
                 <strong>Admissão aguardando efetivação</strong>
                 <span>
-                  {`A admissão foi registrada com início em ${formatarDiaCivil(vinculo.dataAdmissao)}. Efetive quando a pessoa começar: ela passa a Ativa e entra nas listas, na escala e nos benefícios.`}
+                  {`A admissão foi registrada com início em ${formatarDiaCivil(vinculo.dataAdmissao)}. Efetive quando a pessoa começar: o status passa a Ativo e o cadastro entra nas listas, na escala e nos benefícios.`}
                 </span>
               </span>
               {podeEditar ? (
@@ -912,7 +950,7 @@ export function FichaDoColaborador({
                 <IconeEnviar tamanho={16} />
                 Enviar convite
               </button>
-            ) : podeEditar && onEditar ? (
+            ) : podeEditar && onEditar && status !== "desligado" ? (
               <button
                 type="button"
                 className="ficha-ref__botao"
@@ -995,11 +1033,18 @@ export function FichaDoColaborador({
                 titulo="Dados pessoais"
                 subtitulo="Documentos e informações civis"
                 icone={<IconeCartaoPessoais />}
-                {...(podeEditar && onEditar
+                {...(podeEditar && onEditar && !dadosBloqueados
                   ? { onEditar: () => onEditar("dados-basicos") }
                   : {})}
                 className="ficha-ref__cartao--inteiro"
               >
+                {dadosBloqueados ? (
+                  <p className="ficha-ref__bloqueado" role="note">
+                    Dados pessoais e contatos bloqueados depois do desligamento.
+                    Eles continuam guardados, mas não aparecem nem podem ser
+                    editados.
+                  </p>
+                ) : null}
                 <Campo rotulo="Nome completo">{nome || VAZIO}</Campo>
                 <Campo rotulo="CPF">
                   {perfil?.cpf ? mascararCpf(perfil.cpf) : VAZIO}
@@ -1167,7 +1212,7 @@ export function FichaDoColaborador({
         <Dialog
           aberto={janela === "desligar"}
           titulo={`Desligar ${nome}?`}
-          descricao={`${trato.pronome} sai da lista de ativos e perde o acesso ao portal. O histórico continua guardado na aba Desligados.`}
+          descricao={`${trato.pronome} sai da lista de ativos. O histórico continua guardado na aba Desligados.`}
           onFechar={() => setJanela(null)}
           bloqueado={trabalhando}
           rodape={
@@ -1182,7 +1227,9 @@ export function FichaDoColaborador({
               <Button
                 type="button"
                 className="ficha-ref__botao-perigo"
-                disabled={trabalhando || !dataDesligamento}
+                disabled={
+                  trabalhando || !dataDesligamento || dataDesligamento > hoje
+                }
                 onClick={() => void desligar()}
               >
                 Desligar colaborador
@@ -1194,16 +1241,28 @@ export function FichaDoColaborador({
             <span>Data do desligamento</span>
             <input
               type="date"
+              max={hoje}
               value={dataDesligamento}
               onChange={(e) => setDataDesligamento(e.target.value)}
             />
           </label>
+          {erroDoDesligamento ? (
+            <p className="ficha-ref__janela-texto" role="alert">
+              {erroDoDesligamento}
+            </p>
+          ) : null}
+          {dataDesligamento > hoje ? (
+            <p className="ficha-ref__janela-texto" role="alert">
+              Use a data de hoje ou uma data passada. Desligamento com data
+              futura deve ser registrado no dia.
+            </p>
+          ) : null}
         </Dialog>
 
         <Dialog
           aberto={janela === "efetivar"}
           titulo={`Efetivar a admissão de ${nome}?`}
-          descricao={`${trato.pronome} passa a Ativa a partir de ${vinculo ? formatarDiaCivil(vinculo.dataAdmissao) : "a data de admissão"}. A efetivação entra no histórico funcional.`}
+          descricao={`O status passa a Ativo a partir de ${vinculo ? formatarDiaCivil(vinculo.dataAdmissao) : "a data de admissão"}. A efetivação entra no histórico funcional.`}
           onFechar={() => setJanela(null)}
           bloqueado={trabalhando}
           rodape={
@@ -1268,7 +1327,7 @@ export function FichaDoColaborador({
           <p className="ficha-ref__janela-texto">
             {janela === "reativar"
               ? "Volta a aparecer em Ativos."
-              : "Continua em Todos, marcada como Inativo."}
+              : "Continua em Todos, com o status Inativo."}
           </p>
         </Dialog>
 

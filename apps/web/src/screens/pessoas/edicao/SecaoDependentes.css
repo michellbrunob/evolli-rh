@@ -121,3 +121,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.secao-dependentes__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}
