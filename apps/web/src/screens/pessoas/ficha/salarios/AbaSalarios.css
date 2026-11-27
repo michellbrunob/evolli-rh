@@ -1,0 +1,575 @@
+/*
+ * T215 — aba Salários da ficha. Só tokens; os cartões reaproveitam
+ * `.ficha-ref__cartao` (FichaDoColaborador.css). Movimento (desenho do
+ * gráfico e pulso do período vigente) só sem `prefers-reduced-motion`.
+ */
+
+.salarios {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.salarios__aviso {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-ink-subtle);
+}
+
+.salarios__topo {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 52rem) {
+  .salarios__topo {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------- Salário atual */
+
+.salarios__atual-corpo {
+  display: grid;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 48rem) {
+  .salarios__atual-corpo {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.salarios__valor {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.salarios__moeda,
+.salarios__periodo {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-ui);
+}
+
+.salarios__numero {
+  font-size: 2.5rem;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.salarios__origem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 0;
+}
+
+.salarios__origem-texto,
+.salarios__suave,
+.salarios__ajuda {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.salarios__selo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.375rem;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.salarios__selo--vigente {
+  background: color-mix(in srgb, var(--color-action) 12%, transparent);
+  color: var(--color-action);
+}
+
+.salarios__detalhes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: var(--space-md) 0 0;
+  padding-top: var(--space-md);
+  border-top: var(--divisor);
+}
+
+.salarios__detalhe {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.salarios__detalhe + .salarios__detalhe {
+  padding-left: var(--space-lg);
+  border-left: var(--divisor);
+}
+
+.salarios__detalhe dt {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.salarios__detalhe dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- Gráfico */
+
+.salarios__grafico {
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+  max-width: 22rem;
+  margin: 0;
+  min-width: 0;
+  justify-self: end;
+}
+
+.salarios__grafico-area {
+  position: relative;
+}
+
+.salarios__grafico-area svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.salarios__grafico-guia {
+  stroke: var(--divisor-cor);
+  stroke-width: 1;
+}
+
+.salarios__grafico-cor-topo {
+  stop-color: var(--color-action);
+  stop-opacity: 0.16;
+}
+
+.salarios__grafico-cor-base {
+  stop-color: var(--color-action);
+  stop-opacity: 0;
+}
+
+.salarios__grafico-linha {
+  fill: none;
+  stroke: var(--color-action);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 0;
+}
+
+.salarios__grafico-depois {
+  fill: none;
+  stroke: var(--color-action);
+  stroke-width: 2;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+}
+
+.salarios__grafico-inicio {
+  fill: var(--surface-canvas);
+  stroke: var(--color-action);
+  stroke-width: 2;
+}
+
+.salarios__grafico-fim {
+  fill: var(--color-action);
+  stroke: var(--surface-canvas);
+  stroke-width: 2;
+}
+
+.salarios__grafico-rotulo {
+  position: absolute;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--radius-md);
+  background: var(--color-ink);
+  color: var(--surface-canvas);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translate(-100%, calc(-100% - 0.625rem));
+  translate: 0.75rem 0;
+}
+
+.salarios__grafico-legenda {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.salarios__grafico-hoje {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .salarios__grafico-linha {
+    animation: salarios-desenhar 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .salarios__grafico-preenchimento,
+  .salarios__grafico-depois,
+  .salarios__grafico-fim,
+  .salarios__grafico-rotulo {
+    animation: salarios-surgir 500ms ease-out 450ms both;
+  }
+}
+
+@keyframes salarios-desenhar {
+  from {
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes salarios-surgir {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* ----------------------------------------------------------------- Resumo */
+
+.salarios__resumo-lista {
+  margin: 0;
+  padding: 0 var(--space-lg);
+}
+
+.salarios__resumo-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: var(--space-md) 0;
+}
+
+.salarios__resumo-item + .salarios__resumo-item {
+  border-top: var(--divisor);
+}
+
+.salarios__resumo-item dt {
+  color: var(--color-ink-muted);
+}
+
+.salarios__resumo-item dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.salarios__resumo-item--barra .salarios__barra,
+.salarios__resumo-item--barra .salarios__ajuda {
+  flex-basis: 100%;
+}
+
+.salarios__barra {
+  display: block;
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.salarios__barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-action);
+}
+
+/* -------------------------------------------------------- Linha do tempo */
+
+.salarios__periodos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg) var(--space-sm)
+    var(--space-xl, 1.5rem);
+  list-style: none;
+}
+
+.salarios__periodo {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+/* O trilho: o marcador e, abaixo dele, o tracejado até o próximo período. */
+.salarios__trilho {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 0.875rem;
+  padding-top: 1.25rem;
+}
+
+.salarios__marco {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.salarios__ponto {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 3px solid var(--surface-canvas);
+  border-radius: 50%;
+  background: var(--divisor-cor-forte);
+  box-shadow: 0 0 0 1px var(--divisor-cor-forte);
+}
+
+.salarios__periodo--vigente .salarios__ponto {
+  background: var(--color-action);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-action) 25%, transparent);
+}
+
+.salarios__ponto--futuro {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px dashed var(--divisor-cor-forte);
+  background: var(--surface-canvas);
+  box-shadow: none;
+}
+
+.salarios__pulso {
+  position: absolute;
+  inset: 0;
+  display: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-action) 25%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .salarios__pulso {
+    display: block;
+    animation: salarios-pulsar 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+}
+
+@keyframes salarios-pulsar {
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+.salarios__conector {
+  flex: 1;
+  width: 0;
+  min-height: 1rem;
+  margin-top: var(--space-xxs);
+  border-left: 1.5px dashed var(--divisor-cor-forte);
+}
+
+.salarios__conteudo {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-md) 0;
+  border-bottom: var(--divisor);
+}
+
+.salarios__periodo--proximo .salarios__conteudo {
+  border-bottom: 0;
+}
+
+@container (min-width: 48rem) {
+  .salarios__conteudo {
+    grid-template-columns: 9.375rem 13.75rem minmax(0, 1fr) auto;
+    gap: var(--space-lg);
+  }
+
+  .salarios__conteudo--proximo {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.salarios__coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.salarios__forte,
+.salarios__texto {
+  color: var(--color-ink);
+}
+
+.salarios__forte {
+  font-weight: var(--weight-strong);
+}
+
+.salarios__data {
+  font-variant-numeric: tabular-nums;
+}
+
+.salarios__valor-periodo {
+  color: var(--color-ink);
+  font-size: 1.0625rem;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  line-height: 1.45;
+}
+
+.salarios__cortado {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salarios__selos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+@container (min-width: 48rem) {
+  .salarios__selos {
+    justify-content: flex-end;
+  }
+}
+
+.salarios__menu-item {
+  gap: var(--space-xs);
+}
+
+/* ------------------------------------------------------------------ Vazio */
+
+.salarios__vazio {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.salarios__vazio-titulo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+.salarios__vazio-texto {
+  margin: 0;
+  color: var(--color-ink-subtle);
+}
+
+/* ----------------------------------------------------------------- Gaveta */
+
+.salarios-gaveta__campos {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.salarios-gaveta__campo {
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+}
+
+.salarios-gaveta__campo label {
+  font-weight: var(--weight-strong);
+}
+
+.salarios-gaveta__campo input {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.salarios-gaveta__campo input:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.salarios-gaveta__campo input:disabled {
+  background: var(--surface-neutral);
+  color: var(--color-ink-subtle);
+}
+
+.salarios-gaveta__campo input[aria-invalid="true"] {
+  border-color: var(--status-danger-ink);
+}
+
+.salarios__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}
+
+.salarios-gaveta__campo > span:first-child {
+  font-weight: var(--weight-strong);
+}
+
+.salarios__grafico-meio {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salarios-gaveta__confira {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+}
+
+.salarios-gaveta__confira ul {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding-left: var(--space-md);
+}

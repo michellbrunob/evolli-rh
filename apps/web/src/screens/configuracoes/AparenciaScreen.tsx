@@ -51,15 +51,12 @@ export interface AparenciaScreenProps {
   readonly onContaAtualizada?: ((ator: SafeAccessUserApi) => void) | undefined;
   /** A conta alcança Configurações › Empresas (item na navegação). */
   readonly mostrarEmpresas?: boolean;
-  /** T211 — a conta alcança Equipe e permissões (item na navegação). */
-  readonly mostrarEquipe?: boolean;
 }
 
 export function AparenciaScreen({
   temaAtual,
   onContaAtualizada,
   mostrarEmpresas = false,
-  mostrarEquipe = false,
 }: AparenciaScreenProps) {
   const [emUso, setEmUso] = useState<TemaDeAparencia>(() =>
     temaDaConta(temaAtual),
@@ -118,7 +115,6 @@ export function AparenciaScreen({
         <NavegacaoConfiguracoes
           atual="aparencia"
           mostrarEmpresas={mostrarEmpresas}
-          mostrarEquipe={mostrarEquipe}
         />
 
         <section

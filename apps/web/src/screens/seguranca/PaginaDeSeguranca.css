@@ -1,0 +1,8 @@
+/* T215 — o painel de Segurança: a tela dentro dele já traz as superfícies
+   (sem moldura dupla). Só a regra de não vazar largura. */
+.seguranca__painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}

@@ -634,6 +634,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           tipo: "clt",
           dataAdmissao: "2026-06-01",
           motivoCodigo: "admissao_inicial",
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
           departamentoId: departamentoA,
         })
         .expect(201);
@@ -971,6 +973,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           tipo: "pj",
           dataAdmissao: ADMISSAO,
           motivoCodigo: "admissao_inicial",
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
           departamentoId: departamentoA,
         })
         .expect(201);
@@ -1606,9 +1610,19 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           .send()
           .expect(201);
 
-        // Ordem que satisfaz as FKs: alocacoes -> movimentacoes -> vinculo.
+        // Ordem que satisfaz as FKs: linha salarial e contrato (T215) ->
+        // alocacoes -> movimentacoes -> vinculo. So o trigger deferido do
+        // COMMIT pode recusar.
         await expect(
           migrator.$transaction([
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.alteracao_salarial WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
+            migrator.$executeRawUnsafe(
+              `DELETE FROM app.contrato_vinculo WHERE vinculo_id = $1`,
+              vinculoId,
+            ),
             migrator.$executeRawUnsafe(
               `DELETE FROM app.alocacao_organizacional WHERE vinculo_id = $1`,
               vinculoId,
@@ -2757,12 +2771,19 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
       expect(linha.celular).toBe("+5511987650009");
     });
 
-    it("listagem e detalhe do colaborador NÃO expõem contatos", async () => {
+    it("detalhe NÃO expõe contatos; a listagem só e-mail e celular, nunca o telefone (T215)", async () => {
       const lista = await get("/v1/colaboradores", rhA).expect(200);
       const detalhe = await get(`/v1/colaboradores/${pessoaA}`, rhA).expect(
         200,
       );
-      for (const corpoResposta of [lista.body, detalhe.body]) {
+      // T215 — a página inicial no desenho da referência mostra, na linha,
+      // e-mail pessoal e celular (com a trilha da leitura); o telefone fixo
+      // segue só na ficha.
+      const textoDaLista = JSON.stringify(lista.body);
+      for (const proibido of [TELEFONE_NOVO, "telefone"]) {
+        expect(textoDaLista).not.toContain(proibido);
+      }
+      for (const corpoResposta of [detalhe.body]) {
         const texto = JSON.stringify(corpoResposta);
         for (const proibido of [
           EMAIL,

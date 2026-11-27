@@ -71,7 +71,7 @@ function statusDe(erro: unknown): number | null {
 function mensagemDoErroDeCep(erro: unknown): string {
   switch (statusDe(erro)) {
     case 404:
-      return "CEP não encontrado. Preencha o endereço manualmente.";
+      return "CEP não encontrado. Preencha o endereço abaixo.";
     case 503:
       return "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.";
     case 429:

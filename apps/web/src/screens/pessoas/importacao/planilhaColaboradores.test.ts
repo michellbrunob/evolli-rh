@@ -12,6 +12,7 @@ import {
   NOME_DA_LINHA_DE_EXEMPLO,
   conferirPlanilha,
   gerarModelo,
+  lerSalarioDaPlanilha,
   lerPlanilha,
   montarAdmissao,
   chaveDaLinha,
@@ -32,7 +33,7 @@ const REFERENCIAS: Referencias = {
 };
 
 const CABECALHO =
-  "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo";
+  "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo;salario";
 
 function planilha(...linhas: string[]): string {
   return [CABECALHO, ...linhas].join("\r\n");
@@ -44,7 +45,7 @@ function conferir(texto: string) {
   return conferirPlanilha(lida, REFERENCIAS, HOJE);
 }
 
-const VALIDA = "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;";
+const VALIDA = "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00";
 
 describe("modelo", () => {
   it("cabeçalho fixo com as obrigatórias e as opcionais, BOM e uma linha de exemplo", () => {
@@ -69,7 +70,7 @@ describe("modelo", () => {
     });
   });
 
-  it("as colunas obrigatórias incluem a data de nascimento (decisão de 2026-11-16)", () => {
+  it("as colunas obrigatórias incluem a data de nascimento (decisão de 2026-11-16) e o salário (T215)", () => {
     expect(COLUNAS_OBRIGATORIAS).toEqual([
       "nome",
       "tipo_vinculo",
@@ -77,6 +78,7 @@ describe("modelo", () => {
       "data_nascimento",
       "departamento_codigo",
       "cargo_codigo",
+      "salario",
     ]);
     expect(COLUNAS_OPCIONAIS).toEqual(["matricula", "unidade_codigo"]);
   });
@@ -95,7 +97,7 @@ describe("leitura do CSV", () => {
   it("separador ';' ou ',' detectado pelo cabeçalho", () => {
     const virgula = [
       CABECALHO.replace(/;/g, ","),
-      "Ana Souza,clt,01/12/2026,15/05/1990,ADM,ANALISTA,,",
+      "Ana Souza,clt,01/12/2026,15/05/1990,ADM,ANALISTA,,,1621.00",
     ].join("\n");
     const linhas = conferir(virgula);
     expect(linhas[0]!.erros).toEqual([]);
@@ -105,15 +107,17 @@ describe("leitura do CSV", () => {
   it("BOM, CRLF ou LF, aspas com separador e aspas escapadas dentro", () => {
     const texto =
       "﻿" +
-      planilha('"Souza; Ana ""Tia""";clt;01/12/2026;15/05/1990;ADM;ANALISTA;;');
+      planilha(
+        '"Souza; Ana ""Tia""";clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00',
+      );
     const linhas = conferir(texto);
     expect(linhas[0]!.admissao?.nome).toBe('Souza; Ana "Tia"');
   });
 
   it("cabeçalho sem diferença de maiúsculas, acentos ou espaços nas pontas", () => {
     const texto = [
-      " Nome ;TIPO_VINCULO;Data_Admissao;data_nascimento;departamento_codigo;cargo_codigo",
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA",
+      " Nome ;TIPO_VINCULO;Data_Admissao;data_nascimento;departamento_codigo;cargo_codigo; Salário ",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;1.621,00",
     ].join("\n");
     expect(conferir(texto)[0]!.erros).toEqual([]);
   });
@@ -121,13 +125,15 @@ describe("leitura do CSV", () => {
   it("as colunas opcionais podem faltar no cabeçalho", () => {
     const texto = [
       COLUNAS_OBRIGATORIAS.join(";"),
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;1.621,00",
     ].join("\n");
     expect(conferir(texto)[0]!.admissao).not.toBeNull();
   });
 
   it("linhas totalmente vazias são ignoradas; o número é a linha do arquivo", () => {
-    const linhas = conferir(planilha("", VALIDA, ";;;;;;;", "Bia;xx;;;;;;"));
+    const linhas = conferir(
+      planilha("", VALIDA, ";;;;;;;", "Bia;xx;;;;;;;1.621,00"),
+    );
     expect(linhas.map((l) => l.numero)).toEqual([3, 5]);
   });
 
@@ -160,7 +166,7 @@ describe("cabeçalho fixo", () => {
   it("coluna proibida (dado pessoal fora do modelo) recusa o arquivo inteiro", () => {
     for (const coluna of [
       "cpf",
-      "salario",
+      "pis",
       "email",
       "telefone",
       "endereco",
@@ -187,7 +193,9 @@ describe("cabeçalho fixo", () => {
     const semNascimento = CABECALHO.replace(";data_nascimento", "");
     expect(
       lerPlanilha(
-        [semNascimento, "Ana;clt;01/12/2026;ADM;ANALISTA;;"].join("\n"),
+        [semNascimento, "Ana;clt;01/12/2026;ADM;ANALISTA;;;1.621,00"].join(
+          "\n",
+        ),
       ),
     ).toEqual({
       erro: "Faltam colunas obrigatórias no cabeçalho: data_nascimento.",
@@ -207,7 +215,7 @@ describe("conferência por linha", () => {
   it("linha válida: admissão pronta, referências por código resolvidas para id", () => {
     const [linha] = conferir(
       planilha(
-        "  Ana Souza  ;CLT;01/12/2026;1990-05-15;adm;analista;ab-12;sp01",
+        "  Ana Souza  ;CLT;01/12/2026;1990-05-15;adm;analista;ab-12;sp01;1.621,00",
       ),
     );
     expect(linha!.erros).toEqual([]);
@@ -218,6 +226,7 @@ describe("conferência por linha", () => {
       dataNascimento: "1990-05-15",
       departamentoId: "dep-adm",
       cargoId: "car-analista",
+      salarioBruto: "1621.00",
       unidadeId: "uni-sp",
       matricula: "AB-12",
     });
@@ -234,7 +243,9 @@ describe("conferência por linha", () => {
     ["outro_controlado", "outro_controlado"],
   ])("tipo '%s' vira %s", (valor, tipo) => {
     const [linha] = conferir(
-      planilha(`Ana Souza;${valor};01/12/2026;15/05/1990;ADM;ANALISTA;;`),
+      planilha(
+        `Ana Souza;${valor};01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00`,
+      ),
     );
     expect(linha!.admissao?.tipo).toBe(tipo);
   });
@@ -242,13 +253,13 @@ describe("conferência por linha", () => {
   it.each([
     [
       "nome vazio",
-      ";clt;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      ";clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Nome",
       "obrigatório",
     ],
     [
       "nome curto",
-      "A;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      "A;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Nome",
       "deve ter entre 2 e 160 caracteres",
     ],
@@ -260,97 +271,115 @@ describe("conferência por linha", () => {
     ],
     [
       "tipo vazio",
-      "Ana Souza;;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Tipo de vínculo",
       "obrigatório",
     ],
     [
       "tipo fora da lista",
-      "Ana Souza;estatutario;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;estatutario;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Tipo de vínculo",
       "não é um dos tipos aceitos (CLT, Estágio, Aprendiz, PJ, Temporário, Outro controlado)",
     ],
     [
       "admissão vazia",
-      "Ana Souza;clt;;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;clt;;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Data de admissão",
       "obrigatória",
     ],
     [
       "admissão inválida",
-      "Ana Souza;clt;31/02/2026;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;clt;31/02/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Data de admissão",
       "não é uma data válida (use DD/MM/AAAA)",
     ],
     [
       "admissão antes de 1900",
-      "Ana Souza;clt;31/12/1899;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;clt;31/12/1899;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Data de admissão",
       "não pode ser anterior a 01/01/1900",
     ],
     [
       "nascimento vazio",
-      "Ana Souza;clt;01/12/2026;;ADM;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;;ADM;ANALISTA;;;1.621,00",
       "Data de nascimento",
       "obrigatória",
     ],
     [
       "nascimento inválido",
-      "Ana Souza;clt;01/12/2026;1990/05/15;ADM;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;1990/05/15;ADM;ANALISTA;;;1.621,00",
       "Data de nascimento",
       "não é uma data válida (use DD/MM/AAAA)",
     ],
     [
       "nascimento no futuro",
-      "Ana Souza;clt;01/12/2026;17/11/2026;ADM;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;17/11/2026;ADM;ANALISTA;;;1.621,00",
       "Data de nascimento",
       "não pode estar no futuro",
     ],
     [
       "nascimento antes de 1900",
-      "Ana Souza;clt;01/12/2026;31/12/1899;ADM;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;31/12/1899;ADM;ANALISTA;;;1.621,00",
       "Data de nascimento",
       "não pode ser anterior a 01/01/1900",
     ],
     [
       "departamento vazio",
-      "Ana Souza;clt;01/12/2026;15/05/1990;;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;;ANALISTA;;;1.621,00",
       "Departamento",
       "obrigatório",
     ],
     [
       "departamento inexistente",
-      "Ana Souza;clt;01/12/2026;15/05/1990;XYZ;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;XYZ;ANALISTA;;;1.621,00",
       "Departamento",
       "não há departamento ativo com esse código na empresa",
     ],
     [
       "cargo vazio",
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;;;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;;;;1.621,00",
       "Cargo",
       "obrigatório",
     ],
     [
       "cargo inexistente",
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;GERENTE;;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;GERENTE;;;1.621,00",
       "Cargo",
       "não há cargo ativo com esse código na empresa",
     ],
     [
       "unidade inexistente",
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;RJ99",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;RJ99;1.621,00",
       "Unidade",
       "não há unidade ativa com esse código na empresa",
     ],
     [
       "matrícula fora do padrão",
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;a b;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;a b;;1.621,00",
       "Matrícula",
       "use de 2 a 32 letras, números, hífen ou sublinhado",
     ],
     [
+      "salário vazio",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;",
+      "Salário",
+      "obrigatório",
+    ],
+    [
+      "salário inválido",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;mil reais",
+      "Salário",
+      "não é um valor em reais (use, por exemplo, 1.621,00)",
+    ],
+    [
+      "salário zero",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;0,00",
+      "Salário",
+      "não é um valor em reais (use, por exemplo, 1.621,00)",
+    ],
+    [
       "caractere de controle no nome",
-      "Ana\u0007 Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      "Ana\u0007 Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
       "Nome",
       "tem caracteres não permitidos",
     ],
@@ -365,13 +394,13 @@ describe("conferência por linha", () => {
 
   it("nascimento hoje é aceito (o limite é o futuro)", () => {
     const [linha] = conferir(
-      planilha(`Ana Souza;clt;01/12/2026;16/11/2026;ADM;ANALISTA;;`),
+      planilha(`Ana Souza;clt;01/12/2026;16/11/2026;ADM;ANALISTA;;;1.621,00`),
     );
     expect(linha!.erros).toEqual([]);
   });
 
   it("vários erros na mesma linha aparecem todos", () => {
-    const [linha] = conferir(planilha("A;xx;;;;;;"));
+    const [linha] = conferir(planilha("A;xx;;;;;;;"));
     expect(linha!.erros.map((e) => e.campo)).toEqual([
       "Nome",
       "Tipo de vínculo",
@@ -379,6 +408,7 @@ describe("conferência por linha", () => {
       "Data de nascimento",
       "Departamento",
       "Cargo",
+      "Salário",
     ]);
   });
 
@@ -392,6 +422,7 @@ describe("conferência por linha", () => {
       "GERENTE9",
       "a b",
       "RJ99",
+      "9,9,9",
     ];
     const [linha] = conferir(planilha(valores.join(";")));
     const texto = JSON.stringify(linha!.erros);
@@ -403,8 +434,8 @@ describe("conferência por linha", () => {
   it("matrícula repetida no arquivo recusa a linha seguinte, citando a primeira", () => {
     const linhas = conferir(
       planilha(
-        "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-1;",
-        "Bia Lima;clt;01/12/2026;15/05/1991;ADM;ANALISTA;m-1;",
+        "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-1;;1.621,00",
+        "Bia Lima;clt;01/12/2026;15/05/1991;ADM;ANALISTA;m-1;;1.621,00",
       ),
     );
     expect(linhas[0]!.erros).toEqual([]);
@@ -416,7 +447,10 @@ describe("conferência por linha", () => {
 
   it("linha repetida (mesmos dados) recusa a cópia, citando a original", () => {
     const linhas = conferir(
-      planilha(VALIDA, " ana souza ;CLT;01/12/2026;1990-05-15;adm;analista;;"),
+      planilha(
+        VALIDA,
+        " ana souza ;CLT;01/12/2026;1990-05-15;adm;analista;;;1.621,00",
+      ),
     );
     expect(linhas[0]!.erros).toEqual([]);
     expect(linhas[1]!.admissao).toBeNull();
@@ -439,8 +473,8 @@ describe("corpo da admissão", () => {
   it("o mesmo contrato do cadastro individual: motivo de admissão inicial, só a data de nascimento no perfil, opcionais fora quando vazios", () => {
     const [completa, minima] = conferir(
       planilha(
-        "Ana Souza;aprendiz;01/12/2026;15/05/2008;ADM;ANALISTA;M-1;SP01",
-        "Bia Lima;clt;01/12/2026;15/05/1991;OPER;ANALISTA;;",
+        "Ana Souza;aprendiz;01/12/2026;15/05/2008;ADM;ANALISTA;M-1;SP01;1.621,00",
+        "Bia Lima;clt;01/12/2026;15/05/1991;OPER;ANALISTA;;;1.621,00",
       ),
     );
     expect(montarAdmissao(completa!.admissao!, "emp-1")).toEqual({
@@ -454,6 +488,8 @@ describe("corpo da admissão", () => {
       matricula: "M-1",
       unidadeOrganizacionalId: "uni-sp",
       perfilPessoal: expect.objectContaining({ dataNascimento: "2008-05-15" }),
+      // T215 — o primeiro salário abre a linha do tempo salarial.
+      contrato: { salarioBruto: "1621.00" },
     });
     // Nenhum outro dado pessoal: o restante do perfil vai vazio.
     const { dataNascimento, ...resto } = montarAdmissao(
@@ -470,11 +506,36 @@ describe("corpo da admissão", () => {
   });
 });
 
+describe("salário da planilha (T215)", () => {
+  it.each([
+    ["1.621,00"],
+    ["1621,00"],
+    ["1621.00"],
+    ["1621"],
+    ["R$ 1.621,00"],
+    ["1.621"],
+    [" 1621,0 "],
+  ])("'%s' vira 1621.00", (texto) => {
+    expect(lerSalarioDaPlanilha(texto)).toBe("1621.00");
+  });
+
+  it("célula numérica do .xlsx com centavos: '1621.5' vira 1621.50", () => {
+    expect(lerSalarioDaPlanilha("1621.5")).toBe("1621.50");
+  });
+
+  it.each([[""], ["abc"], ["0"], ["0,00"], ["-5"], ["1,2,3"], ["12345678901"]])(
+    "'%s' não é salário",
+    (texto) => {
+      expect(lerSalarioDaPlanilha(texto)).toBeNull();
+    },
+  );
+});
+
 describe("relatório de erros", () => {
   it("CSV com linha, campo e motivo — sem nenhum valor da planilha", () => {
     const linhas = conferir(
       planilha(
-        "Zuleica Teste;estatutario;01/12/2026;15/05/1990;XYZ;ANALISTA;;",
+        "Zuleica Teste;estatutario;01/12/2026;15/05/1990;XYZ;ANALISTA;;;1.621,00",
         VALIDA,
       ),
     );
@@ -515,21 +576,29 @@ describe("chave de idempotência da linha (reimportar não duplica)", () => {
 
   it("depende só da identidade: nome (sem diferença de maiúsculas, acentos ou espaços), nascimento e matrícula", async () => {
     const base = await chaveDe(
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
     );
     // Outro cargo ou admissão: mesma pessoa, mesma chave (o servidor recusa o
     // conteúdo diferente em vez de admitir de novo).
     expect(
-      await chaveDe("  ANA  souza ;pj;02/12/2026;1990-05-15;ADM;ANALISTA;;"),
+      await chaveDe(
+        "  ANA  souza ;pj;02/12/2026;1990-05-15;ADM;ANALISTA;;;1.621,00",
+      ),
     ).toBe(base);
     expect(
-      await chaveDe("Ana Souza;clt;01/12/2026;16/05/1990;ADM;ANALISTA;;"),
+      await chaveDe(
+        "Ana Souza;clt;01/12/2026;16/05/1990;ADM;ANALISTA;;;1.621,00",
+      ),
     ).not.toBe(base);
     expect(
-      await chaveDe("Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;"),
+      await chaveDe(
+        "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;;1.621,00",
+      ),
     ).not.toBe(base);
     expect(
-      await chaveDe("Ana Sousa;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;"),
+      await chaveDe(
+        "Ana Sousa;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;;1.621,00",
+      ),
     ).not.toBe(base);
   });
 
@@ -541,7 +610,7 @@ describe("chave de idempotência da linha (reimportar não duplica)", () => {
 
   it("não carrega dado pessoal: a chave não contém nome, data ou matrícula", async () => {
     const chave = await chaveDe(
-      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;",
+      "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;M-9;;1.621,00",
     );
     expect(chave).not.toMatch(/ana|souza|1990|m-9/i);
   });

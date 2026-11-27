@@ -1,66 +1,102 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { NumeroSuave } from "../../ui/movimento";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Button,
   EmptyState,
-  FormField,
   PageHeader,
   StatusBadge,
   Surface,
 } from "../../components";
-import type { DataTableColumn, StatusVariant } from "../../components";
 import {
   BUSCA_COLABORADORES_MAXIMO,
   type ColaboradorListadoApi,
   type ContadoresColaboradoresApi,
   type GrupoColaboradores,
   type ListarColaboradoresQuery,
-  type LotacaoListadaApi,
   type VinculoListadoApi,
   listarColaboradores,
 } from "../../api/colaboradoresClient";
 import {
-  type DepartamentoApi,
+  listarAreas,
+  listarCentrosCusto,
   listarDepartamentos,
+  listarUnidades,
 } from "../../api/organizacaoClient";
-import { type CargoApi, listarCargos } from "../../api/cargoClient";
+import { listarCargos } from "../../api/cargoClient";
 import {
   type AbaDaFicha,
   type AbaDaListagem,
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type TipoDeVinculo,
-  ABAS_DA_FICHA,
+  type FiltrosDaListagem,
   ABAS_DA_LISTAGEM,
   ESTADO_INICIAL_DA_LISTAGEM,
-  TAMANHOS_DE_PAGINA,
-  TIPOS_DE_VINCULO,
+  FILTROS_VAZIOS,
   abaTemLotacao,
+  abaTemTabela,
   normalizarEstadoDaListagem,
+  quantidadeDeFiltros,
 } from "../../app/rotasDoShell";
-import { formatarDiaCivil } from "../../format/data";
-import { exibirMatricula } from "../../format/matricula";
 import {
-  diaDeHoje,
-  rotuloDaJornada,
-  situacaoDaVigencia,
-} from "./jornadaColaborador";
-import {
-  IconeAdicionarPessoa,
-  PainelAdicionarColaborador,
-} from "./PainelAdicionarColaborador";
-import {
-  ROTULO_DA_ABA as ROTULO_DA_ABA_DA_FICHA,
-  iniciaisDe,
-} from "./FichaColaboradorScreen";
+  type CatalogosDaGaveta,
+  type GrupoDeCatalogo,
+  FALHA_DOS_CATALOGOS,
+  GRUPOS_DE_CATALOGO,
+  GavetaDeFiltros,
+  ROTULO_DO_GRUPO,
+  rotuloDaReferencia,
+} from "./GavetaDeFiltros";
+import { OPCOES_GENERO, OPCOES_NIVEL } from "./NovaAdmissaoScreen";
+import { diaDeHoje } from "./jornadaColaborador";
+import { PainelAdicionarColaborador } from "./PainelAdicionarColaborador";
+import { iniciaisDe } from "./iniciais";
 import { MenuAcoesDaPessoa } from "./MenuAcoesDaPessoa";
+import {
+  IconeBaixarArquivo,
+  IconeBuscar,
+  IconeCalendario,
+  IconeEditar,
+  IconeFiltrar,
+  IconeMais,
+  IconePessoas,
+  IconePlanilha,
+  IconeVer,
+} from "../../ui/icones";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../ui";
+import { exibirTelefone } from "../../format/mascaras";
+import { mascararCpf } from "./NovaAdmissaoScreen";
+import { formatarReais } from "./salarioLiquido";
+import {
+  baixarArquivo,
+  imprimirSomente,
+  nomeDoArquivo,
+} from "../dashboard/exportacao";
+import { TIPO_MIME_XLSX, montarXlsx } from "./importacao/planilhaXlsx";
+import {
+  type ColaboradorDaLista,
+  COLUNAS_DA_EXPORTACAO,
+  lerTudoParaExportar,
+  linhasDaExportacao,
+} from "./exportacaoColaboradores";
 import { PessoasHorarioScreen } from "./PessoasHorarioScreen";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
 import {
-  Card,
   Input,
-  Select,
   Table,
   TableBody,
   TableCaption,
@@ -74,7 +110,16 @@ import {
   TabsTrigger,
 } from "../../ui";
 import "./ColaboradoresScreen.css";
+import {
+  CartoesDeAusencias,
+  FeriasEAusenciasAba,
+} from "./ferias/FeriasEAusenciasAba";
+import type {
+  IndicadoresDeAusencias,
+  ServicoDeAusencias,
+} from "./ferias/tiposAusencia";
 import { FotoDoColaborador } from "./FotoDoColaborador";
+import { plural } from "../../format/plural";
 
 export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
 
@@ -95,33 +140,30 @@ export const COLABORADORES_TITULO_ID = "colaboradores-titulo";
  * - **Escopo** (D-6): sem empresa ativa (`master_tecnico` global), os textos
  *   dizem "no seu escopo", nunca "nesta empresa".
  *
- * Nada de CPF, salário ou contatos na visão coletiva.
+ * T215 — no desenho da referência (2026-11-23): cabeçalho com Exportar e
+ * Novo colaborador, três cartões, abas sem "Em admissão", busca por nome,
+ * CPF, e-mail ou ID, e a tabela com CPF, contatos, salário e contrato —
+ * cada dado só quando o servidor o manda (a permissão é dele).
  */
 
-/**
- * T190 — catálogos dos filtros de lotação: só departamentos e cargos ATIVOS
- * da empresa ativa (o servidor escopa pela sessão). Uma página de 100, o
- * limite já registrado para os catálogos organizacionais.
- */
-type CatalogosDeLotacao =
-  | { readonly status: "carregando" }
-  | { readonly status: "erro" }
-  | {
-      readonly status: "dados";
-      readonly departamentos: readonly DepartamentoApi[];
-      readonly cargos: readonly CargoApi[];
-    };
-
-function rotuloDaReferencia(ref: { nome: string; codigo: string }): string {
-  return `${ref.nome} (${ref.codigo})`;
+/** T215 — rótulos de nível e gênero: os mesmos do Novo colaborador. */
+function rotuloDoNivel(nivel: string): string {
+  return OPCOES_NIVEL.find((o) => o.codigo === nivel)?.rotulo ?? nivel;
+}
+function rotuloDoGenero(genero: string): string {
+  return OPCOES_GENERO.find((o) => o.codigo === genero)?.rotulo ?? genero;
+}
+function rotuloDoTipo(tipo: string): string {
+  return ROTULO_TIPO_DE_VINCULO[tipo as TipoDeVinculo] ?? tipo;
 }
 
 const ROTULO_DA_ABA: Readonly<Record<AbaDaListagem, string>> = {
   ativos: "Ativos",
   "em-admissao": "Em admissão",
+  ferias: "Férias e ausências",
+  jornada: "Escala de trabalho",
   desligados: "Desligados",
   todos: "Todos",
-  jornada: "Jornada de trabalho",
 };
 
 /** O grupo que cada aba pede ao servidor ("Todos": sem grupo). */
@@ -147,6 +189,9 @@ function totalDaAba(
       return c.desligados;
     case "todos":
       return c.total;
+    // T215 — ausências chegam com o módulo de Férias e ausências.
+    case "ferias":
+      return 0;
     default:
       return null;
   }
@@ -162,24 +207,6 @@ export const ROTULO_TIPO_DE_VINCULO: Readonly<Record<TipoDeVinculo, string>> = {
   part_time: "Part-time",
   freelancer: "Freelancer",
   trainee: "Trainee",
-};
-
-/** A situação da pessoa no escopo, pela mesma regra dos grupos (N-1). */
-type SituacaoNoEscopo = "ativo" | "em_admissao" | "desligado";
-
-function situacaoNoEscopo(c: ColaboradorListadoApi): SituacaoNoEscopo | null {
-  if (c.vinculos.some((v) => v.situacao === "ativo")) return "ativo";
-  if (c.vinculos.some((v) => v.situacao === "previsto")) return "em_admissao";
-  if (c.vinculos.some((v) => v.situacao === "encerrado")) return "desligado";
-  return null;
-}
-
-const SITUACAO_NO_ESCOPO: Readonly<
-  Record<SituacaoNoEscopo, { rotulo: string; variante: StatusVariant }>
-> = {
-  ativo: { rotulo: "Ativo", variante: "success" },
-  em_admissao: { rotulo: "Em admissão", variante: "info" },
-  desligado: { rotulo: "Desligado", variante: "neutral" },
 };
 
 /** A situação de vínculo que define cada aba (N-5). */
@@ -200,14 +227,14 @@ const SITUACAO_DA_ABA: Readonly<
 function vinculoDaLinha(
   c: ColaboradorListadoApi,
   aba: AbaDaListagem,
-  tipo: TipoDeVinculo | null,
+  tipos: readonly TipoDeVinculo[],
 ): VinculoListadoApi | undefined {
   const situacao = SITUACAO_DA_ABA[aba];
   return (
     c.vinculos.find(
       (v) =>
         (situacao === undefined || v.situacao === situacao) &&
-        (tipo === null || v.tipo === tipo),
+        (tipos.length === 0 || tipos.includes(v.tipo)),
     ) ?? c.vinculos[0]
   );
 }
@@ -295,14 +322,18 @@ const ID_CAMPO_BUSCA = "colaboradores-busca";
 
 const FALHA_DA_LISTA = "Não foi possível carregar os colaboradores.";
 
-const FALHA_DOS_CATALOGOS = "Não foi possível carregar departamentos e cargos.";
+/** T215 — os grupos de lotação na gaveta: destino do foco na recarga. */
+const ID_GRUPOS_DE_LOTACAO = "colaboradores-gaveta-lotacao";
 
-/** A select de Departamento: destino do foco quando os catálogos voltam. */
-const ID_FILTRO_DEPARTAMENTO = "colaboradores-filtro-departamento";
+/** T215 — o botão "Filtrar": destino do foco quando o último chip sai. */
+const ID_BOTAO_FILTRAR = "colaboradores-filtrar";
 
-/** Os chips de filtro, na ordem em que aparecem. */
-const FILTROS_REMOVIVEIS = ["departamento", "cargo", "tipo"] as const;
-type FiltroRemovivel = (typeof FILTROS_REMOVIVEIS)[number];
+/** T215 — um valor de filtro aplicado: vira um chip removível. */
+interface FiltroAplicado {
+  readonly grupo: keyof FiltrosDaListagem;
+  readonly valor: string;
+  readonly texto: string;
+}
 
 const DESCRICAO_PAGINA_VAZIA =
   "Esta página voltou vazia, embora a consulta tenha colaboradores: o conjunto pode ter mudado desde a última leitura.";
@@ -333,15 +364,8 @@ function mesmoEstado(a: EstadoDaListagem, b: EstadoDaListagem): boolean {
     a.aba === b.aba &&
     a.pagina === b.pagina &&
     a.tamanho === b.tamanho &&
-    a.departamentoId === b.departamentoId &&
-    a.cargoId === b.cargoId &&
-    a.tipo === b.tipo
+    JSON.stringify(a.filtros) === JSON.stringify(b.filtros)
   );
-}
-
-/** Concordância de "N vínculo(s)", para o texto lido por leitor de tela. */
-function vinculosAMais(quantidade: number): string {
-  return quantidade === 1 ? "1 vínculo" : `${quantidade} vínculos`;
 }
 
 export interface ColaboradoresScreenProps {
@@ -361,11 +385,13 @@ export interface ColaboradoresScreenProps {
    * prop, não há menu.
    */
   readonly onAbrirFicha?: (colaboradorId: string, aba?: AbaDaFicha) => void;
+  /** T215 — "Editar colaborador" no ⋯ da linha: só para quem edita. */
+  readonly onEditarColaborador?: (colaboradorId: string) => void;
   /**
-   * T209 — a aba "Solicitações" da ficha só existe para quem a lê (T203): o
-   * menu "Ações" só oferece o atalho a esses papéis.
+   * T215 — a aba "Organograma" leva à estrutura (outra tela, decidida pelo
+   * shell). Sem esta prop, a aba não aparece.
    */
-  readonly podeVerSolicitacoes?: boolean;
+  readonly onAbrirOrganograma?: () => void;
   /**
    * T198 — muda quando a pessoa volta da ficha: o dashboard (que ficou
    * montado, com busca, filtros e página) relê a página atual.
@@ -395,66 +421,191 @@ export interface ColaboradoresScreenProps {
   ) => void;
   /** T183/T199 — a aba de jornada opera só para o RH. */
   readonly podeOperarJornada?: boolean;
+  /**
+   * T215 — Férias e ausências: as chamadas ao servidor e quem registra e
+   * decide. Sem serviço, a aba só avisa que o módulo não está disponível.
+   */
+  readonly servicoDeAusencias?: ServicoDeAusencias;
+  readonly podeRegistrarAusencia?: boolean;
+  /** T215 — a engrenagem da aba leva às Políticas de férias. */
+  readonly onPoliticasDeFerias?: () => void;
 }
 
-/**
- * T184 — cargo ou departamento da lotação vigente do vínculo da linha. Sem
- * lotação vigente, o texto neutro diz isso; sem a referência, "Não
- * informado". Sem vínculo, "—".
- */
-function celulaDaLotacao(
-  vinculo: VinculoListadoApi | undefined,
-  campo: keyof LotacaoListadaApi,
-): ReactNode {
-  if (!vinculo) return "—";
-  const lotacao = vinculo.lotacaoVigente;
-  if (!lotacao) {
-    return (
-      <span className="colaboradores-screen__sem-lotacao">
-        Sem lotação vigente
-      </span>
-    );
+/** T215 — os filtros da gaveta como a API os recebe (lista vazia: fora). */
+function consultaDosFiltros(
+  filtros: FiltrosDaListagem,
+): Partial<ListarColaboradoresQuery> {
+  const query: Partial<ListarColaboradoresQuery> = {};
+  for (const grupo of Object.keys(filtros) as (keyof FiltrosDaListagem)[]) {
+    if (filtros[grupo].length > 0) query[grupo] = filtros[grupo];
   }
-  const referencia = lotacao[campo];
-  return referencia ? (
-    referencia.nome
-  ) : (
-    <span className="colaboradores-screen__sem-lotacao">Não informado</span>
+  return query;
+}
+
+/** T215 — coluna da tabela: o cabeçalho pode ser conteúdo (a seleção). */
+interface ColunaDaLista {
+  readonly key: string;
+  readonly header: ReactNode;
+  readonly cell: (c: ColaboradorListadoApi) => ReactNode;
+}
+
+/** T215 — o minigráfico dos ativos nos últimos meses (só visual). */
+function Minigrafico({ serie }: { readonly serie: readonly number[] }) {
+  if (serie.length < 2) return null;
+  const largura = 90;
+  const altura = 28;
+  const maximo = Math.max(...serie);
+  const minimo = Math.min(...serie);
+  const faixa = Math.max(1, maximo - minimo);
+  const pontos = serie.map((v, i) => [
+    (i / (serie.length - 1)) * (largura - 4) + 2,
+    altura - 2 - ((v - minimo) / faixa) * (altura - 4),
+  ]);
+  const [ultimoX, ultimoY] = pontos[pontos.length - 1]!;
+  return (
+    <svg
+      className="colaboradores-screen__minigrafico"
+      viewBox={`0 0 ${largura} ${altura}`}
+      width={largura}
+      height={altura}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polyline
+        points={pontos.map(([x, y]) => `${x},${y}`).join(" ")}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx={ultimoX} cy={ultimoY} r="2.5" fill="currentColor" />
+    </svg>
   );
 }
 
-/**
- * T185 — jornada vigente HOJE (dia civil do navegador) do vínculo ativo da
- * linha. Sem vínculo, "—".
- */
-function celulaDaJornada(
-  vinculo: VinculoListadoApi | undefined,
-  hoje: string,
-): ReactNode {
-  if (!vinculo) return "—";
-  const vigente =
-    vinculo.situacao === "ativo"
-      ? vinculo.vigenciasDeJornada.find(
-          (v) => situacaoDaVigencia(v, hoje) === "vigente",
-        )
-      : undefined;
-  if (!vigente) {
-    return (
-      <span className="colaboradores-screen__sem-lotacao">
-        Sem jornada vigente
-      </span>
-    );
-  }
+type ContadoresDaPagina = ContadoresColaboradoresApi & {
+  readonly admitidosNoMes?: number;
+  readonly desligadosNoAno?: number;
+  readonly serieAtivos?: readonly number[];
+};
+
+function CartaoAtivos({
+  contadores,
+}: {
+  readonly contadores: ContadoresColaboradoresApi | null;
+}) {
+  const id = useId();
+  const c = contadores as ContadoresDaPagina | null;
+  const ano = new Date().getFullYear();
   return (
-    <>
-      {rotuloDaJornada(vigente.jornada)}
-      {vigente.jornada.ativo ? null : (
-        <>
-          {" "}
-          <StatusBadge variant="warning">Jornada inativa</StatusBadge>
-        </>
-      )}
-    </>
+    <div
+      className="colaboradores-screen__cartao-resumo"
+      role="group"
+      aria-labelledby={id}
+    >
+      <div className="colaboradores-screen__cartao-cabeca">
+        <span className="colaboradores-screen__cartao-icone" aria-hidden="true">
+          <IconePessoas tamanho={18} />
+        </span>
+        <h3 id={id} className="colaboradores-screen__cartao-titulo">
+          Colaboradores ativos
+        </h3>
+      </div>
+      <div className="colaboradores-screen__cartao-linha">
+        <p className="colaboradores-screen__cartao-numero">
+          {c ? <NumeroSuave valor={c.ativos} /> : "…"}
+        </p>
+        {c && (c.admitidosNoMes ?? 0) > 0 ? (
+          <span className="colaboradores-screen__variacao">
+            <span aria-hidden="true">↑</span>
+            <span>{c.admitidosNoMes} no mês</span>
+          </span>
+        ) : null}
+        {c?.serieAtivos ? <Minigrafico serie={c.serieAtivos} /> : null}
+      </div>
+      <p className="colaboradores-screen__cartao-rodape">
+        {c
+          ? c.desligadosNoAno !== undefined
+            ? `${plural(c.total, "cadastrado", "cadastrados")} · ${plural(c.desligadosNoAno, "desligado", "desligados")} em ${ano}`
+            : plural(c.total, "cadastrado", "cadastrados")
+          : "…"}
+      </p>
+    </div>
+  );
+}
+
+/** T215 — os grupos do cartão "Por tipo de contrato", como a referência. */
+const GRUPOS_DE_CONTRATO = [
+  { chave: "clt", rotulo: "CLT", tipos: ["clt"] },
+  { chave: "pj", rotulo: "PJ", tipos: ["pj"] },
+  { chave: "estagio", rotulo: "Estágio", tipos: ["estagio"] },
+  { chave: "aprendiz", rotulo: "Aprendiz", tipos: ["aprendiz"] },
+  {
+    chave: "outros",
+    rotulo: "Outros",
+    tipos: [
+      "temporario",
+      "outro_controlado",
+      "part_time",
+      "freelancer",
+      "trainee",
+    ],
+  },
+] as const;
+
+function CartaoTiposDeContrato({
+  contadores,
+}: {
+  readonly contadores: ContadoresColaboradoresApi | null;
+}) {
+  const id = useId();
+  const grupos = GRUPOS_DE_CONTRATO.map((g) => ({
+    ...g,
+    quantidade: contadores
+      ? g.tipos.reduce(
+          (soma, t) => soma + (contadores.ativosPorTipo?.[t] ?? 0),
+          0,
+        )
+      : 0,
+  }));
+  const comAlguem = grupos.filter((g) => g.quantidade > 0);
+  return (
+    <div
+      className="colaboradores-screen__cartao-resumo"
+      role="group"
+      aria-labelledby={id}
+    >
+      <div className="colaboradores-screen__cartao-cabeca">
+        <span className="colaboradores-screen__cartao-icone" aria-hidden="true">
+          <IconePlanilha tamanho={18} />
+        </span>
+        <h3 id={id} className="colaboradores-screen__cartao-titulo">
+          Por tipo de contrato
+        </h3>
+      </div>
+      {/* Barra só visual; a legenda em texto diz os mesmos números. */}
+      <div className="colaboradores-screen__barra-contratos" aria-hidden="true">
+        {comAlguem.map((g) => (
+          <span
+            key={g.chave}
+            className={`colaboradores-screen__barra-contrato colaboradores-screen__grupo-contrato--${g.chave}`}
+            style={{ flexGrow: g.quantidade }}
+          />
+        ))}
+      </div>
+      <ul className="colaboradores-screen__legenda-contratos">
+        {grupos.map((g) => (
+          <li key={g.chave}>
+            <span
+              className={`colaboradores-screen__marcador-contrato colaboradores-screen__grupo-contrato--${g.chave}`}
+              aria-hidden="true"
+            />
+            {g.rotulo} <strong>{contadores ? g.quantidade : "…"}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -464,12 +615,34 @@ export function ColaboradoresScreen({
   onImportarPlanilha,
   onImportarArquivo,
   onAbrirFicha,
+  onEditarColaborador,
+  onAbrirOrganograma,
   atualizacao = 0,
   estado: estadoControlado,
   onEstadoChange,
   podeOperarJornada = false,
-  podeVerSolicitacoes = false,
+  servicoDeAusencias,
+  podeRegistrarAusencia = false,
+  onPoliticasDeFerias,
 }: ColaboradoresScreenProps = {}) {
+  /** T215 — os números da aba Férias e ausências (cartões e aba). */
+  const [indicadoresDeAusencias, setIndicadoresDeAusencias] =
+    useState<IndicadoresDeAusencias | null>(null);
+  // O número da aba (quem está fora hoje) já na abertura, como a referência.
+  useEffect(() => {
+    if (!servicoDeAusencias) return;
+    const controle = new AbortController();
+    servicoDeAusencias
+      .listar({ pagina: 1, tamanhoPagina: 1 }, { signal: controle.signal })
+      .then(
+        (r) => {
+          if (!controle.signal.aborted)
+            setIndicadoresDeAusencias(r.indicadores);
+        },
+        () => undefined,
+      );
+    return () => controle.abort();
+  }, [servicoDeAusencias]);
   const prefixo = useId();
   const idDaAba = (aba: AbaDaListagem) => `${prefixo}-aba-${aba}`;
   const idDoPainel = `${prefixo}-painel`;
@@ -491,8 +664,12 @@ export function ColaboradoresScreen({
     },
     [onEstadoChange],
   );
-  const { aba, tipo, departamentoId, cargoId, tamanho } = estado;
-  const temTabela = aba !== "jornada";
+  const { aba, filtros, tamanho } = estado;
+  /** T215 — o mesmo conjunto de filtros dá sempre a mesma chave. */
+  const chaveDosFiltros = JSON.stringify(filtros);
+  /** T215 — a gaveta "Filtrar": só estado local. */
+  const [gavetaAberta, setGavetaAberta] = useState(false);
+  const temTabela = abaTemTabela(aba);
 
   const [statusCarregamento, setStatusCarregamento] = useState<
     "carregando" | "erro" | "dados"
@@ -508,7 +685,7 @@ export function ColaboradoresScreen({
    */
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
-  const [catalogos, setCatalogos] = useState<CatalogosDeLotacao>({
+  const [catalogos, setCatalogos] = useState<CatalogosDaGaveta>({
     status: "carregando",
   });
   const [tentativaCatalogos, setTentativaCatalogos] = useState(0);
@@ -519,6 +696,8 @@ export function ColaboradoresScreen({
    * falha é anunciada uma vez. A listagem não é relida por isso.
    */
   const [repetindoCatalogos, setRepetindoCatalogos] = useState(false);
+  /** T215 — a falha de uma recarga, anunciada dentro da gaveta. */
+  const [anuncioDosCatalogos, setAnuncioDosCatalogos] = useState("");
   const repetindoCatalogosRef = useRef(repetindoCatalogos);
   repetindoCatalogosRef.current = repetindoCatalogos;
   const campoBuscaRef = useRef<HTMLInputElement | null>(null);
@@ -550,6 +729,15 @@ export function ColaboradoresScreen({
   );
   /** T194 — painel "Adicionar colaborador": só estado local. */
   const [painelAdicionarAberto, setPainelAdicionarAberto] = useState(false);
+  /** T215 — linhas marcadas (só desta página). */
+  const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  /** T215 — exportação em andamento e o relatório para impressão. */
+  const [exportando, setExportando] = useState(false);
+  const [falhaDaExportacao, setFalhaDaExportacao] = useState("");
+  const [impressao, setImpressao] = useState<string[][] | null>(null);
+  const blocoDaImpressaoRef = useRef<HTMLDivElement | null>(null);
   /**
    * Sequência do pedido em voo: a resposta só é aplicada se ainda for a mais
    * recente — um filtro trocado depressa nunca é sobrescrito pelo anterior.
@@ -607,16 +795,14 @@ export function ColaboradoresScreen({
         };
         const grupo = GRUPO_DA_ABA[consulta.aba];
         if (grupo) query.grupo = grupo;
-        if (consulta.tipo) query.tipoVinculo = consulta.tipo;
         if (busca) query.busca = busca;
-        if (consulta.departamentoId)
-          query.departamentoId = consulta.departamentoId;
-        if (consulta.cargoId) query.cargoId = consulta.cargoId;
+        Object.assign(query, consultaDosFiltros(consulta.filtros));
         const resp = await listarColaboradores(query, {
           signal: controle.signal,
         });
         if (pedido !== pedidoListaRef.current) return;
         setColaboradores(resp.itens);
+        setSelecionados(new Set());
         setPaginaRespondida(resp.pagina);
         setTotal(resp.total);
         setTamanhoPaginaEfetivo(
@@ -633,9 +819,7 @@ export function ColaboradoresScreen({
               anuncioDaPrimeiraPagina(
                 resp.total,
                 busca !== "",
-                consulta.tipo !== null ||
-                  consulta.departamentoId !== null ||
-                  consulta.cargoId !== null,
+                quantidadeDeFiltros(consulta.filtros) > 0,
               ),
             );
           }
@@ -679,33 +863,36 @@ export function ColaboradoresScreen({
    * servidor decide (o escopo dele nunca devolve outra empresa).
    */
   const comLotacaoNaAba = abaTemLotacao(aba);
+  const comIdsDeCatalogo =
+    comLotacaoNaAba && GRUPOS_DE_CATALOGO.some((g) => filtros[g].length > 0);
   // Só a primeira leitura dos catálogos segura a tabela: uma recarga depois
   // de falha não relê a listagem (o servidor já decidiu sem os catálogos).
   const aguardandoCatalogos =
     tentativaCatalogos === 0 &&
-    comLotacaoNaAba &&
-    (departamentoId !== null || cargoId !== null) &&
+    comIdsDeCatalogo &&
     catalogos.status === "carregando";
-  const departamentoDesconhecido =
-    comLotacaoNaAba &&
-    departamentoId !== null &&
-    catalogos.status === "dados" &&
-    !catalogos.departamentos.some((d) => d.id === departamentoId);
-  const cargoDesconhecido =
-    comLotacaoNaAba &&
-    cargoId !== null &&
-    catalogos.status === "dados" &&
-    !catalogos.cargos.some((c) => c.id === cargoId);
-  const lotacaoDesconhecida = departamentoDesconhecido || cargoDesconhecido;
+  // T215 — os filtros com os ids conferidos nos 5 catálogos.
+  const filtrosConferidos: FiltrosDaListagem | null =
+    comIdsDeCatalogo && catalogos.status === "dados"
+      ? GRUPOS_DE_CATALOGO.reduce<FiltrosDaListagem>(
+          (acc, g) => ({
+            ...acc,
+            [g]: filtros[g].filter((id) =>
+              catalogos[g].some((r) => r.id === id),
+            ),
+          }),
+          filtros,
+        )
+      : null;
+  const lotacaoDesconhecida =
+    filtrosConferidos !== null &&
+    GRUPOS_DE_CATALOGO.some(
+      (g) => filtrosConferidos[g].length !== filtros[g].length,
+    );
   useEffect(() => {
-    if (!lotacaoDesconhecida) return;
+    if (!lotacaoDesconhecida || filtrosConferidos === null) return;
     mudarEstado(
-      {
-        ...estado,
-        pagina: 1,
-        departamentoId: departamentoDesconhecido ? null : departamentoId,
-        cargoId: cargoDesconhecido ? null : cargoId,
-      },
+      { ...estado, pagina: 1, filtros: filtrosConferidos },
       { substituir: true },
     );
     // A cada estado novo vindo do shell, não só na primeira descoberta: se a
@@ -721,11 +908,14 @@ export function ColaboradoresScreen({
     const daAcaoDoVazio = cargaDaAcaoRef.current;
     cargaDaAcaoRef.current = false;
     void carregarDados(
-      { aba, pagina: estado.pagina, tamanho, departamentoId, cargoId, tipo },
+      { aba, pagina: estado.pagina, tamanho, filtros },
       buscaAplicada,
       false,
       daAcaoDoVazio,
     );
+    // `filtros` entra pela chave: um objeto novo com os mesmos valores não
+    // relê.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     temTabela,
     aguardandoCatalogos,
@@ -733,9 +923,7 @@ export function ColaboradoresScreen({
     aba,
     estado.pagina,
     tamanho,
-    departamentoId,
-    cargoId,
-    tipo,
+    chaveDosFiltros,
     buscaAplicada,
     carregarDados,
   ]);
@@ -798,31 +986,38 @@ export function ColaboradoresScreen({
   const buscaRef = useRef(buscaAplicada);
   buscaRef.current = buscaAplicada;
   useEffect(() => {
-    if (atualizacao === 0 || estadoRef.current.aba === "jornada") return;
+    if (atualizacao === 0 || !abaTemTabela(estadoRef.current.aba)) return;
     void carregarDados(estadoRef.current, buscaRef.current, true);
   }, [atualizacao, carregarDados]);
 
   // T190 — catálogos dos filtros de lotação: uma leitura por montagem (e a
-  // cada "Recarregar"), só ativos.
+  // cada "Recarregar"), só ativos. T215 — os 5 catálogos da gaveta.
   useEffect(() => {
     let vigente = true;
     setCatalogos({ status: "carregando" });
+    const consulta = { status: "ativo", tamanhoPagina: 100 } as const;
+    const ativos = (itens: readonly { status: string }[] | undefined) =>
+      (itens ?? []).filter((r) => r.status === "ativo");
     Promise.all([
-      listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
-      listarCargos({ status: "ativo", tamanhoPagina: 100 }),
+      listarDepartamentos(consulta),
+      listarAreas(consulta),
+      listarCentrosCusto(consulta),
+      listarUnidades(consulta),
+      listarCargos(consulta),
     ])
-      .then(([departamentos, cargos]) => {
+      .then(([departamentos, areas, centrosCusto, unidades, cargos]) => {
         if (!vigente) return;
         setCatalogos({
           status: "dados",
-          departamentos: departamentos.itens.filter(
-            (d) => d.status === "ativo",
-          ),
-          cargos: cargos.itens.filter((c) => c.status === "ativo"),
+          departamentos: ativos(departamentos.itens) as never,
+          areas: ativos(areas.itens) as never,
+          centrosCusto: ativos(centrosCusto.itens) as never,
+          unidades: ativos(unidades.itens) as never,
+          cargos: ativos(cargos.itens) as never,
         });
         if (repetindoCatalogosRef.current) {
           setRepetindoCatalogos(false);
-          setFocoPendente(ID_FILTRO_DEPARTAMENTO);
+          setFocoPendente(ID_GRUPOS_DE_LOTACAO);
         }
       })
       .catch(() => {
@@ -830,7 +1025,7 @@ export function ColaboradoresScreen({
         setCatalogos({ status: "erro" });
         if (repetindoCatalogosRef.current) {
           setRepetindoCatalogos(false);
-          setAnuncioDaLista(FALHA_DOS_CATALOGOS);
+          setAnuncioDosCatalogos(FALHA_DOS_CATALOGOS);
         }
       });
     return () => {
@@ -841,20 +1036,69 @@ export function ColaboradoresScreen({
   const totalPaginas = Math.max(1, Math.ceil(total / tamanhoPaginaEfetivo));
   const carregando = statusCarregamento === "carregando";
   const comLotacao = abaTemLotacao(aba);
-  const temFiltroDeLotacao =
-    comLotacao && (departamentoId !== null || cargoId !== null);
-  const temFiltro = temFiltroDeLotacao || tipo !== null;
+  const quantosFiltros = quantidadeDeFiltros(filtros);
+  const temFiltro = quantosFiltros > 0;
   const filtrando = temFiltro || buscaAplicada !== "";
   const onde = empresaAtiva ? "nesta empresa" : "no seu escopo";
 
-  const departamentoFiltrado =
-    catalogos.status === "dados"
-      ? catalogos.departamentos.find((d) => d.id === departamentoId)
-      : undefined;
-  const cargoFiltrado =
-    catalogos.status === "dados"
-      ? catalogos.cargos.find((c) => c.id === cargoId)
-      : undefined;
+  /** T215 — cada valor aplicado, na ordem dos grupos da gaveta. */
+  const nomeNoCatalogo = (grupo: GrupoDeCatalogo, id: string) => {
+    const ref =
+      catalogos.status === "dados"
+        ? catalogos[grupo].find((r) => r.id === id)
+        : undefined;
+    return ref ? rotuloDaReferencia(ref) : "selecionado";
+  };
+  const filtrosAplicados: FiltroAplicado[] = [
+    ...GRUPOS_DE_CATALOGO.flatMap((g) =>
+      filtros[g].map((id) => ({
+        grupo: g,
+        valor: id,
+        texto: `${ROTULO_DO_GRUPO[g]}: ${nomeNoCatalogo(g, id)}`,
+      })),
+    ),
+    ...filtros.niveis.map((n) => ({
+      grupo: "niveis" as const,
+      valor: n,
+      texto: `Nível: ${rotuloDoNivel(n)}`,
+    })),
+    ...filtros.tipos.map((t) => ({
+      grupo: "tipos" as const,
+      valor: t,
+      texto: `Tipo: ${rotuloDoTipo(t)}`,
+    })),
+    ...filtros.generos.map((g) => ({
+      grupo: "generos" as const,
+      valor: g,
+      texto: `Gênero: ${rotuloDoGenero(g)}`,
+    })),
+  ];
+
+  /** T215 — quantos o rascunho da gaveta traria (aba e busca aplicadas). */
+  const contarNaGaveta = useCallback(
+    async (rascunho: FiltrosDaListagem, sinal: AbortSignal) => {
+      const query: ListarColaboradoresQuery = {
+        pagina: 1,
+        tamanhoPagina: 1,
+        ...consultaDosFiltros(
+          normalizarEstadoDaListagem({ ...estado, filtros: rascunho }).filtros,
+        ),
+      };
+      const grupo = GRUPO_DA_ABA[aba];
+      if (grupo) query.grupo = grupo;
+      if (buscaAplicada) query.busca = buscaAplicada;
+      const resp = await listarColaboradores(query, { signal: sinal });
+      return resp.total;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aba, buscaAplicada, estado.tamanho],
+  );
+
+  /** T215 — "Ver N resultados": uma única mudança, na página 1. */
+  function aplicarFiltros(rascunho: FiltrosDaListagem) {
+    setGavetaAberta(false);
+    mudarEstado({ ...estado, pagina: 1, filtros: rascunho });
+  }
 
   /**
    * T199 — dispara a ação de um estado vazio: congela o estado vazio como
@@ -880,37 +1124,123 @@ export function ColaboradoresScreen({
   function recarregarCatalogos() {
     if (repetindoCatalogos) return;
     // Limpa o anúncio antes: a mesma falha, de novo, é anunciada de novo.
-    setAnuncioDaLista("");
+    setAnuncioDosCatalogos("");
     setRepetindoCatalogos(true);
     setTentativaCatalogos((n) => n + 1);
   }
 
-  const idDoChip = (filtro: FiltroRemovivel) => `${prefixo}-chip-${filtro}`;
+  const idDoChip = (f: Pick<FiltroAplicado, "grupo" | "valor">) =>
+    `${prefixo}-chip-${f.grupo}-${f.valor}`;
 
   /**
    * T199 — remove um filtro pelo chip (uma única mudança de estado). O chip
    * some: o foco vai ao chip seguinte, ou ao anterior, ou ao campo de busca.
+   * T215 — um chip por valor.
    */
-  function removerFiltro(filtro: FiltroRemovivel) {
-    const presentes = FILTROS_REMOVIVEIS.filter((f) =>
-      f === "tipo"
-        ? tipo !== null
-        : temFiltroDeLotacao &&
-          (f === "departamento" ? departamentoId : cargoId) !== null,
+  function removerFiltro(filtro: FiltroAplicado) {
+    const i = filtrosAplicados.findIndex(
+      (f) => f.grupo === filtro.grupo && f.valor === filtro.valor,
     );
-    const i = presentes.indexOf(filtro);
-    const destino = presentes[i + 1] ?? presentes[i - 1];
+    const destino = filtrosAplicados[i + 1] ?? filtrosAplicados[i - 1];
     mudarEstado({
       ...estado,
       pagina: 1,
-      ...(filtro === "departamento"
-        ? { departamentoId: null }
-        : filtro === "cargo"
-          ? { cargoId: null }
-          : { tipo: null }),
+      filtros: {
+        ...filtros,
+        [filtro.grupo]: (filtros[filtro.grupo] as readonly string[]).filter(
+          (v) => v !== filtro.valor,
+        ),
+      },
     });
     setFocoPendente(destino ? idDoChip(destino) : ID_CAMPO_BUSCA);
   }
+
+  /**
+   * T215 — a busca também vai sozinha, pouco depois de a pessoa parar de
+   * digitar (Enter continua valendo na hora).
+   */
+  useEffect(() => {
+    const termo = normalizarBusca(buscaDigitada);
+    if (termo === buscaAplicada) return;
+    const espera = window.setTimeout(() => {
+      if (estadoRef.current.pagina !== 1) {
+        mudarEstado({ ...estadoRef.current, pagina: 1 });
+      }
+      setBuscaAplicada(termo);
+    }, 350);
+    return () => window.clearTimeout(espera);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscaDigitada]);
+
+  /** A consulta da tela, sem página: a mesma que a exportação lê. */
+  function consultaAtual(): Omit<
+    ListarColaboradoresQuery,
+    "pagina" | "tamanhoPagina"
+  > {
+    const consulta: Omit<ListarColaboradoresQuery, "pagina" | "tamanhoPagina"> =
+      { ...consultaDosFiltros(filtros) };
+    const grupo = GRUPO_DA_ABA[aba];
+    if (grupo) consulta.grupo = grupo;
+    if (buscaAplicada) consulta.busca = buscaAplicada;
+    return consulta;
+  }
+
+  /** T215 — Exportar em Excel: a planilha da consulta atual. */
+  async function exportarExcel() {
+    if (exportando) return;
+    setExportando(true);
+    setFalhaDaExportacao("");
+    try {
+      const itens = await lerTudoParaExportar(consultaAtual());
+      const bytes = montarXlsx([
+        {
+          nome: "Colaboradores",
+          cabecalho: true,
+          larguras: [34, 24, 24, 16, 30, 18, 14, 16, 14, 12, 14, 16],
+          linhas: [
+            [...COLUNAS_DA_EXPORTACAO],
+            ...linhasDaExportacao(itens, rotuloDoTipo),
+          ],
+        },
+      ]);
+      baixarArquivo(
+        bytes,
+        nomeDoArquivo(
+          ["colaboradores", empresaAtiva?.nome ?? "escopo", diaDeHoje()],
+          "xlsx",
+        ),
+        TIPO_MIME_XLSX,
+      );
+    } catch {
+      setFalhaDaExportacao("Não foi possível exportar agora. Tente de novo.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  /** T215 — Exportar em PDF: o relatório da consulta, na impressão. */
+  async function exportarPdf() {
+    if (exportando) return;
+    setExportando(true);
+    setFalhaDaExportacao("");
+    try {
+      const itens = await lerTudoParaExportar(consultaAtual());
+      setImpressao(linhasDaExportacao(itens, rotuloDoTipo));
+    } catch {
+      setFalhaDaExportacao("Não foi possível exportar agora. Tente de novo.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  // O relatório montado: imprime só ele e, depois, sai da página.
+  useEffect(() => {
+    if (impressao === null || !blocoDaImpressaoRef.current) return;
+    const terminar = () => setImpressao(null);
+    window.addEventListener("afterprint", terminar, { once: true });
+    imprimirSomente(blocoDaImpressaoRef.current);
+    return () => window.removeEventListener("afterprint", terminar);
+  }, [impressao]);
 
   /** "Tentar novamente" do erro da tabela: relê a mesma consulta. */
   function repetirLeitura() {
@@ -935,20 +1265,7 @@ export function ColaboradoresScreen({
     mudarEstado({ ...estado, pagina: destino });
   }
 
-  /**
-   * T209 — trocar o tamanho da página (C-2) volta à página 1, com aba,
-   * filtros e busca mantidos. O seletor fica montado durante a leitura.
-   */
-  function trocarTamanho(valor: string) {
-    const novo = TAMANHOS_DE_PAGINA.find((n) => String(n) === valor);
-    if (novo === undefined || novo === tamanho) return;
-    mudarEstado({ ...estado, tamanho: novo, pagina: 1 });
-  }
-
   /** T209 — as abas da ficha que o papel vê, na ordem da ficha (C-4). */
-  const abasDosAtalhos = ABAS_DA_FICHA.filter(
-    (a) => a !== "solicitacoes" || podeVerSolicitacoes,
-  );
 
   function trocarAba(nova: AbaDaListagem) {
     if (nova === aba) return;
@@ -997,13 +1314,7 @@ export function ColaboradoresScreen({
    * devolveria os filtros que a primeira tirou.
    */
   function limparBuscaEFiltros() {
-    mudarEstado({
-      ...estado,
-      pagina: 1,
-      departamentoId: null,
-      cargoId: null,
-      tipo: null,
-    });
+    mudarEstado({ ...estado, pagina: 1, filtros: FILTROS_VAZIOS });
     setBuscaDigitada("");
     setBuscaAplicada("");
     campoBuscaRef.current?.focus();
@@ -1040,13 +1351,7 @@ export function ColaboradoresScreen({
                 rotulo: "Limpar filtros",
                 destinoDoFoco: ID_CAMPO_BUSCA,
               },
-              {
-                ...estado,
-                pagina: 1,
-                departamentoId: null,
-                cargoId: null,
-                tipo: null,
-              },
+              { ...estado, pagina: 1, filtros: FILTROS_VAZIOS },
             ),
         },
       };
@@ -1088,142 +1393,201 @@ export function ColaboradoresScreen({
     }
   }
 
-  const hoje = diaDeHoje();
-  const colunasColaboradores: DataTableColumn<ColaboradorListadoApi>[] = [
+  const idsDaPagina = colaboradores.map((c) => c.id);
+  const marcadosNaPagina = idsDaPagina.filter((id) => selecionados.has(id));
+  const todosMarcados =
+    idsDaPagina.length > 0 && marcadosNaPagina.length === idsDaPagina.length;
+  const algunsMarcados = marcadosNaPagina.length > 0 && !todosMarcados;
+  function alternarTodos() {
+    setSelecionados(todosMarcados ? new Set() : new Set(idsDaPagina));
+  }
+  function alternarUm(id: string) {
+    setSelecionados((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }
+
+  const colunasColaboradores: ColunaDaLista[] = [
     {
-      key: "colaborador",
-      header: "Colaborador",
+      key: "selecao",
+      header: (
+        <label className="colaboradores-screen__marcar">
+          <input
+            type="checkbox"
+            checked={todosMarcados}
+            ref={(no) => {
+              if (no) no.indeterminate = algunsMarcados;
+            }}
+            onChange={alternarTodos}
+          />
+          <span className="colaboradores-screen__so-leitor">
+            Selecionar todos desta página
+          </span>
+        </label>
+      ),
       cell: (c) => (
-        <span className="colaboradores-screen__pessoa">
-          {/* T209 — a foto de 96 px, preguiçosa, quando o servidor a anuncia;
-              senão (ou na falha), as iniciais. O nome está ao lado. */}
-          <FotoDoColaborador
-            colaboradorId={c.id}
-            foto={c.foto}
-            tamanho={96}
-            className="colaboradores-screen__avatar"
-          >
-            {iniciaisDe(c.nome)}
-          </FotoDoColaborador>
-          {onAbrirFicha ? (
-            <button
-              type="button"
-              className="colaboradores-screen__nome"
-              aria-label={`Abrir ficha de ${c.nome}`}
-              onClick={(evento) => {
-                evento.currentTarget.focus();
-                onAbrirFicha(c.id);
-              }}
-            >
-              {c.nome}
-            </button>
-          ) : (
-            <span className="colaboradores-screen__nome-texto">{c.nome}</span>
-          )}
-        </span>
+        <label className="colaboradores-screen__marcar">
+          <input
+            type="checkbox"
+            checked={selecionados.has(c.id)}
+            onChange={() => alternarUm(c.id)}
+          />
+          <span className="colaboradores-screen__so-leitor">
+            {`Selecionar ${c.nome}`}
+          </span>
+        </label>
       ),
     },
     {
-      key: "matricula",
-      header: "Matrícula",
+      key: "colaborador",
+      header: "Colaborador",
       cell: (c) => {
-        const vinculo = vinculoDaLinha(c, aba, tipo);
-        if (!vinculo) return "—";
-        const aMais = c.vinculos.length - 1;
+        const cargo = vinculoDaLinha(c, aba, filtros.tipos)?.lotacaoVigente
+          ?.cargo?.nome;
         return (
-          <>
-            {exibirMatricula(vinculo.matricula)}
-            {aMais > 0 ? (
-              <>
-                <span
-                  className="colaboradores-screen__vinculos-a-mais"
-                  aria-hidden="true"
+          <span className="colaboradores-screen__pessoa">
+            {/* T209 — a foto de 96 px, preguiçosa, quando o servidor a
+                anuncia; senão (ou na falha), as iniciais. */}
+            <FotoDoColaborador
+              colaboradorId={c.id}
+              foto={c.foto}
+              tamanho={96}
+              className="colaboradores-screen__avatar"
+            >
+              {iniciaisDe(c.nome)}
+            </FotoDoColaborador>
+            <span className="colaboradores-screen__pessoa-texto">
+              {onAbrirFicha ? (
+                <button
+                  type="button"
+                  className="colaboradores-screen__nome"
+                  aria-label={`Abrir ficha de ${c.nome}`}
+                  onClick={(evento) => {
+                    evento.currentTarget.focus();
+                    onAbrirFicha(c.id);
+                  }}
                 >
-                  {" "}
-                  +{aMais}
+                  {c.nome}
+                </button>
+              ) : (
+                <span className="colaboradores-screen__nome-texto">
+                  {c.nome}
                 </span>
-                <span className="colaboradores-screen__so-leitor">
-                  {" "}
-                  e mais {vinculosAMais(aMais)}
-                </span>
-              </>
-            ) : null}
-          </>
+              )}
+              <span className="colaboradores-screen__cargo">
+                {cargo ?? "Sem cargo"}
+                {(c as ColaboradorDaLista).desativado ? (
+                  <StatusBadge variant="neutral">Inativo</StatusBadge>
+                ) : null}
+              </span>
+            </span>
+          </span>
         );
       },
     },
     {
-      key: "cargo",
-      header: "Cargo",
-      cell: (c) => celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "cargo"),
-    },
-    {
-      key: "departamento",
-      header: "Departamento",
-      cell: (c) =>
-        celulaDaLotacao(vinculoDaLinha(c, aba, tipo), "departamento"),
-    },
-    {
-      key: "jornada",
-      header: "Jornada de trabalho",
-      cell: (c) => celulaDaJornada(vinculoDaLinha(c, aba, tipo), hoje),
-    },
-    {
-      key: "tipo",
-      header: "Tipo",
+      key: "cpf",
+      header: "CPF",
       cell: (c) => {
-        const vinculo = vinculoDaLinha(c, aba, tipo);
-        return vinculo ? ROTULO_TIPO_DE_VINCULO[vinculo.tipo] : "—";
+        const cpf = (c as ColaboradorDaLista).cpf;
+        return cpf ? mascararCpf(cpf) : "—";
       },
     },
     {
-      key: "situacao",
-      header: "Situação",
+      key: "contatos",
+      header: "Contatos",
       cell: (c) => {
-        const situacao = situacaoNoEscopo(c);
-        // Sem vínculo na resposta: a situação do próprio item.
-        if (!situacao) {
+        const contatos = (c as ColaboradorDaLista).contatos;
+        const email = contatos?.emailPessoal;
+        const telefone = contatos?.celular;
+        if (!email && !telefone) {
           return (
-            <StatusBadge
-              variant={c.situacao === "ativo" ? "success" : "neutral"}
-            >
-              {c.situacao === "ativo" ? "Ativo" : "Inativo"}
-            </StatusBadge>
+            <span className="colaboradores-screen__sem-lotacao">
+              Sem contato
+            </span>
           );
         }
-        const { rotulo, variante } = SITUACAO_NO_ESCOPO[situacao];
-        return <StatusBadge variant={variante}>{rotulo}</StatusBadge>;
+        return (
+          <span className="colaboradores-screen__contatos">
+            {email ? <span>{email}</span> : null}
+            {telefone ? (
+              <span className="colaboradores-screen__telefone">
+                {exibirTelefone(telefone)}
+              </span>
+            ) : null}
+          </span>
+        );
       },
     },
     {
-      key: "admissao",
-      header: "Admissão",
-      cell: (c) => formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataAdmissao),
+      key: "salario",
+      header: "Salário",
+      cell: (c) => {
+        const salario = (c as ColaboradorDaLista).salarioBruto;
+        return salario ? (
+          <span className="colaboradores-screen__salario">
+            R$ {formatarReais(Number(salario))}
+          </span>
+        ) : (
+          "—"
+        );
+      },
     },
-    ...(aba === "desligados"
-      ? [
-          {
-            key: "desligamento",
-            header: "Desligamento",
-            cell: (c: ColaboradorListadoApi) =>
-              formatarDiaCivil(vinculoDaLinha(c, aba, tipo)?.dataDesligamento),
-          },
-        ]
-      : []),
-    // T209 — só atalhos às abas da ficha (C-4); sem ficha, sem menu.
+    {
+      key: "contrato",
+      header: "Contrato",
+      cell: (c) => {
+        const vinculo = vinculoDaLinha(c, aba, filtros.tipos);
+        return (
+          <span
+            className={
+              vinculo
+                ? `colaboradores-screen__contrato colaboradores-screen__contrato--${vinculo.tipo}`
+                : "colaboradores-screen__contrato colaboradores-screen__contrato--vazio"
+            }
+          >
+            <span
+              className="colaboradores-screen__contrato-ponto"
+              aria-hidden="true"
+            />
+            {vinculo ? ROTULO_TIPO_DE_VINCULO[vinculo.tipo] : "—"}
+          </span>
+        );
+      },
+    },
+    // T215 — o ⋯ da linha: Ver ficha e, para quem edita, Editar
+    // colaborador. Sem ficha, sem menu.
     ...(onAbrirFicha
       ? [
           {
             key: "acoes",
-            header: "Ações",
+            header: (
+              <span className="colaboradores-screen__so-leitor">Ações</span>
+            ),
             cell: (c: ColaboradorListadoApi) => (
               <MenuAcoesDaPessoa
                 nome={c.nome}
-                atalhos={abasDosAtalhos.map((abaDaFicha) => ({
-                  id: abaDaFicha,
-                  rotulo: ROTULO_DA_ABA_DA_FICHA[abaDaFicha],
-                  aoEscolher: () => onAbrirFicha(c.id, abaDaFicha),
-                }))}
+                atalhos={[
+                  {
+                    id: "ver-ficha",
+                    rotulo: "Ver ficha",
+                    icone: IconeVer,
+                    aoEscolher: () => onAbrirFicha(c.id),
+                  },
+                  ...(onEditarColaborador
+                    ? [
+                        {
+                          id: "editar",
+                          rotulo: "Editar colaborador",
+                          icone: IconeEditar,
+                          aoEscolher: () => onEditarColaborador(c.id),
+                        },
+                      ]
+                    : []),
+                ]}
               />
             ),
           },
@@ -1231,53 +1595,95 @@ export function ColaboradoresScreen({
       : []),
   ];
 
-  const valor = (n: number | undefined) =>
-    contadores && n !== undefined ? String(n) : "…";
-  const distribuicao = contadores
-    ? TIPOS_DE_VINCULO.map((t) => ({
-        tipo: t,
-        quantidade: contadores.ativosPorTipo?.[t] ?? 0,
-      })).filter((d) => d.quantidade > 0)
-    : [];
-
   return (
     <div className="colaboradores-screen">
       <PageHeader
         headingLevel={1}
         titleId={COLABORADORES_TITULO_ID}
         title="Colaboradores"
-        description="Quem está ativo, em admissão ou desligado, com a ficha de cada pessoa a um clique."
+        description="Gerencie contratos, dados e documentos do time."
         actions={
-          /* T194 — "Adicionar colaborador" abre o painel das formas de
-             entrada. Só o que existe: nada de exportar. */
-          onNovaAdmissao ? (
-            <Button
-              aria-haspopup="dialog"
-              onClick={() => setPainelAdicionarAberto(true)}
-            >
-              <IconeAdicionarPessoa />
-              Adicionar colaborador
-            </Button>
-          ) : null
+          <div className="colaboradores-screen__acoes-do-topo">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="colaboradores-screen__exportar"
+                disabled={exportando}
+              >
+                <IconeBaixarArquivo tamanho={18} />
+                Exportar
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="colaboradores-screen__menu-exportar">
+                <DropdownMenuItem
+                  className="colaboradores-screen__opcao-exportar"
+                  onSelect={() => void exportarPdf()}
+                >
+                  <IconePlanilha tamanho={20} />
+                  <span className="colaboradores-screen__opcao-texto">
+                    <span className="colaboradores-screen__opcao-titulo">
+                      Exportar em PDF
+                    </span>
+                    <span className="colaboradores-screen__opcao-descricao">
+                      Relatório para impressão
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="colaboradores-screen__opcao-exportar"
+                  onSelect={() => void exportarExcel()}
+                >
+                  <IconePlanilha tamanho={20} />
+                  <span className="colaboradores-screen__opcao-texto">
+                    <span className="colaboradores-screen__opcao-titulo">
+                      Exportar em Excel
+                    </span>
+                    <span className="colaboradores-screen__opcao-descricao">
+                      Planilha com todas as colunas
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <p className="colaboradores-screen__nota-exportar">
+                  Busca e filtros atuais são respeitados.
+                </p>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* T194 — "Novo colaborador" abre o painel das formas de
+                entrada (cadastro e planilha). */}
+            {onNovaAdmissao ? (
+              <Button
+                aria-haspopup="dialog"
+                onClick={() => setPainelAdicionarAberto(true)}
+              >
+                <IconeMais tamanho={18} />
+                Novo colaborador
+              </Button>
+            ) : null}
+          </div>
         }
       />
+      {exportando ? (
+        <p className="colaboradores-screen__so-leitor" role="status">
+          Preparando a exportação…
+        </p>
+      ) : null}
+      {falhaDaExportacao ? (
+        <p className="colaboradores-screen__falha-exportar" role="alert">
+          {falhaDaExportacao}
+        </p>
+      ) : null}
 
-      {/* T199 — indicadores do escopo inteiro, como o servidor os contou:
-          não acompanham aba, busca nem filtros (o rótulo diz isso). Sem
-          região viva: o número não é anunciado a cada filtro. */}
-      <Card
-        className="colaboradores-screen__indicadores"
+      {/* T215 — três cartões, como a referência. Os números são do
+          servidor, do escopo inteiro (sem aba, busca nem filtros). */}
+      <section
+        className="colaboradores-screen__resumo"
         aria-labelledby="colaboradores-indicadores-titulo"
       >
         <h2
           id="colaboradores-indicadores-titulo"
-          className="colaboradores-screen__indicadores-titulo"
+          className="colaboradores-screen__so-leitor"
           ref={tituloTotaisRef}
           tabIndex={-1}
         >
-          {empresaAtiva
-            ? `Totais de ${empresaAtiva.nome}, sem filtros`
-            : "Totais no seu escopo, sem filtros"}
+          Resumo de colaboradores
         </h2>
         <p
           className="colaboradores-screen__anuncio-totais colaboradores-screen__so-leitor"
@@ -1285,7 +1691,9 @@ export function ColaboradoresScreen({
         >
           {anuncioTotais}
         </p>
-        {!temTabela && contadores === null && falhaContadores ? (
+        {aba === "ferias" && servicoDeAusencias ? (
+          <CartoesDeAusencias indicadores={indicadoresDeAusencias} />
+        ) : !temTabela && contadores === null && falhaContadores ? (
           <div className="colaboradores-screen__totais-falha">
             <p className="colaboradores-screen__totais-falha-texto">
               Não foi possível carregar os totais de colaboradores.
@@ -1299,84 +1707,43 @@ export function ColaboradoresScreen({
             </Button>
           </div>
         ) : (
-          /* T209 — faixa de indicadores: dois painéis (lado a lado quando
-             há espaço). À esquerda, "Ativos" em destaque e os demais totais
-             como fatos menores; à direita, a distribuição dos ativos por
-             tipo. Só números que o servidor conta (nada de ausência,
-             salário ou outro dado sem contrato). */
-          <div className="colaboradores-screen__faixa">
-            <div className="colaboradores-screen__painel-totais">
-              <dl className="colaboradores-screen__cartoes">
-                {(
-                  [
-                    ["Ativos", contadores?.ativos],
-                    ["Em admissão", contadores?.emAdmissao],
-                    ["Desligados", contadores?.desligados],
-                    [
-                      empresaAtiva
-                        ? "Total nesta empresa"
-                        : "Total no seu escopo",
-                      contadores?.total,
-                    ],
-                  ] as const
-                ).map(([rotulo, numero], i) => (
-                  <div
-                    key={rotulo}
-                    className={
-                      i === 0
-                        ? "colaboradores-screen__cartao colaboradores-screen__cartao--destaque"
-                        : "colaboradores-screen__cartao colaboradores-screen__fato"
-                    }
-                  >
-                    <dt>{rotulo}</dt>
-                    <dd>{valor(numero)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-            <div className="colaboradores-screen__distribuicao">
-              <h3 className="colaboradores-screen__distribuicao-titulo">
-                Ativos por tipo de vínculo
-              </h3>
-              {contadores === null ? (
-                <p className="colaboradores-screen__distribuicao-vazio">…</p>
-              ) : distribuicao.length === 0 ? (
-                <p className="colaboradores-screen__distribuicao-vazio">
-                  Nenhum colaborador ativo {onde}.
-                </p>
-              ) : (
-                <>
-                  {/* Barra só visual; a legenda em texto diz os mesmos números. */}
-                  <div
-                    className="colaboradores-screen__barra-tipos"
-                    aria-hidden="true"
-                  >
-                    {distribuicao.map((d) => (
-                      <span
-                        key={d.tipo}
-                        className={`colaboradores-screen__barra-tipo colaboradores-screen__barra-tipo--${d.tipo}`}
-                        style={{ flexGrow: d.quantidade }}
-                      />
-                    ))}
-                  </div>
-                  <ul className="colaboradores-screen__legenda-tipos">
-                    {distribuicao.map((d) => (
-                      <li key={d.tipo}>
-                        <span
-                          className={`colaboradores-screen__marcador colaboradores-screen__barra-tipo--${d.tipo}`}
-                          aria-hidden="true"
-                        />
-                        {ROTULO_TIPO_DE_VINCULO[d.tipo]}:{" "}
-                        <strong>{d.quantidade}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
+          <div className="colaboradores-screen__cartoes-resumo">
+            <CartaoAtivos contadores={contadores} />
+            <CartaoTiposDeContrato contadores={contadores} />
+            <div
+              className="colaboradores-screen__cartao-resumo"
+              role="group"
+              aria-labelledby={`${prefixo}-ausentes`}
+            >
+              <div className="colaboradores-screen__cartao-cabeca">
+                <span
+                  className="colaboradores-screen__cartao-icone"
+                  aria-hidden="true"
+                >
+                  <IconeCalendario tamanho={18} />
+                </span>
+                <h3
+                  id={`${prefixo}-ausentes`}
+                  className="colaboradores-screen__cartao-titulo"
+                >
+                  Ausentes hoje
+                </h3>
+                <button
+                  type="button"
+                  className="colaboradores-screen__cartao-link"
+                  onClick={() => trocarAba("ferias")}
+                >
+                  Ver calendário
+                </button>
+              </div>
+              <p className="colaboradores-screen__cartao-numero">0</p>
+              <p className="colaboradores-screen__cartao-rodape">
+                Ninguém ausente hoje
+              </p>
             </div>
           </div>
         )}
-      </Card>
+      </section>
 
       <div className="colaboradores-screen__painel">
         {/* T209 — Tabs da camada `src/ui` (ativação manual: setas, Home e
@@ -1385,38 +1752,61 @@ export function ColaboradoresScreen({
           label="Grupos de colaboradores"
           className="colaboradores-screen__abas"
         >
-          {ABAS_DA_LISTAGEM.map((a) => {
+          {ABAS_DA_LISTAGEM.filter(
+            (a) => a !== "em-admissao" || aba === "em-admissao",
+          ).map((a) => {
             const selecionada = a === aba;
-            const numero = contadores ? totalDaAba(a, contadores) : null;
+            const numero =
+              a === "ferias" && indicadoresDeAusencias
+                ? (indicadoresDeAusencias.ausentesHoje ?? 0)
+                : contadores
+                  ? totalDaAba(a, contadores)
+                  : null;
             return (
-              <TabsTrigger
-                key={a}
-                id={idDaAba(a)}
-                data-aba={a}
-                selected={selecionada}
-                controls={idDoPainel}
-                className={
-                  selecionada
-                    ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
-                    : "colaboradores-screen__aba"
-                }
-                // Nome acessível "Ativos, 12": a pausa que o número
-                // colado ao rótulo não dá.
-                {...(numero !== null
-                  ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
-                  : {})}
-                onClick={() => trocarAba(a)}
-              >
-                {ROTULO_DA_ABA[a]}
-                {numero !== null ? (
-                  <span
-                    className="colaboradores-screen__aba-total"
-                    aria-hidden="true"
+              <Fragment key={a}>
+                <TabsTrigger
+                  key={a}
+                  id={idDaAba(a)}
+                  data-aba={a}
+                  selected={selecionada}
+                  controls={idDoPainel}
+                  className={
+                    selecionada
+                      ? "colaboradores-screen__aba colaboradores-screen__aba--ativa"
+                      : "colaboradores-screen__aba"
+                  }
+                  // Nome acessível "Ativos, 12": a pausa que o número
+                  // colado ao rótulo não dá.
+                  {...(numero !== null
+                    ? { "aria-label": `${ROTULO_DA_ABA[a]}, ${numero}` }
+                    : {})}
+                  onClick={() => trocarAba(a)}
+                >
+                  {ROTULO_DA_ABA[a]}
+                  {numero !== null ? (
+                    <span
+                      className="colaboradores-screen__aba-total"
+                      aria-hidden="true"
+                    >
+                      {numero}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                {a === "jornada" && onAbrirOrganograma ? (
+                  // T215 — atalho: abre a estrutura (outra tela); nunca fica
+                  // selecionado nem controla o painel.
+                  <TabsTrigger
+                    data-aba="organograma"
+                    selected={false}
+                    controls={idDoPainel}
+                    aria-controls={undefined}
+                    className="colaboradores-screen__aba"
+                    onClick={onAbrirOrganograma}
                   >
-                    {numero}
-                  </span>
+                    Organograma
+                  </TabsTrigger>
                 ) : null}
-              </TabsTrigger>
+              </Fragment>
             );
           })}
         </TabsList>
@@ -1426,7 +1816,26 @@ export function ColaboradoresScreen({
           labelledBy={idDaAba(aba)}
           className="colaboradores-screen__painel-conteudo"
         >
-          {aba === "jornada" ? (
+          {aba === "ferias" && servicoDeAusencias ? (
+            /* T215 — o módulo de Férias e ausências. */
+            <FeriasEAusenciasAba
+              servico={servicoDeAusencias}
+              podeRegistrar={podeRegistrarAusencia}
+              podeDecidir={podeRegistrarAusencia}
+              onIndicadores={setIndicadoresDeAusencias}
+              {...(onPoliticasDeFerias
+                ? { onPoliticas: onPoliticasDeFerias }
+                : {})}
+            />
+          ) : aba === "ferias" ? (
+            <div className="colaboradores-screen__aba-em-breve">
+              <h2>Férias e ausências</h2>
+              <p>
+                O registro de férias e ausências está em construção e chega na
+                próxima versão.
+              </p>
+            </div>
+          ) : aba === "jornada" ? (
             /* D-5, N-4 — a mesma visão de jornadas da empresa, com as mesmas
                permissões: só o RH opera. */
             <AreaDeEdicao id={AREAS_DE_EDICAO.jornadaDoDashboard}>
@@ -1457,151 +1866,72 @@ export function ColaboradoresScreen({
                   className="colaboradores-screen__busca"
                   onSubmit={handleBuscar}
                 >
-                  <FormField
-                    id="colaboradores-busca"
-                    label="Buscar por nome ou matrícula"
+                  <span
+                    className="colaboradores-screen__busca-icone"
+                    aria-hidden="true"
                   >
-                    {(control) => (
-                      <Input
-                        ref={campoBuscaRef}
-                        type="search"
-                        maxLength={BUSCA_COLABORADORES_MAXIMO}
-                        autoComplete="off"
-                        value={buscaDigitada}
-                        onChange={(e) => setBuscaDigitada(e.target.value)}
-                        {...control}
-                      />
-                    )}
-                  </FormField>
-                  <div className="colaboradores-screen__busca-acoes">
-                    <Button type="submit" variant="secondary">
-                      Buscar
-                    </Button>
-                    {buscaDigitada !== "" || buscaAplicada !== "" ? (
-                      <Button
-                        type="button"
-                        variant="subtle"
-                        onClick={limparBusca}
-                      >
-                        Limpar busca
-                      </Button>
-                    ) : null}
-                  </div>
+                    <IconeBuscar tamanho={16} />
+                  </span>
+                  <Input
+                    id="colaboradores-busca"
+                    ref={campoBuscaRef}
+                    type="search"
+                    maxLength={BUSCA_COLABORADORES_MAXIMO}
+                    autoComplete="off"
+                    placeholder="Buscar por nome, CPF, e-mail ou ID"
+                    aria-label="Buscar por nome, CPF, e-mail ou ID"
+                    className="colaboradores-screen__busca-campo"
+                    value={buscaDigitada}
+                    onChange={(e) => setBuscaDigitada(e.target.value)}
+                  />
                 </form>
 
-                {/* T190 — lotação vigente: só existe em vínculo ativo, então
-                    só em Ativos e Todos. */}
-                {comLotacao ? (
-                  <>
-                    <FormField
-                      id="colaboradores-filtro-departamento"
-                      label="Departamento"
-                      {...(catalogos.status === "erro"
-                        ? {
-                            help: FALHA_DOS_CATALOGOS,
-                          }
-                        : {})}
-                    >
-                      {(control) => (
-                        <Select
-                          value={departamentoId ?? ""}
-                          onChange={(e) =>
-                            mudarEstado({
-                              ...estado,
-                              pagina: 1,
-                              departamentoId: e.target.value || null,
-                            })
-                          }
-                          disabled={catalogos.status !== "dados"}
-                          {...control}
-                        >
-                          <option value="">
-                            {catalogos.status === "carregando"
-                              ? "Carregando…"
-                              : "Todos os departamentos"}
-                          </option>
-                          {catalogos.status === "dados"
-                            ? catalogos.departamentos.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {rotuloDaReferencia(d)}
-                                </option>
-                              ))
-                            : null}
-                        </Select>
-                      )}
-                    </FormField>
-
-                    <FormField id="colaboradores-filtro-cargo" label="Cargo">
-                      {(control) => (
-                        <Select
-                          value={cargoId ?? ""}
-                          onChange={(e) =>
-                            mudarEstado({
-                              ...estado,
-                              pagina: 1,
-                              cargoId: e.target.value || null,
-                            })
-                          }
-                          disabled={catalogos.status !== "dados"}
-                          {...control}
-                        >
-                          <option value="">
-                            {catalogos.status === "carregando"
-                              ? "Carregando…"
-                              : "Todos os cargos"}
-                          </option>
-                          {catalogos.status === "dados"
-                            ? catalogos.cargos.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {rotuloDaReferencia(c)}
-                                </option>
-                              ))
-                            : null}
-                        </Select>
-                      )}
-                    </FormField>
-                  </>
-                ) : null}
-
-                <FormField
-                  id="colaboradores-filtro-tipo"
-                  label="Tipo de vínculo"
-                >
-                  {(control) => (
-                    <Select
-                      value={tipo ?? ""}
-                      onChange={(e) =>
-                        mudarEstado({
-                          ...estado,
-                          pagina: 1,
-                          tipo: (e.target.value ||
-                            null) as TipoDeVinculo | null,
-                        })
+                {/* T215 — os filtros moram na gaveta "Filtrar". */}
+                <Button
+                  id={ID_BOTAO_FILTRAR}
+                  variant="secondary"
+                  className="colaboradores-screen__botao-filtrar"
+                  aria-haspopup="dialog"
+                  {...(quantosFiltros > 0
+                    ? {
+                        "aria-label": `Filtrar, ${
+                          quantosFiltros === 1
+                            ? "1 filtro ativo"
+                            : `${quantosFiltros} filtros ativos`
+                        }`,
                       }
-                      {...control}
+                    : {})}
+                  onClick={() => setGavetaAberta(true)}
+                >
+                  <IconeFiltrar tamanho={16} />
+                  Filtrar
+                  {quantosFiltros > 0 ? (
+                    <span
+                      className="colaboradores-screen__filtrar-total"
+                      aria-hidden="true"
                     >
-                      <option value="">Todos os tipos</option>
-                      {TIPOS_DE_VINCULO.map((t) => (
-                        <option key={t} value={t}>
-                          {ROTULO_TIPO_DE_VINCULO[t]}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </FormField>
-
-                {comLotacao &&
-                (catalogos.status === "erro" || repetindoCatalogos) ? (
-                  <Button
-                    variant="subtle"
-                    className="colaboradores-screen__filtros-retry"
-                    aria-disabled={repetindoCatalogos}
-                    onClick={recarregarCatalogos}
-                  >
-                    Recarregar departamentos e cargos
-                  </Button>
-                ) : null}
+                      {quantosFiltros}
+                    </span>
+                  ) : null}
+                </Button>
               </div>
+
+              <GavetaDeFiltros
+                aberta={gavetaAberta}
+                onFechar={() => setGavetaAberta(false)}
+                filtros={filtros}
+                comLotacao={comLotacao}
+                catalogos={catalogos}
+                repetindoCatalogos={repetindoCatalogos}
+                onRecarregarCatalogos={recarregarCatalogos}
+                anuncioDosCatalogos={anuncioDosCatalogos}
+                idDosGruposDeLotacao={ID_GRUPOS_DE_LOTACAO}
+                rotuloDoNivel={rotuloDoNivel}
+                rotuloDoTipo={rotuloDoTipo}
+                rotuloDoGenero={rotuloDoGenero}
+                contar={contarNaGaveta}
+                onAplicar={aplicarFiltros}
+              />
 
               {/* O que está filtrando, à vista, e como desfazer cada um. */}
               {temFiltro ? (
@@ -1610,56 +1940,18 @@ export function ColaboradoresScreen({
                   role="group"
                   aria-label="Filtros ativos"
                 >
-                  {temFiltroDeLotacao && departamentoId ? (
+                  {filtrosAplicados.map((f) => (
                     <Button
-                      id={idDoChip("departamento")}
+                      key={`${f.grupo}-${f.valor}`}
+                      id={idDoChip(f)}
                       variant="secondary"
                       className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de departamento: ${
-                        departamentoFiltrado
-                          ? rotuloDaReferencia(departamentoFiltrado)
-                          : "selecionado"
-                      }`}
-                      onClick={() => removerFiltro("departamento")}
+                      aria-label={`Remover filtro ${f.texto}`}
+                      onClick={() => removerFiltro(f)}
                     >
-                      Departamento:{" "}
-                      {departamentoFiltrado
-                        ? rotuloDaReferencia(departamentoFiltrado)
-                        : "selecionado"}{" "}
-                      <span aria-hidden="true">×</span>
+                      {f.texto} <span aria-hidden="true">×</span>
                     </Button>
-                  ) : null}
-                  {temFiltroDeLotacao && cargoId ? (
-                    <Button
-                      id={idDoChip("cargo")}
-                      variant="secondary"
-                      className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de cargo: ${
-                        cargoFiltrado
-                          ? rotuloDaReferencia(cargoFiltrado)
-                          : "selecionado"
-                      }`}
-                      onClick={() => removerFiltro("cargo")}
-                    >
-                      Cargo:{" "}
-                      {cargoFiltrado
-                        ? rotuloDaReferencia(cargoFiltrado)
-                        : "selecionado"}{" "}
-                      <span aria-hidden="true">×</span>
-                    </Button>
-                  ) : null}
-                  {tipo ? (
-                    <Button
-                      id={idDoChip("tipo")}
-                      variant="secondary"
-                      className="colaboradores-screen__filtro-ativo"
-                      aria-label={`Remover filtro de tipo de vínculo: ${ROTULO_TIPO_DE_VINCULO[tipo]}`}
-                      onClick={() => removerFiltro("tipo")}
-                    >
-                      Tipo: {ROTULO_TIPO_DE_VINCULO[tipo]}{" "}
-                      <span aria-hidden="true">×</span>
-                    </Button>
-                  ) : null}
+                  ))}
                 </div>
               ) : null}
 
@@ -1696,25 +1988,6 @@ export function ColaboradoresScreen({
                       a paginação já anuncia a posição. Depois de uma falha
                       (o estado vazio da ação segue à vista), nenhum total:
                       nem "Contando…", nem o número de antes. */}
-                  {statusCarregamento !== "erro" ? (
-                    <p className="colaboradores-screen__contexto">
-                      <span className="colaboradores-screen__total">
-                        {statusCarregamento !== "dados"
-                          ? "Contando…"
-                          : colaboradores.length > 0
-                            ? textoDoIntervalo(
-                                paginaRespondida,
-                                tamanhoPaginaEfetivo,
-                                colaboradores.length,
-                                total,
-                              )
-                            : total === 1
-                              ? "1 colaborador nesta consulta"
-                              : `${total} colaboradores nesta consulta`}
-                      </span>
-                    </p>
-                  ) : null}
-
                   {acaoDoVazio ? (
                     /* T199 — o estado vazio que pediu a ação, no MESMO lugar
                        e com o mesmo botão (o foco fica nele). */
@@ -1817,8 +2090,8 @@ export function ColaboradoresScreen({
                                         setPainelAdicionarAberto(true)
                                       }
                                     >
-                                      <IconeAdicionarPessoa />
-                                      Adicionar colaborador
+                                      <IconeMais tamanho={18} />
+                                      Novo colaborador
                                     </Button>
                                   ),
                                 }
@@ -1840,7 +2113,10 @@ export function ColaboradoresScreen({
                         <TableHeader>
                           <TableRow>
                             {colunasColaboradores.map((coluna) => (
-                              <TableHead key={coluna.key}>
+                              <TableHead
+                                key={coluna.key}
+                                className={`colaboradores-screen__coluna--${coluna.key}`}
+                              >
                                 {coluna.header}
                               </TableHead>
                             ))}
@@ -1848,9 +2124,19 @@ export function ColaboradoresScreen({
                         </TableHeader>
                         <TableBody>
                           {colaboradores.map((c) => (
-                            <TableRow key={c.id}>
+                            <TableRow
+                              key={c.id}
+                              className={
+                                selecionados.has(c.id)
+                                  ? "colaboradores-screen__linha--marcada"
+                                  : undefined
+                              }
+                            >
                               {colunasColaboradores.map((coluna) => (
-                                <TableCell key={coluna.key}>
+                                <TableCell
+                                  key={coluna.key}
+                                  className={`colaboradores-screen__coluna--${coluna.key}`}
+                                >
                                   {coluna.cell(c)}
                                 </TableCell>
                               ))}
@@ -1870,21 +2156,15 @@ export function ColaboradoresScreen({
                       paginação numerada (C-3). O seletor fica fora do ramo
                       que troca na carga: o foco não se perde. */}
                   <div className="colaboradores-screen__rodape-tabela">
-                    <label className="colaboradores-screen__tamanho">
-                      <span>Itens por página</span>
-                      <Select
-                        value={String(tamanho)}
-                        onChange={(evento) =>
-                          trocarTamanho(evento.target.value)
-                        }
-                      >
-                        {TAMANHOS_DE_PAGINA.map((n) => (
-                          <option key={n} value={String(n)}>
-                            {n}
-                          </option>
-                        ))}
-                      </Select>
-                    </label>
+                    {statusCarregamento !== "erro" ? (
+                      <p className="colaboradores-screen__resultados">
+                        {statusCarregamento !== "dados"
+                          ? "Contando…"
+                          : total === 1
+                            ? "1 resultado"
+                            : `${total} resultados`}
+                      </p>
+                    ) : null}
                     {totalPaginas > 1 && paginaRespondida <= totalPaginas ? (
                       <nav
                         className="colaboradores-screen__paginacao"
@@ -1961,23 +2241,40 @@ export function ColaboradoresScreen({
         </TabsPanel>
       </div>
 
-      <Surface
-        as="section"
-        padding="md"
-        className="colaboradores-screen__aviso"
-        aria-labelledby="colaboradores-aviso-rh-titulo"
-      >
-        <StatusBadge variant="info">RH e DP</StatusBadge>
-        <p
-          id="colaboradores-aviso-rh-titulo"
-          className="colaboradores-screen__aviso-texto"
+      {impressao !== null ? (
+        <div
+          ref={blocoDaImpressaoRef}
+          className="colaboradores-screen__impressao"
         >
-          Admissão e correções deste cadastro são feitas pelo RH e pelo DP da
-          própria empresa, na página de Nova admissão e na ficha. Admissões,
-          alterações e a leitura de contatos geram trilha de auditoria; o
-          suporte técnico apenas consulta.
-        </p>
-      </Surface>
+          <h1>Colaboradores</h1>
+          <p>
+            {empresaAtiva ? empresaAtiva.nome : "Seu escopo"} —{" "}
+            {ROTULO_DA_ABA[aba]}
+            {buscaAplicada ? ` · busca “${buscaAplicada}”` : ""}
+            {quantosFiltros > 0
+              ? ` · ${plural(quantosFiltros, "filtro", "filtros")}`
+              : ""}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                {COLUNAS_DA_EXPORTACAO.map((coluna) => (
+                  <th key={coluna}>{coluna}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {impressao.map((linha, i) => (
+                <tr key={i}>
+                  {linha.map((celula, j) => (
+                    <td key={j}>{celula}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {/* T194 — painel "Adicionar colaborador": só para quem pode admitir. */}
       {onNovaAdmissao ? (

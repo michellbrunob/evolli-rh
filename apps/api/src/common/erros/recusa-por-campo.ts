@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 
@@ -33,7 +34,36 @@ export type MotivoDoCampo =
   | "igual_a_vigente"
   | "fora_de_ordem"
   | "ja_encerrada"
-  | "sobreposta";
+  | "sobreposta"
+  // T215 — Férias e ausências.
+  | "obrigatorio"
+  | "nao_se_aplica"
+  | "fim_antes_do_inicio"
+  | "sobreposicao"
+  | "saldo_insuficiente"
+  | "venda_acima_do_limite"
+  // T215 — Salários: data de vigência depois de hoje.
+  | "futura"
+  // T215 — Escala: vigência antes da admissão do colaborador.
+  | "antes_da_admissao"
+  // T215 — Quadro da escala: dia fora do vínculo da pessoa na empresa.
+  | "fora_do_vinculo"
+  // T215 — Ajustar período (reinício da contagem de férias).
+  | "ja_existe"
+  // T215 — Sugerir outras datas: o mesmo período pedido.
+  | "igual_ao_pedido"
+  | "sem_saldo_calculado"
+  | "abaixo_das_ferias"
+  | "ferias_sem_periodo"
+  // T215 — Visões salvas: o teto de visões por pessoa.
+  | "limite"
+  // T215 — Benefícios: tabela da ANS fora das regras (RN 63/2003).
+  | "fora_das_regras_ans"
+  // T215 — Benefícios: a pessoa já recebe o benefício.
+  | "ja_recebe"
+  // T215 — Aprovar um "ajuste sugerido": a sugestão ainda espera a resposta
+  // de quem pediu (pelo Portal, quando ele existir).
+  | "aguardando_resposta";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -49,12 +79,80 @@ export type CampoPublico =
   | "cnpj"
   // T209 — gestor direto sem vínculo na empresa.
   | "contrato.gestorDiretoId"
+  // T215 — o primeiro salário é obrigatório na admissão.
+  | "contrato.salarioBruto"
+  // T215 — o mesmo campo na edição do contrato (corpo sem o bloco).
+  | "gestorDiretoId"
   // T182 — código de jornada repetido na empresa.
   | "codigo"
   // T183 — jornada do colaborador e a sua vigência.
   | "tabelaHorarioId"
   | "vigenciaInicio"
-  | "vigenciaFim";
+  | "vigenciaFim"
+  // T215 — registro de ausência.
+  | "colaboradorId"
+  | "motivoAfastamento"
+  | "inicio"
+  | "fim"
+  | "diasVendidos"
+  | "periodoAquisitivoInicio"
+  // T215 — Ajustar período: os dias que o período encurtado deu.
+  | "diasPeriodoAnterior"
+  // T215 — férias coletivas de quem tem menos de 12 meses de casa.
+  | "feriasColetivas"
+  // T215 — Políticas de férias: quem entra e o motivo de registrar fora.
+  | "alvos"
+  | "motivoForaDaPolitica"
+  // T215 — Políticas de férias: regras incoerentes entre si.
+  | "regras.bloqueios"
+  | "regras.duracaoMaximaDias"
+  // T215 — Responder solicitação: a sugestão de outras datas pendente.
+  | "sugestao"
+  // T215 — Salários: o salário do contrato com linha do tempo.
+  | "salarioBruto"
+  // T215 — férias para quem não tem férias (PJ e Freelancer).
+  | "tipo"
+  // T215 — Escala: o padrão de escala do colaborador.
+  | "modelo"
+  | "turnoNoiteId"
+  | "folgaSemanal"
+  | "diasTrabalho"
+  | "inicioCiclo"
+  // T215 — Turnos: a unidade do turno.
+  | "unidadeOrganizacionalId"
+  // T215 — Quadro da escala: o dia gravado.
+  | "dia"
+  | "periodos"
+  | "sobreaviso"
+  | "intervaloMinutos"
+  | "observacao"
+  // T215 — Regras da escala.
+  | "convencao"
+  | "avisos"
+  // T215 — Visões salvas do quadro.
+  | "nome"
+  | "filtros"
+  // T215 — Benefícios e dependentes.
+  | "categoria"
+  | "folha"
+  | "tipoValor"
+  | "competencia"
+  | "aPartirDe"
+  | "pessoas"
+  | "regras.valorMensal"
+  | "regras.valorDia"
+  | "regras.planos"
+  | "regras.faixas"
+  | "regras.quemPaga"
+  | "regras.colaboradorPaga"
+  | "regras.vt"
+  | "regras.antecipacao"
+  | "dependenteIds"
+  | "parentesco"
+  | "dataNascimento"
+  | "cpf"
+  | "telefone"
+  | "email";
 
 export interface ErroDeCampo {
   campo: CampoPublico;
@@ -91,7 +189,28 @@ export type CodigoDeRecusa =
   // T209 — foto do colaborador (ADR 0020): tipo declarado, extensão e
   // conteúdo que não concordam, e tamanho de versão pedido fora da lista.
   | "foto_tipo_divergente"
-  | "foto_tamanho_invalido";
+  | "foto_tamanho_invalido"
+  // T213 — documentos do colaborador (ADR 0021).
+  | "documento_arquivo_vazio"
+  | "documento_arquivo_grande_demais"
+  | "documento_formato_invalido"
+  | "documento_arquivo_malformado"
+  | "documento_categoria_invalida"
+  | "documento_nome_obrigatorio"
+  | "documento_nome_invalido"
+  | "documento_nome_nao_permitido"
+  | "documento_limite_categoria"
+  | "documento_limite_colaborador"
+  | "documento_nao_disponivel"
+  // T215 — anexo da ausência (atestado ou documento).
+  | "anexo_arquivo_vazio"
+  | "anexo_arquivo_grande_demais"
+  | "anexo_formato_invalido"
+  | "anexo_arquivo_malformado"
+  | "anexo_com_macro"
+  | "anexo_reprovado_antivirus"
+  // T215 — Publicar a escala sem mudança no rascunho do período.
+  | "escala_nada_para_publicar";
 
 /**
  * 422 com um código estável. Hoje só um caso: a mesma chave de idempotência
@@ -99,6 +218,23 @@ export type CodigoDeRecusa =
  */
 export class RecusaDeNegocioException extends UnprocessableEntityException {
   constructor(readonly codigo: CodigoDeRecusa) {
+    super();
+  }
+}
+
+/**
+ * T213 — serviço de que a operação depende está fora do ar (503). A resposta
+ * leva só um código de uma lista fechada, para a tela dizer o que fazer;
+ * nunca host, porta, nome do serviço ou mensagem interna.
+ */
+export type CodigoDeIndisponibilidade =
+  | "documento_verificacao_indisponivel"
+  // T215 — anexo da ausência.
+  | "anexo_verificacao_indisponivel"
+  | "anexo_armazenamento_indisponivel";
+
+export class IndisponibilidadeException extends ServiceUnavailableException {
+  constructor(readonly codigo: CodigoDeIndisponibilidade) {
     super();
   }
 }

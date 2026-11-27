@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -29,6 +30,7 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+import { ConsultarCpfEmUsoDto } from "../dados-pessoais/dados-pessoais.dto";
 
 /**
  * T179 — chave de idempotência do envio da admissão. Opcional na API (a tela
@@ -122,6 +124,28 @@ export class ColaboradorController {
       res.setHeader(CABECALHO_REENVIO, "true");
     }
     return admissao;
+  }
+
+  /**
+   * T215 — o CPF já está cadastrado nesta empresa? Conferido enquanto o RH
+   * digita. `POST` para o CPF ir no corpo, fora da URL e dos logs de acesso.
+   */
+  @Post("cpf-em-uso")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("colaborador", "create")
+  @ApiOperation({
+    summary: "Diz se o CPF ja esta cadastrado na empresa ativa (sem gravar)",
+  })
+  async cpfEmUso(
+    @Body() dto: ConsultarCpfEmUsoDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.cpfEmUso(dto, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
   }
 
   @Patch(":colaboradorId")

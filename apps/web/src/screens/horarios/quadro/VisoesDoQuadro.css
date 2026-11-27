@@ -1,0 +1,73 @@
+/* T215 — Visões salvas: salvar e gerenciar. */
+.visoes-quadro__form {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.visoes-quadro__form label {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.visoes-quadro__erro {
+  margin: 0;
+  color: var(--status-danger-ink);
+  font-size: var(--text-caption);
+}
+
+.visoes-quadro__vazio {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.visoes-quadro__lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.visoes-quadro__linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 3rem;
+  padding: var(--space-xs) 0;
+  border-bottom: var(--divisor);
+}
+
+.visoes-quadro__linha:last-child {
+  border-bottom: 0;
+}
+
+.visoes-quadro__nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visoes-quadro__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+.visoes-quadro__renomear,
+.visoes-quadro__confirmar {
+  display: grid;
+  flex: 1;
+  gap: var(--space-xs);
+}
+
+.visoes-quadro__confirmar p {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}

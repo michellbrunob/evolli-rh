@@ -4,6 +4,38 @@ import { AuditModule } from "../audit/audit.module";
 import { PessoasAuditoriaService } from "./pessoas-auditoria.service";
 import { ColaboradorController } from "./colaborador/colaborador.controller";
 import { ColaboradorService } from "./colaborador/colaborador.service";
+import { ContratoColaboradorController } from "./colaborador/contrato-colaborador.controller";
+import { ContratoColaboradorService } from "./colaborador/contrato-colaborador.service";
+import { DesativacaoColaboradorController } from "./colaborador/desativacao-colaborador.controller";
+import { DesativacaoColaboradorService } from "./colaborador/desativacao-colaborador.service";
+import {
+  AusenciasController,
+  FeriasDoColaboradorController,
+} from "./ausencias/ausencias.controller";
+import { AusenciasService } from "./ausencias/ausencias.service";
+import { PoliticasFeriasService } from "./ausencias/politicas-ferias.service";
+import { PoliticasFeriasController } from "./ausencias/politicas-ferias.controller";
+import {
+  BeneficiosController,
+  BeneficiosDoColaboradorController,
+} from "./beneficios/beneficios.controller";
+import { BeneficiosService } from "./beneficios/beneficios.service";
+import { DependentesService } from "./beneficios/dependentes.service";
+import { AnexoAusenciaController } from "./ausencias/anexo-ausencia.controller";
+import { AnexoAusenciaService } from "./ausencias/anexo-ausencia.service";
+import { HistoricoSalarialController } from "./salarios/historico-salarial.controller";
+import { EscalaColaboradorController } from "./escala/escala-colaborador.controller";
+import { EscalaColaboradorService } from "./escala/escala-colaborador.service";
+import { QuadroEscalaController } from "./escala/quadro-escala.controller";
+import { EscalaDiaController } from "./escala/escala-dia.controller";
+import { EscalaDiaService } from "./escala/escala-dia.service";
+import { EscalaPublicacaoService } from "./escala/escala-publicacao.service";
+import { EscalaRegrasController } from "./escala/escala-regras.controller";
+import { EscalaRegrasService } from "./escala/escala-regras.service";
+import { EscalaVisoesController } from "./escala/escala-visoes.controller";
+import { EscalaVisoesService } from "./escala/escala-visoes.service";
+import { QuadroEscalaService } from "./escala/quadro-escala.service";
+import { HistoricoSalarialService } from "./salarios/historico-salarial.service";
 import { VinculoController } from "./vinculo/vinculo.controller";
 import { VinculoService } from "./vinculo/vinculo.service";
 import { MovimentacaoController } from "./movimentacao/movimentacao.controller";
@@ -31,10 +63,21 @@ import { FotoColaboradorController } from "./foto-colaborador/foto-colaborador.c
 import { FotoColaboradorService } from "./foto-colaborador/foto-colaborador.service";
 import { ARMAZENAMENTO_DE_FOTOS } from "./foto-colaborador/armazenamento-de-objetos";
 import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armazenamento";
+import { DocumentoColaboradorController } from "./documentos-colaborador/documento-colaborador.controller";
+import { DocumentoColaboradorService } from "./documentos-colaborador/documento-colaborador.service";
+import {
+  ARMAZENAMENTO_DE_DOCUMENTOS,
+  escolherArmazenamentoDeDocumentos,
+} from "./documentos-colaborador/armazenamento-de-documentos";
+import {
+  VERIFICADOR_DE_ARQUIVOS,
+  escolherVerificadorDeArquivos,
+} from "./documentos-colaborador/verificador-de-arquivos";
 
 @Module({
   imports: [AuthModule, AuditModule],
   controllers: [
+    PoliticasFeriasController,
     ColaboradorController,
     VinculoController,
     MovimentacaoController,
@@ -46,6 +89,23 @@ import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armaze
     RascunhoAdmissaoController,
     // T209 — foto do colaborador (ADR 0020).
     FotoColaboradorController,
+    // T213 — documentos do colaborador (ADR 0021).
+    DocumentoColaboradorController,
+    // T215 — contrato do vínculo na edição do colaborador.
+    ContratoColaboradorController,
+    DesativacaoColaboradorController,
+    // T215 — Férias e ausências.
+    AusenciasController,
+    BeneficiosController,
+    BeneficiosDoColaboradorController,
+    AnexoAusenciaController,
+    HistoricoSalarialController,
+    EscalaColaboradorController,
+    QuadroEscalaController,
+    EscalaDiaController,
+    EscalaRegrasController,
+    EscalaVisoesController,
+    FeriasDoColaboradorController,
   ],
   providers: [
     PessoasAuditoriaService,
@@ -56,10 +116,35 @@ import { escolherArmazenamentoDeFotos } from "./foto-colaborador/escolher-armaze
     DadosPessoaisColaboradorService,
     RascunhoAdmissaoService,
     FotoColaboradorService,
+    DocumentoColaboradorService,
+    ContratoColaboradorService,
+    DesativacaoColaboradorService,
+    AusenciasService,
+    BeneficiosService,
+    DependentesService,
+    PoliticasFeriasService,
+    AnexoAusenciaService,
+    HistoricoSalarialService,
+    EscalaColaboradorService,
+    QuadroEscalaService,
+    EscalaDiaService,
+    EscalaPublicacaoService,
+    EscalaRegrasService,
+    EscalaVisoesService,
     // Produção: Cloudflare R2 privado. Testes trocam por ArmazenamentoEmMemoria.
     {
       provide: ARMAZENAMENTO_DE_FOTOS,
       useFactory: () => escolherArmazenamentoDeFotos(),
+    },
+    // T213 — R2 privado dos documentos e o antivírus (ClamAV). Sem ClamAV
+    // configurado, nada é aprovado (fail-closed).
+    {
+      provide: ARMAZENAMENTO_DE_DOCUMENTOS,
+      useFactory: () => escolherArmazenamentoDeDocumentos(),
+    },
+    {
+      provide: VERIFICADOR_DE_ARQUIVOS,
+      useFactory: () => escolherVerificadorDeArquivos(),
     },
   ],
 })

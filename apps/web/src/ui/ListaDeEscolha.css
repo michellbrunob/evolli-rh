@@ -1,0 +1,140 @@
+/*
+ * T215 — lista de escolha própria (ui/ListaDeEscolha.tsx). Campo com a mesma
+ * medida dos outros controles; a lista abre logo abaixo (ou acima, sem
+ * espaço), com a escolhida marcada por um visto à direita.
+ */
+.lista-escolha {
+  position: relative;
+  min-width: 0;
+}
+
+.lista-escolha__campo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  font: inherit;
+  text-align: left;
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.lista-escolha__campo:hover:not(:disabled) {
+  border-color: var(--divisor-cor-forte);
+}
+
+.lista-escolha__campo:focus-visible,
+.lista-escolha[data-aberta] .lista-escolha__campo {
+  outline: none;
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-action) 18%, transparent);
+}
+
+.lista-escolha__campo[aria-invalid="true"] {
+  border-color: var(--status-danger-ink);
+}
+
+.lista-escolha__campo:disabled {
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+.lista-escolha__valor {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lista-escolha__valor--vazio {
+  color: var(--color-ink-subtle);
+}
+
+.lista-escolha__seta {
+  flex: none;
+  color: var(--color-ink-subtle);
+  transition: transform 160ms ease;
+}
+
+.lista-escolha[data-aberta] .lista-escolha__seta {
+  transform: rotate(180deg);
+}
+
+.lista-escolha__lista {
+  position: absolute;
+  top: calc(100% + var(--space-xxs));
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  min-width: 100%;
+  max-width: calc(100vw - 2 * var(--space-md));
+  max-height: 16.5rem;
+  margin: 0;
+  padding: var(--space-xxs);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface-canvas);
+  border: 1px solid var(--divisor-cor-forte);
+  border-radius: var(--radius-md);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.lista-escolha__lista--acima {
+  top: auto;
+  bottom: calc(100% + var(--space-xxs));
+}
+
+.lista-escolha__opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 2.5rem;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.lista-escolha__opcao--ativa {
+  background: var(--estado-selecao-superficie);
+}
+
+.lista-escolha__opcao[aria-selected="true"] {
+  font-weight: var(--weight-strong);
+}
+
+.lista-escolha__opcao-textos {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lista-escolha__opcao-descricao {
+  font-size: var(--text-caption);
+  font-weight: 400;
+  color: var(--color-ink-muted);
+}
+
+.lista-escolha__visto {
+  flex: none;
+  color: var(--color-action);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lista-escolha__campo,
+  .lista-escolha__seta {
+    transition: none;
+  }
+}

@@ -51,7 +51,6 @@ const ITENS_EM_DESENVOLVIMENTO = [
   "Pesquisas",
   "Calendário",
   "Folha de Pagamento",
-  "Benefícios",
   "Hub de Benefícios",
   "Suporte",
   "Roadmap",
@@ -145,7 +144,8 @@ describe("T209 — menu completo no desktop (expandido)", () => {
       [...rodape.querySelectorAll(".painel-nav__rotulo")].map(
         (r) => r.firstChild?.textContent,
       ),
-    ).toEqual(["Suporte", "Roadmap", "Configurações"]);
+      // T215 — Segurança, logo acima de Roadmap.
+    ).toEqual(["Suporte", "Segurança", "Roadmap", "Configurações"]);
     // O rodapé é a última lista da navegação.
     expect(navegacao().lastElementChild).toBe(rodape);
   });
@@ -171,7 +171,13 @@ describe("T209 — menu completo no desktop (expandido)", () => {
       "Hub de Benefícios",
     ];
     expect(rotulos.slice(0, esperado.length)).toEqual(esperado);
-    expect(rotulos.slice(-3)).toEqual(["Suporte", "Roadmap", "Configurações"]);
+    // T215 — Segurança, logo acima de Roadmap.
+    expect(rotulos.slice(-4)).toEqual([
+      "Suporte",
+      "Segurança",
+      "Roadmap",
+      "Configurações",
+    ]);
   });
 
   it("T211 — nenhum destino funcional fica sem caminho: menu, Configurações ou URL própria", () => {
@@ -298,7 +304,7 @@ describe("T209 — menu completo no desktop (expandido)", () => {
 
   it("o botão 'Fechar' do aviso também devolve o foco ao item", () => {
     render(<App papelDoAtor="rh" />);
-    const botao = item("Benefícios");
+    const botao = item("Folha de Pagamento");
     fireEvent.click(botao);
     fireEvent.click(
       within(aviso()!).getByRole("button", { name: "Fechar aviso" }),

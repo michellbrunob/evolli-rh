@@ -130,7 +130,7 @@
   width: 2rem;
   height: 2rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--color-ink-subtle);
   cursor: pointer;

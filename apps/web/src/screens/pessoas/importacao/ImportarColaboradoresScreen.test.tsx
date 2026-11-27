@@ -50,10 +50,12 @@ vi.mock("../../../api/cargoClient", async (original) => ({
 }));
 
 const CABECALHO =
-  "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo";
-const ANA = "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;;";
-const BIA = "Bia Lima;aprendiz;01/12/2026;20/03/2008;ADM;ANALISTA;M-2;";
-const RUIM = "Zuleica Teste;estatutario;01/12/2026;15/05/1990;ADM;ANALISTA;;";
+  "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;salario;matricula;unidade_codigo";
+const ANA = "Ana Souza;clt;01/12/2026;15/05/1990;ADM;ANALISTA;1.621,00;;";
+const BIA =
+  "Bia Lima;aprendiz;01/12/2026;20/03/2008;ADM;ANALISTA;1.621,00;M-2;";
+const RUIM =
+  "Zuleica Teste;estatutario;01/12/2026;15/05/1990;ADM;ANALISTA;1.621,00;;";
 
 function paginado<T>(itens: T[], total = itens.length) {
   return { itens, pagina: 1, tamanhoPagina: 100, total };
@@ -282,7 +284,9 @@ describe("passo 2 — conferência", () => {
             101,
           ),
     );
-    await ateConferencia("Ana Souza;clt;01/12/2026;15/05/1990;OPER;ANALISTA;;");
+    await ateConferencia(
+      "Ana Souza;clt;01/12/2026;15/05/1990;OPER;ANALISTA;1.621,00;;",
+    );
     expect(listarDepartamentos).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "ativo",
@@ -601,7 +605,9 @@ describe("reimportar não duplica (chave determinística por pessoa e empresa)",
     fireEvent.click(
       screen.getByRole("button", { name: "Importar outra planilha" }),
     );
-    await importarArquivo("Ana Souza;pj;05/12/2026;15/05/1990;ADM;ANALISTA;;");
+    await importarArquivo(
+      "Ana Souza;pj;05/12/2026;15/05/1990;ADM;ANALISTA;1.621,00;;",
+    );
     expect(criadas).toEqual(["emp-1:Ana Souza"]);
     expect(
       screen.getByRole("table", { name: "Não entraram" }),

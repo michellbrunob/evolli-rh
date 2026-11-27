@@ -13,9 +13,13 @@ import {
   TAMANHO_PAGINA_MOVIMENTACOES,
   TETO_DE_PAGINAS_POR_SERIE,
   diaCivilDe,
-  fraseResumo,
+  anosDoFiltro,
+  fraseDoTime,
+  lerPrimeiroAnoComDados,
   lerSerieMensal,
   periodoDoAno,
+  rotuloDoPeriodo,
+  saldoAcumulado,
 } from "./dashboardDados";
 
 /** 9 de novembro de 2026, meio-dia, no relógio do navegador. */
@@ -283,16 +287,151 @@ describe("T205 — série mensal (movimentações efetivadas)", () => {
   });
 });
 
-describe("T205 — frase-resumo", () => {
-  it("pessoas para ativos e em admissão; vínculos para admissões e desligamentos", () => {
-    expect(fraseResumo(12, 2, 5, 1, periodoDoAno(2026, AGORA))).toBe(
-      "Hoje há 12 pessoas ativas e 2 pessoas em admissão. Em 2026, até hoje, houve 5 admissões e 1 desligamento de vínculos efetivados.",
+describe("T214 — frase do card principal", () => {
+  const texto = (t: ReturnType<typeof fraseDoTime>) =>
+    t.map((p) => p.texto).join("");
+  const destaques = (t: ReturnType<typeof fraseDoTime>) =>
+    t.filter((p) => p.destaque).map((p) => p.texto);
+
+  it("pessoas de hoje e entradas e saídas do ano, com os números em destaque", () => {
+    const t = fraseDoTime({
+      ativos: 12,
+      emAdmissao: 2,
+      entradas: 5,
+      saidas: 1,
+      periodo: periodoDoAno(2026, AGORA),
+    });
+    expect(texto(t)).toBe(
+      "Seu time tem 12 pessoas ativas hoje e 2 em admissão. Em 2026, até hoje, entraram 5 e saiu 1.",
+    );
+    expect(destaques(t)).toEqual([
+      "12 pessoas ativas",
+      "2 em admissão",
+      "entraram 5",
+      "saiu 1",
+    ]);
+  });
+
+  it("singular, ninguém em admissão, ninguém entrou ou saiu; ano passado sem 'até hoje'", () => {
+    expect(
+      texto(
+        fraseDoTime({
+          ativos: 1,
+          emAdmissao: 0,
+          entradas: 0,
+          saidas: 3,
+          periodo: periodoDoAno(2025, AGORA),
+        }),
+      ),
+    ).toBe(
+      "Seu time tem 1 pessoa ativa hoje. Em 2025, ninguém entrou e saíram 3.",
+    );
+    expect(
+      texto(
+        fraseDoTime({
+          ativos: 4,
+          emAdmissao: 1,
+          entradas: 1,
+          saidas: 0,
+          periodo: periodoDoAno(2026, AGORA),
+        }),
+      ),
+    ).toBe(
+      "Seu time tem 4 pessoas ativas hoje e 1 em admissão. Em 2026, até hoje, entrou 1 e ninguém saiu.",
+    );
+    expect(
+      texto(
+        fraseDoTime({
+          ativos: 0,
+          emAdmissao: 0,
+          entradas: 0,
+          saidas: 0,
+          periodo: periodoDoAno(2026, AGORA),
+        }),
+      ),
+    ).toBe(
+      "Seu time tem 0 pessoas ativas hoje. Em 2026, até hoje, ninguém entrou nem saiu.",
     );
   });
 
-  it("singular e zero; ano passado sem 'até hoje'", () => {
-    expect(fraseResumo(1, 0, 0, 3, periodoDoAno(2025, AGORA))).toBe(
-      "Hoje há 1 pessoa ativa e 0 pessoas em admissão. Em 2025, houve 0 admissões e 3 desligamentos de vínculos efetivados.",
+  it("sem as movimentações do ano, só a parte de hoje (nenhum número inventado)", () => {
+    expect(
+      texto(
+        fraseDoTime({
+          ativos: 12,
+          emAdmissao: 2,
+          entradas: null,
+          saidas: null,
+          periodo: periodoDoAno(2026, AGORA),
+        }),
+      ),
+    ).toBe("Seu time tem 12 pessoas ativas hoje e 2 em admissão.");
+  });
+});
+
+describe("T214 — anos do filtro: só os que têm cadastro", () => {
+  /** O servidor lista da vigência mais nova para a mais antiga. */
+  const servidor = (vigencias: string[]) =>
+    vi.fn(async (q: { pagina?: number; tamanhoPagina?: number }) => {
+      const ordenadas = [...vigencias].sort().reverse();
+      const tamanho = q.tamanhoPagina ?? 20;
+      const pagina = q.pagina ?? 1;
+      return {
+        itens: ordenadas
+          .slice((pagina - 1) * tamanho, pagina * tamanho)
+          .map((v) => mov(v)),
+        pagina,
+        tamanhoPagina: tamanho,
+        total: ordenadas.length,
+      };
+    });
+
+  it("o primeiro ano é o da admissão efetivada mais antiga, com duas leituras de um item", async () => {
+    const listar = servidor(["2026-03-01", "2019-07-15", "2023-01-10"]);
+    expect(await lerPrimeiroAnoComDados(listar)).toBe(2019);
+    expect(listar.mock.calls.map(([q]) => q)).toEqual([
+      { tipo: "admissao", status: "efetivada", pagina: 1, tamanhoPagina: 1 },
+      { tipo: "admissao", status: "efetivada", pagina: 3, tamanhoPagina: 1 },
+    ]);
+  });
+
+  it("uma admissão só: uma leitura; nenhuma: sem ano", async () => {
+    const uma = servidor(["2024-05-02"]);
+    expect(await lerPrimeiroAnoComDados(uma)).toBe(2024);
+    expect(uma).toHaveBeenCalledTimes(1);
+    expect(await lerPrimeiroAnoComDados(servidor([]))).toBeNull();
+  });
+
+  it("os anos do filtro vão do corrente ao primeiro com cadastro, sem passar do mínimo, e incluem o ano aberto", () => {
+    expect(
+      anosDoFiltro({ corrente: 2026, primeiro: 2023, aberto: 2026 }),
+    ).toEqual([2026, 2025, 2024, 2023]);
+    // Sem admissão nenhuma: só o ano corrente.
+    expect(
+      anosDoFiltro({ corrente: 2026, primeiro: null, aberto: 2026 }),
+    ).toEqual([2026]);
+    // Ano aberto pela URL antes do primeiro cadastro continua na lista.
+    expect(
+      anosDoFiltro({ corrente: 2026, primeiro: 2024, aberto: 2021 }),
+    ).toEqual([2026, 2025, 2024, 2021]);
+    // Nunca antes do mínimo do Dashboard (2000).
+    expect(
+      anosDoFiltro({ corrente: 2026, primeiro: 1990, aberto: 2026 }).at(-1),
+    ).toBe(2000);
+  });
+});
+
+describe("T214 — período e saldo acumulado", () => {
+  it("o rótulo do período: meses abreviados do ano, até o mês corrente", () => {
+    expect(rotuloDoPeriodo(periodoDoAno(2026, AGORA))).toBe("jan a nov");
+    expect(rotuloDoPeriodo(periodoDoAno(2025, AGORA))).toBe("jan a dez");
+    expect(rotuloDoPeriodo(periodoDoAno(2026, new Date(2026, 0, 5)))).toBe(
+      "jan",
     );
+  });
+
+  it("o saldo acumulado mês a mês (entradas menos saídas)", () => {
+    expect(saldoAcumulado([2, 0, 1], [0, 1, 0])).toEqual([2, 1, 2]);
+    expect(saldoAcumulado([], [])).toEqual([]);
   });
 });

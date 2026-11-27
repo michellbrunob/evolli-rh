@@ -69,7 +69,8 @@ export class PessoasAuditoriaService {
     evento: {
       action: AuditAction;
       resource: AuditResource;
-      resourceId: string;
+      /** `null` na leitura em lote: as pessoas ficam na tabela da categoria. */
+      resourceId: string | null;
       empresaId: string | null;
       result: AuditResult;
     },
@@ -90,6 +91,33 @@ export class PessoasAuditoriaService {
       },
       tx,
     );
+  }
+
+  /**
+   * T215 — leitura de dado sensível (ex.: ausências, com licenças de saúde),
+   * em regime fail-safe: sem trilha gravada, nada é entregue. Só ação,
+   * recurso, empresa e o id — nunca valor.
+   */
+  async registrarLeitura(
+    ctx: PessoasAuditContext,
+    action: AuditAction,
+    resource: AuditResource,
+    resourceId: string,
+    empresaId: string,
+  ): Promise<void> {
+    await this.auditService.recordOrThrow({
+      actorType: "user",
+      actorUserId: ctx.actor.id,
+      actorRole: ctx.actor.role,
+      companyId: empresaId,
+      action,
+      resource,
+      resourceId,
+      ip: ctx.metadata.ip,
+      userAgent: ctx.metadata.userAgent,
+      result: "success",
+      requestId: ctx.metadata.requestId,
+    });
   }
 
   /**

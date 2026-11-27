@@ -55,10 +55,19 @@ export interface JanelaProps {
   readonly alterado?: boolean;
   /** Ilustração decorativa ao lado do título. */
   readonly icone?: ReactNode;
+  /** T215 — linha curta sob o título, no cabeçalho (ex.: pessoa · cargo). */
+  readonly subtitulo?: string;
   /** Ações fixas no rodapé. */
   readonly rodape?: ReactNode;
+  /** T215 — ação no cabeçalho, ao lado de Fechar (ex.: "Limpar tudo"). */
+  readonly acaoDoCabecalho?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
+  /**
+   * T215 — onde pôr o foco ao abrir (ex.: o campo que o menu pediu); sem
+   * ele, ou vazio, o título.
+   */
+  readonly focoInicialRef?: { readonly current: HTMLElement | null };
 }
 
 function Janela({
@@ -70,9 +79,12 @@ function Janela({
   bloqueado = false,
   alterado = false,
   icone,
+  subtitulo,
   rodape,
+  acaoDoCabecalho,
   children,
   className,
+  focoInicialRef,
 }: JanelaProps & { readonly lado: "centro" | "direita" }) {
   const tituloRef = useRef<HTMLHeadingElement | null>(null);
   const confirmacaoRef = useRef<HTMLDivElement | null>(null);
@@ -145,7 +157,9 @@ function Janela({
               ativo instanceof HTMLElement && ativo !== document.body
                 ? ativo
                 : null;
-            tituloRef.current?.focus({ preventScroll: true });
+            (focoInicialRef?.current ?? tituloRef.current)?.focus({
+              preventScroll: true,
+            });
           }}
           onCloseAutoFocus={(evento) => {
             evento.preventDefault();
@@ -154,6 +168,13 @@ function Janela({
             if (alvo && document.contains(alvo)) alvo.focus();
           }}
           onEscapeKeyDown={(evento) => {
+            // T215 — um painel de dentro que fecha com Esc (ex.: o calendário
+            // do período) fecha só ele, não a janela.
+            const alvo = evento.target;
+            if (alvo instanceof Element && alvo.closest("[data-esc-proprio]")) {
+              evento.preventDefault();
+              return;
+            }
             if (confirmando) {
               evento.preventDefault();
               continuarEditando();
@@ -170,20 +191,30 @@ function Janela({
                   {icone}
                 </span>
               ) : null}
-              <RadixDialog.Title
-                ref={tituloRef}
-                tabIndex={-1}
-                className="ev:m-0 ev:min-w-0 ev:text-[length:var(--text-lead)] ev:font-semibold ev:leading-[var(--leading-tight)] ev:text-[var(--color-ink)]"
-              >
-                {titulo}
-              </RadixDialog.Title>
+              <div className="ev:min-w-0">
+                <RadixDialog.Title
+                  ref={tituloRef}
+                  tabIndex={-1}
+                  className="ev:m-0 ev:min-w-0 ev:text-[length:var(--text-lead)] ev:font-semibold ev:leading-[var(--leading-tight)] ev:text-[var(--color-ink)]"
+                >
+                  {titulo}
+                </RadixDialog.Title>
+                {subtitulo ? (
+                  <p className="ev:m-0 ev:truncate ev:text-[length:var(--text-caption)] ev:text-[var(--color-ink-subtle)]">
+                    {subtitulo}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <IconButton
-              label="Fechar"
-              icon={<IconeFechar tamanho={20} />}
-              onClick={pedirFechamento}
-              disabled={bloqueado}
-            />
+            <div className="ev:flex ev:shrink-0 ev:items-center ev:gap-[var(--space-xs)]">
+              {acaoDoCabecalho}
+              <IconButton
+                label="Fechar"
+                icon={<IconeFechar tamanho={20} />}
+                onClick={pedirFechamento}
+                disabled={bloqueado}
+              />
+            </div>
           </header>
           {descricao ? (
             <RadixDialog.Description className="ev:m-0 ev:px-[var(--space-lg)] ev:pt-[var(--space-sm)] ev:text-[var(--color-ink-muted)]">

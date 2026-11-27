@@ -5,6 +5,9 @@
  * (`menuLateral.ts`), o módulo e a tela vêm do mapa de destinos
  * (`mapaNavegacao.ts`). Nome igual ao anterior não se repete (o Dashboard é
  * só "Dashboard"). Numa sub-página (`agrupadoEm`), o item do pai leva a ele.
+ * T215 — como na referência, o MÓDULO também leva à página principal dele
+ * (o primeiro destino funcional do grupo) sempre que não é a tela atual; a
+ * seção continua só texto.
  * Destino desconhecido não ganha caminho inventado.
  */
 import type { IconeModuloId } from "./IconeModulo";
@@ -25,6 +28,8 @@ export interface ItemDaTrilha {
  */
 const TELA_DO_DESTINO: Readonly<Record<string, string>> = {
   configuracoes: "Meu perfil",
+  // T215 — o módulo Segurança abre em Sessões ativas.
+  seguranca: "Sessões ativas",
 };
 
 /** O ícone do módulo da tela (o mesmo do menu lateral), ou `null`. */
@@ -66,8 +71,16 @@ export function trilhaDoDestino(destinoId: string): ItemDaTrilha[] {
     }
     itens.push(item);
   };
+  const principal =
+    grupo.destinos.find((d) => !d.agrupadoEm && d.estado === "funcional") ??
+    grupo.destinos[0];
   if (secao) somar({ rotulo: secao });
-  somar({ rotulo: modulo });
+  somar({
+    rotulo: modulo,
+    ...(principal && principal.id !== destino.id
+      ? { destinoId: principal.id }
+      : {}),
+  });
   if (destino.agrupadoEm) {
     somar({ rotulo: base.label, destinoId: base.id });
     somar({ rotulo: destino.label });

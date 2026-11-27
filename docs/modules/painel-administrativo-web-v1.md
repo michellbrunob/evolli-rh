@@ -19,24 +19,17 @@
   [ADR 0007](../adr/0007-colaboradores-e-vida-funcional-baseline-v1.md),
   [ADR 0008](../adr/0008-jornada-ponto-rastreavel-baseline-v1.md).
 
-## Referência visual (T032)
+## Referência visual
 
-O arquivo raiz [`DESIGN-apple.md`](../../DESIGN-apple.md) é a **fonte oficial de
-tokens e princípios visuais** do painel — a referência de design para as
-próximas interfaces do Evolli RH.
+A fonte oficial de design do Evolli RH é o
+[`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md): marca, fonte
+Parkinsans, ícones Iconsax, tokens de `apps/web/src/app/tokens.css`, os quatro
+temas de Aparência e as regras de acessibilidade. Dados, tabelas, formulários,
+alertas, **estados de erro** e **acessibilidade** prevalecem sobre estética.
 
-**Adotar** dele: o **azul de ação `#0066cc`**, superfícies claras/neutras,
-tipografia **system/SF Pro com fallback seguro** (`system-ui, -apple-system,
-sans-serif`), **espaçamento generoso**, **botões pill**, **bordas sutis** e
-**responsividade**.
-
-**Adaptar** para um sistema **interno de RH**: dados, tabelas, formulários,
-alertas, **estados de erro** e **acessibilidade** prevalecem sobre estética de
-marketing. A referência orienta o vocabulário visual, não o layout de um site de
-produto.
-
-**Não copiar** marcas, imagens, textos ou componentes proprietários da Apple —
-`DESIGN-apple.md` é uma extração de tokens/princípios, não um kit de ativos.
+> Histórico: a T032 adotou um arquivo de referência externa como base inicial
+> de tokens. Em 2026-11-25 ele foi removido e deixou de ser padrão; o design do
+> Evolli é próprio.
 
 **Obrigatórios (não negociáveis):** **contraste** adequado, **foco visível**,
 **navegação por teclado**, compatibilidade com **leitores de tela** e **alvos de

@@ -502,7 +502,7 @@ consulta; as ações ficam nos fluxos próprios do RH, sempre manuais e auditada
 Requisitos **visuais/estruturais**, não implementação. As telas futuras devem
 reutilizar a fundação já entregue, herdando acessibilidade (foco visível,
 contraste AA, alvos de 44px, `prefers-reduced-motion`, sem sombra/gradiente) e
-seguindo o [`DESIGN-apple.md`](../../DESIGN-apple.md) como referência de tokens.
+seguindo o [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md) como guia de design.
 
 | Superfície                        | Componentes reutilizados                                                                                                                                                                                                           |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

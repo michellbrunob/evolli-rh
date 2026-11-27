@@ -1,0 +1,403 @@
+/**
+ * T215 — Férias e ausências: os tipos que a tela usa (o mesmo contrato do
+ * servidor, `GET/POST /v1/ausencias`) e os rótulos, iguais aos da
+ * referência funcional (decisão de 2026-11-23).
+ *
+ * A tela recebe as chamadas ao servidor por parâmetro (`ServicoDeAusencias`):
+ * o shell liga o cliente real; os testes, um falso.
+ */
+import { formatarIntervaloDeDias } from "../../../format/data";
+import type {
+  AvisoCltApi,
+  ViolacaoDaPoliticaApi,
+  MotivoReinicio,
+  NovoReinicioDto,
+  ReinicioApi,
+  SimulacaoDeReinicioApi,
+} from "../../../api/ausenciasClient";
+
+export type TipoAusencia =
+  | "ferias"
+  | "licenca_medica"
+  | "licenca_maternidade"
+  | "licenca_paternidade"
+  | "afastamento"
+  | "falta_justificada"
+  | "falta_sem_justificativa"
+  | "day_off"
+  | "home_office";
+
+export type MotivoAfastamento =
+  | "auxilio_doenca"
+  | "acidente_trabalho"
+  | "licenca_nao_remunerada"
+  | "licenca_remunerada"
+  | "outro";
+
+export type StatusAusencia =
+  | "aguardando_gestor"
+  | "aguardando_rh"
+  | "aprovada"
+  | "cancelamento_pedido"
+  | "ajuste_sugerido"
+  | "recusada"
+  | "cancelada";
+
+export type FiltroPeriodo =
+  | "em_ferias_agora"
+  | "licencas_afastamentos"
+  | "faltas_mes"
+  | "proximas_ferias";
+
+export type FiltroTipo =
+  "ferias" | "licencas" | "afastamentos" | "faltas" | "day_off" | "home_office";
+
+export type FiltroStatus = StatusAusencia | "aguardando_voce";
+
+export interface AusenciaApi {
+  readonly id: string;
+  readonly colaborador: {
+    readonly id: string;
+    readonly nome: string;
+    readonly cargo: string | null;
+    readonly foto?: { readonly versao: number } | null;
+  };
+  readonly tipo: TipoAusencia;
+  readonly motivoAfastamento: MotivoAfastamento | null;
+  readonly inicio: string;
+  readonly fim: string | null;
+  readonly dias: number | null;
+  readonly diasUteis: number | null;
+  readonly diasVendidos: number;
+  readonly periodoAquisitivo: {
+    readonly inicio: string;
+    readonly fim: string;
+  } | null;
+  readonly status: StatusAusencia;
+  readonly observacao: string | null;
+  readonly registradoEm: string;
+  readonly decididoEm: string | null;
+  /** T215 — o atestado ou documento anexado (ausente em dados antigos). */
+  readonly anexo?: {
+    readonly formato: string;
+    readonly tamanhoBytes: number;
+    readonly enviadoEm: string;
+  } | null;
+  /** T215 — "Sugerir outras datas": o período proposto, se houver. */
+  readonly sugestao?: { readonly inicio: string; readonly fim: string } | null;
+  /** T215 — férias coletivas (art. 140), que abrem um novo período. */
+  readonly feriasColetivas?: boolean;
+  /** T215 — registrada fora da política de férias: o porquê. */
+  readonly motivoForaDaPolitica?: string | null;
+}
+
+export interface IndicadoresDeAusencias {
+  readonly emFeriasAgora: number;
+  /** T215 — pessoas fora hoje (o número da aba, como a referência). */
+  readonly ausentesHoje?: number;
+  readonly licencasEAfastamentos: number;
+  readonly faltasEsteMes: number;
+  readonly proximasFerias: number;
+  readonly pendentes: number;
+}
+
+export interface ListagemDeAusencias {
+  readonly itens: readonly AusenciaApi[];
+  readonly pagina: number;
+  readonly tamanhoPagina: number;
+  readonly total: number;
+  readonly indicadores: IndicadoresDeAusencias;
+}
+
+export interface ConsultaDeAusencias {
+  readonly pagina: number;
+  readonly tamanhoPagina: number;
+  readonly busca?: string;
+  readonly periodo?: FiltroPeriodo;
+  readonly tipo?: FiltroTipo;
+  readonly status?: FiltroStatus;
+}
+
+export interface NovaAusencia {
+  readonly colaboradorId: string;
+  readonly tipo: TipoAusencia;
+  readonly motivoAfastamento?: MotivoAfastamento;
+  readonly inicio: string;
+  readonly fim?: string;
+  readonly diasVendidos?: number;
+  readonly periodoAquisitivoInicio?: string;
+  readonly aprovada: boolean;
+  readonly observacao?: string;
+  /** T215 — férias coletivas de quem tem menos de 12 meses (art. 140). */
+  readonly feriasColetivas?: boolean;
+  /** T215 — por que registrar fora da política de férias. */
+  readonly motivoForaDaPolitica?: string;
+}
+
+export interface SimulacaoDeAusencia {
+  readonly dias: number | null;
+  readonly diasUteis: number | null;
+  readonly volta: string | null;
+  readonly periodo: { readonly inicio: string; readonly fim: string } | null;
+  readonly saldoAntes: number | null;
+  readonly saldoDepois: number | null;
+  /** O que ainda dá para vender no período (o limite menos o já vendido). */
+  readonly maxVendaveis: number | null;
+  /** T215 — dias já vendidos por outras férias do mesmo período. */
+  readonly vendidosNoPeriodo?: number | null;
+  readonly prazoAbono: string | null;
+  /**
+   * T215 — a regra de férias do vínculo: calculada (CLT, Estágio),
+   * sem_ferias (PJ, Freelancer) ou sem_regra (Aprendiz e demais).
+   */
+  readonly regraDeFerias?: "calculada" | "sem_ferias" | "sem_regra";
+  /** T215 — "Regras da CLT" (só aviso, como a referência). */
+  readonly avisosClt?: readonly AvisoCltApi[];
+  /** T215 — os períodos com saldo de que as férias podem descontar. */
+  readonly periodosDisponiveis?: readonly {
+    readonly inicio: string;
+    readonly fim: string;
+    readonly disponiveis: number;
+  }[];
+  /** T215 — menos de 12 meses de casa: cabe "férias coletivas". */
+  readonly podeSerColetiva?: boolean;
+  readonly coletiva?: {
+    readonly dias: number;
+    readonly novoPeriodo: string;
+  } | null;
+  /** T215 — a política de férias da pessoa e o que o pedido não segue. */
+  readonly politica?: {
+    readonly id: string;
+    readonly nome: string;
+    readonly violacoes: readonly ViolacaoDaPoliticaApi[];
+  } | null;
+}
+
+export interface ConsultaDeSimulacao {
+  readonly colaboradorId: string;
+  readonly tipo: TipoAusencia;
+  readonly inicio: string;
+  readonly fim?: string;
+  readonly diasVendidos?: number;
+  readonly periodoAquisitivoInicio?: string;
+  /** Editando: a própria ausência não conta (sobreposição e saldo). */
+  readonly ignorar?: string;
+  /** T215 — simular como férias coletivas (art. 140). */
+  readonly feriasColetivas?: boolean;
+}
+
+/** Pessoa que pode ser escolhida na gaveta. */
+export interface PessoaParaAusencia {
+  readonly id: string;
+  readonly nome: string;
+  readonly cargo: string | null;
+}
+
+/** As chamadas ao servidor que a aba usa. */
+export interface ServicoDeAusencias {
+  readonly listar: (
+    consulta: ConsultaDeAusencias,
+    opcoes?: { readonly signal?: AbortSignal },
+  ) => Promise<ListagemDeAusencias>;
+  readonly registrar: (nova: NovaAusencia) => Promise<AusenciaApi>;
+  readonly simular: (
+    consulta: ConsultaDeSimulacao,
+    opcoes?: { readonly signal?: AbortSignal },
+  ) => Promise<SimulacaoDeAusencia>;
+  readonly aprovar: (id: string, mensagem?: string) => Promise<AusenciaApi>;
+  /** T215 — "Sugerir outras datas" (Responder solicitação). */
+  readonly sugerir?: (
+    id: string,
+    sugestao: { inicio: string; fim: string; mensagem?: string },
+  ) => Promise<AusenciaApi>;
+  readonly recusar: (id: string, motivo?: string) => Promise<AusenciaApi>;
+  readonly cancelar: (id: string) => Promise<AusenciaApi>;
+  /** T215 — editar e excluir, como a referência. */
+  readonly alterar?: (
+    id: string,
+    alteracao: Omit<NovaAusencia, "colaboradorId">,
+  ) => Promise<AusenciaApi>;
+  readonly excluir?: (id: string) => Promise<void>;
+  /** T215 — "Ajustar período": reinício da contagem de férias. */
+  readonly simularReinicio?: (
+    colaboradorId: string,
+    proposta?: { inicio?: string; motivo?: MotivoReinicio; dias?: number },
+  ) => Promise<SimulacaoDeReinicioApi>;
+  readonly registrarReinicio?: (
+    colaboradorId: string,
+    dto: NovoReinicioDto,
+  ) => Promise<ReinicioApi>;
+  readonly removerReinicio?: (
+    colaboradorId: string,
+    reinicioId: string,
+  ) => Promise<void>;
+  readonly buscarPessoas: (
+    termo: string,
+    opcoes?: { readonly signal?: AbortSignal },
+  ) => Promise<readonly PessoaParaAusencia[]>;
+  /** T215 — anexo (atestado ou documento) da ausência. */
+  readonly enviarAnexo?: (ausenciaId: string, arquivo: File) => Promise<void>;
+  readonly removerAnexo?: (ausenciaId: string) => Promise<void>;
+  readonly baixarAnexo?: (
+    ausenciaId: string,
+  ) => Promise<{ readonly blob: Blob; readonly nome: string }>;
+}
+
+export const ROTULO_DO_TIPO: Readonly<Record<TipoAusencia, string>> = {
+  ferias: "Férias",
+  licenca_medica: "Licença médica",
+  licenca_maternidade: "Licença maternidade",
+  licenca_paternidade: "Licença paternidade",
+  afastamento: "Afastamento",
+  falta_justificada: "Falta justificada",
+  falta_sem_justificativa: "Falta sem justificativa",
+  day_off: "Day off",
+  home_office: "Home office",
+};
+
+/** "19 dias de licença médica": o tipo em minúsculas, no meio da frase. */
+export const TIPO_NA_FRASE: Readonly<Record<TipoAusencia, string>> = {
+  ferias: "férias",
+  licenca_medica: "licença médica",
+  licenca_maternidade: "licença maternidade",
+  licenca_paternidade: "licença paternidade",
+  afastamento: "afastamento",
+  falta_justificada: "falta justificada",
+  falta_sem_justificativa: "falta sem justificativa",
+  day_off: "day off",
+  home_office: "home office",
+};
+
+export const TIPOS_DE_AUSENCIA = Object.keys(ROTULO_DO_TIPO) as TipoAusencia[];
+
+export const MOTIVOS_DE_AFASTAMENTO: readonly {
+  readonly valor: MotivoAfastamento;
+  readonly rotulo: string;
+  readonly ajuda: string;
+}[] = [
+  {
+    valor: "auxilio_doenca",
+    rotulo: "Auxílio-doença (INSS)",
+    ajuda: "Doença, a partir do 16º dia de atestado",
+  },
+  {
+    valor: "acidente_trabalho",
+    rotulo: "Acidente de trabalho",
+    ajuda: "Acidente ou doença ligada ao trabalho",
+  },
+  {
+    valor: "licenca_nao_remunerada",
+    rotulo: "Licença não remunerada",
+    ajuda: "Contrato suspenso, sem salário",
+  },
+  {
+    valor: "licenca_remunerada",
+    rotulo: "Licença remunerada",
+    ajuda: "A empresa continua pagando o salário",
+  },
+  {
+    valor: "outro",
+    rotulo: "Outro motivo",
+    ajuda: "Conte o motivo na observação",
+  },
+];
+
+export const ROTULO_DO_STATUS: Readonly<Record<StatusAusencia, string>> = {
+  aguardando_gestor: "Aguardando o gestor",
+  aguardando_rh: "Aguardando o RH",
+  aprovada: "Aprovada",
+  cancelamento_pedido: "Cancelamento pedido",
+  ajuste_sugerido: "Ajuste sugerido",
+  recusada: "Recusada",
+  cancelada: "Cancelada",
+};
+
+export const OPCOES_DE_PERIODO: readonly {
+  readonly valor: FiltroPeriodo | "";
+  readonly rotulo: string;
+}[] = [
+  { valor: "", rotulo: "Todos" },
+  { valor: "em_ferias_agora", rotulo: "Em férias agora" },
+  { valor: "licencas_afastamentos", rotulo: "Licenças e afastamentos" },
+  { valor: "faltas_mes", rotulo: "Faltas deste mês" },
+  { valor: "proximas_ferias", rotulo: "Próximas férias" },
+];
+
+export const OPCOES_DE_TIPO: readonly {
+  readonly valor: FiltroTipo | "";
+  readonly rotulo: string;
+}[] = [
+  { valor: "", rotulo: "Todos" },
+  { valor: "ferias", rotulo: "Férias" },
+  { valor: "licencas", rotulo: "Licenças" },
+  { valor: "afastamentos", rotulo: "Afastamentos" },
+  { valor: "faltas", rotulo: "Faltas" },
+  { valor: "day_off", rotulo: "Day off" },
+  { valor: "home_office", rotulo: "Home office" },
+];
+
+export const OPCOES_DE_STATUS: readonly {
+  readonly valor: FiltroStatus | "";
+  readonly rotulo: string;
+}[] = [
+  { valor: "", rotulo: "Todos" },
+  { valor: "aguardando_voce", rotulo: "Aguardando você" },
+  { valor: "aguardando_gestor", rotulo: "Aguardando o gestor" },
+  { valor: "aguardando_rh", rotulo: "Aguardando o RH" },
+  { valor: "aprovada", rotulo: "Aprovada" },
+  { valor: "cancelamento_pedido", rotulo: "Cancelamento pedido" },
+  { valor: "ajuste_sugerido", rotulo: "Ajuste sugerido" },
+  { valor: "recusada", rotulo: "Recusada" },
+  { valor: "cancelada", rotulo: "Cancelada" },
+];
+
+/**
+ * T215 — como a referência mostra o tipo nas listas, no histórico e nas
+ * frases (o quadro de escolha da janela segue com `ROTULO_DO_TIPO`).
+ */
+export const ROTULO_NA_LISTA: Readonly<Record<TipoAusencia, string>> = {
+  ...ROTULO_DO_TIPO,
+  falta_sem_justificativa: "Falta injustificada",
+  day_off: "Day off aniversário",
+};
+
+export const NA_FRASE_DA_LISTA: Readonly<Record<TipoAusencia, string>> = {
+  ...TIPO_NA_FRASE,
+  falta_sem_justificativa: "falta injustificada",
+  day_off: "day off aniversário",
+};
+
+/** O status nas linhas e cartões: o que espera o RH é "Pendente". */
+export const ROTULO_DO_STATUS_NA_LISTA: Readonly<
+  Record<StatusAusencia, string>
+> = {
+  ...ROTULO_DO_STATUS,
+  aguardando_rh: "Pendente",
+};
+
+/** "As férias … serão removidas", "O day off … será removido". */
+const EXCLUSAO_NA_FRASE: Readonly<
+  Record<TipoAusencia, { readonly artigo: string; readonly verbo: string }>
+> = {
+  ferias: { artigo: "As", verbo: "serão removidas" },
+  licenca_medica: { artigo: "A", verbo: "será removida" },
+  licenca_maternidade: { artigo: "A", verbo: "será removida" },
+  licenca_paternidade: { artigo: "A", verbo: "será removida" },
+  afastamento: { artigo: "O", verbo: "será removido" },
+  falta_justificada: { artigo: "A", verbo: "será removida" },
+  falta_sem_justificativa: { artigo: "A", verbo: "será removida" },
+  day_off: { artigo: "O", verbo: "será removido" },
+  home_office: { artigo: "O", verbo: "será removido" },
+};
+
+/**
+ * O texto da confirmação de excluir. Nas férias coletivas, o reinício do
+ * período aquisitivo que elas abriram é desfeito junto (o servidor faz).
+ */
+export function textoDaExclusao(a: AusenciaApi, nome: string): string {
+  const { artigo, verbo } = EXCLUSAO_NA_FRASE[a.tipo];
+  const coletiva = a.feriasColetivas
+    ? ", e o novo período aquisitivo que a coletiva abriu é desfeito"
+    : "";
+  return `${artigo} ${NA_FRASE_DA_LISTA[a.tipo]} de ${nome} (${formatarIntervaloDeDias(a.inicio, a.fim)}) ${verbo} do histórico e do calendário${coletiva}. Essa ação não pode ser desfeita.`;
+}

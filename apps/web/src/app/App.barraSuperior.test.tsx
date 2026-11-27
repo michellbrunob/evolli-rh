@@ -232,7 +232,8 @@ describe("T209 — barra superior: conta", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
-  it("'Sessões ativas' abre o painel de sempre", async () => {
+  // T215 — leva à página Segurança › Sessões ativas (o mesmo conteúdo).
+  it("'Sessões ativas' leva à página de Segurança", async () => {
     montar();
     fireEvent.click(
       within(await abrirMenuDaConta()).getByRole("menuitem", {
@@ -242,6 +243,7 @@ describe("T209 — barra superior: conta", () => {
     expect(
       await screen.findByRole("heading", { name: /Sessões ativas/ }),
     ).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/seguranca/sessoes-ativas");
   });
 
   it("clique fora fecha o menu", async () => {

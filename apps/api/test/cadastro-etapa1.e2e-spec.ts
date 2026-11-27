@@ -13,7 +13,7 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { lotacaoMinima } from "./admissao-obrigatoria";
+import { contratoDaAdmissao, lotacaoMinima } from "./admissao-obrigatoria";
 
 /**
  * T209 — Novo colaborador, etapa 1 (dados básicos). PostgreSQL real e
@@ -159,6 +159,7 @@ describe("T209 — Novo colaborador, etapa 1 (e2e)", () => {
       motivoCodigo: "admissao_inicial",
       perfilPessoal: perfil,
       ...extra,
+      contrato: contratoDaAdmissao(extra["contrato"]),
     };
   }
 

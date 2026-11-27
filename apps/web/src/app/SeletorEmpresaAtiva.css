@@ -477,7 +477,7 @@
   min-height: 36px;
   padding: 0 0.75rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--color-ink-muted);
   font: inherit;

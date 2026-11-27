@@ -1,0 +1,118 @@
+/*
+ * T215 — Status do colaborador: rótulo cinza à esquerda, botão claro com
+ * contorno (bolinha, nome e seta), lista em cartão com sombra leve, item
+ * atual destacado com o visto à direita e "Desligado" em vermelho. Só tokens.
+ */
+.status-colaborador {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.status-colaborador__rotulo {
+  font-size: var(--text-ui);
+  color: var(--color-ink-subtle);
+}
+
+.status-colaborador__botao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.status-colaborador__botao:hover:not(:disabled),
+.status-colaborador__botao[data-state="open"] {
+  border-color: var(--color-action);
+}
+
+.status-colaborador__botao:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.status-colaborador__botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.status-colaborador__seta {
+  color: var(--color-ink-subtle);
+  transition: transform 150ms ease;
+}
+
+.status-colaborador__botao[data-state="open"] .status-colaborador__seta {
+  transform: rotate(180deg);
+}
+
+.status-colaborador__ponto {
+  display: inline-block;
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.status-colaborador__ponto--ativo {
+  background: var(--status-ponto-ativo);
+}
+.status-colaborador__ponto--ferias {
+  background: var(--status-ponto-ferias);
+}
+.status-colaborador__ponto--afastado {
+  background: var(--status-ponto-afastado);
+}
+.status-colaborador__ponto--inativo {
+  background: var(--status-ponto-inativo);
+}
+.status-colaborador__ponto--desligado {
+  background: var(--status-ponto-desligado);
+}
+
+.status-colaborador__lista {
+  min-width: 17rem;
+  padding: var(--space-xs);
+  border-color: var(--hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.status-colaborador__opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  cursor: pointer;
+  outline: none;
+}
+
+.status-colaborador__opcao[data-highlighted],
+.status-colaborador__opcao[data-state="checked"] {
+  background: var(--surface-neutral);
+}
+
+.status-colaborador__opcao[data-state="checked"] {
+  font-weight: var(--weight-strong);
+}
+
+.status-colaborador__opcao--perigo {
+  color: var(--status-danger-ink);
+}
+
+.status-colaborador__indicador {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--color-ink);
+}

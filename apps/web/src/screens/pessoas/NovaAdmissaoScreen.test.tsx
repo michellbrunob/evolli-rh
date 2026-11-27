@@ -20,6 +20,7 @@
  * obrigatório. Os testes do comportamento genérico dos seletores usam a
  * Unidade (que tem "+" e «Criar»).
  */
+import { campoPeloRotulo } from "../../test/campoPeloRotulo";
 import {
   act,
   fireEvent,
@@ -38,7 +39,10 @@ import {
   ApiError,
   type AdmissaoRegistradaApi,
   admitirColaborador,
+  consultarCpfEmUso,
   descartarRascunhoAdmissao,
+  type DocumentoColaboradorApi,
+  enviarDocumentoDoColaborador,
   enviarFotoColaborador,
   obterRascunhoAdmissao,
   salvarRascunhoAdmissao,
@@ -243,20 +247,20 @@ async function aguardarEmpresa() {
   await screen.findByText("Empresa Sintética (teste)");
 }
 
-const nome = () => screen.getByLabelText(/Nome completo/);
-const dataNascimento = () => screen.getByLabelText(/^Data de nascimento/);
-const matricula = () => screen.getByLabelText(/^Matrícula/);
-const tipo = () => screen.getByLabelText(/Tipo de contratação/);
-const data = () => screen.getByLabelText(/Data de admissão/);
+const nome = () => campoPeloRotulo(/Nome completo/);
+const dataNascimento = () => campoPeloRotulo(/^Data de nascimento/);
+const matricula = () => campoPeloRotulo(/^Matrícula/);
+const tipo = () => campoPeloRotulo(/Tipo de contratação/);
+const data = () => campoPeloRotulo(/Data de admissão/);
 // T179 — um seletor por referência da lotação.
 // T209 — etapa 2: as linhas "Cargo e nível" e "Departamento e área" também
 // têm nome; os campos são procurados pelo nome exato. O cargo é texto.
-const departamentoSel = () => screen.getByLabelText(/^Departamento$/);
-const cargoSel = () => screen.getByLabelText(/^Cargo$/);
-const unidadeSel = () => screen.getByLabelText(/^Unidade$/);
-const salarioBruto = () => screen.getByLabelText(/^Salário bruto/);
-const areaSel = () => screen.getByLabelText(/^Área/);
-const centroSel = () => screen.getByLabelText(/^Centro de custo$/);
+const departamentoSel = () => campoPeloRotulo(/^Departamento$/);
+const cargoSel = () => campoPeloRotulo(/^Cargo$/);
+const unidadeSel = () => campoPeloRotulo(/^Unidade$/);
+const salarioBruto = () => campoPeloRotulo(/^Salário bruto/);
+const areaSel = () => campoPeloRotulo(/^Área/);
+const centroSel = () => campoPeloRotulo(/^Centro de custo$/);
 
 /** T196 — a linha "Escolha atual" de um seletor pesquisável. */
 const escolhaDe = (campo: HTMLElement) =>
@@ -341,14 +345,14 @@ async function salvarEConfirmar() {
   fireEvent.click(botaoConfirmar());
 }
 
-const emailPessoal = () => screen.getByLabelText(/E-mail pessoal/);
-const celular = () => screen.getByLabelText(/^Telefone pessoal/);
+const emailPessoal = () => campoPeloRotulo(/E-mail pessoal/);
+const celular = () => campoPeloRotulo(/^Telefone pessoal/);
 // T209 — o telefone fixo saiu da etapa 1; quem o usava passa ao do contato
 // de emergência, o segundo telefone da etapa.
-const telefone = () => screen.getByLabelText(/^Telefone do contato/);
+const telefone = () => campoPeloRotulo(/^Telefone do contato/);
 /** T209 — CPF sintético com dígitos verificadores válidos. */
 const CPF_VALIDO = "529.982.247-25";
-const cpf = () => screen.getByLabelText(/^CPF$/);
+const cpf = () => campoPeloRotulo(/^CPF$/);
 /**
  * T209 — sair da Nova admissão: "Cancelar" na etapa 1; nas demais (como no
  * novo rodapé), o voltar do cabeçalho — o mesmo caminho, com a guarda.
@@ -373,7 +377,7 @@ async function preencherLotacao() {
   fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
   await escolher(unidadeSel(), unidade);
   // T209 — o salário bruto é obrigatório na etapa 2.
-  fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+  fireEvent.change(salarioBruto(), { target: { value: "5000" } });
 }
 
 async function preencherValido() {
@@ -517,7 +521,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.click(salvar());
     await waitFor(() => expect(salarioBruto()).toHaveFocus());
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(salvar());
     // Sem Departamento nem Unidade, o formulário está completo: abre a
     // confirmação.
@@ -552,7 +556,7 @@ describe("Nova admissão — página própria", () => {
       /Informe o telefone com DDD, no formato \(00\) 00000-0000/,
     ],
     // T209 — CPF com dígito verificador errado.
-    [/^CPF$/, "529.982.247-26", /Informe um CPF válido/],
+    [/^CPF$/, "529.982.247-26", /CPF inválido. Confira os números digitados/],
     // T179 — opcionais, mas o formato ainda vale quando preenchidos.
     [/^Matrícula/, "M", /Use apenas letras maiúsculas/],
     [/^Matrícula/, "MAT 01", /Use apenas letras maiúsculas/],
@@ -655,7 +659,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(data(), { target: { value: "2026-11-04" } });
     // T209 — da lotação, só o cargo (digitado); e o salário bruto.
     fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const [dto, opcoes] = vi.mocked(admitirColaborador).mock.calls[0]!;
@@ -1048,13 +1052,13 @@ describe("T179 — confirmação antes de gravar", () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
+    fireEvent.change(campoPeloRotulo(/^CEP/), {
       target: { value: "30140071" },
     });
-    fireEvent.change(screen.getByLabelText(/^Cidade$/), {
+    fireEvent.change(campoPeloRotulo(/^Cidade$/), {
       target: { value: "Cidade Resumo Sintética" },
     });
-    fireEvent.change(screen.getByLabelText(/^Logradouro$/), {
+    fireEvent.change(campoPeloRotulo(/^Logradouro$/), {
       target: { value: "Rua Resumo Sintética" },
     });
     fireEvent.click(salvar());
@@ -1129,14 +1133,12 @@ describe("T179 — confirmação antes de gravar", () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
-    fireEvent.change(screen.getByLabelText(/^CEP/), {
+    fireEvent.change(campoPeloRotulo(/^CEP/), {
       target: { value: "30140071" },
     });
     // T209 — completar o CEP consulta sozinho.
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Logradouro$/)).toHaveValue(
-        "Avenida Sintética",
-      ),
+      expect(campoPeloRotulo(/^Logradouro$/)).toHaveValue("Avenida Sintética"),
     );
     salvar().focus();
     fireEvent.click(salvar());
@@ -1159,10 +1161,10 @@ describe("T179 — confirmação antes de gravar", () => {
       `${unidade.codigo} — ${unidade.nome}`,
     );
     expect(celular()).toHaveValue("(31) 99999-0000");
-    expect(screen.getByLabelText(/^CEP/)).toHaveValue("30140-071");
+    expect(campoPeloRotulo(/^CEP/)).toHaveValue("30140-071");
     expect(
       document.getElementById("nova-admissao-cep-status"),
-    ).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    ).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("Escape faz o mesmo que 'Voltar e revisar'", async () => {
@@ -1590,7 +1592,7 @@ describe("T179 — máscaras na Nova admissão", () => {
   it("CEP: máscara 00000-000 (T209: o endereço é sempre do Brasil)", async () => {
     montar();
     await aguardarEmpresa();
-    const cep = () => screen.getByLabelText(/^CEP/);
+    const cep = () => campoPeloRotulo(/^CEP/);
     expect(cep()).toHaveAttribute("inputmode", "numeric");
     expect(cep()).toHaveAttribute("placeholder", "00000-000");
     fireEvent.change(cep(), { target: { value: "301400" } });
@@ -1701,11 +1703,10 @@ describe("Nova admissão — sucesso", () => {
     expect(
       screen.getByText("Departamento: DEP1 — Departamento Sintético (teste)"),
     ).toBeInTheDocument();
-    // T209 — o cargo gravado veio do nome digitado; a linha dele existe.
+    // T209 — o cargo gravado veio do nome digitado; a linha mostra o nome
+    // (o do cadastro, ou o digitado quando ele acabou de ser criado).
     expect(
-      screen.getByText(
-        /^Cargo(: CAR1 — Cargo Sintético \(teste\)| registrado)$/,
-      ),
+      screen.getByText(/^Cargo: (CAR1 — )?Cargo Sintético \(teste\)$/),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Unidade: UNI1 — Unidade Sintética (teste)"),
@@ -1798,9 +1799,7 @@ describe("Nova admissão — sucesso", () => {
 
   it("revisar contatos na ficha é uma ação separada", async () => {
     const { onAbrirAdmitido } = await admitirComSucesso();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Revisar contatos na ficha" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Revisar contatos" }));
     expect(onAbrirAdmitido).toHaveBeenCalledWith(
       expect.objectContaining({ id: resposta.id }),
       "contatos",
@@ -1874,16 +1873,16 @@ describe("Nova admissão — contrato de CSS da confirmação", () => {
 // alternativa). O cliente de CEP é automockado: nenhum teste sai da página.
 // ---------------------------------------------------------------------------
 
-const campoCep = () => screen.getByLabelText(/^CEP/);
+const campoCep = () => campoPeloRotulo(/^CEP/);
 // T209 — etapa 3: "Logradouro e número" e "Cidade e estado" são grupos;
 // cada campo tem o próprio nome.
-const logradouro = () => screen.getByLabelText(/^Logradouro$/);
+const logradouro = () => campoPeloRotulo(/^Logradouro$/);
 // T209 — "Número do registro" (etapa 2) também começa por "Número".
-const numero = () => screen.getByLabelText(/^Número(?! do registro)/);
-const complemento = () => screen.getByLabelText(/^Complemento/);
-const bairro = () => screen.getByLabelText(/^Bairro/);
-const cidade = () => screen.getByLabelText(/^Cidade$/);
-const estado = () => screen.getByLabelText(/^Estado$/);
+const numero = () => campoPeloRotulo(/^Número(?! do registro)/);
+const complemento = () => campoPeloRotulo(/^Complemento/);
+const bairro = () => campoPeloRotulo(/^Bairro/);
+const cidade = () => campoPeloRotulo(/^Cidade$/);
+const estado = () => campoPeloRotulo(/^Estado$/);
 const botaoConsultarDeNovo = () =>
   screen.queryByRole("button", { name: "Consultar de novo" });
 const statusCep = () => document.getElementById("nova-admissao-cep-status");
@@ -1918,7 +1917,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await abrirEndereco();
     const secao = screen.getByRole("region", { name: "Endereço residencial" });
     expect(secao).toHaveTextContent(
-      "Digite o CEP e o Evolli completa o endereço.",
+      "Preenchemos o restante automaticamente a partir do CEP.",
     );
     expect(screen.queryByLabelText(/^País/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Buscar CEP/ })).toBeNull();
@@ -1944,7 +1943,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     }
     // Sem nada preenchido, a etapa avança.
     fireEvent.click(botaoContinuar());
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
   });
 
   it("o estado é uma das 27 siglas, em ordem alfabética do nome", async () => {
@@ -1987,7 +1986,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect((estado() as HTMLSelectElement).options[0]).toHaveTextContent("UF");
   });
 
-  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço localizado pelo CEP'", async () => {
+  it("completar os 8 dígitos consulta sozinho e preenche o resto; 'Endereço encontrado'", async () => {
     montar();
     await aguardarEmpresa();
     await abrirEndereco();
@@ -2007,7 +2006,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     expect(numero()).toHaveValue("100");
     expect(complemento()).toHaveValue("Sala 2");
     expect(statusCep()).toHaveAttribute("role", "status");
-    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
     expect(statusCep()).toHaveClass("nova-admissao__cep-status--encontrado");
 
     // Sair do campo com o mesmo CEP não repergunta.
@@ -2045,7 +2044,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     fireEvent.blur(campoCep());
     expect(consultarCep).toHaveBeenCalledTimes(1);
     await act(async () => concluir(RESPOSTA_CEP));
-    expect(statusCep()).toHaveTextContent(/^Endereço localizado pelo CEP$/);
+    expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/);
   });
 
   it("resposta obsoleta (o CEP mudou durante a busca) é descartada", async () => {
@@ -2068,7 +2067,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
     await act(async () => concluir(RESPOSTA_CEP));
     expect(logradouro()).toHaveValue("");
     expect(cidade()).toHaveValue("");
-    expect(statusCep()).not.toHaveTextContent("Endereço localizado pelo CEP");
+    expect(statusCep()).not.toHaveTextContent("Endereço encontrado");
   });
 
   it("sem sigla, o estado por extenso vira a sigla do seletor", async () => {
@@ -2145,7 +2144,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
   });
 
   it.each([
-    [404, "CEP não encontrado. Preencha o endereço manualmente.", false],
+    [404, "CEP não encontrado. Preencha o endereço abaixo.", false],
     [
       503,
       "Não foi possível consultar o CEP agora. Preencha o endereço manualmente ou tente de novo.",
@@ -2177,9 +2176,7 @@ describe("T209 — etapa 3: endereço residencial", () => {
         fireEvent.click(botaoConsultarDeNovo()!);
         await waitFor(() => expect(consultarCep).toHaveBeenCalledTimes(2));
         await waitFor(() =>
-          expect(statusCep()).toHaveTextContent(
-            /^Endereço localizado pelo CEP$/,
-          ),
+          expect(statusCep()).toHaveTextContent(/^Endereço encontrado$/),
         );
         expect(botaoConsultarDeNovo()).toBeNull();
       } else {
@@ -3422,7 +3419,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.change(cargoSel(), { target: { value: `  ${cargoNovo.nome} ` } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     // Sem cargo com esse nome no cadastro: o RH o cria, só com nome e empresa.
@@ -3456,7 +3453,7 @@ const botaoContinuar = () =>
 /** As etapas 1 e 2 válidas e a 3 vazia: chega à revisão. */
 async function ateARevisao() {
   await preencherValido();
-  irAteEtapa("Revisão e conclusão");
+  irAteEtapa("Documentos");
 }
 
 describe("T195 — quatro etapas: indicador e progresso", () => {
@@ -3489,7 +3486,7 @@ describe("T195 — quatro etapas: indicador e progresso", () => {
     for (const [titulo, pct] of [
       ["Etapa 2 de 4: Dados profissionais", "50"],
       ["Etapa 3 de 4: Endereço", "75"],
-      ["Etapa 4 de 4: Revisão e conclusão", "100"],
+      ["Etapa 4 de 4: Documentos", "100"],
     ] as const) {
       fireEvent.click(botaoContinuar());
       expect(tituloDaEtapa()).toHaveTextContent(titulo);
@@ -3596,10 +3593,10 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     // A revisão, já alcançada, continua ao alcance: o caminho é validado.
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 4: Revisão e conclusão, visitada",
+        name: "Etapa 4: Documentos, visitada",
       }),
     );
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     expect(progresso()).toHaveAttribute("value", "100");
   });
 
@@ -3615,7 +3612,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     fireEvent.change(data(), { target: { value: "" } });
     fireEvent.click(
       within(indicador()).getByRole("button", {
-        name: "Etapa 4: Revisão e conclusão, visitada",
+        name: "Etapa 4: Documentos, visitada",
       }),
     );
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
@@ -3632,7 +3629,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.change(matricula(), { target: { value: "x" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
@@ -3647,75 +3644,47 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
 });
 
 describe("T195 — revisão e conclusão", () => {
-  it("mostra o que foi digitado, sem opcional em branco, com Editar por bloco", async () => {
-    montar();
-    await aguardarEmpresa();
-    await preencherValido();
-    irAteEtapa("Endereço");
-    fireEvent.change(cidade(), { target: { value: "Cidade Sintética" } });
-    irAteEtapa("Revisão e conclusão");
-    const bloco = (titulo: string) =>
-      screen
-        .getByRole("heading", { level: 3, name: titulo })
-        .closest("section")!;
-
-    const basicos = bloco("Dados básicos");
-    expect(basicos).toHaveTextContent("Nome completoPessoa Sintética Nova");
-    expect(basicos).toHaveTextContent("E-mail pessoalPessoa.Nova@Exemplo.TEST");
-    expect(basicos).toHaveTextContent("Data de nascimento20/05/1990");
-    expect(basicos).toHaveTextContent("Telefone pessoal(31) 99999-0000");
-    expect(basicos).toHaveTextContent("CPF529.982.247-25");
-    // Opcional em branco não aparece.
-    expect(basicos).not.toHaveTextContent("Saudação");
-    expect(basicos).not.toHaveTextContent("Sexo");
-
-    const profissionais = bloco("Dados profissionais");
-    expect(profissionais).toHaveTextContent("MatrículaMAT-0900");
-    expect(profissionais).toHaveTextContent("Tipo de contrataçãoCLT");
-    expect(profissionais).toHaveTextContent("Data de admissão03/11/2026");
-    // T209 — o cargo digitado aparece como texto; o salário, em reais.
-    expect(profissionais).toHaveTextContent(`Cargo${cargo.nome}`);
-    expect(profissionais).toHaveTextContent(
-      `Departamento${departamento.codigo} — ${departamento.nome}`,
-    );
-    expect(profissionais).toHaveTextContent(
-      `Unidade${unidade.codigo} — ${unidade.nome}`,
-    );
-    expect(profissionais).toHaveTextContent(/Salário brutoR\$\s/);
-    expect(profissionais).not.toHaveTextContent("Área");
-    expect(profissionais).not.toHaveTextContent("Nível");
-    expect(profissionais).not.toHaveTextContent("Jornada");
-
-    const endereco = bloco("Endereço");
-    // T209 — sem campo País na etapa 3, o país não aparece no resumo.
-    expect(endereco).not.toHaveTextContent("País");
-    expect(endereco).toHaveTextContent("CidadeCidade Sintética");
-    expect(endereco).not.toHaveTextContent("Logradouro");
-    expectSemIsoVisivel(document.body);
-
-    // Editar volta à etapa, com o foco no título e os dados no lugar.
-    fireEvent.click(
-      within(profissionais).getByRole("button", {
-        name: "Editar Dados profissionais",
-      }),
-    );
-    expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
-    await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
-    expect(matricula()).toHaveValue("MAT-0900");
-    expect(admitirColaborador).not.toHaveBeenCalled();
-  });
-
-  it("T209 — sem bloco de documentos futuros na revisão; o único arquivo é a foto", async () => {
+  it("T213 — a etapa 4 é Documentos: cinco principais Pendente, Outros documentos, nada obrigatório", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
+    const principais = screen
+      .getByRole("heading", { level: 3, name: "Documentos obrigatórios" })
+      .closest("section")!;
+    for (const nome of [
+      "RG",
+      "CPF",
+      "Comprovante de endereço",
+      "Carteira de Trabalho",
+      "Certidões",
+    ]) {
+      expect(
+        within(principais).getByRole("button", {
+          name: `Enviar arquivo de ${nome}`,
+        }),
+      ).toBeInTheDocument();
+    }
+    expect(within(principais).getAllByText("Pendente")).toHaveLength(5);
+    expect(principais).toHaveTextContent("0 de 5 enviados.");
     expect(
-      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
-    ).toBeNull();
-    expect(document.body).not.toHaveTextContent(/Documentos serão liberados/);
-    const arquivos = document.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+      screen.getByRole("heading", { level: 3, name: "Outros documentos" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    ).toBeEnabled();
+  });
+
+  it("T213 — campos de arquivo: a foto e um por documento, nenhum obrigatório", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
   });
 
   it("Confirmar admissão abre a mesma confirmação e envia uma vez, com a chave", async () => {
@@ -3775,7 +3744,7 @@ describe("T195 — revisão e conclusão", () => {
       /Não foi possível confirmar se o cadastro foi gravado/,
     );
     await waitFor(() => expect(alerta).toHaveFocus());
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(2));
     expect(chaveDaChamada(1)).toBe(chaveDaChamada(0));
@@ -3844,7 +3813,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     // O mesmo botão já virou "Concluir" — é onde o 2º clique cai.
     expect(botao).toHaveTextContent("Cadastrar colaborador");
     fireEvent.click(botao, { detail: 2 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     expect(dialogoConfirmacao()).toBeNull();
     await waitFor(() => expect(tituloDaEtapa()).toHaveFocus());
     // Um clique novo, deliberado, abre a confirmação de sempre.
@@ -3883,7 +3852,7 @@ describe("T195 (revisão final) — duplo clique não salta a revisão", () => {
     fireEvent.click(botaoContinuar(), { detail: 0 });
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
     fireEvent.click(botaoContinuar(), { detail: 0 });
-    expect(tituloDaEtapa()).toHaveTextContent(/Revisão e conclusão$/);
+    expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     fireEvent.click(
       screen.getByRole("button", { name: "Cadastrar colaborador" }),
       {
@@ -3916,7 +3885,7 @@ describe("T195 (revisão final) — depois de um seletor, avança-se por Tab e E
     // T209 — o último campo da etapa (Pensão alimentícia) e, logo depois, as
     // ações — nesta ordem.
     const depois = ordem.slice(
-      ordem.indexOf(screen.getByLabelText(/^Pensão alimentícia/)) + 1,
+      ordem.indexOf(campoPeloRotulo(/^Pensão alimentícia/)) + 1,
     );
     expect(
       depois.map((e) => e.getAttribute("aria-label") ?? e.textContent),
@@ -4125,7 +4094,7 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
     abrirLotacao();
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(cargoSel()).toHaveFocus());
@@ -4150,10 +4119,10 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
     await waitFor(() => expect(salarioBruto()).toHaveFocus());
     expect(salarioBruto()).toHaveAttribute("aria-invalid", "true");
     expect(salarioBruto()).toHaveAccessibleDescription(
-      "Informe o salário bruto.",
+      "Informe o salário bruto. Ele é usado na folha de pagamento.",
     );
     expect(cargoSel()).not.toHaveAttribute("aria-invalid");
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
   });
@@ -4737,7 +4706,7 @@ const ETAPAS_REAIS = [
   "Dados básicos",
   "Dados profissionais",
   "Endereço",
-  "Revisão e conclusão",
+  "Documentos",
 ];
 
 const rodape = () =>
@@ -4763,7 +4732,7 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
       }),
     ).toBeInTheDocument();
     expect(cabecalho).toHaveTextContent(
-      "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+      "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
     );
     fireEvent.click(
       within(cabecalho).getByRole("button", {
@@ -4802,32 +4771,41 @@ describe("T209 — Nova admissão como assistente de etapas", () => {
         (e) => e.textContent,
       ),
     ).toEqual([
-      "Identificação e contatos",
-      "Lotação e contrato",
-      "CEP e endereço",
-      "Resumo final",
+      "Informações pessoais",
+      "Cargo e contrato",
+      "Residência",
+      "Envio de arquivos",
     ]);
     expect(
       screen.getByRole("heading", { level: 2, name: /Dados básicos$/ }),
     ).toBeVisible();
   });
 
-  it("nada que o contrato não suporta: sem PIS nem upload de documento (CPF, RG, rascunho e foto existem, T209)", async () => {
+  it("nada que o contrato não suporta: sem PIS; documentos só como arquivo opcional na etapa 4 (T213)", async () => {
     montar();
     await aguardarEmpresa();
     const formulario = screen.getByRole("form", {
       name: "Formulário de nova admissão",
     });
-    // T209 — o único arquivo é a foto opcional (PNG ou JPEG).
-    const arquivos = formulario.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+    expect(formulario).toBeInTheDocument();
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
     // T209 — CPF e RG entraram na etapa 1; continua sem campo de documento.
     for (const proibido of [/\bPIS\b/, /Carteira de Trabalho/]) {
       expect(
         screen
           .queryAllByLabelText(proibido)
-          .filter((e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName)),
+          // T213 — o anexo da carteira (campo de arquivo) é permitido; o
+          // dado dela (número, série) continua fora.
+          .filter(
+            (e) =>
+              ["INPUT", "SELECT", "TEXTAREA"].includes(e.tagName) &&
+              e.getAttribute("type") !== "file",
+          ),
       ).toEqual([]);
     }
     expect(
@@ -5035,7 +5013,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Quatro etapas. Salve o rascunho a qualquer momento e termine depois.",
+        "Preencha os dados em 4 etapas. Você pode salvar e continuar depois.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -5051,7 +5029,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     ).toBeInTheDocument();
   });
 
-  it("sem aviso interno, explicação longa, documentos futuros, trilha repetida nem upload", async () => {
+  it("sem aviso interno, explicação longa, documentos futuros nem trilha repetida", async () => {
     montar();
     await aguardarEmpresa();
     const corpo = document.body.textContent ?? "";
@@ -5060,10 +5038,12 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     expect(corpo).not.toMatch(/Documentos serão liberados/);
     expect(corpo).not.toMatch(/T209|em desenvolvimento|branch/i);
     expect(screen.queryByRole("navigation", { name: /trilha/i })).toBeNull();
-    // T209 — o único arquivo é a foto opcional; nenhum upload de documento.
-    const arquivos = document.querySelectorAll('input[type="file"]');
-    expect(arquivos).toHaveLength(1);
+    // T213 — além da foto (PNG ou JPEG), um campo por documento da etapa 4
+    // (PDF, JPG ou PNG); nenhum é obrigatório.
+    const arquivos = [...document.querySelectorAll('input[type="file"]')];
     expect(arquivos[0]).toHaveAttribute("accept", "image/png,image/jpeg");
+    expect(arquivos.slice(1)).toHaveLength(5);
+    for (const campo of arquivos) expect(campo).not.toBeRequired();
   });
 
   it("as quatro etapas, nos nomes pedidos", async () => {
@@ -5073,7 +5053,7 @@ describe("T209 — Novo colaborador: cabeçalho, empresa e o que saiu da tela", 
     expect(etapas).toHaveTextContent("Dados básicos");
     expect(etapas).toHaveTextContent("Dados profissionais");
     expect(etapas).toHaveTextContent("Endereço");
-    expect(etapas).toHaveTextContent("Revisão e conclusão");
+    expect(etapas).toHaveTextContent("Documentos");
   });
 });
 
@@ -5527,7 +5507,9 @@ describe("T209 — etapa 1: dados básicos", () => {
     montar();
     await aguardarEmpresa();
     const painel = etapa1();
-    expect(painel).toHaveTextContent("Quem é a pessoa e como falar com ela.");
+    expect(painel).toHaveTextContent(
+      "Informações pessoais e de contato do novo colaborador.",
+    );
     expect(
       painel.querySelector(".cadastro-etapas__etapa-selo"),
     ).toHaveTextContent("Etapa 1 de 4");
@@ -5541,9 +5523,9 @@ describe("T209 — etapa 1: dados básicos", () => {
       h.nextElementSibling?.textContent,
     ]);
     expect(secoes).toEqual([
-      ["Identificação", "Dados que identificam a pessoa no Evolli."],
-      ["Contato", "Como a empresa fala com a pessoa."],
-      ["Contato de emergência", "Quem avisar se algo acontecer."],
+      ["Identificação", "Aparecem no perfil, nos documentos e no eSocial."],
+      ["Contato", "Canais pessoais para falar com o colaborador."],
+      ["Contato de emergência", "Acionado apenas em situações de urgência."],
     ]);
   });
 
@@ -5554,12 +5536,12 @@ describe("T209 — etapa 1: dados básicos", () => {
       ...etapa1().querySelectorAll(".cadastro-etapas__linha-rotulo"),
     ].map((l) => [...l.children].map((c) => c.textContent));
     expect(linhas).toEqual([
-      ["Foto", "Mostrada na lista e na ficha."],
-      ["Nome completo", "Igual ao documento de identidade."],
-      ["CPF e RG", "Documentos de identificação da pessoa."],
+      ["Foto", "Aparece na lista de colaboradores e no perfil."],
+      ["Nome completo", "Como está nos documentos oficiais."],
+      ["CPF e RG", "Usados na folha e no eSocial."],
       ["Data de nascimento"],
       ["Gênero e estado civil"],
-      ["E-mail pessoal", "O e-mail particular, não o da empresa."],
+      ["E-mail pessoal", "Diferente do e-mail corporativo."],
       ["Telefone pessoal", "Com DDD."],
       ["Nome do contato"],
       ["Telefone do contato"],
@@ -5655,7 +5637,9 @@ describe("T209 — etapa 1: dados básicos", () => {
     fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
     fireEvent.click(screen.getByRole("button", { name: "Próxima etapa" }));
     await waitFor(() => expect(cpf()).toHaveFocus());
-    expect(cpf()).toHaveAccessibleDescription("Informe um CPF válido.");
+    expect(cpf()).toHaveAccessibleDescription(
+      "CPF inválido. Confira os números digitados.",
+    );
     expect(dataNascimento()).not.toHaveAttribute("aria-invalid");
   });
 
@@ -5750,5 +5734,434 @@ describe("T209 — etapa 1: dados básicos", () => {
     expect(
       screen.getByRole("button", { name: "Cadastrar colaborador" }),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T213 — documentos da etapa 4 (arquivos sintéticos).
+
+describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
+  const pdf = (nome = "rg-sintetico.pdf") =>
+    new File(["%PDF-1.4 sintetico %%EOF"], nome, { type: "application/pdf" });
+  const escolherDocumento = (nome: string, arquivo: File) =>
+    fireEvent.change(screen.getByLabelText(`Arquivo de ${nome}`), {
+      target: { files: [arquivo] },
+    });
+  const abrirMenu = (botao: HTMLElement) =>
+    fireEvent.pointerDown(botao, {
+      button: 0,
+      ctrlKey: false,
+      pointerType: "mouse",
+    });
+  const gravado = (
+    categoria: DocumentoColaboradorApi["categoria"],
+    estado: DocumentoColaboradorApi["estado"],
+  ): DocumentoColaboradorApi => ({
+    id: `doc-${categoria}`,
+    categoria,
+    nome: null,
+    estado,
+    formato: "pdf",
+    tamanhoBytes: 24,
+    versao: 1,
+    enviadoEm: "2026-11-19T12:00:00.000Z",
+    verificadoEm:
+      estado === "em_verificacao" ? null : "2026-11-19T12:00:01.000Z",
+  });
+  const linhaDe = (nome: string) =>
+    screen
+      .getAllByText(nome, { selector: ".documentos__nome" })
+      .at(-1)!
+      .closest("li")!;
+
+  async function cadastrar() {
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar colaborador" }),
+    );
+    const dialogo = await screen.findByRole("dialog", {
+      name: "Confirmar cadastro de colaborador?",
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", { name: "Confirmar cadastro" }),
+    );
+    await screen.findByText("Admissão registrada");
+  }
+
+  it("escolher o arquivo: a linha mostra nome e tamanho, Ver e o menu; nada sobe antes de cadastrar", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    const linha = linhaDe("RG");
+    expect(linha).toHaveTextContent("rg-sintetico.pdf");
+    expect(linha).toHaveTextContent("1 KB");
+    expect(
+      within(linha).getByRole("button", { name: "Ver o arquivo de RG" }),
+    ).toBeInTheDocument();
+    expect(
+      within(linha).getByRole("button", { name: "Mais ações: RG" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 de 5 enviados.")).toBeInTheDocument();
+    expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("arquivo fora de PDF, JPG ou PNG é recusado ali mesmo e a linha segue Pendente", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento(
+      "CPF",
+      new File(["x"], "cpf.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+    const linha = linhaDe("CPF");
+    expect(within(linha).getByRole("alert")).toHaveTextContent(
+      "Use um arquivo PDF, JPG ou PNG.",
+    );
+    expect(linha).toHaveTextContent("Pendente");
+  });
+
+  it("menu do arquivo: Remover arquivo volta a linha a Pendente", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Remover arquivo" }),
+    );
+    await waitFor(() => expect(linhaDe("RG")).toHaveTextContent("Pendente"));
+    expect(screen.getByText("0 de 5 enviados.")).toBeInTheDocument();
+  });
+
+  it("proteção de saída: arquivo escolhido conta como edição pendente", async () => {
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <NovaAdmissaoScreen
+          onSair={vi.fn()}
+          onAbrirAdmitido={vi.fn()}
+          papelDoAtor="rh"
+        />
+      </ProvedorDeEdicoes>,
+    );
+    await aguardarEmpresa();
+    await ateARevisao();
+    // Com o rascunho salvo, o formulário não tem pendência…
+    vi.mocked(salvarRascunhoAdmissao).mockResolvedValue({
+      versao: 1,
+      atualizadoEm: "2026-11-19T12:00:00.000Z",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    await waitFor(() =>
+      expect(registro.obter().pendentes).not.toContain("Nova admissão"),
+    );
+    // …e o arquivo escolhido (que nunca vai ao rascunho) passa a ser uma.
+    escolherDocumento("Comprovante de endereço", pdf("comprovante.pdf"));
+    await waitFor(() =>
+      expect(registro.obter().pendentes).toContain("Nova admissão"),
+    );
+  });
+
+  it("cadastrar envia cada arquivo depois da admissão, com categoria e chave própria; Aprovado aparece com texto", async () => {
+    vi.mocked(enviarDocumentoDoColaborador).mockImplementation(
+      async (_id, pedido) => gravado(pedido.categoria, "aprovado"),
+    );
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    const arquivo = pdf();
+    escolherDocumento("RG", arquivo);
+    await cadastrar();
+    await waitFor(() =>
+      expect(enviarDocumentoDoColaborador).toHaveBeenCalledTimes(1),
+    );
+    const [colaboradorId, pedido] = vi.mocked(enviarDocumentoDoColaborador).mock
+      .calls[0]!;
+    expect(colaboradorId).toBe(resposta.id);
+    expect(pedido.categoria).toBe("rg");
+    expect(pedido.arquivo).toBe(arquivo);
+    expect(pedido.chaveIdempotencia).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    const envio = await screen.findByRole("heading", {
+      level: 3,
+      name: "Documentos",
+    });
+    await waitFor(() =>
+      expect(envio.closest("section")!).toHaveTextContent("Aprovado"),
+    );
+  });
+
+  it("falha transitória: Não enviado com Tentar de novo, que repete a mesma chave", async () => {
+    vi.mocked(enviarDocumentoDoColaborador)
+      .mockRejectedValueOnce(recusa(503))
+      .mockResolvedValueOnce(gravado("rg", "aprovado"));
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const tentar = await screen.findByRole("button", {
+      name: "Tentar de novo o envio de RG",
+    });
+    expect(tentar.closest("li")!).toHaveTextContent("Não enviado");
+    fireEvent.click(tentar);
+    await waitFor(() =>
+      expect(enviarDocumentoDoColaborador).toHaveBeenCalledTimes(2),
+    );
+    const chaves = vi
+      .mocked(enviarDocumentoDoColaborador)
+      .mock.calls.map(([, p]) => p.chaveIdempotencia);
+    expect(chaves[1]).toBe(chaves[0]);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Tentar de novo o envio de RG" }),
+      ).toBeNull(),
+    );
+  });
+
+  it.each([
+    [
+      "formato",
+      recusa(422, { codigo: "documento_formato_invalido" }),
+      /não é um PDF, JPG ou PNG válido/,
+    ],
+    [
+      "conteúdo corrompido",
+      recusa(422, { codigo: "documento_arquivo_malformado" }),
+      /corrompido ou incompleto/,
+    ],
+    ["tamanho", recusa(413), /passa de 10 MB/],
+    ["acesso recusado", recusa(403), /acesso não permite/],
+  ])(
+    "recusa definitiva (%s): mensagem acionável, sem Tentar de novo",
+    async (_, erro, mensagem) => {
+      vi.mocked(enviarDocumentoDoColaborador).mockRejectedValueOnce(erro);
+      montar();
+      await aguardarEmpresa();
+      await ateARevisao();
+      escolherDocumento("RG", pdf());
+      await cadastrar();
+      await waitFor(() =>
+        expect(screen.getByText(mensagem)).toBeInTheDocument(),
+      );
+      expect(screen.getByText(mensagem).closest("li")!).toHaveTextContent(
+        "Não enviado",
+      );
+      expect(
+        screen.queryByRole("button", { name: "Tentar de novo o envio de RG" }),
+      ).toBeNull();
+    },
+  );
+
+  it("arquivo reprovado pelo antivírus: Reprovado, explicado, sem nova tentativa", async () => {
+    vi.mocked(enviarDocumentoDoColaborador).mockResolvedValueOnce(
+      gravado("rg", "reprovado"),
+    );
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const detalhe = await screen.findByText(/antivírus recusou este arquivo/);
+    expect(detalhe.closest("li")!).toHaveTextContent("Reprovado");
+    expect(screen.queryByRole("button", { name: /Tentar de novo/ })).toBeNull();
+  });
+
+  it("durante o envio, Registrar outra admissão fica bloqueado, com aviso; a página conta como salvando", async () => {
+    let liberar: (v: DocumentoColaboradorApi) => void = () => undefined;
+    vi.mocked(enviarDocumentoDoColaborador).mockReturnValue(
+      new Promise((r) => {
+        liberar = r;
+      }),
+    );
+    const registro = new RegistroDeEdicoes();
+    render(
+      <ProvedorDeEdicoes registro={registro}>
+        <NovaAdmissaoScreen
+          onSair={vi.fn()}
+          onAbrirAdmitido={vi.fn()}
+          papelDoAtor="rh"
+        />
+      </ProvedorDeEdicoes>,
+    );
+    await aguardarEmpresa();
+    await ateARevisao();
+    escolherDocumento("RG", pdf());
+    await cadastrar();
+    const outra = screen.getByRole("button", {
+      name: "Registrar outra admissão",
+    });
+    expect(outra).toBeDisabled();
+    expect(outra).toHaveAccessibleDescription(/Aguarde terminar/);
+    expect(registro.obter().salvando).toContain("Nova admissão");
+    await act(async () => liberar(gravado("rg", "aprovado")));
+    await waitFor(() => expect(outra).toBeEnabled());
+    expect(registro.obter().salvando).not.toContain("Nova admissão");
+  });
+
+  it("sem arquivo, cadastrar não envia documento e não mostra o bloco", async () => {
+    montar();
+    await aguardarEmpresa();
+    await ateARevisao();
+    await cadastrar();
+    expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { level: 3, name: "Documentos" }),
+    ).toBeNull();
+  });
+});
+
+describe("T215 — CPF já cadastrado, conferido ao digitar", () => {
+  const AVISO = "Este CPF já está cadastrado nesta empresa.";
+  const proxima = () => screen.getByRole("button", { name: "Próxima etapa" });
+  const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it("CPF completo e válido: consulta só os dígitos e avisa no campo; não avança", async () => {
+    vi.mocked(consultarCpfEmUso).mockResolvedValue(true);
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(cpf()).toHaveAccessibleDescription(AVISO));
+    expect(cpf()).toHaveAttribute("aria-invalid", "true");
+    expect(consultarCpfEmUso).toHaveBeenCalledTimes(1);
+    expect(consultarCpfEmUso).toHaveBeenCalledWith("52998224725");
+    fireEvent.click(proxima());
+    await waitFor(() => expect(cpf()).toHaveFocus());
+    expect(tituloDaEtapa()).toHaveTextContent(/Dados básicos$/);
+    expect(cpf()).toHaveAccessibleDescription(AVISO);
+  });
+
+  it("incompleto ou inválido não consulta; trocar o CPF tira o aviso; o livre não acusa", async () => {
+    vi.mocked(consultarCpfEmUso).mockImplementation(
+      async (c) => c === "52998224725",
+    );
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: "529.982.247" } });
+    fireEvent.change(cpf(), { target: { value: "111.111.111-11" } });
+    await esperar(700);
+    expect(consultarCpfEmUso).not.toHaveBeenCalled();
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(cpf()).toHaveAccessibleDescription(AVISO));
+    fireEvent.change(cpf(), { target: { value: "111.444.777-35" } });
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+    await waitFor(() =>
+      expect(consultarCpfEmUso).toHaveBeenLastCalledWith("11144477735"),
+    );
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("digitação rápida: uma consulta só, a do CPF que ficou; resposta velha não acusa", async () => {
+    let responderVelho: (v: boolean) => void = () => {};
+    vi.mocked(consultarCpfEmUso).mockImplementation((c) =>
+      c === "52998224725"
+        ? new Promise<boolean>((r) => {
+            responderVelho = r;
+          })
+        : Promise.resolve(false),
+    );
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(1));
+    fireEvent.change(cpf(), { target: { value: "111.444.777-35" } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(2));
+    responderVelho(true);
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+
+    vi.mocked(consultarCpfEmUso).mockClear();
+    fireEvent.change(cpf(), { target: { value: "390.533.447" } });
+    fireEvent.change(cpf(), { target: { value: "390.533.447-05" } });
+    await esperar(700);
+    expect(consultarCpfEmUso).toHaveBeenCalledTimes(1);
+    expect(consultarCpfEmUso).toHaveBeenCalledWith("39053344705");
+  });
+
+  it("falha na conferência não trava: a etapa avança e o servidor confere ao gravar", async () => {
+    vi.mocked(consultarCpfEmUso).mockRejectedValue(new Error("rede"));
+    montar();
+    await aguardarEmpresa();
+    fireEvent.change(nome(), { target: { value: "Ana Sintética" } });
+    fireEvent.change(cpf(), { target: { value: CPF_VALIDO } });
+    await waitFor(() => expect(consultarCpfEmUso).toHaveBeenCalledTimes(1));
+    await esperar(50);
+    expect(cpf()).not.toHaveAttribute("aria-invalid");
+    fireEvent.click(proxima());
+    await waitFor(() =>
+      expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/),
+    );
+  });
+});
+
+describe("T215 — textos das etapas 2 a 4 iguais aos da referência", () => {
+  beforeEach(() => {
+    vi.mocked(obterRascunhoAdmissao).mockResolvedValue(null);
+  });
+
+  const etapa = (titulo: RegExp) =>
+    screen
+      .getByRole("heading", { level: 2, name: titulo })
+      .closest("section") as HTMLElement;
+  const secoes = (el: HTMLElement) =>
+    [...el.querySelectorAll("h3")].map((h) => [
+      h.textContent,
+      h.nextElementSibling?.textContent,
+    ]);
+  const linhas = (el: HTMLElement) =>
+    [...el.querySelectorAll(".cadastro-etapas__linha-rotulo")].map((l) =>
+      [...l.children].map((c) => c.textContent),
+    );
+
+  it("etapa 2: seções, linhas e ajudas", async () => {
+    montar();
+    await aguardarEmpresa();
+    abrirLotacao();
+    const el = etapa(/Dados profissionais$/);
+    expect(el).toHaveTextContent(
+      "Cargo, contrato e remuneração do novo colaborador.",
+    );
+    expect(secoes(el)).toEqual([
+      ["Cargo e estrutura", "Onde o colaborador está na organização."],
+      ["Contrato", "Tipo de vínculo, admissão, jornada, escala e matrícula."],
+      ["Remuneração", "Valores mensais usados na folha."],
+      ["Informações adicionais", "Registro profissional e deduções."],
+    ]);
+    const ajudas = Object.fromEntries(
+      linhas(el).map(([rotulo, ajuda]) => [rotulo, ajuda]),
+    );
+    expect(ajudas).toMatchObject({
+      Unidade: "Filial, loja ou local de trabalho.",
+      "Gestor direto": "Recebe as solicitações do colaborador.",
+      "Escala de trabalho":
+        "Sem escala, os benefícios usam os dias úteis do mês.",
+      "Salário líquido": "Calculado a partir do bruto.",
+      "Conselho e registro": "Obrigatório para algumas profissões.",
+    });
+  });
+
+  it("etapa 3: descrição e a seção do endereço", async () => {
+    montar();
+    await aguardarEmpresa();
+    await abrirEndereco();
+    const el = etapa(/Endereço$/);
+    expect(el).toHaveTextContent(
+      "Residência usada em correspondências e no eSocial.",
+    );
+    expect(secoes(el)).toEqual([
+      [
+        "Endereço residencial",
+        "Preenchemos o restante automaticamente a partir do CEP.",
+      ],
+    ]);
   });
 });

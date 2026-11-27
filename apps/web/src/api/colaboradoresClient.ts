@@ -135,6 +135,27 @@ export interface VigenciaDeJornadaListadaApi {
  */
 export interface ColaboradorListadoApi extends ColaboradorApi {
   vinculos: VinculoListadoApi[];
+  /**
+   * T215 — desativado na empresa (lixeira do "Editar colaborador"): a
+   * `situacao` vem "inativo" e a linha só aparece em Todos.
+   */
+  desativado?: boolean;
+  /**
+   * T215 — CPF (11 dígitos) na empresa ativa. AUSENTE para quem não lê dados
+   * pessoais (e sem empresa ativa); `null` sem CPF ou com o dado bloqueado
+   * (desligado). A tela distingue "sem permissão" de "vazio".
+   */
+  cpf?: string | null;
+  /**
+   * T215 — e-mail pessoal e celular do contato ativo na empresa. AUSENTE
+   * para quem não lê contatos; `null` sem contato ou bloqueado.
+   */
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  /**
+   * T215 — salário bruto do contrato do vínculo principal ("5000.00").
+   * AUSENTE para quem não lê o contrato; `null` sem contrato ou salário.
+   */
+  salarioBruto?: string | null;
 }
 
 /**
@@ -152,8 +173,25 @@ export interface ContadoresColaboradoresApi {
   emAdmissao: number;
   desligados: number;
   total: number;
+  /**
+   * T215 — desativados na empresa, fora dos três grupos:
+   * `ativos + emAdmissao + desligados + desativados = total`.
+   */
+  desativados?: number;
   /** T199 — ativos pelo tipo do vínculo principal ativo; a soma é `ativos`. */
   ativosPorTipo: Record<TipoVinculo, number>;
+  /**
+   * T215 — cartão "Colaboradores ativos": pessoas com vínculo ativo admitido
+   * no mês civil de hoje (America/Sao_Paulo).
+   */
+  admitidosNoMes?: number;
+  /** T215 — pessoas com vínculo encerrado no ano civil de hoje. */
+  desligadosNoAno?: number;
+  /**
+   * T215 — ativos ao fim de cada um dos 6 meses até hoje (o mais antigo
+   * primeiro; o atual fecha hoje), para o gráfico do cartão.
+   */
+  serieAtivos?: number[];
 }
 
 /** T199 — grupo da aba do dashboard (ausente: todos). */
@@ -191,6 +229,20 @@ export interface ListarColaboradoresQuery {
   grupo?: GrupoColaboradores;
   /** T199 — tipo do vínculo que define o grupo (sem grupo: qualquer um). */
   tipoVinculo?: TipoVinculo;
+  /**
+   * T215 — os grupos da gaveta "Filtrar": dentro de um grupo vale qualquer
+   * valor; entre grupos, todos. Lotação e nível pela lotação vigente (vínculo
+   * ativo, regra da T190); tipo pelo vínculo do grupo; gênero pelo perfil.
+   * Lista vazia não vai à query.
+   */
+  departamentos?: readonly string[];
+  areas?: readonly string[];
+  centrosCusto?: readonly string[];
+  unidades?: readonly string[];
+  cargos?: readonly string[];
+  niveis?: readonly string[];
+  tipos?: readonly string[];
+  generos?: readonly string[];
   pagina?: number;
   tamanhoPagina?: number;
 }
@@ -457,6 +509,18 @@ export interface OpcoesDaLeitura {
   readonly signal?: AbortSignal;
 }
 
+/** T215 — os grupos da gaveta, com os nomes dos parâmetros da API. */
+const GRUPOS_DA_GAVETA = [
+  "departamentos",
+  "areas",
+  "centrosCusto",
+  "unidades",
+  "cargos",
+  "niveis",
+  "tipos",
+  "generos",
+] as const satisfies readonly (keyof ListarColaboradoresQuery)[];
+
 export async function listarColaboradores(
   query: ListarColaboradoresQuery = {},
   opcoes: OpcoesDaLeitura = {},
@@ -476,6 +540,10 @@ export async function listarColaboradores(
   if (query.cargoId) params.set("cargoId", query.cargoId);
   if (query.grupo) params.set("grupo", query.grupo);
   if (query.tipoVinculo) params.set("tipoVinculo", query.tipoVinculo);
+  for (const grupo of GRUPOS_DA_GAVETA) {
+    const lista = query[grupo];
+    if (lista && lista.length > 0) params.set(grupo, lista.join(","));
+  }
   if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
   if (query.tamanhoPagina !== undefined)
     params.set("tamanhoPagina", String(query.tamanhoPagina));
@@ -495,7 +563,10 @@ export async function buscarColaborador(id: string): Promise<ColaboradorApi> {
 export async function listarVinculosDoColaborador(
   colaboradorId: string,
 ): Promise<VinculoApi[]> {
-  const res = await apiFetch(`/colaboradores/${colaboradorId}/vinculos`);
+  // Sem cache: a situação do vínculo muda na efetivação e no desligamento.
+  const res = await apiFetch(`/colaboradores/${colaboradorId}/vinculos`, {
+    cache: "no-store",
+  });
   return jsonOrThrow(res);
 }
 
@@ -542,6 +613,26 @@ export async function enviarAdmissao(
     admissao,
     reenvio: res.headers?.get("Idempotent-Replayed") === "true",
   };
+}
+
+/**
+ * T215 — o CPF já está cadastrado na empresa ativa? Conferido enquanto o RH
+ * digita. O CPF vai no corpo, nunca na URL.
+ */
+export async function consultarCpfEmUso(
+  cpf: string,
+  ignorarColaboradorId?: string,
+): Promise<boolean> {
+  const token = await getCsrf();
+  const res = await apiFetch("/colaboradores/cpf-em-uso", {
+    method: "POST",
+    headers: { "x-csrf-token": token },
+    body: JSON.stringify({
+      cpf,
+      ...(ignorarColaboradorId ? { ignorarColaboradorId } : {}),
+    }),
+  });
+  return (await jsonOrThrow<{ emUso: boolean }>(res)).emUso;
 }
 
 export async function retificarColaborador(
@@ -666,4 +757,159 @@ export async function enviarFotoColaborador(
     res = await enviar();
   }
   return jsonOrThrow<FotoColaboradorGravadaApi>(res);
+}
+
+// ---------------------------------------------------------------------------
+// T213 — documentos do colaborador com arquivo (ADR 0021). O navegador nunca
+// fala com o armazenamento: envio e download passam pela API autenticada. O
+// nome original do arquivo NUNCA é enviado — só a extensão e o tipo.
+
+export type CategoriaDocumentoColaborador =
+  | "rg"
+  | "cpf"
+  | "comprovante_endereco"
+  | "carteira_trabalho"
+  | "certidoes"
+  | "outros";
+
+export type EstadoDocumentoColaborador =
+  "em_verificacao" | "aprovado" | "reprovado";
+
+export interface DocumentoColaboradorApi {
+  readonly id: string;
+  readonly categoria: CategoriaDocumentoColaborador;
+  /** Nome curto de "outros" (nunca para o `master_tecnico`). */
+  readonly nome: string | null;
+  readonly estado: EstadoDocumentoColaborador;
+  readonly formato: "pdf" | "jpg" | "png";
+  readonly tamanhoBytes: number;
+  readonly versao: number;
+  readonly enviadoEm: string;
+  readonly verificadoEm: string | null;
+}
+
+const rotaDosDocumentos = (colaboradorId: string) =>
+  `/colaboradores/${encodeURIComponent(colaboradorId)}/documentos`;
+
+export async function listarDocumentosDoColaborador(
+  colaboradorId: string,
+): Promise<DocumentoColaboradorApi[]> {
+  const res = await apiFetch(rotaDosDocumentos(colaboradorId));
+  return jsonOrThrow<DocumentoColaboradorApi[]>(res);
+}
+
+/** Um envio em binário, com nova tentativa única se o token CSRF mudou. */
+async function enviarBinario(
+  caminho: string,
+  arquivo: File,
+  cabecalhos: Record<string, string>,
+): Promise<DocumentoColaboradorApi> {
+  const enviar = async () =>
+    apiFetch(caminho, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": await getCsrf(),
+        "x-evolli-documento-tipo": arquivo.type,
+        "x-evolli-documento-extensao": extensaoDoArquivo(arquivo.name),
+        ...cabecalhos,
+      },
+      body: arquivo,
+    });
+  let res = await enviar();
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+  }
+  return jsonOrThrow<DocumentoColaboradorApi>(res);
+}
+
+/**
+ * Envia um documento novo (`POST /v1/colaboradores/:id/documentos`). A chave
+ * de idempotência é a do arquivo escolhido: a nova tentativa não duplica.
+ */
+export function enviarDocumentoDoColaborador(
+  colaboradorId: string,
+  pedido: {
+    readonly categoria: CategoriaDocumentoColaborador;
+    readonly nome?: string;
+    readonly arquivo: File;
+    readonly chaveIdempotencia: string;
+  },
+): Promise<DocumentoColaboradorApi> {
+  return enviarBinario(rotaDosDocumentos(colaboradorId), pedido.arquivo, {
+    "x-evolli-documento-categoria": pedido.categoria,
+    ...(pedido.nome
+      ? { "x-evolli-documento-nome": encodeURIComponent(pedido.nome) }
+      : {}),
+    "Idempotency-Key": pedido.chaveIdempotencia,
+  });
+}
+
+/** Troca o arquivo (versão nova; a anterior fica guardada). */
+export function trocarDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+  arquivo: File,
+  chaveIdempotencia: string,
+): Promise<DocumentoColaboradorApi> {
+  return enviarBinario(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/versoes`,
+    arquivo,
+    { "Idempotency-Key": chaveIdempotencia },
+  );
+}
+
+/** Nova tentativa do antivírus para o documento em verificação. */
+export async function verificarDocumentoDeNovo(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<DocumentoColaboradorApi> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/verificacao`,
+    { method: "POST", headers: { "x-csrf-token": await getCsrf() } },
+  );
+  return jsonOrThrow<DocumentoColaboradorApi>(res);
+}
+
+/** Remoção lógica do documento. */
+export async function removerDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<void> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}`,
+    { method: "DELETE", headers: { "x-csrf-token": await getCsrf() } },
+  );
+  if (!res.ok) await jsonOrThrow<unknown>(res);
+}
+
+/**
+ * Lê o arquivo aprovado pela rota autenticada (nunca uma URL do
+ * armazenamento): os bytes e o nome neutro do servidor.
+ */
+export async function obterArquivoDoDocumento(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<{ readonly blob: Blob; readonly nome: string }> {
+  const res = await apiFetch(
+    `${rotaDosDocumentos(colaboradorId)}/${encodeURIComponent(documentoId)}/arquivo`,
+    { headers: { Accept: "*/*" } },
+  );
+  if (!res.ok) await jsonOrThrow<unknown>(res);
+  const nome =
+    /filename="([^"]+)"/.exec(
+      res.headers.get("content-disposition") ?? "",
+    )?.[1] ?? "documento";
+  return { blob: await res.blob(), nome };
+}
+
+/** Abre o arquivo aprovado numa aba nova, a partir da memória do navegador. */
+export async function verDocumentoDoColaborador(
+  colaboradorId: string,
+  documentoId: string,
+): Promise<void> {
+  const { blob } = await obterArquivoDoDocumento(colaboradorId, documentoId);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

@@ -150,6 +150,23 @@ export function formatarDiaCivil(valor: string | null | undefined): string {
 }
 
 /**
+ * Data civil → só o ano (`AAAA`), com a mesma validação de
+ * `formatarDiaCivil`. Qualquer recusa devolve `null`.
+ */
+export function anoDoDiaCivil(valor: string | null | undefined): string | null {
+  if (typeof valor !== "string") return null;
+  const casado = CIVIL_EXATA.exec(valor) ?? CIVIL_SERIALIZADA.exec(valor);
+  if (!casado) return null;
+  const [, ano, mes, dia] = casado as unknown as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  return diaExiste(Number(ano), Number(mes), Number(dia)) ? ano : null;
+}
+
+/**
  * Mês de referência → `MM/AAAA`.
  *
  * Aceita **só** `AAAA-MM`. Não deriva competência de data completa: nenhum
@@ -305,4 +322,239 @@ export function formatarInstante(valor: string | null | undefined): string {
   // que são `2-digit`. Sem este `padStart`, o ano 99 sai como "99" e o formato
   // prometido (`DD/MM/AAAA`) quebra justamente onde ninguém olha.
   return `${dia}/${mes}/${ano.padStart(4, "0")} às ${hora}:${minuto}`;
+}
+
+/**
+ * T215 — o dia civil de hoje (`AAAA-MM-DD`) no fuso de negócio.
+ */
+export function diaCivilDeHoje(agora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_DE_NEGOCIO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(agora);
+}
+
+const MESES_ABREVIADOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+] as const;
+
+/**
+ * T215 — data civil → mês abreviado com o ano em dois dígitos (`nov/26`),
+ * com a validação de `formatarDiaCivil`; recusa devolve `AUSENTE`.
+ */
+export function formatarMesAbreviado(valor: string | null | undefined): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  return `${MESES_ABREVIADOS[mes - 1]}/${ano.slice(2)}`;
+}
+
+/**
+ * T215 — data civil → dia (`07`) e mês abreviado (`dez`), para o calendário
+ * da "Próxima ausência". Recusa devolve `null`.
+ */
+export function diaEMesAbreviado(
+  valor: string | null | undefined,
+): { readonly dia: string; readonly mes: string } | null {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return null;
+  return {
+    dia: valor.slice(8, 10),
+    mes: MESES_ABREVIADOS[Number(valor.slice(5, 7)) - 1]!,
+  };
+}
+
+const DIAS_DA_SEMANA_POR_EXTENSO = [
+  "domingo",
+  "segunda",
+  "terça",
+  "quarta",
+  "quinta",
+  "sexta",
+  "sábado",
+] as const;
+
+/**
+ * T215 — data civil → dia da semana, dia e mês (`terça 24/11`), para o quadro
+ * da escala dizer o dia de cada coluna a quem lê pela tela. Recusa devolve
+ * `AUSENTE`.
+ */
+export function diaDaSemanaEDiaMes(valor: string | null | undefined): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  const dia = Number(valor.slice(8, 10));
+  const semana = new Date(Date.UTC(Number(ano), mes - 1, dia)).getUTCDay();
+  return `${DIAS_DA_SEMANA_POR_EXTENSO[semana]} ${dia}/${mes}`;
+}
+
+const MESES_POR_EXTENSO = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+] as const;
+
+/**
+ * T215 — data civil → "Quarta, 3 de março", o título do painel do dia no
+ * quadro da escala. Recusa devolve `AUSENTE`.
+ */
+export function diaPorExtensoComSemana(
+  valor: string | null | undefined,
+): string {
+  const ano = anoDoDiaCivil(valor);
+  if (ano === null || typeof valor !== "string") return AUSENTE;
+  const mes = Number(valor.slice(5, 7));
+  const dia = Number(valor.slice(8, 10));
+  const semana =
+    DIAS_DA_SEMANA_POR_EXTENSO[
+      new Date(Date.UTC(Number(ano), mes - 1, dia)).getUTCDay()
+    ]!;
+  return `${semana.charAt(0).toUpperCase()}${semana.slice(1)}, ${dia} de ${MESES_POR_EXTENSO[mes - 1]}`;
+}
+
+/**
+ * T215 — o intervalo de dias curto: "1 a 7/3", ou "30/11 a 6/12" entre meses.
+ * Recusa devolve `AUSENTE`.
+ */
+export function intervaloCurtoDeDias(
+  inicio: string | null | undefined,
+  fim: string | null | undefined,
+): string {
+  if (
+    anoDoDiaCivil(inicio) === null ||
+    anoDoDiaCivil(fim) === null ||
+    typeof inicio !== "string" ||
+    typeof fim !== "string"
+  ) {
+    return AUSENTE;
+  }
+  const d = (v: string) => Number(v.slice(8, 10));
+  const m = (v: string) => Number(v.slice(5, 7));
+  return m(inicio) === m(fim)
+    ? `${d(inicio)} a ${d(fim)}/${m(fim)}`
+    : `${d(inicio)}/${m(inicio)} a ${d(fim)}/${m(fim)}`;
+}
+
+/** T215 — data civil → dia e mês curtos ("2/3", "24/11"); recusa: `AUSENTE`. */
+export function diaMesCurto(valor: string | null | undefined): string {
+  if (anoDoDiaCivil(valor) === null || typeof valor !== "string")
+    return AUSENTE;
+  return `${Number(valor.slice(8, 10))}/${Number(valor.slice(5, 7))}`;
+}
+
+/** T215 — o número do dia no mês de uma data civil (`2026-11-05` → 5). */
+export function numeroDoDia(valor: string): number {
+  return Number(valor.slice(8, 10));
+}
+
+/**
+ * T215 — a mesma data um ano depois (`2026-12-16` → `2027-12-16`): a 2ª
+ * etapa da transição da EC 141/2026.
+ */
+export function umAnoDepois(valor: string): string {
+  return `${Number(valor.slice(0, 4)) + 1}${valor.slice(4)}`;
+}
+
+/** T215 — idade em anos completos numa data civil (aviso de menor de idade). */
+export function idadeEmAnos(nascimento: string, dia: string): number {
+  let anos = Number(dia.slice(0, 4)) - Number(nascimento.slice(0, 4));
+  if (dia.slice(5) < nascimento.slice(5)) anos -= 1;
+  return anos;
+}
+
+/** T215 — o mês (`AAAA-MM`) de uma data civil. */
+export function mesDoDia(valor: string): string {
+  return valor.slice(0, 7);
+}
+
+/**
+ * T215 — o período de uma ausência por extenso: "De 19/11/2026 a
+ * 19/11/2026" ou, sem data de volta, "Desde 07/03/2026, sem data de volta".
+ */
+export function periodoDaAusencia(inicio: string, fim: string | null): string {
+  return fim === null
+    ? `Desde ${formatarDiaCivil(inicio)}, sem data de volta`
+    : `De ${formatarDiaCivil(inicio)} a ${formatarDiaCivil(fim)}`;
+}
+
+/** T215 — "07/12" (dia e mês com dois dígitos) de uma data civil. */
+export function diaMesComZero(valor: string): string {
+  return formatarDiaCivil(valor).slice(0, 5);
+}
+
+/**
+ * T215 — um intervalo de dias civis, como a referência: "30/11/2026" (um
+ * dia), "02/11 – 07/11/2026" (mesmo ano) ou "31/12/2026 – 04/01/2027"; sem
+ * fim, "Desde 02/11/2026". Data inválida: "—".
+ */
+export function formatarIntervaloDeDias(
+  inicio: string,
+  fim: string | null,
+): string {
+  const de = formatarDiaCivil(inicio);
+  if (!fim) return `Desde ${de}`;
+  const ate = formatarDiaCivil(fim);
+  if (inicio === fim) return de;
+  if (anoDoDiaCivil(inicio) === anoDoDiaCivil(fim)) {
+    return `${de.slice(0, 5)} – ${ate}`;
+  }
+  return `${de} – ${ate}`;
+}
+
+/** `AAAA-MM` válido → [ano, mês 1–12]; senão `null`. */
+function competenciaDe(
+  valor: string | null | undefined,
+): [number, number] | null {
+  if (typeof valor !== "string") return null;
+  const casado = MES_EXATO.exec(valor);
+  if (!casado) return null;
+  const mes = Number(casado[2]);
+  const ano = Number(casado[1]);
+  if (mes < 1 || mes > 12 || ano < 1) return null;
+  return [ano, mes];
+}
+
+/**
+ * T215 — competência (`AAAA-MM`) por extenso: `novembro de 2026`; com
+ * `"barra"`, `novembro/2026`. Recusa devolve `AUSENTE`.
+ */
+export function formatarCompetenciaPorExtenso(
+  valor: string | null | undefined,
+  forma: "de" | "barra" = "de",
+): string {
+  const c = competenciaDe(valor);
+  if (!c) return AUSENTE;
+  const nome = MESES_POR_EXTENSO[c[1] - 1];
+  return forma === "de" ? `${nome} de ${c[0]}` : `${nome}/${c[0]}`;
+}
+
+/** T215 — competência (`AAAA-MM`) abreviada: `nov/2026`. */
+export function formatarCompetenciaAbreviada(
+  valor: string | null | undefined,
+): string {
+  const c = competenciaDe(valor);
+  if (!c) return AUSENTE;
+  return `${MESES_ABREVIADOS[c[1] - 1]}/${c[0]}`;
 }

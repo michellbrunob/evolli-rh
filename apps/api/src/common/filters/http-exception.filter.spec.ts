@@ -13,6 +13,7 @@ import {
   ErroDeCampo,
   RecusaCsrfException,
   ConflitoDeReferenciaException,
+  IndisponibilidadeException,
   RecusaDeNegocioException,
 } from "../erros/recusa-por-campo";
 import { AllExceptionsFilter } from "./http-exception.filter";
@@ -223,6 +224,24 @@ describe("AllExceptionsFilter", () => {
         codigo: "idempotencia_conteudo_divergente",
       });
       expect(corpo).not.toHaveProperty("erros");
+    });
+
+    it("T213 — 503 de indisponibilidade: mensagem fixa e o código estável, nada da mensagem interna", () => {
+      const erro = new IndisponibilidadeException(
+        "documento_verificacao_indisponivel",
+      );
+      // Mesmo que alguém anexe detalhe interno, nada dele sai na resposta.
+      Object.assign(erro, { detalhe: "clamd em 10.0.0.9:3310" });
+      const { status, corpo } = corpoDe(erro);
+      expect(status).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      expect(corpo).toEqual({
+        status_code: HttpStatus.SERVICE_UNAVAILABLE,
+        message: "Serviço temporariamente indisponível.",
+        request_id: "req-t179",
+        timestamp: expect.any(String),
+        codigo: "documento_verificacao_indisponivel",
+      });
+      expect(JSON.stringify(corpo)).not.toMatch(/clamd|3310|10\.0\.0\.9/);
     });
 
     it("T197 — 409 da criação automática: código e, no nome_em_uso, só id, código e nome", () => {

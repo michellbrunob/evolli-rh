@@ -26,6 +26,16 @@ export interface TabelaHorarioApi {
   criadoEm: string;
   atualizadoEm: string;
   periodos: PeriodoApi[];
+  /** T215 — turno da escala (opcionais só para respostas antigas). */
+  cor?: string;
+  sigla?: string | null;
+  unidadeOrganizacionalId?: string | null;
+  modo?: "mesmo_horario" | "por_dia";
+  intervaloMinutos?: number;
+  toleranciaMinutos?: number | null;
+  minimoPorDia?: number | null;
+  /** Pessoas com escala vigente ou futura no turno. */
+  emUso?: number;
 }
 
 export interface PeriodoInputDto {
@@ -34,18 +44,29 @@ export interface PeriodoInputDto {
   fim: string;
 }
 
-export interface CriarTabelaHorarioDto {
-  /** T182 — obrigatório, único na empresa. */
-  codigo: string;
+/** T215 — campos de turno da escala (criação e edição). */
+export interface CamposDeTurnoDto {
+  cor?: string;
+  sigla?: string;
+  unidadeOrganizacionalId?: string | null;
+  toleranciaMinutos?: number | null;
+  minimoPorDia?: number | null;
+}
+
+export interface CriarTabelaHorarioDto extends CamposDeTurnoDto {
+  /** T182 — único na empresa. T215 — sem ele, o servidor gera do nome. */
+  codigo?: string;
   nome: string;
   periodos: PeriodoInputDto[];
+  modo?: "mesmo_horario" | "por_dia";
+  intervaloMinutos?: number;
 }
 
 /**
  * T182 — edição de uma jornada: só nome e código. Os períodos são imutáveis
  * desde a T038 (no banco, inclusive).
  */
-export interface EditarTabelaHorarioDto {
+export interface EditarTabelaHorarioDto extends CamposDeTurnoDto {
   codigo?: string;
   nome?: string;
 }

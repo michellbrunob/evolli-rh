@@ -542,7 +542,11 @@
   white-space: nowrap;
 }
 
-.cadastro-etapas__linha-campos :where(input:not([type="file"]), select),
+.cadastro-etapas__linha-campos
+  :where(
+    input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+    select
+  ),
 .cadastro-etapas__linha-cadastro .seletor-referencia__linha input {
   min-height: 42px;
   padding: 0 0.75rem;

@@ -569,9 +569,9 @@ decisões e bloqueios, está no ledger versionado
       contido) havia sido reprovado por não ser proposta, e não foi propagado. **Integrada em
       `main`** pela PR #134 (squash `8c3d8c3`), com a ADR 0014 da T143; a expansão para as demais
       telas está **liberada e ainda não iniciada**.
-    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. `DESIGN-apple.md`
-      NÃO foi editado: é referência externa mantida intacta byte a byte por decisão do projeto
-      (T032); as decisões próprias ficam no documento acima e nos tokens/componentes.
+    - **Decisão registrada em** `docs/decisions/t142-direcao-visual-b-modais.md`. O arquivo de
+      referência externa da T032 NÃO foi editado na época (removido em 2026-11-25; fonte oficial atual:
+      `docs/DESIGN-SYSTEM-EVOLLI.md`); as decisões próprias ficam no documento acima e nos tokens/componentes.
     - **Origem:** o proprietário navegou no ambiente local real e relatou falta de organização
       visual, conteúdo fora dos quadros e aparência inconsistente.
     - **Base:** `origin/main` em `f2c1014`. **Não depende** da tarefa do ambiente de demonstração —
@@ -595,7 +595,8 @@ decisões e bloqueios, está no ledger versionado
       instalador oficial (`npx ui-ux-pro-max-cli init`) **não** foi executado, para não rodar código
       de terceiros nem sobrescrever configuração. Nenhuma dependência da aplicação foi alterada e
       nenhuma skill existente foi substituída. Requisito próprio: Python 3 (presente, 3.14.7).
-    - **Fonte de verdade de design continua sendo o projeto:** `DESIGN-apple.md`, `app/tokens.css` e
+    - **Fonte de verdade de design continua sendo o projeto:** na época, o arquivo de referência da
+      T032 (removido em 2026-11-25; hoje `docs/DESIGN-SYSTEM-EVOLLI.md`), `app/tokens.css` e
       `src/components/`. A skill foi usada como checklist consultivo; cada sugestão foi avaliada
       contra esses documentos, e nada dela foi copiado como regra. Nenhuma fonte, biblioteca, efeito
       ou framework externo entrou.
@@ -621,7 +622,7 @@ decisões e bloqueios, está no ledger versionado
       **estáticos**, sem API e sem gravação, servidos em porta própria.
     - **Diretrizes de design:** nenhuma alteração proposta ainda. Os protótipos usam apenas os
       tokens já existentes, copiados de `tokens.css`. Se a alternativa B for escolhida, a navegação
-      em coluna lateral é a única convenção nova a registrar em `DESIGN-apple.md`.
+      em coluna lateral é a única convenção nova a registrar no guia de design (hoje `docs/DESIGN-SYSTEM-EVOLLI.md`).
     - **Implementação do piloto (em validação):** componente `Modal` novo (UI-F04) concentrando
       acessibilidade e comportamento de janela — `role="dialog"`, `aria-modal`, foco inicial, foco
       preso, devolução do foco, Escape seguro, fundo sem rolagem, confirmação de descarte dentro da
@@ -789,7 +790,7 @@ decisões e bloqueios, está no ledger versionado
       HTML, CSS, componente, texto, ícone, imagem ou ativo copiado; nenhuma dependência; a decisão
       de plataforma não foi reaberta.
     - **Padrão visual:** tokens, padrão B e regras de modal do Evolli preservados;
-      `DESIGN-apple.md` intocado; nenhuma paleta, fonte, raio ou escala nova; nenhuma dependência,
+      guia de design intocado; nenhuma paleta, fonte, raio ou escala nova; nenhuma dependência,
       framework, CDN ou fonte externa.
     - **Fora de escopo:** expansão do padrão para outro módulo; folha, eSocial, férias, benefícios
       e clima; `apps/api`, Prisma, migrations, contratos, RBAC e dados; telas funcionais de
@@ -3578,9 +3579,10 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         mudança funcional nas telas; Documentos.
 
 109.  **T212 - Importação de colaboradores por planilha `.xlsx`**
-      - **Estado:** **aprovada visualmente pela proprietária em 18/11/2026; aguarda a ordem de
-        publicação**. Branch `codex/t212-importacao-xlsx`, a partir do squash da T211 em
-        `main` (`255a886`, PR #204). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` pela PR #205, squash
+        `9caf216c7f0912efa145781f35a59cad6a55c49a`, com a CI de push 3/3 verde (run
+        44527419288); branch remota `codex/t212-importacao-xlsx` preservada. Aprovação visual da
+        proprietária em 18/11/2026.
       - **Comprovado:** suíte web completa com 160 arquivos e 4436 testes verdes; E2E com
         PostgreSQL real 14 de 14; Excel real; navegador como RH e DP, desktop e 375 px (`.xlsx`,
         reenvio sem duplicar, CSV).
@@ -3591,6 +3593,55 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         passos, conforme o [documento de decisão](../docs/decisions/t212-importacao-xlsx.md).
       - **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; colunas além
         das 8 do modelo; dependência nova; Documentos.
+
+110.  **T213 - Documentos do colaborador**
+      - **Estado:** **primeira fatia implementada localmente** (API e tela), com a **validação
+        visual aprovada pela proprietária em 23/11/2026**; aguarda a autorização para publicar
+        a PR. Branch `codex/t213-documentos-colaborador`, a partir do squash da T212 em `main`
+        (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Arquivos reais:** continuam bloqueados até o ClamAV estar configurado e a revisão de
+        segurança estar concluída; até lá, só arquivos sintéticos.
+      - **Correções pós-revisão (23/11/2026, PR #206 em Draft):** antivírus antes de gravar (sem
+        verificador operante, 503 e nada gravado); `DELETE` revogado do usuário da aplicação em
+        documento e versão; foco depois de cada ação na etapa 4 e na ficha; download pelo padrão do
+        Dashboard. Aguardam a validação da proprietária antes do Ready.
+      - **Objetivo:** RH e DP anexarem documentos reais do colaborador com rapidez e segurança,
+        pela etapa 4 "Documentos" do Novo colaborador e pela ficha, conforme a
+        [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md) e o
+        [documento de decisão](../docs/decisions/t213-documentos-colaborador.md).
+      - **Feito:** migration, rotas, RBAC, auditoria, conferência do arquivo, ClamAV com
+        quarentena fail-closed e limpeza pendente (API); etapa 4, envio depois do cadastro,
+        proteção de saída e seção da ficha (tela).
+      - **Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
+        configuráveis, OCR, assinatura, leitura automática, compartilhamento externo,
+        vencimentos e envio de documentos pela importação.
+
+111.  **T214 - Card principal do Dashboard e login novo**
+      - **Estado:** implementada localmente (commit `515b7e0`, só tela), empilhada na branch da
+        T215. Sem push próprio, PR, Ready ou merge; a separação em entrega própria aguarda
+        autorização.
+      - **Feito:** card único do Dashboard com o resumo do time, período por anos com admissão
+        efetivada, exportação (CSV e impressão), "Como calculamos" com o botão "i", e a tela de
+        login com o formulário à esquerda e o painel à direita.
+
+112.  **T215 - Colaboradores: lista, edição, ficha e abas**
+      - **Estado:** em andamento localmente na branch `codex/t215-colaboradores-lista`; a branch
+        foi enviada ao GitHub em 24/11/2026 até `204633a`, e os commits seguintes ficaram só
+        locais. Sem PR, Ready ou merge. A separação em entregas revisáveis (T213, T214 e a
+        T215 em partes) aguarda autorização.
+      - **Feito (comprovado por testes):** lista com filtros e ações; Segurança e Editar
+        colaborador; desativar e reativar; página inicial com busca, CPF, contatos, salário e
+        indicadores; auditoria da lista com um evento por consulta; Férias e ausências na API
+        e na lista; ficha nova com a aba Dados; aba Salários com a linha do tempo salarial e o
+        salário obrigatório na admissão (inclusive na planilha); aba Férias e ausências da
+        ficha com a regra de férias por vínculo, a leitura auditada e o anexo (atestado ou
+        documento), conforme o [documento de decisão](../docs/decisions/t215-colaboradores.md).
+      - **Pendente de decisão:** salário obrigatório por tipo de vínculo, regularização de quem
+        não tem salário, permissão própria e auditoria de leitura do salário, regra de férias
+        do Aprendiz e dos tipos não decididos (temporário, part-time, trainee e outro).
+      - **Fora de escopo nesta fatia:** Portal do colaborador, fluxo do gestor, férias
+        coletivas, políticas de férias, mudança automática de status e feriados móveis,
+        estaduais e municipais no cálculo de dias úteis.
 
 ## Regra obrigatória para as próximas tarefas
 

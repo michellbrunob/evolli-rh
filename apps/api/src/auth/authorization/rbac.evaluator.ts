@@ -3,8 +3,13 @@ import {
   AuthorizationResource,
   AuthorizationSubject,
   AuthorizationTarget,
+  isAusenciaResource,
+  isEscalaResource,
+  isBeneficioResource,
   isContatosResource,
+  isContratoResource,
   isDadosPessoaisResource,
+  isDocumentosColaboradorResource,
   isDocumentosResource,
   isHorariosResource,
   isSolicitacoesPessoasResource,
@@ -65,6 +70,26 @@ export function evaluatePermission(
       }
       if (isDadosPessoaisResource(target.resource)) {
         return evaluateDadosPessoais(subject, target);
+      }
+      if (isContratoResource(target.resource)) {
+        // T215 — mesma matriz dos dados pessoais: rh e dp leem e editam na
+        // empresa ativa; master_tecnico so le; os demais, negados.
+        return evaluateDadosPessoais(subject, target);
+      }
+      if (isDocumentosColaboradorResource(target.resource)) {
+        return evaluateDocumentosColaborador(subject, target);
+      }
+      if (isAusenciaResource(target.resource)) {
+        return evaluateAusencia(subject, target);
+      }
+      if (isBeneficioResource(target.resource)) {
+        // T215 — mesma matriz das ausências.
+        return evaluateAusencia(subject, target);
+      }
+      if (isEscalaResource(target.resource)) {
+        // T215 — mesma matriz das ausências (rh e dp operam na empresa
+        // ativa; master_tecnico só lê; os demais, negados).
+        return evaluateAusencia(subject, target);
       }
       return false;
   }
@@ -726,6 +751,92 @@ function evaluateDadosPessoais(
       }
       // Sem empresa ativa, global; com empresa ativa, so ela.
       return subject.companyId === null || isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * T213 — documentos do colaborador com arquivo (ADR 0021). Duas fases, como
+ * nos dados pessoais: sem empresa-alvo decide a CAPACIDADE; com ela, a
+ * FRONTEIRA.
+ *
+ * - `rh` e `dp`: lista, envio, troca, remoção e download, só na própria
+ *   empresa.
+ * - `master_tecnico`: só a lista e o estado (`documento_colaborador`/`read`),
+ *   com empresa ativa; nunca o conteúdo nem escrita.
+ * - Demais papéis: negados em tudo.
+ */
+function evaluateDocumentosColaborador(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const conteudo = target.resource === "conteudo_documento_colaborador";
+  const acoes: readonly AuthorizationAction[] = conteudo
+    ? ["read"]
+    : ["read", "create", "alter"];
+  if (!acoes.includes(target.action)) {
+    return false;
+  }
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      if (conteudo || target.action !== "read") {
+        return false;
+      }
+      if (!escopoResolvido) {
+        return true;
+      }
+      // Só com empresa ativa, e só nela.
+      return subject.companyId !== null && isSameCompany(subject, target);
+
+    case "rh":
+    case "dp":
+      return escopoResolvido
+        ? isSameCompany(subject, target)
+        : subject.companyId !== null;
+
+    default:
+      // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
+      return false;
+  }
+}
+
+/**
+ * T215 — Férias e ausências. Duas fases: sem empresa-alvo decide a
+ * CAPACIDADE; com ela, a FRONTEIRA.
+ *
+ * - `rh` e `dp`: leem, registram e decidem, só na própria empresa.
+ * - `master_tecnico`: só lê, e só com empresa ativa.
+ * - Os demais papéis: negados.
+ */
+function evaluateAusencia(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  const acoes: readonly AuthorizationAction[] = ["read", "create", "alter"];
+  if (!acoes.includes(target.action)) {
+    return false;
+  }
+  const escopoResolvido = target.targetCompanyId !== undefined;
+
+  switch (subject.role) {
+    case "master_tecnico":
+      // O arquivo anexado (atestado) nunca: o master vê só o registro.
+      if (target.resource === "anexo_ausencia") return false;
+      if (target.action !== "read" || subject.companyId === null) {
+        return false;
+      }
+      return escopoResolvido ? isSameCompany(subject, target) : true;
 
     case "rh":
     case "dp":

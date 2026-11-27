@@ -499,7 +499,7 @@ const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
 /**
  * T177 — o que a admissão exige além do nome: data de nascimento e os três
  * contatos. Valores SINTÉTICOS; o domínio é reservado (`example.test`).
- * Endereço é opcional e fica de fora.
+ * Endereço é opcional e fica de fora. T215 — e o primeiro salário.
  *
  * T179 — o e-mail pessoal é único na mesma empresa: cada pessoa da
  * demonstração ganha o seu, derivado da matrícula. Os telefones já estão na
@@ -511,6 +511,8 @@ function camposObrigatoriosDaAdmissao(matricula: unknown) {
     .replace(/[^a-z0-9]+/g, ".");
   return {
     perfilPessoal: { dataNascimento: "1990-01-15" },
+    // T215 — a admissão exige o primeiro salário (abre a linha do tempo).
+    contrato: { salarioBruto: "1621.00" },
     contatos: {
       emailPessoal: `pessoa.demo.${sufixo}@example.test`,
       celular: "+5511900000000",
@@ -1037,8 +1039,14 @@ export async function semearDemonstracao(
           // a jornada anterior, sem código.
           codigo: "COMERCIAL_44H",
           nome: nomeHorario,
-          periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].map(
-            (dia) => ({ dia, inicio: "08:00", fim: "17:00" }),
+          // T215 — prática de mercado dentro da CLT: 44 h em cinco dias
+          // (8 h 48 por dia, sábado compensado por acordo escrito, art. 59,
+          // § 2º) com 1 h de almoço (art. 71).
+          periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].flatMap(
+            (dia) => [
+              { dia, inicio: "08:00", fim: "12:00" },
+              { dia, inicio: "13:00", fim: "17:48" },
+            ],
           ),
         }),
     );
@@ -1095,6 +1103,8 @@ export async function semearDemonstracao(
           dataAdmissao: "2026-03-02",
           motivoCodigo: "admissao_inicial",
           departamentoId: operacoes.id,
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
         }),
     );
 

@@ -115,19 +115,34 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Consulta de colaboradores por nome ou matrícula, ficha, vida funcional e vínculo com horário de trabalho.",
   "nova-admissao":
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
+  beneficios:
+    "Benefícios da empresa: quem recebe, quanto a empresa paga e quanto é descontado de cada pessoa, mês a mês.",
+  "politicas-ferias":
+    "Regras que o sistema confere nos pedidos e registros de férias: antecedência, períodos, datas bloqueadas e aprovação.",
   "importar-colaboradores":
     "Várias admissões de uma vez, por planilha CSV conferida linha a linha na empresa ativa.",
   cadastros:
     "Estrutura organizacional da empresa: unidades, departamentos, áreas, equipes, cargos e centros de custo.",
-  // T182 — tela própria do catálogo de jornadas (antes a aba Horários).
+  // T215 — o quadro da escala (antes, o catálogo de jornadas).
   "jornadas-trabalho":
-    "Jornadas de trabalho da empresa: código, nome e os dias e horários de cada turno.",
+    "Quadro da escala por semana e por mês: quem trabalha em cada dia, com o turno, as folgas e as horas.",
+  "turnos-escala":
+    "Turnos da empresa: nome, cor, sigla e os dias e horários de cada um, usados no quadro de escala.",
+  "regras-escala":
+    "Regras da escala: transição da EC 141/2026, convenção, feriados locais, avisos da CLT e publicação.",
+  "transicao-escala":
+    "Planejar a transição da EC 141/2026: quem está em 6x1 e o novo padrão a partir da data da transição.",
+  "modelo-escala":
+    "Aplicar modelo: uma escala do catálogo para várias pessoas de uma vez, no rascunho do quadro.",
   ponto: "Registros de ponto do período e conferência das folhas apuradas.",
   equipe:
     "Consulta da sua equipe: quem responde a você hoje, pela atribuição vigente.",
   "administracao-lideranca":
     "Atribuição de gestores a equipes, com vigência e histórico.",
   "contas-acesso": "Contas de acesso, papéis e redefinição de segundo fator.",
+  // T215 — Segurança abre em Sessões ativas (de toda conta).
+  seguranca:
+    "Sessões ativas da sua conta e, para quem gerencia acessos, as permissões de acesso.",
   // T208 — Meu perfil: a foto, o nome de exibição e os dados da conta.
   configuracoes:
     "Meu perfil: a sua foto, o seu nome de exibição e os dados da sua conta de acesso.",

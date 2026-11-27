@@ -25,9 +25,6 @@ import {
 } from "../test/viewport";
 import {
   ABAS_DA_FICHA,
-  competenciaDoMesAtual,
-  competenciaValida,
-  competenciaVizinha,
   destinoDaRota,
   fichaDaRota,
   rotaDaFicha,
@@ -37,6 +34,7 @@ import {
   type VinculoApi,
   buscarColaborador,
   listarColaboradores,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
 } from "../api/colaboradoresClient";
 import { buscarCargo, listarCargos } from "../api/cargoClient";
@@ -52,6 +50,7 @@ import {
 import { listarAlocacoesVinculo } from "../api/vinculoContratualClient";
 import { listarVinculosHorario } from "../api/vinculoHorarioClient";
 import { listarTabelasHorario } from "../api/horariosClient";
+import { consultarEscalas, consultarQuadro } from "../api/escalaClient";
 import { consultarContatosDoColaborador } from "../api/contatosColaboradorClient";
 import { consultarDadosPessoaisDoColaborador } from "../api/dadosPessoaisClient";
 import {
@@ -60,19 +59,11 @@ import {
 } from "../api/movimentacaoClient";
 import { obterUsuarioAtual } from "../api/usersClient";
 import {
-  detalharSolicitacaoPessoa,
   historicoSolicitacaoPessoa,
   listarSolicitacoesPessoas,
-  registrarSolicitacaoPessoa,
-  transicionarSolicitacaoPessoa,
 } from "../api/solicitacoesPessoasClient";
+import { listarPontosDoVinculo } from "../api/pontoClient";
 import {
-  listarPontosDoVinculo,
-  registrarAjustePonto,
-  registrarPonto,
-} from "../api/pontoClient";
-import {
-  criarDocumento,
   listarDocumentos,
   listarSolicitacoesDocumento,
   listarTiposDocumento,
@@ -84,6 +75,7 @@ vi.mock("../api/organizacaoClient");
 vi.mock("../api/vinculoContratualClient");
 vi.mock("../api/vinculoHorarioClient");
 vi.mock("../api/horariosClient");
+vi.mock("../api/escalaClient");
 vi.mock("../api/contatosColaboradorClient");
 vi.mock("../api/dadosPessoaisClient");
 vi.mock("../api/movimentacaoClient");
@@ -247,6 +239,19 @@ beforeEach(() => {
   vi.mocked(buscarDepartamento).mockRejectedValue(new Error("não usado"));
   vi.mocked(listarVinculosHorario).mockResolvedValue(paginado([]));
   vi.mocked(listarTabelasHorario).mockResolvedValue(paginado([]));
+  vi.mocked(consultarQuadro).mockResolvedValue({
+    empresaId: EMPRESA,
+    inicio: "2026-11-23",
+    fim: "2026-11-29",
+    pessoas: [],
+  });
+  vi.mocked(consultarEscalas).mockImplementation(async (colaboradorId) => ({
+    colaboradorId,
+    empresaId: EMPRESA,
+    vinculo: { dataAdmissao: "2025-01-10", situacao: "ativo" },
+    escalaDoCadastro: null,
+    escalas: [],
+  }));
   vi.mocked(buscarLinhaDoTempo).mockResolvedValue([]);
   vi.mocked(listarMovimentacoes).mockResolvedValue(paginado([]) as never);
   for (const catalogo of [
@@ -324,14 +329,16 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
+/** T215 — a ficha da referência carregada: o nome no título. */
 async function esperarFicha(nome: string) {
-  await screen.findByRole("tablist", { name: `Seções da ficha de ${nome}` });
+  await screen.findByRole("tablist", { name: "Seções da ficha" });
+  await screen.findByRole("heading", { level: 1, name: nome });
 }
 
 function abaSelecionada() {
   return screen
     .getAllByRole("tab", { selected: true })
-    .find((a) => a.closest(".ficha-colaborador"));
+    .find((a) => a.closest(".ficha-ref"));
 }
 
 /** O que o navegador faz no "voltar"/"avançar": a URL, e `popstate`. */
@@ -352,10 +359,23 @@ function voltarPelaTrilha(): HTMLElement {
 
 describe("T198 — rota da ficha (rotasDoShell)", () => {
   it("colaborador e aba; sem aba, vale 'dados'", () => {
+    // T215 — "jornada" virou Escala; as abas antigas abrem Dados.
     expect(fichaDaRota(rotaDe(ana, "jornada"))).toEqual({
       colaboradorId: ana.id,
-      aba: "jornada",
+      aba: "escala",
     });
+    for (const antiga of [
+      "vida-funcional",
+      "contratuais",
+      "ponto",
+      "ponto/2026-05",
+      "solicitacoes",
+    ]) {
+      expect(fichaDaRota(rotaDe(ana, antiga))).toEqual({
+        colaboradorId: ana.id,
+        aba: "dados",
+      });
+    }
     expect(fichaDaRota(`${LISTAGEM}/${ana.id}`)).toEqual({
       colaboradorId: ana.id,
       aba: "dados",
@@ -364,9 +384,6 @@ describe("T198 — rota da ficha (rotasDoShell)", () => {
       expect(fichaDaRota(rotaDaFicha({ colaboradorId: ana.id, aba }))).toEqual({
         colaboradorId: ana.id,
         aba,
-        // T202 — a aba de ponto sempre leva a competência (a do mês corrente,
-        // se não houver).
-        ...(aba === "ponto" ? { competencia: competenciaDoMesAtual() } : {}),
       });
     }
   });
@@ -374,8 +391,9 @@ describe("T198 — rota da ficha (rotasDoShell)", () => {
   it("id fora do formato, aba desconhecida ou segmento a mais: não é rota", () => {
     for (const fragmento of [
       `${LISTAGEM}/nao-e-uuid/dados`,
-      `${LISTAGEM}/${ana.id}/salarios`,
+      `${LISTAGEM}/${ana.id}/inexistente`,
       `${LISTAGEM}/${ana.id}/dados/extra`,
+      `${LISTAGEM}/${ana.id}/editar/inexistente`,
       `${LISTAGEM}/`,
       `${LISTAGEM}/../admin`,
     ]) {
@@ -408,11 +426,11 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     // O `<main>` é rotulado pelo título da ficha.
     expect(screen.getByRole("main")).toHaveAccessibleName(ana.nome);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Vida funcional" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Escala" }));
     await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "vida-funcional")),
+      expect(window.location.hash).toBe(rotaDe(ana, "escala")),
     );
-    expect(abaSelecionada()).toHaveTextContent("Vida funcional");
+    expect(abaSelecionada()).toHaveTextContent("Escala");
 
     // T209 — a trilha é uma só, na barra superior: Pessoas / Colaboradores
     // / nome da pessoa; a página não repete a sua.
@@ -436,12 +454,12 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
   });
 
   it("rota direta abre a ficha já na aba pedida, sem entrada nova no histórico", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(bruno, "contratuais")}`);
+    window.history.replaceState(null, "", `/${rotaDe(bruno, "salarios")}`);
     const entradas = window.history.length;
     render(<App papelDoAtor="dp" />);
     await esperarFicha(bruno.nome);
-    expect(abaSelecionada()).toHaveTextContent("Dados contratuais");
-    expect(window.location.hash).toBe(rotaDe(bruno, "contratuais"));
+    expect(abaSelecionada()).toHaveTextContent("Salários");
+    expect(window.location.hash).toBe(rotaDe(bruno, "salarios"));
     expect(window.history.length).toBe(entradas);
     expect(buscarColaborador).toHaveBeenCalledWith(bruno.id);
     // A listagem não foi montada por baixo.
@@ -457,12 +475,12 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
   });
 
   it("recarregar (nova montagem) mantém o colaborador e a aba", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
+    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
     const { unmount } = render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
-    fireEvent.click(screen.getByRole("tab", { name: "Vida funcional" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Salários" }));
     await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "vida-funcional")),
+      expect(window.location.hash).toBe(rotaDe(ana, "salarios")),
     );
     const url = window.location.hash;
     unmount();
@@ -470,18 +488,16 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     window.history.replaceState(null, "", `/${url}`);
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Vida funcional");
+    expect(abaSelecionada()).toHaveTextContent("Salários");
   });
 
   it("'voltar' e 'avançar' do navegador percorrem abas, fichas e a listagem", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
+    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
 
-    navegadorVaiPara(rotaDe(ana, "contratuais"));
-    await waitFor(() =>
-      expect(abaSelecionada()).toHaveTextContent("Dados contratuais"),
-    );
+    navegadorVaiPara(rotaDe(ana, "salarios"));
+    await waitFor(() => expect(abaSelecionada()).toHaveTextContent("Salários"));
 
     navegadorVaiPara(rotaDe(bruno, "dados"));
     await esperarFicha(bruno.nome);
@@ -491,11 +507,11 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
 
     navegadorVaiPara(LISTAGEM);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
 
-    navegadorVaiPara(rotaDe(ana, "vida-funcional"));
+    navegadorVaiPara(rotaDe(ana, "ferias"));
     await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Vida funcional");
+    expect(abaSelecionada()).toHaveTextContent("Férias e ausências");
   });
 
   it("id que não é de um colaborador da empresa: 'não encontrado', com volta à listagem", async () => {
@@ -523,7 +539,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     expect(buscarColaborador).not.toHaveBeenCalled();
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
   });
 
   it("sair de Colaboradores pela barra fecha a ficha; voltar à barra abre a listagem", async () => {
@@ -538,7 +554,7 @@ describe("T198 — abrir, trocar de aba, voltar (App)", () => {
       within(barra).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
     expect(window.location.hash).toBe(LISTAGEM);
   });
 });
@@ -553,53 +569,73 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
       window.history.replaceState(null, "", `/${rotaDe(ana)}`);
       const { unmount } = render(<App papelDoAtor={papel} />);
       await esperarFicha(ana.nome);
-      const ficha = document.querySelector<HTMLElement>(".ficha-colaborador")!;
+      const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
+      // T215 — editar é na página Editar colaborador, aberta pela ficha.
+      const editar = within(ficha).queryAllByRole("button", {
+        name: /Editar colaborador/,
+      });
       if (edita) {
-        expect(within(ficha).getByLabelText("Nome")).toBeInTheDocument();
+        expect(editar.length).toBeGreaterThan(0);
       } else {
-        expect(within(ficha).queryByLabelText("Nome")).toBeNull();
+        expect(editar).toHaveLength(0);
       }
       unmount();
     }
   });
 
-  it("pós-revisão (C1): rh e dp seguem vendo a jornada vigente da própria empresa no cabeçalho", async () => {
-    // Escopados, rh e dp só recebem vínculos de horário da empresa ativa — a
-    // mesma do vínculo principal: o filtro por empresa não muda nada para eles.
-    vi.mocked(listarVinculosHorario).mockResolvedValue(
-      paginado([
+  it("T215: rh e dp operam a escala da própria empresa; o master só consulta", async () => {
+    vi.mocked(consultarEscalas).mockResolvedValue({
+      colaboradorId: ana.id,
+      empresaId: EMPRESA,
+      vinculo: { dataAdmissao: "2025-01-10", situacao: "ativo" },
+      escalaDoCadastro: null,
+      escalas: [
         {
-          id: "h-1",
-          colaboradorId: ana.id,
-          empresaId: EMPRESA,
-          tabelaHorarioId: "t-1",
-          tabela: {
+          id: "e-1",
+          modelo: "5x2",
+          turno: {
             id: "t-1",
             codigo: "JOR44",
             nome: "Comercial (teste)",
             ativo: true,
+            periodos: [{ dia: "segunda", inicio: "08:00", fim: "12:00" }],
           },
-          colaborador: { id: ana.id, nome: ana.nome },
+          turnoNoite: null,
+          folgaSemanal: null,
+          diasTrabalho: [],
+          inicioCiclo: null,
           vigenciaInicio: "2025-01-10",
           vigenciaFim: null,
-          criadoPorUserId: "u-1",
-          criadoEm: "2025-01-10T12:00:00.000Z",
-          atualizadoEm: "2025-01-10T12:00:00.000Z",
+          definidaEm: "2025-01-10T12:00:00.000Z",
+          definidaPor: null,
         },
-      ]),
-    );
+      ],
+    });
     for (const papel of ["rh", "dp"] as const) {
-      window.history.replaceState(null, "", `/${rotaDe(ana)}`);
+      window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
       const { unmount } = render(<App papelDoAtor={papel} />);
       await esperarFicha(ana.nome);
-      const cabecalho = document.querySelector<HTMLElement>(
-        ".ficha-colaborador__cabecalho",
-      )!;
-      await waitFor(() =>
-        expect(cabecalho).toHaveTextContent("JOR44 — Comercial (teste)"),
-      );
+      const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
+      await waitFor(() => expect(ficha).toHaveTextContent("Comercial (teste)"));
+      expect(
+        within(ficha).getByRole("button", { name: "Alterar padrão" }),
+      ).toBeInTheDocument();
+      expect(
+        within(ficha).getByRole("button", { name: "Abrir no quadro" }),
+      ).toBeInTheDocument();
       unmount();
     }
+    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
+    render(<App papelDoAtor="master_tecnico" />);
+    await esperarFicha(ana.nome);
+    const ficha = document.querySelector<HTMLElement>(".ficha-ref")!;
+    await waitFor(() => expect(ficha).toHaveTextContent("Comercial (teste)"));
+    expect(
+      within(ficha).queryByRole("button", {
+        name: /Alterar padrão|Definir escala/,
+      }),
+    ).toBeNull();
+    expect(ficha).toHaveTextContent("Somente consulta");
   });
 
   it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
@@ -609,7 +645,7 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
       render(<App papelDoAtor={papel} />);
       await screen.findByRole("navigation", { name: "Navegação do painel" });
       await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
+      expect(document.querySelector(".ficha-ref")).toBeNull();
       expect(buscarColaborador).not.toHaveBeenCalled();
       expect(listarVinculosDoColaborador).not.toHaveBeenCalled();
     },
@@ -624,13 +660,13 @@ describe("T198 — quem abre a ficha (mesma capacidade de Colaboradores)", () =>
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
     expect(buscarColaborador).not.toHaveBeenCalled();
   });
 });
 
 describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
-  it("Horário de trabalho: o nome na linha abre a ficha, na rota dela", async () => {
+  it("Horário de trabalho (aba Escala de trabalho): o nome na linha abre a ficha, na rota dela", async () => {
     vi.mocked(listarVinculosHorario).mockResolvedValue(
       paginado([
         {
@@ -655,7 +691,9 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
     );
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    // T215 — sem a faixa de seções na página: a visão de horários é a aba
+    // Escala de trabalho da lista.
+    fireEvent.click(screen.getByRole("tab", { name: /^Escala de trabalho/ }));
     const tabela = await screen.findByRole("table", {
       name: "Colaboradores com tabela de horário vinculada",
     });
@@ -667,11 +705,11 @@ describe("T198 — atalhos das visões da empresa para a ficha (D24)", () => {
     await esperarFicha(ana.nome);
     expect(window.location.hash).toBe(rotaDe(ana));
 
-    // Voltar devolve à mesma aba de Pessoas de onde se veio.
+    // Voltar devolve à mesma aba de onde se veio.
     fireEvent.click(voltarPelaTrilha());
     expect(
       await screen.findByRole("tab", {
-        name: "Horário de trabalho",
+        name: /^Escala de trabalho/,
         selected: true,
       }),
     ).toBeInTheDocument();
@@ -705,19 +743,33 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     await waitFor(() => expect(ultimaConsulta().grupo).toBe("desligados"));
   });
 
+  /** T215 — o tipo de contrato pela gaveta "Filtrar". */
+  async function filtrarPorTipo(rotulo: string) {
+    fireEvent.click(screen.getByRole("button", { name: /^Filtrar/ }));
+    const gaveta = await screen.findByRole("dialog", { name: "Filtrar" });
+    fireEvent.click(within(gaveta).getByRole("button", { name: rotulo }));
+    fireEvent.click(
+      within(gaveta).getByRole("button", {
+        name: /^Ver (\d+ )?resultados?$/,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Filtrar" })).toBeNull(),
+    );
+  }
+
   it("a busca nunca vai para a URL", async () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "pj" },
-    });
+    await filtrarPorTipo("PJ");
     await waitFor(() =>
       expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`),
     );
-    fireEvent.change(screen.getByLabelText("Buscar por nome ou matrícula"), {
-      target: { value: "Ana MAT-0001" },
+    const busca = screen.getByRole("searchbox", {
+      name: "Buscar por nome, CPF, e-mail ou ID",
     });
-    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    fireEvent.change(busca, { target: { value: "Ana MAT-0001" } });
+    fireEvent.submit(busca.closest("form")!);
     await waitFor(() => expect(ultimaConsulta().busca).toBe("Ana MAT-0001"));
     expect(window.location.hash).toBe(`${LISTAGEM}?tipo=pj`);
     expect(window.location.href).not.toMatch(/Ana|MAT-0001|busca/);
@@ -735,7 +787,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     );
     expect(ultimaConsulta()).toMatchObject({
       grupo: "em_admissao",
-      tipoVinculo: "estagio",
+      tipos: ["estagio"],
       pagina: 1,
     });
     expect(window.location.hash).toBe(rota);
@@ -755,8 +807,8 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     expect(window.history.length).toBe(entradas);
     for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
       expect(consulta).not.toHaveProperty("busca");
-      expect(consulta).not.toHaveProperty("tipoVinculo");
-      expect(consulta).not.toHaveProperty("departamentoId");
+      expect(consulta).not.toHaveProperty("tipos");
+      expect(consulta).not.toHaveProperty("departamentos");
       expect(consulta?.pagina).toBe(1);
     }
   });
@@ -779,7 +831,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     );
     expect(window.history.length).toBe(entradas);
     for (const [consulta] of vi.mocked(listarColaboradores).mock.calls) {
-      expect(consulta?.departamentoId).toBeUndefined();
+      expect(consulta?.departamentos).toBeUndefined();
     }
   });
 
@@ -828,7 +880,7 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
       expect(ultimaConsulta()).toEqual({
         pagina: 1,
         tamanhoPagina: 20,
-        tipoVinculo: "pj",
+        tipos: ["pj"],
       }),
     );
     await screen.findByRole("table", { name: "Colaboradores — Todos" });
@@ -838,9 +890,8 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     const { unmount } = render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — / });
     fireEvent.click(abaDoDashboard(/^Todos/));
-    fireEvent.change(screen.getByLabelText("Tipo de vínculo"), {
-      target: { value: "temporario" },
-    });
+    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
+    await filtrarPorTipo("Temporário");
     await waitFor(() =>
       expect(window.location.hash).toBe(
         `${LISTAGEM}?aba=todos&tipo=temporario`,
@@ -854,9 +905,9 @@ describe("T199 — o estado do dashboard na URL (App)", () => {
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
     expect(
-      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
-    ).toBe("temporario");
-    expect(ultimaConsulta()).toMatchObject({ tipoVinculo: "temporario" });
+      screen.getByRole("button", { name: "Remover filtro Tipo: Temporário" }),
+    ).toBeInTheDocument();
+    expect(ultimaConsulta()).toMatchObject({ tipos: ["temporario"] });
     expect(ultimaConsulta()).not.toHaveProperty("grupo");
   });
 
@@ -936,20 +987,42 @@ describe("T200 — guarda de saída no App", () => {
       </ComGuardaDeSaida>,
     );
   }
+  /** A ficha (só leitura) aberta, com o nome no título. */
+  const fichaDeLeitura = () =>
+    document.querySelector<HTMLElement>(".ficha-ref");
+  async function esperarFichaDeLeitura(nome: string) {
+    await screen.findByRole("tablist", { name: "Seções da ficha" });
+    await screen.findByRole("heading", { level: 1, name: nome });
+  }
   const pergunta = () =>
     screen.getByRole("alertdialog", { name: "Sair sem salvar?" });
   const telasDaPergunta = () =>
     within(pergunta())
       .getAllByRole("listitem")
       .map((li) => li.textContent);
+  /**
+   * T215 — a ficha não edita mais nada: a alteração pendente vem da página
+   * Editar colaborador (o nome, em Dados básicos), aberta pela rota ou pelo
+   * ⋯ da linha.
+   */
   const fichaNaTela = () =>
-    document.querySelector<HTMLElement>(".ficha-colaborador");
+    document.querySelector<HTMLElement>(".editar-colaborador");
   function editarNome(valor = "Ana Editada (teste)") {
     const campo = within(fichaNaTela()!).getByLabelText(
-      "Nome",
+      "Nome completo",
     ) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: valor } });
     return campo;
+  }
+  const rotaDe = (c: ColaboradorListadoApi) =>
+    `${LISTAGEM}/${c.id}/editar/dados-basicos`;
+  /** A página de edição carregada (o nome no campo). */
+  async function esperarFicha(nome: string) {
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Editar colaborador",
+    });
+    await screen.findByDisplayValue(nome);
   }
   const barra = () =>
     screen.getByRole("navigation", { name: "Navegação do painel" });
@@ -974,7 +1047,7 @@ describe("T200 — guarda de saída no App", () => {
     });
     item.focus();
     fireEvent.click(item);
-    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Continuar editando" }),
     );
@@ -998,7 +1071,7 @@ describe("T200 — guarda de saída no App", () => {
     editarNome();
     const trilha = voltarPelaTrilha();
     fireEvent.click(trilha);
-    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
@@ -1013,10 +1086,11 @@ describe("T200 — guarda de saída no App", () => {
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
+    abrirMenuDaLinha(
+      within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
     fireEvent.click(
-      within(tabela).getByRole("button", {
-        name: `Abrir ficha de ${ana.nome}`,
-      }),
+      await screen.findByRole("menuitem", { name: "Editar colaborador" }),
     );
     await esperarFicha(ana.nome);
     const entradas = window.history.length;
@@ -1024,7 +1098,7 @@ describe("T200 — guarda de saída no App", () => {
 
     await navegador(() => window.history.back());
     await esperarPergunta();
-    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
     await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Continuar editando" }),
@@ -1058,10 +1132,11 @@ describe("T200 — guarda de saída no App", () => {
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
+    abrirMenuDaLinha(
+      within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
     fireEvent.click(
-      within(tabela).getByRole("button", {
-        name: `Abrir ficha de ${ana.nome}`,
-      }),
+      await screen.findByRole("menuitem", { name: "Editar colaborador" }),
     );
     await esperarFicha(ana.nome);
     editarNome();
@@ -1095,10 +1170,11 @@ describe("T200 — guarda de saída no App", () => {
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
+    abrirMenuDaLinha(
+      within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
     fireEvent.click(
-      within(tabela).getByRole("button", {
-        name: `Abrir ficha de ${ana.nome}`,
-      }),
+      await screen.findByRole("menuitem", { name: "Editar colaborador" }),
     );
     await esperarFicha(ana.nome);
     // Sem edição: a trilha sai direto (entrada nova da listagem).
@@ -1111,7 +1187,7 @@ describe("T200 — guarda de saída no App", () => {
 
     await navegador(() => window.history.forward());
     await esperarPergunta();
-    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
     await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Continuar editando" }),
@@ -1140,7 +1216,7 @@ describe("T200 — guarda de saída no App", () => {
       window.location.hash = digitada;
     });
     await esperarPergunta();
-    expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+    expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
     await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
     fireEvent.click(
       within(pergunta()).getByRole("button", { name: "Continuar editando" }),
@@ -1158,50 +1234,6 @@ describe("T200 — guarda de saída no App", () => {
     await screen.findByRole("table", { name: "Colaboradores — Desligados" });
     expect(window.location.hash).toBe(digitada);
     expect(fichaNaTela()).toBeNull();
-  });
-
-  it("aba interna de Pessoas: trocar de aba com o formulário aberto pergunta; continuar fica na aba", async () => {
-    vi.mocked(listarTabelasHorario).mockResolvedValue(
-      paginado([
-        {
-          id: "tabela-1",
-          codigo: "ADM",
-          nome: "Administrativo (teste)",
-          ativo: true,
-        },
-      ]) as never,
-    );
-    window.history.replaceState(null, "", `/${LISTAGEM}`);
-    montarComGuarda();
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
-    fireEvent.click(
-      within(abas).getByRole("tab", { name: "Horário de trabalho" }),
-    );
-    const novo = await screen.findByRole("button", { name: "Novo vínculo" });
-    await waitFor(() => expect(novo).toBeEnabled());
-    fireEvent.click(novo);
-
-    fireEvent.click(
-      within(abas).getByRole("tab", { name: "Histórico funcional" }),
-    );
-    expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
-    fireEvent.click(
-      within(pergunta()).getByRole("button", { name: "Continuar editando" }),
-    );
-    expect(
-      within(abas).getByRole("tab", { name: "Horário de trabalho" }),
-    ).toHaveAttribute("aria-selected", "true");
-
-    fireEvent.click(
-      within(abas).getByRole("tab", { name: "Histórico funcional" }),
-    );
-    fireEvent.click(
-      within(pergunta()).getByRole("button", { name: "Sair sem salvar" }),
-    );
-    expect(
-      within(abas).getByRole("tab", { name: "Histórico funcional" }),
-    ).toHaveAttribute("aria-selected", "true");
   });
 
   it("aba Jornada do dashboard: sair dela com o formulário aberto pergunta; sem formulário, troca direto", async () => {
@@ -1228,7 +1260,7 @@ describe("T200 — guarda de saída no App", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
     fireEvent.click(
-      within(grupos).getByRole("tab", { name: /^Jornada de trabalho/ }),
+      within(grupos).getByRole("tab", { name: /^Escala de trabalho/ }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Novo vínculo" }),
@@ -1252,13 +1284,14 @@ describe("T200 — guarda de saída no App", () => {
           name: /^Colaboradores Consulta/,
         }),
       );
-      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
       unmount();
     }
     window.history.replaceState(null, "", `/${rotaDe(ana)}`);
     montarComGuarda("master_tecnico");
-    await esperarFicha(ana.nome);
-    expect(within(fichaNaTela()!).queryByLabelText("Nome")).toBeNull();
+    // T215 — sem permissão de editar, a rota de edição abre a ficha.
+    await esperarFichaDeLeitura(ana.nome);
+    expect(fichaNaTela()).toBeNull();
     fireEvent.click(
       within(barra()).getByRole("button", { name: /^Colaboradores Consulta/ }),
     );
@@ -1282,10 +1315,11 @@ describe("T200 — guarda de saída no App", () => {
     const tabela = await screen.findByRole("table", {
       name: /^Colaboradores — /,
     });
+    abrirMenuDaLinha(
+      within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+    );
     fireEvent.click(
-      within(tabela).getByRole("button", {
-        name: `Abrir ficha de ${ana.nome}`,
-      }),
+      await screen.findByRole("menuitem", { name: "Editar colaborador" }),
     );
     await esperarFicha(ana.nome);
     editarNome();
@@ -1378,7 +1412,7 @@ describe("T200 — guarda de saída no App", () => {
       screen.getByRole("tablist", { name: "Grupos de colaboradores" });
     async function irParaJornada() {
       fireEvent.click(
-        within(grupos()).getByRole("tab", { name: /^Jornada de trabalho/ }),
+        within(grupos()).getByRole("tab", { name: /^Escala de trabalho/ }),
       );
       await screen.findByRole("button", { name: "Novo vínculo" });
     }
@@ -1419,10 +1453,11 @@ describe("T200 — guarda de saída no App", () => {
       await navegador(() => {
         window.location.hash = "#conteudo-principal";
       });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
       fireEvent.click(
-        within(tabela).getByRole("button", {
-          name: `Abrir ficha de ${ana.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(ana.nome);
       const campo = editarNome();
@@ -1459,7 +1494,7 @@ describe("T200 — guarda de saída no App", () => {
       editarNome("Ana Outra Edição (teste)");
       await navegador(() => window.history.go(-2));
       await esperarPergunta();
-      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
       // A reversão chega de volta à ficha (o navegador termina de andar
       // antes de o teste acabar, sem vazar para o próximo).
       await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
@@ -1477,7 +1512,7 @@ describe("T200 — guarda de saída no App", () => {
           name: `Abrir ficha de ${ana.nome}`,
         }),
       );
-      await esperarFicha(ana.nome);
+      await esperarFichaDeLeitura(ana.nome);
       const digitada = `${LISTAGEM}?aba=ativos`;
 
       await navegador(() => {
@@ -1487,7 +1522,7 @@ describe("T200 — guarda de saída no App", () => {
       expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
       await navegador(() => undefined);
       continuarEditando();
-      expect(fichaNaTela()).not.toBeNull();
+      expect(fichaDeLeitura()).not.toBeNull();
       // De volta à Jornada pela trilha (só a ficha sai, e ela está limpa):
       // o formulário continua aberto.
       fireEvent.click(voltarPelaTrilha());
@@ -1499,7 +1534,7 @@ describe("T200 — guarda de saída no App", () => {
           name: `Abrir ficha de ${ana.nome}`,
         }),
       );
-      await esperarFicha(ana.nome);
+      await esperarFichaDeLeitura(ana.nome);
       await navegador(() => {
         window.location.hash = digitada;
       });
@@ -1508,7 +1543,7 @@ describe("T200 — guarda de saída no App", () => {
       sairSemSalvar();
       await navegador(() => undefined);
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
-      expect(fichaNaTela()).toBeNull();
+      expect(fichaDeLeitura()).toBeNull();
       expect(formularioDeVinculo()).toBeNull();
     });
 
@@ -1524,10 +1559,10 @@ describe("T200 — guarda de saída no App", () => {
           name: `Abrir ficha de ${ana.nome}`,
         }),
       );
-      await esperarFicha(ana.nome);
+      await esperarFichaDeLeitura(ana.nome);
       // Saída isenta: trocar a aba da ficha não desmonta nada.
       fireEvent.click(
-        within(fichaNaTela()!).getByRole("tab", { name: /^Jornada/ }),
+        within(fichaDeLeitura()!).getByRole("tab", { name: "Escala" }),
       );
       expect(screen.queryByRole("alertdialog")).toBeNull();
 
@@ -1536,7 +1571,7 @@ describe("T200 — guarda de saída no App", () => {
       expect(telasDaPergunta()).toEqual(["Horário de trabalho"]);
       await navegador(() => undefined);
       continuarEditando();
-      expect(fichaNaTela()).not.toBeNull();
+      expect(fichaDeLeitura()).not.toBeNull();
 
       await navegador(() => window.history.go(-3));
       await esperarPergunta();
@@ -1613,44 +1648,35 @@ describe("T200 — guarda de saída no App", () => {
       montarComGuarda();
       await screen.findByRole("table", { name: "Colaboradores — Ativos" });
 
-      // Jornadas de trabalho com o formulário aberto.
-      const jornadas = () =>
+      // T215 — Escala de trabalho abre o quadro; Turnos (sub-página) com o
+      // formulário aberto.
+      const escala = () =>
         within(barra()).getByRole("button", { name: /^Escala de trabalho/ });
-      fireEvent.click(jornadas());
-      const nova = await screen.findAllByRole("button", {
-        name: "Nova jornada",
-      });
-      fireEvent.click(nova[0]!);
-      fireEvent.click(jornadas());
-      expect(screen.queryByRole("alertdialog")).toBeNull();
-      // Outro destino desmonta: pergunta.
+      fireEvent.click(escala());
+      fireEvent.click(await screen.findByRole("button", { name: "Turnos" }));
       fireEvent.click(
-        within(barra()).getByRole("button", {
-          name: /^Colaboradores Consulta/,
-        }),
+        await screen.findByRole("button", { name: "Novo turno" }),
       );
-      expect(telasDaPergunta()).toEqual(["Jornadas de trabalho"]);
+      fireEvent.change(
+        await screen.findByRole("textbox", { name: /^Nome do turno/ }),
+        { target: { value: "Turno sintético" } },
+      );
+      // O item da barra leva ao quadro, outro destino: desmonta e pergunta.
+      fireEvent.click(escala());
+      expect(telasDaPergunta()).toEqual(["Turnos"]);
       sairSemSalvar();
-      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
-    });
-
-    it("B5 — Pessoas › Horário de trabalho: o item já ativo não troca a aba, então não pergunta", async () => {
-      comJornadaAtiva();
-      window.history.replaceState(null, "", `/${LISTAGEM}`);
-      montarComGuarda();
-      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
-      const abas = screen.getByRole("tablist", { name: "Seções de Pessoas" });
-      fireEvent.click(
-        within(abas).getByRole("tab", { name: "Horário de trabalho" }),
-      );
-      await abrirNovoVinculo();
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Escala de trabalho",
+      });
+      // No quadro (sem edição), outro destino não pergunta.
       fireEvent.click(
         within(barra()).getByRole("button", {
           name: /^Colaboradores Consulta/,
         }),
       );
       expect(screen.queryByRole("alertdialog")).toBeNull();
-      expect(formularioDeVinculo()).not.toBeNull();
+      await screen.findByRole("table", { name: "Colaboradores — Ativos" });
     });
 
     it("B5 — Pessoas com a Jornada aberta: o item já ativo volta a listagem ao início, então pergunta", async () => {
@@ -1681,20 +1707,22 @@ describe("T200 — guarda de saída no App", () => {
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
       fireEvent.click(
-        within(tabela).getByRole("button", {
-          name: `Abrir ficha de ${ana.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(ana.nome);
-      const campo = editarNome();
-      // Trocar a aba da ficha é uma entrada nova, sem nada a perguntar.
+      editarNome();
+      // Trocar a seção da edição é uma entrada nova, sem nada a perguntar.
+      const profissionais = `${LISTAGEM}/${ana.id}/editar/dados-profissionais`;
       fireEvent.click(
-        within(fichaNaTela()!).getByRole("tab", { name: /^Jornada/ }),
+        within(fichaNaTela()!).getByRole("link", {
+          name: "Dados profissionais",
+        }),
       );
-      await waitFor(() =>
-        expect(window.location.hash).toBe(rotaDe(ana, "jornada")),
-      );
+      await waitFor(() => expect(window.location.hash).toBe(profissionais));
       const digitada = `${LISTAGEM}?aba=desligados`;
 
       await navegador(() => {
@@ -1703,7 +1731,7 @@ describe("T200 — guarda de saída no App", () => {
       await esperarPergunta();
       await navegador(() => undefined);
       continuarEditando();
-      expect(window.location.hash).toBe(rotaDe(ana, "jornada"));
+      expect(window.location.hash).toBe(profissionais);
       // A entrada digitada ficou à frente, já com o índice dela.
       await navegador(() => window.history.back());
       expect(window.location.hash).toBe(rotaDe(ana));
@@ -1712,10 +1740,12 @@ describe("T200 — guarda de saída no App", () => {
       // Salto de dois passos até a rota digitada: pergunta.
       await navegador(() => window.history.go(2));
       await esperarPergunta();
-      expect(telasDaPergunta()).toEqual(["Ficha do colaborador"]);
+      expect(telasDaPergunta()).toEqual(["Editar colaborador"]);
       await navegador(() => undefined);
       expect(window.location.hash).toBe(rotaDe(ana));
-      expect(campo.value).toBe("Ana Editada (teste)");
+      expect(await screen.findByLabelText("Nome completo")).toHaveValue(
+        "Ana Editada (teste)",
+      );
 
       sairSemSalvar();
       await navegador(() => undefined);
@@ -1734,10 +1764,11 @@ describe("T200 — guarda de saída no App", () => {
         const tabela = await screen.findByRole("table", {
           name: /^Colaboradores — /,
         });
+        abrirMenuDaLinha(
+          within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+        );
         fireEvent.click(
-          within(tabela).getByRole("button", {
-            name: `Abrir ficha de ${ana.nome}`,
-          }),
+          await screen.findByRole("menuitem", { name: "Editar colaborador" }),
         );
         await esperarFicha(ana.nome);
         editarNome();
@@ -1767,10 +1798,11 @@ describe("T200 — guarda de saída no App", () => {
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
       fireEvent.click(
-        within(tabela).getByRole("button", {
-          name: `Abrir ficha de ${ana.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(ana.nome);
       editarNome();
@@ -1807,10 +1839,11 @@ describe("T200 — guarda de saída no App", () => {
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
       fireEvent.click(
-        within(tabela).getByRole("button", {
-          name: `Abrir ficha de ${ana.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(ana.nome);
       // A listagem à frente da ficha (índices 0 → 1 → 2), e de volta à ficha.
@@ -1851,20 +1884,22 @@ describe("T200 — guarda de saída no App", () => {
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
+      abrirMenuDaLinha(
+        within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+      );
       fireEvent.click(
-        within(tabela).getByRole("button", {
-          name: `Abrir ficha de ${ana.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(ana.nome);
       fireEvent.click(voltarPelaTrilha());
       const listagem = await screen.findByRole("table", {
         name: /^Colaboradores — /,
       });
+      abrirMenuDaLinha(
+        within(listagem).getByRole("button", { name: `Ações: ${bruno.nome}` }),
+      );
       fireEvent.click(
-        within(listagem).getByRole("button", {
-          name: `Abrir ficha de ${bruno.nome}`,
-        }),
+        await screen.findByRole("menuitem", { name: "Editar colaborador" }),
       );
       await esperarFicha(bruno.nome);
       // Ficha de Ana (1), listagem (2), ficha de Bruno (3): de volta à de Ana.
@@ -1990,10 +2025,11 @@ describe("T200 — guarda de saída no App", () => {
         const tabela = await screen.findByRole("table", {
           name: /^Colaboradores — /,
         });
+        abrirMenuDaLinha(
+          within(tabela).getByRole("button", { name: `Ações: ${ana.nome}` }),
+        );
         fireEvent.click(
-          within(tabela).getByRole("button", {
-            name: `Abrir ficha de ${ana.nome}`,
-          }),
+          await screen.findByRole("menuitem", { name: "Editar colaborador" }),
         );
         await esperarFicha(ana.nome);
         fireEvent.click(voltarPelaTrilha());
@@ -2035,9 +2071,12 @@ describe("T200 — guarda de saída no App", () => {
 });
 
 describe("T201 — aba Documentos da ficha no shell", () => {
-  const painelDocumentos = (nome = ana.nome) =>
-    screen.findByRole("table", { name: `Documentos registrados — ${nome}` });
-  const clicarVoltarPelaTrilha = () => fireEvent.click(voltarPelaTrilha());
+  // T215 — a aba Documentos da ficha mostra os arquivos do colaborador.
+  beforeEach(() => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([]);
+  });
+  const painelDocumentos = () =>
+    screen.findByRole("list", { name: "Documentos principais" });
 
   it("rota direta abre a aba Documentos; recarregar a mantém", async () => {
     window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
@@ -2048,9 +2087,7 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     await painelDocumentos();
     expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
     expect(window.history.length).toBe(entradas);
-    expect(listarDocumentos).toHaveBeenCalledWith(
-      expect.objectContaining({ colaboradorId: ana.id }),
-    );
+    expect(listarDocumentosDoColaborador).toHaveBeenCalledWith(ana.id);
     const url = window.location.hash;
     unmount();
 
@@ -2062,11 +2099,11 @@ describe("T201 — aba Documentos da ficha no shell", () => {
   });
 
   it("a aba muda a URL; 'voltar' e 'avançar' alternam entre ela e a anterior", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
+    window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
     // Só ao abrir a aba os documentos são lidos.
-    expect(listarDocumentos).not.toHaveBeenCalled();
+    expect(listarDocumentosDoColaborador).not.toHaveBeenCalled();
     const aba = screen.getByRole("tab", { name: "Documentos" });
     aba.focus();
     fireEvent.click(aba);
@@ -2077,16 +2114,13 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     // O foco fica na aba (padrão de abas): a carga não o tira dela.
     expect(screen.getByRole("tab", { name: "Documentos" })).toHaveFocus();
 
-    navegadorVaiPara(rotaDe(ana, "jornada"));
-    await waitFor(() =>
-      expect(abaSelecionada()).toHaveTextContent("Jornada de trabalho"),
-    );
+    navegadorVaiPara(rotaDe(ana, "escala"));
+    await waitFor(() => expect(abaSelecionada()).toHaveTextContent("Escala"));
     navegadorVaiPara(rotaDe(ana, "documentos"));
     await waitFor(() =>
       expect(abaSelecionada()).toHaveTextContent("Documentos"),
     );
-    // A aba já visitada fica montada: nada é relido por voltar a ela.
-    expect(listarDocumentos).toHaveBeenCalledTimes(1);
+    await painelDocumentos();
   });
 
   it("outra pessoa pela URL: a aba lê e mostra só os documentos dela", async () => {
@@ -2094,15 +2128,11 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     render(<App papelDoAtor="rh" />);
     await painelDocumentos();
     navegadorVaiPara(rotaDe(bruno, "documentos"));
-    await painelDocumentos(bruno.nome);
+    await esperarFicha(bruno.nome);
+    await painelDocumentos();
     expect(
-      vi.mocked(listarDocumentos).mock.calls.map((c) => c[0]?.colaboradorId),
+      vi.mocked(listarDocumentosDoColaborador).mock.calls.map((c) => c[0]),
     ).toEqual([ana.id, bruno.id]);
-    expect(
-      screen.queryByRole("table", {
-        name: `Documentos registrados — ${ana.nome}`,
-      }),
-    ).toBeNull();
   });
 
   it("colaborador fora da empresa da sessão: 'não encontrado', e nenhum documento é lido", async () => {
@@ -2117,9 +2147,7 @@ describe("T201 — aba Documentos da ficha no shell", () => {
       name: "Colaborador não encontrado",
     });
     expect(screen.queryByRole("tab", { name: "Documentos" })).toBeNull();
-    expect(obterUsuarioAtual).not.toHaveBeenCalled();
-    expect(listarDocumentos).not.toHaveBeenCalled();
-    expect(listarSolicitacoesDocumento).not.toHaveBeenCalled();
+    expect(listarDocumentosDoColaborador).not.toHaveBeenCalled();
   });
 
   it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
@@ -2129,671 +2157,10 @@ describe("T201 — aba Documentos da ficha no shell", () => {
       render(<App papelDoAtor={papel} />);
       await screen.findByRole("navigation", { name: "Navegação do painel" });
       await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-      expect(listarDocumentos).not.toHaveBeenCalled();
-      expect(listarSolicitacoesDocumento).not.toHaveBeenCalled();
-      expect(listarTiposDocumento).not.toHaveBeenCalled();
+      expect(document.querySelector(".ficha-ref")).toBeNull();
+      expect(listarDocumentosDoColaborador).not.toHaveBeenCalled();
     },
   );
-
-  it("guarda de saída (T200): tipo escolhido e não salvo pergunta antes de sair da ficha", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
-    render(
-      <ComGuardaDeSaida>
-        <App papelDoAtor="rh" />
-      </ComGuardaDeSaida>,
-    );
-    await painelDocumentos();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Registrar documento" }),
-    );
-    fireEvent.change(screen.getByLabelText(/^Tipo do documento/), {
-      target: { value: "t-rg" },
-    });
-    clicarVoltarPelaTrilha();
-    const pergunta = screen.getByRole("alertdialog", {
-      name: "Sair sem salvar?",
-    });
-    expect(
-      within(pergunta)
-        .getAllByRole("listitem")
-        .map((li) => li.textContent),
-    ).toEqual(["Ficha do colaborador"]);
-    fireEvent.click(
-      within(pergunta).getByRole("button", { name: "Continuar editando" }),
-    );
-    expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue("t-rg");
-    expect(criarDocumento).not.toHaveBeenCalled();
-
-    // Outra aba da ficha não é saída: o formulário fica, escondido.
-    fireEvent.click(screen.getByRole("tab", { name: "Dados do colaborador" }));
-    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "documentos")),
-    );
-    expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue("t-rg");
-  });
-
-  it("formulário aberto e vazio não pergunta nada ao sair", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
-    render(
-      <ComGuardaDeSaida>
-        <App papelDoAtor="dp" />
-      </ComGuardaDeSaida>,
-    );
-    await painelDocumentos();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Solicitar documento" }),
-    );
-    clicarVoltarPelaTrilha();
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-  });
-});
-
-describe("T202 — rota da aba de ponto (rotasDoShell)", () => {
-  it("competência na rota; sem ela, o mês corrente", () => {
-    expect(fichaDaRota(`${LISTAGEM}/${ana.id}/ponto/2026-10`)).toEqual({
-      colaboradorId: ana.id,
-      aba: "ponto",
-      competencia: "2026-10",
-    });
-    expect(fichaDaRota(`${LISTAGEM}/${ana.id}/ponto`)).toEqual({
-      colaboradorId: ana.id,
-      aba: "ponto",
-      competencia: competenciaDoMesAtual(),
-    });
-    expect(
-      rotaDaFicha({
-        colaboradorId: ana.id,
-        aba: "ponto",
-        competencia: "2026-10",
-      }),
-    ).toBe(`${LISTAGEM}/${ana.id}/ponto/2026-10`);
-    // Nas outras abas a competência não vai à URL.
-    expect(
-      rotaDaFicha({
-        colaboradorId: ana.id,
-        aba: "dados",
-        competencia: "2026-10",
-      }),
-    ).toBe(`${LISTAGEM}/${ana.id}/dados`);
-  });
-
-  it("mês inválido, mês em outra aba ou segmento a mais: não é rota", () => {
-    for (const fragmento of [
-      `${LISTAGEM}/${ana.id}/ponto/2026-13`,
-      `${LISTAGEM}/${ana.id}/ponto/2026-00`,
-      `${LISTAGEM}/${ana.id}/ponto/2026-1`,
-      `${LISTAGEM}/${ana.id}/ponto/26-11`,
-      `${LISTAGEM}/${ana.id}/ponto/abc`,
-      `${LISTAGEM}/${ana.id}/ponto/`,
-      `${LISTAGEM}/${ana.id}/ponto/2026-11/extra`,
-      `${LISTAGEM}/${ana.id}/dados/2026-11`,
-      `${LISTAGEM}/${ana.id}/documentos/2026-11`,
-    ]) {
-      expect(fichaDaRota(fragmento)).toBeNull();
-      expect(destinoDaRota(fragmento)).toBeNull();
-    }
-  });
-
-  it("competência vizinha e validação", () => {
-    expect(competenciaVizinha("2026-01", -1)).toBe("2025-12");
-    expect(competenciaVizinha("2026-12", 1)).toBe("2027-01");
-    expect(competenciaVizinha("2026-11", -1)).toBe("2026-10");
-    expect(competenciaValida("2026-11")).toBe(true);
-    expect(competenciaValida("2026-13")).toBe(false);
-    expect(competenciaValida("0000-05")).toBe(false);
-    expect(competenciaDoMesAtual(new Date(2026, 0, 31))).toBe("2026-01");
-  });
-});
-
-describe("T202 — aba Registros de ponto no shell", () => {
-  const blocoPrincipal = () =>
-    screen.findByRole("region", { name: /MAT-0001 · vínculo principal/ });
-  const rotaPonto = (c: ColaboradorListadoApi, competencia: string) =>
-    `${LISTAGEM}/${c.id}/ponto/${competencia}`;
-  const entradaDe = (competencia: string, momento: string) => ({
-    id: `e-${competencia}`,
-    vinculoId: ana.vinculos[0]!.id,
-    empresaId: EMPRESA,
-    tipo: "entrada" as const,
-    momento,
-    competencia,
-    registradoPorUserId: "u-1",
-    registradoEm: momento,
-    efetivo: {
-      tipo: "entrada" as const,
-      momento,
-      anulado: false,
-      totalAjustes: 0,
-    },
-  });
-
-  beforeEach(() => {
-    vi.mocked(listarPontosDoVinculo).mockImplementation(async (_id, q) =>
-      q?.competencia === "2026-10"
-        ? paginado([entradaDe("2026-10", "2026-10-05T11:00:00.000Z")])
-        : paginado([]),
-    );
-  });
-
-  it("rota direta abre a aba no mês da URL, sem entrada nova; recarregar mantém", async () => {
-    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
-    const entradas = window.history.length;
-    const { unmount } = render(<App papelDoAtor="dp" />);
-    await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Registros de ponto");
-    const bloco = await blocoPrincipal();
-    expect(bloco).toHaveTextContent("05/10/2026");
-    expect(screen.getByText("outubro de 2026")).toBeInTheDocument();
-    expect(window.location.hash).toBe(rotaPonto(ana, "2026-10"));
-    expect(window.history.length).toBe(entradas);
-    expect(listarPontosDoVinculo).toHaveBeenCalledWith(ana.vinculos[0]!.id, {
-      competencia: "2026-10",
-      pagina: 1,
-      tamanhoPagina: 100,
-    });
-    const url = window.location.hash;
-    unmount();
-
-    window.history.replaceState(null, "", `/${url}`);
-    render(<App papelDoAtor="dp" />);
-    await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Registros de ponto");
-    expect(await blocoPrincipal()).toHaveTextContent("05/10/2026");
-  });
-
-  it("URL sem mês: abre no mês corrente e corrige a URL no lugar", async () => {
-    window.history.replaceState(null, "", `/${LISTAGEM}/${ana.id}/ponto`);
-    const entradas = window.history.length;
-    render(<App papelDoAtor="rh" />);
-    await esperarFicha(ana.nome);
-    await blocoPrincipal();
-    await waitFor(() =>
-      expect(window.location.hash).toBe(
-        rotaPonto(ana, competenciaDoMesAtual()),
-      ),
-    );
-    expect(window.history.length).toBe(entradas);
-  });
-
-  it("mês inválido na URL não abre a ficha nem consulta ponto", async () => {
-    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-13")}`);
-    render(<App papelDoAtor="rh" />);
-    await screen.findByRole("navigation", { name: "Navegação do painel" });
-    await waitFor(() => expect(window.location.hash).not.toContain("2026-13"));
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
-    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
-  });
-
-  it("trocar de mês empilha entrada; voltar e avançar percorrem os meses", async () => {
-    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
-    render(<App papelDoAtor="rh" />);
-    await blocoPrincipal();
-    const entradas = window.history.length;
-    const anterior = screen.getByRole("button", { name: "Mês anterior" });
-    anterior.focus();
-    fireEvent.click(anterior);
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaPonto(ana, "2026-09")),
-    );
-    expect(window.history.length).toBe(entradas + 1);
-    expect(await screen.findByText("setembro de 2026")).toBeInTheDocument();
-    expect(anterior).toHaveFocus();
-
-    navegadorVaiPara(rotaPonto(ana, "2026-10"));
-    expect(await screen.findByText("outubro de 2026")).toBeInTheDocument();
-    expect(await blocoPrincipal()).toHaveTextContent("05/10/2026");
-    navegadorVaiPara(rotaPonto(ana, "2026-09"));
-    expect(await screen.findByText("setembro de 2026")).toBeInTheDocument();
-  });
-
-  it("trocar de aba: a de ponto abre no mês corrente e, ao voltar a ela, no último mês visto", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "dados")}`);
-    render(<App papelDoAtor="rh" />);
-    await esperarFicha(ana.nome);
-    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("tab", { name: "Registros de ponto" }));
-    await waitFor(() =>
-      expect(window.location.hash).toBe(
-        rotaPonto(ana, competenciaDoMesAtual()),
-      ),
-    );
-    await blocoPrincipal();
-    fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
-    const mesAnterior = competenciaVizinha(competenciaDoMesAtual(), -1);
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaPonto(ana, mesAnterior)),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "documentos")),
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "Registros de ponto" }));
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaPonto(ana, mesAnterior)),
-    );
-  });
-
-  it("outra pessoa pela URL: lê só os vínculos dela", async () => {
-    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
-    render(<App papelDoAtor="rh" />);
-    await blocoPrincipal();
-    navegadorVaiPara(rotaPonto(bruno, "2026-10"));
-    await screen.findByRole("region", { name: /MAT-0002 · vínculo principal/ });
-    expect(
-      vi.mocked(listarPontosDoVinculo).mock.calls.map(([id]) => id),
-    ).toEqual([ana.vinculos[0]!.id, bruno.vinculos[0]!.id]);
-    expect(screen.queryByRole("region", { name: /MAT-0001/ })).toBeNull();
-  });
-
-  it("colaborador fora da empresa da sessão: 'não encontrado', sem consulta de ponto", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      `/${LISTAGEM}/99999999-9999-4999-8999-999999999999/ponto/2026-10`,
-    );
-    render(<App papelDoAtor="rh" />);
-    await screen.findByRole("heading", {
-      level: 1,
-      name: "Colaborador não encontrado",
-    });
-    expect(listarPontosDoVinculo).not.toHaveBeenCalled();
-  });
-
-  it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
-    "%s com a URL da aba de ponto não monta a ficha, e nada de ponto é lido",
-    async (papel) => {
-      window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
-      render(<App papelDoAtor={papel} />);
-      await screen.findByRole("navigation", { name: "Navegação do painel" });
-      await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-      expect(listarPontosDoVinculo).not.toHaveBeenCalled();
-    },
-  );
-
-  it("só leitura: sair da ficha pela aba de ponto não pergunta nada (sem edição pendente)", async () => {
-    window.history.replaceState(null, "", `/${rotaPonto(ana, "2026-10")}`);
-    render(
-      <ComGuardaDeSaida>
-        <App papelDoAtor="rh" />
-      </ComGuardaDeSaida>,
-    );
-    await blocoPrincipal();
-    fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaPonto(ana, "2026-09")),
-    );
-    fireEvent.click(voltarPelaTrilha());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(registrarPonto).not.toHaveBeenCalled();
-    expect(registrarAjustePonto).not.toHaveBeenCalled();
-  });
-});
-
-describe("T203 — aba Solicitações no shell", () => {
-  const blocoPrincipal = (c: ColaboradorListadoApi = ana) =>
-    screen.findByRole("region", {
-      name: new RegExp(
-        `^CLT · ${c.vinculos[0]!.matricula} · vínculo principal`,
-      ),
-    });
-  const solicitacaoDe = (c: ColaboradorListadoApi) => ({
-    id: `s-de-${c.id}`,
-    empresaId: EMPRESA,
-    vinculoId: c.vinculos[0]!.id,
-    tipo: "atestado" as const,
-    motivo: "atestado_apresentado" as const,
-    situacao: "enviada" as const,
-    periodoReferencia: "2026-10-05",
-    registradoPorUserId: "u-1",
-    enviadaEm: "2026-10-05T12:30:00.000Z",
-    primeiraRevisaoEm: null,
-    criadoEm: "2026-10-05T12:00:00.000Z",
-    atualizadoEm: "2026-10-05T12:30:00.000Z",
-  });
-
-  beforeEach(() => {
-    vi.mocked(listarSolicitacoesPessoas).mockImplementation(async (q) => {
-      const dono = [ana, bruno].find((c) => c.vinculos[0]!.id === q?.vinculoId);
-      return paginado(dono ? [solicitacaoDe(dono)] : []);
-    });
-  });
-
-  function comoMaster(companyId: string | null) {
-    vi.mocked(obterUsuarioAtual).mockResolvedValue({
-      id: "ator-sintetico",
-      email: "pessoa.teste@example.test",
-      role: "master_tecnico",
-      companyId,
-      unitId: null,
-      teamId: null,
-      status: "active",
-      createdAt: "2026-01-01T00:00:00.000Z",
-    });
-  }
-
-  it("rota direta (RH) abre a aba, sem entrada nova; recarregar mantém; só leitura", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    const entradas = window.history.length;
-    const { unmount } = render(<App papelDoAtor="rh" />);
-    await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Solicitações");
-    const bloco = await blocoPrincipal();
-    expect(bloco).toHaveTextContent("Atestado");
-    expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes"));
-    expect(window.history.length).toBe(entradas);
-    expect(listarSolicitacoesPessoas).toHaveBeenCalledWith({
-      vinculoId: ana.vinculos[0]!.id,
-      pagina: 1,
-      tamanhoPagina: 100,
-    });
-    const url = window.location.hash;
-    unmount();
-
-    window.history.replaceState(null, "", `/${url}`);
-    render(<App papelDoAtor="rh" />);
-    await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Solicitações");
-    await blocoPrincipal();
-    expect(registrarSolicitacaoPessoa).not.toHaveBeenCalled();
-    expect(transicionarSolicitacaoPessoa).not.toHaveBeenCalled();
-  });
-
-  it("DP com a URL da aba: abre Dados do colaborador, corrige a URL no lugar e não consulta solicitações", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    const entradas = window.history.length;
-    render(<App papelDoAtor="dp" />);
-    await esperarFicha(ana.nome);
-    expect(abaSelecionada()).toHaveTextContent("Dados do colaborador");
-    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
-    expect(window.history.length).toBe(entradas);
-    expect(screen.queryByRole("tab", { name: "Solicitações" })).toBeNull();
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 20));
-    });
-    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-    expect(detalharSolicitacaoPessoa).not.toHaveBeenCalled();
-    expect(historicoSolicitacaoPessoa).not.toHaveBeenCalled();
-  });
-
-  it("DP indo à URL da aba por voltar/avançar: fica em Dados, URL corrigida, sem consulta", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "jornada")}`);
-    render(<App papelDoAtor="dp" />);
-    await esperarFicha(ana.nome);
-    navegadorVaiPara(rotaDe(ana, "solicitacoes"));
-    await waitFor(() => expect(window.location.hash).toBe(rotaDe(ana)));
-    expect(abaSelecionada()).toHaveTextContent("Dados do colaborador");
-    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-  });
-
-  it("master_tecnico com empresa ativa lê; sem empresa, orientação e nenhuma consulta", async () => {
-    comoMaster(EMPRESA);
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    const { unmount } = render(<App papelDoAtor="master_tecnico" />);
-    await blocoPrincipal();
-    expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
-    unmount();
-
-    vi.mocked(listarSolicitacoesPessoas).mockClear();
-    comoMaster(null);
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    render(<App papelDoAtor="master_tecnico" />);
-    expect(
-      await screen.findByText(
-        `Escolha uma empresa ativa para consultar as solicitações de ${ana.nome}.`,
-      ),
-    ).toBeInTheDocument();
-    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-  });
-
-  it("trocar de aba empilha a URL; voltar e avançar alternam entre ela e a anterior", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "dados")}`);
-    render(<App papelDoAtor="rh" />);
-    await esperarFicha(ana.nome);
-    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-    const entradas = window.history.length;
-    const aba = screen.getByRole("tab", { name: "Solicitações" });
-    aba.focus();
-    fireEvent.click(aba);
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
-    );
-    expect(window.history.length).toBe(entradas + 1);
-    await blocoPrincipal();
-    expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveFocus();
-
-    navegadorVaiPara(rotaDe(ana, "dados"));
-    await waitFor(() =>
-      expect(abaSelecionada()).toHaveTextContent("Dados do colaborador"),
-    );
-    navegadorVaiPara(rotaDe(ana, "solicitacoes"));
-    await waitFor(() =>
-      expect(abaSelecionada()).toHaveTextContent("Solicitações"),
-    );
-    // A aba já visitada fica montada: nada é relido por voltar a ela.
-    expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
-  });
-
-  it("outra pessoa pela URL: lê só os vínculos dela", async () => {
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    render(<App papelDoAtor="rh" />);
-    await blocoPrincipal();
-    navegadorVaiPara(rotaDe(bruno, "solicitacoes"));
-    await blocoPrincipal(bruno);
-    expect(
-      vi
-        .mocked(listarSolicitacoesPessoas)
-        .mock.calls.map(([q]) => q?.vinculoId),
-    ).toEqual([ana.vinculos[0]!.id, bruno.vinculos[0]!.id]);
-  });
-
-  it("colaborador fora da empresa da sessão: 'não encontrado', sem consulta", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      `/${LISTAGEM}/99999999-9999-4999-8999-999999999999/solicitacoes`,
-    );
-    render(<App papelDoAtor="rh" />);
-    await screen.findByRole("heading", {
-      level: 1,
-      name: "Colaborador não encontrado",
-    });
-    expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-  });
-
-  it.each(["gestor", "colaborador", "financeiro", "auditor", "dpo"] as const)(
-    "%s com a URL da aba Solicitações não monta a ficha, e nada é lido",
-    async (papel) => {
-      window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-      render(<App papelDoAtor={papel} />);
-      await screen.findByRole("navigation", { name: "Navegação do painel" });
-      await waitFor(() => expect(window.location.hash).not.toContain(ana.id));
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-      expect(listarSolicitacoesPessoas).not.toHaveBeenCalled();
-    },
-  );
-
-  it("só leitura: com o detalhe aberto, sair da ficha não pergunta nada (sem edição pendente)", async () => {
-    vi.mocked(detalharSolicitacaoPessoa).mockResolvedValue(solicitacaoDe(ana));
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    render(
-      <ComGuardaDeSaida>
-        <App papelDoAtor="rh" />
-      </ComGuardaDeSaida>,
-    );
-    const bloco = await blocoPrincipal();
-    fireEvent.click(
-      within(bloco).getByRole("button", { name: /^Ver detalhe/ }),
-    );
-    await screen.findByRole("heading", {
-      level: 4,
-      name: "Detalhe da solicitação de Atestado",
-    });
-    fireEvent.click(voltarPelaTrilha());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-  });
-});
-
-describe("T204 — Nova solicitação na ficha, no shell", () => {
-  const pergunta = () =>
-    screen.findByRole("alertdialog", { name: "Sair sem salvar?" });
-  async function navegador(acao: () => void) {
-    await act(async () => {
-      acao();
-      await new Promise((resolver) => setTimeout(resolver, 20));
-    });
-  }
-  /** Listagem → ficha (Dados) → aba Solicitações: três entradas. */
-  async function abrirAbaSolicitacoes() {
-    window.history.replaceState(null, "", `/${LISTAGEM}`);
-    render(
-      <ComGuardaDeSaida>
-        <App papelDoAtor="rh" />
-      </ComGuardaDeSaida>,
-    );
-    const tabela = await screen.findByRole("table", {
-      name: /^Colaboradores — /,
-    });
-    fireEvent.click(
-      within(tabela).getByRole("button", {
-        name: `Abrir ficha de ${ana.nome}`,
-      }),
-    );
-    await esperarFicha(ana.nome);
-    fireEvent.click(screen.getByRole("tab", { name: "Solicitações" }));
-    return screen.findByRole("button", { name: "Nova solicitação" });
-  }
-  function escolherTipo(valor: string) {
-    const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
-    fireEvent.change(within(janela).getByLabelText(/^Tipo/), {
-      target: { value: valor },
-    });
-  }
-
-  it("janela alterada: sair da ficha pelo navegador pergunta ('Nova solicitação'); continuar mantém o tipo; sair sem salvar sai sem gravar", async () => {
-    fireEvent.click(await abrirAbaSolicitacoes());
-    escolherTipo("ferias");
-
-    await navegador(() => window.history.go(-2));
-    const dialogo = await pergunta();
-    // A guarda desfaz o passo do navegador antes de perguntar.
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
-    );
-    expect(
-      within(dialogo)
-        .getAllByRole("listitem")
-        .map((li) => li.textContent),
-    ).toEqual(["Nova solicitação"]);
-    fireEvent.click(
-      within(dialogo).getByRole("button", { name: "Continuar editando" }),
-    );
-    expect(
-      within(
-        screen.getByRole("dialog", { name: "Nova solicitação" }),
-      ).getByLabelText(/^Tipo/),
-    ).toHaveValue("ferias");
-    await waitFor(() =>
-      expect(window.location.hash).toBe(rotaDe(ana, "solicitacoes")),
-    );
-
-    await navegador(() => window.history.go(-2));
-    fireEvent.click(
-      within(await pergunta()).getByRole("button", { name: "Sair sem salvar" }),
-    );
-    await navegador(() => undefined);
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(registrarSolicitacaoPessoa).not.toHaveBeenCalled();
-  });
-
-  it("registro em curso: sair espera o salvamento (nada é descartado nem repetido)", async () => {
-    let entregar!: (v: unknown) => void;
-    vi.mocked(registrarSolicitacaoPessoa).mockReturnValueOnce(
-      new Promise((ok) => {
-        entregar = ok;
-      }) as never,
-    );
-    vi.mocked(transicionarSolicitacaoPessoa).mockResolvedValueOnce({} as never);
-    fireEvent.click(await abrirAbaSolicitacoes());
-    escolherTipo("ausencia");
-    const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
-    fireEvent.click(within(janela).getByRole("button", { name: "Revisar" }));
-    fireEvent.click(
-      await within(janela).findByRole("button", { name: "Confirmar e enviar" }),
-    );
-
-    await navegador(() => window.history.go(-2));
-    expect(
-      await screen.findByRole("alertdialog", {
-        name: "Aguarde o salvamento terminar",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sair sem salvar" })).toBe(
-      null,
-    );
-    await act(async () => {
-      entregar({
-        id: "nova-shell",
-        empresaId: EMPRESA,
-        vinculoId: ana.vinculos[0]!.id,
-        tipo: "ausencia",
-        motivo: "ausencia_programada",
-        situacao: "rascunho",
-        periodoReferencia: null,
-        registradoPorUserId: "u-1",
-        enviadaEm: null,
-        primeiraRevisaoEm: null,
-        criadoEm: "2026-11-09T12:00:00.000Z",
-        atualizadoEm: "2026-11-09T12:00:00.000Z",
-      });
-    });
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Nova solicitação" })).toBe(
-        null,
-      ),
-    );
-    expect(registrarSolicitacaoPessoa).toHaveBeenCalledTimes(1);
-    expect(transicionarSolicitacaoPessoa).toHaveBeenCalledWith("nova-shell", {
-      acao: "enviar",
-    });
-    // Nada navega sozinho: continua na ficha.
-    expect(document.querySelector(".ficha-colaborador")).not.toBeNull();
-  });
-
-  it("janela aberta sem alteração: sair não pergunta", async () => {
-    fireEvent.click(await abrirAbaSolicitacoes());
-    await navegador(() => window.history.go(-2));
-    await screen.findByRole("table", { name: /^Colaboradores — / });
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-  });
-
-  it("master_tecnico com empresa: a aba lê, sem 'Nova solicitação'", async () => {
-    vi.mocked(obterUsuarioAtual).mockResolvedValue({
-      id: "ator-sintetico",
-      email: "pessoa.teste@example.test",
-      role: "master_tecnico",
-      companyId: EMPRESA,
-      unitId: null,
-      teamId: null,
-      status: "active",
-      createdAt: "2026-01-01T00:00:00.000Z",
-    });
-    window.history.replaceState(null, "", `/${rotaDe(ana, "solicitacoes")}`);
-    render(<App papelDoAtor="master_tecnico" />);
-    await screen.findByText("Somente consulta");
-    await waitFor(() => expect(listarSolicitacoesPessoas).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Nova solicitação" })).toBe(
-      null,
-    );
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2810,46 +2177,20 @@ function abrirMenuDaLinha(botao: HTMLElement) {
 }
 
 describe("T209 — tamanho da página e atalhos da linha no shell", () => {
-  const seletorDoTamanho = () =>
-    screen.getByRole("combobox", { name: "Itens por página" });
   const ultimaConsulta = () =>
     vi.mocked(listarColaboradores).mock.lastCall?.[0] ?? {};
 
-  it("trocar o tamanho empilha a URL canônica; recarregar mantém; 20 sai da URL", async () => {
-    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&pagina=2`);
-    const { unmount } = render(<App papelDoAtor="rh" />);
-    await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
-    // Empilhar é `pushState` com a URL nova (o tamanho do histórico depende
-    // da ordem dos testes: entradas à frente são truncadas).
-    const empilhar = vi.spyOn(window.history, "pushState");
-
-    fireEvent.change(seletorDoTamanho(), { target: { value: "50" } });
-    await waitFor(() =>
-      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`),
-    );
-    expect(empilhar).toHaveBeenCalledWith(
-      expect.anything(),
-      "",
-      expect.stringContaining(`${LISTAGEM}?aba=todos&tamanho=50`),
-    );
-    empilhar.mockRestore();
-    await waitFor(() =>
-      expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 }),
-    );
-    const url = window.location.hash;
-    unmount();
-
-    vi.mocked(listarColaboradores).mockClear();
-    window.history.replaceState(null, "", `/${url}`);
+  // T215 — o seletor "Itens por página" saiu da tela (desenho da
+  // referência); o tamanho continua valendo pela URL.
+  it("o tamanho da URL vale ao abrir e ao recarregar, sem seletor na tela", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}?aba=todos&tamanho=50`);
     render(<App papelDoAtor="rh" />);
     await screen.findByRole("table", { name: /^Colaboradores — Todos/ });
-    expect(seletorDoTamanho()).toHaveValue("50");
-    expect(ultimaConsulta()).toMatchObject({ tamanhoPagina: 50 });
-
-    fireEvent.change(seletorDoTamanho(), { target: { value: "20" } });
-    await waitFor(() =>
-      expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos`),
-    );
+    expect(ultimaConsulta()).toMatchObject({ pagina: 1, tamanhoPagina: 50 });
+    expect(window.location.hash).toBe(`${LISTAGEM}?aba=todos&tamanho=50`);
+    expect(
+      screen.queryByRole("combobox", { name: "Itens por página" }),
+    ).toBeNull();
   });
 
   it("tamanho inválido na URL cai em 20 e é corrigido no lugar; nada inválido vira consulta", async () => {
@@ -2868,12 +2209,12 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
   });
 
   it.each([
-    ["rh", true],
-    ["dp", false],
-    ["master_tecnico", true],
+    ["rh", ["Ver ficha", "Editar colaborador"]],
+    ["dp", ["Ver ficha", "Editar colaborador"]],
+    ["master_tecnico", ["Ver ficha"]],
   ] as const)(
-    "%s: atalhos às abas que o papel vê; Solicitações só para quem as lê (%s)",
-    async (papel, comSolicitacoes) => {
+    "T215 — %s: o ⋯ da linha traz %j (Editar só para quem edita a ficha)",
+    async (papel, esperados) => {
       render(<App papelDoAtor={papel} />);
       const tabela = await screen.findByRole("table", {
         name: /^Colaboradores — /,
@@ -2884,54 +2225,70 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       const rotulos = within(await screen.findByRole("menu"))
         .getAllByRole("menuitem")
         .map((item) => item.textContent);
-      expect(rotulos.includes("Solicitações")).toBe(comSolicitacoes);
-      expect(rotulos).toContain("Documentos");
-      expect(rotulos).toHaveLength(comSolicitacoes ? 7 : 6);
+      expect(rotulos).toEqual(esperados);
     },
   );
 
-  it("o atalho empilha a rota da ficha na aba; ponto no mês corrente; a trilha devolve o foco ao botão", async () => {
+  it("T215 — Ver ficha empilha a ficha nos dados; Editar colaborador, a página de edição; a trilha devolve o foco ao ⋯", async () => {
     render(<App papelDoAtor="rh" />);
-    const tabela = await screen.findByRole("table", {
-      name: /^Colaboradores — /,
-    });
-    const empilhar = vi.spyOn(window.history, "pushState");
-    const botao = within(tabela).getByRole("button", {
-      name: `Ações: ${ana.nome}`,
-    });
-    abrirMenuDaLinha(botao);
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Documentos" }),
-    );
-    await esperarFicha(ana.nome);
-    expect(window.location.hash).toBe(rotaDe(ana, "documentos"));
-    expect(empilhar).toHaveBeenCalledWith(
-      expect.anything(),
-      "",
-      expect.stringContaining(rotaDe(ana, "documentos")),
-    );
-    empilhar.mockRestore();
-    expect(abaSelecionada()).toHaveTextContent("Documentos");
-
-    fireEvent.click(voltarPelaTrilha());
     await screen.findByRole("table", { name: /^Colaboradores — / });
-    await waitFor(() =>
-      expect(
+    const destinos = [
+      ["Ver ficha", rotaDe(ana, "dados")],
+      [
+        "Editar colaborador",
+        `#/pessoas/colaboradores/${ana.id}/editar/dados-basicos`,
+      ],
+    ] as const;
+    for (const [item, rota] of destinos) {
+      abrirMenuDaLinha(
         screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
-      ).toHaveFocus(),
-    );
-
-    abrirMenuDaLinha(
-      screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
-    );
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Registros de ponto" }),
-    );
-    await esperarFicha(ana.nome);
-    expect(window.location.hash).toBe(
-      `${rotaDe(ana, "ponto")}/${competenciaDoMesAtual()}`,
-    );
+      );
+      fireEvent.click(await screen.findByRole("menuitem", { name: item }));
+      if (item === "Ver ficha") await esperarFicha(ana.nome);
+      else
+        expect(
+          await screen.findByRole("heading", {
+            level: 1,
+            name: "Editar colaborador",
+          }),
+        ).toBeInTheDocument();
+      expect(window.location.hash).toBe(rota);
+      fireEvent.click(voltarPelaTrilha());
+      await screen.findByRole("table", { name: /^Colaboradores — / });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: `Ações: ${ana.nome}` }),
+        ).toHaveFocus(),
+      );
+    }
   });
+
+  it.each([
+    ["rh", true],
+    ["dp", true],
+    ["master_tecnico", false],
+  ] as const)(
+    "T215 — %s pela URL da edição: abre a página = %s (quem não edita cai na ficha)",
+    async (papel, abre) => {
+      const rota = `#/pessoas/colaboradores/${ana.id}/editar/endereco`;
+      window.history.replaceState(null, "", `/${rota}`);
+      render(<App papelDoAtor={papel} />);
+      if (abre) {
+        expect(
+          await screen.findByRole("heading", {
+            level: 1,
+            name: "Editar colaborador",
+          }),
+        ).toBeInTheDocument();
+        expect(window.location.hash).toBe(rota);
+      } else {
+        await esperarFicha(ana.nome);
+        await waitFor(() =>
+          expect(window.location.hash).toBe(rotaDe(ana, "dados")),
+        );
+      }
+    },
+  );
 
   it("perfis sem Colaboradores não veem menu nenhum (a rota é recusada)", async () => {
     window.history.replaceState(null, "", `/${LISTAGEM}`);
@@ -2942,5 +2299,28 @@ describe("T209 — tamanho da página e atalhos da linha no shell", () => {
       ).toBeNull(),
     );
     expect(screen.queryByRole("button", { name: /^Ações: / })).toBeNull();
+  });
+});
+
+describe("T215 — aba Organograma da listagem no shell", () => {
+  it("abre a estrutura (o item Organograma do menu fica atual) e sai da listagem", async () => {
+    window.history.replaceState(null, "", `/${LISTAGEM}`);
+    render(<App papelDoAtor="rh" />);
+    await screen.findByRole("table", { name: /^Colaboradores — Ativos/ });
+    const grupos = screen.getByRole("tablist", {
+      name: "Grupos de colaboradores",
+    });
+    fireEvent.click(within(grupos).getByRole("tab", { name: "Organograma" }));
+    const barra = screen.getByRole("navigation", {
+      name: "Navegação do painel",
+    });
+    await waitFor(() =>
+      expect(
+        within(barra).getByRole("button", { name: /^Organograma/ }),
+      ).toHaveAttribute("aria-current", "page"),
+    );
+    expect(
+      screen.queryByRole("table", { name: /^Colaboradores — / }),
+    ).toBeNull();
   });
 });

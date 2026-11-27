@@ -58,18 +58,33 @@ describe("estrutura dos grupos", () => {
       "Dashboard",
       "Gestão de Pessoas",
       "Jornada",
+      // T215 — Benefícios (Remuneração › Benefícios).
+      "Benefícios",
       "Liderança",
+      // T215 — Segurança (Sessões ativas e Permissões de acesso).
+      "Segurança",
       "Configurações",
       "Demonstração",
     ]);
   });
 
-  it("T208 — só Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas", () => {
+  it("T208 — Configurações é grupo da conta; T209: Empresas e Nova empresa como sub-páginas; T215: Segurança também é da conta", () => {
     const daConta = GRUPOS.filter((g) => g.daConta);
-    expect(daConta.map((g) => g.titulo)).toEqual(["Configurações"]);
-    expect(daConta[0]!.secundario).toBeFalsy();
+    expect(daConta.map((g) => g.titulo)).toEqual([
+      "Segurança",
+      "Configurações",
+    ]);
+    expect(daConta.every((g) => !g.secundario)).toBe(true);
+    // T215 — Segurança abre em Sessões ativas; as Contas de acesso viram
+    // Permissões de acesso, sub-página do módulo.
     expect(
-      daConta[0]!.destinos.map((d) => [
+      daConta[0]!.destinos.map((d) => [d.id, d.label, d.papeis, d.agrupadoEm]),
+    ).toEqual([
+      ["seguranca", "Segurança", undefined, undefined],
+      ["contas-acesso", "Permissões de acesso", undefined, "seguranca"],
+    ]);
+    expect(
+      daConta[1]!.destinos.map((d) => [
         d.id,
         d.label,
         d.estado,
@@ -90,14 +105,6 @@ describe("estrutura dos grupos", () => {
         "Empresas",
         "funcional",
         ["rh", "dp", "master_tecnico"],
-        "configuracoes",
-      ],
-      // T211 — Contas de acesso como Equipe e permissões.
-      [
-        "contas-acesso",
-        "Equipe e permissões",
-        "funcional",
-        undefined,
         "configuracoes",
       ],
       [
@@ -163,13 +170,24 @@ describe("o estado declarado bate com o código", () => {
     "nova-admissao": "src/screens/pessoas/NovaAdmissaoScreen.tsx",
     "importar-colaboradores":
       "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
+    beneficios: "src/screens/beneficios/BeneficiosModulo.tsx",
+    "politicas-ferias":
+      "src/screens/pessoas/ferias/politicas/PoliticasFeriasScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
-    "jornadas-trabalho": "src/screens/horarios/JornadasTrabalhoScreen.tsx",
+    // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
+    "jornadas-trabalho": "src/screens/horarios/quadro/QuadroDaEscalaScreen.tsx",
+    "turnos-escala": "src/screens/horarios/turnos/TurnosScreen.tsx",
+    "regras-escala": "src/screens/horarios/quadro/RegrasDaEscalaScreen.tsx",
+    "transicao-escala":
+      "src/screens/horarios/quadro/PlanejarTransicaoScreen.tsx",
+    "modelo-escala": "src/screens/horarios/quadro/AplicarModeloScreen.tsx",
     ponto: "src/screens/ponto/VisaoPeriodoScreen.tsx",
     equipe: "src/screens/equipe/EquipeScreen.tsx",
     "administracao-lideranca":
       "src/screens/administracao/AdministracaoLiderancaScreen.tsx",
     "contas-acesso": "src/screens/administracao/ContasAcessoScreen.tsx",
+    // T215 — Segurança › Sessões ativas (`GET /v1/auth/sessions`).
+    seguranca: "src/app/SessoesAtivasPanel.tsx",
     inicio: "src/screens/inicio/InicioVisaoGeralScreen.tsx",
     "pessoas-demonstracao": "src/screens/pessoas/BeneficiosScreen.tsx",
     "cadastros-demonstracao":
@@ -520,7 +538,7 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
           .map((b) => b.textContent),
       ).toEqual([
         "Colaboradores Consulta, ficha e vida funcional",
-        "Escala de trabalho Turnos da empresa",
+        "Escala de trabalho Quadro da semana e do mês",
         "Organograma Unidades, cargos e centros de custo",
         // T209 — subitem em desenvolvimento, ao lado dos funcionais.
         "Desenvolvimento Em desenvolvimento",
@@ -651,12 +669,14 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     // T209 — um por módulo do menu e um por item em desenvolvimento de
     // primeiro nível (Portal, Recrutamento, Pesquisas, Calendário, Folha,
     // Benefícios, Hub de Benefícios, Suporte e Roadmap). T211 — módulos no
-    // menu: Dashboard, Colaboradores, Liderança e Configurações.
+    // menu: Dashboard, Colaboradores, Liderança e Configurações. T215 — e
+    // Segurança. T215 — Benefícios virou módulo (sai dos itens em
+    // desenvolvimento).
     const modulosNoMenu = MENU_LATERAL.flatMap((secao) =>
       secao.entradas.filter((e) => e.tipo === "modulo"),
     ).length;
-    expect(modulosNoMenu).toBe(4);
-    expect(icones.length).toBe(modulosNoMenu + 9);
+    expect(modulosNoMenu).toBe(6);
+    expect(icones.length).toBe(modulosNoMenu + 8);
     for (const icone of icones) {
       expect(icone).toHaveAttribute("aria-hidden", "true");
       expect(icone).toHaveAttribute("focusable", "false");

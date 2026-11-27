@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -56,13 +57,78 @@ function aparar(valor: unknown): unknown {
   return typeof valor === "string" ? valor.trim() : valor;
 }
 
-export class CriarTabelaHorarioDto {
-  /** T182 — obrigatório ao criar (decisão da proprietária de 2026-10-23). */
+/** T215 — as 12 cores de turno do quadro. */
+export const CORES_DE_TURNO = [
+  "azul",
+  "laranja",
+  "cinza",
+  "verde",
+  "verde_agua",
+  "roxo",
+  "indigo",
+  "tangerina",
+  "ciano",
+  "oliva",
+  "mostarda",
+  "violeta",
+] as const;
+export const MODOS_DE_TURNO = ["mesmo_horario", "por_dia"] as const;
+export const INTERVALOS_DE_TURNO = [0, 15, 30, 45, 60, 90, 120] as const;
+/** T215 — sigla no mês: 1 ou 2 letras ou dígitos. */
+export const SIGLA_DE_TURNO = /^[A-Za-zÀ-ÿ0-9]{1,2}$/;
+
+/** T215 — campos de turno, comuns à criação e à edição. */
+class CamposDeTurno {
+  @IsOptional()
+  @IsIn(CORES_DE_TURNO)
+  cor?: (typeof CORES_DE_TURNO)[number];
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().toUpperCase() : value,
+  )
+  @Matches(SIGLA_DE_TURNO)
+  sigla?: string;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  unidadeOrganizacionalId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  toleranciaMinutos?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  minimoPorDia?: number | null;
+}
+
+export class CriarTabelaHorarioDto extends CamposDeTurno {
+  /**
+   * T182 — código da jornada. T215 — opcional: sem ele, o servidor gera um a
+   * partir do nome (o Turno do quadro não pede código). `null` é recusado.
+   */
+  @ValidateIf((_, v) => v !== undefined)
   @IsString()
   @Matches(CODIGO_JORNADA, {
     message: "codigo deve ter de 2 a 32 letras maiusculas, digitos ou _.",
   })
-  codigo!: string;
+  codigo?: string;
+
+  @IsOptional()
+  @IsIn(MODOS_DE_TURNO)
+  modo?: (typeof MODOS_DE_TURNO)[number];
+
+  @IsOptional()
+  @IsIn(INTERVALOS_DE_TURNO)
+  intervaloMinutos?: number;
 
   @Transform(({ value }) => aparar(value))
   @IsString()
@@ -87,7 +153,7 @@ export class CriarTabelaHorarioDto {
  * (ou quebraria no banco com o nome). Por isso `@ValidateIf` só pula o
  * `undefined`, e `null` é recusado com 400.
  */
-export class EditarTabelaHorarioDto {
+export class EditarTabelaHorarioDto extends CamposDeTurno {
   @ValidateIf((_, valor) => valor !== undefined)
   @IsString()
   @Matches(CODIGO_JORNADA, {
@@ -101,6 +167,27 @@ export class EditarTabelaHorarioDto {
   @MinLength(1)
   @MaxLength(120)
   nome?: string;
+
+  /**
+   * T215 — os horários do turno também mudam (como no quadro da referência):
+   * valem para o rascunho a partir de hoje; o que já foi publicado guarda o
+   * próprio horário. Com eles, ao menos um período.
+   */
+  @ValidateIf((_, valor) => valor !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => PeriodoHorarioInputDto)
+  periodos?: PeriodoHorarioInputDto[];
+
+  @IsOptional()
+  @IsIn(MODOS_DE_TURNO)
+  modo?: (typeof MODOS_DE_TURNO)[number];
+
+  @IsOptional()
+  @IsIn(INTERVALOS_DE_TURNO)
+  intervaloMinutos?: number;
 }
 
 /** Vincula uma tabela a um colaborador com vigência (início e fim opcional). */
@@ -194,6 +281,11 @@ export class ListarTabelasHorarioQueryDto {
   @Min(1)
   @Max(TAMANHO_PAGINA_MAXIMO)
   tamanhoPagina?: number = TAMANHO_PAGINA_PADRAO;
+
+  /** T215 — turnos de uma unidade (e os de todas as unidades). */
+  @IsOptional()
+  @IsUUID()
+  unidadeOrganizacionalId?: string;
 }
 
 export class ListarVinculosHorarioQueryDto {

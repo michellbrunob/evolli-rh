@@ -16,6 +16,7 @@ import {
   ValidatorConstraintInterface,
 } from "class-validator";
 import { CamposRecusadosException } from "../../common/erros/recusa-por-campo";
+import { registrarSalarioDaAdmissao } from "../salarios/salario-vigente";
 
 /**
  * T209 — contrato da admissão (etapa 2 do Novo colaborador, decisão de
@@ -264,7 +265,15 @@ export function contratoConfere(
  */
 export async function gravarContratoNaAdmissao(
   tx: Prisma.TransactionClient,
-  alvo: { vinculoId: string; empresaId: string },
+  alvo: {
+    vinculoId: string;
+    empresaId: string;
+    /** T215 — a linha da admissão na linha do tempo salarial. */
+    dataAdmissao: Date;
+    registradaPorUserId: string;
+    /** O cargo da contratação, que a linha da admissão guarda pelo nome. */
+    cargoId: string | null;
+  },
   dto: ContratoAdmissaoDto | undefined,
 ): Promise<ContratoDaAdmissao | null> {
   const enviado = contratoEnviado(dto);
@@ -298,5 +307,19 @@ export async function gravarContratoNaAdmissao(
       pensaoAlimenticiaPercentual: enviado.pensaoAlimenticiaPercentual,
     },
   });
+  // T215 — o salário da admissão abre a linha do tempo salarial.
+  const cargo =
+    alvo.cargoId === null
+      ? null
+      : await tx.cargo.findFirst({
+          where: { id: alvo.cargoId, empresaId: alvo.empresaId },
+          select: { nome: true },
+        });
+  await registrarSalarioDaAdmissao(
+    tx,
+    alvo,
+    enviado.salarioBruto,
+    cargo?.nome ?? null,
+  );
   return contratoGravado(linha);
 }

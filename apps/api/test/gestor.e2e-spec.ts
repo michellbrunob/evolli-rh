@@ -1354,6 +1354,8 @@ describe("Gestor consultivo: escopo por equipe e administracao pelo RH (e2e)", (
           tipo: "clt",
           dataAdmissao: dia(-99),
           motivoCodigo: "admissao_inicial",
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
           departamentoId: departamentoA,
           equipeId: equipeAlfa,
         })

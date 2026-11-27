@@ -147,10 +147,19 @@ export interface ContasAcessoScreenProps {
    * quem decide voltar ao login é o `AutenticacaoApp`, pelo mesmo caminho já
    * usado por `SessoesAtivasPanel` (T117). */
   onSessaoAtualEncerrada?: () => void;
+  /**
+   * T215 — dentro do módulo Segurança, o `h1` é o do módulo: a tela vira o
+   * painel "Permissões de acesso", com `h2`. Sem estas props, a tela segue
+   * como sempre (`h1` "Contas de acesso").
+   */
+  nivelDoTitulo?: 1 | 2;
+  titulo?: string;
 }
 
 export function ContasAcessoScreen({
   onSessaoAtualEncerrada,
+  nivelDoTitulo = 1,
+  titulo = "Contas de acesso",
 }: ContasAcessoScreenProps = {}) {
   const [statusAtor, setStatusAtor] = useState<
     "carregando" | "erro" | "pronto"
@@ -667,9 +676,9 @@ export function ContasAcessoScreen({
   return (
     <div className="contas-acesso-screen">
       <PageHeader
-        headingLevel={1}
+        headingLevel={nivelDoTitulo}
         titleId={CONTAS_ACESSO_TITULO_ID}
-        title="Contas de acesso"
+        title={titulo}
         description="Crie, altere o papel e desative contas de acesso ao Painel Administrativo — sempre dentro do escopo que o backend concede à sua conta."
         actions={
           podeCriarOuAlterarPapel ? (

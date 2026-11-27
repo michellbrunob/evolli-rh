@@ -165,3 +165,8 @@
   line-height: var(--leading-body);
   color: var(--color-ink-subtle);
 }
+
+/* T215 — o sublinhado que desliza mantém a cor desta tela. */
+.admin-lideranca__abas {
+  --aba-cor: var(--color-ink);
+}

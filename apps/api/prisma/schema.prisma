@@ -126,8 +126,28 @@ model AccessUser {
   // T038 — Cadastros: Horarios. Quem cadastrou uma tabela de horario e quem
   // criou um vinculo horario<->colaborador. Mesma natureza das relacoes acima:
   // identifica o ATOR da operacao, nunca a pessoa cujo horario foi vinculado.
-  tabelasHorarioCriadas  TabelaHorario[]  @relation("HorarioTabelaCriadaPor")
-  vinculosHorarioCriados VinculoHorario[] @relation("HorarioVinculoCriadoPor")
+  tabelasHorarioCriadas     TabelaHorario[]         @relation("HorarioTabelaCriadaPor")
+  vinculosHorarioCriados    VinculoHorario[]        @relation("HorarioVinculoCriadoPor")
+  /// T215 — escalas de colaborador definidas por esta conta.
+  escalasColaboradorCriadas EscalaColaborador[]     @relation("EscalaColaboradorCriadaPor")
+  beneficiosCriados         Beneficio[]             @relation("BeneficioCriadoPor")
+  beneficiosExcluidos       Beneficio[]             @relation("BeneficioExcluidoPor")
+  beneficioPessoasCriadas   BeneficioPessoa[]       @relation("BeneficioPessoaCriadaPor")
+  beneficioAjustes          BeneficioAjuste[]       @relation("BeneficioAjustePor")
+  beneficioHistorico        BeneficioHistorico[]    @relation("BeneficioHistoricoPor")
+  beneficioVersoes          BeneficioVersao[]       @relation("BeneficioVersaoPor")
+  beneficioPausas           BeneficioPausa[]        @relation("BeneficioPausaPor")
+  dependentesCriados        DependenteColaborador[] @relation("DependenteCriadoPor")
+  /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
+  diasDeEscalaCriados       EscalaDia[]             @relation("EscalaDiaCriadoPor")
+  diasDeEscalaAtualizados   EscalaDia[]             @relation("EscalaDiaAtualizadoPor")
+  /// T215 — publicações do quadro da escala feitas por esta conta.
+  publicacoesDeEscala       EscalaPublicacao[]      @relation("EscalaPublicacaoPor")
+  /// T215 — regras da escala salvas e feriados locais criados por esta conta.
+  regrasDeEscalaSalvas      EscalaRegras[]          @relation("EscalaRegrasPor")
+  feriadosLocaisCriados     EscalaFeriadoLocal[]    @relation("EscalaFeriadoLocalPor")
+  /// T215 — visões salvas do quadro da escala (só desta conta).
+  visoesDeEscala            EscalaVisao[]
 
   // T151 — Gestor consultivo. `contaColaborador` e o vinculo DP-23 desta
   // propria conta com a pessoa; os demais identificam o ATOR administrativo
@@ -161,11 +181,31 @@ model AccessUser {
   dadosPessoaisEventos      DadosPessoaisColaboradorEvento[] @relation("DadosPessoaisEventoAtor")
 
   // T179 — admissões que esta conta enviou com chave de idempotência.
-  idempotenciasAdmissao    IdempotenciaAdmissao[] @relation("IdempotenciaAdmissaoAtor")
+  idempotenciasAdmissao          IdempotenciaAdmissao[]       @relation("IdempotenciaAdmissaoAtor")
   // T209 — rascunho da Nova admissão, por conta e empresa.
-  rascunhosAdmissao        RascunhoAdmissao[]     @relation("RascunhoAdmissaoAtor")
+  rascunhosAdmissao              RascunhoAdmissao[]           @relation("RascunhoAdmissaoAtor")
   // T209 — fotos de colaborador enviadas por esta conta (autoria).
-  fotosColaboradorEnviadas FotoColaborador[]      @relation("FotoColaboradorAutor")
+  fotosColaboradorEnviadas       FotoColaborador[]            @relation("FotoColaboradorAutor")
+  desativacoesFeitas             DesativacaoColaborador[]     @relation("DesativacaoColaboradorAutor")
+  reativacoesFeitas              DesativacaoColaborador[]     @relation("ReativacaoColaboradorAutor")
+  // T215 — Férias e ausências: quem registrou e quem decidiu.
+  ausenciasRegistradas           Ausencia[]                   @relation("AusenciaRegistradaPor")
+  ausenciasDecididas             Ausencia[]                   @relation("AusenciaDecididaPor")
+  ausenciasExcluidas             Ausencia[]                   @relation("AusenciaExcluidaPor")
+  reiniciosPeriodoRegistrados    ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRegistradoPor")
+  reiniciosPeriodoRemovidos      ReinicioPeriodoAquisitivo[]  @relation("ReinicioPeriodoRemovidoPor")
+  politicasFeriasCriadas         PoliticaFerias[]             @relation("PoliticaFeriasCriadaPor")
+  politicasFeriasDesativadas     PoliticaFerias[]             @relation("PoliticaFeriasDesativadaPor")
+  // T215 — anexos de ausência: quem enviou e quem removeu.
+  anexosAusenciaEnviados         AnexoAusencia[]              @relation("AnexoAusenciaEnviadoPor")
+  anexosAusenciaRemovidos        AnexoAusencia[]              @relation("AnexoAusenciaRemovidoPor")
+  // T215 — Salários: quem registrou e quem removeu uma alteração salarial.
+  alteracoesSalariaisRegistradas AlteracaoSalarial[]          @relation("AlteracaoSalarialRegistradaPor")
+  alteracoesSalariaisRemovidas   AlteracaoSalarial[]          @relation("AlteracaoSalarialRemovidaPor")
+  // T213 — documentos do colaborador: quem registrou, enviou ou removeu.
+  documentosColaboradorCriados   DocumentoColaborador[]       @relation("DocumentoColaboradorAutor")
+  documentosColaboradorRemovidos DocumentoColaborador[]       @relation("DocumentoColaboradorRemocao")
+  versoesDocumentoEnviadas       VersaoDocumentoColaborador[] @relation("VersaoDocumentoColaboradorAutor")
 
   @@index([companyId])
   @@map("access_user")
@@ -486,6 +526,79 @@ enum AuditAction {
   pessoas_foto_colaborador_substituida @map("pessoas.foto_colaborador.substituida")
   pessoas_foto_colaborador_removida    @map("pessoas.foto_colaborador.removida")
 
+  // T215 — desativacao e reativacao do colaborador na empresa (lixeira do
+  // Editar colaborador). Sem conteudo: so o id do colaborador e a empresa.
+  pessoas_colaborador_desativado @map("pessoas.colaborador.desativado")
+  pessoas_colaborador_reativado  @map("pessoas.colaborador.reativado")
+
+  // T215 — Férias e ausências: registro e decisões. Sem conteúdo: só o id da
+  // ausência e a empresa (nunca tipo, datas, motivo ou observação).
+  pessoas_ausencia_registrada         @map("pessoas.ausencia.registrada")
+  pessoas_ausencia_aprovada           @map("pessoas.ausencia.aprovada")
+  pessoas_ausencia_recusada           @map("pessoas.ausencia.recusada")
+  pessoas_ausencia_cancelada          @map("pessoas.ausencia.cancelada")
+  /// T215 — editar e excluir (a exclusão marca; nada é apagado).
+  pessoas_ausencia_alterada           @map("pessoas.ausencia.alterada")
+  pessoas_ausencia_excluida           @map("pessoas.ausencia.excluida")
+  pessoas_ausencia_ajuste_sugerido    @map("pessoas.ausencia.ajuste_sugerido")
+  pessoas_politica_ferias_criada      @map("pessoas.politica_ferias.criada")
+  pessoas_beneficio_criado            @map("pessoas.beneficio.criado")
+  pessoas_beneficio_alterado          @map("pessoas.beneficio.alterado")
+  pessoas_beneficio_pausado           @map("pessoas.beneficio.pausado")
+  pessoas_beneficio_encerrado         @map("pessoas.beneficio.encerrado")
+  pessoas_beneficio_reativado         @map("pessoas.beneficio.reativado")
+  pessoas_beneficio_excluido          @map("pessoas.beneficio.excluido")
+  pessoas_beneficio_pessoas_alteradas @map("pessoas.beneficio.pessoas_alteradas")
+  pessoas_beneficio_valores_alterados @map("pessoas.beneficio.valores_alterados")
+  pessoas_dependente_criado           @map("pessoas.dependente.criado")
+  pessoas_dependente_alterado         @map("pessoas.dependente.alterado")
+  pessoas_dependente_removido         @map("pessoas.dependente.removido")
+  pessoas_politica_ferias_alterada    @map("pessoas.politica_ferias.alterada")
+  pessoas_politica_ferias_desativada  @map("pessoas.politica_ferias.desativada")
+  pessoas_politica_ferias_reativada   @map("pessoas.politica_ferias.reativada")
+  pessoas_periodo_reiniciado          @map("pessoas.periodo_aquisitivo.reiniciado")
+  pessoas_periodo_reinicio_removido   @map("pessoas.periodo_aquisitivo.reinicio_removido")
+  // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
+  // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
+  pessoas_ausencia_consultada         @map("pessoas.ausencia.consultada")
+  pessoas_ausencia_anexo_enviado      @map("pessoas.ausencia.anexo_enviado")
+  pessoas_ausencia_anexo_baixado      @map("pessoas.ausencia.anexo_baixado")
+  pessoas_ausencia_anexo_removido     @map("pessoas.ausencia.anexo_removido")
+
+  // T215 — Salários (linha do tempo salarial da ficha). Sem conteúdo: só o
+  // id da alteração e a empresa (nunca valor, cargo ou modelo de contrato).
+  pessoas_salario_registrado @map("pessoas.salario.registrado")
+  pessoas_salario_atualizado @map("pessoas.salario.atualizado")
+  pessoas_salario_removido   @map("pessoas.salario.removido")
+
+  // T215 — escala do colaborador (aba Escala da ficha). Sem conteúdo: só o
+  // id da escala e a empresa (nunca modelo, turno ou datas).
+  pessoas_escala_definida          @map("pessoas.escala.definida")
+  pessoas_escala_encerrada         @map("pessoas.escala.encerrada")
+  // T215 — quadro da escala: o dia gravado ou limpo no rascunho. Só o id do
+  // dia e a empresa (nunca turno, horário ou observação).
+  pessoas_escala_dia_gravado       @map("pessoas.escala.dia_gravado")
+  pessoas_escala_dia_limpo         @map("pessoas.escala.dia_limpo")
+  // T215 — o rascunho do período publicado (id da publicação e a empresa).
+  pessoas_escala_publicada         @map("pessoas.escala.publicada")
+  // T215 — Regras da escala e feriados locais (id e empresa, sem conteúdo).
+  pessoas_escala_regras_salvas     @map("pessoas.escala.regras_salvas")
+  pessoas_escala_feriado_criado    @map("pessoas.escala.feriado_criado")
+  pessoas_escala_feriado_removido  @map("pessoas.escala.feriado_removido")
+  pessoas_escala_feriado_alterado  @map("pessoas.escala.feriado_alterado")
+  pessoas_escala_feriado_arquivado @map("pessoas.escala.feriado_arquivado")
+
+  // T213 — documentos do colaborador (ADR 0021): envio, troca, remocao
+  // logica, verificacao pelo antivirus e download. Sem conteudo, nome,
+  // categoria, tamanho, hash ou chave do objeto.
+  pessoas_documento_colaborador_enviado        @map("pessoas.documento_colaborador.enviado")
+  pessoas_documento_colaborador_substituido    @map("pessoas.documento_colaborador.substituido")
+  pessoas_documento_colaborador_removido       @map("pessoas.documento_colaborador.removido")
+  pessoas_documento_colaborador_aprovado       @map("pessoas.documento_colaborador.aprovado")
+  pessoas_documento_colaborador_reprovado      @map("pessoas.documento_colaborador.reprovado")
+  pessoas_documento_colaborador_nao_verificado @map("pessoas.documento_colaborador.nao_verificado")
+  pessoas_documento_colaborador_baixado        @map("pessoas.documento_colaborador.baixado")
+
   pessoas_vinculo_criado    @map("pessoas.vinculo.criado")
   pessoas_vinculo_ativado   @map("pessoas.vinculo.ativado")
   pessoas_vinculo_encerrado @map("pessoas.vinculo.encerrado")
@@ -769,8 +882,23 @@ model Empresa {
   // (fronteira `empresa_id`); o vinculo horario<->colaborador carrega
   // `empresa_id` redundante por desenho, para que a FK COMPOSTA garanta, no
   // banco, que o vinculo nunca aponte para tabela de outra empresa.
-  tabelasHorario  TabelaHorario[]
-  vinculosHorario VinculoHorario[]
+  tabelasHorario       TabelaHorario[]
+  vinculosHorario      VinculoHorario[]
+  /// T215 — padrões de escala (aba Escala da ficha).
+  escalasColaborador   EscalaColaborador[]
+  beneficios           Beneficio[]
+  beneficioPessoas     BeneficioPessoa[]
+  beneficioAjustes     BeneficioAjuste[]
+  beneficioDependentes BeneficioDependente[]
+  beneficioHistorico   BeneficioHistorico[]
+  beneficioVersoes     BeneficioVersao[]
+  beneficioPausas      BeneficioPausa[]
+  dependentes          DependenteColaborador[]
+  diasDeEscala         EscalaDia[]
+  publicacoesDeEscala  EscalaPublicacao[]
+  regrasDeEscala       EscalaRegras?
+  feriadosLocais       EscalaFeriadoLocal[]
+  visoesDeEscala       EscalaVisao[]
 
   // T139 — Central de Solicitacoes de Pessoas. `empresa_id` redundante com o do
   // vinculo pelo mesmo desenho de alocacao/movimentacao: e o que permite a FK
@@ -798,13 +926,22 @@ model Empresa {
   eventosDadosPessoais      DadosPessoaisColaboradorEvento[]
 
   // T179 — idempotência da admissão e relação técnica de revisão.
-  idempotenciasAdmissao IdempotenciaAdmissao[]
-  revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
+  idempotenciasAdmissao       IdempotenciaAdmissao[]
+  revisoesNormalizacao        RevisaoNormalizacaoCadastro[]
   // T209 — rascunhos da Nova admissão desta empresa.
-  rascunhosAdmissao     RascunhoAdmissao[]
+  rascunhosAdmissao           RascunhoAdmissao[]
   // T209 — fotos de colaborador e limpezas pendentes no armazenamento.
-  fotosColaborador      FotoColaborador[]
-  limpezasFotoPendentes LimpezaFotoColaboradorPendente[]
+  fotosColaborador            FotoColaborador[]
+  desativacoesColaborador     DesativacaoColaborador[]
+  // T215 — Férias e ausências.
+  ausencias                   Ausencia[]
+  reiniciosPeriodoAquisitivo  ReinicioPeriodoAquisitivo[]
+  politicasFerias             PoliticaFerias[]
+  limpezasFotoPendentes       LimpezaFotoColaboradorPendente[]
+  // T213 — documentos do colaborador.
+  documentosColaborador       DocumentoColaborador[]
+  versoesDocumentoColaborador VersaoDocumentoColaborador[]
+  limpezasDocumentoPendentes  LimpezaDocumentoColaboradorPendente[]
 
   @@index([status])
   @@map("empresa")
@@ -826,6 +963,9 @@ model UnidadeOrganizacional {
   // Etapa 1 — Fatia 2
   alocacoes         AlocacaoOrganizacional[]
   movimentacoesAlvo MovimentacaoFuncional[]
+
+  /// T215 — dias do quadro da escala com esta unidade como local.
+  diasDeEscala EscalaDia[]
 
   @@unique([empresaId, codigo])
   // Alvo da FK composta vinda de Equipe: o banco passa a garantir que a
@@ -1119,7 +1259,14 @@ model Colaborador {
   // `empresa_id` proprio, a coerencia empresa<->colaborador (o colaborador
   // precisa ter vinculo funcional na empresa do horario) e garantida por
   // CONSTRAINT TRIGGER na migration, alem da checagem na aplicacao.
-  vinculosHorario VinculoHorario[]
+  vinculosHorario      VinculoHorario[]
+  /// T215 — padrões de escala (aba Escala da ficha).
+  escalasColaborador   EscalaColaborador[]
+  beneficios           BeneficioPessoa[]
+  beneficioAjustes     BeneficioAjuste[]
+  beneficioDependentes BeneficioDependente[]
+  dependentes          DependenteColaborador[]
+  diasDeEscala         EscalaDia[]
 
   // T151 — Gestor consultivo. `contasDeAcesso` e o elo DP-23 (quem acessa o
   // sistema como esta pessoa); `equipesQueGerencia` e `excecoesDeAcesso`
@@ -1146,7 +1293,14 @@ model Colaborador {
   revisoesNormalizacao  RevisaoNormalizacaoCadastro[]
 
   // T209 — foto do colaborador, por empresa (ADR 0020).
-  fotos FotoColaborador[]
+  fotos                      FotoColaborador[]
+  /// T215 — desativações NA EMPRESA (lixeira do Editar colaborador).
+  desativacoes               DesativacaoColaborador[]
+  // T213 — documentos do colaborador.
+  documentos                 DocumentoColaborador[]
+  /// T215 — Férias e ausências.
+  ausencias                  Ausencia[]
+  reiniciosPeriodoAquisitivo ReinicioPeriodoAquisitivo[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -1197,6 +1351,14 @@ model VinculoFuncional {
   /// T209 — o contrato da admissão (etapa 2): tabela própria, fora do
   /// vínculo, para o salário não sair pelas rotas do vínculo.
   contrato ContratoVinculo?
+
+  /// T215 — ausências registradas com este vínculo como o principal.
+  ausencias                  Ausencia[]
+  /// T215 — reinícios da contagem do período aquisitivo (Ajustar período).
+  reiniciosPeriodoAquisitivo ReinicioPeriodoAquisitivo[]
+
+  /// T215 — a linha do tempo salarial do vínculo (aba Salários da ficha).
+  alteracoesSalariais AlteracaoSalarial[]
 
   @@unique([empresaId, matricula])
   /// Alvo das FKs compostas de alocacao e movimentacao: o banco garante que
@@ -1665,23 +1827,40 @@ model SolicitacaoDocumento {
 /// os vinculos historicos que a usaram permanecem. Nao ha exclusao fisica (a
 /// migration REVOGA DELETE de `evolli_app`).
 model TabelaHorario {
-  id              String  @id @default(uuid())
-  empresaId       String  @map("empresa_id")
+  id                      String  @id @default(uuid())
+  empresaId               String  @map("empresa_id")
   /// T182 — código da jornada, único na empresa. Anulável: tabelas criadas
   /// antes da T182 ficam sem código até alguém editá-las (migration aditiva,
   /// sem valor inventado). Forma `^[A-Z0-9_]{2,32}$` (CHECK na migration).
-  codigo          String?
-  nome            String
-  ativo           Boolean @default(true)
-  criadoPorUserId String  @map("criado_por_user_id")
+  codigo                  String?
+  nome                    String
+  ativo                   Boolean @default(true)
+  criadoPorUserId         String  @map("criado_por_user_id")
+  /// T215 — turno da escala: cor no quadro (uma de 12), sigla do mês (1 ou
+  /// 2 letras), unidade (nula = todas), modo ("mesmo_horario": os períodos
+  /// de segunda valem para todo dia de trabalho; "por_dia": cada dia tem os
+  /// seus), intervalo descontado de quem tem um período só, tolerância de
+  /// marcação e mínimo de pessoas por dia (cobertura).
+  cor                     String  @default("cinza")
+  sigla                   String? @db.VarChar(2)
+  unidadeOrganizacionalId String? @map("unidade_organizacional_id")
+  modo                    String  @default("por_dia")
+  intervaloMinutos        Int     @default(0) @map("intervalo_minutos")
+  toleranciaMinutos       Int?    @map("tolerancia_minutos")
+  minimoPorDia            Int?    @map("minimo_por_dia")
 
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  empresa   Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  criadoPor AccessUser       @relation("HorarioTabelaCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  periodos  PeriodoHorario[]
-  vinculos  VinculoHorario[]
+  empresa               Empresa             @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor             AccessUser          @relation("HorarioTabelaCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  periodos              PeriodoHorario[]
+  vinculos              VinculoHorario[]
+  /// T215 — escalas que usam esta jornada como turno (ou turno da noite).
+  escalasComoTurno      EscalaColaborador[] @relation("EscalaTurno")
+  escalasComoTurnoNoite EscalaColaborador[] @relation("EscalaTurnoNoite")
+  /// T215 — dias do quadro com esta jornada como turno.
+  diasDeEscala          EscalaDia[]
 
   /// Alvo da FK COMPOSTA de `vinculo_horario` — garante, no banco, que um
   /// vinculo so referencie tabela da MESMA empresa.
@@ -1689,6 +1868,7 @@ model TabelaHorario {
   /// T182 — código único na empresa; NULLs distintos (tabelas antigas).
   @@unique([empresaId, codigo])
   @@index([empresaId, ativo])
+  @@index([empresaId, unidadeOrganizacionalId], map: "tabela_horario_unidade_idx")
   @@map("tabela_horario")
 }
 
@@ -2603,6 +2783,201 @@ model RascunhoAdmissao {
   @@map("rascunho_admissao")
 }
 
+/// T215 — desativação do colaborador NA EMPRESA (a lixeira do "Editar
+/// colaborador"; decisão da proprietária de 2026-11-23: desativar preserva
+/// todo o histórico e pode ser desfeito). Não é a situação derivada dos
+/// vínculos (`Colaborador.situacao`): é um ato próprio, por empresa, porque a
+/// mesma pessoa pode ter vínculo em mais de uma. Uma linha por desativação;
+/// reativar preenche `reativadoEm` e `reativadoPorId` (a linha fica). No
+/// máximo UMA vigente por pessoa e empresa (índice único parcial, na
+/// migration). Sem DELETE para a aplicação: o histórico é imutável.
+model DesativacaoColaborador {
+  id              String    @id @default(uuid())
+  colaboradorId   String    @map("colaborador_id")
+  empresaId       String    @map("empresa_id")
+  desativadoEm    DateTime  @default(now()) @map("desativado_em")
+  desativadoPorId String    @map("desativado_por_id")
+  reativadoEm     DateTime? @map("reativado_em")
+  reativadoPorId  String?   @map("reativado_por_id")
+
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  desativadoPor AccessUser  @relation("DesativacaoColaboradorAutor", fields: [desativadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reativadoPor  AccessUser? @relation("ReativacaoColaboradorAutor", fields: [reativadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, empresaId])
+  @@index([empresaId])
+  @@map("desativacao_colaborador")
+}
+
+/// T215 — Férias e ausências: tipos de ausência (lista fechada).
+enum TipoAusencia {
+  ferias
+  licenca_medica
+  licenca_maternidade
+  licenca_paternidade
+  afastamento
+  falta_justificada
+  falta_sem_justificativa
+  day_off
+  home_office
+}
+
+/// T215 — motivo do afastamento (só para `afastamento`, e obrigatório nele).
+enum MotivoAfastamento {
+  auxilio_doenca
+  acidente_trabalho
+  licenca_nao_remunerada
+  licenca_remunerada
+  outro
+}
+
+/// T215 — situação da ausência no fluxo de aprovação.
+enum StatusAusencia {
+  aguardando_gestor
+  aguardando_rh
+  aprovada
+  cancelamento_pedido
+  ajuste_sugerido
+  recusada
+  cancelada
+}
+
+/// T215 — Férias e ausências do colaborador NA EMPRESA. Uma linha por
+/// ausência; nada se apaga (cancelar e recusar mudam o status; o banco nega o
+/// DELETE). `fim` nulo só no afastamento sem data de volta. `vinculoId` é o
+/// vínculo principal no registro; `periodoAquisitivoInicio` diz de que
+/// período aquisitivo as férias descontam. Datas são dias civis.
+model Ausencia {
+  id                      String             @id @default(uuid())
+  empresaId               String             @map("empresa_id")
+  colaboradorId           String             @map("colaborador_id")
+  vinculoId               String             @map("vinculo_id")
+  tipo                    TipoAusencia
+  motivoAfastamento       MotivoAfastamento? @map("motivo_afastamento")
+  inicio                  DateTime           @db.Date
+  fim                     DateTime?          @db.Date
+  diasVendidos            Int                @default(0) @map("dias_vendidos")
+  periodoAquisitivoInicio DateTime?          @map("periodo_aquisitivo_inicio") @db.Date
+  status                  StatusAusencia
+  observacao              String?
+  registradoPorId         String             @map("registrado_por_id")
+  decididoPorId           String?            @map("decidido_por_id")
+  decididoEm              DateTime?          @map("decidido_em")
+  motivoDecisao           String?            @map("motivo_decisao")
+  /// T215 — "Sugerir outras datas": o período proposto a quem pediu.
+  sugestaoInicio          DateTime?          @map("sugestao_inicio") @db.Date
+  sugestaoFim             DateTime?          @map("sugestao_fim") @db.Date
+  /// T215 — registrado fora da política de férias: qual e por quê.
+  politicaFeriasId        String?            @map("politica_ferias_id")
+  motivoForaDaPolitica    String?            @map("motivo_fora_da_politica")
+  /// T215 — férias coletivas (CLT art. 140): abrem um reinício do período.
+  feriasColetivas         Boolean            @default(false) @map("ferias_coletivas")
+  /// T215 — excluída (como a referência): sai de tudo, o registro fica.
+  excluidaEm              DateTime?          @map("excluida_em")
+  excluidaPorId           String?            @map("excluida_por_id")
+  criadoEm                DateTime           @default(now()) @map("criado_em")
+  atualizadoEm            DateTime           @updatedAt @map("atualizado_em")
+
+  empresa        Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador    Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo        VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor  AccessUser       @relation("AusenciaRegistradaPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  decididoPor    AccessUser?      @relation("AusenciaDecididaPor", fields: [decididoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  excluidaPor    AccessUser?      @relation("AusenciaExcluidaPor", fields: [excluidaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  politicaFerias PoliticaFerias?  @relation(fields: [politicaFeriasId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  /// T215 — o atestado ou documento da ausência (um vivo por vez).
+  anexos    AnexoAusencia[]
+  /// T215 — o reinício que a coletiva abriu (desfeito junto com ela).
+  reinicios ReinicioPeriodoAquisitivo[]
+
+  @@index([empresaId, inicio])
+  @@index([empresaId, status])
+  @@index([colaboradorId, empresaId])
+  @@map("ausencia")
+}
+
+/// T215 — quem entra numa política de férias.
+enum AbrangenciaPoliticaFerias {
+  todos
+  algumas
+}
+
+/// T215 — Políticas de férias (como a referência, 2026-11-26): as regras que
+/// a empresa confere em cada registro de férias, além dos pisos da CLT. Só
+/// apontam o que não segue (o RH registra mesmo assim, com motivo). Regras e
+/// aprovação em JSON (validados na entrada); desativar é lógico.
+model PoliticaFerias {
+  id               String                    @id @default(uuid())
+  empresaId        String                    @map("empresa_id")
+  nome             String
+  descricao        String?
+  textoColaborador String?                   @map("texto_colaborador")
+  tiposVinculo     TipoVinculo[]             @map("tipos_vinculo")
+  abrangencia      AbrangenciaPoliticaFerias
+  /// Só em "algumas": [{ tipo: "departamento" | "unidade" | "pessoa", id }].
+  alvos            Json                      @default("[]")
+  valeAPartirDe    DateTime                  @map("vale_a_partir_de") @db.Date
+  regras           Json
+  aprovacao        Json
+  rascunho         Boolean                   @default(false)
+  ativa            Boolean                   @default(true)
+  criadoPorId      String                    @map("criado_por_id")
+  desativadaEm     DateTime?                 @map("desativada_em")
+  desativadaPorId  String?                   @map("desativada_por_id")
+  criadoEm         DateTime                  @default(now()) @map("criado_em")
+  atualizadoEm     DateTime                  @updatedAt @map("atualizado_em")
+
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser  @relation("PoliticaFeriasCriadaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  desativadaPor AccessUser? @relation("PoliticaFeriasDesativadaPor", fields: [desativadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ausencias     Ausencia[]
+
+  @@index([empresaId])
+  @@map("politica_ferias")
+}
+
+/// T215 — por que a contagem do período aquisitivo recomeçou.
+enum MotivoReinicioPeriodo {
+  ferias_coletivas
+  perda_direito
+  outro
+}
+
+/// T215 — "Ajustar período" (como a referência, 2026-11-26): a contagem de
+/// férias recomeça numa data (férias coletivas, CLT art. 140; perda do
+/// direito, art. 133; ou outro motivo). O período em que a data cai é
+/// encurtado (dias informados ou proporcionais; na perda, 0). Remover é
+/// lógico: o registro fica, com quem removeu e quando.
+model ReinicioPeriodoAquisitivo {
+  id                  String                @id @default(uuid())
+  empresaId           String                @map("empresa_id")
+  colaboradorId       String                @map("colaborador_id")
+  vinculoId           String                @map("vinculo_id")
+  inicio              DateTime              @db.Date
+  motivo              MotivoReinicioPeriodo
+  diasPeriodoAnterior Int?                  @map("dias_periodo_anterior")
+  observacao          String?
+  registradoPorId     String                @map("registrado_por_id")
+  removidoEm          DateTime?             @map("removido_em")
+  removidoPorId       String?               @map("removido_por_id")
+  /// T215 — criado pelas férias coletivas desta ausência (nulo: manual).
+  ausenciaId          String?               @map("ausencia_id")
+  criadoEm            DateTime              @default(now()) @map("criado_em")
+
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradoPor AccessUser       @relation("ReinicioPeriodoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor   AccessUser?      @relation("ReinicioPeriodoRemovidoPor", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ausencia      Ausencia?        @relation(fields: [ausenciaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([vinculoId, empresaId])
+  @@index([ausenciaId])
+  @@map("reinicio_periodo_aquisitivo")
+}
+
 /// T209 — foto do colaborador (ADR 0020). Pertence ao COLABORADOR naquela
 /// empresa, nunca à conta de acesso (`AccessUserFoto` é outra coisa). Os bytes
 /// ficam no armazenamento de objetos privado (Cloudflare R2), em três versões
@@ -2685,4 +3060,611 @@ model ContratoVinculo {
   @@index([empresaId])
   @@index([gestorDiretoColaboradorId])
   @@map("contrato_vinculo")
+}
+
+/// T213 — categorias iniciais dos documentos do colaborador (ADR 0021). Fixas
+/// nesta fase; "outros" leva um nome curto dado por quem envia.
+enum CategoriaDocumentoColaborador {
+  rg
+  cpf
+  comprovante_endereco
+  carteira_trabalho
+  certidoes
+  outros
+}
+
+/// T213 — formatos aceitos (conferidos pela extensão, pelo tipo declarado e
+/// pelo conteúdo real).
+enum FormatoDocumentoColaborador {
+  pdf
+  jpg
+  png
+}
+
+/// T213 — quarentena: toda versão nasce `em_verificacao`; só `aprovado` pode
+/// ser baixado. Falha do antivírus mantém `em_verificacao` (fail-closed).
+enum EstadoVerificacaoDocumento {
+  em_verificacao
+  aprovado
+  reprovado
+}
+
+/// T213 — documento do colaborador naquela empresa (ADR 0021). Opcional:
+/// nunca condiciona a admissão. Remoção LÓGICA (`removidoEm`); os bytes
+/// ficam no R2 privado. O nome original do arquivo nunca é guardado.
+model DocumentoColaborador {
+  id            String                        @id @default(uuid())
+  empresaId     String                        @map("empresa_id")
+  colaboradorId String                        @map("colaborador_id")
+  categoria     CategoriaDocumentoColaborador
+  /// Só para "outros": nome curto dado por quem envia (até 60 caracteres).
+  nomeOutros    String?                       @map("nome_outros") @db.VarChar(60)
+  criadoPorId   String                        @map("criado_por_id")
+  criadoEm      DateTime                      @default(now()) @map("criado_em")
+  atualizadoEm  DateTime                      @updatedAt @map("atualizado_em")
+  removidoEm    DateTime?                     @map("removido_em")
+  removidoPorId String?                       @map("removido_por_id")
+
+  empresa     Empresa                      @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador                  @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser                   @relation("DocumentoColaboradorAutor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor AccessUser?                  @relation("DocumentoColaboradorRemocao", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  versoes     VersaoDocumentoColaborador[]
+
+  @@index([empresaId, colaboradorId])
+  @@map("documento_colaborador")
+}
+
+/// T213 — cada arquivo enviado para um documento (a troca cria versão nova e
+/// preserva a anterior). A chave do objeto só tem ids internos:
+/// v1/empresas/{e}/colaboradores/{c}/documentos/{d}/{v}.
+model VersaoDocumentoColaborador {
+  id                String                      @id @default(uuid())
+  documentoId       String                      @map("documento_id")
+  empresaId         String                      @map("empresa_id")
+  /// Sobe a cada troca, a partir de 1.
+  numero            Int
+  chave             String                      @unique
+  formato           FormatoDocumentoColaborador
+  tamanhoBytes      Int                         @map("tamanho_bytes")
+  hashSha256        String                      @map("hash_sha256")
+  estado            EstadoVerificacaoDocumento  @default(em_verificacao)
+  verificadoEm      DateTime?                   @map("verificado_em")
+  enviadaPorId      String                      @map("enviada_por_id")
+  /// Chave de idempotência do envio (por conta e empresa).
+  chaveIdempotencia String?                     @map("chave_idempotencia") @db.Uuid
+  criadoEm          DateTime                    @default(now()) @map("criado_em")
+
+  documento  DocumentoColaborador @relation(fields: [documentoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa    Empresa              @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadaPor AccessUser           @relation("VersaoDocumentoColaboradorAutor", fields: [enviadaPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([documentoId, numero])
+  @@unique([enviadaPorId, empresaId, chaveIdempotencia])
+  @@index([empresaId])
+  @@map("versao_documento_colaborador")
+}
+
+/// T213 — objeto de documento no R2 sem registro concluído (envio
+/// interrompido ou que falhou depois de gravar). Fica para nova tentativa de
+/// apagar; só ids e a chave, nenhum dado pessoal.
+model LimpezaDocumentoColaboradorPendente {
+  id                String    @id @default(uuid())
+  empresaId         String    @map("empresa_id")
+  colaboradorId     String    @map("colaborador_id")
+  chave             String    @unique
+  motivo            String
+  tentativas        Int       @default(0)
+  criadoEm          DateTime  @default(now()) @map("criado_em")
+  ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId])
+  @@map("limpeza_documento_colaborador_pendente")
+}
+
+/// T215 — origem da alteração salarial: a da admissão (vigência = data de
+/// admissão, não se remove) ou uma alteração registrada depois.
+enum OrigemAlteracaoSalarial {
+  admissao
+  alteracao
+}
+
+/// T215 — linha do tempo salarial do vínculo (aba Salários da ficha). Cada
+/// linha é um período que começa em `vigencia_inicio` e vai até a véspera da
+/// próxima. O salário VIGENTE (a linha de maior vigência) é espelhado em
+/// `contrato_vinculo.salario_bruto`, que a lista e a edição já leem.
+///
+/// Remoção só lógica (`removida_em`): a linha sai da tela, fica no banco.
+/// Uma data por vínculo entre as linhas não removidas (índice parcial na
+/// migration). Nenhum valor vai à trilha de auditoria.
+model AlteracaoSalarial {
+  id                  String                  @id @default(uuid())
+  empresaId           String                  @map("empresa_id")
+  vinculoId           String                  @map("vinculo_id")
+  origem              OrigemAlteracaoSalarial
+  vigenciaInicio      DateTime                @map("vigencia_inicio") @db.Date
+  salarioBruto        Decimal                 @map("salario_bruto") @db.Decimal(12, 2)
+  /// Texto livre: o cargo NESSE período (pode ser anterior ao catálogo).
+  cargo               String?
+  /// Texto livre ("CLT, PJ, Estágio..."); vazio, a tela mostra o tipo do vínculo.
+  modeloContrato      String?                 @map("modelo_contrato")
+  /// `null` só na carga inicial da migration (sem ator).
+  registradaPorUserId String?                 @map("registrada_por_user_id")
+  removidaEm          DateTime?               @map("removida_em")
+  removidaPorUserId   String?                 @map("removida_por_user_id")
+  criadoEm            DateTime                @default(now()) @map("criado_em")
+  atualizadoEm        DateTime                @updatedAt @map("atualizado_em")
+
+  vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  registradaPor AccessUser?      @relation("AlteracaoSalarialRegistradaPor", fields: [registradaPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidaPor   AccessUser?      @relation("AlteracaoSalarialRemovidaPor", fields: [removidaPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([vinculoId, empresaId])
+  @@index([empresaId])
+  @@map("alteracao_salarial")
+}
+
+/// T215 — formatos do anexo de ausência (os da referência).
+enum FormatoAnexoAusencia {
+  pdf
+  jpg
+  png
+  webp
+  heic
+  heif
+  doc
+  docx
+}
+
+/// T215 — anexo da ausência (atestado ou documento). Os bytes ficam no
+/// armazenamento privado dos documentos (R2, ADR 0021), numa chave só com
+/// ids; aqui, só os metadados. O antivírus roda ANTES de gravar: só arquivo
+/// aprovado existe. Um anexo vivo por ausência (índice parcial na
+/// migration). Remoção só lógica; DELETE revogado do papel da aplicação.
+/// O nome original do arquivo nunca é guardado.
+model AnexoAusencia {
+  id            String               @id @default(uuid())
+  empresaId     String               @map("empresa_id")
+  colaboradorId String               @map("colaborador_id")
+  ausenciaId    String               @map("ausencia_id")
+  formato       FormatoAnexoAusencia
+  tamanhoBytes  Int                  @map("tamanho_bytes")
+  hashSha256    String               @map("hash_sha256")
+  chaveObjeto   String               @map("chave_objeto")
+  enviadoPorId  String               @map("enviado_por_id")
+  verificadoEm  DateTime             @map("verificado_em")
+  criadoEm      DateTime             @default(now()) @map("criado_em")
+  removidoEm    DateTime?            @map("removido_em")
+  removidoPorId String?              @map("removido_por_id")
+
+  ausencia    Ausencia    @relation(fields: [ausenciaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  enviadoPor  AccessUser  @relation("AnexoAusenciaEnviadoPor", fields: [enviadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  removidoPor AccessUser? @relation("AnexoAusenciaRemovidoPor", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([ausenciaId])
+  @@index([empresaId])
+  @@map("anexo_ausencia")
+}
+
+/// T215 — padrão de escala do colaborador (aba Escala da ficha), com
+/// vigência `[início, fim)`. O modelo usa os mesmos códigos do contrato
+/// (`contrato_vinculo.escala`). O turno é uma jornada da empresa (nulo = sem
+/// turno fixo); o turno da noite só no 12x36; a folga semanal só no 6x1
+/// (1 = segunda … 7 = domingo); os dias de trabalho só em "outra"; o início
+/// do ciclo em revezamento, plantão e embarque. Sem sobreposição de
+/// vigências por colaborador e empresa (EXCLUSION na migration). Sem
+/// exclusão física: a troca encerra a vigente.
+model EscalaColaborador {
+  id              String    @id @default(uuid())
+  colaboradorId   String    @map("colaborador_id")
+  empresaId       String    @map("empresa_id")
+  modelo          String
+  tabelaHorarioId String?   @map("tabela_horario_id")
+  turnoNoiteId    String?   @map("turno_noite_id")
+  folgaSemanal    Int?      @map("folga_semanal")
+  diasTrabalho    Int[]     @default([]) @map("dias_trabalho")
+  inicioCiclo     DateTime? @map("inicio_ciclo") @db.Date
+  vigenciaInicio  DateTime  @map("vigencia_inicio") @db.Date
+  vigenciaFim     DateTime? @map("vigencia_fim") @db.Date
+  criadoPorUserId String    @map("criado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador Colaborador    @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turno       TabelaHorario? @relation("EscalaTurno", fields: [tabelaHorarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turnoNoite  TabelaHorario? @relation("EscalaTurnoNoite", fields: [turnoNoiteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser     @relation("EscalaColaboradorCriadaPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([colaboradorId, empresaId, vigenciaInicio])
+  @@index([empresaId])
+  @@map("escala_colaborador")
+}
+
+/// T215 — um dia do quadro "Escala de trabalho", gravado à mão (menu da
+/// célula ou painel do dia), por cima do padrão da pessoa. Duas camadas: o
+/// rascunho (o que o RH está montando) e o publicado (o que a pessoa vê);
+/// sem linha, vale o padrão de escala (escala_colaborador).
+///
+/// - `tipo`: trabalho (turno, até 2 períodos, intervalo e sobreaviso depois
+///   do turno), folga, dsr ou sobreaviso (até 2 períodos);
+/// - `periodos` e `sobreaviso`: [{ inicio: "HH:MM", fim: "HH:MM" }] — fim
+///   antes do início termina no dia seguinte;
+/// - `unidadeOrganizacionalId`: o local do dia (nulo = a unidade da pessoa);
+/// - `observacao`: até 300 caracteres.
+///
+/// O banco garante a forma (CHECKs) e que o publicado não é apagado.
+model EscalaDia {
+  id                      String   @id @default(uuid())
+  colaboradorId           String   @map("colaborador_id")
+  empresaId               String   @map("empresa_id")
+  dia                     DateTime @db.Date
+  camada                  String
+  tipo                    String
+  tabelaHorarioId         String?  @map("tabela_horario_id")
+  periodos                Json     @default("[]")
+  intervaloMinutos        Int      @default(0) @map("intervalo_minutos")
+  sobreaviso              Json     @default("[]")
+  unidadeOrganizacionalId String?  @map("unidade_organizacional_id")
+  observacao              String?  @db.VarChar(300)
+  criadoPorUserId         String   @map("criado_por_user_id")
+  atualizadoPorUserId     String   @map("atualizado_por_user_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  colaborador   Colaborador            @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa                @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  turno         TabelaHorario?         @relation(fields: [tabelaHorarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  unidade       UnidadeOrganizacional? @relation(fields: [unidadeOrganizacionalId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor     AccessUser             @relation("EscalaDiaCriadoPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser             @relation("EscalaDiaAtualizadoPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([colaboradorId, empresaId, dia, camada])
+  @@index([empresaId, dia])
+  @@map("escala_dia")
+}
+
+/// T215 — uma publicação do quadro da escala: o rascunho do período
+/// [inicio, fim] virou publicado. Guarda as contagens (novas, alteradas,
+/// pessoas) e se o RH pediu o aviso às pessoas (o envio depende do Portal e
+/// do e-mail). Só se cria; nunca muda nem se apaga.
+model EscalaPublicacao {
+  id                 String   @id @default(uuid())
+  empresaId          String   @map("empresa_id")
+  inicio             DateTime @db.Date
+  fim                DateTime @db.Date
+  novas              Int
+  alteradas          Int
+  pessoas            Int
+  avisar             Boolean
+  publicadoPorUserId String   @map("publicado_por_user_id")
+  publicadoEm        DateTime @default(now()) @map("publicado_em")
+
+  empresa      Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  publicadoPor AccessUser @relation("EscalaPublicacaoPor", fields: [publicadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, inicio, fim])
+  @@map("escala_publicacao")
+}
+
+/// T215 — as Regras da escala da empresa (uma linha; sem linha, valem as
+/// regras padrão): início da transição da EC 141/2026 (nulo = o padrão),
+/// dia em que a semana começa, o que a convenção ou o acordo permite, quais
+/// avisos da CLT ficam ligados, a antecedência mínima da publicação e se o
+/// aviso às pessoas vem marcado. Chaves conferidas pelo serviço.
+model EscalaRegras {
+  empresaId           String    @id @map("empresa_id")
+  inicioTransicao     DateTime? @map("inicio_transicao") @db.Date
+  semanaComeca        Int       @default(1) @map("semana_comeca")
+  convencao           Json      @default("{}")
+  avisos              Json      @default("{}")
+  antecedenciaDias    Int       @default(7) @map("antecedencia_dias")
+  avisarPadrao        Boolean   @default(true) @map("avisar_padrao")
+  atualizadoPorUserId String    @map("atualizado_por_user_id")
+  atualizadoEm        DateTime  @updatedAt @map("atualizado_em")
+
+  empresa       Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser @relation("EscalaRegrasPor", fields: [atualizadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("escala_regras")
+}
+
+/// T215 — feriado local da empresa (municipal ou ponto facultativo), em
+/// todas as unidades (lista vazia) ou só em algumas.
+model EscalaFeriadoLocal {
+  id              String    @id @default(uuid())
+  empresaId       String    @map("empresa_id")
+  data            DateTime  @db.Date
+  nome            String    @db.VarChar(80)
+  tipo            String
+  unidadeIds      String[]  @default([]) @map("unidade_ids")
+  criadoPorUserId String    @map("criado_por_user_id")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+  /// Arquivado: sai do quadro e dos avisos; o registro fica.
+  arquivadoEm     DateTime? @map("arquivado_em")
+
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("EscalaFeriadoLocalPor", fields: [criadoPorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([empresaId, data])
+  @@map("escala_feriado_local")
+}
+
+/// T215 — visão salva do quadro da escala: os filtros com um nome, para abrir
+/// de novo com um clique. Só a conta que salvou vê, e só na empresa em que
+/// salvou. Os filtros são conferidos pelo serviço (chaves conhecidas).
+model EscalaVisao {
+  id           String   @id @default(uuid())
+  empresaId    String   @map("empresa_id")
+  userId       String   @map("user_id")
+  nome         String   @db.VarChar(60)
+  filtros      Json
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  empresa Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user    AccessUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([empresaId, userId, nome])
+  @@map("escala_visao")
+}
+
+/// T215 — Benefícios (como a referência, 2026-11-26): categoria (as regras
+/// da lei que valem), como entra na folha e o tipo de valor.
+enum CategoriaBeneficio {
+  alimentacao
+  mobilidade
+  saude
+  odontologico
+  seguro_vida
+  bem_estar
+  saude_mental
+  educacao
+  trabalho_remoto
+  multibeneficios
+  antecipacao
+  outros
+}
+
+enum FolhaBeneficio {
+  desconto
+  adicional
+  fora_da_folha
+}
+
+enum TipoValorBeneficio {
+  fixo
+  dia_util
+  individual
+  faixa_etaria
+  antecipacao
+}
+
+enum SituacaoBeneficio {
+  ativo
+  pausado
+  encerrado
+}
+
+/// T215 — um benefício da empresa. As regras de valor (valores, dias, planos,
+/// faixas da ANS, quem paga, vale-transporte, antecipação) ficam em `regras`,
+/// conferidas pelo serviço. Competências são o 1º dia do mês. Pausar e
+/// encerrar valem a partir de uma competência; excluir é lógico (nada se
+/// apaga: as folhas futuras precisarão do histórico).
+model Beneficio {
+  id                String             @id @default(uuid())
+  empresaId         String             @map("empresa_id")
+  nome              String             @db.VarChar(120)
+  categoria         CategoriaBeneficio
+  folha             FolhaBeneficio
+  tipoValor         TipoValorBeneficio @map("tipo_valor")
+  inicio            DateTime           @db.Date
+  fim               DateTime?          @db.Date
+  observacao        String?            @db.VarChar(500)
+  regras            Json
+  situacao          SituacaoBeneficio  @default(ativo)
+  /// Competência (1º dia) a partir da qual o benefício sai das folhas.
+  suspensoAPartirDe DateTime?          @map("suspenso_a_partir_de") @db.Date
+  excluidoEm        DateTime?          @map("excluido_em")
+  excluidoPorId     String?            @map("excluido_por_id")
+  criadoPorId       String             @map("criado_por_id")
+  criadoEm          DateTime           @default(now()) @map("criado_em")
+  atualizadoEm      DateTime           @updatedAt @map("atualizado_em")
+
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser            @relation("BeneficioCriadoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  excluidoPor AccessUser?           @relation("BeneficioExcluidoPor", fields: [excluidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  pessoas     BeneficioPessoa[]
+  ajustes     BeneficioAjuste[]
+  dependentes BeneficioDependente[]
+  historico   BeneficioHistorico[]
+  versoes     BeneficioVersao[]
+  pausas      BeneficioPausa[]
+
+  @@index([empresaId])
+  @@map("beneficio")
+}
+
+/// T215 — meses em que o benefício ficou fora (pausado ou encerrado e
+/// depois reativado): de `de` (inclusive) até `ate` (exclusive), 1º dia de
+/// cada mês. Reativar guarda o intervalo; os meses dele continuam sem o
+/// benefício.
+model BeneficioPausa {
+  id          String   @id @default(uuid())
+  beneficioId String   @map("beneficio_id")
+  empresaId   String   @map("empresa_id")
+  de          DateTime @db.Date
+  ate         DateTime @db.Date
+  criadoPorId String   @map("criado_por_id")
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioPausaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId])
+  @@index([empresaId])
+  @@map("beneficio_pausa")
+}
+
+/// T215 — versão das regras de valor de um benefício a partir de uma
+/// competência ("Vale a partir de"). Sem versão, valem as regras do
+/// próprio benefício (desde o início). Uma versão nova substitui as que
+/// começavam depois dela (`substituidaEm`); nada é apagado.
+model BeneficioVersao {
+  id            String             @id @default(uuid())
+  beneficioId   String             @map("beneficio_id")
+  empresaId     String             @map("empresa_id")
+  /// Competência (1º dia) em que a versão começa.
+  aPartirDe     DateTime           @map("a_partir_de") @db.Date
+  tipoValor     TipoValorBeneficio @map("tipo_valor")
+  regras        Json
+  substituidaEm DateTime?          @map("substituida_em")
+  criadoPorId   String             @map("criado_por_id")
+  criadoEm      DateTime           @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioVersaoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, aPartirDe])
+  @@index([empresaId])
+  @@map("beneficio_versao")
+}
+
+/// T215 — quem recebe o benefício, a partir de uma competência (e até a
+/// competência de saída, exclusiva). Plano (valor individual por plano) ou
+/// valor livre da pessoa. Um vínculo vivo por benefício e pessoa (índice
+/// parcial na migration); remover é lógico.
+model BeneficioPessoa {
+  id              String    @id @default(uuid())
+  beneficioId     String    @map("beneficio_id")
+  empresaId       String    @map("empresa_id")
+  colaboradorId   String    @map("colaborador_id")
+  aPartirDe       DateTime  @map("a_partir_de") @db.Date
+  ate             DateTime? @db.Date
+  planoId         String?   @map("plano_id") @db.VarChar(40)
+  valorIndividual Decimal?  @map("valor_individual") @db.Decimal(12, 2)
+  removidoEm      DateTime? @map("removido_em")
+  criadoPorId     String    @map("criado_por_id")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+
+  beneficio   Beneficio   @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser  @relation("BeneficioPessoaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId])
+  @@index([empresaId, colaboradorId])
+  @@map("beneficio_pessoa")
+}
+
+/// T215 — o que o RH digitou para a pessoa num mês (dias, valor do dia,
+/// valor do mês, coparticipação, valor antecipado), por cima da regra.
+model BeneficioAjuste {
+  id              String   @id @default(uuid())
+  beneficioId     String   @map("beneficio_id")
+  empresaId       String   @map("empresa_id")
+  colaboradorId   String   @map("colaborador_id")
+  competencia     DateTime @db.Date
+  dias            Int?
+  valorDia        Decimal? @map("valor_dia") @db.Decimal(12, 2)
+  valorMes        Decimal? @map("valor_mes") @db.Decimal(12, 2)
+  coparticipacao  Decimal? @db.Decimal(12, 2)
+  antecipado      Decimal? @db.Decimal(12, 2)
+  atualizadoPorId String   @map("atualizado_por_id")
+  criadoEm        DateTime @default(now()) @map("criado_em")
+  atualizadoEm    DateTime @updatedAt @map("atualizado_em")
+
+  beneficio     Beneficio   @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  atualizadoPor AccessUser  @relation("BeneficioAjustePor", fields: [atualizadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([beneficioId, colaboradorId, competencia])
+  @@index([empresaId])
+  @@map("beneficio_ajuste")
+}
+
+/// T215 — dependente no plano (faixa etária), a partir de uma competência e
+/// até a de saída (exclusiva).
+model BeneficioDependente {
+  id            String    @id @default(uuid())
+  beneficioId   String    @map("beneficio_id")
+  empresaId     String    @map("empresa_id")
+  colaboradorId String    @map("colaborador_id")
+  dependenteId  String    @map("dependente_id")
+  aPartirDe     DateTime  @map("a_partir_de") @db.Date
+  ate           DateTime? @db.Date
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  beneficio   Beneficio             @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador           @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dependente  DependenteColaborador @relation(fields: [dependenteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, colaboradorId])
+  @@index([empresaId])
+  @@map("beneficio_dependente")
+}
+
+/// T215 — histórico de alterações do benefício (só se cria).
+model BeneficioHistorico {
+  id          String   @id @default(uuid())
+  beneficioId String   @map("beneficio_id")
+  empresaId   String   @map("empresa_id")
+  tipo        String   @db.VarChar(40)
+  aPartirDe   DateTime @map("a_partir_de") @db.Date
+  descricao   String   @db.VarChar(300)
+  criadoPorId String   @map("criado_por_id")
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioHistoricoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, criadoEm])
+  @@map("beneficio_historico")
+}
+
+/// T215 — grau de parentesco do dependente (como a referência).
+enum ParentescoDependente {
+  conjuge
+  filho
+  pai_mae
+  irmao
+  grau_1
+  grau_2
+  grau_3
+  outro
+}
+
+/// T215 — dependente do colaborador (Editar colaborador › Dependentes): para
+/// plano de saúde e benefícios. Remover é lógico.
+model DependenteColaborador {
+  id             String               @id @default(uuid())
+  empresaId      String               @map("empresa_id")
+  colaboradorId  String               @map("colaborador_id")
+  nome           String               @db.VarChar(160)
+  parentesco     ParentescoDependente
+  dataNascimento DateTime?            @map("data_nascimento") @db.Date
+  cpf            String?              @db.VarChar(11)
+  telefone       String?              @db.VarChar(20)
+  email          String?              @db.VarChar(254)
+  removidoEm     DateTime?            @map("removido_em")
+  criadoPorId    String               @map("criado_por_id")
+  criadoEm       DateTime             @default(now()) @map("criado_em")
+  atualizadoEm   DateTime             @updatedAt @map("atualizado_em")
+
+  empresa     Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador           @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor   AccessUser            @relation("DependenteCriadoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  planos      BeneficioDependente[]
+
+  @@index([empresaId, colaboradorId])
+  @@map("dependente_colaborador")
 }

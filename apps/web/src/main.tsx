@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { AutenticacaoApp } from "./app/AutenticacaoApp";
 // T209 — fundação de interface (Tailwind sem preflight, prefixo `ev`).
 import "./ui/estilos.css";
+import "./ui/movimento.css";
+import { iniciarMovimentoDaInterface } from "./ui/movimentoDaInterface";
 // T209 — fonte do ecossistema, do pacote local (sem Google Fonts); só os
 // pesos usados.
 import "@fontsource/parkinsans/latin-400.css";
@@ -19,3 +21,7 @@ createRoot(container).render(
     <AutenticacaoApp />
   </StrictMode>,
 );
+
+// T215 — o sublinhado de todas as abas desliza; o conteúdo novo (aba,
+// seção, etapa, formulário, página) entra suave, como na aba Dados.
+iniciarMovimentoDaInterface();

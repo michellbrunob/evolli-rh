@@ -37,12 +37,17 @@ describe("T209 — Aprendiz na URL e na ordem dos tipos", () => {
   });
 
   it("tipo=aprendiz é lido e escrito na URL da listagem", () => {
-    expect(listagemDaRota(`${ROTA}?tipo=aprendiz`)?.tipo).toBe("aprendiz");
+    expect(listagemDaRota(`${ROTA}?tipo=aprendiz`)?.filtros.tipos).toEqual([
+      "aprendiz",
+    ]);
     expect(
-      rotaDaListagem({ ...ESTADO_INICIAL_DA_LISTAGEM, tipo: "aprendiz" }),
+      rotaDaListagem({
+        ...ESTADO_INICIAL_DA_LISTAGEM,
+        filtros: { ...ESTADO_INICIAL_DA_LISTAGEM.filtros, tipos: ["aprendiz"] },
+      }),
     ).toBe(`${ROTA}?tipo=aprendiz`);
     // Variações não são tipo controlado: caem no padrão.
-    expect(listagemDaRota(`${ROTA}?tipo=Aprendiz`)?.tipo).toBeNull();
+    expect(listagemDaRota(`${ROTA}?tipo=Aprendiz`)?.filtros.tipos).toEqual([]);
   });
 });
 
@@ -50,7 +55,8 @@ describe("T209 — rótulo 'Aprendiz' em todas as superfícies que exibem o tipo
   it.each([
     "src/screens/pessoas/ColaboradoresScreen.tsx",
     "src/screens/pessoas/NovaAdmissaoScreen.tsx",
-    "src/screens/pessoas/FichaColaboradorScreen.tsx",
+    // T215 — a ficha usa os rótulos da página de edição.
+    "src/screens/pessoas/edicao/dadosProfissionais.ts",
     "src/screens/pessoas/DadosContratuaisScreen.tsx",
     "src/screens/pessoas/HistoricoFuncionalScreen.tsx",
     "src/screens/pessoas/RegistrosPontoColaboradorSecao.tsx",
