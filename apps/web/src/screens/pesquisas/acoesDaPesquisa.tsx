@@ -131,7 +131,7 @@ export function MenuDeStatus({
           </span>
           <IconeAbrir tamanho={12} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent className="pesquisas__menu" align="start">
           <p className="pesquisas__menu-titulo" aria-hidden="true">
             Mudar status
           </p>
@@ -142,10 +142,14 @@ export function MenuDeStatus({
                 CONFIRMACAO[s] ? setConfirmar(s) : void mudar(s)
               }
             >
+              <span
+                className="pesquisas__ponto-status"
+                data-tom={TOM_DO_STATUS[s]}
+              >
+                <PontoDoStatus />
+              </span>
               <span className="pesquisas__menu-opcao">
-                <StatusBadge variant={TOM_DO_STATUS[s]}>
-                  {ROTULO_DO_STATUS[s]}
-                </StatusBadge>
+                <strong>{ROTULO_DO_STATUS[s]}</strong>
                 <span className="pesquisas__suave">{TEXTO_DO_STATUS[s]}</span>
               </span>
             </DropdownMenuItem>
@@ -330,7 +334,10 @@ export function GavetaDeDuplicar({
   onFechar,
   onDuplicada,
 }: {
-  readonly pesquisa: Pick<PesquisaResumo, "id" | "nome"> | null;
+  readonly pesquisa: Pick<
+    PesquisaResumo,
+    "id" | "nome" | "identificacao"
+  > | null;
   readonly servico: ServicoDePesquisas;
   readonly onFechar: () => void;
   /** A cópia, e se ela ficou na empresa ativa (dá para abrir aqui). */
@@ -413,8 +420,9 @@ export function GavetaDeDuplicar({
     >
       <div className="pesquisas__etapa">
         <p>
-          A cópia leva as perguntas, a identificação e os participantes e já
-          começa ativa. As respostas não vão junto.
+          {pesquisa?.identificacao === "anonima"
+            ? "A cópia leva as perguntas e a identificação e já começa ativa, com um link aberto novo. As respostas não vão junto."
+            : "A cópia leva as perguntas, a identificação e os participantes e já começa ativa. As respostas não vão junto."}
         </p>
         {empresas.length > 1 ? (
           <div className="pesquisas__campos">

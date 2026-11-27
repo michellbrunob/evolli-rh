@@ -34,6 +34,7 @@ import {
 } from "../../ui/icones";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { GarantirAvisos, useAvisar } from "./avisos";
+import { usePublicarComConfirmacao } from "./confirmarPublicacao";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { enderecoDaPrevia } from "./rotasDePesquisas";
 import { SepararRespostasPor } from "./SepararRespostasPor";
@@ -200,6 +201,7 @@ function AssistenteDoModeloInterno({
   const [salvoAs, setSalvoAs] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const confirmacao = usePublicarComConfirmacao(servico);
   const [gravada, setGravada] = useState<PesquisaDetalhe | null>(base ?? null);
   const [gerada, setGerada] = useState<PesquisaDetalhe | null>(null);
   const [criadaAs, setCriadaAs] = useState<string | null>(null);
@@ -329,7 +331,8 @@ function AssistenteDoModeloInterno({
       }
       const id = await gravar(estado);
       if (!id) return;
-      const publicada = await servico.publicarPesquisa(id);
+      const publicada = await confirmacao.publicar(id);
+      if (!publicada) return;
       setCriadaAs(horaDe(agora()));
       setGerada(publicada);
     } catch (erro) {
@@ -450,6 +453,7 @@ function AssistenteDoModeloInterno({
 
   return (
     <div className="pesquisas pesquisas--com-rodape">
+      {confirmacao.janela}
       {cabecalho}
 
       <BarraDeEtapas etapas={etapas} atual={etapa} />

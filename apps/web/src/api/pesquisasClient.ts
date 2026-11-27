@@ -164,11 +164,18 @@ export interface ListaDePesquisasApi {
   contagens: ContagensDePesquisas;
 }
 
+/**
+ * Por que um grupo não mostra números: abaixo do mínimo, ou escondido para
+ * proteger um grupo menor (sem ele, daria para deduzir o menor pelo total).
+ */
+export type MotivoOculto = "minimo" | "protege_grupo_menor";
+
 export interface DepartamentoDoResultado {
   id: string;
   nome: string;
   respostas: number;
   visivel: boolean;
+  oculto?: MotivoOculto;
 }
 
 interface ResultadoBase {
@@ -243,7 +250,13 @@ export interface ResultadosPesquisa {
   participantes: number;
   departamentos: DepartamentoDoResultado[];
   /** `visivel: false`: abaixo do mínimo por grupo (sem números). */
-  filtro: { departamentoId: string | null; visivel: boolean };
+  filtro: {
+    departamentoId: string | null;
+    visivel: boolean;
+    /** Respostas do recorte (a API ampliada manda). */
+    respostas?: number;
+    oculto?: MotivoOculto;
+  };
   /** Vazio quando `filtro.visivel` é `false`. */
   perguntas: ResultadoPergunta[];
   indicadores?: IndicadoresDosResultados;
@@ -276,6 +289,7 @@ export interface AnalisesPesquisa {
     nome: string;
     respostas: number;
     visivel: boolean;
+    oculto?: MotivoOculto;
     media: number | null;
     medias: (number | null)[];
   }[];
@@ -296,6 +310,9 @@ export interface RespostaResumo {
   departamento: string | null;
   respondidaEm: string;
   media: number | null;
+  /** Anônima com separação: o grupo escolhido (ou oculto pela regra). */
+  grupo?: string | null;
+  grupoOculto?: MotivoOculto;
 }
 
 /** `GET /pesquisas/:id/respostas/:respostaId`. */
@@ -456,8 +473,17 @@ export const obterPesquisa = (pesquisaId: string) =>
 export const alterarPesquisa = (pesquisaId: string, entrada: PesquisaEntrada) =>
   pedir<PesquisaDetalhe>(`/pesquisas/${id(pesquisaId)}`, "PUT", entrada);
 
-export const publicarPesquisa = (pesquisaId: string) =>
-  pedir<PesquisaDetalhe>(`/pesquisas/${id(pesquisaId)}/publicar`, "POST");
+export const publicarPesquisa = (
+  pesquisaId: string,
+  opcoes?: { confirmarSemIdentificaveis?: boolean },
+) =>
+  pedir<PesquisaDetalhe>(
+    `/pesquisas/${id(pesquisaId)}/publicar`,
+    "POST",
+    opcoes?.confirmarSemIdentificaveis
+      ? { confirmarSemIdentificaveis: true }
+      : undefined,
+  );
 
 export const alterarStatusDaPesquisa = (
   pesquisaId: string,

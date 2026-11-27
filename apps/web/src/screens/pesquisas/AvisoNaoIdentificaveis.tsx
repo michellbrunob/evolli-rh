@@ -23,7 +23,7 @@ export function textoDosNaoIdentificaveis(
   const um = n === 1;
   return `${plural(n, "pessoa não tem", "pessoas não têm")} CPF ou data de nascimento na ficha e não ${um ? "consegue" : "conseguem"} confirmar quem ${um ? "é" : "são"} no link. ${
     publicada
-      ? "Complete o cadastro para que consigam responder."
+      ? `Complete o cadastro para que ${um ? "ela consiga" : "consigam"} responder.`
       : "Complete o cadastro antes de enviar."
   }`;
 }

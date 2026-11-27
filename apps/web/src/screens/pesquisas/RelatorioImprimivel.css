@@ -243,10 +243,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Rótulos inteiros (quebram a linha, sem reticências). */
 .relatorio__rotulo {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .relatorio__barra {

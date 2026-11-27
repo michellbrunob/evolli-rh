@@ -278,39 +278,48 @@ export function planilhaDosResultados(
     ["Resultado", "", ""],
   ];
   const linhaDoResultado = resumo.length - 1;
-  resumo.push(
-    [
-      "Média geral (de 0 a 10)",
-      decimal(rel.mediaGeral),
-      rel.faixaGeral ? textoDaFaixa(rel.faixaGeral) : "Sem perguntas de escala",
-    ],
-    [
-      "Favorável",
-      porcento(rel.favoravelGeral),
-      "Notas 8 a 10 na escala de 10 (ou o terço de cima das outras escalas)",
-    ],
-    rel.enps
-      ? [
-          "eNPS",
-          rel.enps.indice,
-          `${rel.enps.rotuloDaZona} · ${percentual(rel.enps.promotores, rel.enps.total)}% promotores · ${percentual(rel.enps.neutros, rel.enps.total)}% neutros · ${percentual(rel.enps.detratores, rel.enps.total)}% detratores`,
-        ]
-      : ["eNPS", "—", "Sem a pergunta de recomendação"],
-    [
-      "Maior média",
-      decimal(rel.maior?.media10 ?? null),
-      rel.maior?.texto ?? "—",
-    ],
-    [
-      "Menor média",
-      decimal(rel.menor?.media10 ?? null),
-      rel.menor?.texto ?? "—",
-    ],
-    [
-      "Comentários livres",
-      rel.comentarios.reduce((n, c) => n + c.textos.length, 0),
-    ],
-  );
+  if (rel.numerosOcultos)
+    resumo.push([
+      "Números ocultos",
+      "",
+      `Menos de ${rel.minimoPorGrupo} respostas: para proteger quem respondeu, médias, favorável, eNPS e comentários não aparecem.`,
+    ]);
+  else
+    resumo.push(
+      [
+        "Média geral (de 0 a 10)",
+        decimal(rel.mediaGeral),
+        rel.faixaGeral
+          ? textoDaFaixa(rel.faixaGeral)
+          : "Sem perguntas de escala",
+      ],
+      [
+        "Favorável",
+        porcento(rel.favoravelGeral),
+        "Notas 8 a 10 na escala de 10 (ou o terço de cima das outras escalas)",
+      ],
+      rel.enps
+        ? [
+            "eNPS",
+            rel.enps.indice,
+            `${rel.enps.rotuloDaZona} · ${percentual(rel.enps.promotores, rel.enps.total)}% promotores · ${percentual(rel.enps.neutros, rel.enps.total)}% neutros · ${percentual(rel.enps.detratores, rel.enps.total)}% detratores`,
+          ]
+        : ["eNPS", "—", "Sem a pergunta de recomendação"],
+      [
+        "Maior média",
+        decimal(rel.maior?.media10 ?? null),
+        rel.maior?.texto ?? "—",
+      ],
+      [
+        "Menor média",
+        decimal(rel.menor?.media10 ?? null),
+        rel.menor?.texto ?? "—",
+      ],
+      [
+        "Comentários livres",
+        rel.comentarios.reduce((n, c) => n + c.textos.length, 0),
+      ],
+    );
   abas.push({
     nome: "Resumo",
     larguras: [28, 16, 70],
@@ -318,7 +327,12 @@ export function planilhaDosResultados(
   });
 
   // 2. Perguntas (as de escala; o eNPS tem a aba dele).
-  const NOTAS = Array.from({ length: 11 }, (_, i) => i);
+  const menorNota = Math.min(10, ...rel.perguntas.map((p) => p.escala.minimo));
+  const maiorNota = Math.max(1, ...rel.perguntas.map((p) => p.escala.maximo));
+  const NOTAS = Array.from(
+    { length: maiorNota - menorNota + 1 },
+    (_, i) => menorNota + i,
+  );
   const perguntas: CelulaXlsx[][] = [
     ...cabecalhoDaAba("Perguntas", rel),
     [
@@ -372,7 +386,11 @@ export function planilhaDosResultados(
   // 3. eNPS.
   const enps: CelulaXlsx[][] = [...cabecalhoDaAba("eNPS", rel)];
   const cabecalhosDoEnps = [DEPOIS_DO_CABECALHO];
-  if (rel.enps) {
+  if (rel.numerosOcultos) {
+    enps.push([
+      `Números ocultos: menos de ${rel.minimoPorGrupo} respostas, para proteger quem respondeu.`,
+    ]);
+  } else if (rel.enps) {
     const e = rel.enps;
     enps.push(
       ["Indicador", "Valor", "Detalhe"],
@@ -417,18 +435,11 @@ export function planilhaDosResultados(
     const ocultos = new Set(
       geral.departamentos.filter((d) => !d.visivel).map((d) => d.nome),
     );
-    const departamentoDe = (r: RespostaDetalhe) =>
-      r.departamento === null
-        ? "—"
-        : !identificada && ocultos.has(r.departamento)
-          ? "Oculto"
-          : r.departamento;
-    const comentarioDe = (r: RespostaDetalhe) => {
-      const textos = todas
-        .filter((p) => p.tipo === "paragrafo" || p.tipo === "texto_curto")
-        .map((p) => r.valores.find((v) => v.perguntaId === p.id)?.valor)
-        .filter((v): v is string => typeof v === "string" && v.trim() !== "");
-      return textos.at(-1) ?? "";
+    const departamentoDe = (r: RespostaDetalhe) => {
+      if (!identificada && r.grupoOculto) return "Oculto";
+      const grupo = identificada ? r.departamento : (r.grupo ?? r.departamento);
+      if (!grupo) return "—";
+      return !identificada && ocultos.has(grupo) ? "Oculto" : grupo;
     };
     const formatos: Record<number, "data" | "dataHora"> = {};
     const fixas = identificada ? 3 : 2;
@@ -444,7 +455,6 @@ export function planilhaDosResultados(
         ...(identificada ? ["Respondida em"] : []),
         ...todas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
         "Média",
-        "Comentário",
       ],
       ...individuais.map((r): CelulaXlsx[] => {
         const valores = new Map(r.valores.map((v) => [v.perguntaId, v.valor]));
@@ -463,7 +473,6 @@ export function planilhaDosResultados(
               : SEM_RESPOSTA,
           ),
           decimal(r.media),
-          comentarioDe(r),
         ];
       }),
     ];
@@ -475,7 +484,6 @@ export function planilhaDosResultados(
         ...(identificada ? [18] : []),
         ...todas.map(() => 24),
         9,
-        40,
       ],
       formatos,
       ...titulo(participantes, [DEPOIS_DO_CABECALHO]),

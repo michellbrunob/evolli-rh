@@ -259,7 +259,8 @@ describe("Resultados — Visão geral", () => {
     expect(cartao).toHaveTextContent("Favorável = notas 4 e 5");
     expect(
       within(cartao).getByRole("img", {
-        name: /Faixas: 1 a 2 0%, 3 a 3 0%, 4 a 5 100%/,
+        // Faixa de uma nota só: "3", não "3 a 3".
+        name: /Faixas: 1 a 2 0%, 3 0%, 4 a 5 100%/,
       }),
     ).toBeInTheDocument();
     expect(

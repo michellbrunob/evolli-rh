@@ -195,8 +195,16 @@ describe("planilha (.xlsx)", () => {
       "1",
     ]);
     // Quantas respostas em cada nota (nota 4: 6; nota 5: 2).
-    expect(conc[11 + 4]).toBe("6");
-    expect(conc[11 + 5]).toBe("2");
+    // Só as notas das escalas usadas (aqui, de 1 a 5): nada de "Nota 0".
+    expect(perguntas[3]!.slice(11)).toEqual([
+      "Nota 1",
+      "Nota 2",
+      "Nota 3",
+      "Nota 4",
+      "Nota 5",
+    ]);
+    expect(conc[11 + 3]).toBe("6");
+    expect(conc[11 + 4]).toBe("2");
     expect(perguntas.at(-1)![1]).toBe("Média geral (média das perguntas)");
   });
 
@@ -324,7 +332,9 @@ describe("relatório em PDF (página imprimível)", () => {
     expect(
       await screen.findByRole("list", { name: "Sumário" }),
     ).toBeInTheDocument();
-    expect(document.title).toBe("clima-de-novembro-resultados");
+    await waitFor(() =>
+      expect(document.title).toBe("clima-de-novembro-resultados"),
+    );
     await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
     // Confidencial: nenhuma resposta individual é buscada.
     expect(servico.respostasDaPesquisa).not.toHaveBeenCalled();

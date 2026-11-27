@@ -45,6 +45,9 @@ import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { umaCasa } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 
+/** Nota inteira sem casa ("3"); média com uma casa ("3,5"). */
+const nota = (v: number) => (Number.isInteger(v) ? String(v) : umaCasa(v));
+
 const diferenca = (v: number, time: number) => {
   const d = v - time;
   return `${d > 0 ? "+" : d < 0 ? "−" : ""}${umaCasa(Math.abs(d))}`;
@@ -270,7 +273,7 @@ export function PaginaDaResposta({
                     {`${r.posicao} de ${r.total}`}
                     <IconeAbrir tamanho={14} />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent>
+                  <DropdownMenuContent className="pesquisas__menu">
                     {todasAsRespostas.map((x) => (
                       <DropdownMenuItem
                         key={x.id}
@@ -403,7 +406,7 @@ export function PaginaDaResposta({
                   {x ? (
                     <>
                       <p className="pesquisas__indicador-valor">
-                        {umaCasa(x.valor)}
+                        {nota(x.valor)}
                       </p>
                       <p className="pesquisas__suave">
                         {textoDe(x.perguntaId)}
@@ -479,10 +482,10 @@ export function PaginaDaResposta({
                     {escalas.map((p) => {
                       const v = porId.get(p.id)!;
                       const e = escalaDe(p);
-                      const nota =
+                      const valorDaNota =
                         typeof v.valor === "number" ? v.valor : Number(v.valor);
-                      const nota10 = Number.isFinite(nota)
-                        ? mediaNa10(nota, e)
+                      const nota10 = Number.isFinite(valorDaNota)
+                        ? mediaNa10(valorDaNota, e)
                         : null;
                       const time10 =
                         v.mediaTime === null ? null : mediaNa10(v.mediaTime, e);
@@ -506,7 +509,7 @@ export function PaginaDaResposta({
                                 className="pesquisas__nota-colorida"
                                 data-faixa={faixaDaMedia10(nota10)}
                               >
-                                {`${umaCasa(nota)} /${e.maximo}`}
+                                {`${nota(valorDaNota)} /${e.maximo}`}
                               </span>
                             )}
                           </td>
@@ -521,7 +524,7 @@ export function PaginaDaResposta({
                             {nota10 !== null && v.mediaTime !== null ? (
                               <span className="pesquisas__pessoa-textos">
                                 <span className="pesquisas__forte">
-                                  {diferenca(nota, v.mediaTime)}
+                                  {diferenca(valorDaNota, v.mediaTime)}
                                 </span>
                                 <span className="pesquisas__suave">{`time ${umaCasa(v.mediaTime)}`}</span>
                               </span>

@@ -144,6 +144,11 @@ export interface RelatorioDeResultados {
   readonly evolucao: AnalisesPesquisa["evolucao"];
   readonly alertas: readonly AlertaDoRelatorio[];
   readonly minimoPorGrupo: number;
+  /**
+   * Abaixo do mínimo por grupo (ex.: confidencial com poucas respostas): os
+   * números não aparecem em nenhuma exportação.
+   */
+  readonly numerosOcultos: boolean;
 }
 
 const pct = (n: number, total: number) =>
@@ -333,9 +338,11 @@ export function montarRelatorio(x: {
     emitidoEm: x.hoje,
     classificacao: CLASSIFICACAO[d.identificacao],
     convidados,
-    respostas: geral.respostas,
+    respostas: Math.max(geral.respostas, d.respostas),
     participacao:
-      convidados && convidados > 0 ? pct(geral.respostas, convidados) : null,
+      convidados && convidados > 0
+        ? pct(Math.max(geral.respostas, d.respostas), convidados)
+        : null,
     mediaGeral: ind.mediaGeral,
     faixaGeral: ind.mediaGeral === null ? null : faixaDaMedia10(ind.mediaGeral),
     favoravelGeral: pct(altas, totalDasFaixas),
@@ -348,9 +355,11 @@ export function montarRelatorio(x: {
       analises && analises.linhas.some((l) => l.grupoId !== null)
         ? analises
         : null,
-    evolucao: analises?.evolucao ?? [],
+    // Só aplicações com respostas (como a aba Análises).
+    evolucao: (analises?.evolucao ?? []).filter((e) => e.mediaGeral !== null),
     alertas,
     minimoPorGrupo: d.minimoPorGrupo,
+    numerosOcultos: !geral.filtro.visivel,
   };
 }
 

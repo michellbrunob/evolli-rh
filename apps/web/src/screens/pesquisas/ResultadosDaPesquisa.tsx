@@ -15,6 +15,7 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import type {
   AnalisesPesquisa,
   CampoGrupo,
+  MotivoOculto,
   Pergunta,
   PesquisaDetalhe,
   RespostaResumo,
@@ -45,9 +46,11 @@ import {
   IconeCadeado,
   IconeComentario,
   IconeCopiar,
+  IconeDocumento,
   IconeEditar,
   IconeInformacao,
   IconeMaisAcoes,
+  IconePlanilha,
   IconeRemover,
   IconeStatus,
   IconeVoltar,
@@ -99,6 +102,7 @@ import {
   dataDoInstante,
   participacao,
   percentual,
+  textoDoOculto,
   podeEditarPesquisa,
   umaCasa,
 } from "./textosDasPesquisas";
@@ -384,7 +388,7 @@ function ResultadosInterno({
             >
               <IconeMaisAcoes tamanho={18} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="pesquisas__menu">
               {podeEditar ? (
                 <DropdownMenuItem onSelect={() => setDuplicar(true)}>
                   <IconeCopiar tamanho={16} />
@@ -427,8 +431,9 @@ function ResultadosInterno({
               Exportar
               <IconeAbrir tamanho={12} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="pesquisas__menu">
               <DropdownMenuItem onSelect={() => void exportar("xlsx")}>
+                <IconePlanilha tamanho={16} />
                 <span className="pesquisas__menu-opcao">
                   <strong>Excel (.xlsx)</strong>
                   <span className="pesquisas__suave">
@@ -439,6 +444,7 @@ function ResultadosInterno({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => void exportar("pdf")}>
+                <IconeDocumento tamanho={16} />
                 <span className="pesquisas__menu-opcao">
                   <strong>PDF</strong>
                   <span className="pesquisas__suave">
@@ -621,13 +627,29 @@ function ResultadosInterno({
   );
 }
 
-function PoucasRespostas({ minimo }: { readonly minimo: number }) {
+/** "3 a 5", ou só "3" quando a faixa tem uma nota (escala de 1 a 5). */
+export const intervalo = (de: number, ate: number) =>
+  de === ate ? String(de) : `${de} a ${ate}`;
+
+function PoucasRespostas({
+  minimo,
+  motivo,
+}: {
+  readonly minimo: number;
+  readonly motivo?: MotivoOculto | undefined;
+}) {
   return (
     <div className="pesquisas__aba-vazia">
       <IconeCadeado tamanho={18} />
-      <strong>Poucas respostas para mostrar</strong>
+      <strong>
+        {motivo === "protege_grupo_menor"
+          ? "Oculto para proteger um grupo menor"
+          : "Poucas respostas para mostrar"}
+      </strong>
       <span className="pesquisas__suave">
-        {`Este grupo tem menos de ${plural(minimo, "resposta", "respostas")}. Para proteger quem respondeu, os números não aparecem.`}
+        {motivo === "protege_grupo_menor"
+          ? "Mostrar este grupo deixaria deduzir as respostas de um grupo com menos pessoas. Para proteger quem respondeu, os números não aparecem."
+          : `Este grupo tem menos de ${plural(minimo, "resposta", "respostas")}. Para proteger quem respondeu, os números não aparecem.`}
       </span>
     </div>
   );
@@ -745,7 +767,7 @@ function VisaoGeral({
               </span>
             ) : null}
             <p className="pesquisas__suave">
-              {`Média das ${plural(indicadores.perguntasDeEscala, "pergunta de escala", "perguntas de escala")}, com ${plural(geral.respostas, "resposta", "respostas")}`}
+              {`${indicadores.perguntasDeEscala === 1 ? "Média da única pergunta de escala" : `Média das ${indicadores.perguntasDeEscala} perguntas de escala`}, com ${plural(geral.respostas, "resposta", "respostas")}`}
             </p>
             <Regua valor={indicadores.mediaGeral} rotulo="Média geral" />
           </div>
@@ -844,14 +866,14 @@ function VisaoGeral({
                 <div key={campo} className="pesquisas__filtro-lista">
                   <label
                     htmlFor={`${base}-${campo}`}
-                    className="pesquisas__so-leitor"
+                    className="pesquisas__rotulo-do-filtro"
                   >
                     {rotulo}
                   </label>
                   <ListaDeEscolha
                     id={`${base}-${campo}`}
                     opcoes={[
-                      { valor: "", rotulo: `${rotulo}: todos` },
+                      { valor: "", rotulo: "Todos" },
                       ...opcoes.map((o) => ({ valor: o.id, rotulo: o.nome })),
                     ]}
                     valor={recorte?.campo === campo ? recorte.grupoId : ""}
@@ -866,7 +888,7 @@ function VisaoGeral({
 
       {recorte ? (
         <p className="pesquisas__filtro-aplicado" role="status">
-          {`Mostrando ${plural(atual.respostas, "resposta", "respostas")} de ${geral.respostas}`}
+          {`Mostrando ${plural(atual.filtro.respostas ?? atual.respostas, "resposta", "respostas")} de ${geral.respostas}`}
           {" · "}
           <button
             type="button"
@@ -883,7 +905,10 @@ function VisaoGeral({
         {...(filtrando ? { "aria-busy": true, "data-carregando": "" } : {})}
       >
         {!atual.filtro.visivel ? (
-          <PoucasRespostas minimo={detalhe.minimoPorGrupo} />
+          <PoucasRespostas
+            minimo={detalhe.minimoPorGrupo}
+            motivo={atual.filtro.oculto}
+          />
         ) : atual.respostas === 0 ? (
           <div className="pesquisas__aba-vazia">
             <strong>Ainda não há respostas.</strong>
@@ -1132,17 +1157,17 @@ function CartaoDaPergunta({
               rotulo="Faixas"
               partes={[
                 {
-                  rotulo: `${e.minimo} a ${baixaAte}`,
+                  rotulo: intervalo(e.minimo, baixaAte),
                   valor: faixas.baixa,
                   cor: COR_DA_FAIXA.baixa,
                 },
                 {
-                  rotulo: `${baixaAte + 1} a ${altaDesde - 1}`,
+                  rotulo: intervalo(baixaAte + 1, altaDesde - 1),
                   valor: faixas.media,
                   cor: COR_DA_FAIXA.media,
                 },
                 {
-                  rotulo: `${altaDesde} a ${e.maximo}`,
+                  rotulo: intervalo(altaDesde, e.maximo),
                   valor: faixas.alta,
                   cor: COR_DA_FAIXA.alta,
                 },
@@ -1345,7 +1370,9 @@ function Analises({
                       <tr key={l.grupoId ?? "todos"}>
                         <th scope="row">
                           {l.grupoId === null ? "Toda a empresa" : l.nome}
-                          <span className="pesquisas__suave">{` (${plural(l.respostas, "resposta", "respostas")})`}</span>
+                          {l.visivel ? (
+                            <span className="pesquisas__suave">{` (${plural(l.respostas, "resposta", "respostas")})`}</span>
+                          ) : null}
                         </th>
                         {l.visivel ? (
                           [l.media, ...l.medias].map((v, i) => (
@@ -1365,7 +1392,7 @@ function Analises({
                             className="pesquisas__suave"
                           >
                             <IconeCadeado tamanho={12} />
-                            {` Oculto · menos de ${plural(detalhe.minimoPorGrupo, "resposta", "respostas")}`}
+                            {` ${textoDoOculto(l.oculto, detalhe.minimoPorGrupo)}`}
                           </td>
                         )}
                       </tr>
@@ -1543,7 +1570,7 @@ function ListaDeRespostas({
                       </span>
                     )}
                   </td>
-                  <td className="pesquisas__numero">
+                  <td className="pesquisas__data">
                     {diaEHora(r.respondidaEm)}
                   </td>
                   <td>

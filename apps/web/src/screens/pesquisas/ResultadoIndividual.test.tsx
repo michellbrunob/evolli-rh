@@ -49,7 +49,9 @@ describe("Resultado individual", () => {
     const tabela = screen.getByRole("table", { name: "Comparação com o time" });
     const [, linha] = within(tabela).getAllByRole("row");
     expect(linha).toHaveTextContent("Tenho clareza das prioridades.");
-    expect(linha).toHaveTextContent("5,0 /5");
+    // Nota inteira, sem ",0".
+    expect(linha).toHaveTextContent("5 /5");
+    expect(linha).not.toHaveTextContent("5,0 /5");
     expect(linha).toHaveTextContent("+0,8time 4,3");
   });
 

@@ -410,11 +410,9 @@
 
 .pesquisas__categoria-titulo {
   margin: 0;
-  color: var(--color-ink-muted);
-  font-size: var(--text-caption);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
   font-weight: var(--weight-strong);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .pesquisas__cartoes {
@@ -1419,11 +1417,18 @@ textarea.pesquisas__campo {
 }
 
 .pesquisas__numero-pergunta {
+  display: inline-grid;
   flex: 0 0 auto;
+  place-items: center;
   min-width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
   color: var(--color-ink-muted);
   font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 /* Sobre o modelo e faixa de informações. */
@@ -1439,7 +1444,7 @@ textarea.pesquisas__campo {
 
 .pesquisas__faixa > div {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   gap: 2px;
   padding: var(--space-md);
 }
@@ -1592,6 +1597,10 @@ textarea.pesquisas__campo {
   align-items: center;
   gap: var(--space-sm);
   min-width: 0;
+}
+
+.pesquisas__etapas-barra li:first-child {
+  flex: 0 0 auto;
 }
 
 .pesquisas__etapas-barra li + li::before {
@@ -2920,6 +2929,89 @@ textarea.pesquisas__campo {
 
   .pesquisas__indicador--largo {
     grid-column: auto;
+  }
+}
+
+/* Revisão 2: menus, datas, abas, recorte e telas estreitas. */
+
+/* Menus do módulo: por cima do menu lateral e ícone afastado do texto. */
+.pesquisas__menu.ev-menu {
+  z-index: 60;
+}
+
+.pesquisas__menu [role="menuitem"] {
+  gap: var(--space-xs);
+}
+
+/* Opções do "Mudar status": ponto colorido e texto. */
+.pesquisas__ponto-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.pesquisas__ponto-status[data-tom="success"] {
+  color: var(--status-success-ink);
+}
+
+.pesquisas__ponto-status[data-tom="warning"] {
+  color: var(--status-warning-ink);
+}
+
+.pesquisas__ponto-status[data-tom="info"] {
+  color: var(--status-info-ink);
+}
+
+.pesquisas__ponto-status[data-tom="danger"] {
+  color: var(--status-danger-ink);
+}
+
+.pesquisas__ponto-status[data-tom="neutral"] {
+  color: var(--status-neutral-ink);
+}
+
+/* Datas à esquerda, como o cabeçalho. */
+.pesquisas__data {
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* Abas com selo ("Novo") no mesmo centro do rótulo. */
+.pesquisas__abas button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+/* Filtro de recorte: "Departamento:" visível antes da escolha. */
+.pesquisas__filtro-lista {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.pesquisas__rotulo-do-filtro {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.pesquisas__rotulo-do-filtro::after {
+  content: ":";
+}
+
+/* Modelo e identificação juntos (sem "·" sozinho na quebra). */
+.pesquisas__sem-quebra {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 48rem) {
+  .pesquisas__participacao--linha {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 

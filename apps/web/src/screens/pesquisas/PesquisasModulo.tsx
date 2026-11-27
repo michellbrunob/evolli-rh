@@ -679,6 +679,23 @@ function ListaDePesquisas({
   const [busca, setBusca] = useState("");
   const [tipos, setTipos] = useState<readonly string[]>([]);
   const [filtroAberto, setFiltroAberto] = useState(false);
+  const filtroRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!filtroAberto) return;
+    const fora = (e: Event) => {
+      if (!filtroRef.current?.contains(e.target as Node))
+        setFiltroAberto(false);
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFiltroAberto(false);
+    };
+    document.addEventListener("pointerdown", fora, true);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("pointerdown", fora, true);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [filtroAberto]);
   const [crescente, setCrescente] = useState(false);
   const [excluir, setExcluir] = useState<PesquisaResumo | null>(null);
   const [duplicar, setDuplicar] = useState<PesquisaResumo | null>(null);
@@ -835,7 +852,7 @@ function ListaDePesquisas({
                 onMudar={setBusca}
                 atalho
               />
-              <div className="pesquisas__filtro-tipo">
+              <div className="pesquisas__filtro-tipo" ref={filtroRef}>
                 <Button
                   variant="secondary"
                   aria-expanded={filtroAberto}
@@ -1067,9 +1084,12 @@ function LinhaDaPesquisa({
           >
             <span className="pesquisas__forte">{p.nome}</span>
             <span className="pesquisas__suave pesquisas__com-icone">
-              {`${ROTULO_DO_MODELO[p.modelo]} · `}
-              <IconeId tamanho={12} />
-              {ROTULO_DA_IDENTIFICACAO[p.identificacao]}
+              {ROTULO_DO_MODELO[p.modelo]}
+              <span className="pesquisas__sem-quebra">
+                {" · "}
+                <IconeId tamanho={12} />
+                {ROTULO_DA_IDENTIFICACAO[p.identificacao]}
+              </span>
             </span>
           </button>
         </span>
@@ -1077,7 +1097,7 @@ function LinhaDaPesquisa({
       <td>
         <Participacao pesquisa={p} />
       </td>
-      <td className="pesquisas__numero">{dataDoInstante(p.criadaEm)}</td>
+      <td className="pesquisas__data">{dataDoInstante(p.criadaEm)}</td>
       <td>
         <StatusBadge variant={TOM_DO_STATUS[p.status]}>
           {ROTULO_DO_STATUS[p.status]}
@@ -1093,7 +1113,7 @@ function LinhaDaPesquisa({
               >
                 <IconeMaisAcoes tamanho={18} />
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent className="pesquisas__menu">
                 <DropdownMenuItem onSelect={onResultados}>
                   <IconeVer tamanho={16} />
                   Ver resultados

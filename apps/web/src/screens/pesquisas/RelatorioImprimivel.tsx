@@ -52,7 +52,7 @@ import {
 import { modeloDaGaleria } from "./modelosDePesquisa";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
-import { percentual, umaCasa } from "./textosDasPesquisas";
+import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
 import "./RelatorioImprimivel.css";
 
 const COR_DA_FAIXA: Readonly<Record<Faixa, string>> = {
@@ -447,6 +447,14 @@ export function DocumentoDoRelatorio({
       {/* 01 e 02 */}
       <Pagina cabecalho={cabecalho} rodape={rodape(3)}>
         {tituloDasPaginas}
+        {rel.numerosOcultos ? (
+          <div className="relatorio__quadro" role="note">
+            <h3>Números ocultos</h3>
+            <p>
+              {`Esta pesquisa tem menos de ${plural(rel.minimoPorGrupo, "resposta", "respostas")} por grupo: para proteger quem respondeu, médias, favorável, eNPS e comentários não aparecem.`}
+            </p>
+          </div>
+        ) : null}
         <Secao numero={numeroDe("resumo")} titulo="Resumo executivo">
           <div className="relatorio__indicadores">
             <div className="relatorio__indicador relatorio__indicador--destaque">
@@ -599,7 +607,7 @@ export function DocumentoDoRelatorio({
                       }
                     >
                       {!l.visivel
-                        ? `Oculto · menos de ${rel.minimoPorGrupo} respostas`
+                        ? textoDoOculto(l.oculto, rel.minimoPorGrupo)
                         : l.media === null
                           ? "—"
                           : umaCasa(l.media)}

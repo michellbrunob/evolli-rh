@@ -55,6 +55,16 @@ export const IDENTIFICACOES: readonly {
   },
 ];
 
+/** "Oculto · menos de 3 respostas" ou "Oculto · protege um grupo menor". */
+export function textoDoOculto(
+  motivo: "minimo" | "protege_grupo_menor" | undefined,
+  minimo: number,
+): string {
+  return motivo === "protege_grupo_menor"
+    ? "Oculto · protege um grupo menor"
+    : `Oculto · menos de ${minimo === 1 ? "1 resposta" : `${minimo} respostas`}`;
+}
+
 export const ROTULO_DA_IDENTIFICACAO: Readonly<Record<Identificacao, string>> =
   {
     identificada: "Identificada",

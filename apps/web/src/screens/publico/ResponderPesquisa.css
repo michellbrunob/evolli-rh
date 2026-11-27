@@ -87,7 +87,7 @@
   display: flex;
   flex: 1 0 auto;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   padding: 0 var(--space-md) var(--space-xl);
 }
 
@@ -337,9 +337,11 @@
 
 .pesquisa-pergunta__obrigatoria {
   color: var(--status-danger-ink);
+  white-space: nowrap;
 }
 
 .pesquisa-pergunta__opcional {
+  white-space: nowrap;
   font-size: var(--text-caption);
   font-weight: var(--weight-regular);
   color: var(--color-ink-subtle);
@@ -501,6 +503,13 @@ textarea.pesquisa-campo {
 
 .pesquisa-opcoes--estrelas .pesquisa-opcao--ativa {
   color: var(--status-warning-ink);
+}
+
+.pesquisa-opcoes--estrelas
+  .pesquisa-opcao:not(.pesquisa-opcao--ativa)
+  [aria-hidden="true"] {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--color-ink-subtle);
 }
 
 .pesquisa-opcoes--estrelas .pesquisa-opcao--marcada,

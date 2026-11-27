@@ -148,8 +148,7 @@ export const MODELOS_DE_PESQUISA: readonly ModeloDaGaleria[] = [
     sobre:
       "Mede, em poucos minutos, clareza, carga de trabalho, retorno, segurança para opinar, ferramentas e pertencimento. Feito para repetir a cada mês ou trimestre.",
     nomeBase: "Pulso",
-    boasVindas:
-      "São poucas perguntas e leva cerca de dois minutos. Responda pensando nas últimas semanas.",
+    boasVindas: "São poucas perguntas. Responda pensando nas últimas semanas.",
     secoes: [
       {
         titulo: null,
@@ -221,7 +220,7 @@ export const MODELOS_DE_PESQUISA: readonly ModeloDaGaleria[] = [
       "Cobre liderança, comunicação, ambiente, reconhecimento e bem-estar. Bom para um retrato anual ou semestral.",
     nomeBase: "Clima",
     boasVindas:
-      "Queremos entender como é trabalhar aqui hoje. Leva cerca de oito minutos. Não existe resposta certa: vale a sua percepção.",
+      "Queremos entender como é trabalhar aqui hoje. Não existe resposta certa: vale a sua percepção.",
     secoes: [
       {
         titulo: "Liderança",
@@ -327,7 +326,7 @@ export const MODELOS_DE_PESQUISA: readonly ModeloDaGaleria[] = [
     sobre:
       "Promotores (9 e 10) menos detratores (0 a 6), em pontos de −100 a 100. Simples de repetir e de comparar entre períodos.",
     nomeBase: "eNPS",
-    boasVindas: "Leva menos de um minuto.",
+    boasVindas: "É uma pergunta só.",
     secoes: [
       {
         titulo: null,
@@ -532,7 +531,7 @@ export const MODELOS_DE_PESQUISA: readonly ModeloDaGaleria[] = [
     sobre:
       "Mostra o uso de cada benefício, o que é mais valorizado e onde as regras confundem.",
     nomeBase: "Benefícios",
-    boasVindas: "Leva cerca de três minutos.",
+    boasVindas: "Obrigado por responder.",
     secoes: [
       {
         titulo: null,

@@ -27,6 +27,7 @@ import { formatarDiaCivil } from "../../format/data";
 import { plural } from "../../format/plural";
 import { Dialog } from "../../ui";
 import { GarantirAvisos } from "./avisos";
+import { usePublicarComConfirmacao } from "./confirmarPublicacao";
 import { IconeDoModelo } from "./componentes";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
@@ -146,6 +147,7 @@ function AssistenteDePesquisaInterno({
   const [mostrarErros, setMostrarErros] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const confirmacao = usePublicarComConfirmacao(servico);
   const [avisoRascunho, setAvisoRascunho] = useState<string | null>(null);
   const [sair, setSair] = useState(false);
   const [salvoAs, setSalvoAs] = useState<string | null>(null);
@@ -251,7 +253,8 @@ function AssistenteDePesquisaInterno({
           return;
         }
         try {
-          setPublicada(await servico.publicarPesquisa(id));
+          const publicada = await confirmacao.publicar(id);
+          if (publicada) setPublicada(publicada);
         } catch (erro) {
           setFalha(mensagemDaFalha(erro, "publicar a pesquisa"));
         }
@@ -570,6 +573,7 @@ function AssistenteDePesquisaInterno({
 
   return (
     <>
+      {confirmacao.janela}
       <CadastroEmEtapas
         tituloId={PESQUISAS_TITULO_ID}
         iconeDoCabecalho={<IconeDoModelo id={estado.modelo} tamanho="lg" />}
