@@ -122,7 +122,7 @@ Autenticadas (sessão + CSRF nas escritas, empresa ativa):
 | `PUT /pesquisas/:id`                            | atualiza (respeita as regras de edição) → `PesquisaDetalhe`          |
 | `POST /pesquisas/:id/publicar`                  | rascunho → ativa (valida estrutura e ≥1 participante)                |
 | `POST /pesquisas/:id/status`                    | `{ status }` → `PesquisaDetalhe`                                     |
-| `POST /pesquisas/:id/duplicar`                  | → `PesquisaDetalhe` (rascunho)                                       |
+| `POST /pesquisas/:id/duplicar`                  | `{ empresaId? }` → `PesquisaDetalhe` (ativa; ver revisão no fim)     |
 | `DELETE /pesquisas/:id`                         | exclusão lógica (204)                                                |
 | `GET /pesquisas/:id/resultados?departamentoId=` | `ResultadosPesquisa` (agregados)                                     |
 | `GET /pesquisas/:id/respostas`                  | só identificada: respostas por pessoa (auditado)                     |
@@ -216,7 +216,7 @@ interface PesquisaEntrada {
   identificacao: Identificacao; // ignorado no PUT depois de publicar (422 se mudar)
   secoes: Secao[]; // 1..20 seções; 0..60 perguntas no total (publicar exige ≥1)
   participantes: { todos: true } | { todos: false; colaboradorIds: string[] };
-  encerraEm: string | null; // AAAA-MM-DD, ≥ hoje
+  encerraEm: string | null; // AAAA-MM-DDTHH:mm (Brasília), ≥ agora; só a data = 23:59
   minimoPorGrupo: number; // 3..10
 }
 
@@ -230,7 +230,7 @@ interface PesquisaResumo {
   respostas: number;
   criadaEm: string; // ISO
   publicadaEm: string | null;
-  encerraEm: string | null;
+  encerraEm: string | null; // ISO com fuso de Brasília, ex.: 2026-12-01T18:30:00-03:00
   link: string | null; // caminho público "#/p/<token>" (só depois de publicar)
 }
 interface PesquisaDetalhe extends PesquisaResumo {
@@ -247,6 +247,9 @@ interface PesquisaDetalhe extends PesquisaResumo {
   }[];
   // respondeu: null na anônima; na confidencial só true/false
   naoIdentificaveis: number; // participantes com identificavel=false (0 na anônima); CPF e data nunca saem
+  participantesTotal: number | null; // painel da edição; os três são null na anônima
+  responderam: number | null;
+  pendentes: number | null;
   temRespostas: boolean;
 }
 // GET /pesquisas → ResultadoPaginado<PesquisaResumo> & { contagens: Record<"todas"|StatusPesquisa, number> }
@@ -319,7 +322,14 @@ interface PesquisaPublica {
 }
 type AberturaPublica =
   | PesquisaPublica
-  | { indisponivel: "pausada" | "encerrada" | "cancelada" | "inexistente" };
+  | {
+      indisponivel:
+        | "pausada"
+        | "finalizada" // encerrada à mão
+        | "encerrada" // prazo vencido
+        | "cancelada"
+        | "inexistente";
+    };
 // POST identificar → { passe: string; primeiroNome: string }  (401 genérico; 429 limite; 409 já respondeu)
 // POST respostas   → 201 { ok: true }  (422 erros por perguntaId; 409 já respondeu; 410 indisponível)
 ```
@@ -455,3 +465,19 @@ Notas da implementação (API):
 - `RespostaDetalhe.valores[].mediaTime` vai na escala da própria pergunta (escalas e número; `null`
   nas demais). Na anônima, `RespostaResumo.departamento` é `null` (a escolha de grupo não aparece por
   resposta).
+
+Revisão lado a lado (27/11/2026):
+
+- **Encerramento com hora:** `encerraEm` entra como `AAAA-MM-DDTHH:mm` no horário de Brasília (só a
+  data ainda é aceita e vale até 23:59) e sai em ISO com o fuso (`-03:00`). Precisa ser no futuro; o
+  vencimento compara com o instante atual. Os prazos já gravados (só a data) viraram 23:59 daquele dia.
+- **Duplicar:** `POST /pesquisas/:id/duplicar` com `{ empresaId? }` (destino; padrão a empresa ativa;
+  empresa que a conta não acessa → 403). A cópia nasce **ativa** (publicada, link novo), com
+  "(cópia)" no nome e as mesmas perguntas, identificação, separação e prazo (vencido: sem prazo).
+  Participantes: mesma empresa → os mesmos; outra → todo o time ativo dela; anônima → nenhum. Sem
+  pergunta ou sem participante: 422 como no publicar. Responde 201 com o `PesquisaDetalhe`; auditado
+  na empresa de destino.
+- **Textos sem autor** (confidencial, anônima e a leitura do master) saem em ordem alfabética, assim
+  como os "outro" das escolhas; na identificada, a ordem de chegada com o autor.
+- **Respostas individuais:** a lista sai da mais recente para a mais antiga (`numero` = ordem de
+  chegada, #1 a primeira); `anteriorId`/`proximaId`/`posicao` seguem a ordem da lista.
