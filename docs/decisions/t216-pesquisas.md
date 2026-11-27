@@ -323,3 +323,119 @@ type AberturaPublica =
 // POST identificar → { passe: string; primeiroNome: string }  (401 genérico; 429 limite; 409 já respondeu)
 // POST respostas   → 201 { ok: true }  (422 erros por perguntaId; 409 já respondeu; 410 indisponível)
 ```
+
+## Ampliação de 27/11/2026 (revisão do fluxo e dos resultados)
+
+Decisões:
+
+- **Modelos prontos em 3 etapas** (Configurar → Colaboradores → Enviar, barra horizontal); a anônima
+  fica em 2 (sem participantes: quem tiver o link responde; a participação mostra só as respostas e
+  "link aberto"). A Personalizada mantém as 5 etapas.
+- **Anônima com separação por grupo:** até 2 campos (`departamento`, `centroCusto`, `unidade`) que quem
+  responde escolhe antes das perguntas ("Prefiro não informar" permitido); os recortes da anônima usam
+  essa escolha, sempre com o mínimo por grupo.
+- **Uma pergunta por tela** na resposta pelo link, com barra de progresso.
+- **Respostas individuais:** identificada (com o nome) e anônima (numeradas "#1, #2…", sem pessoa);
+  a confidencial nunca as mostra.
+- **Rótulo curto por pergunta** (`rotulo`, até 40) para as tabelas de análise.
+- **Indicadores e faixas:** média geral (média das perguntas de escala, na escala 0–10), maior e menor
+  média, "% favorável" por pergunta (escala 1–10 e nota: 8 a 10; concordância e estrelas: 4 e 5;
+  escala personalizada: o terço superior) e as três faixas da distribuição; eNPS com zona (crítica
+  < 0, aperfeiçoamento 0–49, qualidade 50–74, excelência 75–100).
+- **Análises:** mapa de médias por grupo (departamento, centro de custo ou unidade) × pergunta, com a
+  linha "Toda a empresa" e grupos abaixo do mínimo ocultos; evolução da média geral entre pesquisas do
+  mesmo modelo.
+- **Exportação:** Excel (.xlsx, todas as respostas permitidas pela identificação + resultados) e PDF
+  (relatório dos resultados), gerados no navegador.
+
+Contrato (acréscimos):
+
+```ts
+type CampoGrupo = "departamento" | "centroCusto" | "unidade";
+interface Pergunta {
+  /* … */ rotulo: string | null;
+} // até 40
+interface PesquisaEntrada {
+  /* … */ separarPor: CampoGrupo[];
+} // 0..2; só na anônima (senão 422)
+// Anônima: `participantes` é ignorado; PesquisaResumo.participantes = null; publicar não exige participante.
+
+interface PesquisaPublica {
+  /* … */
+  grupos: {
+    campo: CampoGrupo;
+    rotulo: string;
+    opcoes: { id: string; nome: string }[];
+  }[];
+}
+// POST /publico/pesquisas/:token/respostas → { passe?, grupos?: Partial<Record<CampoGrupo, string | null>>, respostas }
+
+interface ResultadosPesquisa {
+  /* … */
+  indicadores: {
+    mediaGeral: number | null;
+    perguntasDeEscala: number;
+    maiorMedia: { perguntaId: string; media: number } | null;
+    menorMedia: { perguntaId: string; media: number } | null;
+    enps: {
+      indice: number;
+      zona: "critica" | "aperfeicoamento" | "qualidade" | "excelencia";
+      promotores: number;
+      neutros: number;
+      detratores: number;
+    } | null;
+  };
+  recortes: CampoGrupo[]; // filtros disponíveis (anônima: os de separarPor)
+}
+// GET /pesquisas/:id/resultados?campo=<CampoGrupo>&grupoId=<id>  (departamentoId continua aceito)
+// Perguntas de escala/nota/estrelas ganham: favoravel: number | null (0–100); faixas: { baixa; media; alta }
+// eNPS ganha: zona
+
+// GET /pesquisas/:id/analises?campo=<CampoGrupo>
+interface AnalisesPesquisa {
+  campo: CampoGrupo;
+  colunas: { perguntaId: string; rotulo: string }[];
+  linhas: {
+    grupoId: string | null;
+    nome: string;
+    respostas: number;
+    visivel: boolean;
+    media: number | null;
+    medias: (number | null)[];
+  }[]; // 1ª linha: "Toda a empresa" (grupoId null)
+  evolucao: {
+    pesquisaId: string;
+    nome: string;
+    publicadaEm: string;
+    mediaGeral: number | null;
+  }[];
+}
+
+// GET /pesquisas/:id/respostas  (identificada e anônima; confidencial → 404)
+interface RespostaResumo {
+  id: string;
+  numero: number;
+  colaboradorId: string | null;
+  nome: string | null;
+  departamento: string | null;
+  respondidaEm: string;
+  media: number | null;
+}
+// GET /pesquisas/:id/respostas/:respostaId
+interface RespostaDetalhe extends RespostaResumo {
+  anteriorId: string | null;
+  proximaId: string | null;
+  posicao: number;
+  total: number;
+  valores: { perguntaId: string; valor: unknown; mediaTime: number | null }[];
+  indicadores: {
+    media: number | null;
+    mediaTime: number | null;
+    recomendacao: number | null;
+    enpsTime: number | null;
+    maior: { perguntaId: string; valor: number } | null;
+    menor: { perguntaId: string; valor: number } | null;
+  };
+}
+// A aba da ficha abre o RespostaDetalhe da pessoa (GET /colaboradores/:id/pesquisas devolve também respostaId).
+```
