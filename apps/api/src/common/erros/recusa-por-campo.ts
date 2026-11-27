@@ -63,7 +63,11 @@ export type MotivoDoCampo =
   | "ja_recebe"
   // T215 — Aprovar um "ajuste sugerido": a sugestão ainda espera a resposta
   // de quem pediu (pelo Portal, quando ele existir).
-  | "aguardando_resposta";
+  | "aguardando_resposta"
+  // T216 — Pesquisas: a identificação não muda depois de publicar; perguntas
+  // e participantes que já têm resposta não saem.
+  | "nao_editavel"
+  | "com_respostas";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -152,7 +156,28 @@ export type CampoPublico =
   | "dataNascimento"
   | "cpf"
   | "telefone"
-  | "email";
+  | "email"
+  // T216 — Pesquisas (assistente, publicação e resposta pelo link).
+  | "boasVindas"
+  | "identificacao"
+  | "secoes"
+  | "participantes"
+  | "encerraEm"
+  | "minimoPorGrupo"
+  | "respostas"
+  | "status"
+  | CampoDePergunta;
+
+/**
+ * T216 — o id de uma pergunta da pesquisa como campo do erro (o contrato
+ * responde "por perguntaId"). Só sai por `campoDaPergunta`, que recebe um id
+ * já conferido no formato (`[A-Za-z0-9_-]{1,40}`), nunca texto livre.
+ */
+export type CampoDePergunta = string & { readonly __campoDePergunta: true };
+
+export function campoDaPergunta(id: string): CampoDePergunta {
+  return id as CampoDePergunta;
+}
 
 export interface ErroDeCampo {
   campo: CampoPublico;
