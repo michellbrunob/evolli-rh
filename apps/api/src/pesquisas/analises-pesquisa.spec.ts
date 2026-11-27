@@ -1,5 +1,6 @@
 import {
   compararComOTime,
+  mediaDasRespostas,
   mediaGeralVisivel,
   montarAnalises,
   type RespostaDaAnalise,
@@ -162,5 +163,44 @@ describe("T216 — compararComOTime", () => {
     const outra = compararComOTime(secoes, [r(5, 2, null)], 0);
     expect(outra.indicadores.maior).toEqual({ perguntaId: "clima", valor: 5 });
     expect(outra.indicadores.menor).toEqual({ perguntaId: "carga", valor: 2 });
+  });
+});
+
+describe("T216 — mediaDasRespostas (últimos pulsos da pessoa)", () => {
+  const conc: Secao[] = [
+    {
+      id: "s",
+      titulo: null,
+      descricao: null,
+      perguntas: [p("c", "concordancia"), p("t", "texto_curto")],
+    },
+  ];
+  const dez: Secao[] = [
+    {
+      id: "s",
+      titulo: null,
+      descricao: null,
+      perguntas: [p("e", "escala", { minimo: 1, maximo: 10 })],
+    },
+  ];
+
+  it("média (0–10) das médias de cada resposta anterior, cada uma na sua estrutura", () => {
+    expect(
+      mediaDasRespostas([
+        // 4 de 5 → 8
+        { secoes: conc, valores: [{ perguntaId: "c", valor: 4 }] },
+        // 5 de 10 → 5
+        { secoes: dez, valores: [{ perguntaId: "e", valor: 5 }] },
+      ]),
+    ).toBe(6.5);
+  });
+
+  it("sem resposta anterior (ou sem nota de escala): nulo", () => {
+    expect(mediaDasRespostas([])).toBeNull();
+    expect(
+      mediaDasRespostas([
+        { secoes: conc, valores: [{ perguntaId: "t", valor: "só texto" }] },
+      ]),
+    ).toBeNull();
   });
 });

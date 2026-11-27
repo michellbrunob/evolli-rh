@@ -24,6 +24,7 @@ import { CurrentUser } from "../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
 import {
   AnalisesQueryDto,
+  CandidatosQueryDto,
   DuplicarDto,
   IdentificarDto,
   ListarPesquisasQueryDto,
@@ -74,6 +75,23 @@ export class PesquisasController {
     @Req() req: Request,
   ) {
     return this.service.criar(dto, ctx(actor, req));
+  }
+
+  // Rota fixa ANTES de ":pesquisaId" (senão "candidatos" seria um id).
+  @Get("candidatos")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary:
+      "Escolher pessoas: ativos da empresa com cargo, departamento, centro de custo e unidade",
+  })
+  candidatos(
+    @Query() q: CandidatosQueryDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.candidatos(q, ctx(actor, req));
   }
 
   @Get(":pesquisaId")

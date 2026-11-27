@@ -685,6 +685,74 @@ describe("T216 — Pesquisas (e2e)", () => {
   });
 
   // -----------------------------------------------------------------------
+  describe("candidatos (Escolher pessoas)", () => {
+    it("ativos da empresa com cargo, departamento, centro de custo e unidade; filtros e busca", async () => {
+      const lot = await lotacaoMinima(appUrl, empresaA);
+      const centro = await prisma.centroCusto.create({
+        data: {
+          empresaId: empresaA,
+          codigo: "T216_CAND_CC",
+          nome: "Centro Candidatos Sintetico",
+        },
+      });
+      const comCentro = await admitir(rhA, empresaA, undefined, centro.id);
+      const r = await get(
+        `/v1/pesquisas/candidatos?centroCustoId=${centro.id}`,
+        rhA,
+      ).expect(200);
+      expect(r.headers["cache-control"]).toBe("no-store");
+      expect(r.body).toEqual({
+        itens: [
+          {
+            colaboradorId: comCentro.id,
+            nome: comCentro.nome,
+            cargo: "Cargo T179 Sintetico",
+            departamento: "Departamento T179 Sintetico",
+            centroCusto: "Centro Candidatos Sintetico",
+            unidade: "Unidade T179 Sintetica",
+          },
+        ],
+        pagina: 1,
+        tamanhoPagina: 20,
+        total: 1,
+      });
+      // Busca pelo nome (sem diferenciar maiúsculas) e os outros filtros.
+      const busca = await get(
+        `/v1/pesquisas/candidatos?busca=${encodeURIComponent(comCentro.nome.toLowerCase())}`,
+        rhA,
+      ).expect(200);
+      expect(
+        busca.body.itens.map((x: { colaboradorId: string }) => x.colaboradorId),
+      ).toEqual([comCentro.id]);
+      const porUnidade = await get(
+        `/v1/pesquisas/candidatos?unidadeId=${lot.unidadeOrganizacionalId}&departamentoId=${lot.departamentoId}&tamanhoPagina=2`,
+        rhA,
+      ).expect(200);
+      expect(porUnidade.body.itens).toHaveLength(2);
+      expect(porUnidade.body.total).toBeGreaterThan(2);
+      // Sem filtro: só ativos da empresa ativa, sem ninguém de fora.
+      const todos = await get(
+        "/v1/pesquisas/candidatos?tamanhoPagina=100",
+        rhA,
+      ).expect(200);
+      expect(todos.body.total).toBe(
+        await prisma.vinculoFuncional.count({
+          where: { empresaId: empresaA, situacao: "ativo" },
+        }),
+      );
+      const deB = await get("/v1/pesquisas/candidatos", rhB).expect(200);
+      expect(
+        deB.body.itens.map((x: { colaboradorId: string }) => x.colaboradorId),
+      ).not.toContain(comCentro.id);
+      // Permissão de leitura da pesquisa: master lê; gestor não.
+      await get("/v1/pesquisas/candidatos", masterA).expect(200);
+      const gestor = outrosPapeis.find(([p]) => p === "gestor")![1];
+      await get("/v1/pesquisas/candidatos", gestor).expect(403);
+      await get("/v1/pesquisas/candidatos?centroCustoId=x", rhA).expect(400);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   describe("ciclo completo (identificada)", () => {
     let a: Pessoa;
     let b: Pessoa;
@@ -1416,6 +1484,8 @@ describe("T216 — Pesquisas (e2e)", () => {
         anteriorId: lista.body[0].id,
         proximaId: lista.body[2].id,
         nome: null,
+        // Na anônima não há como ligar a pessoa às pesquisas anteriores.
+        indicadores: { mediaUltimosPulsos: null },
       });
     });
 
@@ -1656,6 +1726,36 @@ describe("T216 — Pesquisas (e2e)", () => {
         [id, 8],
         [segundo.id, 4],
       ]);
+
+      // Resultado individual: a média da MESMA pessoa nos pulsos anteriores
+      // (só na identificada; o primeiro pulso não tem anterior).
+      const listaDoSegundo = await get(
+        `/v1/pesquisas/${segundo.id}/respostas`,
+        rhA,
+      ).expect(200);
+      const respostaDoSegundo = listaDoSegundo.body.find(
+        (x: { colaboradorId: string }) => x.colaboradorId === grandes[0]!.id,
+      );
+      const detalheDoSegundo = await get(
+        `/v1/pesquisas/${segundo.id}/respostas/${respostaDoSegundo.id}`,
+        rhA,
+      ).expect(200);
+      expect(detalheDoSegundo.body.indicadores).toMatchObject({
+        media: 4,
+        mediaUltimosPulsos: 8,
+      });
+      const listaDoPrimeiro = await get(
+        `/v1/pesquisas/${id}/respostas`,
+        rhA,
+      ).expect(200);
+      const respostaDoPrimeiro = listaDoPrimeiro.body.find(
+        (x: { colaboradorId: string }) => x.colaboradorId === grandes[0]!.id,
+      );
+      const detalheDoPrimeiro = await get(
+        `/v1/pesquisas/${id}/respostas/${respostaDoPrimeiro.id}`,
+        rhA,
+      ).expect(200);
+      expect(detalheDoPrimeiro.body.indicadores.mediaUltimosPulsos).toBeNull();
     });
   });
 

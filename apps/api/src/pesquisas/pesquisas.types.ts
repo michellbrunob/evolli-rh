@@ -273,11 +273,27 @@ export interface RespostaDetalhe extends RespostaResumo {
   indicadores: {
     media: number | null;
     mediaTime: number | null;
+    /**
+     * Média geral (0–10) da MESMA pessoa nas pesquisas anteriores do mesmo
+     * modelo (publicadas antes desta). Só na identificada; `null` sem
+     * anterior e sempre na anônima.
+     */
+    mediaUltimosPulsos: number | null;
     recomendacao: number | null;
     enpsTime: number | null;
     maior: { perguntaId: string; valor: number } | null;
     menor: { perguntaId: string; valor: number } | null;
   };
+}
+
+/** `GET /pesquisas/candidatos`: um colaborador ativo e a lotação vigente. */
+export interface CandidatoPesquisa {
+  colaboradorId: string;
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+  centroCusto: string | null;
+  unidade: string | null;
 }
 
 export interface PesquisaDaFicha {

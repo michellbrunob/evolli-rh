@@ -56,6 +56,30 @@ export function mediaGeralVisivel(
   return mediaGeralDe(secoes, respostas);
 }
 
+/**
+ * Média (0–10) de várias respostas, cada uma na sua própria estrutura: a
+ * média de cada resposta nas perguntas de escala e, delas, a média. Sem
+ * resposta com nota de escala: `null`.
+ */
+export function mediaDasRespostas(
+  respostas: readonly {
+    secoes: readonly Secao[];
+    valores: readonly ValorRespondido[];
+  }[],
+): number | null {
+  const medias = respostas
+    .map((r) =>
+      mediaDaResposta(
+        r.secoes,
+        new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+      ),
+    )
+    .filter((m): m is number => m !== null);
+  return medias.length
+    ? arredondar(medias.reduce((a, b) => a + b, 0) / medias.length)
+    : null;
+}
+
 export interface EntradaDasAnalises {
   campo: CampoGrupo;
   secoes: readonly Secao[];
@@ -150,7 +174,9 @@ export function compararComOTime(
   secoes: readonly Secao[],
   todas: readonly { valores: readonly ValorRespondido[] }[],
   indice: number,
-): Pick<RespostaDetalhe, "valores" | "indicadores"> {
+): Pick<RespostaDetalhe, "valores"> & {
+  indicadores: Omit<RespostaDetalhe["indicadores"], "mediaUltimosPulsos">;
+} {
   const time = resultadoDasPerguntas(
     secoes,
     todas.map((r) => ({ valores: r.valores, autor: null })),

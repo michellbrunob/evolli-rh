@@ -130,6 +130,43 @@ export class ListarPesquisasQueryDto {
   tamanhoPagina: number = TAMANHO_PAGINA_PADRAO;
 }
 
+const textoDeBusca = ({ value }: { value: unknown }) =>
+  typeof value === "string" ? value.trim() || undefined : value;
+
+export class CandidatosQueryDto {
+  /** Pelo nome, sem diferenciar maiúsculas. */
+  @IsOptional()
+  @Transform(textoDeBusca)
+  @IsString()
+  @MaxLength(160)
+  busca?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departamentoId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  centroCustoId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  unidadeId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pagina: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(TAMANHO_PAGINA_MAXIMO)
+  tamanhoPagina: number = TAMANHO_PAGINA_PADRAO;
+}
+
 export class ResultadosQueryDto {
   /** Atalho antigo para `campo=departamento&grupoId=`. */
   @IsOptional()

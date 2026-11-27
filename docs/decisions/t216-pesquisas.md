@@ -442,6 +442,7 @@ interface RespostaDetalhe extends RespostaResumo {
   indicadores: {
     media: number | null;
     mediaTime: number | null;
+    mediaUltimosPulsos: number | null; // mesma pessoa, pesquisas anteriores do mesmo modelo; só identificada
     recomendacao: number | null;
     enpsTime: number | null;
     maior: { perguntaId: string; valor: number } | null;
@@ -482,3 +483,25 @@ Revisão lado a lado (27/11/2026):
   como os "outro" das escolhas; na identificada, a ordem de chegada com o autor.
 - **Respostas individuais:** a lista sai da mais recente para a mais antiga (`numero` = ordem de
   chegada, #1 a primeira); `anteriorId`/`proximaId`/`posicao` seguem a ordem da lista.
+
+Lacunas das telas (27/11/2026):
+
+- **`RespostaDetalhe.indicadores.mediaUltimosPulsos`:** a média geral (0–10) das respostas da mesma
+  pessoa nas pesquisas anteriores do mesmo modelo (não excluídas, identificadas e publicadas antes
+  desta): a média de cada resposta nas perguntas de escala e, delas, a média. `null` sem anterior e
+  sempre na anônima (não há como ligar a pessoa).
+- **`GET /pesquisas/candidatos`** (leitura de pesquisa; antes de `/:id`), para "Escolher pessoas":
+
+```ts
+// GET /pesquisas/candidatos?busca=&departamentoId=&centroCustoId=&unidadeId=&pagina=&tamanhoPagina=
+// Colaboradores ativos da empresa ativa (sem os desativados), pela lotação vigente, por nome.
+// busca: parte do nome, sem diferenciar maiúsculas; filtros por id (uuid).
+type ListaDeCandidatos = ResultadoPaginado<{
+  colaboradorId: string;
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+  centroCusto: string | null;
+  unidade: string | null;
+}>;
+```

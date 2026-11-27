@@ -25,6 +25,7 @@ import {
 } from "./calculo-resultados";
 import {
   compararComOTime,
+  mediaDasRespostas,
   mediaGeralVisivel,
   montarAnalises,
 } from "./analises-pesquisa";
@@ -35,8 +36,10 @@ import {
   nomesDosGrupos,
 } from "./pessoas-da-pesquisa";
 import { conferirSecoes, totalDePerguntas } from "./estrutura-pesquisa";
+import { semDesativacaoVigente } from "../pessoas/colaborador/desativacao";
 import {
   type AnalisesPesquisa,
+  type CandidatoPesquisa,
   CAMPOS_GRUPO,
   type CampoGrupo,
   type ContagensPorStatus,
@@ -292,6 +295,81 @@ export class PesquisasService {
       total: filtradas.length,
     };
     return { ...pagina, contagens };
+  }
+
+  /**
+   * "Escolher pessoas": os colaboradores ativos da empresa com a lotação
+   * vigente (cargo, departamento, centro de custo e unidade), com busca pelo
+   * nome e filtros por grupo. Paginado, pelo nome.
+   */
+  async candidatos(
+    q: {
+      busca?: string;
+      departamentoId?: string;
+      centroCustoId?: string;
+      unidadeId?: string;
+      pagina: number;
+      tamanhoPagina: number;
+    },
+    ctx: PessoasAuditContext,
+  ): Promise<ResultadoPaginado<CandidatoPesquisa>> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const filtros = {
+      ...(q.departamentoId ? { departamentoId: q.departamentoId } : {}),
+      ...(q.centroCustoId ? { centroCustoId: q.centroCustoId } : {}),
+      ...(q.unidadeId ? { unidadeOrganizacionalId: q.unidadeId } : {}),
+    };
+    const where: Prisma.VinculoFuncionalWhereInput = {
+      empresaId,
+      situacao: "ativo",
+      colaborador: {
+        ...semDesativacaoVigente(empresaId),
+        ...(q.busca
+          ? { nome: { contains: q.busca, mode: "insensitive" as const } }
+          : {}),
+      },
+      ...(Object.keys(filtros).length
+        ? { alocacoes: { some: { vigenteAte: null, ...filtros } } }
+        : {}),
+    };
+    const [total, vinculos] = await Promise.all([
+      this.prisma.vinculoFuncional.count({ where }),
+      this.prisma.vinculoFuncional.findMany({
+        where,
+        orderBy: [{ colaborador: { nome: "asc" } }, { colaboradorId: "asc" }],
+        skip: (q.pagina - 1) * q.tamanhoPagina,
+        take: q.tamanhoPagina,
+        select: {
+          colaborador: { select: { id: true, nome: true } },
+          alocacoes: {
+            where: { vigenteAte: null },
+            take: 1,
+            select: {
+              cargo: { select: { nome: true } },
+              departamento: { select: { nome: true } },
+              centroCusto: { select: { nome: true } },
+              unidadeOrganizacional: { select: { nome: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    return {
+      itens: vinculos.map((v) => {
+        const a = v.alocacoes[0];
+        return {
+          colaboradorId: v.colaborador.id,
+          nome: v.colaborador.nome,
+          cargo: a?.cargo?.nome ?? null,
+          departamento: a?.departamento?.nome ?? null,
+          centroCusto: a?.centroCusto?.nome ?? null,
+          unidade: a?.unidadeOrganizacional?.nome ?? null,
+        };
+      }),
+      pagina: q.pagina,
+      tamanhoPagina: q.tamanhoPagina,
+      total,
+    };
   }
 
   async obter(id: string, ctx: PessoasAuditContext): Promise<PesquisaDetalhe> {
@@ -1049,13 +1127,44 @@ export class PesquisasService {
       lista,
       i,
     );
+    const colaboradorId = lista[i]!.colaboradorId;
+    let mediaUltimosPulsos: number | null = null;
+    if (
+      p.identificacao === "identificada" &&
+      colaboradorId !== null &&
+      p.publicadaEm !== null
+    ) {
+      // As respostas da mesma pessoa nas pesquisas anteriores do mesmo
+      // modelo (não excluídas, publicadas antes desta).
+      const anteriores = await this.prisma.pesquisaResposta.findMany({
+        where: {
+          colaboradorId,
+          empresaId,
+          pesquisa: {
+            id: { not: p.id },
+            modelo: p.modelo,
+            identificacao: "identificada",
+            excluidaEm: null,
+            publicadaEm: { lt: p.publicadaEm },
+          },
+        },
+        select: { valores: true, pesquisa: { select: { secoes: true } } },
+      });
+      mediaUltimosPulsos = mediaDasRespostas(
+        anteriores.map((a) => ({
+          secoes: a.pesquisa.secoes as unknown as Secao[],
+          valores: a.valores as unknown as ValorRespondido[],
+        })),
+      );
+    }
     return {
       ...lista[i]!.resumo,
       anteriorId: i > 0 ? lista[i - 1]!.id : null,
       proximaId: i < lista.length - 1 ? lista[i + 1]!.id : null,
       posicao: i + 1,
       total: lista.length,
-      ...comparacao,
+      valores: comparacao.valores,
+      indicadores: { ...comparacao.indicadores, mediaUltimosPulsos },
     };
   }
 
