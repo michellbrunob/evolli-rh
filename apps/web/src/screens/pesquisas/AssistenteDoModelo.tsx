@@ -432,18 +432,16 @@ function AssistenteDoModeloInterno({
 
   if (gerada) {
     return (
-      <div className="pesquisas">
+      <div className="pesquisas pesquisas--com-rodape">
         {cabecalho}
         <BarraDeEtapas etapas={etapas} atual={etapas.length} />
-        <div className="pesquisas__final">
-          <TelaDeGerada
-            pesquisa={gerada}
-            comCabecalhoDaPagina
-            onVerResultados={(id) => onVerResultados(id)}
-            onEditar={onEditarGerada}
-            onConcluir={onConcluir}
-          />
-        </div>
+        <TelaDeGerada
+          pesquisa={gerada}
+          comCabecalhoDaPagina
+          onVerResultados={(id) => onVerResultados(id)}
+          onEditar={onEditarGerada}
+          onConcluir={onConcluir}
+        />
       </div>
     );
   }
@@ -969,7 +967,10 @@ function EtapaEnviar({
           </Button>
         }
       >
-        <dl className="pesquisas__resumo-grade" aria-label="Resumo da pesquisa">
+        <dl
+          className="pesquisas__resumo-grade pesquisas__resumo-celulas"
+          aria-label="Resumo da pesquisa"
+        >
           <div>
             <dt>Nome</dt>
             <dd>{estado.nome.trim() || "—"}</dd>

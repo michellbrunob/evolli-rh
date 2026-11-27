@@ -295,7 +295,7 @@ function AssistenteDePesquisaInterno({
 
   if (publicada) {
     return (
-      <div className="pesquisas">
+      <div className="pesquisas pesquisas--com-rodape">
         <TelaDeGerada
           pesquisa={publicada}
           onVerResultados={(id) => onVerResultados(id)}

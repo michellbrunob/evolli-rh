@@ -465,10 +465,10 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       "_blank",
     );
     expect(
-      within(final).getByRole("button", { name: /Acompanhar respostas/ }),
+      screen.getByRole("button", { name: /Acompanhar respostas/ }),
     ).toBeInTheDocument();
     expect(
-      within(final).getByRole("button", { name: "Concluir" }),
+      screen.getByRole("button", { name: "Concluir" }),
     ).toBeInTheDocument();
     // Sem `naoIdentificaveis` na resposta: nenhum aviso.
     expect(

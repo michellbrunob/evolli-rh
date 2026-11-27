@@ -1107,10 +1107,10 @@ textarea.pesquisas__campo {
 .pesquisas__final-cartao {
   display: grid;
   justify-items: center;
-  gap: var(--space-md);
+  gap: 20px;
   width: 100%;
-  max-width: 40rem;
-  padding: var(--space-xl) var(--space-lg);
+  max-width: 45rem;
+  padding: 40px var(--space-xl) var(--space-xl);
   border: 1px solid var(--divisor-cor);
   border-radius: var(--radius-lg, var(--radius-md));
   background: var(--surface-canvas);
@@ -1130,8 +1130,13 @@ textarea.pesquisas__campo {
 .pesquisas__final-titulo {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-title);
+  font-size: 1.375rem;
   font-weight: var(--weight-strong);
+}
+
+/* Só a ação da direita no rodapé fixo (ex.: "Concluir" na tela final). */
+.pesquisas__rodape--so-direita {
+  justify-content: flex-end;
 }
 
 .pesquisas__final-link {
@@ -2045,6 +2050,42 @@ textarea.pesquisas__campo {
   grid-column: 1 / -1;
 }
 
+/* Revisão antes de gerar: duas colunas de células com borda. */
+.pesquisas__resumo-celulas {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+.pesquisas__resumo-celulas > div {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.pesquisas__resumo-celulas > div:nth-child(even) {
+  border-left: 1px solid var(--divisor-cor);
+}
+
+.pesquisas__resumo-celulas > div:nth-child(n + 3) {
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.pesquisas__resumo-celulas > .pesquisas__resumo-largo {
+  border-left: 0;
+}
+
+.pesquisas__resumo-celulas dt {
+  font-size: 0.78125rem;
+}
+
+.pesquisas__resumo-celulas dd {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
 /* Tela final. */
 .pesquisas__proximas {
   display: grid;
@@ -2875,12 +2916,93 @@ textarea.pesquisas__campo {
   font-size: var(--text-caption);
 }
 
-/* Encerramento com data e hora. */
-.pesquisas__encerramento {
+/* Encerramento: ícone, título e interruptor; ligado, o cartão ganha a
+   borda da cor de ação e os campos ficam lado a lado na largura dele. */
+.pesquisas__encerramento-cartao {
+  gap: 20px;
+}
+
+.pesquisas__encerramento-cartao[data-ligado] {
+  border-color: color-mix(
+    in srgb,
+    var(--color-action) 45%,
+    var(--surface-canvas)
+  );
+}
+
+.pesquisas__encerramento-cabeca {
   display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  align-items: flex-start;
   gap: var(--space-sm);
+}
+
+.pesquisas__encerramento-icone {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.pesquisas__encerramento-cartao[data-ligado] .pesquisas__encerramento-icone {
+  background: color-mix(
+    in srgb,
+    var(--color-action) 12%,
+    var(--surface-canvas)
+  );
+  color: var(--color-action);
+}
+
+.pesquisas__encerramento-textos {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pesquisas__encerramento-textos p {
+  margin: 0;
+}
+
+.pesquisas__encerramento {
+  display: grid;
+  gap: var(--space-xs);
+  padding-top: 20px;
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.pesquisas__encerramento-campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.pesquisas__encerramento-campos .pesquisas__campo {
+  width: 100%;
+}
+
+.pesquisas__encerramento-fuso {
+  margin: 0;
+  font-size: 0.78125rem;
+}
+
+.pesquisas__encerramento-cartao .pesquisas__nota-cinza {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-ink);
+}
+
+.pesquisas__encerramento-cartao .pesquisas__nota-cinza svg {
+  flex: 0 0 auto;
+  color: var(--color-ink-muted);
+}
+
+.pesquisas__encerramento-cartao--compacto .pesquisas__encerramento-campos {
+  grid-template-columns: 1fr;
 }
 
 /* Separar por: as opções que quem responde vai ver, dentro da faixa. */
@@ -3057,10 +3179,13 @@ textarea.pesquisas__campo {
   transform: rotate(180deg);
 }
 
-/* Tela final: três próximas ações lado a lado. */
+/* Tela final: três próximas ações lado a lado, abaixo do cartão e da
+   mesma largura; título em até duas linhas e a frase numa linha só, com
+   reticências; a seta à direita. */
 .pesquisas__final .pesquisas__proximas {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-sm);
+  max-width: 45rem;
   overflow: visible;
   border: 0;
 }
@@ -3070,10 +3195,39 @@ textarea.pesquisas__campo {
 }
 
 .pesquisas__final .pesquisas__proximas button {
-  align-items: flex-start;
+  align-items: center;
   height: 100%;
+  padding: 14px;
   border: 1px solid var(--divisor-cor);
   border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.pesquisas__proximas-textos {
+  min-width: 0;
+}
+
+.pesquisas__final .pesquisas__proximas button:hover {
+  background: var(--surface-pearl);
+}
+
+.pesquisas__final .pesquisas__proximas-icone {
+  flex: 0 0 auto;
+}
+
+.pesquisas__proximas-titulo {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.pesquisas__proximas-texto {
+  overflow: hidden;
+  font-size: 0.78125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Seletor de tipos agrupado. */

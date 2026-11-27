@@ -1,11 +1,15 @@
 /**
- * T216 — cartão "Encerrar automaticamente": interruptor; ligado, já sugere
- * a data daqui a 14 dias às 23:59 (horário de Brasília). A frase explica o
- * que acontece em cada caso.
+ * T216 — cartão "Encerrar automaticamente": ícone e título, interruptor à
+ * direita; ligado, já sugere a data daqui a 14 dias às 23:59 (horário de
+ * Brasília), com data e hora lado a lado na largura do cartão. A frase que
+ * explica o que acontece fica numa caixa cinza com ícone.
+ *
+ * `compacto` (coluna estreita de "Editar pesquisa"): "Encerramento", a frase
+ * embaixo do título e os campos um embaixo do outro.
  */
 import { useId } from "react";
 import { formatarDiaCivil } from "../../format/data";
-import { CartaoDeSecao } from "./componentes";
+import { IconeCalendario, IconeLocal, IconeTempo } from "../../ui/icones";
 import { DIAS_PADRAO, HORA_PADRAO, diasDepois } from "./encerramento";
 
 export function CartaoDeEncerramento({
@@ -13,6 +17,7 @@ export function CartaoDeEncerramento({
   hora,
   hoje,
   erro,
+  compacto = false,
   onMudar,
 }: {
   /** `null` sem prazo. */
@@ -20,6 +25,7 @@ export function CartaoDeEncerramento({
   readonly hora: string;
   readonly hoje: string;
   readonly erro?: string | undefined;
+  readonly compacto?: boolean;
   readonly onMudar: (m: {
     encerraEm: string | null;
     encerraHora: string;
@@ -27,17 +33,32 @@ export function CartaoDeEncerramento({
 }) {
   const ids = useId();
   const ligado = data !== null;
+  const titulo = compacto ? "Encerramento" : "Encerrar automaticamente";
+  const frase = ligado
+    ? data
+      ? `Depois de ${formatarDiaCivil(data)} às ${hora}, o link avisa que a pesquisa encerrou e não aceita mais respostas. Você ainda pode finalizar antes, pelo status.`
+      : "Depois da data e da hora escolhidas, o link avisa que a pesquisa encerrou e não aceita mais respostas."
+    : "Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada.";
   return (
-    <CartaoDeSecao
-      titulo="Encerrar automaticamente"
-      descricao={
-        ligado
-          ? data
-            ? `Depois de ${formatarDiaCivil(data)} às ${hora}, o link avisa que a pesquisa encerrou e não aceita mais respostas.`
-            : "Depois da data e da hora escolhidas, o link avisa que a pesquisa encerrou e não aceita mais respostas."
-          : "Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada."
-      }
-      acao={
+    <section
+      className={`pesquisas__cartao-secao pesquisas__encerramento-cartao${compacto ? " pesquisas__encerramento-cartao--compacto" : ""}`}
+      aria-label={titulo}
+      {...(ligado ? { "data-ligado": "" } : {})}
+    >
+      <header className="pesquisas__encerramento-cabeca">
+        {compacto ? null : (
+          <span className="pesquisas__encerramento-icone" aria-hidden="true">
+            <IconeCalendario tamanho={16} />
+          </span>
+        )}
+        <div className="pesquisas__encerramento-textos">
+          <h2 className="pesquisas__cartao-secao-titulo">{titulo}</h2>
+          <p className="pesquisas__suave">
+            {compacto
+              ? frase
+              : "A pesquisa fecha sozinha na data escolhida e deixa de aceitar respostas."}
+          </p>
+        </div>
         <button
           type="button"
           role="switch"
@@ -57,41 +78,45 @@ export function CartaoDeEncerramento({
         >
           <span className="pesquisas__interruptor-trilho" aria-hidden="true" />
         </button>
-      }
-    >
+      </header>
       {ligado ? (
         <div className="pesquisas__encerramento">
-          <div className="pesquisas__campos">
-            <label htmlFor={`${ids}-data`} className="pesquisas__rotulo">
-              Data de encerramento
-            </label>
-            <input
-              id={`${ids}-data`}
-              type="date"
-              min={hoje}
-              className="pesquisas__campo pesquisas__campo--curto"
-              value={data ?? ""}
-              aria-invalid={erro ? true : undefined}
-              onChange={(e) =>
-                onMudar({ encerraEm: e.target.value, encerraHora: hora })
-              }
-            />
+          <div className="pesquisas__encerramento-campos">
+            <div className="pesquisas__campos">
+              <label htmlFor={`${ids}-data`} className="pesquisas__rotulo">
+                Data de encerramento
+              </label>
+              <input
+                id={`${ids}-data`}
+                type="date"
+                min={hoje}
+                className="pesquisas__campo"
+                value={data ?? ""}
+                aria-invalid={erro ? true : undefined}
+                onChange={(e) =>
+                  onMudar({ encerraEm: e.target.value, encerraHora: hora })
+                }
+              />
+            </div>
+            <div className="pesquisas__campos">
+              <label htmlFor={`${ids}-hora`} className="pesquisas__rotulo">
+                Hora
+              </label>
+              <input
+                id={`${ids}-hora`}
+                type="time"
+                className="pesquisas__campo"
+                value={hora}
+                onChange={(e) =>
+                  onMudar({ encerraEm: data, encerraHora: e.target.value })
+                }
+              />
+            </div>
           </div>
-          <div className="pesquisas__campos">
-            <label htmlFor={`${ids}-hora`} className="pesquisas__rotulo">
-              Hora
-            </label>
-            <input
-              id={`${ids}-hora`}
-              type="time"
-              className="pesquisas__campo pesquisas__campo--curto"
-              value={hora}
-              onChange={(e) =>
-                onMudar({ encerraEm: data, encerraHora: e.target.value })
-              }
-            />
-          </div>
-          <p className="pesquisas__suave">Horário de Brasília</p>
+          <p className="pesquisas__suave pesquisas__com-icone pesquisas__encerramento-fuso">
+            <IconeLocal tamanho={12} />
+            Horário de Brasília
+          </p>
           {erro ? (
             <p className="pesquisas__erro" role="alert">
               {erro}
@@ -99,6 +124,12 @@ export function CartaoDeEncerramento({
           ) : null}
         </div>
       ) : null}
-    </CartaoDeSecao>
+      {compacto ? null : (
+        <p className="pesquisas__nota-cinza pesquisas__com-icone" role="note">
+          <IconeTempo tamanho={14} />
+          {frase}
+        </p>
+      )}
+    </section>
   );
 }

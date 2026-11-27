@@ -488,9 +488,9 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
       "target",
       "_blank",
     );
-    const proximas = within(final).getByRole("list", {
-      name: "Próximas ações",
-    });
+    // As próximas ações ficam abaixo do cartão, fora dele.
+    const proximas = screen.getByRole("list", { name: "Próximas ações" });
+    expect(final).not.toContainElement(proximas);
     expect(
       within(proximas)
         .getAllByRole("button")
@@ -504,7 +504,7 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
       within(proximas).getByRole("button", { name: /Acompanhar respostas/ }),
     );
     expect(onVerResultados).toHaveBeenCalledWith("p-novo");
-    fireEvent.click(within(final).getByRole("button", { name: "Concluir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
     expect(onConcluir).toHaveBeenCalled();
   });
 

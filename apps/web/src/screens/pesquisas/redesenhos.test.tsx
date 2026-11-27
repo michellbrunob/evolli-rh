@@ -9,9 +9,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CampoGrupo } from "../../api/pesquisasClient";
-import { GRUPOS, RESULTADOS, servicoFalso } from "./dadosDeTeste";
+import { DETALHE, GRUPOS, RESULTADOS, servicoFalso } from "./dadosDeTeste";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
+import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { SepararRespostasPor } from "./SepararRespostasPor";
+import { TelaDeGerada } from "./TelaDeGerada";
 
 function montarResultados(extra: Parameters<typeof servicoFalso>[0] = {}) {
   render(
@@ -237,5 +239,164 @@ describe("B9 — Separar respostas por", () => {
     expect(screen.getByRole("note")).toHaveTextContent(
       "A pesquisa já tem respostas: os campos não mudam mais.",
     );
+  });
+});
+
+describe("B11 — tela final do assistente", () => {
+  function montarFinal(identificacao: "identificada" | "anonima") {
+    const onConcluir = vi.fn();
+    render(
+      <TelaDeGerada
+        pesquisa={{
+          ...DETALHE,
+          identificacao,
+          status: "ativa",
+          link: "#/p/token",
+        }}
+        comCabecalhoDaPagina
+        onVerResultados={vi.fn()}
+        onEditar={vi.fn()}
+        onConcluir={onConcluir}
+      />,
+    );
+    return onConcluir;
+  }
+
+  it("as próximas ações ficam abaixo do cartão, cada uma com a seta à direita", () => {
+    montarFinal("identificada");
+    const cartao = screen.getByRole("region", {
+      name: "Pesquisa criada e ativa",
+    });
+    const proximas = screen.getByRole("list", { name: "Próximas ações" });
+    expect(cartao).not.toContainElement(proximas);
+    expect(cartao.nextElementSibling).toBe(proximas);
+    for (const botao of within(proximas).getAllByRole("button")) {
+      expect(botao.lastElementChild!.tagName.toLowerCase()).toBe("svg");
+      expect(botao.querySelector(".pesquisas__proximas-titulo")).not.toBeNull();
+    }
+  });
+
+  it("'Concluir' no rodapé fixo, à direita", () => {
+    const onConcluir = montarFinal("identificada");
+    const concluir = screen.getByRole("button", { name: "Concluir" });
+    const rodape = concluir.closest("footer")!;
+    expect(rodape).toHaveClass("pesquisas__rodape");
+    expect(rodape).toHaveClass("pesquisas__rodape--so-direita");
+    fireEvent.click(concluir);
+    expect(onConcluir).toHaveBeenCalled();
+  });
+
+  it("'Editar pesquisa' não promete editar as perguntas", () => {
+    montarFinal("identificada");
+    const editar = screen.getByRole("button", { name: /Editar pesquisa/ });
+    expect(editar).toHaveTextContent("Nome, prazo e participantes");
+    expect(editar.textContent).not.toMatch(/pergunta/i);
+  });
+
+  it("na anônima, 'Editar pesquisa' fala de nome, descrição e prazo", () => {
+    montarFinal("anonima");
+    const editar = screen.getByRole("button", { name: /Editar pesquisa/ });
+    expect(editar).toHaveTextContent("Nome, descrição e prazo");
+  });
+});
+
+describe("B12 — etapa Enviar", () => {
+  function montarEncerramento(data: string | null, compacto = false) {
+    const onMudar = vi.fn();
+    render(
+      <CartaoDeEncerramento
+        data={data}
+        hora="23:59"
+        hoje="2026-11-27"
+        compacto={compacto}
+        onMudar={onMudar}
+      />,
+    );
+    return onMudar;
+  }
+
+  it("desligado: ícone no título e a frase 'Sem prazo…' numa caixa cinza com ícone", () => {
+    const onMudar = montarEncerramento(null);
+    const cartao = screen.getByRole("region", {
+      name: "Encerrar automaticamente",
+    });
+    expect(
+      cartao.querySelector(".pesquisas__encerramento-icone svg"),
+    ).not.toBeNull();
+    const nota = within(cartao).getByRole("note");
+    expect(nota).toHaveClass("pesquisas__nota-cinza");
+    expect(nota).toHaveTextContent(
+      "Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada.",
+    );
+    expect(nota.querySelector("svg")).not.toBeNull();
+    fireEvent.click(
+      within(cartao).getByRole("switch", { name: "Encerrar automaticamente" }),
+    );
+    expect(onMudar).toHaveBeenCalledWith({
+      encerraEm: "2026-12-11",
+      encerraHora: "23:59",
+    });
+  });
+
+  it("ligado: data e hora lado a lado, na largura do cartão, e a frase na caixa cinza", () => {
+    montarEncerramento("2026-12-11");
+    const cartao = screen.getByRole("region", {
+      name: "Encerrar automaticamente",
+    });
+    expect(cartao).toHaveAttribute("data-ligado");
+    const campos = cartao.querySelector(".pesquisas__encerramento-campos")!;
+    expect(campos.children).toHaveLength(2);
+    for (const rotulo of ["Data de encerramento", "Hora"]) {
+      const campo = within(cartao).getByLabelText(rotulo);
+      expect(campo).not.toHaveClass("pesquisas__campo--curto");
+    }
+    expect(within(cartao).getByRole("note")).toHaveTextContent(
+      "Depois de 11/12/2026 às 23:59",
+    );
+  });
+
+  it("compacto (Editar pesquisa): 'Encerramento' com a frase embaixo do título", () => {
+    montarEncerramento(null, true);
+    const cartao = screen.getByRole("region", { name: "Encerramento" });
+    expect(cartao).toHaveTextContent(
+      "Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada.",
+    );
+    expect(within(cartao).queryByRole("note")).toBeNull();
+    expect(
+      within(cartao).getByRole("switch", { name: "Encerrar automaticamente" }),
+    ).toBeInTheDocument();
+  });
+
+  it("o resumo da revisão é uma grade de células com borda", async () => {
+    const { AssistenteDoModelo } = await import("./AssistenteDoModelo");
+    render(
+      <AssistenteDoModelo
+        servico={servicoFalso()}
+        modeloId="pulso"
+        hoje="2026-11-27"
+        agora={() => new Date(2026, 10, 27, 9, 5)}
+        atrasoDoRascunho={0}
+        onCancelar={vi.fn()}
+        onConcluir={vi.fn()}
+        onVerResultados={vi.fn()}
+        onEditarGerada={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /Anônima/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Próximo: Enviar/ }));
+    await screen.findByRole("region", { name: "Revise antes de gerar" });
+    const resumo = document.querySelector<HTMLElement>(
+      'dl[aria-label="Resumo da pesquisa"]',
+    )!;
+    expect(resumo).toHaveClass("pesquisas__resumo-celulas");
+    const celulas = Array.from(resumo.children);
+    expect(celulas.map((c) => c.querySelector("dt")?.textContent)).toEqual([
+      "Nome",
+      "Identificação",
+      "Perguntas",
+      "Participantes",
+      "Descrição",
+    ]);
+    expect(celulas.at(-1)).toHaveClass("pesquisas__resumo-largo");
   });
 });

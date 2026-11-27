@@ -1,7 +1,9 @@
 /**
  * T216 — o fim dos assistentes: cartão centrado com o visto, "Pesquisa
- * criada e ativa", o link (copiar e abrir em outra aba), as próximas ações
- * e "Concluir". Também o campo do link, usado nos resultados.
+ * criada e ativa" e o link (copiar e abrir em outra aba); abaixo dele, fora
+ * do cartão, as três próximas ações (título em até duas linhas, seta à
+ * direita) e, no rodapé fixo, "Concluir" à direita. Também o campo do link,
+ * usado nos resultados.
  */
 import { useEffect, useState } from "react";
 import type { PesquisaDetalhe } from "../../api/pesquisasClient";
@@ -104,7 +106,10 @@ export function TelaDeGerada({
     },
     {
       titulo: "Editar pesquisa",
-      texto: anonima ? "Nome, perguntas e prazo" : "Perguntas e participantes",
+      // A edição de uma publicada não mexe nas perguntas.
+      texto: anonima
+        ? "Nome, descrição e prazo"
+        : "Nome, prazo e participantes",
       icone: <IconeEditar tamanho={18} />,
       onClick: () => onEditar(pesquisa),
     },
@@ -116,58 +121,73 @@ export function TelaDeGerada({
     },
   ];
   return (
-    <section className="pesquisas__final-cartao" aria-labelledby={idDoTitulo}>
-      <span className="pesquisas__final-icone" aria-hidden="true">
-        <IconeSucesso tamanho={32} />
-      </span>
-      <Titulo id={idDoTitulo} className="pesquisas__final-titulo" tabIndex={-1}>
-        Pesquisa criada e ativa
-      </Titulo>
-      <p className="pesquisas__suave">
-        {anonima
-          ? "Compartilhe o link: quem tiver o link pode responder."
-          : quantos === 1
-            ? "Compartilhe o link com a pessoa selecionada."
-            : `Compartilhe o link com as ${quantos} pessoas selecionadas.`}
-      </p>
-      <div className="pesquisas__final-link">
-        <p className="pesquisas__grupo-titulo">
-          <span>Link da pesquisa</span>
-          <StatusBadge variant="success">Ativa</StatusBadge>
-        </p>
-        {pesquisa.link ? (
-          <CampoDoLink link={pesquisa.link} principal />
-        ) : (
+    <>
+      <div className="pesquisas__final">
+        <section
+          className="pesquisas__final-cartao"
+          aria-labelledby={idDoTitulo}
+        >
+          <span className="pesquisas__final-icone" aria-hidden="true">
+            <IconeSucesso tamanho={32} />
+          </span>
+          <Titulo
+            id={idDoTitulo}
+            className="pesquisas__final-titulo"
+            tabIndex={-1}
+          >
+            Pesquisa criada e ativa
+          </Titulo>
           <p className="pesquisas__suave">
-            O link ainda não chegou. Abra a pesquisa na lista para copiá-lo.
+            {anonima
+              ? "Compartilhe o link: quem tiver o link pode responder."
+              : quantos === 1
+                ? "Compartilhe o link com a pessoa selecionada."
+                : `Compartilhe o link com as ${quantos} pessoas selecionadas.`}
           </p>
-        )}
+          <div className="pesquisas__final-link">
+            <p className="pesquisas__grupo-titulo">
+              <span>Link da pesquisa</span>
+              <StatusBadge variant="success">Ativa</StatusBadge>
+            </p>
+            {pesquisa.link ? (
+              <CampoDoLink link={pesquisa.link} principal />
+            ) : (
+              <p className="pesquisas__suave">
+                O link ainda não chegou. Abra a pesquisa na lista para copiá-lo.
+              </p>
+            )}
+          </div>
+          <AvisoNaoIdentificaveis
+            identificacao={pesquisa.identificacao}
+            naoIdentificaveis={pesquisa.naoIdentificaveis}
+            participantes={pesquisa.participantesLista ?? []}
+            publicada
+          />
+        </section>
+        <ul className="pesquisas__proximas" aria-label="Próximas ações">
+          {acoes.map((a) => (
+            <li key={a.titulo}>
+              <button type="button" onClick={a.onClick}>
+                <span className="pesquisas__proximas-icone" aria-hidden="true">
+                  {a.icone}
+                </span>
+                <span className="pesquisas__proximas-textos">
+                  <strong className="pesquisas__proximas-titulo">
+                    {a.titulo}
+                  </strong>
+                  <span className="pesquisas__suave pesquisas__proximas-texto">
+                    {a.texto}
+                  </span>
+                </span>
+                <IconeAvancar tamanho={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <AvisoNaoIdentificaveis
-        identificacao={pesquisa.identificacao}
-        naoIdentificaveis={pesquisa.naoIdentificaveis}
-        participantes={pesquisa.participantesLista ?? []}
-        publicada
-      />
-      <ul className="pesquisas__proximas" aria-label="Próximas ações">
-        {acoes.map((a) => (
-          <li key={a.titulo}>
-            <button type="button" onClick={a.onClick}>
-              <span className="pesquisas__proximas-icone" aria-hidden="true">
-                {a.icone}
-              </span>
-              <span className="pesquisas__proximas-textos">
-                <strong>{a.titulo}</strong>
-                <span className="pesquisas__suave">{a.texto}</span>
-              </span>
-              <IconeAvancar tamanho={16} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="pesquisas__final-acoes">
+      <footer className="pesquisas__rodape pesquisas__rodape--so-direita">
         <Button onClick={onConcluir}>Concluir</Button>
-      </div>
-    </section>
+      </footer>
+    </>
   );
 }

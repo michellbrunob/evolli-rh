@@ -221,6 +221,7 @@ function FormularioDeEdicao({
       </CartaoDeSecao>
 
       <CartaoDeEncerramento
+        compacto
         data={estado.encerraEm}
         hora={estado.encerraHora}
         hoje={hoje}
