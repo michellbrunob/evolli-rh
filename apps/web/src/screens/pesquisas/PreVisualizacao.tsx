@@ -10,11 +10,10 @@ import {
   ROTULOS_DA_CONCORDANCIA,
   opcoesDaCondicao,
 } from "./textosDasPesquisas";
+import { minutosEstimados } from "./tempoEstimado";
 
-/** Cerca de 20 segundos por pergunta, no mínimo 1 minuto. */
-export function minutosEstimados(total: number): number {
-  return Math.max(1, Math.round((total * 20) / 60));
-}
+// A mesma regra da página pública de resposta (`tempoEstimado.ts`).
+export { minutosEstimados };
 
 export function PreVisualizacao({
   nome,
