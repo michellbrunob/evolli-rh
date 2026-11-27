@@ -49,6 +49,10 @@ import {
 import { AdicionarPessoasDoBeneficio } from "./AdicionarPessoasDoBeneficio";
 import { AssistenteDeBeneficio } from "./AssistenteDeBeneficio";
 import { DetalheDoBeneficio, JanelaDeSituacao } from "./DetalheDoBeneficio";
+import {
+  type PlanilhaEnviada,
+  RevisaoDaImportacao,
+} from "./ImportarValoresDoBeneficio";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
 import { CATEGORIAS, ICONE_DA_CATEGORIA } from "./textosDosBeneficios";
 import "./Beneficios.css";
@@ -58,7 +62,16 @@ export const BENEFICIOS_TITULO_ID = "beneficios-titulo";
 type Tela =
   | { readonly tipo: "lista" }
   | { readonly tipo: "novo" }
-  | { readonly tipo: "detalhe"; readonly id: string }
+  | {
+      readonly tipo: "detalhe";
+      readonly id: string;
+      readonly importar?: boolean;
+    }
+  | {
+      readonly tipo: "importar";
+      readonly id: string;
+      readonly planilha: PlanilhaEnviada;
+    }
   | { readonly tipo: "editar"; readonly base: BeneficioApi }
   | { readonly tipo: "adicionar"; readonly id: string; readonly nome: string };
 
@@ -88,6 +101,7 @@ export function BeneficiosModulo({
         {...(tela.tipo === "editar"
           ? {
               base: tela.base,
+              competenciaDaEdicao: competencia,
               onVerPessoas: () => irPara({ tipo: "detalhe", id: tela.base.id }),
             }
           : {})}
@@ -102,10 +116,31 @@ export function BeneficiosModulo({
       />
     );
   }
+  if (tela.tipo === "importar") {
+    return (
+      <RevisaoDaImportacao
+        servico={servico}
+        beneficioId={tela.id}
+        planilha={tela.planilha}
+        onTrocarArquivo={() =>
+          irPara({ tipo: "detalhe", id: tela.id, importar: true })
+        }
+        onCancelar={() => irPara({ tipo: "detalhe", id: tela.id })}
+        onImportado={(mensagem) => {
+          setCompetencia(tela.planilha.competencia);
+          irPara({ tipo: "detalhe", id: tela.id }, mensagem);
+        }}
+      />
+    );
+  }
   if (tela.tipo === "detalhe") {
     return (
       <DetalheDoBeneficio
-        key={tela.id}
+        key={`${tela.id}-${tela.importar ? "i" : ""}`}
+        abrirImportacao={tela.importar === true}
+        onImportar={(planilha) =>
+          irPara({ tipo: "importar", id: tela.id, planilha })
+        }
         servico={servico}
         beneficioId={tela.id}
         podeEditar={podeEditar}

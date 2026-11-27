@@ -24,6 +24,7 @@ import {
   formatarInstante,
   formatarMesReferencia,
 } from "../../format/data";
+import type { OrigemDosDias, TotaisApi } from "../../api/beneficiosClient";
 import { formatarCentavos, formatarPercentual } from "../../format/moeda";
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  ListaDeEscolha,
   Sheet,
 } from "../../ui";
 import {
@@ -39,9 +41,24 @@ import {
   IconeAvancar,
   IconeCalendario,
   IconeEditar,
+  IconeEnviarArquivo,
   IconeMaisAcoes,
+  IconeModelo,
+  IconeTempo,
   IconeVoltar,
 } from "../../ui/icones";
+import { baixarArquivo } from "../dashboard/exportacao";
+import { SeletorDePeriodo } from "../horarios/quadro/SeletorDePeriodo";
+import { TIPO_MIME_XLSX, montarXlsx } from "../pessoas/importacao/planilhaXlsx";
+import {
+  GavetaDeImportacao,
+  type PlanilhaEnviada,
+} from "./ImportarValoresDoBeneficio";
+import {
+  baseDoArquivo,
+  colunasDaImportacao,
+  formatarCpf,
+} from "./planilhaDeValores";
 import {
   competenciaDoMesAtual,
   competenciaVizinha,
@@ -83,6 +100,8 @@ export function DetalheDoBeneficio({
   onAbrirOutro,
   onAbrirFicha,
   onCompetencia,
+  onImportar,
+  abrirImportacao = false,
 }: {
   readonly servico: ServicoDeBeneficios;
   readonly beneficioId: string;
@@ -95,6 +114,10 @@ export function DetalheDoBeneficio({
   readonly onAbrirOutro: (id: string, mensagem: string) => void;
   readonly onAbrirFicha: (colaboradorId: string) => void;
   readonly onCompetencia: (c: string) => void;
+  /** Planilha enviada: o módulo abre a página Revisar. */
+  readonly onImportar?: (planilha: PlanilhaEnviada) => void;
+  /** Volta de "Trocar arquivo": a gaveta já aberta. */
+  readonly abrirImportacao?: boolean;
 }) {
   const [competencia, setCompetencia] = useState(competenciaInicial);
   const [dados, setDados] = useState<DetalheDoBeneficioApi | null>(null);
@@ -115,6 +138,14 @@ export function DetalheDoBeneficio({
   const [dependentesDe, setDependentesDe] =
     useState<PessoaDoBeneficioApi | null>(null);
   const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [importando, setImportando] = useState(abrirImportacao);
+  const [origem, setOrigem] = useState<OrigemDosDias | "">("");
+  const [porPagina, setPorPagina] = useState(25);
+  const [pagina, setPagina] = useState(1);
+  const [previa, setPrevia] = useState<{
+    antes: TotaisApi;
+    depois: TotaisApi;
+  } | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -149,16 +180,56 @@ export function DetalheDoBeneficio({
   const pessoasVisiveis = useMemo(
     () =>
       (dados?.pessoas ?? []).filter((p) => {
-        if (busca && !p.nome.toLowerCase().includes(busca.toLowerCase()))
+        const termo = busca.trim().toLowerCase();
+        const digitos = termo.replace(/\D/g, "");
+        if (
+          termo &&
+          !p.nome.toLowerCase().includes(termo) &&
+          !(digitos.length >= 3 && (p.cpf ?? "").includes(digitos))
+        )
           return false;
+        if (origem && p.origemDias !== origem) return false;
         if (filtro === "ajustado") return p.ajustado;
         if (filtro === "observacao") return !!p.observacao || !!p.pendencia;
         if (filtro === "dependente") return p.dependentesNoPlano > 0;
         if (filtro === "pendencia") return !!p.pendencia;
         return true;
       }),
-    [dados, busca, filtro],
+    [dados, busca, filtro, origem],
   );
+
+  // Totais antes e depois do que foi digitado (a barra de alterações).
+  useEffect(() => {
+    const linhas = Object.entries(edicoes)
+      .map(([colaboradorId, e]) => ({ colaboradorId, ...e }))
+      .filter(
+        (l) =>
+          l.dias !== undefined ||
+          l.valorDia !== undefined ||
+          l.valorMes !== undefined ||
+          l.coparticipacao !== undefined ||
+          l.antecipado !== undefined,
+      );
+    if (linhas.length === 0) {
+      setPrevia(null);
+      return;
+    }
+    let vivo = true;
+    const t = window.setTimeout(() => {
+      servico
+        .simularValoresDoBeneficio(beneficioId, competencia, linhas)
+        .then((r) => {
+          if (vivo) setPrevia(r);
+        })
+        .catch(() => {
+          if (vivo) setPrevia(null);
+        });
+    }, 250);
+    return () => {
+      vivo = false;
+      window.clearTimeout(t);
+    };
+  }, [edicoes, servico, beneficioId, competencia]);
 
   if (falhou) {
     return (
@@ -187,11 +258,14 @@ export function DetalheDoBeneficio({
   const Icone = ICONE_DA_CATEGORIA[b.categoria];
   const t = dados.totais;
   const nEdicoes = Object.keys(edicoes).length;
-  const mesAtual = competenciaDoMesAtual();
-  const opcoesDeMes = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3].map((d) =>
-    competenciaVizinha(mesAtual, d),
+  const colunasImportaveis = colunasDaImportacao(tipo!, r);
+  const total = pessoasVisiveis.length;
+  const ultimaPagina = Math.max(1, Math.ceil(total / porPagina));
+  const paginaAtual = Math.min(pagina, ultimaPagina);
+  const daPagina = pessoasVisiveis.slice(
+    (paginaAtual - 1) * porPagina,
+    paginaAtual * porPagina,
   );
-  if (!opcoesDeMes.includes(competencia)) opcoesDeMes.push(competencia);
   const pctDesconto = t.valor ? (t.desconto / t.valor) * 100 : 0;
 
   const editar = (id: string, parcial: Edicao) =>
@@ -264,39 +338,55 @@ export function DetalheDoBeneficio({
     const linhas = [
       [
         "Colaborador",
+        "CPF",
         "Contrato",
+        "Escala",
         "Dias",
         "Valor do mês",
         "Empresa paga",
-        "Desconto",
+        b!.folha === "adicional" ? "Adicional" : "Desconto",
         "Observação",
       ],
       ...dados!.pessoas.map((p) => [
         p.nome,
+        formatarCpf(p.cpf),
         (ROTULO_DO_TIPO_DE_VINCULO as Record<string, string>)[p.contrato] ??
           p.contrato,
-        p.dias === null ? "" : String(p.dias),
-        (p.valor / 100).toFixed(2).replace(".", ","),
-        (p.empresa / 100).toFixed(2).replace(".", ","),
-        (p.desconto / 100).toFixed(2).replace(".", ","),
+        nomeDaEscala(p.escala),
+        p.dias ?? "",
+        p.valor / 100,
+        p.empresa / 100,
+        (b!.folha === "adicional" ? p.adicional : p.desconto) / 100,
         p.pendencia
           ? TEXTO_DA_PENDENCIA[p.pendencia]
           : p.observacao
             ? TEXTO_DA_OBSERVACAO[p.observacao]
             : "",
       ]),
+      [
+        "Total",
+        "",
+        "",
+        "",
+        "",
+        t.valor / 100,
+        t.empresa / 100,
+        (b!.folha === "adicional" ? t.adicional : t.desconto) / 100,
+        "",
+      ],
     ];
-    const csv = linhas
-      .map((l) => l.map((c) => `"${c.replace(/"/g, '""')}"`).join(";"))
-      .join("\r\n");
-    const url = URL.createObjectURL(
-      new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+    baixarArquivo(
+      montarXlsx([
+        {
+          nome: formatarMesReferencia(competencia).replace("/", "-"),
+          cabecalho: true,
+          larguras: [32, 16, 14, 16, 8, 14, 14, 14, 30],
+          linhas,
+        },
+      ]),
+      `${baseDoArquivo(b!.nome, competencia)}.xlsx`,
+      TIPO_MIME_XLSX,
     );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${b!.nome} ${competencia}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   return (
@@ -331,7 +421,7 @@ export function DetalheDoBeneficio({
               <DropdownMenuContent>
                 <DropdownMenuItem
                   onSelect={exportar}
-                >{`Exportar planilha de ${formatarMesReferencia(competencia)}`}</DropdownMenuItem>
+                >{`Exportar Excel de ${formatarMesReferencia(competencia)}`}</DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={async () => {
                     try {
@@ -368,6 +458,7 @@ export function DetalheDoBeneficio({
                     Reativar
                   </DropdownMenuItem>
                 )}
+                <RadixMenu.Separator className="beneficios__menu-divisor" />
                 <DropdownMenuItem
                   className="beneficios__menu-perigo"
                   onSelect={() => setJanela("excluir")}
@@ -376,6 +467,12 @@ export function DetalheDoBeneficio({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {colunasImportaveis.length > 0 && onImportar ? (
+              <Button variant="secondary" onClick={() => setImportando(true)}>
+                <IconeEnviarArquivo tamanho={16} />
+                Importar valores
+              </Button>
+            ) : null}
             <Button onClick={() => onEditar(b)}>
               <IconeEditar tamanho={16} />
               Editar configuração
@@ -402,17 +499,12 @@ export function DetalheDoBeneficio({
                 mudarCompetencia(competenciaVizinha(competencia, -1))
               }
             />
-            <select
-              aria-label="Competência"
-              value={competencia}
-              onChange={(e) => mudarCompetencia(e.target.value)}
-            >
-              {opcoesDeMes.map((c) => (
-                <option key={c} value={c}>
-                  {maiuscula(formatarCompetenciaPorExtenso(c))}
-                </option>
-              ))}
-            </select>
+            <SeletorDePeriodo
+              tamanho="mes"
+              ancora={`${competencia}-01`}
+              semanaComeca={0}
+              onEscolher={(dia) => mudarCompetencia(dia.slice(0, 7))}
+            />
             <IconButton
               label="Mês seguinte"
               icon={<IconeAvancar tamanho={16} />}
@@ -533,10 +625,12 @@ export function DetalheDoBeneficio({
           <h2>Ninguém recebe este benefício ainda</h2>
           <p>{`Adicione as pessoas que vão receber o ${b.nome}. Os valores já vêm calculados para cada pessoa.`}</p>
           {podeEditar && b.situacao === "ativo" ? (
-            <Button onClick={() => onAdicionar(b.nome)}>
-              <IconeAdicionarPessoa tamanho={16} />
-              Adicionar pessoas
-            </Button>
+            <div className="beneficios__acoes-topo">
+              <Button onClick={() => onAdicionar(b.nome)}>
+                <IconeAdicionarPessoa tamanho={16} />
+                Adicionar pessoas
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : (
@@ -546,9 +640,12 @@ export function DetalheDoBeneficio({
               type="search"
               className="beneficios__busca"
               aria-label="Buscar colaborador"
-              placeholder="Nome do colaborador"
+              placeholder="Nome ou CPF"
               value={busca}
-              onChange={(e) => setBusca(e.target.value)}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setPagina(1);
+              }}
             />
             <div
               role="tablist"
@@ -561,12 +658,32 @@ export function DetalheDoBeneficio({
                   type="button"
                   role="tab"
                   aria-selected={filtro === p.valor}
-                  onClick={() => setFiltro(p.valor)}
+                  onClick={() => {
+                    setFiltro(p.valor);
+                    setPagina(1);
+                  }}
                 >
                   {p.rotulo} <span className="beneficios__contagem">{p.n}</span>
                 </button>
               ))}
             </div>
+            {tipo === "dia_util" ? (
+              <ListaDeEscolha
+                aria-label="Origem dos dias"
+                className="beneficios__filtro-origem"
+                valor={origem}
+                onMudar={(v) => {
+                  setOrigem(v as OrigemDosDias | "");
+                  setPagina(1);
+                }}
+                opcoes={[
+                  { valor: "", rotulo: "Origem dos dias: todas" },
+                  ...(["escala", "catalogo", "uteis", "digitado"] as const).map(
+                    (o) => ({ valor: o, rotulo: ROTULO_DA_ORIGEM[o] }),
+                  ),
+                ]}
+              />
+            ) : null}
           </div>
           {podeEditar ? (
             <div className="beneficios__acoes-tabela">
@@ -586,7 +703,7 @@ export function DetalheDoBeneficio({
           ) : null}
           <div className="beneficios__tabela-caixa">
             <table
-              className="beneficios__tabela"
+              className="beneficios__tabela beneficios__tabela--pessoas"
               aria-label="Pessoas do benefício"
             >
               <thead>
@@ -637,7 +754,7 @@ export function DetalheDoBeneficio({
                 </tr>
               </thead>
               <tbody>
-                {pessoasVisiveis.map((p) => {
+                {daPagina.map((p) => {
                   const ed = edicoes[p.colaboradorId] ?? {};
                   const alterada = !!edicoes[p.colaboradorId];
                   return (
@@ -709,14 +826,7 @@ export function DetalheDoBeneficio({
                                 p.dias
                               )}
                               {p.origemDias ? (
-                                <span
-                                  className={`beneficios__origem beneficios__origem--${p.origemDias}`}
-                                  title={ROTULO_DA_ORIGEM[p.origemDias]}
-                                >
-                                  <span className="beneficios__so-leitor">
-                                    {ROTULO_DA_ORIGEM[p.origemDias]}
-                                  </span>
-                                </span>
+                                <IconeDaOrigem origem={p.origemDias} />
                               ) : null}
                             </span>
                           </td>
@@ -755,12 +865,16 @@ export function DetalheDoBeneficio({
                                   valor={
                                     ed.coparticipacao !== undefined
                                       ? (ed.coparticipacao ?? null)
-                                      : null
+                                      : p.coparticipacao
                                   }
                                   onMudar={(coparticipacao) =>
                                     editar(p.colaboradorId, { coparticipacao })
                                   }
                                 />
+                              ) : p.coparticipacao !== null ? (
+                                formatarCentavos(
+                                  Math.round(p.coparticipacao * 100),
+                                )
                               ) : (
                                 "—"
                               )}
@@ -818,7 +932,7 @@ export function DetalheDoBeneficio({
                               valor={
                                 ed.antecipado !== undefined
                                   ? (ed.antecipado ?? null)
-                                  : null
+                                  : p.antecipado
                               }
                               onMudar={(antecipado) =>
                                 editar(p.colaboradorId, { antecipado })
@@ -885,21 +999,57 @@ export function DetalheDoBeneficio({
               </tbody>
             </table>
           </div>
-          {tipo === "dia_util" ? (
-            <p className="beneficios__legenda">
-              {(["escala", "catalogo", "uteis", "digitado"] as const).map(
-                (o) => (
-                  <span key={o}>
-                    <span
-                      className={`beneficios__origem beneficios__origem--${o}`}
-                      aria-hidden="true"
-                    />
-                    {ROTULO_DA_ORIGEM[o]}
-                  </span>
-                ),
-              )}
-            </p>
-          ) : null}
+          <div className="beneficios__rodape-tabela">
+            <span className="beneficios__suave" role="status">
+              {total === 0
+                ? "Nenhuma pessoa com esses filtros."
+                : `Mostrando ${(paginaAtual - 1) * porPagina + 1}–${Math.min(paginaAtual * porPagina, total)} de ${total}`}
+            </span>
+            {ultimaPagina > 1 ? (
+              <span className="beneficios__paginas">
+                <IconButton
+                  label="Página anterior"
+                  icon={<IconeVoltar tamanho={16} />}
+                  variant="subtle"
+                  disabled={paginaAtual === 1}
+                  onClick={() => setPagina(paginaAtual - 1)}
+                />
+                <span className="beneficios__suave">{`${paginaAtual} de ${ultimaPagina}`}</span>
+                <IconButton
+                  label="Próxima página"
+                  icon={<IconeAvancar tamanho={16} />}
+                  variant="subtle"
+                  disabled={paginaAtual === ultimaPagina}
+                  onClick={() => setPagina(paginaAtual + 1)}
+                />
+              </span>
+            ) : null}
+            {tipo === "dia_util" ? (
+              <span className="beneficios__legenda">
+                {(["escala", "catalogo", "uteis", "digitado"] as const).map(
+                  (o) => (
+                    <span key={o}>
+                      <IconeDaOrigem origem={o} decorativo />
+                      {ROTULO_DA_ORIGEM[o]}
+                    </span>
+                  ),
+                )}
+              </span>
+            ) : null}
+            <ListaDeEscolha
+              aria-label="Pessoas por página"
+              className="beneficios__por-pagina"
+              valor={String(porPagina)}
+              onMudar={(v) => {
+                setPorPagina(Number(v));
+                setPagina(1);
+              }}
+              opcoes={["25", "50", "100"].map((n) => ({
+                valor: n,
+                rotulo: `${n} por página`,
+              }))}
+            />
+          </div>
         </>
       )}
 
@@ -909,7 +1059,12 @@ export function DetalheDoBeneficio({
           role="region"
           aria-label="Alterações não salvas"
         >
-          <span>{`${nEdicoes === 1 ? "1 alteração não salva" : `${nEdicoes} alterações não salvas`} em ${formatarMesReferencia(competencia)}`}</span>
+          <span>
+            {`${nEdicoes === 1 ? "1 alteração não salva" : `${nEdicoes} alterações não salvas`} em ${formatarMesReferencia(competencia)}`}
+            {previa
+              ? ` · ${b.folha === "adicional" ? "Adicionais" : "Descontos"}: ${formatarCentavos(b.folha === "adicional" ? previa.antes.adicional : previa.antes.desconto)} → ${formatarCentavos(b.folha === "adicional" ? previa.depois.adicional : previa.depois.desconto)}`
+              : ""}
+          </span>
           <Button
             variant="secondary"
             disabled={salvando}
@@ -957,6 +1112,20 @@ export function DetalheDoBeneficio({
             setSelecionados([]);
             setAviso(mensagem);
             await carregar();
+          }}
+        />
+      ) : null}
+
+      {importando && onImportar ? (
+        <GavetaDeImportacao
+          nome={b.nome}
+          colunas={colunasImportaveis}
+          competenciaInicial={competencia}
+          pessoas={dados.pessoas}
+          onFechar={() => setImportando(false)}
+          onRevisar={(planilha) => {
+            setImportando(false);
+            onImportar(planilha);
           }}
         />
       ) : null}
@@ -1549,5 +1718,35 @@ function GavetaDeDependentes({
         ) : null}
       </div>
     </Sheet>
+  );
+}
+
+const ICONE_DA_ORIGEM: Readonly<Record<OrigemDosDias, typeof IconeCalendario>> =
+  {
+    escala: IconeCalendario,
+    catalogo: IconeModelo,
+    uteis: IconeTempo,
+    digitado: IconeEditar,
+  };
+
+/** O ícone de onde vieram os dias (a legenda dá o nome). */
+function IconeDaOrigem({
+  origem,
+  decorativo = false,
+}: {
+  readonly origem: OrigemDosDias;
+  readonly decorativo?: boolean;
+}) {
+  const Icone = ICONE_DA_ORIGEM[origem];
+  return (
+    <span
+      className={`beneficios__origem beneficios__origem--${origem}`}
+      {...(decorativo
+        ? { "aria-hidden": true }
+        : { role: "img", "aria-label": ROTULO_DA_ORIGEM[origem] })}
+      title={decorativo ? undefined : ROTULO_DA_ORIGEM[origem]}
+    >
+      <Icone tamanho={14} />
+    </span>
   );
 }

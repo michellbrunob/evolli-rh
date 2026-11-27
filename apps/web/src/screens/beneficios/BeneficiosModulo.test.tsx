@@ -68,8 +68,10 @@ const pessoa = (
   ...extra,
 });
 
-const ANA = pessoa("c-1", "Ana Teste");
+const ANA = pessoa("c-1", "Ana Teste", { cpf: "11144477735" });
 const BIA = pessoa("c-2", "Bia Teste", {
+  cpf: "52998224725",
+  origemDias: "escala",
   contrato: "estagio",
   empresa: 57000,
   desconto: 0,
@@ -216,6 +218,11 @@ function servico(
       competencia: "2026-11",
       colunas: ["dias", "valorDia"],
       linhas: [],
+    })),
+    simularValoresDoBeneficio: vi.fn(async () => ({
+      competencia: "2026-11",
+      antes: DETALHE.totais,
+      depois: { ...DETALHE.totais, desconto: 9000 },
     })),
     simularDependentesNoPlano: vi.fn(async () => ({
       competencia: "2026-11",
@@ -695,6 +702,13 @@ describe("Benefícios (T215) — detalhe", () => {
     });
     const barra = screen.getByRole("region", { name: "Alterações não salvas" });
     expect(barra).toHaveTextContent("1 alteração não salva em 11/2026");
+    // Os descontos antes e depois, sem gravar.
+    await waitFor(() =>
+      expect(barra).toHaveTextContent("Descontos: R$ 114,00 → R$ 90,00"),
+    );
+    expect(s.simularValoresDoBeneficio).toHaveBeenCalledWith("b-1", "2026-11", [
+      { colaboradorId: "c-1", dias: 15 },
+    ]);
     await act(async () => {
       fireEvent.click(
         within(barra).getByRole("button", { name: "Salvar valores" }),
@@ -705,6 +719,212 @@ describe("Benefícios (T215) — detalhe", () => {
     ]);
     expect(
       await screen.findByText("Valores de 11/2026 salvos para 1 pessoa."),
+    ).toBeInTheDocument();
+  });
+
+  it("busca por nome ou CPF, origem dos dias e paginação", async () => {
+    await abrirDetalhe();
+    const tabela = screen.getByRole("table", { name: "Pessoas do benefício" });
+    expect(screen.getByText("Mostrando 1–2 de 2")).toBeInTheDocument();
+    expect(
+      within(tabela).getByRole("img", { name: "Escala publicada" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar colaborador"), {
+      target: { value: "529.982" },
+    });
+    expect(within(tabela).queryByText("Ana Teste")).toBeNull();
+    expect(within(tabela).getByText("Bia Teste")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar colaborador"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("combobox", { name: "Origem dos dias" }));
+    fireEvent.click(screen.getByRole("option", { name: "Escala publicada" }));
+    expect(within(tabela).queryByText("Ana Teste")).toBeNull();
+    expect(screen.getByText("Mostrando 1–1 de 1")).toBeInTheDocument();
+  });
+
+  it("Exportar Excel do mês no ⋯", async () => {
+    vi.mocked(baixarArquivo).mockClear();
+    await abrirDetalhe();
+    abrirMenu("Mais ações do benefício");
+    await act(async () => {
+      fireEvent.click(
+        await screen.findByRole("menuitem", {
+          name: "Exportar Excel de 11/2026",
+        }),
+      );
+    });
+    const [bytes, nome] = vi.mocked(baixarArquivo).mock.calls[0]!;
+    expect(nome).toBe("vr-teste-2026-11.xlsx");
+    const abas = await lerAbasXlsx(bytes as Uint8Array);
+    const aba = abas["11-2026"]!;
+    expect(aba[0]![0]).toBe("Colaborador");
+    expect(aba[1]!.slice(0, 2)).toEqual(["Ana Teste", "111.444.777-35"]);
+    expect(aba.at(-1)![0]).toBe("Total");
+  });
+
+  it("importar valores: modelo, planilha, revisão, corrigir, ignorar e importar", async () => {
+    vi.mocked(baixarArquivo).mockClear();
+    const s = servico({
+      conferirImportacaoDoBeneficio: vi.fn(async () => ({
+        competencia: "2026-11",
+        colunas: ["dias", "valorDia"],
+        linhas: [
+          {
+            linha: 2,
+            cpf: "11144477735",
+            colaboradorId: "c-1",
+            nome: "Ana Teste",
+            situacao: "pronta",
+            problemas: [],
+            valores: { dias: 15 },
+            antes: { valor: 57000, empresa: 45600, desconto: 11400 },
+            depois: { valor: 45000, empresa: 36000, desconto: 9000 },
+          },
+          {
+            linha: 3,
+            cpf: "39053344705",
+            colaboradorId: null,
+            nome: null,
+            situacao: "pendencia",
+            problemas: [{ campo: "cpf", motivo: "nao_encontrado" }],
+            valores: { dias: 10 },
+            antes: null,
+            depois: null,
+          },
+        ],
+      })),
+    });
+    await abrirDetalhe(s);
+    fireEvent.click(screen.getByRole("button", { name: /Importar valores/ }));
+    const gaveta = screen.getByRole("dialog", { name: "Importar valores" });
+    expect(gaveta).toHaveTextContent(
+      "VR teste · atualiza dias no mês e valor por dia por CPF.",
+    );
+    expect(gaveta).toHaveTextContent("Valores de novembro/2026");
+    fireEvent.click(
+      within(gaveta).getByRole("button", {
+        name: /Baixar modelo com 2 pessoas/,
+      }),
+    );
+    const [modelo, nomeModelo] = vi.mocked(baixarArquivo).mock.calls[0]!;
+    expect(nomeModelo).toBe("valores-vr-teste-2026-11.xlsx");
+    expect((await lerAbasXlsx(modelo as Uint8Array))["Valores"]![1]).toEqual([
+      "111.444.777-35",
+      "Ana Teste",
+      "5x2",
+      "19",
+      "30",
+    ]);
+    const revisar = within(gaveta).getByRole("button", {
+      name: "Revisar planilha",
+    });
+    expect(revisar).toBeDisabled();
+    const csv = new File(
+      [
+        "CPF;Colaborador;Dias no mês\n111.444.777-35;Ana;15\n390.533.447-05;Caio Planilha;10\n",
+      ],
+      "valores.csv",
+      { type: "text/csv" },
+    );
+    fireEvent.change(within(gaveta).getByLabelText("Planilha de valores"), {
+      target: { files: [csv] },
+    });
+    await act(async () => {
+      fireEvent.click(revisar);
+    });
+    await waitFor(() =>
+      expect(s.conferirImportacaoDoBeneficio).toHaveBeenCalled(),
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Importar valores" }),
+    ).toBeInTheDocument();
+    expect(s.conferirImportacaoDoBeneficio).toHaveBeenCalledWith(
+      "b-1",
+      "2026-11",
+      [
+        { linha: 2, cpf: "111.444.777-35", valores: { dias: "15" } },
+        { linha: 3, cpf: "390.533.447-05", valores: { dias: "10" } },
+      ],
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "1 de 2 linhas prontas para importar",
+      }),
+    ).toBeInTheDocument();
+    const tabela = screen.getByRole("table", { name: "Linhas da planilha" });
+    expect(tabela).toHaveTextContent("CPF não encontrado");
+    expect(tabela).toHaveTextContent("Ninguém ativo com esse CPF na empresa");
+    fireEvent.click(within(tabela).getByRole("button", { name: "Corrigir" }));
+    const corrigir = screen.getByRole("dialog", { name: "Caio Planilha" });
+    expect(corrigir).toHaveTextContent(
+      "Pendência 1 de 1 · linha 3 da planilha",
+    );
+    expect(within(corrigir).getByLabelText("CPF")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    fireEvent.click(
+      within(corrigir).getByRole("button", { name: "Ignorar esta linha" }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Todos/ }));
+    expect(
+      screen.getByRole("table", { name: "Linhas da planilha" }),
+    ).toHaveTextContent("Ignorada");
+    fireEvent.click(screen.getByRole("tab", { name: /Prontas/ }));
+    expect(
+      screen.getByRole("table", { name: "Linhas da planilha" }),
+    ).toHaveTextContent("R$ 114,00 → R$ 90,00");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Importar 1 linha" }));
+    });
+    expect(s.salvarValoresDoBeneficio).toHaveBeenCalledWith(
+      "b-1",
+      "2026-11",
+      [{ colaboradorId: "c-1", dias: 15 }],
+      "importacao",
+    );
+    expect(
+      await screen.findByText("Valores de 11/2026 importados para 1 pessoa."),
+    ).toBeInTheDocument();
+  });
+
+  it("editar: os valores mudam a partir da competência escolhida", async () => {
+    const s = await abrirDetalhe();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Editar configuração/ }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /Valores/ }));
+    const vale = await screen.findByRole("combobox", {
+      name: "Vale a partir de",
+    });
+    fireEvent.click(vale);
+    const opcoes = screen.getAllByRole("option");
+    expect(opcoes).toHaveLength(3);
+    fireEvent.click(opcoes[1]!);
+    fireEvent.click(screen.getByRole("button", { name: /Revisão/ }));
+    expect(
+      await screen.findByText(
+        /os meses anteriores ficam com os valores de antes/,
+      ),
+    ).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Salvar alterações" }),
+      );
+    });
+    const [, dto] = vi.mocked(s.alterarBeneficio).mock.calls[0]! as unknown as [
+      string,
+      { aPartirDe: string },
+    ];
+    const proximo = new Date();
+    proximo.setDate(1);
+    proximo.setMonth(proximo.getMonth() + 1);
+    expect(dto.aPartirDe).toBe(
+      `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, "0")}`,
+    );
+    expect(
+      await screen.findByText(/Mudanças nos valores valem a partir de/),
     ).toBeInTheDocument();
   });
 

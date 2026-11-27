@@ -1648,6 +1648,49 @@ export class BeneficiosService {
     };
   }
 
+  /**
+   * A barra "alterações não salvas": os totais do mês antes e depois dos
+   * valores digitados na tela, sem gravar.
+   */
+  async simularValores(
+    id: string,
+    dto: {
+      competencia: string;
+      linhas: {
+        colaboradorId: string;
+        dias?: number | null;
+        valorDia?: number | null;
+        valorMes?: number | null;
+        coparticipacao?: number | null;
+        antecipado?: number | null;
+      }[];
+    },
+    ctx: PessoasAuditContext,
+  ): Promise<{
+    competencia: Competencia;
+    antes: TotaisApi;
+    depois: TotaisApi;
+  }> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const c = this.competencia(dto.competencia);
+    const b = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    const ajustes = new Map<string, AjusteDoMes>();
+    for (const l of dto.linhas) {
+      const { colaboradorId, ...resto } = l;
+      ajustes.set(
+        colaboradorId,
+        Object.fromEntries(
+          Object.entries(resto).filter(([, v]) => v !== undefined),
+        ) as AjusteDoMes,
+      );
+    }
+    const [antes, depois] = await Promise.all([
+      this.pessoasDoBeneficio(this.prisma, b, c),
+      this.pessoasDoBeneficio(this.prisma, b, c, undefined, { ajustes }),
+    ]);
+    return { competencia: c, antes: totaisDe(antes), depois: totaisDe(depois) };
+  }
+
   /** "Dependentes no plano" › o impacto antes e depois, sem gravar. */
   async simularDependentes(
     id: string,

@@ -244,6 +244,23 @@ export class BeneficiosController {
     );
   }
 
+  @Post(":beneficioId/valores/simular")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("beneficio", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Totais do mês com os valores digitados, sem gravar",
+  })
+  simularValores(
+    @Param("beneficioId", ParseUUIDPipe) id: string,
+    @Body() dto: SalvarValoresDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.simularValores(id, dto, ctx(actor, req));
+  }
+
   @Post(":beneficioId/importacao/conferir")
   @HttpCode(200)
   @UseGuards(CsrfGuard, AuthorizationGuard)

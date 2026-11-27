@@ -452,6 +452,16 @@ export const salvarValoresDoBeneficio = (
       ...(origem === "importacao" ? { origem } : {}),
     },
   );
+export const simularValoresDoBeneficio = (
+  beneficioId: string,
+  competencia: string,
+  linhas: LinhaDeValoresDto[],
+) =>
+  pedir<{ competencia: string; antes: TotaisApi; depois: TotaisApi }>(
+    `/beneficios/${id(beneficioId)}/valores/simular`,
+    "POST",
+    { competencia, linhas },
+  );
 export const conferirImportacaoDoBeneficio = (
   beneficioId: string,
   competencia: string,

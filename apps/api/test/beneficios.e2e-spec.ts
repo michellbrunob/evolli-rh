@@ -1134,6 +1134,12 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
         rhA,
       ).expect(200);
       expect(d2.body.pessoas[0]).toMatchObject({ dias: 19, ajustado: false });
+      // A barra de alterações: totais antes e depois, sem gravar.
+      const sim = await post(`/v1/beneficios/${b.body.id}/valores/simular`, rhA)
+        .send({ competencia: C, linhas: [{ colaboradorId: a.id, dias: 10 }] })
+        .expect(200);
+      expect(sim.body.antes).toMatchObject({ desconto: 11400 });
+      expect(sim.body.depois).toMatchObject({ desconto: 6000 });
       // O master não importa.
       await post(`/v1/beneficios/${b.body.id}/importacao/conferir`, masterA)
         .send({ competencia: C, linhas: [] })

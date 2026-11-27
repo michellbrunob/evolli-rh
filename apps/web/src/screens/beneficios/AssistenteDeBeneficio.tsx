@@ -38,6 +38,10 @@ import {
   formatarDiaCivil,
   formatarMesReferencia,
 } from "../../format/data";
+import {
+  competenciaDoMesAtual,
+  competenciaVizinha,
+} from "../../app/rotasDoShell";
 import { formatarCentavos, formatarPercentual } from "../../format/moeda";
 import { Dialog, IconButton, ListaDeEscolha } from "../../ui";
 import { IconeMais, IconeRemover } from "../../ui/icones";
@@ -338,6 +342,7 @@ function gravarRascunho(e: EstadoDoAssistente | null) {
 export function AssistenteDeBeneficio({
   servico,
   base,
+  competenciaDaEdicao,
   onSair,
   onSalvo,
   onVerPessoas,
@@ -345,6 +350,8 @@ export function AssistenteDeBeneficio({
   readonly servico: ServicoDeBeneficios;
   /** Editar configuração: o benefício gravado. */
   readonly base?: BeneficioApi;
+  /** Editar: a competência aberta no detalhe (padrão de "Vale a partir de"). */
+  readonly competenciaDaEdicao?: string;
   readonly onSair: () => void;
   readonly onSalvo: (id: string, aviso: string) => void;
   readonly onVerPessoas?: () => void;
@@ -368,6 +375,15 @@ export function AssistenteDeBeneficio({
   >("todos");
   const [avisoRascunho, setAvisoRascunho] = useState<string | null>(null);
   const pedido = useRef(0);
+  // "Vale a partir de" (edição): este mês ou os dois seguintes.
+  const mesesDaMudanca = [0, 1, 2].map((d) =>
+    competenciaVizinha(competenciaDoMesAtual(), d),
+  );
+  const [valeAPartirDe, setValeAPartirDe] = useState(
+    competenciaDaEdicao && mesesDaMudanca.includes(competenciaDaEdicao)
+      ? competenciaDaEdicao
+      : mesesDaMudanca[0]!,
+  );
 
   const mudar = (parcial: Partial<EstadoDoAssistente>) =>
     setEstado((e) => ({ ...e, ...parcial }));
@@ -451,9 +467,12 @@ export function AssistenteDeBeneficio({
         delete semPessoas.pessoas;
         await servico.alterarBeneficio(base.id, {
           ...semPessoas,
-          aPartirDe: diaCivilDeHoje().slice(0, 7),
+          aPartirDe: valeAPartirDe,
         });
-        onSalvo(base.id, "Configuração salva.");
+        onSalvo(
+          base.id,
+          `Configuração salva. Mudanças nos valores valem a partir de ${formatarMesReferencia(valeAPartirDe)}.`,
+        );
       } else {
         const criado = await servico.criarBeneficio(dto);
         gravarRascunho(null);
@@ -770,6 +789,28 @@ export function AssistenteDeBeneficio({
   const etapa2 = (
     <div key="2" className="beneficios__etapa">
       {mostrarErros && qtdErros > 0 ? <FaixaDeErros n={qtdErros} /> : null}
+      {editando ? (
+        <SecaoDoCadastro
+          titulo="Quando a mudança começa"
+          descricao="Os meses antes dela ficam com os valores de antes."
+        >
+          <LinhaDoCadastro
+            rotulo="Vale a partir de *"
+            ajuda="Competência em que a mudança começa."
+            grupo={false}
+          >
+            <ListaDeEscolha
+              aria-label="Vale a partir de"
+              valor={valeAPartirDe}
+              onMudar={setValeAPartirDe}
+              opcoes={mesesDaMudanca.map((c) => ({
+                valor: c,
+                rotulo: `${formatarMesReferencia(c)} · valores previstos`,
+              }))}
+            />
+          </LinhaDoCadastro>
+        </SecaoDoCadastro>
+      ) : null}
       {estado.tipoValor !== "antecipacao" &&
       estado.categoria !== "antecipacao" ? (
         <SecaoDoCadastro titulo="Como o valor é definido" descricao="">
@@ -1622,7 +1663,7 @@ export function AssistenteDeBeneficio({
       ) : null}
       <p className="beneficios__nota">
         {editando
-          ? `A mudança vale a partir de ${formatarMesReferencia(diaCivilDeHoje().slice(0, 7))}. Sem folha fechada no Evolli, os meses anteriores mostram as regras novas.`
+          ? `Mudanças nos valores valem a partir de ${formatarMesReferencia(valeAPartirDe)}; os meses anteriores ficam com os valores de antes. Nome, categoria, vigência e folha mudam para todos os meses.`
           : `Os valores entram na folha de ${formatarMesReferencia(competencia)} quando ela existir. Folhas fechadas não mudam.`}
       </p>
     </div>

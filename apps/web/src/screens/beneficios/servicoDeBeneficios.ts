@@ -17,6 +17,7 @@ export type ServicoDeBeneficios = Pick<
   | "removerPessoaDoBeneficio"
   | "salvarValoresDoBeneficio"
   | "conferirImportacaoDoBeneficio"
+  | "simularValoresDoBeneficio"
   | "simularDependentesNoPlano"
   | "alterarValoresEmLote"
   | "dependentesDaPessoaNoBeneficio"

@@ -1172,24 +1172,23 @@
 }
 
 .beneficios__origem {
-  display: inline-block;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 2px;
-  background: var(--color-ink-muted);
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--color-ink-muted);
   vertical-align: middle;
 }
 
 .beneficios__origem--escala {
-  background: var(--color-action);
+  color: var(--color-action);
 }
 
 .beneficios__origem--uteis {
-  background: var(--status-info-ink);
+  color: var(--status-info-ink);
 }
 
 .beneficios__origem--digitado {
-  background: var(--status-warning-ink);
+  color: var(--status-warning-ink);
 }
 
 .beneficios__legenda {
@@ -1347,5 +1346,314 @@
 
   .beneficios__competencia {
     border-right: 0;
+  }
+}
+
+/* Detalhe › Pessoas: campos compactos dentro da tabela (sem rolagem
+   lateral em telas comuns). */
+.beneficios__tabela--pessoas th,
+.beneficios__tabela--pessoas td {
+  padding-right: var(--space-sm);
+  padding-left: var(--space-sm);
+}
+
+.beneficios__tabela--pessoas .beneficios__dinheiro {
+  min-height: 2.25rem;
+  padding: 0 var(--space-xs);
+}
+
+.beneficios__tabela--pessoas .beneficios__dinheiro input {
+  width: 4.75rem;
+}
+
+.beneficios__tabela--pessoas .beneficios__dinheiro--curto input {
+  width: 2rem;
+  text-align: center;
+}
+
+.beneficios__tabela--pessoas .beneficios__pessoa .beneficios__pessoa-textos {
+  min-width: 10rem;
+}
+
+.beneficios__filtro-origem {
+  min-width: 13rem;
+}
+
+.beneficios__rodape-tabela {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.beneficios__rodape-tabela .beneficios__legenda {
+  margin-left: auto;
+}
+
+.beneficios__rodape-tabela .beneficios__legenda > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.beneficios__paginas {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.beneficios__por-pagina {
+  min-width: 9.5rem;
+}
+
+/* Importar valores › gaveta. */
+.beneficios__importar {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.beneficios__importar-mes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.beneficios__importar-mes > div {
+  display: grid;
+  flex: 1 1 12rem;
+  gap: 2px;
+}
+
+.beneficios__passos-importar {
+  display: grid;
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beneficios__passos-importar > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.beneficios__passos-importar > li > div {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xs);
+}
+
+.beneficios__passo-bola {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.beneficios__obrigatorios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.beneficios__chip-campo {
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+.beneficios__soltar {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-lg) var(--space-md);
+  border: 1px dashed var(--borda-controle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  text-align: center;
+  transition: border-color var(--movimento-curto, 150ms);
+}
+
+.beneficios__soltar--arrastando,
+.beneficios__soltar--escolhido {
+  border-color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 4%, var(--surface-canvas));
+}
+
+.beneficios__rodape-gaveta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.beneficios__rodape-gaveta > :last-child {
+  flex: none;
+  width: auto;
+  margin: 0 0 0 auto;
+}
+
+/* Importar valores › Revisar. */
+.beneficios__etapas-importar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  list-style: none;
+}
+
+.beneficios__etapas-importar li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.beneficios__etapas-importar li + li::before {
+  content: "";
+  width: 2rem;
+  height: 1px;
+  margin-right: var(--space-xs);
+  background: var(--divisor-cor);
+}
+
+.beneficios__etapas-importar li > span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+}
+
+.beneficios__etapas-importar li[data-feita] > span {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--surface-canvas);
+}
+
+.beneficios__etapas-importar li[aria-current="step"] {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.beneficios__etapas-importar li[aria-current="step"] > span {
+  border-color: var(--color-action);
+  color: var(--color-action);
+}
+
+.beneficios__importar-resumo {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+}
+
+.beneficios__alerta-forte {
+  color: var(--status-danger-ink);
+}
+
+.beneficios__cartoes-importar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.beneficios__cartoes-importar > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.beneficios__cartoes-importar > div > strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.beneficios__cartoes-importar > div[data-tom="sucesso"] > strong {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.beneficios__cartoes-importar > div[data-tom="atencao"] > strong {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.beneficios__cartoes-importar > div > span {
+  display: grid;
+}
+
+.beneficios__busca--direita {
+  margin-left: auto;
+}
+
+.beneficios__correcao {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.beneficios__correcao p {
+  margin: 0;
+}
+
+.beneficios__campo-texto {
+  min-height: 2.5rem;
+  padding: 0 var(--space-sm);
+  border: var(--borda-espessura, 1px) solid var(--borda-controle);
+  border-radius: var(--radius-botao, var(--radius-sm));
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.beneficios__campo-texto[aria-invalid="true"] {
+  border-color: var(--status-danger-ink);
+}
+
+.beneficios__campo-rotulado label {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+@media (max-width: 760px) {
+  .beneficios__cartoes-importar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .beneficios__rodape-tabela .beneficios__legenda {
+    margin-left: 0;
   }
 }
