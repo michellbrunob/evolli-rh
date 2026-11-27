@@ -318,7 +318,7 @@ describe("T216 — o time", () => {
     const r = calibracao([
       ...Array.from({ length: 5 }, (_, i) => a(`x${i}`, todas(4), "x")),
       ...Array.from({ length: 5 }, (_, i) =>
-        a(`y${i}`, porCompetencia({}, 3.2 > 0 ? 3 : 3), "y"),
+        a(`y${i}`, porCompetencia({}, 3), "y"),
       ),
       ...Array.from({ length: 5 }, (_, i) => a(`z${i}`, todas(4), "z")),
     ]);
@@ -448,7 +448,7 @@ describe("T216 — 180°: gestor × autoavaliação", () => {
           organizacao: [5, 5, 4],
           adaptabilidade: [2, 2, 2],
         },
-        3.5 > 3 ? 4 : 4,
+        4,
       ),
       porCompetencia(
         {
