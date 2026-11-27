@@ -44,7 +44,7 @@ export function feriadoEstadualFixo(dia: string, uf: string | null): boolean {
   return FERIADOS_ESTADUAIS[uf]?.includes(dia.slice(5)) ?? false;
 }
 
-function diasDoMes(competencia: string): number {
+export function diasDoMes(competencia: string): number {
   const [ano, mes] = competencia.split("-").map(Number) as [number, number];
   return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
 }
@@ -53,6 +53,20 @@ function diasDoMes(competencia: string): number {
 function diaDaSemana(dia: string): number {
   const d = new Date(`${dia}T00:00:00Z`).getUTCDay();
   return d === 0 ? 7 : d;
+}
+
+/** Dia útil: segunda a sexta, sem feriado nacional, estadual ou municipal. */
+export function ehDiaUtil(
+  dia: string,
+  uf: string | null,
+  municipais: ReadonlySet<string>,
+): boolean {
+  return (
+    diaDaSemana(dia) <= 5 &&
+    !ehFeriadoNacional(dia) &&
+    !feriadoEstadualFixo(dia, uf) &&
+    !municipais.has(dia)
+  );
 }
 
 export function diasUteisDoMes(
@@ -64,11 +78,7 @@ export function diasUteisDoMes(
   let total = 0;
   for (let d = 1; d <= diasDoMes(competencia); d += 1) {
     const dia = `${competencia}-${String(d).padStart(2, "0")}`;
-    if (diaDaSemana(dia) > 5) continue;
-    if (ehFeriadoNacional(dia)) continue;
-    if (feriadoEstadualFixo(dia, uf)) continue;
-    if (municipais.has(dia)) continue;
-    total += 1;
+    if (ehDiaUtil(dia, uf, municipais)) total += 1;
   }
   return total;
 }
@@ -81,20 +91,28 @@ const SEMANAIS: Readonly<Record<string, number>> = {
 };
 const PLANTAO = new Set(["12x36", "12x60", "12x72", "18x36", "24x48", "24x72"]);
 
+/**
+ * A proporção de trabalho do modelo (dias de trabalho por dia corrido);
+ * `null` = o modelo conta os dias úteis (5x2, "outra", sem escala).
+ */
+export function proporcaoDoModelo(modelo: string | null): number | null {
+  if (!modelo || modelo === "5x2" || modelo === "outra") return null;
+  if (modelo in SEMANAIS) return SEMANAIS[modelo]! / 7;
+  const ciclo = /^(\d+)x(\d+)$/.exec(modelo);
+  if (!ciclo) return null;
+  const trabalho = Number(ciclo[1]);
+  const folga = Number(ciclo[2]);
+  return PLANTAO.has(modelo)
+    ? 24 / (trabalho + folga)
+    : trabalho / (trabalho + folga);
+}
+
 /** Os dias do mês pela proporção do modelo; `null` = contar os dias úteis. */
 export function diasPeloModelo(
   modelo: string | null,
   competencia: string,
 ): number | null {
-  if (!modelo || modelo === "5x2" || modelo === "outra") return null;
-  const dias = diasDoMes(competencia);
-  if (modelo in SEMANAIS) return Math.round((dias * SEMANAIS[modelo]!) / 7);
-  const ciclo = /^(\d+)x(\d+)$/.exec(modelo);
-  if (!ciclo) return null;
-  const trabalho = Number(ciclo[1]);
-  const folga = Number(ciclo[2]);
-  const proporcao = PLANTAO.has(modelo)
-    ? 24 / (trabalho + folga)
-    : trabalho / (trabalho + folga);
-  return Math.round(dias * proporcao);
+  const proporcao = proporcaoDoModelo(modelo);
+  if (proporcao === null) return null;
+  return Math.round(diasDoMes(competencia) * proporcao);
 }

@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -18,7 +19,11 @@ import { AuthorizationGuard } from "../../auth/authorization/authorization.guard
 import { RequirePermission } from "../../auth/authorization/require-permission.decorator";
 import { CurrentUser } from "../../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../../auth/request-metadata.util";
-import { DefinirEscalaDto, EncerrarEscalaDto } from "./escala-colaborador.dto";
+import {
+  ConsultarDiasDeTrabalhoDto,
+  DefinirEscalaDto,
+  EncerrarEscalaDto,
+} from "./escala-colaborador.dto";
 import { EscalaColaboradorService } from "./escala-colaborador.service";
 
 /**
@@ -28,7 +33,9 @@ import { EscalaColaboradorService } from "./escala-colaborador.service";
  *   mais antiga, a admissão e a escala do contrato;
  * - `POST /colaboradores/:colaboradorId/escalas`: define (ou troca) o
  *   padrão a partir de uma data;
- * - `POST /colaboradores/:colaboradorId/escalas/:escalaId/encerrar`.
+ * - `POST /colaboradores/:colaboradorId/escalas/:escalaId/encerrar`;
+ * - `GET /colaboradores/:colaboradorId/escalas/dias-de-trabalho?mes=AAAA-MM`:
+ *   os dias de trabalho no mês, com a mesma conta dos benefícios.
  *
  * Toda gravação devolve a lista inteira. Parâmetros nunca se chamam `id` (o
  * `AuthorizationGuard` o trataria como conta de acesso). `no-store`.
@@ -50,6 +57,26 @@ export class EscalaColaboradorController {
     @Req() req: Request,
   ) {
     return this.service.consultar(colaboradorId, {
+      actor,
+      metadata: extractRequestMetadata(req),
+    });
+  }
+
+  @Get("dias-de-trabalho")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("escala_colaborador", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary:
+      "Dias de trabalho do colaborador no mes (a base dos beneficios pela escala)",
+  })
+  async diasDeTrabalho(
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Query() dto: ConsultarDiasDeTrabalhoDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.diasDeTrabalho(colaboradorId, dto.mes, {
       actor,
       metadata: extractRequestMetadata(req),
     });

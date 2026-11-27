@@ -14,6 +14,10 @@ import { escolherVinculoPrincipal } from "../colaborador/vinculo-principal";
 import { resolverEscopoContatos } from "../contatos/escopo-contatos.util";
 import { PessoasAuditoriaService } from "../pessoas-auditoria.service";
 import { PessoasAuditContext } from "../pessoas.types";
+import {
+  carregarCalendarioDoMes,
+  carregarDiasDeTrabalho,
+} from "./carregar-dias-de-trabalho";
 import { DefinirEscalaDto, EncerrarEscalaDto } from "./escala-colaborador.dto";
 import { conferirPadrao, diasOrdenados, mesmoPadrao } from "./padrao-escala";
 
@@ -155,8 +159,19 @@ function eSobreposta(erro: unknown): boolean {
 
 interface Resolvido {
   empresaId: string;
+  vinculoId: string;
   dataAdmissao: Date;
   situacao: SituacaoVinculo;
+}
+
+/** T215 — os dias de trabalho no mês, para a aba Escala da ficha. */
+export interface DiasDeTrabalhoDoMes {
+  colaboradorId: string;
+  /** AAAA-MM. */
+  mes: string;
+  dias: number;
+  /** `escala`: há padrão ou publicado no mês; `catalogo`: só o cadastro. */
+  origem: "escala" | "catalogo";
 }
 
 /**
@@ -201,6 +216,66 @@ export class EscalaColaboradorService {
       );
     }
     return this.montar(this.prisma, colaboradorId, resolvido);
+  }
+
+  /**
+   * T215 — os dias de trabalho no mês (a aba Escala da ficha), com a MESMA
+   * conta dos benefícios pagos pela escala (`carregarDiasDeTrabalho`): o
+   * publicado por cima do padrão, a troca de escala no mês, sem ausências
+   * aprovadas e, sem padrão, a escala do cadastro.
+   */
+  async diasDeTrabalho(
+    colaboradorId: string,
+    mes: string,
+    ctx: PessoasAuditContext,
+  ): Promise<DiasDeTrabalhoDoMes> {
+    const escopo = resolverEscopoContatos(ctx.actor);
+    const resolvido = await this.resolver(
+      colaboradorId,
+      ctx,
+      escopo.global ? null : escopo.empresaId,
+    );
+    if (escopo.global) {
+      await this.auditoria.registrarConsultaGlobal(
+        ctx,
+        "escala_colaborador",
+        colaboradorId,
+      );
+    }
+    const { empresaId } = resolvido;
+    const vinculo = await this.prisma.vinculoFuncional.findUniqueOrThrow({
+      where: { id: resolvido.vinculoId },
+      select: {
+        dataAdmissao: true,
+        dataDesligamento: true,
+        contrato: { select: { escala: true } },
+        alocacoes: {
+          where: { vigenteAte: null },
+          take: 1,
+          select: { unidadeOrganizacionalId: true },
+        },
+      },
+    });
+    const cal = await carregarCalendarioDoMes(this.prisma, empresaId, mes);
+    const dias = await carregarDiasDeTrabalho(
+      this.prisma,
+      empresaId,
+      mes,
+      [
+        {
+          colaboradorId,
+          unidadeId: vinculo.alocacoes[0]?.unidadeOrganizacionalId ?? null,
+          escalaDoCadastro: vinculo.contrato?.escala ?? null,
+          admissao: diaCivil(vinculo.dataAdmissao),
+          desligamento: vinculo.dataDesligamento
+            ? diaCivil(vinculo.dataDesligamento)
+            : null,
+        },
+      ],
+      cal,
+    );
+    const d = dias.get(colaboradorId)!;
+    return { colaboradorId, mes, dias: d.dias, origem: d.origem };
   }
 
   async definir(
@@ -448,6 +523,7 @@ export class EscalaColaboradorService {
         ...(empresaDaSessao === null ? {} : { empresaId: empresaDaSessao }),
       },
       select: {
+        id: true,
         empresaId: true,
         situacao: true,
         dataAdmissao: true,
@@ -470,6 +546,7 @@ export class EscalaColaboradorService {
     const principal = escolherVinculoPrincipal(vinculos)!;
     return {
       empresaId,
+      vinculoId: principal.id,
       dataAdmissao: principal.dataAdmissao,
       situacao: principal.situacao,
     };

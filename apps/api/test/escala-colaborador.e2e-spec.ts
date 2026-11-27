@@ -628,4 +628,53 @@ describe("T215 — escala do colaborador (e2e)", () => {
     await get(rota(p.id), rhA).expect(200);
     await definir(p.id, { modelo: "5x2", vigenciaInicio: D1 }).expect(409);
   });
+
+  it("dias de trabalho no mês: a conta dos benefícios (padrão, publicado por cima, cadastro)", async () => {
+    const diasEm = async (id: string, mes: string, cred: Credencial = rhA) =>
+      (await get(`${rota(id)}/dias-de-trabalho?mes=${mes}`, cred).expect(200))
+        .body as { mes: string; dias: number; origem: string };
+    // Sem padrão: a proporção do modelo do cadastro (6x1 = 26 em 30 dias).
+    const cadastro = await admitir("6x1");
+    expect(await diasEm(cadastro.id, "2026-11")).toEqual({
+      colaboradorId: cadastro.id,
+      mes: "2026-11",
+      dias: 26,
+      origem: "catalogo",
+    });
+    // 6x1 com folga no domingo: 25 em novembro/2026; uma folga publicada
+    // numa terça tira só aquele dia.
+    const p = await admitir();
+    await definir(p.id, {
+      modelo: "6x1",
+      folgaSemanal: 7,
+      vigenciaInicio: D1,
+    }).expect(201);
+    expect(await diasEm(p.id, "2026-11")).toMatchObject({
+      dias: 25,
+      origem: "escala",
+    });
+    const rh = await prisma.accessUser.findFirstOrThrow({
+      where: { email: "rh.esca@example.test" },
+    });
+    await prisma.escalaDia.create({
+      data: {
+        colaboradorId: p.id,
+        empresaId: empresaA,
+        dia: new Date("2026-11-03T00:00:00Z"),
+        camada: "publicado",
+        tipo: "folga",
+        criadoPorUserId: rh.id,
+        atualizadoPorUserId: rh.id,
+      },
+    });
+    expect((await diasEm(p.id, "2026-11")).dias).toBe(24);
+    // O master só com empresa ativa lê; outra empresa não vê; mês inválido.
+    await get(`${rota(p.id)}/dias-de-trabalho?mes=2026-11`, rhB).expect(404);
+    await get(`${rota(p.id)}/dias-de-trabalho?mes=2026-13`, rhA).expect(400);
+    for (const cred of outros) {
+      expect([403, 404]).toContain(
+        (await get(`${rota(p.id)}/dias-de-trabalho?mes=2026-11`, cred)).status,
+      );
+    }
+  });
 });

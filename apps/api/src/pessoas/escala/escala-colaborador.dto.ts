@@ -70,3 +70,9 @@ export class EncerrarEscalaDto {
   @IsDateString({ strict: true })
   vigenciaFim!: string;
 }
+
+/** T215 — o mês dos dias de trabalho na ficha (`AAAA-MM`). */
+export class ConsultarDiasDeTrabalhoDto {
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  mes!: string;
+}

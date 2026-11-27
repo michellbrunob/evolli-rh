@@ -742,6 +742,74 @@ describe("T215 — dia do quadro da escala (e2e)", () => {
     });
   });
 
+  describe("publicar o padrão", () => {
+    const INICIO = `${ANO - 1}-06-02`;
+    const somar = (dia: string, n: number) => {
+      const d = new Date(`${dia}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const DIAS = Array.from({ length: 7 }, (_, i) => somar(INICIO, i));
+    const FIM = DIAS[6]!;
+    /** 1 = segunda … 7 = domingo. */
+    const semana = (dia: string) =>
+      new Date(`${dia}T00:00:00Z`).getUTCDay() || 7;
+
+    it("os dias que seguem o padrão viram publicados; trocar o padrão depois não muda o publicado", async () => {
+      const pessoa = await admitirNomeada("Padrao Publicado Sintetico");
+      const folga = semana(DIAS[6]!);
+      await post(`/v1/colaboradores/${pessoa}/escalas`, rhA)
+        .send({
+          modelo: "6x1",
+          folgaSemanal: folga,
+          tabelaHorarioId: turnoA,
+          vigenciaInicio: INICIO,
+        })
+        .expect(201);
+      const corpo = { inicio: INICIO, fim: FIM, avisar: false };
+
+      // Nenhum rascunho: mesmo assim há o que publicar (o padrão).
+      const r = await post("/v1/escala/publicar", rhA).send(corpo).expect(200);
+      expect(r.body).toMatchObject({ novas: 7, alteradas: 0, pessoas: 1 });
+
+      const publicados = async () =>
+        (
+          (await quadro(INICIO, FIM).expect(200)).body as {
+            pessoas: { colaboradorId: string; dias: DiaGravado[] }[];
+          }
+        ).pessoas.find((p) => p.colaboradorId === pessoa)?.dias ?? [];
+      const antes = await publicados();
+      expect(antes.map((d) => [d.dia, d.camada, d.tipo])).toEqual(
+        DIAS.map((dia) => [
+          dia,
+          "publicado",
+          semana(dia) === folga ? "dsr" : "trabalho",
+        ]),
+      );
+      expect(antes[0]).toMatchObject({
+        turno: { id: turnoA },
+        periodos: [
+          { inicio: "09:00", fim: "12:00" },
+          { inicio: "13:00", fim: "18:00" },
+        ],
+        intervaloMinutos: 0,
+        observacao: null,
+      });
+
+      // Trocar o padrão no meio da semana publicada: o publicado fica.
+      await post(`/v1/colaboradores/${pessoa}/escalas`, rhA)
+        .send({ modelo: "outra", diasTrabalho: [1], vigenciaInicio: DIAS[2] })
+        .expect(201);
+      expect(await publicados()).toEqual(antes);
+
+      // Tudo publicado e sem rascunho: nada a publicar.
+      expect(
+        (await post("/v1/escala/publicar", rhA).send(corpo).expect(422)).body
+          .codigo,
+      ).toBe("escala_nada_para_publicar");
+    });
+  });
+
   describe("lote", () => {
     const DIAS_LOTE = [`${ANO - 1}-04-06`, `${ANO - 1}-04-07`];
     const putLote = (dias: Record<string, unknown>[], cred: Credencial = rhA) =>

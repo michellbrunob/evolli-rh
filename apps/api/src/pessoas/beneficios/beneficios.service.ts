@@ -16,7 +16,13 @@ import {
   limitePat,
   regrasAns,
 } from "./calculo-beneficios";
-import { diasPeloModelo, diasUteisDoMes } from "./dias-beneficio";
+import {
+  carregarCalendarioDoMes,
+  carregarDiasDeTrabalho,
+  municipaisDaUnidade,
+} from "../escala/carregar-dias-de-trabalho";
+import type { DiasDeTrabalho } from "../escala/dias-de-trabalho";
+import { diasUteisDoMes } from "./dias-beneficio";
 import {
   type ColunaDaImportacao,
   type LinhaConferida,
@@ -216,7 +222,8 @@ interface PessoaCarregada {
   salarioBase: number | null;
   nascimento: string | null;
   escala: string | null;
-  diasPublicados: number | null;
+  /** Os dias de trabalho no mês (padrão, publicado, ausências, cadastro). */
+  diasEscala: DiasDeTrabalho;
   dependentesCadastrados: number;
 }
 
@@ -397,8 +404,10 @@ export class BeneficiosService {
 
   /**
    * As pessoas (por colaborador) com o que o cálculo pede no mês: contrato,
-   * salário vigente, nascimento, escala (publicada ou do cadastro),
-   * lotação. Sem `ids`: as ativas da empresa (e as desligadas, se pedido).
+   * o salário que valia no mês (a linha viva do histórico salarial com
+   * vigência até o último dia do mês; sem ela, o do contrato), nascimento,
+   * os dias de trabalho no mês (`carregarDiasDeTrabalho`) e a lotação. Sem
+   * `ids`: as ativas da empresa (e as desligadas, se pedido).
    */
   private async carregarPessoas(
     db: Prisma.TransactionClient,
@@ -421,8 +430,10 @@ export class BeneficiosService {
             }),
       },
       select: {
+        id: true,
         tipo: true,
         situacao: true,
+        dataAdmissao: true,
         dataDesligamento: true,
         colaborador: { select: { id: true, nome: true } },
         contrato: { select: { salarioBruto: true, escala: true } },
@@ -440,9 +451,19 @@ export class BeneficiosService {
       orderBy: [{ colaborador: { nome: "asc" } }, { dataAdmissao: "desc" }],
     });
     const mapa = new Map<string, PessoaCarregada>();
+    /** O vínculo de cada pessoa (salário e dias de trabalho do mês). */
+    const doVinculo = new Map<
+      string,
+      { vinculoId: string; admissao: string; cadastro: string | null }
+    >();
     for (const v of vinculos) {
       if (mapa.has(v.colaborador.id)) continue;
       const alocacao = v.alocacoes[0];
+      doVinculo.set(v.colaborador.id, {
+        vinculoId: v.id,
+        admissao: diaDe(v.dataAdmissao),
+        cadastro: v.contrato?.escala ?? null,
+      });
       mapa.set(v.colaborador.id, {
         colaboradorId: v.colaborador.id,
         nome: v.colaborador.nome,
@@ -457,13 +478,13 @@ export class BeneficiosService {
         salarioBase: numero(v.contrato?.salarioBruto),
         nascimento: null,
         escala: v.contrato?.escala ?? null,
-        diasPublicados: null,
+        diasEscala: { dias: 0, origem: "catalogo" },
         dependentesCadastrados: 0,
       });
     }
     const todos = [...mapa.keys()];
     if (todos.length === 0) return mapa;
-    const [perfis, escalas, publicados, dependentes] = await Promise.all([
+    const [perfis, escalas, salarios, dependentes, cal] = await Promise.all([
       db.perfilPessoalColaborador.findMany({
         where: { empresaId, colaboradorId: { in: todos } },
         select: { colaboradorId: true, dataNascimento: true, cpf: true },
@@ -478,22 +499,37 @@ export class BeneficiosService {
         orderBy: { vigenciaInicio: "asc" },
         select: { colaboradorId: true, modelo: true },
       }),
-      db.escalaDia.groupBy({
-        by: ["colaboradorId", "tipo"],
+      // O salário de cada mês é o da linha viva mais recente que já valia
+      // no último dia do mês (reajuste em 01/11 não muda outubro).
+      db.alteracaoSalarial.findMany({
         where: {
           empresaId,
-          camada: "publicado",
-          colaboradorId: { in: todos },
-          dia: { gte: inicio, lte: fim },
+          vinculoId: { in: [...doVinculo.values()].map((v) => v.vinculoId) },
+          removidaEm: null,
+          vigenciaInicio: { lte: fim },
         },
-        _count: { _all: true },
+        orderBy: [{ vigenciaInicio: "desc" }, { criadoEm: "desc" }],
+        select: { vinculoId: true, salarioBruto: true },
       }),
       db.dependenteColaborador.groupBy({
         by: ["colaboradorId"],
         where: { empresaId, colaboradorId: { in: todos }, removidoEm: null },
         _count: { _all: true },
       }),
+      this.calendario(db, empresaId, c),
     ]);
+    const salarioDoMes = new Map<string, number | null>();
+    for (const s of salarios) {
+      if (!salarioDoMes.has(s.vinculoId)) {
+        salarioDoMes.set(s.vinculoId, numero(s.salarioBruto));
+      }
+    }
+    for (const [colaboradorId, v] of doVinculo) {
+      const pessoa = mapa.get(colaboradorId);
+      if (pessoa && salarioDoMes.has(v.vinculoId)) {
+        pessoa.salarioBase = salarioDoMes.get(v.vinculoId) ?? null;
+      }
+    }
     for (const p of perfis) {
       const pessoa = mapa.get(p.colaboradorId);
       if (!pessoa) continue;
@@ -504,12 +540,22 @@ export class BeneficiosService {
       const pessoa = mapa.get(e.colaboradorId);
       if (pessoa) pessoa.escala = e.modelo; // a última vigente no mês
     }
-    for (const g of publicados) {
-      const pessoa = mapa.get(g.colaboradorId);
-      if (!pessoa) continue;
-      pessoa.diasPublicados =
-        (pessoa.diasPublicados ?? 0) +
-        (g.tipo === "trabalho" ? g._count._all : 0);
+    const dias = await carregarDiasDeTrabalho(
+      db,
+      empresaId,
+      c,
+      [...mapa.values()].map((p) => ({
+        colaboradorId: p.colaboradorId,
+        unidadeId: p.unidadeId,
+        escalaDoCadastro: doVinculo.get(p.colaboradorId)?.cadastro ?? null,
+        admissao: doVinculo.get(p.colaboradorId)?.admissao ?? null,
+        desligamento: p.desligamento,
+      })),
+      cal,
+    );
+    for (const [colaboradorId, d] of dias) {
+      const pessoa = mapa.get(colaboradorId);
+      if (pessoa) pessoa.diasEscala = d;
     }
     for (const d of dependentes) {
       const pessoa = mapa.get(d.colaboradorId);
@@ -527,25 +573,8 @@ export class BeneficiosService {
     uf: string | null;
     municipais: { data: string; unidadeIds: string[] }[];
   }> {
-    const [empresa, feriados] = await Promise.all([
-      db.empresa.findUnique({ where: { id: empresaId }, select: { uf: true } }),
-      db.escalaFeriadoLocal.findMany({
-        where: {
-          empresaId,
-          arquivadoEm: null,
-          tipo: "municipal",
-          data: { gte: inicioDa(c), lte: fimDoMes(c) },
-        },
-        select: { data: true, unidadeIds: true },
-      }),
-    ]);
-    return {
-      uf: empresa?.uf ?? null,
-      municipais: feriados.map((f) => ({
-        data: diaDe(f.data),
-        unidadeIds: f.unidadeIds,
-      })),
-    };
+    const cal = await carregarCalendarioDoMes(db, empresaId, c);
+    return { uf: cal.uf, municipais: [...cal.municipais] };
   }
 
   /** O cálculo de cada pessoa do benefício no mês. */
@@ -570,22 +599,14 @@ export class BeneficiosService {
         const uteis = diasUteisDoMes(
           c,
           cal.uf,
-          cal.municipais
-            .filter(
-              (f) =>
-                f.unidadeIds.length === 0 ||
-                (pessoa.unidadeId && f.unidadeIds.includes(pessoa.unidadeId)),
-            )
-            .map((f) => f.data),
+          municipaisDaUnidade(cal, pessoa.unidadeId),
         );
-        const peloModelo = diasPeloModelo(pessoa.escala, c);
-        const escala =
-          pessoa.diasPublicados !== null
-            ? { escala: pessoa.diasPublicados, origemEscala: "escala" as const }
-            : {
-                escala: peloModelo ?? uteis,
-                origemEscala: "catalogo" as const,
-              };
+        // Dia a dia: o publicado por cima do padrão, sem as ausências; sem
+        // padrão nem publicado no mês, a proporção do modelo do cadastro.
+        const escala = {
+          escala: pessoa.diasEscala.dias,
+          origemEscala: pessoa.diasEscala.origem,
+        };
         const calculo = calcularPessoa(
           regras,
           {

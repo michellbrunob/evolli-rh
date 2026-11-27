@@ -11,6 +11,7 @@ import { semDesativacaoVigente } from "../colaborador/desativacao";
 import { resolverEscopoContatos } from "../contatos/escopo-contatos.util";
 import { PessoasAuditContext } from "../pessoas.types";
 import { ConsultarQuadroDto } from "./quadro-escala.dto";
+import { ausenciasQueValem } from "./ausencias-que-valem";
 import {
   EscalaProjetada,
   PROJECAO,
@@ -51,12 +52,6 @@ export interface AusenciaNoQuadro {
   /** `null`: afastamento sem data de volta. */
   fim: string | null;
 }
-
-/** Aprovada (ou com cancelamento pedido, que ainda vale até a decisão). */
-const STATUS_QUE_VALEM = ["aprovada", "cancelamento_pedido"] as const;
-
-/** Home office não é ausência do trabalho: fica fora do quadro. */
-const TIPOS_FORA_DO_QUADRO: TipoAusencia[] = ["home_office"];
 
 /** Uma pessoa do quadro: o vínculo no período, a lotação e os padrões. */
 export interface PessoaDoQuadro {
@@ -254,15 +249,7 @@ export class QuadroEscalaService {
       ids.length === 0
         ? []
         : await this.prisma.ausencia.findMany({
-            where: {
-              empresaId,
-              colaboradorId: { in: ids },
-              status: { in: [...STATUS_QUE_VALEM] },
-              excluidaEm: null,
-              tipo: { notIn: TIPOS_FORA_DO_QUADRO },
-              inicio: { lte: fim },
-              OR: [{ fim: null }, { fim: { gte: inicio } }],
-            },
+            where: ausenciasQueValem(empresaId, ids, inicio, fim),
             orderBy: [{ inicio: "asc" }, { id: "asc" }],
             select: {
               id: true,

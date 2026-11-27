@@ -572,6 +572,21 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
       const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
         where: { colaboradorId: semSalario.id },
       });
+      // Sem salário (como um vínculo antigo, de antes do histórico salarial):
+      // nenhuma linha viva no histórico e o contrato vazio. A linha da
+      // admissão não se remove pela aplicação; aqui ela vira uma alteração
+      // removida só para simular o vínculo antigo.
+      const rh = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "rh.bena@example.test" },
+      });
+      await prisma.alteracaoSalarial.updateMany({
+        where: { vinculoId: vinculo.id },
+        data: {
+          origem: "alteracao",
+          removidaEm: new Date(),
+          removidaPorUserId: rh.id,
+        },
+      });
       await prisma.contratoVinculo.update({
         where: { vinculoId: vinculo.id },
         data: { salarioBruto: null },
@@ -1465,6 +1480,185 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
       });
       expect((await em(b.body.id, "2026-09")).pessoas).toHaveLength(1);
       expect((await em(b.body.id, "2026-10")).pessoas).toHaveLength(0);
+    });
+  });
+
+  describe("dias pela escala e salário do mês", () => {
+    const VR_ESCALA = {
+      ...VR,
+      nome: "VR pela escala",
+      regras: { ...VR.regras, diasModo: "escala" },
+    };
+
+    async function idDoRh(): Promise<string> {
+      return (
+        await prisma.accessUser.findFirstOrThrow({
+          where: { email: "rh.bena@example.test" },
+        })
+      ).id;
+    }
+
+    async function definirPadrao(
+      colaboradorId: string,
+      corpo: Record<string, unknown>,
+    ) {
+      await post(`/v1/colaboradores/${colaboradorId}/escalas`, rhA)
+        .send({ vigenciaInicio: "2026-10-01", ...corpo })
+        .expect(201);
+    }
+
+    async function publicarDireto(
+      colaboradorId: string,
+      dia: string,
+      tipo: "trabalho" | "folga",
+    ) {
+      const rh = await idDoRh();
+      await prisma.escalaDia.create({
+        data: {
+          colaboradorId,
+          empresaId: empresaA,
+          dia: new Date(`${dia}T00:00:00Z`),
+          camada: "publicado",
+          tipo,
+          periodos:
+            tipo === "trabalho" ? [{ inicio: "09:00", fim: "18:00" }] : [],
+          criadoPorUserId: rh,
+          atualizadoPorUserId: rh,
+        },
+      });
+    }
+
+    const pessoaNo = async (
+      beneficioId: string,
+      colaboradorId: string,
+      c = C,
+    ) =>
+      (
+        await get(`/v1/beneficios/${beneficioId}?competencia=${c}`, rhA).expect(
+          200,
+        )
+      ).body.pessoas.find(
+        (p: { colaboradorId: string }) => p.colaboradorId === colaboradorId,
+      );
+
+    it("6x1 com um dia publicado: o mês inteiro dia a dia, o publicado por cima do padrão", async () => {
+      const soTerca = await admitir(rhA, empresaA);
+      const comFolga = await admitir(rhA, empresaA);
+      for (const p of [soTerca, comFolga]) {
+        await definirPadrao(p.id, { modelo: "6x1", folgaSemanal: 7 });
+      }
+      // 03/11/2026 é terça: trabalho publicado num, folga publicada no outro.
+      await publicarDireto(soTerca.id, "2026-11-03", "trabalho");
+      await publicarDireto(comFolga.id, "2026-11-03", "folga");
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          ...VR_ESCALA,
+          pessoas: [
+            { colaboradorId: soTerca.id },
+            { colaboradorId: comFolga.id },
+          ],
+        })
+        .expect(201);
+      // Novembro/2026: 30 dias, 5 domingos (DSR) = 25 dias de trabalho.
+      expect(await pessoaNo(b.body.id, soTerca.id)).toMatchObject({
+        dias: 25,
+        origemDias: "escala",
+        valor: 25 * 3000,
+      });
+      expect(await pessoaNo(b.body.id, comFolga.id)).toMatchObject({
+        dias: 24,
+        origemDias: "escala",
+      });
+    });
+
+    it("férias aprovadas tiram os dias; home office não", async () => {
+      const ferias = await admitir(rhA, empresaA);
+      const remoto = await admitir(rhA, empresaA);
+      const rh = await idDoRh();
+      for (const [p, tipo] of [
+        [ferias, "ferias"],
+        [remoto, "home_office"],
+      ] as const) {
+        await definirPadrao(p.id, { modelo: "5x2" });
+        const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
+          where: { colaboradorId: p.id },
+        });
+        await prisma.ausencia.create({
+          data: {
+            empresaId: empresaA,
+            colaboradorId: p.id,
+            vinculoId: vinculo.id,
+            tipo,
+            inicio: new Date("2026-11-09T00:00:00Z"),
+            fim: new Date("2026-11-13T00:00:00Z"),
+            status: "aprovada",
+            registradoPorId: rh,
+          },
+        });
+      }
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          ...VR_ESCALA,
+          pessoas: [{ colaboradorId: ferias.id }, { colaboradorId: remoto.id }],
+        })
+        .expect(201);
+      // 5x2 pelo padrão: 21 dias de semana em novembro/2026.
+      expect(await pessoaNo(b.body.id, ferias.id)).toMatchObject({
+        dias: 16,
+        origemDias: "escala",
+      });
+      expect(await pessoaNo(b.body.id, remoto.id)).toMatchObject({ dias: 21 });
+    });
+
+    it("sem padrão nem publicado: a proporção do modelo do cadastro", async () => {
+      const p = await admitir(rhA, empresaA);
+      const vinculo = await prisma.vinculoFuncional.findFirstOrThrow({
+        where: { colaboradorId: p.id },
+      });
+      await prisma.contratoVinculo.update({
+        where: { vinculoId: vinculo.id },
+        data: { escala: "12x36" },
+      });
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR_ESCALA, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      expect(await pessoaNo(b.body.id, p.id)).toMatchObject({
+        dias: 15,
+        origemDias: "catalogo",
+      });
+    });
+
+    it("reajuste em 01/11: outubro desconta o VT pelo salário antigo", async () => {
+      const p = await admitir(rhA, empresaA);
+      await post(`/v1/colaboradores/${p.id}/salarios`, rhA)
+        .send({ vigenciaInicio: "2026-11-01", salarioBruto: "3000.00" })
+        .expect(201);
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          nome: "VT do reajuste",
+          categoria: "mobilidade",
+          folha: "desconto",
+          tipoValor: "dia_util",
+          inicio: "2026-01-01",
+          regras: {
+            valorDia: 10,
+            diasModo: "uteis",
+            vt: { percentualSalario: 6, empresaCusteiaTudo: false },
+          },
+          pessoas: [{ colaboradorId: p.id }],
+        })
+        .expect(201);
+      // Outubro/2026: 21 dias úteis (12/10 é feriado) → VT de R$ 210,00;
+      // 6% de R$ 1.621,00 = R$ 97,26.
+      expect(await pessoaNo(b.body.id, p.id, "2026-10")).toMatchObject({
+        valor: 21000,
+        desconto: 9726,
+      });
+      // Novembro: 6% de R$ 3.000,00 = R$ 180,00 (menor que o VT de R$ 190,00).
+      expect(await pessoaNo(b.body.id, p.id, C)).toMatchObject({
+        valor: 19000,
+        desconto: 18000,
+      });
     });
   });
 });
