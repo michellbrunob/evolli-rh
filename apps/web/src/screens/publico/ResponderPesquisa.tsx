@@ -26,7 +26,7 @@
  * o foco é programático, para o leitor de tela); ao barrar o avanço, vai ao
  * primeiro campo com erro.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import "../../app/tokens.css";
 import "../../components/FormField.css";
@@ -391,9 +391,10 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [respostas, grupos, token, encerrada]);
 
-  // Foco no título de cada tela nova (depois do diálogo da prévia).
+  // Foco no título de cada tela nova (depois do diálogo da prévia). No
+  // mesmo quadro da troca: o leitor de tela anuncia a tela já pronta.
   const chaveDaEtapa = etapa.tipo === "tela" ? `tela-${etapa.id}` : etapa.tipo;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (dialogoDaPrevia) return;
     tituloRef.current?.focus({ preventScroll: true });
   }, [chaveDaEtapa, dialogoDaPrevia]);
