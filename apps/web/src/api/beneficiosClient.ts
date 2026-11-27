@@ -127,6 +127,8 @@ export interface CalculoApi {
 export interface PessoaDoBeneficioApi extends CalculoApi {
   colaboradorId: string;
   nome: string;
+  /** Só para RH e DP (busca, colar lista, importar). */
+  cpf: string | null;
   cargo: string | null;
   departamento: string | null;
   departamentoId: string | null;
@@ -135,6 +137,9 @@ export interface PessoaDoBeneficioApi extends CalculoApi {
   planoId: string | null;
   valorIndividual: number | null;
   ajustado: boolean;
+  /** Digitados no mês (reais). */
+  coparticipacao: number | null;
+  antecipado: number | null;
   dependentesCadastrados: number;
   desligado: boolean;
 }
@@ -165,13 +170,80 @@ export interface LinhaDeBeneficioApi {
   situacao: SituacaoBeneficio;
   suspensoAPartirDe: string | null;
   pessoas: number;
+  /** Dependentes no plano (faixa etária). */
+  dependentes: number;
   empresa: number;
   desconto: number;
+}
+
+export interface PessoaSemBeneficioApi {
+  colaboradorId: string;
+  nome: string;
+  cargo: string | null;
+}
+
+export interface ResumoDaListaApi {
+  /** Pessoas distintas nos benefícios ativos do mês. */
+  pessoas: number;
+  /** Pessoas com desconto em folha no mês. */
+  comDesconto: number;
+  empresa: number;
+  desconto: number;
+  beneficiosAtivos: number;
+  /** Pessoas ativas da empresa. */
+  ativos: number;
+  semBeneficio: PessoaSemBeneficioApi[];
 }
 
 export interface ListaDeBeneficiosApi {
   competencia: string;
   beneficios: LinhaDeBeneficioApi[];
+  resumo: ResumoDaListaApi;
+}
+
+export type ColunaDaImportacao =
+  "dias" | "valorDia" | "valorMes" | "coparticipacao" | "antecipado";
+
+export interface LinhaDaPlanilhaDto {
+  linha: number;
+  cpf: string;
+  valores: Partial<Record<ColunaDaImportacao, string | null>>;
+}
+
+export interface ProblemaDaLinhaApi {
+  campo: "cpf" | "valores" | ColunaDaImportacao;
+  motivo:
+    "obrigatorio" | "invalido" | "nao_encontrado" | "nao_recebe" | "duplicado";
+}
+
+export interface ValoresDaPessoaApi {
+  valor: number;
+  empresa: number;
+  desconto: number;
+}
+
+export interface LinhaConferidaApi {
+  linha: number;
+  cpf: string;
+  colaboradorId: string | null;
+  nome: string | null;
+  situacao: "pronta" | "sem_mudanca" | "pendencia";
+  problemas: ProblemaDaLinhaApi[];
+  valores: Partial<Record<ColunaDaImportacao, number>>;
+  antes: ValoresDaPessoaApi | null;
+  depois: ValoresDaPessoaApi | null;
+}
+
+export interface ImportacaoConferidaApi {
+  competencia: string;
+  colunas: ColunaDaImportacao[];
+  linhas: LinhaConferidaApi[];
+}
+
+export interface SimulacaoDeDependentesApi {
+  competencia: string;
+  antes: ValoresDaPessoaApi;
+  depois: ValoresDaPessoaApi;
 }
 
 export interface PreviaApi {
@@ -329,8 +401,10 @@ export const obterBeneficio = (beneficioId: string, competencia?: string) =>
     `/beneficios/${id(beneficioId)}${comp(competencia)}`,
     "GET",
   );
-export const alterarBeneficio = (beneficioId: string, dto: BeneficioDto) =>
-  pedir<BeneficioApi>(`/beneficios/${id(beneficioId)}`, "PUT", dto);
+export const alterarBeneficio = (
+  beneficioId: string,
+  dto: BeneficioDto & { aPartirDe?: string },
+) => pedir<BeneficioApi>(`/beneficios/${id(beneficioId)}`, "PUT", dto);
 export const historicoDoBeneficio = (beneficioId: string) =>
   pedir<HistoricoApi>(`/beneficios/${id(beneficioId)}/historico`, "GET");
 export const candidatosDoBeneficio = (
@@ -367,6 +441,7 @@ export const salvarValoresDoBeneficio = (
   beneficioId: string,
   competencia: string,
   linhas: LinhaDeValoresDto[],
+  origem: "tela" | "importacao" = "tela",
 ) =>
   pedir<{ alteradas: number }>(
     `/beneficios/${id(beneficioId)}/valores`,
@@ -374,7 +449,29 @@ export const salvarValoresDoBeneficio = (
     {
       competencia,
       linhas,
+      ...(origem === "importacao" ? { origem } : {}),
     },
+  );
+export const conferirImportacaoDoBeneficio = (
+  beneficioId: string,
+  competencia: string,
+  linhas: LinhaDaPlanilhaDto[],
+) =>
+  pedir<ImportacaoConferidaApi>(
+    `/beneficios/${id(beneficioId)}/importacao/conferir`,
+    "POST",
+    { competencia, linhas },
+  );
+export const simularDependentesNoPlano = (
+  beneficioId: string,
+  colaboradorId: string,
+  dependenteIds: string[],
+  aPartirDe: string,
+) =>
+  pedir<SimulacaoDeDependentesApi>(
+    `/beneficios/${id(beneficioId)}/pessoas/${id(colaboradorId)}/dependentes/simular`,
+    "POST",
+    { dependenteIds, aPartirDe },
   );
 export const alterarValoresEmLote = (
   beneficioId: string,

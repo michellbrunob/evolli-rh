@@ -19,8 +19,15 @@ import type {
   PessoaDoBeneficioApi,
   PreviaApi,
 } from "../../api/beneficiosClient";
+import { baixarArquivo } from "../dashboard/exportacao";
+import { lerAbasXlsx } from "../pessoas/importacao/planilhaXlsx";
 import { BeneficiosModulo } from "./BeneficiosModulo";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
+
+vi.mock("../dashboard/exportacao", async (original) => {
+  const actual = await original<typeof import("../dashboard/exportacao")>();
+  return { ...actual, baixarArquivo: vi.fn() };
+});
 
 const CALC: CalculoApi = {
   dias: 19,
@@ -45,6 +52,7 @@ const pessoa = (
   ...CALC,
   colaboradorId: id,
   nome,
+  cpf: null,
   cargo: "Analista",
   departamento: "Operações",
   departamentoId: "dep-1",
@@ -53,6 +61,8 @@ const pessoa = (
   planoId: null,
   valorIndividual: null,
   ajustado: false,
+  coparticipacao: null,
+  antecipado: null,
   dependentesCadastrados: 0,
   desligado: false,
   ...extra,
@@ -139,8 +149,20 @@ function servico(
           situacao: "ativo",
           suspensoAPartirDe: null,
           pessoas: 2,
+          dependentes: 0,
           empresa: 102600,
           desconto: 11400,
+        },
+        {
+          id: "b-3",
+          nome: "Saúde teste",
+          categoria: "saude",
+          situacao: "ativo",
+          suspensoAPartirDe: null,
+          pessoas: 1,
+          dependentes: 1,
+          empresa: 21400,
+          desconto: 6600,
         },
         {
           id: "b-2",
@@ -149,10 +171,24 @@ function servico(
           situacao: "pausado",
           suspensoAPartirDe: "2026-12",
           pessoas: 1,
+          dependentes: 0,
           empresa: 0,
           desconto: 0,
         },
       ],
+      resumo: {
+        pessoas: 2,
+        comDesconto: 1,
+        empresa: 124000,
+        desconto: 18000,
+        beneficiosAtivos: 2,
+        ativos: 5,
+        semBeneficio: [
+          { colaboradorId: "c-7", nome: "Davi Teste", cargo: "Vendedor" },
+          { colaboradorId: "c-8", nome: "Eva Teste", cargo: null },
+          { colaboradorId: "c-9", nome: "Fabi Teste", cargo: "Estagiária" },
+        ],
+      },
     })),
     previaDoBeneficio: vi.fn(async () => PREVIA),
     criarBeneficio: vi.fn(async () => ({ ...BENEFICIO })),
@@ -176,6 +212,16 @@ function servico(
     adicionarPessoasAoBeneficio: vi.fn(async () => ({ adicionadas: 1 })),
     removerPessoaDoBeneficio: vi.fn(async () => ({ removida: true as const })),
     salvarValoresDoBeneficio: vi.fn(async () => ({ alteradas: 1 })),
+    conferirImportacaoDoBeneficio: vi.fn(async () => ({
+      competencia: "2026-11",
+      colunas: ["dias", "valorDia"],
+      linhas: [],
+    })),
+    simularDependentesNoPlano: vi.fn(async () => ({
+      competencia: "2026-11",
+      antes: { valor: 18000, empresa: 14400, desconto: 3600 },
+      depois: { valor: 28000, empresa: 21400, desconto: 6600 },
+    })),
     alterarValoresEmLote: vi.fn(async () => ({ alteradas: 2 })),
     dependentesDaPessoaNoBeneficio: vi.fn(async () => ({ dependentes: [] })),
     salvarDependentesNoPlano: vi.fn(async () => ({ noPlano: 0 })),
@@ -227,6 +273,15 @@ describe("Benefícios (T215) — lista", () => {
         listarBeneficios: vi.fn(async () => ({
           competencia: "2026-11",
           beneficios: [],
+          resumo: {
+            pessoas: 0,
+            comDesconto: 0,
+            empresa: 0,
+            desconto: 0,
+            beneficiosAtivos: 0,
+            ativos: 3,
+            semBeneficio: [],
+          },
         })),
       }),
     );
@@ -248,7 +303,8 @@ describe("Benefícios (T215) — lista", () => {
   it("abas por situação, custos da competência e o menu ⋯", async () => {
     const { s } = montar();
     const tabela = await screen.findByRole("table", { name: "Benefícios" });
-    expect(within(tabela).getAllByRole("row")).toHaveLength(2);
+    // Cabeçalho, 2 benefícios ativos e o total da competência.
+    expect(within(tabela).getAllByRole("row")).toHaveLength(4);
     const linha = within(tabela).getAllByRole("row")[1]!;
     expect(linha).toHaveTextContent("VR teste");
     expect(linha).toHaveTextContent("Alimentação");
@@ -259,7 +315,7 @@ describe("Benefícios (T215) — lista", () => {
     expect(
       screen.getByText(/pausado a partir de 12\/2026/),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Ativos 1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Ativos 2" }));
     abrirMenu("Ações de VR teste");
     const menu = await screen.findByRole("menu");
     expect(
@@ -291,6 +347,133 @@ describe("Benefícios (T215) — lista", () => {
     expect(
       await screen.findByText(/VR teste pausado a partir de/),
     ).toBeInTheDocument();
+  });
+
+  it("pessoas com dependentes, total da competência e colunas de número à direita", async () => {
+    montar();
+    const tabela = await screen.findByRole("table", { name: "Benefícios" });
+    const linhas = within(tabela).getAllByRole("row");
+    expect(linhas[2]).toHaveTextContent("Saúde teste");
+    expect(within(linhas[2]!).getByText("+ 1 dep.")).toBeInTheDocument();
+    const total = linhas[3]!;
+    expect(total).toHaveTextContent("Total da competência");
+    expect(total).toHaveTextContent("2 benefícios ativos · 2 pessoas");
+    expect(total).toHaveTextContent("R$ 1.240,00");
+    expect(total).toHaveTextContent("R$ 180,00");
+    for (const nome of ["Pessoas", "Custo da empresa", "Desconto em folha"]) {
+      expect(
+        within(tabela).getByRole("columnheader", { name: nome }),
+      ).toHaveClass("beneficios__numero");
+    }
+  });
+
+  it("resumo: investimento, descontado e cobertura; Ver quem lista quem está sem benefício", async () => {
+    const { onAbrirFicha } = montar();
+    const resumo = await screen.findByRole("region", {
+      name: "Resumo da competência",
+    });
+    expect(resumo).toHaveTextContent("Investimento da empresaR$ 1.240,00/mês");
+    expect(resumo).toHaveTextContent(
+      "Competência 11/2026 · 2 benefícios ativos",
+    );
+    expect(resumo).toHaveTextContent("Descontado em folhaR$ 180,00");
+    expect(resumo).toHaveTextContent(
+      "Parte paga pelos colaboradores · 1 pessoa",
+    );
+    expect(resumo).toHaveTextContent("Cobertura do time");
+    expect(resumo).toHaveTextContent("2de 5 ativos");
+    expect(resumo).toHaveTextContent("3 sem nenhum benefício");
+    expect(within(resumo).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "40",
+    );
+    fireEvent.click(within(resumo).getByRole("button", { name: "Ver quem" }));
+    const gaveta = screen.getByRole("dialog", { name: "Sem nenhum benefício" });
+    expect(gaveta).toHaveTextContent("3 pessoas ativas em 11/2026");
+    expect(gaveta).toHaveTextContent("Davi TesteVendedor");
+    fireEvent.click(within(gaveta).getByRole("button", { name: /Eva Teste/ }));
+    expect(onAbrirFicha).toHaveBeenCalledWith("c-8");
+  });
+
+  it("abas vazias com o texto de cada situação", async () => {
+    montar();
+    await screen.findByRole("table", { name: "Benefícios" });
+    fireEvent.click(screen.getByRole("tab", { name: "Encerrados 0" }));
+    expect(screen.getByText("Nenhum benefício encerrado")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Benefícios encerrados ficam aqui com todo o histórico de valores.",
+      ),
+    ).toBeInTheDocument();
+    // O resumo continua.
+    expect(
+      screen.getByRole("region", { name: "Resumo da competência" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Exportar: Excel com os custos e descontos; PDF com o relatório", async () => {
+    vi.mocked(baixarArquivo).mockClear();
+    montar();
+    await screen.findByRole("table", { name: "Benefícios" });
+    abrirMenu("Exportar");
+    const menu = await screen.findByRole("menu");
+    expect(menu).toHaveTextContent("Exportar em PDFRelatório da competência");
+    expect(menu).toHaveTextContent(
+      "Exportar em ExcelPlanilha com custos e descontos",
+    );
+    expect(menu).toHaveTextContent("Competência 11/2026.");
+    await act(async () => {
+      fireEvent.click(
+        within(menu).getByRole("menuitem", { name: /Exportar em Excel/ }),
+      );
+    });
+    expect(baixarArquivo).toHaveBeenCalledTimes(1);
+    const [bytes, nome] = vi.mocked(baixarArquivo).mock.calls[0]!;
+    expect(nome).toBe("beneficios-2026-11.xlsx");
+    const abas = await lerAbasXlsx(bytes as Uint8Array);
+    expect(abas["Benefícios"]![0]).toEqual([
+      "Benefício",
+      "Categoria",
+      "Situação",
+      "Pessoas",
+      "Dependentes",
+      "Custo da empresa",
+      "Desconto em folha",
+    ]);
+    expect(abas["Benefícios"]![1]).toEqual([
+      "VR teste",
+      "Alimentação",
+      "Ativo",
+      "2",
+      "0",
+      "1026",
+      "114",
+    ]);
+    expect(abas["Benefícios"]!.at(-1)).toEqual([
+      "Total da competência",
+      "",
+      "",
+      "2",
+      "",
+      "1240",
+      "180",
+    ]);
+    expect(abas["Sem benefício"]![1]).toEqual(["Davi Teste", "Vendedor"]);
+
+    abrirMenu("Exportar");
+    await act(async () => {
+      fireEvent.click(
+        within(await screen.findByRole("menu")).getByRole("menuitem", {
+          name: /Exportar em PDF/,
+        }),
+      );
+    });
+    const [pdf, nomePdf, tipo] = vi.mocked(baixarArquivo).mock.calls[1]!;
+    expect(nomePdf).toBe("beneficios-2026-11.pdf");
+    expect(tipo).toBe("application/pdf");
+    expect(new TextDecoder().decode((pdf as Uint8Array).slice(0, 5))).toBe(
+      "%PDF-",
+    );
   });
 
   it("sem permissão: sem Novo benefício nem ⋯", async () => {
@@ -493,7 +676,9 @@ describe("Benefícios (T215) — assistente", () => {
 describe("Benefícios (T215) — detalhe", () => {
   async function abrirDetalhe(s = servico()) {
     montar(s);
-    fireEvent.click(await screen.findByRole("button", { name: "Ver mais" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Ver mais sobre VR teste" }),
+    );
     await screen.findByRole("table", { name: "Pessoas do benefício" });
     return s;
   }
@@ -553,7 +738,9 @@ describe("Benefícios (T215) — detalhe", () => {
   it("histórico e Ver colaborador", async () => {
     const s = servico();
     const { onAbrirFicha } = montar(s);
-    fireEvent.click(await screen.findByRole("button", { name: "Ver mais" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Ver mais sobre VR teste" }),
+    );
     await screen.findByRole("table", { name: "Pessoas do benefício" });
     abrirMenu("Ações de Ana Teste");
     fireEvent.click(

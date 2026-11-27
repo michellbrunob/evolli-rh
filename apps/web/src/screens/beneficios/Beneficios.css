@@ -113,6 +113,9 @@
 }
 
 .beneficios__abas {
+  /* Posicionada desde o início: o sublinhado global (movimento.css) mede a
+     aba pelo offsetLeft, relativo a esta lista. */
+  position: relative;
   border-bottom: 1px solid var(--divisor-cor);
 }
 
@@ -206,7 +209,10 @@
   background: color-mix(in srgb, var(--color-action) 5%, var(--surface-canvas));
 }
 
-.beneficios__numero {
+.beneficios__numero,
+.beneficios__tabela th.beneficios__numero,
+.beneficios__tabela td.beneficios__numero {
+  font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
@@ -221,8 +227,8 @@
 .beneficios__menu-botao {
   display: inline-grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   border: 0;
   border-radius: var(--radius-botao, var(--radius-sm));
   background: transparent;
@@ -258,6 +264,210 @@
 .beneficios__sem-linhas {
   padding: var(--space-lg) 0;
   text-align: center;
+}
+
+/* Lista de benefícios: linhas mais altas, ações juntas à direita, total. */
+.beneficios__tabela--lista td {
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+.beneficios__tabela--lista th:first-child {
+  width: 100%;
+}
+
+.beneficios__tabela--lista th:not(:first-child),
+.beneficios__tabela--lista td:not(:first-child) {
+  padding-left: var(--space-lg);
+}
+
+.beneficios__tabela tfoot th,
+.beneficios__tabela tfoot td {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--divisor-cor);
+  border-bottom: 0;
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+
+.beneficios__tabela tfoot .beneficios__numero {
+  text-align: right;
+}
+
+.beneficios__tabela tfoot .beneficios__forte,
+.beneficios__tabela tfoot .beneficios__pessoa-nome {
+  font-weight: var(--weight-strong);
+}
+
+.beneficios__dep {
+  font-size: inherit;
+}
+
+.beneficios__aba-vazia {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xl) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  text-align: center;
+}
+
+.beneficios__aba-vazia strong {
+  color: var(--color-ink);
+}
+
+/* Exportar: opções com título e linha de baixo, e a nota. */
+.beneficios__menu-exportar {
+  min-width: 17rem;
+}
+
+.beneficios__menu-opcao {
+  display: grid;
+  gap: 2px;
+}
+
+.beneficios__menu-opcao strong {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.beneficios__menu-nota {
+  max-width: 17rem;
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+/* Resumo da competência (embaixo da tabela). */
+.beneficios__painel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.beneficios__painel-item {
+  display: grid;
+  align-content: start;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-md);
+}
+
+.beneficios__painel-item + .beneficios__painel-item {
+  border-left: 1px solid var(--divisor-cor);
+}
+
+.beneficios__painel-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.beneficios__painel-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body, 0.9375rem);
+  font-weight: 500;
+}
+
+.beneficios__painel-titulo .beneficios__icone-cat {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.beneficios__painel-valor {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-strong);
+  line-height: 1.1;
+}
+
+.beneficios__painel-valor .beneficios__suave {
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+.beneficios__painel-barra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.beneficios__painel-barra .beneficios__barra {
+  flex: 1 1 auto;
+}
+
+.beneficios__barra {
+  display: block;
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--divisor-cor);
+}
+
+.beneficios__barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-action);
+}
+
+.beneficios__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.beneficios__link:hover {
+  text-decoration: underline;
+}
+
+/* Gaveta "Sem nenhum benefício". */
+.beneficios__lista-pessoas {
+  display: grid;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beneficios__pessoa-botao {
+  display: flex;
+  width: 100%;
+  padding: var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.beneficios__pessoa-botao:hover {
+  background: var(--surface-neutral);
 }
 
 /* Pessoa e ícone da categoria. */
@@ -1106,6 +1316,15 @@
 }
 
 @media (max-width: 760px) {
+  .beneficios__painel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .beneficios__painel-item + .beneficios__painel-item {
+    border-top: 1px solid var(--divisor-cor);
+    border-left: 0;
+  }
+
   .beneficios__cabecalho,
   .beneficios__faixa-numeros {
     flex-wrap: wrap;

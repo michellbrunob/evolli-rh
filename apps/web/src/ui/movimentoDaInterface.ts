@@ -41,19 +41,22 @@ export function medirAbas(lista: HTMLElement): void {
     lista.removeAttribute("data-abas-animadas");
     return;
   }
-  lista.style.setProperty("--aba-x", `${aba.offsetLeft}px`);
-  lista.style.setProperty("--aba-largura", `${aba.offsetWidth}px`);
-  const espessura = parseFloat(getComputedStyle(aba).borderBottomWidth);
-  if (espessura > 0) {
-    lista.style.setProperty("--aba-espessura", `${espessura}px`);
-  }
   // Primeira medida sem transição: o sublinhado não "voa" ao abrir a tela.
+  // O atributo vem ANTES da medida: ele deixa a lista com `position:
+  // relative`, e o `offsetLeft` da aba passa a contar a partir dela (antes,
+  // contava de um ancestral e o sublinhado nascia deslocado).
   if (lista.getAttribute("data-abas-animadas") === null) {
     lista.setAttribute("data-abas-animadas", "inicial");
     window.setTimeout(
       () => lista.setAttribute("data-abas-animadas", "pronto"),
       50,
     );
+  }
+  lista.style.setProperty("--aba-x", `${aba.offsetLeft}px`);
+  lista.style.setProperty("--aba-largura", `${aba.offsetWidth}px`);
+  const espessura = parseFloat(getComputedStyle(aba).borderBottomWidth);
+  if (espessura > 0) {
+    lista.style.setProperty("--aba-espessura", `${espessura}px`);
   }
 }
 

@@ -125,6 +125,18 @@ describe("T215 — movimento de todas as abas", () => {
     expect(lista.style.getPropertyValue("--aba-largura")).toBe("40px");
   });
 
+  it("mede a aba já com a lista posicionada (o x conta a partir dela)", () => {
+    const { lista, um } = grupo();
+    // O offsetLeft só é relativo à lista quando ela já tem o atributo que
+    // a deixa com position: relative.
+    Object.defineProperty(um, "offsetLeft", {
+      configurable: true,
+      get: () => (lista.hasAttribute("data-abas-animadas") ? 0 : 312),
+    });
+    medirAbas(lista);
+    expect(lista.style.getPropertyValue("--aba-x")).toBe("0px");
+  });
+
   it("trocar de aba move o sublinhado", () => {
     const { lista, um, dois } = grupo();
     medirAbas(lista);

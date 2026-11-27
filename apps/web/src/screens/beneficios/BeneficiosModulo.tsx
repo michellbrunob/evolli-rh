@@ -16,27 +16,36 @@ import type {
   SituacaoBeneficio,
 } from "../../api/beneficiosClient";
 import { Button } from "../../components";
-import {
-  formatarCompetenciaPorExtenso,
-  formatarMesReferencia,
-} from "../../format/data";
+import { formatarMesReferencia } from "../../format/data";
 import { formatarCentavos } from "../../format/moeda";
+import { plural } from "../../format/plural";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Sheet,
 } from "../../ui";
 import {
+  IconeBaixarArquivo,
   IconeBeneficios,
+  IconeCarteira,
+  IconeDinheiro,
+  IconeEquipe,
   IconeInformacao,
   IconeMais,
   IconeMaisAcoes,
 } from "../../ui/icones";
+import { competenciaDoMesAtual } from "../../app/rotasDoShell";
+import { baixarArquivo } from "../dashboard/exportacao";
+import { SeletorDePeriodo } from "../horarios/quadro/SeletorDePeriodo";
+import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
+import { PessoaNaLinha } from "./comuns";
 import {
-  competenciaDoMesAtual,
-  competenciaVizinha,
-} from "../../app/rotasDoShell";
+  nomeDaExportacao,
+  pdfDaLista,
+  planilhaDaLista,
+} from "./exportarBeneficios";
 import { AdicionarPessoasDoBeneficio } from "./AdicionarPessoasDoBeneficio";
 import { AssistenteDeBeneficio } from "./AssistenteDeBeneficio";
 import { DetalheDoBeneficio, JanelaDeSituacao } from "./DetalheDoBeneficio";
@@ -141,6 +150,7 @@ export function BeneficiosModulo({
       }}
       onAbrirOutro={(id, mensagem) => irPara({ tipo: "detalhe", id }, mensagem)}
       onAviso={setAviso}
+      onAbrirFicha={onAbrirFicha}
     />
   );
 }
@@ -162,6 +172,7 @@ function ListaDeBeneficios({
   onEditar,
   onAbrirOutro,
   onAviso,
+  onAbrirFicha,
 }: {
   readonly servico: ServicoDeBeneficios;
   readonly podeEditar: boolean;
@@ -173,10 +184,12 @@ function ListaDeBeneficios({
   readonly onEditar: (id: string) => Promise<void>;
   readonly onAbrirOutro: (id: string, mensagem: string) => void;
   readonly onAviso: (m: string | null) => void;
+  readonly onAbrirFicha: (colaboradorId: string) => void;
 }) {
   const [dados, setDados] = useState<ListaDeBeneficiosApi | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [aba, setAba] = useState<SituacaoBeneficio>("ativo");
+  const [verQuem, setVerQuem] = useState(false);
   const [janela, setJanela] = useState<{
     tipo: "pausar" | "encerrar" | "excluir";
     linha: LinhaDeBeneficioApi;
@@ -199,9 +212,25 @@ function ListaDeBeneficios({
   const contagem = (s: SituacaoBeneficio) =>
     (dados?.beneficios ?? []).filter((b) => b.situacao === s).length;
   const vazio = dados !== null && dados.beneficios.length === 0;
-  const opcoesDeMes = [-3, -2, -1, 0, 1, 2, 3].map((d) =>
-    competenciaVizinha(competenciaDoMesAtual(), d),
-  );
+  const resumo = dados?.resumo ?? null;
+  const mesCurto = formatarMesReferencia(competencia);
+
+  function exportar(formato: "xlsx" | "pdf") {
+    if (!dados) return;
+    if (formato === "xlsx") {
+      baixarArquivo(
+        planilhaDaLista(dados),
+        nomeDaExportacao(competencia, "xlsx"),
+        TIPO_MIME_XLSX,
+      );
+    } else {
+      baixarArquivo(
+        pdfDaLista(dados),
+        nomeDaExportacao(competencia, "pdf"),
+        "application/pdf",
+      );
+    }
+  }
 
   return (
     <div className="beneficios">
@@ -217,21 +246,47 @@ function ListaDeBeneficios({
         </div>
         {!vazio ? (
           <div className="beneficios__acoes-topo">
-            <select
-              className="beneficios__mes"
-              aria-label="Competência"
-              value={competencia}
-              onChange={(e) => onCompetencia(e.target.value)}
-            >
-              {opcoesDeMes.map((c) => (
-                <option key={c} value={c}>
-                  {formatarMesReferencia(c)}
-                </option>
-              ))}
-            </select>
+            <SeletorDePeriodo
+              tamanho="mes"
+              ancora={`${competencia}-01`}
+              semanaComeca={0}
+              onEscolher={(dia) => onCompetencia(dia.slice(0, 7))}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="evolli-button evolli-button--secondary"
+                aria-label="Exportar"
+                disabled={!dados}
+              >
+                <IconeBaixarArquivo tamanho={16} />
+                Exportar
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="beneficios__menu-exportar">
+                <DropdownMenuItem onSelect={() => exportar("pdf")}>
+                  <span className="beneficios__menu-opcao">
+                    <strong>Exportar em PDF</strong>
+                    <span className="beneficios__suave">
+                      Relatório da competência
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportar("xlsx")}>
+                  <span className="beneficios__menu-opcao">
+                    <strong>Exportar em Excel</strong>
+                    <span className="beneficios__suave">
+                      Planilha com custos e descontos
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                <RadixMenu.Separator className="beneficios__menu-divisor" />
+                <p className="beneficios__menu-nota">
+                  {`Competência ${mesCurto}. Entram todos os benefícios, de todas as abas.`}
+                </p>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {podeEditar ? (
               <Button onClick={onNovo}>
-                <IconeMais tamanho={18} />
+                <IconeMais tamanho={16} />
                 Novo benefício
               </Button>
             ) : null}
@@ -270,7 +325,7 @@ function ListaDeBeneficios({
             </p>
             {podeEditar ? (
               <Button onClick={onNovo}>
-                <IconeMais tamanho={18} />
+                <IconeMais tamanho={16} />
                 Cadastrar primeiro benefício
               </Button>
             ) : null}
@@ -325,16 +380,18 @@ function ListaDeBeneficios({
             ))}
           </div>
           {linhas.length === 0 ? (
-            <p className="beneficios__suave beneficios__sem-linhas">
-              {aba === "pausado"
-                ? "Nenhum benefício pausado."
-                : aba === "encerrado"
-                  ? "Nenhum benefício encerrado."
-                  : "Nenhum benefício ativo."}
-            </p>
+            <div className="beneficios__aba-vazia">
+              <strong>{VAZIO_DA_ABA[aba].titulo}</strong>
+              <span className="beneficios__suave">
+                {VAZIO_DA_ABA[aba].texto}
+              </span>
+            </div>
           ) : (
             <div className="beneficios__tabela-caixa">
-              <table className="beneficios__tabela" aria-label="Benefícios">
+              <table
+                className="beneficios__tabela beneficios__tabela--lista"
+                aria-label="Benefícios"
+              >
                 <thead>
                   <tr>
                     <th scope="col">Benefício</th>
@@ -382,115 +439,118 @@ function ListaDeBeneficios({
                             </span>
                           </button>
                         </td>
-                        <td className="beneficios__numero">{b.pessoas}</td>
+                        <td className="beneficios__numero">
+                          {b.pessoas}
+                          {b.dependentes > 0 ? (
+                            <span className="beneficios__suave beneficios__dep">
+                              {` + ${b.dependentes} dep.`}
+                            </span>
+                          ) : null}
+                        </td>
                         <td className="beneficios__numero beneficios__forte">
                           {formatarCentavos(b.empresa)}
                         </td>
                         <td className="beneficios__numero">
                           {formatarCentavos(b.desconto)}
                         </td>
-                        <td className="beneficios__acoes-linha">
-                          <Button
-                            variant="secondary"
-                            onClick={() => onAbrir(b.id)}
-                          >
-                            Ver mais
-                          </Button>
-                          {podeEditar ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                className="beneficios__menu-botao"
-                                aria-label={`Ações de ${b.nome}`}
-                              >
-                                <IconeMaisAcoes tamanho={18} />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem
-                                  onSelect={() => onAbrir(b.id)}
-                                >
-                                  Ver valores e pessoas
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => void onEditar(b.id)}
-                                >
-                                  Editar configuração
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={async () => {
-                                    try {
-                                      const copia =
-                                        await servico.duplicarBeneficio(b.id);
-                                      onAbrirOutro(
-                                        copia.id,
-                                        "Benefício duplicado. Agora é só escolher quem recebe.",
-                                      );
-                                    } catch {
-                                      onAviso(
-                                        "Não foi possível duplicar. Tente de novo.",
-                                      );
-                                    }
-                                  }}
-                                >
-                                  Duplicar benefício
-                                </DropdownMenuItem>
-                                <RadixMenu.Separator className="beneficios__menu-divisor" />
-                                {b.situacao === "ativo" ? (
-                                  <>
-                                    <DropdownMenuItem
-                                      onSelect={() =>
-                                        setJanela({ tipo: "pausar", linha: b })
-                                      }
-                                    >
-                                      Pausar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onSelect={() =>
-                                        setJanela({
-                                          tipo: "encerrar",
-                                          linha: b,
-                                        })
-                                      }
-                                    >
-                                      Encerrar
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onSelect={async () => {
-                                      await servico.reativarBeneficio(b.id);
-                                      onAviso(`${b.nome} reativado.`);
-                                      await carregar();
-                                    }}
-                                  >
-                                    Reativar
-                                  </DropdownMenuItem>
-                                )}
-                                <RadixMenu.Separator className="beneficios__menu-divisor" />
-                                <DropdownMenuItem
-                                  className="beneficios__menu-perigo"
-                                  onSelect={() =>
-                                    setJanela({ tipo: "excluir", linha: b })
-                                  }
-                                >
-                                  Excluir
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
+                        <td>
+                          <div className="beneficios__acoes-linha">
+                            <Button
+                              variant="secondary"
+                              aria-label={`Ver mais sobre ${b.nome}`}
+                              onClick={() => onAbrir(b.id)}
+                            >
+                              Ver mais
+                            </Button>
+                            {podeEditar ? (
+                              <MenuDaLinha
+                                linha={b}
+                                servico={servico}
+                                onAbrir={onAbrir}
+                                onEditar={onEditar}
+                                onAbrirOutro={onAbrirOutro}
+                                onAviso={onAviso}
+                                onJanela={(tipo) =>
+                                  setJanela({ tipo, linha: b })
+                                }
+                                onRecarregar={carregar}
+                              />
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
+                {aba === "ativo" && resumo ? (
+                  <tfoot>
+                    <tr>
+                      <th scope="row">
+                        <span className="beneficios__pessoa-textos">
+                          <span className="beneficios__pessoa-nome">
+                            Total da competência
+                          </span>
+                          <span className="beneficios__suave">
+                            {`${plural(resumo.beneficiosAtivos, "benefício ativo", "benefícios ativos")} · ${plural(resumo.pessoas, "pessoa", "pessoas")}`}
+                          </span>
+                        </span>
+                      </th>
+                      <td />
+                      <td className="beneficios__numero beneficios__forte">
+                        {formatarCentavos(resumo.empresa)}
+                      </td>
+                      <td className="beneficios__numero beneficios__forte">
+                        {formatarCentavos(resumo.desconto)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                ) : null}
               </table>
             </div>
           )}
           <p className="beneficios__nota-linha">
             <IconeInformacao tamanho={14} />
-            {`Custos de ${formatarCompetenciaPorExtenso(competencia)}. Clique em um benefício para ver como é calculado e o valor de cada pessoa.`}
+            {`Custos da competência ${mesCurto}. Clique em um benefício para ver como é calculado e o valor de cada pessoa.`}
           </p>
+          {resumo ? (
+            <ResumoDaCompetencia
+              resumo={resumo}
+              competencia={competencia}
+              onVerQuem={() => setVerQuem(true)}
+            />
+          ) : null}
         </>
       )}
+
+      {resumo ? (
+        <Sheet
+          aberto={verQuem}
+          titulo="Sem nenhum benefício"
+          subtitulo={`${plural(resumo.semBeneficio.length, "pessoa ativa", "pessoas ativas")} em ${mesCurto}`}
+          onFechar={() => setVerQuem(false)}
+        >
+          {resumo.semBeneficio.length === 0 ? (
+            <p className="beneficios__suave">
+              Todas as pessoas ativas recebem pelo menos um benefício.
+            </p>
+          ) : (
+            <ul className="beneficios__lista-pessoas">
+              {resumo.semBeneficio.map((p) => (
+                <li key={p.colaboradorId}>
+                  <button
+                    type="button"
+                    className="beneficios__pessoa-botao"
+                    onClick={() => onAbrirFicha(p.colaboradorId)}
+                  >
+                    <PessoaNaLinha nome={p.nome} detalhe={p.cargo} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Sheet>
+      ) : null}
 
       {janela ? (
         <JanelaDeSituacao
@@ -509,5 +569,190 @@ function ListaDeBeneficios({
         />
       ) : null}
     </div>
+  );
+}
+
+const VAZIO_DA_ABA: Readonly<
+  Record<SituacaoBeneficio, { titulo: string; texto: string }>
+> = {
+  ativo: {
+    titulo: "Nenhum benefício ativo",
+    texto: "Benefícios ativos entram no cálculo de cada competência.",
+  },
+  pausado: {
+    titulo: "Nenhum benefício pausado",
+    texto:
+      "Benefícios pausados aparecem aqui e podem ser reativados quando quiser.",
+  },
+  encerrado: {
+    titulo: "Nenhum benefício encerrado",
+    texto: "Benefícios encerrados ficam aqui com todo o histórico de valores.",
+  },
+};
+
+/** Os três números da competência, embaixo da tabela. */
+function ResumoDaCompetencia({
+  resumo,
+  competencia,
+  onVerQuem,
+}: {
+  readonly resumo: ListaDeBeneficiosApi["resumo"];
+  readonly competencia: string;
+  readonly onVerQuem: () => void;
+}) {
+  const cobertos = resumo.ativos - resumo.semBeneficio.length;
+  const pct =
+    resumo.ativos > 0 ? Math.round((cobertos / resumo.ativos) * 100) : 0;
+  return (
+    <section className="beneficios__painel" aria-label="Resumo da competência">
+      <div className="beneficios__painel-item">
+        <h2 className="beneficios__painel-titulo">
+          <span className="beneficios__icone-cat" aria-hidden="true">
+            <IconeDinheiro tamanho={16} />
+          </span>
+          Investimento da empresa
+        </h2>
+        <p className="beneficios__painel-valor">
+          {formatarCentavos(resumo.empresa)}
+          <span className="beneficios__suave">/mês</span>
+        </p>
+        <p className="beneficios__suave">
+          {`Competência ${formatarMesReferencia(competencia)} · ${plural(resumo.beneficiosAtivos, "benefício ativo", "benefícios ativos")}`}
+        </p>
+      </div>
+      <div className="beneficios__painel-item">
+        <h2 className="beneficios__painel-titulo">
+          <span className="beneficios__icone-cat" aria-hidden="true">
+            <IconeCarteira tamanho={16} />
+          </span>
+          Descontado em folha
+        </h2>
+        <p className="beneficios__painel-valor">
+          {formatarCentavos(resumo.desconto)}
+        </p>
+        <p className="beneficios__suave">
+          {`Parte paga pelos colaboradores · ${plural(resumo.comDesconto, "pessoa", "pessoas")}`}
+        </p>
+      </div>
+      <div className="beneficios__painel-item">
+        <div className="beneficios__painel-cabeca">
+          <h2 className="beneficios__painel-titulo">
+            <span className="beneficios__icone-cat" aria-hidden="true">
+              <IconeEquipe tamanho={16} />
+            </span>
+            Cobertura do time
+          </h2>
+          <button
+            type="button"
+            className="beneficios__link"
+            onClick={onVerQuem}
+          >
+            Ver quem
+          </button>
+        </div>
+        <p className="beneficios__painel-valor">
+          {cobertos}
+          <span className="beneficios__suave">{`de ${resumo.ativos} ativos`}</span>
+        </p>
+        <div className="beneficios__painel-barra">
+          <span
+            role="progressbar"
+            aria-label="Cobertura do time"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+            className="beneficios__barra"
+          >
+            <span style={{ width: `${pct}%` }} />
+          </span>
+          <span className="beneficios__suave">
+            {`${resumo.semBeneficio.length} sem nenhum benefício`}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** O ⋯ de cada benefício da lista. */
+function MenuDaLinha({
+  linha: b,
+  servico,
+  onAbrir,
+  onEditar,
+  onAbrirOutro,
+  onAviso,
+  onJanela,
+  onRecarregar,
+}: {
+  readonly linha: LinhaDeBeneficioApi;
+  readonly servico: ServicoDeBeneficios;
+  readonly onAbrir: (id: string) => void;
+  readonly onEditar: (id: string) => Promise<void>;
+  readonly onAbrirOutro: (id: string, mensagem: string) => void;
+  readonly onAviso: (m: string | null) => void;
+  readonly onJanela: (tipo: "pausar" | "encerrar" | "excluir") => void;
+  readonly onRecarregar: () => Promise<void>;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="beneficios__menu-botao"
+        aria-label={`Ações de ${b.nome}`}
+      >
+        <IconeMaisAcoes tamanho={18} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onSelect={() => onAbrir(b.id)}>
+          Ver valores e pessoas
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void onEditar(b.id)}>
+          Editar configuração
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={async () => {
+            try {
+              const copia = await servico.duplicarBeneficio(b.id);
+              onAbrirOutro(
+                copia.id,
+                "Benefício duplicado. Agora é só escolher quem recebe.",
+              );
+            } catch {
+              onAviso("Não foi possível duplicar. Tente de novo.");
+            }
+          }}
+        >
+          Duplicar benefício
+        </DropdownMenuItem>
+        <RadixMenu.Separator className="beneficios__menu-divisor" />
+        {b.situacao === "ativo" ? (
+          <>
+            <DropdownMenuItem onSelect={() => onJanela("pausar")}>
+              Pausar
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onJanela("encerrar")}>
+              Encerrar
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <DropdownMenuItem
+            onSelect={async () => {
+              await servico.reativarBeneficio(b.id);
+              onAviso(`${b.nome} reativado.`);
+              await onRecarregar();
+            }}
+          >
+            Reativar
+          </DropdownMenuItem>
+        )}
+        <RadixMenu.Separator className="beneficios__menu-divisor" />
+        <DropdownMenuItem
+          className="beneficios__menu-perigo"
+          onSelect={() => onJanela("excluir")}
+        >
+          Excluir
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
