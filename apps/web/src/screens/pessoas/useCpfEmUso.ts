@@ -26,9 +26,12 @@ export function useCpfEmUso(
   useEffect(() => {
     if (!consultavel) return;
     const espera = setTimeout(() => {
-      (ignorarColaboradorId
-        ? consultarCpfEmUso(digitos, ignorarColaboradorId)
-        : consultarCpfEmUso(digitos)
+      // Promise.resolve: uma resposta fora do contrato (sem promessa) vira
+      // "não sei" em vez de derrubar a tela.
+      Promise.resolve(
+        ignorarColaboradorId
+          ? consultarCpfEmUso(digitos, ignorarColaboradorId)
+          : consultarCpfEmUso(digitos),
       ).then(
         (resposta) => {
           if (resposta === true) setEmUso(digitos);
