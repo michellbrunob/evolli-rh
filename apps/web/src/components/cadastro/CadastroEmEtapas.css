@@ -688,7 +688,7 @@ button.cadastro-etapas__etapa-passo:focus-visible {
 
 .cadastro-etapas__linha-ajuda {
   font-size: 0.8125rem;
-  line-height: 1.45;
+  line-height: var(--leading-body);
   color: var(--cadastro-texto-suave);
 }
 

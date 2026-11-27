@@ -14,7 +14,7 @@ export type ButtonVariant = "primary" | "secondary" | "subtle" | "danger";
 
 /** T215 — o comum aos botões; a altura vem de BASE (texto) ou do botão de ícone. */
 const COMUM =
-  "ev:inline-flex ev:items-center ev:justify-center ev:gap-2 ev:rounded-[var(--radius-botao)] ev:border ev:font-[inherit] ev:font-semibold ev:leading-none ev:cursor-pointer ev:disabled:cursor-not-allowed ev:disabled:opacity-50 ev:aria-disabled:cursor-not-allowed";
+  "ev:inline-flex ev:items-center ev:justify-center ev:gap-2 ev:rounded-[var(--radius-botao)] ev:border ev:font-[inherit] ev:font-semibold ev:leading-none ev:whitespace-nowrap ev:cursor-pointer ev:disabled:cursor-not-allowed ev:disabled:opacity-50 ev:aria-disabled:cursor-not-allowed";
 const BASE = `${COMUM} ev:min-h-[var(--altura-botao)]`;
 
 const VARIANTS: Readonly<Record<ButtonVariant, string>> = {

@@ -50,6 +50,8 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
     expect(b).toHaveAttribute("data-variant", "primary");
     // T215 — altura padrão do botão de texto.
     expect(b.className).toMatch(/ev:min-h-\[var\(--altura-botao\)\]/);
+    // T216 — o rótulo não quebra linha dentro do botão.
+    expect(b.className).toMatch(/ev:whitespace-nowrap/);
   });
 
   it("IconButton exige rótulo; o ícone é decorativo", () => {
@@ -167,6 +169,20 @@ describe("T209 — Tabs (ativação manual)", () => {
     expect(abas[1]).toHaveAttribute("aria-selected", "true");
     expect(abas[1]).toHaveAttribute("aria-controls", "painel");
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Aba b");
+  });
+
+  it("T216 — cada aba leva a classe da aba sublinhada padrão, somada à de quem usa", () => {
+    render(
+      <TabsList label="Grupos">
+        <TabsTrigger selected controls="p" className="tela__aba">
+          Aba
+        </TabsTrigger>
+      </TabsList>,
+    );
+    expect(screen.getByRole("tab", { name: "Aba" })).toHaveClass(
+      "evolli-aba",
+      "tela__aba",
+    );
   });
 });
 

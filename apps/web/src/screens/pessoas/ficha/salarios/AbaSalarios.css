@@ -446,7 +446,7 @@
   font-weight: var(--weight-strong);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
-  line-height: 1.45;
+  line-height: var(--leading-body);
 }
 
 .salarios__cortado {

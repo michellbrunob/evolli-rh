@@ -19,6 +19,8 @@
   line-height: 1;
   letter-spacing: 0;
   text-align: center;
+  /* T216 — o rótulo não quebra linha dentro do botão. */
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
 }
