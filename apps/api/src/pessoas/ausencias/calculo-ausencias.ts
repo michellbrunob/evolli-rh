@@ -299,16 +299,16 @@ export function indiceDoPeriodoAtual(
 
 /**
  * De que período as férias que começam em `inicio` descontam: o mais antigo
- * já completo antes do início, ainda dentro do prazo de gozo, com saldo; ou
- * o pedido (`pedido`), se ele cumprir as mesmas condições.
+ * já completo antes do início, com saldo; ou o pedido (`pedido`), se ele
+ * cumprir as mesmas condições. Período vencido (depois do prazo de gozo)
+ * também serve: a CLT manda conceder, com pagamento em dobro (art. 137).
  */
 export function periodoParaFerias(
   periodos: readonly PeriodoAquisitivo[],
   inicio: Dia,
   pedido?: Dia | null,
 ): PeriodoAquisitivo | null {
-  const serve = (p: PeriodoAquisitivo) =>
-    p.fim < inicio && inicio <= p.prazoGozo && p.direito > 0;
+  const serve = (p: PeriodoAquisitivo) => p.fim < inicio && p.direito > 0;
   if (pedido) {
     const p = periodos.find((x) => x.inicio === pedido);
     return p && serve(p) ? p : null;
@@ -332,7 +332,21 @@ export type AvisoClt =
       regra: "inicio_antes_de_descanso";
       antesDe: "domingo" | "feriado";
       dia: Dia;
-    };
+    }
+  /** Dias gozados depois do prazo de gozo: pagos em dobro (art. 137). */
+  | { regra: "pagamento_em_dobro"; dias: number; prazoGozo: Dia };
+
+/** Quantos dias de `inicio` a `fim` caem depois do prazo de gozo. */
+export function diasEmDobro(
+  periodo: { prazoGozo: Dia },
+  inicio: Dia,
+  fim: Dia,
+): number {
+  if (fim <= periodo.prazoGozo) return 0;
+  const de =
+    inicio > periodo.prazoGozo ? inicio : somarDias(periodo.prazoGozo, 1);
+  return diasCorridos(de, fim);
+}
 
 export function avisosDaClt(entrada: {
   inicio: Dia;
@@ -341,6 +355,8 @@ export function avisosDaClt(entrada: {
   periodo: PeriodoAquisitivo;
   /** As outras férias já lançadas nesse período (sem as vendas). */
   outrasFerias: readonly { inicio: Dia; fim: Dia }[];
+  /** Os dias vendidos nestas férias (também saem do saldo). */
+  diasVendidos?: number;
 }): AvisoClt[] {
   const avisos: AvisoClt[] = [];
   for (const d of [1, 2]) {
@@ -369,8 +385,18 @@ export function avisosDaClt(entrada: {
   const jaHouve14 = entrada.outrasFerias.some(
     (f) => diasCorridos(f.inicio, f.fim) >= 14,
   );
-  if (dias < 14 && !jaHouve14 && entrada.periodo.disponiveis - dias < 14) {
+  const sobra =
+    entrada.periodo.disponiveis - dias - (entrada.diasVendidos ?? 0);
+  if (dias < 14 && !jaHouve14 && sobra < 14) {
     avisos.push({ regra: "um_com_14" });
+  }
+  const emDobro = diasEmDobro(entrada.periodo, entrada.inicio, entrada.fim);
+  if (emDobro > 0) {
+    avisos.push({
+      regra: "pagamento_em_dobro",
+      dias: emDobro,
+      prazoGozo: entrada.periodo.prazoGozo,
+    });
   }
   return avisos;
 }
@@ -378,6 +404,17 @@ export function avisosDaClt(entrada: {
 /** Até 1/3 do direito, no máximo 10 dias (CLT, art. 143). */
 export function maxVendaveis(direito: number): number {
   return Math.min(10, Math.floor(direito / 3));
+}
+
+/**
+ * O que ainda dá para vender no período: o limite (1/3, no máximo 10) menos
+ * o que as outras férias do mesmo período já venderam.
+ */
+export function vendaveisRestantes(
+  direito: number,
+  jaVendidos: number,
+): number {
+  return Math.max(0, maxVendaveis(direito) - jaVendidos);
 }
 
 /** Pedido do abono até 15 dias antes do fim do período (art. 143, § 1º). */

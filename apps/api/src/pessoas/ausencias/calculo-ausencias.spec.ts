@@ -17,6 +17,7 @@ import {
   somarDias,
   somarMeses,
   type AusenciaDoSaldo,
+  vendaveisRestantes,
 } from "./calculo-ausencias";
 
 /**
@@ -147,7 +148,7 @@ describe("T215 — cálculos de ausências", () => {
       expect(regraDeFeriasDoTipo(tipo)).toBe(regra);
     });
 
-    it("de que período as férias descontam: o mais antigo completo e ainda no prazo, com saldo", () => {
+    it("de que período as férias descontam: o mais antigo completo com saldo (vencido também)", () => {
       const p = periodosAquisitivos({
         admissao: "2024-01-01",
         ate: "2027-01-05",
@@ -155,8 +156,10 @@ describe("T215 — cálculos de ausências", () => {
         direito: 30,
         ausencias: sem,
       });
-      expect(periodoParaFerias(p, "2027-01-05")?.inicio).toBe("2026-01-01");
-      expect(periodoParaFerias(p, "2026-12-01")?.inicio).toBe("2025-01-01");
+      // Em 05/01/2027 os períodos de 2024 e 2025 já venceram: o mais antigo
+      // com saldo vem primeiro (CLT art. 137, pago em dobro).
+      expect(periodoParaFerias(p, "2027-01-05")?.inicio).toBe("2024-01-01");
+      expect(periodoParaFerias(p, "2026-12-01")?.inicio).toBe("2024-01-01");
       // Pedido explícito, mas ainda em aquisição na data: não serve.
       expect(periodoParaFerias(p, "2026-12-01", "2026-01-01")).toBeNull();
       expect(periodoParaFerias(p, "2026-12-01", "2025-01-01")?.inicio).toBe(
@@ -473,6 +476,87 @@ describe("T215 — cálculos de ausências", () => {
           outrasFerias: [{ inicio: "2026-02-02", fim: "2026-02-15" }],
         }).some((a) => a.regra === "um_com_14"),
       ).toBe(false);
+    });
+  });
+
+  describe("correções da revisão (T215)", () => {
+    const periodo = {
+      inicio: "2024-01-01",
+      fim: "2024-12-31",
+      direito: 30,
+      solicitados: 0,
+      disponiveis: 30,
+      prazoGozo: "2025-12-31",
+      situacao: "vencido" as const,
+      encurtado: null,
+    };
+
+    it("período vencido com saldo ainda é agendável (CLT art. 137: em dobro)", () => {
+      const p = periodosAquisitivos({
+        admissao: "2024-01-01",
+        ate: "2026-11-26",
+        hoje: "2026-11-26",
+        direito: 30,
+        ausencias: [],
+      });
+      expect(p[0]!.situacao).toBe("vencido");
+      expect(periodoParaFerias(p, "2026-12-01")?.inicio).toBe("2024-01-01");
+      expect(periodoParaFerias(p, "2026-12-01", "2024-01-01")?.inicio).toBe(
+        "2024-01-01",
+      );
+    });
+
+    it("aviso de pagamento em dobro: os dias depois do prazo de gozo", () => {
+      expect(
+        avisosDaClt({
+          inicio: "2025-12-29",
+          fim: "2026-01-11",
+          periodo,
+          outrasFerias: [],
+        }),
+      ).toContainEqual({
+        regra: "pagamento_em_dobro",
+        dias: 11,
+        prazoGozo: "2025-12-31",
+      });
+      expect(
+        avisosDaClt({
+          inicio: "2025-12-01",
+          fim: "2025-12-14",
+          periodo,
+          outrasFerias: [],
+        }).some((a) => a.regra === "pagamento_em_dobro"),
+      ).toBe(false);
+    });
+
+    it("um com 14 dias: os dias vendidos também saem do que sobra", () => {
+      const disponivel = { ...periodo, prazoGozo: "2026-12-31" };
+      // 10 dias agora e 10 vendidos: sobram 10 — não cabe mais um de 14.
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-12",
+          periodo: disponivel,
+          outrasFerias: [],
+          diasVendidos: 10,
+        }),
+      ).toContainEqual({ regra: "um_com_14" });
+      expect(
+        avisosDaClt({
+          inicio: "2026-08-03",
+          fim: "2026-08-12",
+          periodo: disponivel,
+          outrasFerias: [],
+          diasVendidos: 0,
+        }).some((a) => a.regra === "um_com_14"),
+      ).toBe(false);
+    });
+
+    it("venda: o limite do período desconta o que já foi vendido nele", () => {
+      expect(vendaveisRestantes(30, 0)).toBe(10);
+      expect(vendaveisRestantes(30, 6)).toBe(4);
+      expect(vendaveisRestantes(30, 10)).toBe(0);
+      expect(vendaveisRestantes(12, 9)).toBe(0);
     });
   });
 

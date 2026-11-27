@@ -14,6 +14,7 @@ import {
 import {
   type RegrasDaPolitica,
   type ViolacaoDaPolitica,
+  incoerenciasDaPolitica,
   principaisRegras,
   violacoesDaPolitica,
 } from "./politica-ferias";
@@ -251,6 +252,7 @@ export class PoliticasFeriasService {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     this.conferirForma(dto);
     const criada = await this.prisma.$transaction(async (tx) => {
+      await this.conferirAlvos(tx, dto, empresaId);
       const p = await tx.politicaFerias.create({
         data: {
           empresaId,
@@ -291,6 +293,7 @@ export class PoliticasFeriasService {
           empresaId,
         );
       }
+      await this.conferirAlvos(tx, dto, empresaId);
       const p = await tx.politicaFerias.update({
         where: { id: atual.id },
         data: this.dados(dto),
@@ -459,6 +462,46 @@ export class PoliticasFeriasService {
         { campo: "alvos", motivo: "obrigatorio" },
       ]);
     }
+    const incoerencias = incoerenciasDaPolitica(dto.regras);
+    if (incoerencias.length > 0) {
+      throw new CamposRecusadosException(incoerencias);
+    }
+  }
+
+  /**
+   * Os alvos ("algumas") precisam ser da empresa ativa: departamento e
+   * unidade dela, pessoa com vínculo nela. Outro id responde igual ao
+   * inexistente (`indisponivel`), sem revelar outra empresa.
+   */
+  private async conferirAlvos(
+    db: Prisma.TransactionClient,
+    dto: PoliticaFeriasDto,
+    empresaId: string,
+  ): Promise<void> {
+    if (dto.abrangencia !== "algumas") return;
+    const ids = (tipo: AlvoDaPolitica["tipo"]) => [
+      ...new Set(dto.alvos.filter((a) => a.tipo === tipo).map((a) => a.id)),
+    ];
+    const [deps, unidades, pessoas] = await Promise.all([
+      db.departamento.count({
+        where: { id: { in: ids("departamento") }, empresaId },
+      }),
+      db.unidadeOrganizacional.count({
+        where: { id: { in: ids("unidade") }, empresaId },
+      }),
+      db.colaborador.count({
+        where: { id: { in: ids("pessoa") }, vinculos: { some: { empresaId } } },
+      }),
+    ]);
+    if (
+      deps !== ids("departamento").length ||
+      unidades !== ids("unidade").length ||
+      pessoas !== ids("pessoa").length
+    ) {
+      throw new CamposRecusadosException([
+        { campo: "alvos", motivo: "indisponivel" },
+      ]);
+    }
   }
 
   private dados(dto: PoliticaFeriasDto) {
@@ -495,8 +538,9 @@ export class PoliticasFeriasService {
         where: { id: { in: ids("unidade") }, empresaId },
         select: { id: true, nome: true },
       }),
+      // Só quem tem vínculo na empresa: nunca o nome de outra empresa.
       this.prisma.colaborador.findMany({
-        where: { id: { in: ids("pessoa") } },
+        where: { id: { in: ids("pessoa") }, vinculos: { some: { empresaId } } },
         select: { id: true, nome: true },
       }),
     ]);

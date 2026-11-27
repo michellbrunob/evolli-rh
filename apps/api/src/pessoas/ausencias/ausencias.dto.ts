@@ -227,6 +227,19 @@ export class AlterarAusenciaDto {
   @IsBoolean()
   aprovada!: boolean;
 
+  /** T215 — férias coletivas (art. 140), como no registro. */
+  @IsOptional()
+  @IsBoolean()
+  feriasColetivas?: boolean;
+
+  /** T215 — fora da política: o porquê, como no registro. */
+  @Transform(({ value }) => textoOpcional(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(SEM_CONTROLE_COM_LINHA)
+  motivoForaDaPolitica?: string;
+
   @Transform(({ value }) => textoOpcional(value))
   @IsOptional()
   @IsString()

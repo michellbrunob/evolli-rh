@@ -1,5 +1,6 @@
 import {
   type RegrasDaPolitica,
+  incoerenciasDaPolitica,
   REGRAS_VAZIAS,
   principaisRegras,
   violacoesDaPolitica,
@@ -212,6 +213,83 @@ describe("T215 — política de férias: o que não segue", () => {
         foraNaEquipe: 2,
       }),
     ).toEqual([{ regra: "equipe", fora: 2, maximo: 2 }]);
+  });
+
+  it("antecedência mínima não vale para registro retroativo (início hoje ou antes)", () => {
+    const r = regras({ antecedenciaMinimaDias: 30 });
+    expect(
+      violacoesDaPolitica({
+        ...base,
+        regras: r,
+        inicio: "2026-11-10",
+        fim: "2026-11-20",
+      }),
+    ).toEqual([]);
+    expect(
+      violacoesDaPolitica({
+        ...base,
+        regras: r,
+        inicio: "2026-11-26",
+        fim: "2026-12-05",
+      }),
+    ).toEqual([]);
+    expect(
+      violacoesDaPolitica({
+        ...base,
+        regras: r,
+        inicio: "2026-11-27",
+        fim: "2026-12-05",
+      }),
+    ).toEqual([{ regra: "antecedencia_minima", dias: 1, minimo: 30 }]);
+  });
+
+  it("política incoerente: bloqueio com fim antes do início e duração mínima acima da máxima", () => {
+    expect(incoerenciasDaPolitica(REGRAS_VAZIAS)).toEqual([]);
+    expect(
+      incoerenciasDaPolitica(
+        regras({
+          bloqueios: [
+            {
+              nome: "Inventário",
+              inicio: "2027-03-10",
+              fim: "2027-03-01",
+              todoAno: false,
+            },
+          ],
+        }),
+      ),
+    ).toEqual([{ campo: "regras.bloqueios", motivo: "fim_antes_do_inicio" }]);
+    // Todo ano: virar o ano é válido (20/12 a 05/01).
+    expect(
+      incoerenciasDaPolitica(
+        regras({
+          bloqueios: [
+            {
+              nome: "Fim de ano",
+              inicio: "2026-12-20",
+              fim: "2027-01-05",
+              todoAno: true,
+            },
+            {
+              nome: "Fechamento",
+              inicio: "2027-12-20",
+              fim: "2027-01-05",
+              todoAno: true,
+            },
+          ],
+        }),
+      ),
+    ).toEqual([]);
+    expect(
+      incoerenciasDaPolitica(
+        regras({ duracaoMinimaDias: 20, duracaoMaximaDias: 10 }),
+      ),
+    ).toEqual([{ campo: "regras.duracaoMaximaDias", motivo: "fora_de_ordem" }]);
+    expect(
+      incoerenciasDaPolitica(
+        regras({ duracaoMinimaDias: 10, duracaoMaximaDias: 10 }),
+      ),
+    ).toEqual([]);
   });
 });
 

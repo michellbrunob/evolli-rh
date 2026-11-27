@@ -2870,6 +2870,8 @@ model Ausencia {
   /// T215 — registrado fora da política de férias: qual e por quê.
   politicaFeriasId        String?            @map("politica_ferias_id")
   motivoForaDaPolitica    String?            @map("motivo_fora_da_politica")
+  /// T215 — férias coletivas (CLT art. 140): abrem um reinício do período.
+  feriasColetivas         Boolean            @default(false) @map("ferias_coletivas")
   /// T215 — excluída (como a referência): sai de tudo, o registro fica.
   excluidaEm              DateTime?          @map("excluida_em")
   excluidaPorId           String?            @map("excluida_por_id")
@@ -2886,6 +2888,8 @@ model Ausencia {
 
   /// T215 — o atestado ou documento da ausência (um vivo por vez).
   anexos AnexoAusencia[]
+  /// T215 — o reinício que a coletiva abriu (desfeito junto com ela).
+  reinicios ReinicioPeriodoAquisitivo[]
 
   @@index([empresaId, inicio])
   @@index([empresaId, status])
@@ -2957,6 +2961,8 @@ model ReinicioPeriodoAquisitivo {
   registradoPorId     String                @map("registrado_por_id")
   removidoEm          DateTime?             @map("removido_em")
   removidoPorId       String?               @map("removido_por_id")
+  /// T215 — criado pelas férias coletivas desta ausência (nulo: manual).
+  ausenciaId          String?               @map("ausencia_id")
   criadoEm            DateTime              @default(now()) @map("criado_em")
 
   empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -2964,8 +2970,10 @@ model ReinicioPeriodoAquisitivo {
   vinculo       VinculoFuncional @relation(fields: [vinculoId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
   registradoPor AccessUser       @relation("ReinicioPeriodoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   removidoPor   AccessUser?      @relation("ReinicioPeriodoRemovidoPor", fields: [removidoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ausencia      Ausencia?        @relation(fields: [ausenciaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([vinculoId, empresaId])
+  @@index([ausenciaId])
   @@map("reinicio_periodo_aquisitivo")
 }
 

@@ -37,8 +37,8 @@ import {
   direitoDoTipo,
   indiceDoPeriodoAtual,
   hojeEmSaoPaulo,
-  maxVendaveis,
   periodoParaFerias,
+  vendaveisRestantes,
   periodosAquisitivos,
   prazoDoAbono,
   type RegraDeFerias,
@@ -85,6 +85,10 @@ export interface AusenciaApi {
   decididoEm: string | null;
   /** T215 — o atestado ou documento anexado (vivo), sem nome nem chave. */
   anexo: { formato: string; tamanhoBytes: number; enviadoEm: string } | null;
+  /** T215 — férias coletivas (art. 140), que abrem um novo período. */
+  feriasColetivas: boolean;
+  /** T215 — registrada fora da política de férias: o porquê. */
+  motivoForaDaPolitica: string | null;
 }
 
 export interface IndicadoresDeAusencias {
@@ -112,7 +116,10 @@ export interface SimulacaoDeAusencia {
   periodo: { inicio: Dia; fim: Dia } | null;
   saldoAntes: number | null;
   saldoDepois: number | null;
+  /** O que ainda dá para vender no período (o limite menos o já vendido). */
   maxVendaveis: number | null;
+  /** T215 — dias já vendidos por outras férias do mesmo período. */
+  vendidosNoPeriodo: number | null;
   prazoAbono: Dia | null;
   /** T215 — a regra de férias do vínculo da pessoa. */
   regraDeFerias: RegraDeFerias;
@@ -390,6 +397,8 @@ export class AusenciasService {
     const erros = validarForma(dto);
     if (principal.situacao !== "ativo") {
       erros.push({ campo: "colaboradorId", motivo: "indisponivel" });
+    } else if (erros.length === 0) {
+      erros.push(...foraDoVinculo(principal, dto.inicio, dto.fim ?? null));
     }
     const regra = regraDeFeriasDoTipo(principal.tipo);
     if (dto.tipo === "ferias" && regra === "sem_ferias") {
@@ -454,24 +463,18 @@ export class AusenciasService {
           { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
         ]);
       }
+      // O reinício da coletiva não pode tirar o período de férias já
+      // lançadas (a mesma conferência do "Ajustar período").
       if (coletiva && !jaReiniciado) {
-        const reinicio = await tx.reinicioPeriodoAquisitivo.create({
-          data: {
-            empresaId,
-            colaboradorId: dto.colaboradorId,
-            vinculoId: principal.id,
-            inicio: dataDoDia(dto.inicio),
-            motivo: "ferias_coletivas",
-            registradoPorId: ctx.actor.id,
-          },
-        });
-        await this.auditoria.registrarMutacao(
+        await this.conferirFeriasLancadas(
           tx,
-          ctx,
-          "pessoas_periodo_reiniciado",
-          "reinicio_periodo",
-          reinicio.id,
+          principal,
+          dto.colaboradorId,
           empresaId,
+          [
+            ...(await this.reiniciosDoVinculo(tx, principal.id, empresaId)),
+            reinicioDaColetiva(dto.inicio),
+          ],
         );
       }
 
@@ -492,6 +495,7 @@ export class AusenciasService {
             : null,
           status: aprovada ? "aprovada" : "aguardando_rh",
           observacao: dto.observacao ?? null,
+          feriasColetivas: coletiva,
           ...(foraDaPolitica
             ? {
                 politicaFeriasId: avaliacao.id,
@@ -513,6 +517,14 @@ export class AusenciasService {
         criada.id,
         empresaId,
       );
+      if (coletiva && !jaReiniciado) {
+        await this.criarReinicioDaColetiva(tx, ctx, criada.id, {
+          empresaId,
+          colaboradorId: dto.colaboradorId,
+          vinculoId: principal.id,
+          inicio: dto.inicio,
+        });
+      }
       return criada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
@@ -588,7 +600,17 @@ export class AusenciasService {
               : { campo: "fim", motivo: "saldo_insuficiente" },
           );
         } else {
-          if (vendidos > maxVendaveis(periodo.direito)) {
+          // Venda em frações: soma o que as outras férias vivas do mesmo
+          // período já venderam (a própria, na edição, não conta).
+          const jaVendidos = existentes
+            .filter(
+              (a) =>
+                a.tipo === "ferias" &&
+                a.periodoAquisitivoInicio !== null &&
+                diaDe(a.periodoAquisitivoInicio) === periodo.inicio,
+            )
+            .reduce((soma, a) => soma + a.diasVendidos, 0);
+          if (vendidos > vendaveisRestantes(periodo.direito, jaVendidos)) {
             recusas.push({
               campo: "diasVendidos",
               motivo: "venda_acima_do_limite",
@@ -611,10 +633,11 @@ export class AusenciasService {
   // ---- editar e excluir (como a referência) ---------------------------------
 
   /**
-   * Edita a ausência com as mesmas regras do registro (forma, sobreposição
-   * e saldo, sem contar a própria). "Já aprovada" decide de novo (quem e
-   * quando); "ainda não" volta a aguardar o RH. Cancelada ou recusada não
-   * muda (409); excluída ou de outra empresa, 404.
+   * Edita a ausência com as mesmas regras do registro (forma, vínculo,
+   * sobreposição, saldo, coletiva e política, sem contar a própria). "Já
+   * aprovada" decide de novo (quem e quando); "ainda não" volta a aguardar o
+   * RH. Cancelada ou recusada não muda (409); excluída ou de outra empresa,
+   * 404. Vale o vínculo da própria ausência: encerrado, não se edita.
    */
   async alterar(
     ausenciaId: string,
@@ -624,7 +647,11 @@ export class AusenciasService {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const atual = await this.prisma.ausencia.findFirst({
       where: { id: ausenciaId, empresaId, excluidaEm: null },
-      select: { colaboradorId: true, status: true },
+      select: {
+        colaboradorId: true,
+        status: true,
+        vinculo: { select: VINCULO_DO_SALDO },
+      },
     });
     if (!atual) {
       return this.auditoria.negarAcesso(ctx, "ausencia", ausenciaId, empresaId);
@@ -636,13 +663,14 @@ export class AusenciasService {
       ...dto,
       colaboradorId: atual.colaboradorId,
     };
-    const principal = await this.vinculoPrincipal(
-      atual.colaboradorId,
-      empresaId,
-      ctx,
-    );
+    const vinculo = atual.vinculo;
     const erros = validarForma(completo);
-    const regra = regraDeFeriasDoTipo(principal.tipo);
+    if (vinculo.situacao !== "ativo") {
+      erros.push({ campo: "inicio", motivo: "fora_do_vinculo" });
+    } else if (erros.length === 0) {
+      erros.push(...foraDoVinculo(vinculo, dto.inicio, dto.fim ?? null));
+    }
+    const regra = regraDeFeriasDoTipo(vinculo.tipo);
     if (dto.tipo === "ferias" && regra === "sem_ferias") {
       erros.push({ campo: "tipo", motivo: "nao_se_aplica" });
     }
@@ -653,18 +681,22 @@ export class AusenciasService {
     ) {
       erros.push({ campo: "diasVendidos", motivo: "nao_se_aplica" });
     }
+    const coletiva = dto.feriasColetivas === true;
+    if (
+      coletiva &&
+      !(
+        dto.tipo === "ferias" &&
+        regra === "calculada" &&
+        podeSerColetiva(vinculo, dto.inicio)
+      )
+    ) {
+      erros.push({ campo: "feriasColetivas", motivo: "nao_se_aplica" });
+    }
     if (erros.length > 0) throw new CamposRecusadosException(erros);
 
     const aprovada = dto.tipo === "afastamento" || dto.aprovada;
     const linha = await this.prisma.$transaction(async (tx) => {
-      const periodoInicio = await this.conferirNoBanco(
-        tx,
-        completo,
-        empresaId,
-        principal,
-        regra,
-        ausenciaId,
-      );
+      await this.travarSaldo(tx, atual.colaboradorId, empresaId);
       // Relida sob a trava: outra aba pode ter cancelado ou excluído.
       const agora = await tx.ausencia.findFirst({
         where: { id: ausenciaId, empresaId, excluidaEm: null },
@@ -681,6 +713,62 @@ export class AusenciasService {
       if (agora.status === "cancelada" || agora.status === "recusada") {
         throw new ConflictException();
       }
+      // A coletiva que muda de data (ou deixa de ser coletiva) desfaz o
+      // reinício que abriu; as contas seguintes já o veem desfeito.
+      const ligados = await tx.reinicioPeriodoAquisitivo.findMany({
+        where: { ausenciaId, empresaId, removidoEm: null },
+      });
+      const mantido =
+        coletiva && ligados.some((r) => diaDe(r.inicio) === dto.inicio);
+      const desfeitos = mantido
+        ? 0
+        : await this.desfazerReiniciosDaAusencia(
+            tx,
+            ctx,
+            ausenciaId,
+            empresaId,
+          );
+      const jaReiniciado =
+        coletiva &&
+        (mantido ||
+          (await tx.reinicioPeriodoAquisitivo.count({
+            where: {
+              vinculoId: vinculo.id,
+              empresaId,
+              inicio: dataDoDia(dto.inicio),
+              removidoEm: null,
+            },
+          })) > 0);
+
+      const periodoInicio = await this.conferirNoBanco(
+        tx,
+        completo,
+        empresaId,
+        vinculo,
+        regra,
+        ausenciaId,
+        coletiva,
+      );
+      const avaliacao =
+        dto.tipo === "ferias" && dto.fim
+          ? await this.avaliarPolitica(tx, {
+              ...dto,
+              colaboradorId: atual.colaboradorId,
+              fim: dto.fim,
+              ignorar: ausenciaId,
+              empresaId,
+              principal: vinculo,
+              regra,
+            })
+          : null;
+      const foraDaPolitica =
+        avaliacao !== null && avaliacao.violacoes.length > 0;
+      if (foraDaPolitica && !dto.motivoForaDaPolitica) {
+        throw new CamposRecusadosException([
+          { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
+        ]);
+      }
+
       const atualizada = await tx.ausencia.update({
         where: { id: ausenciaId },
         data: {
@@ -694,7 +782,16 @@ export class AusenciasService {
             ? dataDoDia(periodoInicio)
             : null,
           observacao: dto.observacao ?? null,
+          feriasColetivas: coletiva,
+          // A política é avaliada de novo: dentro dela, os campos saem.
+          politicaFeriasId: foraDaPolitica ? avaliacao.id : null,
+          motivoForaDaPolitica: foraDaPolitica
+            ? (dto.motivoForaDaPolitica ?? null)
+            : null,
           motivoDecisao: null,
+          // Editar responde à sugestão de outras datas (se havia).
+          sugestaoInicio: null,
+          sugestaoFim: null,
           ...(aprovada
             ? {
                 status: "aprovada",
@@ -717,6 +814,28 @@ export class AusenciasService {
         ausenciaId,
         empresaId,
       );
+      const criaReinicio = coletiva && !jaReiniciado;
+      if (criaReinicio || desfeitos > 0) {
+        // As férias já lançadas continuam com período (e com direito).
+        await this.conferirFeriasLancadas(
+          tx,
+          vinculo,
+          atual.colaboradorId,
+          empresaId,
+          [
+            ...(await this.reiniciosDoVinculo(tx, vinculo.id, empresaId)),
+            ...(criaReinicio ? [reinicioDaColetiva(dto.inicio)] : []),
+          ],
+        );
+      }
+      if (criaReinicio) {
+        await this.criarReinicioDaColetiva(tx, ctx, ausenciaId, {
+          empresaId,
+          colaboradorId: atual.colaboradorId,
+          vinculoId: vinculo.id,
+          inicio: dto.inicio,
+        });
+      }
       return atualizada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
@@ -726,11 +845,17 @@ export class AusenciasService {
   /**
    * Exclui a ausência, como a referência: ela sai do histórico, da lista,
    * do quadro e do saldo. O registro fica, marcado (quem e quando): a
-   * aplicação não tem DELETE na tabela (histórico imutável).
+   * aplicação não tem DELETE na tabela (histórico imutável). O reinício que
+   * a coletiva abriu é desfeito junto.
    */
   async excluir(ausenciaId: string, ctx: PessoasAuditContext): Promise<void> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     await this.prisma.$transaction(async (tx) => {
+      const alvo = await tx.ausencia.findFirst({
+        where: { id: ausenciaId, empresaId, excluidaEm: null },
+        select: { colaboradorId: true },
+      });
+      if (alvo) await this.travarSaldo(tx, alvo.colaboradorId, empresaId);
       const marcadas = await tx.ausencia.updateMany({
         where: { id: ausenciaId, empresaId, excluidaEm: null },
         data: { excluidaEm: new Date(), excluidaPorId: ctx.actor.id },
@@ -751,6 +876,7 @@ export class AusenciasService {
         ausenciaId,
         empresaId,
       );
+      await this.desfazerEConferir(tx, ctx, ausenciaId, empresaId);
     });
   }
 
@@ -776,9 +902,18 @@ export class AusenciasService {
           empresaId,
         );
       }
+      // Sem o Portal, quem pediu não responde à sugestão: aprovar aqui
+      // aprovaria as datas antigas. Para seguir, edita-se ou recusa-se.
+      if (decisao === "aprovar" && atual.status === "ajuste_sugerido") {
+        throw new CamposRecusadosException([
+          { campo: "sugestao", motivo: "aguardando_resposta" },
+        ]);
+      }
       const destino = proximoStatus(atual.status, decisao);
       if (destino === null) throw new ConflictException();
       if (destino === atual.status) return atual;
+      const desfaz = destino === "recusada" || destino === "cancelada";
+      if (desfaz) await this.travarSaldo(tx, atual.colaboradorId, empresaId);
       const atualizada = await tx.ausencia.update({
         where: { id: atual.id },
         data: {
@@ -803,6 +938,8 @@ export class AusenciasService {
         atual.id,
         empresaId,
       );
+      // Recusada ou cancelada, a coletiva desfaz o reinício que abriu.
+      if (desfaz) await this.desfazerEConferir(tx, ctx, atual.id, empresaId);
       return atualizada;
     });
     const fotos = await this.fotos(empresaId, [linha.colaboradorId]);
@@ -953,6 +1090,7 @@ export class AusenciasService {
         saldoAntes: null,
         saldoDepois: null,
         maxVendaveis: null,
+        vendidosNoPeriodo: null,
         prazoAbono: null,
       };
     }
@@ -996,12 +1134,7 @@ export class AusenciasService {
     }
     const usados = base.dias! + (query.diasVendidos ?? 0);
     const periodosDisponiveis = periodos
-      .filter(
-        (p) =>
-          p.fim < query.inicio &&
-          query.inicio <= p.prazoGozo &&
-          p.disponiveis > 0,
-      )
+      .filter((p) => p.fim < query.inicio && p.disponiveis > 0)
       .map((p) => ({
         inicio: p.inicio,
         fim: p.fim,
@@ -1015,18 +1148,25 @@ export class AusenciasService {
         saldoAntes: 0,
         saldoDepois: -usados,
         maxVendaveis: 0,
+        vendidosNoPeriodo: null,
         prazoAbono: null,
       };
     }
-    const outrasFerias = existentes
-      .filter(
-        (a) =>
-          a.tipo === "ferias" &&
-          a.fim !== null &&
-          a.periodoAquisitivoInicio !== null &&
-          diaDe(a.periodoAquisitivoInicio) === periodo.inicio,
-      )
-      .map((a) => ({ inicio: diaDe(a.inicio), fim: diaDe(a.fim!) }));
+    const doPeriodo = existentes.filter(
+      (a) =>
+        a.tipo === "ferias" &&
+        a.fim !== null &&
+        a.periodoAquisitivoInicio !== null &&
+        diaDe(a.periodoAquisitivoInicio) === periodo.inicio,
+    );
+    const outrasFerias = doPeriodo.map((a) => ({
+      inicio: diaDe(a.inicio),
+      fim: diaDe(a.fim!),
+    }));
+    const vendidosNoPeriodo = doPeriodo.reduce(
+      (soma, a) => soma + a.diasVendidos,
+      0,
+    );
     return {
       ...base,
       avisosClt: avisosDaClt({
@@ -1034,12 +1174,14 @@ export class AusenciasService {
         fim,
         periodo,
         outrasFerias,
+        diasVendidos: query.diasVendidos ?? 0,
       }),
       periodosDisponiveis,
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
       saldoAntes: periodo.disponiveis,
       saldoDepois: periodo.disponiveis - usados,
-      maxVendaveis: maxVendaveis(periodo.direito),
+      maxVendaveis: vendaveisRestantes(periodo.direito, vendidosNoPeriodo),
+      vendidosNoPeriodo,
       prazoAbono: prazoDoAbono(periodo),
     };
   }
@@ -1377,6 +1519,100 @@ export class AusenciasService {
     });
   }
 
+  /** T215 — o reinício que as férias coletivas abrem, ligado a elas. */
+  private async criarReinicioDaColetiva(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    ausenciaId: string,
+    a: {
+      empresaId: string;
+      colaboradorId: string;
+      vinculoId: string;
+      inicio: Dia;
+    },
+  ): Promise<void> {
+    const reinicio = await tx.reinicioPeriodoAquisitivo.create({
+      data: {
+        empresaId: a.empresaId,
+        colaboradorId: a.colaboradorId,
+        vinculoId: a.vinculoId,
+        inicio: dataDoDia(a.inicio),
+        motivo: "ferias_coletivas",
+        ausenciaId,
+        registradoPorId: ctx.actor.id,
+      },
+    });
+    await this.auditoria.registrarMutacao(
+      tx,
+      ctx,
+      "pessoas_periodo_reiniciado",
+      "reinicio_periodo",
+      reinicio.id,
+      a.empresaId,
+    );
+  }
+
+  /**
+   * T215 — desfaz (logicamente: quem e quando) os reinícios que a ausência
+   * abriu como coletiva. Devolve quantos desfez.
+   */
+  private async desfazerReiniciosDaAusencia(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    ausenciaId: string,
+    empresaId: string,
+  ): Promise<number> {
+    const ligados = await tx.reinicioPeriodoAquisitivo.findMany({
+      where: { ausenciaId, empresaId, removidoEm: null },
+      select: { id: true },
+    });
+    for (const r of ligados) {
+      await tx.reinicioPeriodoAquisitivo.update({
+        where: { id: r.id },
+        data: { removidoEm: new Date(), removidoPorId: ctx.actor.id },
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pessoas_periodo_reinicio_removido",
+        "reinicio_periodo",
+        r.id,
+        empresaId,
+      );
+    }
+    return ligados.length;
+  }
+
+  /**
+   * T215 — depois de recusar, cancelar ou excluir: desfaz o reinício da
+   * coletiva e confere que as férias já lançadas seguem com período.
+   */
+  private async desfazerEConferir(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    ausenciaId: string,
+    empresaId: string,
+  ): Promise<void> {
+    const desfeitos = await this.desfazerReiniciosDaAusencia(
+      tx,
+      ctx,
+      ausenciaId,
+      empresaId,
+    );
+    if (desfeitos === 0) return;
+    const ausencia = await tx.ausencia.findFirstOrThrow({
+      where: { id: ausenciaId, empresaId },
+      select: { colaboradorId: true, vinculo: { select: VINCULO_DO_SALDO } },
+    });
+    await this.conferirFeriasLancadas(
+      tx,
+      ausencia.vinculo,
+      ausencia.colaboradorId,
+      empresaId,
+      await this.reiniciosDoVinculo(tx, ausencia.vinculo.id, empresaId),
+    );
+  }
+
   /** Um ajuste por vez para a mesma pessoa (a mesma trava do registro). */
   private async travarSaldo(
     tx: Prisma.TransactionClient,
@@ -1594,6 +1830,9 @@ export function proximoStatus(
   switch (decisao) {
     case "aprovar":
       if (atual === "aprovada") return atual;
+      // Ajuste sugerido: aprovar aprovaria as datas antigas, e quem pediu
+      // ainda não respondeu à sugestão (Portal, quando existir).
+      if (atual === "ajuste_sugerido") return null;
       return PENDENTES.includes(atual) ? "aprovada" : null;
     case "recusar":
       if (atual === "recusada") return atual;
@@ -1631,6 +1870,30 @@ export function validarForma(dto: RegistrarAusenciaDto): ErroDeCampo[] {
     }
   }
   return erros;
+}
+
+/**
+ * T215 — a ausência precisa caber no vínculo: não começa antes da admissão
+ * nem passa do desligamento (afastamento sem volta, com desligamento, passa).
+ */
+export function foraDoVinculo(
+  vinculo: { dataAdmissao: Date; dataDesligamento: Date | null },
+  inicio: Dia,
+  fim: Dia | null,
+): ErroDeCampo[] {
+  if (inicio < diaDe(vinculo.dataAdmissao)) {
+    return [{ campo: "inicio", motivo: "antes_da_admissao" }];
+  }
+  if (vinculo.dataDesligamento) {
+    const desligamento = diaDe(vinculo.dataDesligamento);
+    if (inicio > desligamento) {
+      return [{ campo: "inicio", motivo: "fora_do_vinculo" }];
+    }
+    if (fim === null || fim > desligamento) {
+      return [{ campo: "fim", motivo: "fora_do_vinculo" }];
+    }
+  }
+  return [];
 }
 
 /**
@@ -1688,5 +1951,7 @@ function paraApi(
             enviadoEm: linha.anexos[0].criadoEm.toISOString(),
           }
         : null,
+    feriasColetivas: linha.feriasColetivas,
+    motivoForaDaPolitica: linha.motivoForaDaPolitica,
   };
 }

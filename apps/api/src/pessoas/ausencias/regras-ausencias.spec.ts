@@ -1,4 +1,8 @@
-import { proximoStatus, validarForma } from "./ausencias.service";
+import {
+  foraDoVinculo,
+  proximoStatus,
+  validarForma,
+} from "./ausencias.service";
 import type { RegistrarAusenciaDto } from "./ausencias.dto";
 
 /** T215 — transições das decisões e regras de forma do registro. */
@@ -7,7 +11,10 @@ describe("T215 — regras de ausências", () => {
     it.each([
       ["aguardando_rh", "aprovar", "aprovada"],
       ["aguardando_gestor", "aprovar", "aprovada"],
-      ["ajuste_sugerido", "aprovar", "aprovada"],
+      // Sem o Portal, a sugestão não tem resposta: aprovar aprovaria as datas
+      // antigas (o servidor recusa por campo).
+      ["ajuste_sugerido", "aprovar", null],
+      ["ajuste_sugerido", "recusar", "recusada"],
       ["aprovada", "aprovar", "aprovada"],
       ["recusada", "aprovar", null],
       ["cancelada", "aprovar", null],
@@ -80,6 +87,38 @@ describe("T215 — regras de ausências", () => {
         { campo: "motivoAfastamento", motivo: "nao_se_aplica" },
         { campo: "diasVendidos", motivo: "nao_se_aplica" },
         { campo: "periodoAquisitivoInicio", motivo: "nao_se_aplica" },
+      ]);
+    });
+  });
+
+  describe("dentro do vínculo", () => {
+    const vinculo = {
+      dataAdmissao: new Date("2026-03-02"),
+      dataDesligamento: null as Date | null,
+    };
+
+    it("antes da admissão: recusa no início", () => {
+      expect(foraDoVinculo(vinculo, "2026-03-01", "2026-03-05")).toEqual([
+        { campo: "inicio", motivo: "antes_da_admissao" },
+      ]);
+      expect(foraDoVinculo(vinculo, "2026-03-02", "2026-03-05")).toEqual([]);
+    });
+
+    it("depois do desligamento: recusa no início ou no fim", () => {
+      const desligado = {
+        ...vinculo,
+        dataDesligamento: new Date("2026-10-30"),
+      };
+      expect(foraDoVinculo(desligado, "2026-10-20", "2026-10-30")).toEqual([]);
+      expect(foraDoVinculo(desligado, "2026-10-28", "2026-11-03")).toEqual([
+        { campo: "fim", motivo: "fora_do_vinculo" },
+      ]);
+      expect(foraDoVinculo(desligado, "2026-11-02", "2026-11-03")).toEqual([
+        { campo: "inicio", motivo: "fora_do_vinculo" },
+      ]);
+      // Afastamento sem volta passaria do desligamento.
+      expect(foraDoVinculo(desligado, "2026-10-20", null)).toEqual([
+        { campo: "fim", motivo: "fora_do_vinculo" },
       ]);
     });
   });

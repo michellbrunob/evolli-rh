@@ -1673,7 +1673,11 @@ describe("T215 — Férias e ausências (e2e)", () => {
       bloqueios: [],
       foraAoMesmoTempo: null,
     };
-    const APROVACAO = { quem: "rh", lembreteDias: null, foraDaPolitica: "avisar" };
+    const APROVACAO = {
+      quem: "rh",
+      lembreteDias: null,
+      foraDaPolitica: "avisar",
+    };
     const politica = (extra: Record<string, unknown> = {}) => ({
       nome: "Política sintética",
       tiposVinculo: ["clt"],
@@ -1749,7 +1753,13 @@ describe("T215 — Férias e ausências (e2e)", () => {
       );
 
       const sem = await post("/v1/ausencias", rhA)
-        .send({ colaboradorId: pessoa, tipo: "ferias", inicio, fim, aprovada: true })
+        .send({
+          colaboradorId: pessoa,
+          tipo: "ferias",
+          inicio,
+          fim,
+          aprovada: true,
+        })
         .expect(422);
       expect(sem.body.erros).toEqual([
         { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
@@ -1782,7 +1792,12 @@ describe("T215 — Férias e ausências (e2e)", () => {
             nome: "Específica",
             abrangencia: "algumas",
             alvos: [{ tipo: "pessoa", id: escolhida }],
-            regras: { ...REGRAS, antecedenciaMinimaDias: 5, duracaoMinimaDias: null, periodosPorAno: null },
+            regras: {
+              ...REGRAS,
+              antecedenciaMinimaDias: 5,
+              duracaoMinimaDias: null,
+              periodosPorAno: null,
+            },
           }),
         )
         .expect(201);
@@ -2165,6 +2180,526 @@ describe("T215 — Férias e ausências (e2e)", () => {
       const linhas = await prisma.$queryRaw<{ pode: boolean }[]>`
         SELECT has_table_privilege('evolli_app', 'app.anexo_ausencia', 'DELETE') AS pode`;
       expect(linhas[0]!.pode).toBe(false);
+    });
+  });
+
+  describe("correções da revisão (T215)", () => {
+    function patch(rota: string, cred: Credencial) {
+      return agent()
+        .patch(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    function del(rota: string, cred: Credencial) {
+      return agent()
+        .delete(rota)
+        .set("Cookie", cred.cookie)
+        .set("x-csrf-token", cred.csrfToken);
+    }
+    const REGRAS = {
+      antecedenciaMinimaDias: 30,
+      antecedenciaMaximaMeses: null,
+      alemDoSaldo: "nao_aceitar",
+      duracaoMinimaDias: null,
+      duracaoMaximaDias: null,
+      periodosPorAno: null,
+      periodoMaiorDias: null,
+      intervaloDias: null,
+      inicioNaoAntesDeDescanso: false,
+      inicioNaoNoFimDeSemana: false,
+      voltaNaoNaSexta: false,
+      voltaNaoNaVespera: false,
+      bloqueios: [] as unknown[],
+      foraAoMesmoTempo: null,
+    };
+    const politicaDaPessoa = (pessoa: string, extra = {}) => ({
+      nome: "Política sintética da revisão",
+      tiposVinculo: ["clt"],
+      abrangencia: "algumas",
+      alvos: [{ tipo: "pessoa", id: pessoa }],
+      valeAPartirDe: HOJE,
+      regras: REGRAS,
+      aprovacao: { quem: "rh", lembreteDias: null, foraDaPolitica: "avisar" },
+      ...extra,
+    });
+    const reiniciosDa = (ausenciaId: string) =>
+      prisma.reinicioPeriodoAquisitivo.findMany({
+        where: { ausenciaId },
+        orderBy: { criadoEm: "asc" },
+      });
+
+    describe("férias coletivas: o reinício segue a coletiva", () => {
+      const NOVATO = somarMeses(HOJE, -6);
+      const inicio = somarDias(HOJE, 20);
+      const fim = somarDias(inicio, 9);
+      async function coletiva(aprovada = true) {
+        const { id } = await admitir(rhA, empresaA, "ativo", "clt", NOVATO);
+        const r = await post("/v1/ausencias", rhA)
+          .send({
+            colaboradorId: id,
+            tipo: "ferias",
+            inicio,
+            fim,
+            feriasColetivas: true,
+            aprovada,
+          })
+          .expect(201);
+        expect(r.body.feriasColetivas).toBe(true);
+        const [reinicio] = await reiniciosDa(r.body.id);
+        expect(reinicio).toMatchObject({
+          motivo: "ferias_coletivas",
+          removidoEm: null,
+        });
+        return { pessoa: id, ausencia: r.body.id as string };
+      }
+      const vivos = async (pessoa: string) =>
+        (await get(`/v1/colaboradores/${pessoa}/ferias`, rhA).expect(200)).body
+          .reinicios;
+
+      it("cancelar desfaz o reinício (lógico, com trilha)", async () => {
+        const { pessoa, ausencia } = await coletiva();
+        await post(`/v1/ausencias/${ausencia}/cancelar`, rhA)
+          .send()
+          .expect(200);
+        const [reinicio] = await reiniciosDa(ausencia);
+        expect(reinicio!.removidoEm).not.toBeNull();
+        expect(reinicio!.removidoPorId).toEqual(expect.any(String));
+        expect(await vivos(pessoa)).toEqual([]);
+        const eventos = await prisma.auditEvent.findMany({
+          where: { resourceId: reinicio!.id, resource: "reinicio_periodo" },
+          orderBy: { occurredAt: "asc" },
+        });
+        expect(eventos.map((e) => e.action)).toEqual([
+          "pessoas_periodo_reiniciado",
+          "pessoas_periodo_reinicio_removido",
+        ]);
+      });
+
+      it("recusar e excluir também desfazem", async () => {
+        const recusada = await coletiva(false);
+        await post(`/v1/ausencias/${recusada.ausencia}/recusar`, rhA)
+          .send({ motivo: "Coletiva remarcada" })
+          .expect(200);
+        expect(await vivos(recusada.pessoa)).toEqual([]);
+        const excluida = await coletiva();
+        await del(`/v1/ausencias/${excluida.ausencia}`, rhA).expect(204);
+        expect(await vivos(excluida.pessoa)).toEqual([]);
+      });
+
+      it("editar: mudar a data troca o reinício; deixar de ser férias o desfaz", async () => {
+        const { pessoa, ausencia } = await coletiva();
+        const novoInicio = somarDias(inicio, 5);
+        const r = await patch(`/v1/ausencias/${ausencia}`, rhA)
+          .send({
+            tipo: "ferias",
+            inicio: novoInicio,
+            fim: somarDias(novoInicio, 9),
+            feriasColetivas: true,
+            aprovada: true,
+          })
+          .expect(200);
+        expect(r.body.feriasColetivas).toBe(true);
+        const lista = await reiniciosDa(ausencia);
+        expect(lista).toHaveLength(2);
+        expect(lista[0]!.removidoEm).not.toBeNull();
+        expect(lista[1]!.removidoEm).toBeNull();
+        expect(lista[1]!.inicio.toISOString().slice(0, 10)).toBe(novoInicio);
+        expect(
+          (await vivos(pessoa)).map((x: { inicio: string }) => x.inicio),
+        ).toEqual([novoInicio]);
+        const dayOff = await patch(`/v1/ausencias/${ausencia}`, rhA)
+          .send({
+            tipo: "day_off",
+            inicio: novoInicio,
+            fim: novoInicio,
+            aprovada: true,
+          })
+          .expect(200);
+        expect(dayOff.body.feriasColetivas).toBe(false);
+        expect(await vivos(pessoa)).toEqual([]);
+      });
+
+      it("registrar coletiva confere as férias já lançadas (409 sem período)", async () => {
+        const { id } = await admitir(rhA, empresaA, "ativo", "clt", NOVATO);
+        // Férias lá na frente, do segundo período (que a coletiva apagaria).
+        const segundo = somarMeses(NOVATO, 12);
+        const longe = somarDias(somarMeses(NOVATO, 24), 5);
+        await post("/v1/ausencias", rhA)
+          .send({
+            colaboradorId: id,
+            tipo: "ferias",
+            inicio: longe,
+            fim: somarDias(longe, 9),
+            periodoAquisitivoInicio: segundo,
+            aprovada: true,
+          })
+          .expect(201);
+        const r = await post("/v1/ausencias", rhA)
+          .send({
+            colaboradorId: id,
+            tipo: "ferias",
+            inicio,
+            fim,
+            feriasColetivas: true,
+            aprovada: true,
+          })
+          .expect(409);
+        expect(r.body.erros).toEqual([
+          { campo: "inicio", motivo: "ferias_sem_periodo" },
+        ]);
+        expect(
+          await prisma.reinicioPeriodoAquisitivo.count({
+            where: { colaboradorId: id },
+          }),
+        ).toBe(0);
+      });
+    });
+
+    it("editar férias fora da política: aceita o motivo, reavalia e limpa", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const politica = await post("/v1/politicas-ferias", rhA)
+        .send(politicaDaPessoa(pessoa))
+        .expect(201);
+      const inicio = somarDias(HOJE, 10);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: pessoa,
+          tipo: "ferias",
+          inicio,
+          fim: somarDias(inicio, 14),
+          aprovada: true,
+          motivoForaDaPolitica: "Combinado com a gestão",
+        })
+        .expect(201);
+      expect(r.body.motivoForaDaPolitica).toBe("Combinado com a gestão");
+      const corpo = {
+        tipo: "ferias",
+        inicio,
+        fim: somarDias(inicio, 14),
+        aprovada: true,
+        feriasColetivas: false,
+      };
+      const sem = await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({ ...corpo, observacao: "Sem motivo" })
+        .expect(422);
+      expect(sem.body.erros).toEqual([
+        { campo: "motivoForaDaPolitica", motivo: "obrigatorio" },
+      ]);
+      const com = await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({ ...corpo, motivoForaDaPolitica: "  Novo motivo  " })
+        .expect(200);
+      expect(com.body.motivoForaDaPolitica).toBe("Novo motivo");
+      let linha = await prisma.ausencia.findUniqueOrThrow({
+        where: { id: r.body.id },
+      });
+      expect(linha.politicaFeriasId).toBe(politica.body.id);
+      // Dentro da política (40 dias de antecedência): os campos saem.
+      const longe = somarDias(HOJE, 40);
+      await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({ ...corpo, inicio: longe, fim: somarDias(longe, 14) })
+        .expect(200);
+      linha = await prisma.ausencia.findUniqueOrThrow({
+        where: { id: r.body.id },
+      });
+      expect(linha.politicaFeriasId).toBeNull();
+      expect(linha.motivoForaDaPolitica).toBeNull();
+      await post(`/v1/politicas-ferias/${politica.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+    });
+
+    it("venda em frações: soma o que o período já vendeu", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const a = somarDias(HOJE, 20);
+      await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio: a,
+          fim: somarDias(a, 4),
+          diasVendidos: 6,
+          aprovada: true,
+        })
+        .expect(201);
+      const b = somarDias(HOJE, 40);
+      const s = (
+        await get(
+          `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${b}&fim=${somarDias(b, 4)}`,
+          rhA,
+        ).expect(200)
+      ).body;
+      expect(s).toMatchObject({ maxVendaveis: 4, vendidosNoPeriodo: 6 });
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio: b,
+          fim: somarDias(b, 4),
+          diasVendidos: 6,
+          aprovada: true,
+        })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "diasVendidos", motivo: "venda_acima_do_limite" },
+      ]);
+      await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio: b,
+          fim: somarDias(b, 4),
+          diasVendidos: 4,
+          aprovada: true,
+        })
+        .expect(201);
+    });
+
+    it("período vencido com saldo é agendável, com aviso de pagamento em dobro", async () => {
+      const admissao = somarMeses(HOJE, -30);
+      const fimDoPrimeiro = somarDias(somarMeses(admissao, 12), -1);
+      const prazo = somarMeses(fimDoPrimeiro, 12);
+      const { id } = await admitir(rhA, empresaA, "ativo", "clt", admissao);
+      const ficha = (
+        await get(`/v1/colaboradores/${id}/ferias`, rhA).expect(200)
+      ).body;
+      expect(ficha.periodos[0]).toMatchObject({
+        inicio: admissao,
+        situacao: "vencido",
+        disponiveis: 30,
+      });
+      const inicio = somarDias(HOJE, 10);
+      const fim = somarDias(inicio, 9);
+      const s = (
+        await get(
+          `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${inicio}&fim=${fim}&periodoAquisitivoInicio=${admissao}`,
+          rhA,
+        ).expect(200)
+      ).body;
+      expect(s.periodo).toEqual({ inicio: admissao, fim: fimDoPrimeiro });
+      expect(s.avisosClt).toContainEqual({
+        regra: "pagamento_em_dobro",
+        dias: 10,
+        prazoGozo: prazo,
+      });
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: id,
+          tipo: "ferias",
+          inicio,
+          fim,
+          aprovada: true,
+        })
+        .expect(201);
+      expect(r.body.periodoAquisitivo).toEqual({
+        inicio: admissao,
+        fim: fimDoPrimeiro,
+      });
+    });
+
+    it("um com 14 dias: a simulação conta os dias vendidos", async () => {
+      const { id } = await admitir(rhA, empresaA);
+      const inicio = somarDias(HOJE, 20);
+      const url = (vendidos: number) =>
+        `/v1/ausencias/simulacao?colaboradorId=${id}&tipo=ferias&inicio=${inicio}&fim=${somarDias(inicio, 9)}&diasVendidos=${vendidos}`;
+      const sem = (await get(url(0), rhA).expect(200)).body;
+      expect(sem.avisosClt).not.toContainEqual({ regra: "um_com_14" });
+      const com = (await get(url(10), rhA).expect(200)).body;
+      expect(com.avisosClt).toContainEqual({ regra: "um_com_14" });
+    });
+
+    it("ajuste sugerido: aprovar é recusado por campo; editar responde à sugestão", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const dia = somarDias(HOJE, 160);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: pessoa,
+          tipo: "day_off",
+          inicio: dia,
+          fim: dia,
+          aprovada: false,
+        })
+        .expect(201);
+      await post(`/v1/ausencias/${r.body.id}/sugerir`, rhA)
+        .send({ inicio: somarDias(dia, 1), fim: somarDias(dia, 1) })
+        .expect(200);
+      const aprovar = await post(`/v1/ausencias/${r.body.id}/aprovar`, rhA)
+        .send()
+        .expect(422);
+      expect(aprovar.body.erros).toEqual([
+        { campo: "sugestao", motivo: "aguardando_resposta" },
+      ]);
+      const linha = await prisma.ausencia.findUniqueOrThrow({
+        where: { id: r.body.id },
+      });
+      expect(linha.status).toBe("ajuste_sugerido");
+      const editada = await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({
+          tipo: "day_off",
+          inicio: somarDias(dia, 1),
+          fim: somarDias(dia, 1),
+          aprovada: true,
+        })
+        .expect(200);
+      expect(editada.body).toMatchObject({
+        status: "aprovada",
+        sugestao: null,
+      });
+    });
+
+    it("política: alvo de outra empresa é recusado; nome de outra empresa não aparece", async () => {
+      const deB = await admitir(rhB, empresaB);
+      const lotacaoB = await lotacaoMinima(appUrl, empresaB);
+      const pessoa = await post("/v1/politicas-ferias", rhA)
+        .send(politicaDaPessoa(deB.id))
+        .expect(422);
+      expect(pessoa.body.erros).toEqual([
+        { campo: "alvos", motivo: "indisponivel" },
+      ]);
+      const departamento = await post("/v1/politicas-ferias", rhA)
+        .send({
+          ...politicaDaPessoa(deB.id),
+          alvos: [{ tipo: "departamento", id: lotacaoB.departamentoId }],
+        })
+        .expect(422);
+      expect(departamento.body.erros).toEqual([
+        { campo: "alvos", motivo: "indisponivel" },
+      ]);
+      const unidade = await post("/v1/politicas-ferias", rhA)
+        .send({
+          ...politicaDaPessoa(deB.id),
+          alvos: [{ tipo: "unidade", id: lotacaoB.unidadeOrganizacionalId }],
+        })
+        .expect(422);
+      expect(unidade.body.erros).toEqual([
+        { campo: "alvos", motivo: "indisponivel" },
+      ]);
+      // Gravada antes da correção (direto no banco): o nome não vaza.
+      const { id: daA } = await admitir(rhA, empresaA);
+      const criada = await post("/v1/politicas-ferias", rhA)
+        .send(politicaDaPessoa(daA, { rascunho: true }))
+        .expect(201);
+      await prisma.politicaFerias.update({
+        where: { id: criada.body.id },
+        data: { alvos: [{ tipo: "pessoa", id: deB.id }] },
+      });
+      const detalhe = (
+        await get(`/v1/politicas-ferias/${criada.body.id}`, rhA).expect(200)
+      ).body;
+      expect(detalhe.alvos).toEqual([
+        { tipo: "pessoa", id: deB.id, nome: "—" },
+      ]);
+      expect(JSON.stringify(detalhe)).not.toContain(deB.nome);
+      await post(`/v1/politicas-ferias/${criada.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+    });
+
+    it("política incoerente: bloqueio invertido e duração mínima acima da máxima", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const bloqueio = await post("/v1/politicas-ferias", rhA)
+        .send(
+          politicaDaPessoa(pessoa, {
+            regras: {
+              ...REGRAS,
+              bloqueios: [
+                {
+                  nome: "Inventário",
+                  inicio: "2027-03-10",
+                  fim: "2027-03-01",
+                  todoAno: false,
+                },
+              ],
+            },
+          }),
+        )
+        .expect(422);
+      expect(bloqueio.body.erros).toEqual([
+        { campo: "regras.bloqueios", motivo: "fim_antes_do_inicio" },
+      ]);
+      const duracao = await post("/v1/politicas-ferias", rhA)
+        .send(
+          politicaDaPessoa(pessoa, {
+            regras: { ...REGRAS, duracaoMinimaDias: 20, duracaoMaximaDias: 10 },
+          }),
+        )
+        .expect(422);
+      expect(duracao.body.erros).toEqual([
+        { campo: "regras.duracaoMaximaDias", motivo: "fora_de_ordem" },
+      ]);
+    });
+
+    it("antecedência mínima não vale para registro retroativo", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const politica = await post("/v1/politicas-ferias", rhA)
+        .send(politicaDaPessoa(pessoa))
+        .expect(201);
+      const inicio = somarDias(HOJE, -5);
+      const s = (
+        await get(
+          `/v1/ausencias/simulacao?colaboradorId=${pessoa}&tipo=ferias&inicio=${inicio}&fim=${somarDias(inicio, 14)}`,
+          rhA,
+        ).expect(200)
+      ).body;
+      expect(s.politica).toMatchObject({ id: politica.body.id, violacoes: [] });
+      await post(`/v1/politicas-ferias/${politica.body.id}/desativar`, rhA)
+        .send()
+        .expect(200);
+    });
+
+    it("fora do vínculo: antes da admissão no registro; vínculo encerrado na edição", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const antes = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: pessoa,
+          tipo: "day_off",
+          inicio: somarDias(ADMISSAO, -3),
+          fim: somarDias(ADMISSAO, -3),
+          aprovada: true,
+        })
+        .expect(422);
+      expect(antes.body.erros).toEqual([
+        { campo: "inicio", motivo: "antes_da_admissao" },
+      ]);
+      const dia = somarDias(HOJE, -10);
+      const r = await post("/v1/ausencias", rhA)
+        .send({
+          colaboradorId: pessoa,
+          tipo: "day_off",
+          inicio: dia,
+          fim: dia,
+          aprovada: true,
+        })
+        .expect(201);
+      const antesNaEdicao = await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({
+          tipo: "day_off",
+          inicio: somarDias(ADMISSAO, -1),
+          fim: somarDias(ADMISSAO, -1),
+          aprovada: true,
+        })
+        .expect(422);
+      expect(antesNaEdicao.body.erros).toEqual([
+        { campo: "inicio", motivo: "antes_da_admissao" },
+      ]);
+      await prisma.vinculoFuncional.updateMany({
+        where: { colaboradorId: pessoa, empresaId: empresaA },
+        data: {
+          situacao: "encerrado",
+          dataDesligamento: new Date(`${somarDias(HOJE, -1)}T00:00:00Z`),
+        },
+      });
+      const encerrado = await patch(`/v1/ausencias/${r.body.id}`, rhA)
+        .send({
+          tipo: "day_off",
+          inicio: dia,
+          fim: dia,
+          aprovada: true,
+          observacao: "x",
+        })
+        .expect(422);
+      expect(encerrado.body.erros).toEqual([
+        { campo: "inicio", motivo: "fora_do_vinculo" },
+      ]);
     });
   });
 });

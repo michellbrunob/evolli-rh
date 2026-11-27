@@ -132,10 +132,11 @@ export function violacoesDaPolitica(entrada: {
   const { inicio, fim } = entrada;
   const dias = diasCorridos(inicio, fim);
 
-  // Pedido.
+  // Pedido. Registro retroativo (início hoje ou antes) não tem antecedência.
   const antecedencia = diasEntre(entrada.hoje, inicio);
   if (
     r.antecedenciaMinimaDias !== null &&
+    inicio > entrada.hoje &&
     antecedencia < r.antecedenciaMinimaDias
   ) {
     v.push({
@@ -232,6 +233,31 @@ export function violacoesDaPolitica(entrada: {
     });
   }
   return v;
+}
+
+/**
+ * Regras que não fazem sentido juntas (recusadas ao salvar a política):
+ * bloqueio que termina antes de começar (sem "todo ano", que pode virar o
+ * ano) e duração mínima acima da máxima.
+ */
+export function incoerenciasDaPolitica(
+  r: RegrasDaPolitica,
+): {
+  campo: "regras.bloqueios" | "regras.duracaoMaximaDias";
+  motivo: "fim_antes_do_inicio" | "fora_de_ordem";
+}[] {
+  const erros: ReturnType<typeof incoerenciasDaPolitica> = [];
+  if (r.bloqueios.some((b) => !b.todoAno && b.fim < b.inicio)) {
+    erros.push({ campo: "regras.bloqueios", motivo: "fim_antes_do_inicio" });
+  }
+  if (
+    r.duracaoMinimaDias !== null &&
+    r.duracaoMaximaDias !== null &&
+    r.duracaoMinimaDias > r.duracaoMaximaDias
+  ) {
+    erros.push({ campo: "regras.duracaoMaximaDias", motivo: "fora_de_ordem" });
+  }
+  return erros;
 }
 
 /**

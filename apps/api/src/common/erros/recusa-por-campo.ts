@@ -60,7 +60,10 @@ export type MotivoDoCampo =
   // T215 — Benefícios: tabela da ANS fora das regras (RN 63/2003).
   | "fora_das_regras_ans"
   // T215 — Benefícios: a pessoa já recebe o benefício.
-  | "ja_recebe";
+  | "ja_recebe"
+  // T215 — Aprovar um "ajuste sugerido": a sugestão ainda espera a resposta
+  // de quem pediu (pelo Portal, quando ele existir).
+  | "aguardando_resposta";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -100,6 +103,11 @@ export type CampoPublico =
   // T215 — Políticas de férias: quem entra e o motivo de registrar fora.
   | "alvos"
   | "motivoForaDaPolitica"
+  // T215 — Políticas de férias: regras incoerentes entre si.
+  | "regras.bloqueios"
+  | "regras.duracaoMaximaDias"
+  // T215 — Responder solicitação: a sugestão de outras datas pendente.
+  | "sugestao"
   // T215 — Salários: o salário do contrato com linha do tempo.
   | "salarioBruto"
   // T215 — férias para quem não tem férias (PJ e Freelancer).
