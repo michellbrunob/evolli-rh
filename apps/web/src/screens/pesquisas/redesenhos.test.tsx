@@ -628,3 +628,18 @@ describe("B21 — trilha do resultado individual", () => {
     expect(onLista).toHaveBeenCalled();
   });
 });
+
+describe('B15 — gaveta "Ver perguntas"', () => {
+  it("o subtítulo fica numa linha: a gaveta tem a largura dele e não quebra", () => {
+    const css = readFileSync(resolve(__dirname, "Pesquisas.css"), "utf8");
+    expect(css).toMatch(
+      /\.pesquisas__janela\.ev-janela--lateral\s*\{[^}]*max-width:\s*33\.75rem/,
+    );
+    expect(css).toMatch(
+      /\.pesquisas__janela header p\s*\{[^}]*white-space:\s*nowrap/,
+    );
+    expect(css).not.toMatch(
+      /\.pesquisas__janela header p\s*\{[^}]*white-space:\s*normal/,
+    );
+  });
+});

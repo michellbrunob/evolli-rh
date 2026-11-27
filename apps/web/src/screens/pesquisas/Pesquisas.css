@@ -3346,11 +3346,16 @@ textarea.pesquisas__campo {
   background: var(--surface-pearl);
 }
 
-/* Gaveta do modelo: o subtítulo quebra a linha em vez de ser cortado. */
+/* Gaveta "Ver perguntas": larga o bastante para o subtítulo caber numa
+   linha só (no celular, ocupa a tela e corta com reticências). */
+.pesquisas__janela.ev-janela--lateral {
+  max-width: 33.75rem;
+}
+
 .pesquisas__janela header p {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 48rem) {
