@@ -124,7 +124,6 @@ describe("T215 — CPF já cadastrado, conferido ao digitar (e2e)", () => {
       .set("x-csrf-token", cred.csrfToken);
   }
 
-
   async function criarUsuarioDireto(
     email: string,
     role: string,

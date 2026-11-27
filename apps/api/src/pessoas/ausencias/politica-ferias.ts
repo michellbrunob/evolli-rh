@@ -240,9 +240,7 @@ export function violacoesDaPolitica(entrada: {
  * bloqueio que termina antes de começar (sem "todo ano", que pode virar o
  * ano) e duração mínima acima da máxima.
  */
-export function incoerenciasDaPolitica(
-  r: RegrasDaPolitica,
-): {
+export function incoerenciasDaPolitica(r: RegrasDaPolitica): {
   campo: "regras.bloqueios" | "regras.duracaoMaximaDias";
   motivo: "fim_antes_do_inicio" | "fora_de_ordem";
 }[] {
