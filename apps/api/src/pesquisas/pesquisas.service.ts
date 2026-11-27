@@ -113,6 +113,7 @@ const SEM_SECOES = {
   encerraEm: true,
   minimoPorGrupo: true,
   separarPor: true,
+  configModelo: true,
   token: true,
   publicadaEm: true,
   excluidaEm: true,
