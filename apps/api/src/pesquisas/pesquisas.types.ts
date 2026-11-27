@@ -67,6 +67,9 @@ export const TIPOS_PERGUNTA = [
   // Personalizada): concordância e satisfação.
   "concordancia_4",
   "satisfacao_4",
+  // Perfil comportamental (DISC): bloco de frases, uma por fator, e a
+  // pessoa escolhe a que mais combina com ela. Só existe no modelo `disc`.
+  "escolha_forcada",
 ] as const;
 export type TipoPergunta = (typeof TIPOS_PERGUNTA)[number];
 
@@ -86,6 +89,8 @@ export type GruposDaResposta = Partial<Record<CampoGrupo, string | null>>;
 export interface Opcao {
   id: string;
   texto: string;
+  /** Só nos blocos de escolha forçada: o fator DISC da frase. */
+  fator?: "D" | "I" | "S" | "C";
 }
 
 export interface ConfigPergunta {

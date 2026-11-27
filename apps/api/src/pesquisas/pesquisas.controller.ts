@@ -218,6 +218,24 @@ export class PesquisasController {
     return this.service.resultados(id, filtro, ctx(actor, req));
   }
 
+  @Get(":pesquisaId/perfil-comportamental")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Perfil comportamental (DISC): o time e cada pessoa",
+  })
+  perfilComportamental(
+    @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Query() q: ResultadosQueryDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    const filtro =
+      q.campo && q.grupoId ? { campo: q.campo, grupoId: q.grupoId } : null;
+    return this.service.perfilComportamental(id, filtro, ctx(actor, req));
+  }
+
   @Get(":pesquisaId/analises")
   @UseGuards(AuthorizationGuard)
   @RequirePermission("pesquisa", "read")

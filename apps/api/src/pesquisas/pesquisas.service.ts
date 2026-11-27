@@ -41,6 +41,11 @@ import {
   errosDaEstruturaDoModelo,
   resultadoIndividualDoModelo,
 } from "./modelos/indice";
+import { conferirEstruturaDisc } from "./modelos/disc/regras-disc";
+import {
+  montarResultadoDisc,
+  type ResultadoDisc,
+} from "./modelos/disc/resultado-disc";
 import { semDesativacaoVigente } from "../pessoas/colaborador/desativacao";
 import {
   type AnalisesPesquisa,
@@ -544,6 +549,7 @@ export class PesquisasService {
     if (estrutura.erros.length === 0) {
       erros.push(...errosDaEstruturaDoModelo(dto.modelo, estrutura.secoes));
     }
+    erros.push(...conferirEstruturaDisc(dto.modelo, estrutura.secoes));
     // Data e hora no horário de Brasília, no futuro (o prazo já gravado
     // pode ficar como está).
     let encerraEm: Date | null = null;
@@ -1072,6 +1078,50 @@ export class PesquisasService {
       identificada: comAutor,
       minimoNaVisaoGeral: p.identificacao === "confidencial",
     });
+  }
+
+  /**
+   * Perfil comportamental (DISC): o time e, para RH e DP na identificada e
+   * na anônima, o perfil de cada resposta (leitura auditada). Outro modelo:
+   * 422 (`modelo`, `nao_se_aplica`).
+   */
+  async perfilComportamental(
+    id: string,
+    filtro: { campo: CampoGrupo; grupoId: string } | null,
+    ctx: PessoasAuditContext,
+  ): Promise<ResultadoDisc> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    if (p.modelo !== "disc") {
+      throw new CamposRecusadosException([
+        { campo: "modelo", motivo: "nao_se_aplica" },
+      ]);
+    }
+    const comPessoas =
+      p.identificacao !== "confidencial" &&
+      (ctx.actor.role === "rh" || ctx.actor.role === "dp");
+    const respostas = await this.carregarRespostas(p, comPessoas);
+    const resultado = montarResultadoDisc({
+      pesquisaId: id,
+      secoes: p.secoes as unknown as Secao[],
+      respostas,
+      nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
+      minimoPorGrupo: p.minimoPorGrupo,
+      filtro,
+      recortes: recortesDa(p),
+      minimoNaVisaoGeral: p.identificacao === "confidencial",
+      comPessoas,
+    });
+    if (resultado.pessoas.length) {
+      await this.auditoria.registrarLeitura(
+        ctx,
+        "pesquisas_respostas_consultadas",
+        "resposta_pesquisa",
+        id,
+        empresaId,
+      );
+    }
+    return resultado;
   }
 
   /** Mapa de médias por grupo e a evolução entre pesquisas do mesmo modelo. */

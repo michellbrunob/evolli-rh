@@ -3,6 +3,7 @@ import {
   type ErroDeCampo,
 } from "../common/erros/recusa-por-campo";
 import { perguntasEmOrdem } from "./estrutura-pesquisa";
+import { conferirValorDoBloco } from "./modelos/disc/regras-disc";
 import type { Pergunta, Secao, ValorRespondido } from "./pesquisas.types";
 
 /**
@@ -133,6 +134,8 @@ export function conferirValor(p: Pergunta, valor: unknown): Conferido {
       }
       return { ok: true, valor };
     }
+    case "escolha_forcada":
+      return conferirValorDoBloco(p, valor);
   }
 }
 

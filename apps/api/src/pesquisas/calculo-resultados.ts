@@ -205,7 +205,8 @@ function resultadoDaPergunta(
 
   switch (p.tipo) {
     case "escolha_unica":
-    case "multipla_escolha": {
+    case "multipla_escolha":
+    case "escolha_forcada": {
       const contagem = new Map<string, number>();
       const outros: string[] = [];
       for (const { valor } of valores) {

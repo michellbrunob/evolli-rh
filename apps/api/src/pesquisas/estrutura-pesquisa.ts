@@ -2,6 +2,7 @@ import {
   campoDaPergunta,
   type ErroDeCampo,
 } from "../common/erros/recusa-por-campo";
+import { conferirConfigDoBloco } from "./modelos/disc/regras-disc";
 import {
   type Condicao,
   type ConfigPergunta,
@@ -182,6 +183,8 @@ export function conferirConfig(
         inteiro: c.inteiro === true,
       };
     }
+    case "escolha_forcada":
+      return conferirConfigDoBloco(bruto);
     default:
       return {};
   }
