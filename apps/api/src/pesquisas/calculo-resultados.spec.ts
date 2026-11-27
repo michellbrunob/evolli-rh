@@ -351,6 +351,68 @@ describe("T216 — montarResultados (recorte e mínimo por grupo)", () => {
   });
 });
 
+describe("T216 — ordem dos textos (privacidade)", () => {
+  const sec: Secao[] = [
+    {
+      id: "s",
+      titulo: null,
+      descricao: null,
+      perguntas: [
+        p("t", "texto_curto"),
+        p("u", "escolha_unica", {
+          opcoes: [
+            { id: "a", texto: "A" },
+            { id: "b", texto: "B" },
+          ],
+          outro: true,
+        }),
+      ],
+    },
+  ];
+  const chegada = ["Zebra", "abacate", "Mesa", "Água"].map((texto, i) => ({
+    valores: [
+      { perguntaId: "t", valor: texto },
+      { perguntaId: "u", valor: { outro: `Outro ${4 - i}` } },
+    ],
+    autor: `Pessoa ${i}`,
+    grupos: {},
+  }));
+  const base = {
+    pesquisaId: "pq",
+    secoes: sec,
+    respostas: chegada,
+    participantes: null,
+    nomesDosGrupos: new Map<string, string>(),
+    minimoPorGrupo: 3,
+    filtro: null,
+    recortes: [] as const,
+    minimoNaVisaoGeral: false,
+  };
+
+  it("sem autor (confidencial e anônima): ordem alfabética, não a de chegada", () => {
+    const res = montarResultados({ ...base, identificada: false });
+    expect(
+      (res.perguntas[0] as { textos: { texto: string }[] }).textos.map(
+        (x) => x.texto,
+      ),
+    ).toEqual(["abacate", "Água", "Mesa", "Zebra"]);
+    expect((res.perguntas[1] as { outros: string[] }).outros).toEqual([
+      "Outro 1",
+      "Outro 2",
+      "Outro 3",
+      "Outro 4",
+    ]);
+  });
+
+  it("identificada: a ordem de chegada, com o autor", () => {
+    const res = montarResultados({ ...base, identificada: true });
+    expect(
+      (res.perguntas[0] as { textos: { texto: string; autor: string }[] })
+        .textos[0],
+    ).toEqual({ texto: "Zebra", autor: "Pessoa 0" });
+  });
+});
+
 describe("T216 — recortes por centro de custo e unidade", () => {
   const sec: Secao[] = [
     {

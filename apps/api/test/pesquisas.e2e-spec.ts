@@ -530,6 +530,21 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect(saida).toContain("No difference detected");
     });
 
+    it("prazo: coluna com hora; a conversão das datas antigas dá 23:59 de Brasília", async () => {
+      const coluna = await prisma.$queryRaw<{ tipo: string }[]>`
+        SELECT data_type AS tipo FROM information_schema.columns
+         WHERE table_schema = 'app' AND table_name = 'pesquisa'
+           AND column_name = 'encerra_em'`;
+      expect(coluna[0]!.tipo).toBe("timestamp without time zone");
+      // A mesma expressão do USING da migration.
+      const convertido = await prisma.$queryRaw<{ instante: Date }[]>`
+        SELECT (('2026-12-01'::date)::timestamp + interval '23 hours 59 minutes')
+                 AT TIME ZONE 'America/Sao_Paulo' AT TIME ZONE 'UTC' AS instante`;
+      expect(convertido[0]!.instante.toISOString()).toBe(
+        "2026-12-02T02:59:00.000Z",
+      );
+    });
+
     it("privilégios mínimos: resposta imutável e pesquisa sem DELETE", async () => {
       const linhas = await prisma.$queryRaw<
         { tabela: string; privilegio: string; pode: boolean }[]
@@ -886,16 +901,8 @@ describe("T216 — Pesquisas (e2e)", () => {
         where: { action: "pesquisas_respostas_consultadas" },
       });
       const r = await get(`/v1/pesquisas/${id}/respostas`, dpA).expect(200);
+      // Da mais recente para a mais antiga; #1 continua sendo a primeira.
       expect(r.body).toEqual([
-        {
-          id: expect.any(String),
-          numero: 1,
-          colaboradorId: a.id,
-          nome: a.nome,
-          departamento: "Departamento T179 Sintetico",
-          respondidaEm: expect.any(String),
-          media: 8,
-        },
         {
           id: expect.any(String),
           numero: 2,
@@ -905,8 +912,17 @@ describe("T216 — Pesquisas (e2e)", () => {
           respondidaEm: expect.any(String),
           media: 4,
         },
+        {
+          id: expect.any(String),
+          numero: 1,
+          colaboradorId: a.id,
+          nome: a.nome,
+          departamento: "Departamento T179 Sintetico",
+          respondidaEm: expect.any(String),
+          media: 8,
+        },
       ]);
-      const [primeira, segunda] = r.body as { id: string }[];
+      const [segunda, primeira] = r.body as { id: string }[];
       const det = await get(
         `/v1/pesquisas/${id}/respostas/${primeira!.id}`,
         rhA,
@@ -914,9 +930,10 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect(det.body).toMatchObject({
         id: primeira!.id,
         numero: 1,
-        anteriorId: null,
-        proximaId: segunda!.id,
-        posicao: 1,
+        // Anterior/próxima na ordem de exibição.
+        anteriorId: segunda!.id,
+        proximaId: null,
+        posicao: 2,
         total: 2,
         nome: a.nome,
         valores: [
@@ -944,9 +961,10 @@ describe("T216 — Pesquisas (e2e)", () => {
         rhA,
       ).expect(200);
       expect(ultima.body).toMatchObject({
-        anteriorId: primeira!.id,
-        proximaId: null,
-        posicao: 2,
+        numero: 2,
+        anteriorId: null,
+        proximaId: primeira!.id,
+        posicao: 1,
       });
       // Resposta de outra pesquisa (ou inexistente): 404; o master não lê.
       await get(`/v1/pesquisas/${id}/respostas/${randomUUID()}`, rhA).expect(
@@ -1015,20 +1033,75 @@ describe("T216 — Pesquisas (e2e)", () => {
         .send({
           ...base,
           nome: "Clima renomeada",
-          encerraEm: somarDias(HOJE, 10),
+          boasVindas: "Novas boas-vindas.",
+          encerraEm: `${somarDias(HOJE, 10)}T18:30`,
           minimoPorGrupo: 5,
           participantes: { todos: false, colaboradorIds: [a.id, b.id, c.id] },
         })
         .expect(200);
       expect(ok.body).toMatchObject({
         nome: "Clima renomeada",
-        encerraEm: somarDias(HOJE, 10),
+        boasVindas: "Novas boas-vindas.",
+        // Data e hora de Brasília, em ISO com o fuso.
+        encerraEm: `${somarDias(HOJE, 10)}T18:30:00-03:00`,
         minimoPorGrupo: 5,
         participantes: 3,
+        participantesTotal: 3,
+        responderam: 2,
+        pendentes: 1,
         respostas: 2,
         temRespostas: true,
         status: "ativa",
       });
+      const linha = await prisma.pesquisa.findUniqueOrThrow({ where: { id } });
+      expect(linha.encerraEm!.toISOString()).toBe(
+        `${somarDias(HOJE, 10)}T21:30:00.000Z`,
+      );
+      // Só a data (formato antigo): até 23:59.
+      const soData = await put(`/v1/pesquisas/${id}`, rhA)
+        .send({
+          ...base,
+          encerraEm: somarDias(HOJE, 11),
+          participantes: { todos: false, colaboradorIds: [a.id, b.id, c.id] },
+        })
+        .expect(200);
+      expect(soData.body.encerraEm).toBe(
+        `${somarDias(HOJE, 11)}T23:59:00-03:00`,
+      );
+      // Pausada também edita (nome e inclusão), com as mesmas travas.
+      await post(`/v1/pesquisas/${id}/status`, rhA)
+        .send({ status: "pausada" })
+        .expect(200);
+      const d = await admitir(rhA, empresaA);
+      const pausada = await put(`/v1/pesquisas/${id}`, rhA)
+        .send({
+          ...base,
+          nome: "Clima pausada",
+          participantes: {
+            todos: false,
+            colaboradorIds: [a.id, b.id, c.id, d.id],
+          },
+        })
+        .expect(200);
+      expect(pausada.body).toMatchObject({
+        nome: "Clima pausada",
+        status: "pausada",
+        participantesTotal: 4,
+        responderam: 2,
+        pendentes: 2,
+      });
+      await put(`/v1/pesquisas/${id}`, rhA)
+        .send({
+          ...base,
+          participantes: { todos: false, colaboradorIds: [b.id, c.id, d.id] },
+        })
+        .expect(409);
+      await put(`/v1/pesquisas/${id}`, rhA)
+        .send({ ...base, secoes: mudouPergunta })
+        .expect(409);
+      await post(`/v1/pesquisas/${id}/status`, rhA)
+        .send({ status: "ativa" })
+        .expect(200);
       // Quem não respondeu pode sair.
       await put(`/v1/pesquisas/${id}`, rhA)
         .send({
@@ -1039,7 +1112,7 @@ describe("T216 — Pesquisas (e2e)", () => {
       const eventos = await trilha(id);
       expect(
         eventos.filter((e) => e.action === "pesquisas_pesquisa_alterada"),
-      ).toHaveLength(2);
+      ).toHaveLength(4);
     });
   });
 
@@ -1315,8 +1388,9 @@ describe("T216 — Pesquisas (e2e)", () => {
 
       // Respostas individuais numeradas, sem pessoa.
       const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
+      // Da mais recente para a mais antiga.
       expect(lista.body.map((x: { numero: number }) => x.numero)).toEqual([
-        1, 2, 3,
+        3, 2, 1,
       ]);
       expect(
         lista.body.every(
@@ -1655,15 +1729,16 @@ describe("T216 — Pesquisas (e2e)", () => {
     it("prazo vencido conta como finalizada (lista, detalhe, link e edição)", async () => {
       const a = await admitir(rhA, empresaA);
       const { id, token } = await publicada({
-        encerraEm: HOJE,
+        encerraEm: `${somarDias(HOJE, 1)}T09:00`,
         participantes: { todos: false, colaboradorIds: [a.id] },
       });
       expect(
         (await get(`/v1/pesquisas/${id}`, rhA).expect(200)).body.status,
       ).toBe("ativa");
+      // O vencimento é pelo instante: um minuto atrás já encerrou.
       await prisma.pesquisa.update({
         where: { id },
-        data: { encerraEm: new Date(`${somarDias(HOJE, -1)}T00:00:00Z`) },
+        data: { encerraEm: new Date(Date.now() - 60_000) },
       });
       expect(
         (await get(`/v1/pesquisas/${id}`, rhA).expect(200)).body.status,
@@ -1682,6 +1757,39 @@ describe("T216 — Pesquisas (e2e)", () => {
       await post(`/v1/pesquisas/${id}/status`, rhA)
         .send({ status: "pausada" })
         .expect(409);
+    });
+
+    it("finalizada à mão: o link diz 'finalizada' (não 'encerrada')", async () => {
+      const a = await admitir(rhA, empresaA);
+      const { id, token } = await publicada({
+        participantes: { todos: false, colaboradorIds: [a.id] },
+      });
+      await post(`/v1/pesquisas/${id}/status`, rhA)
+        .send({ status: "finalizada" })
+        .expect(200);
+      expect((await agent().get(publico(token)).expect(200)).body).toEqual({
+        indisponivel: "finalizada",
+      });
+      await identificar(token, a).expect(410);
+    });
+
+    it("prazo com hora: no passado (mesmo de hoje) é 422; formato errado é 400", async () => {
+      const passado = new Date(Date.now() - 2 * 60 * 60_000);
+      const brasilia = new Date(passado.getTime() - 3 * 60 * 60_000)
+        .toISOString()
+        .slice(0, 16);
+      const r = await post("/v1/pesquisas", rhA)
+        .send(corpo({ encerraEm: brasilia }))
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "encerraEm", motivo: "invalido" },
+      ]);
+      await post("/v1/pesquisas", rhA)
+        .send(corpo({ encerraEm: `${somarDias(HOJE, 3)}T25:00` }))
+        .expect(422);
+      await post("/v1/pesquisas", rhA)
+        .send(corpo({ encerraEm: `${somarDias(HOJE, 3)} 10:00` }))
+        .expect(400);
     });
 
     it("prazo no passado e estrutura inválida: 422 por campo", async () => {
@@ -1767,29 +1875,123 @@ describe("T216 — Pesquisas (e2e)", () => {
       ).toBe(true);
     });
 
-    it("duplicar copia como rascunho novo, com '(cópia)'", async () => {
+    it("duplicar: a cópia nasce ativa, com link novo, na mesma empresa", async () => {
       const a = await admitir(rhA, empresaA);
-      const { id } = await publicada({
+      const prazo = `${somarDias(HOJE, 5)}T17:00`;
+      const { id, token } = await publicada({
         identificacao: "confidencial",
+        encerraEm: prazo,
         participantes: { todos: false, colaboradorIds: [a.id] },
+      });
+      const r = await post(`/v1/pesquisas/${id}/duplicar`, rhA)
+        .send({})
+        .expect(201);
+      expect(r.body).toMatchObject({
+        nome: "Pesquisa de clima sintética (cópia)",
+        identificacao: "confidencial",
+        status: "ativa",
+        participantes: 1,
+        participantesTotal: 1,
+        responderam: 0,
+        pendentes: 1,
+        respostas: 0,
+        encerraEm: `${prazo}:00-03:00`,
+        secoes: estrutura(),
+      });
+      expect(r.body.id).not.toBe(id);
+      expect(r.body.publicadaEm).not.toBeNull();
+      expect(r.body.link).toMatch(/^#\/p\/[A-Za-z0-9_-]{43}$/);
+      expect(r.body.link).not.toBe(`#/p/${token}`);
+      // O link da cópia já funciona.
+      const tokenCopia = (r.body.link as string).replace("#/p/", "");
+      await agent().get(publico(tokenCopia)).expect(200);
+      await identificar(tokenCopia, a).expect(200);
+      const eventos = await trilha(r.body.id);
+      expect(eventos.map((e) => e.action)).toEqual([
+        "pesquisas_pesquisa_duplicada",
+      ]);
+      expect(eventos[0]!.companyId).toBe(empresaA);
+    });
+
+    it("duplicar: prazo vencido vira sem prazo; anônima sem participantes", async () => {
+      const { id } = await publicada({
+        identificacao: "anonima",
+        separarPor: ["unidade"],
+      });
+      await prisma.pesquisa.update({
+        where: { id },
+        data: { encerraEm: new Date(Date.now() - 60_000) },
       });
       const r = await post(`/v1/pesquisas/${id}/duplicar`, rhA)
         .send()
         .expect(201);
       expect(r.body).toMatchObject({
-        nome: "Pesquisa de clima sintética (cópia)",
-        identificacao: "confidencial",
-        status: "rascunho",
-        link: null,
-        participantes: 1,
-        respostas: 0,
-        secoes: estrutura(),
+        status: "ativa",
+        encerraEm: null,
+        participantes: null,
+        participantesTotal: null,
+        responderam: null,
+        pendentes: null,
+        separarPor: ["unidade"],
       });
-      expect(r.body.id).not.toBe(id);
+    });
+
+    it("duplicar em outra empresa: só se a conta a acessa; participantes = o time ativo dela", async () => {
+      const a = await admitir(rhA, empresaA);
+      const { id } = await publicada({
+        participantes: { todos: false, colaboradorIds: [a.id] },
+      });
+      // Sem acesso à empresa de destino: 403.
+      await post(`/v1/pesquisas/${id}/duplicar`, rhA)
+        .send({ empresaId: empresaB })
+        .expect(403);
+      await post(`/v1/pesquisas/${id}/duplicar`, dpA)
+        .send({ empresaId: empresaB })
+        .expect(403);
+      await post(`/v1/pesquisas/${id}/duplicar`, rhA)
+        .send({ empresaId: "x" })
+        .expect(400);
+
+      // Conta de RH com acesso às duas empresas.
+      const rhMulti = await criarUsuario(
+        "rh.multi.pesquisas@example.test",
+        "rh",
+        empresaA,
+      );
+      const conta = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "rh.multi.pesquisas@example.test" },
+      });
+      const concedente = await prisma.accessUser.findFirstOrThrow({
+        where: { email: "master.pesquisas@example.test" },
+      });
+      await prisma.accessUserEmpresa.create({
+        data: {
+          userId: conta.id,
+          empresaId: empresaB,
+          concedidoPorUserId: concedente.id,
+        },
+      });
+      const deB = [await admitir(rhB, empresaB), await admitir(rhB, empresaB)];
+      const r = await post(`/v1/pesquisas/${id}/duplicar`, rhMulti)
+        .send({ empresaId: empresaB })
+        .expect(201);
+      expect(r.body).toMatchObject({
+        status: "ativa",
+        participantes: deB.length,
+      });
+      expect(
+        r.body.participantesLista
+          .map((x: { colaboradorId: string }) => x.colaboradorId)
+          .sort(),
+      ).toEqual(deB.map((x) => x.id).sort());
+      // A cópia é da empresa B: o RH de B a vê; o de A, não.
+      await get(`/v1/pesquisas/${r.body.id}`, rhB).expect(200);
+      await get(`/v1/pesquisas/${r.body.id}`, rhA).expect(404);
       const eventos = await trilha(r.body.id);
-      expect(eventos.map((e) => e.action)).toEqual([
-        "pesquisas_pesquisa_duplicada",
-      ]);
+      expect(eventos[0]).toMatchObject({
+        action: "pesquisas_pesquisa_duplicada",
+        companyId: empresaB,
+      });
     });
 
     it("excluir é lógico: some de tudo; o registro e a trilha ficam", async () => {

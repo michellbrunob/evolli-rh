@@ -15,7 +15,6 @@ import { CamposRecusadosException } from "../common/erros/recusa-por-campo";
 import type { SessionRequestMetadata } from "../auth/session/session.service";
 import {
   dataDoDia,
-  diaDe,
   hojeEmSaoPaulo,
 } from "../pessoas/ausencias/calculo-ausencias";
 import { totalDePerguntas } from "./estrutura-pesquisa";
@@ -32,7 +31,6 @@ import {
   minutosEstimados,
   motivoIndisponivel,
   primeiroNome,
-  statusEfetivo,
 } from "./regras-pesquisa";
 import { catalogoAtivo, lotacoesVigentes } from "./pessoas-da-pesquisa";
 import { conferirRespostas } from "./validacao-respostas";
@@ -86,25 +84,16 @@ export class PesquisaPublicaService {
   private async aceitando(token: string): Promise<PesquisaDoLink> {
     const p = await this.doLink(token);
     if (!p) throw new NotFoundException();
-    const efetivo = statusEfetivo(
-      p.status,
-      p.encerraEm ? diaDe(p.encerraEm) : null,
-      hojeEmSaoPaulo(),
-    );
-    if (motivoIndisponivel(efetivo) !== null) throw new GoneException();
+    if (motivoIndisponivel(p.status, p.encerraEm, new Date()) !== null) {
+      throw new GoneException();
+    }
     return p;
   }
 
   async abrir(token: string): Promise<AberturaPublica> {
     const p = await this.doLink(token);
     if (!p) return { indisponivel: "inexistente" };
-    const motivo = motivoIndisponivel(
-      statusEfetivo(
-        p.status,
-        p.encerraEm ? diaDe(p.encerraEm) : null,
-        hojeEmSaoPaulo(),
-      ),
-    );
+    const motivo = motivoIndisponivel(p.status, p.encerraEm, new Date());
     if (motivo) return { indisponivel: motivo };
     const secoes = p.secoes as unknown as Secao[];
     const total = totalDePerguntas(secoes);

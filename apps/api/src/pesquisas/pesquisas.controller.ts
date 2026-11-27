@@ -24,6 +24,7 @@ import { CurrentUser } from "../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
 import {
   AnalisesQueryDto,
+  DuplicarDto,
   IdentificarDto,
   ListarPesquisasQueryDto,
   PesquisaDto,
@@ -135,13 +136,16 @@ export class PesquisasController {
   @UseGuards(CsrfGuard, AuthorizationGuard)
   @RequirePermission("pesquisa", "create")
   @Header("Cache-Control", "no-store")
-  @ApiOperation({ summary: "Duplica como rascunho novo" })
+  @ApiOperation({
+    summary: "Duplica já ativa (na empresa ativa ou em outra autorizada)",
+  })
   duplicar(
     @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Body() dto: DuplicarDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.service.duplicar(id, ctx(actor, req));
+    return this.service.duplicar(id, dto.empresaId, ctx(actor, req));
   }
 
   @Delete(":pesquisaId")

@@ -117,6 +117,7 @@ export interface PesquisaResumo {
   respostas: number;
   criadaEm: string;
   publicadaEm: string | null;
+  /** Data e hora do encerramento, ISO com o fuso de Brasília (`-03:00`). */
   encerraEm: string | null;
   link: string | null;
 }
@@ -140,6 +141,10 @@ export interface PesquisaDetalhe extends PesquisaResumo {
   participantesLista: ParticipanteDaLista[];
   /** Participantes que não conseguem se identificar pelo link (0 na anônima). */
   naoIdentificaveis: number;
+  /** Painel de participantes da edição; `null` na anônima. */
+  participantesTotal: number | null;
+  responderam: number | null;
+  pendentes: number | null;
   temRespostas: boolean;
 }
 
@@ -302,7 +307,7 @@ export interface PesquisaPublica {
 }
 
 export type MotivoIndisponivel =
-  "pausada" | "encerrada" | "cancelada" | "inexistente";
+  "pausada" | "finalizada" | "encerrada" | "cancelada" | "inexistente";
 
 export type AberturaPublica =
   PesquisaPublica | { indisponivel: MotivoIndisponivel };

@@ -36,7 +36,8 @@ import {
  * pelo serviço (`estrutura-pesquisa.ts`), que responde por campo (o id da
  * pergunta); o valor de cada resposta, por `validacao-respostas.ts`.
  */
-const DIA = /^\d{4}-\d{2}-\d{2}$/;
+/** Data e hora no horário de Brasília (só a data: até 23:59). */
+const ENCERRAMENTO = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/;
 
 const nulo = ({ value }: { value: unknown }) => (value === "" ? null : value);
 
@@ -88,7 +89,7 @@ export class PesquisaDto {
 
   @IsOptional()
   @Transform(nulo)
-  @Matches(DIA)
+  @Matches(ENCERRAMENTO)
   encerraEm?: string | null;
 
   @Type(() => Number)
@@ -96,6 +97,13 @@ export class PesquisaDto {
   @Min(3)
   @Max(10)
   minimoPorGrupo!: number;
+}
+
+export class DuplicarDto {
+  /** Empresa de destino; sem ela, a empresa ativa. */
+  @IsOptional()
+  @IsUUID()
+  empresaId?: string;
 }
 
 export class StatusDto {

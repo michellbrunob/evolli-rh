@@ -17,11 +17,7 @@ import type {
   PessoasAuditContext,
   ResultadoPaginado,
 } from "../pessoas/pessoas.types";
-import {
-  dataDoDia,
-  diaDe,
-  hojeEmSaoPaulo,
-} from "../pessoas/ausencias/calculo-ausencias";
+import { empresaEstaAutorizada } from "../auth/session/contexto-empresarial";
 import {
   mediaDaResposta,
   montarResultados,
@@ -61,7 +57,9 @@ import {
   type ValorRespondido,
 } from "./pesquisas.types";
 import {
+  formatarEncerramento,
   identificavelPeloLink,
+  lerEncerramento,
   podeEditar,
   statusEfetivo,
   transicaoValida,
@@ -84,7 +82,6 @@ import {
 
 const LIMITE_NOME = 120;
 const LIMITE_BOAS_VINDAS = 1000;
-const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
 type Db = Prisma.TransactionClient;
 type LinhaPesquisa = Prisma.PesquisaGetPayload<object>;
@@ -127,7 +124,7 @@ interface EntradaConferida {
   nome: string;
   boasVindas: string | null;
   secoes: Secao[];
-  encerraEm: string | null;
+  encerraEm: Date | null;
   minimoPorGrupo: number;
   separarPor: CampoGrupo[];
   /** Na anônima, sempre `{ todos: false, colaboradorIds: [] }`. */
@@ -147,12 +144,6 @@ export function jsonCanonico(v: unknown): string {
       .join(",")}}`;
   }
   return JSON.stringify(v);
-}
-
-function diaValido(v: string): boolean {
-  if (!DIA.test(v)) return false;
-  const d = new Date(`${v}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
 }
 
 /** O link público: 32 bytes aleatórios em base64url. */
@@ -217,11 +208,7 @@ export class PesquisasService {
     status: StatusPesquisa;
     encerraEm: Date | null;
   }): StatusPesquisa {
-    return statusEfetivo(
-      p.status,
-      p.encerraEm ? diaDe(p.encerraEm) : null,
-      hojeEmSaoPaulo(),
-    );
+    return statusEfetivo(p.status, p.encerraEm, new Date());
   }
 
   private resumo(
@@ -239,7 +226,7 @@ export class PesquisasService {
       respostas,
       criadaEm: p.criadaEm.toISOString(),
       publicadaEm: p.publicadaEm ? p.publicadaEm.toISOString() : null,
-      encerraEm: p.encerraEm ? diaDe(p.encerraEm) : null,
+      encerraEm: p.encerraEm ? formatarEncerramento(p.encerraEm) : null,
       link: p.publicadaEm ? `#/p/${p.token}` : null,
     };
   }
@@ -373,7 +360,24 @@ export class PesquisasService {
       participantesLista,
       naoIdentificaveis: participantesLista.filter((x) => !x.identificavel)
         .length,
+      ...this.totaisDosParticipantes(p.identificacao, participantesLista),
       temRespostas: respostas > 0,
+    };
+  }
+
+  /** Painel de participantes da edição; nulos na anônima. */
+  private totaisDosParticipantes(
+    identificacao: Identificacao,
+    lista: readonly ParticipanteDaLista[],
+  ): Pick<PesquisaDetalhe, "participantesTotal" | "responderam" | "pendentes"> {
+    if (identificacao === "anonima") {
+      return { participantesTotal: null, responderam: null, pendentes: null };
+    }
+    const responderam = lista.filter((x) => x.respondeu === true).length;
+    return {
+      participantesTotal: lista.length,
+      responderam,
+      pendentes: lista.length - responderam,
     };
   }
 
@@ -383,7 +387,7 @@ export class PesquisasService {
   /** Nome, boas-vindas, estrutura, prazo e grupos, com erros por campo. */
   private conferirEntrada(
     dto: PesquisaInformada,
-    encerraEmAtual: string | null,
+    encerraEmAtual: Date | null,
   ): EntradaConferida {
     const erros: ErroDeCampo[] = [];
     const nome = dto.nome.trim();
@@ -397,11 +401,16 @@ export class PesquisasService {
     }
     const estrutura = conferirSecoes(dto.secoes);
     erros.push(...estrutura.erros);
-    const encerraEm = dto.encerraEm ?? null;
-    if (encerraEm !== null) {
-      if (!diaValido(encerraEm)) {
-        erros.push({ campo: "encerraEm", motivo: "invalido" });
-      } else if (encerraEm !== encerraEmAtual && encerraEm < hojeEmSaoPaulo()) {
+    // Data e hora no horário de Brasília, no futuro (o prazo já gravado
+    // pode ficar como está).
+    let encerraEm: Date | null = null;
+    if (dto.encerraEm) {
+      encerraEm = lerEncerramento(dto.encerraEm);
+      const mesmo =
+        encerraEm !== null &&
+        encerraEmAtual !== null &&
+        encerraEm.getTime() === encerraEmAtual.getTime();
+      if (encerraEm === null || (!mesmo && encerraEm.getTime() <= Date.now())) {
         erros.push({ campo: "encerraEm", motivo: "invalido" });
       }
     }
@@ -469,7 +478,7 @@ export class PesquisasService {
           secoes: e.secoes as unknown as Prisma.InputJsonValue,
           todos: e.todos,
           separarPor: e.separarPor,
-          encerraEm: e.encerraEm ? dataDoDia(e.encerraEm) : null,
+          encerraEm: e.encerraEm,
           minimoPorGrupo: e.minimoPorGrupo,
           token: novoToken(),
           criadaPorId: ctx.actor.id,
@@ -511,10 +520,7 @@ export class PesquisasService {
           { campo: "identificacao", motivo: "nao_editavel" },
         ]);
       }
-      const e = this.conferirEntrada(
-        dto,
-        atual.encerraEm ? diaDe(atual.encerraEm) : null,
-      );
+      const e = this.conferirEntrada(dto, atual.encerraEm);
       const temRespostas =
         (await tx.pesquisaResposta.count({ where: { pesquisaId: id } })) > 0;
       if (temRespostas) {
@@ -581,7 +587,7 @@ export class PesquisasService {
           secoes: e.secoes as unknown as Prisma.InputJsonValue,
           todos: e.todos,
           separarPor: e.separarPor,
-          encerraEm: e.encerraEm ? dataDoDia(e.encerraEm) : null,
+          encerraEm: e.encerraEm,
           minimoPorGrupo: e.minimoPorGrupo,
         },
       });
@@ -609,7 +615,7 @@ export class PesquisasService {
       if (totalDePerguntas(atual.secoes as unknown as Secao[]) === 0) {
         erros.push({ campo: "secoes", motivo: "obrigatorio" });
       }
-      if (atual.encerraEm && diaDe(atual.encerraEm) < hojeEmSaoPaulo()) {
+      if (atual.encerraEm && atual.encerraEm.getTime() <= Date.now()) {
         erros.push({ campo: "encerraEm", motivo: "invalido" });
       }
       // A anônima não tem participantes: quem tiver o link responde.
@@ -678,47 +684,88 @@ export class PesquisasService {
     });
   }
 
-  /** Nome "(cópia)", identificação, perguntas e participantes; rascunho. */
+  /**
+   * Duplica e já publica: a cópia nasce ATIVA, com link novo, "(cópia)" no
+   * nome, as mesmas perguntas, identificação, separação e prazo (vencido:
+   * sem prazo). Destino: a empresa ativa ou outra que a conta pode acessar
+   * (senão 403). Participantes: na mesma empresa, os mesmos; em outra, todo
+   * o time ativo dela; na anônima, nenhum.
+   */
   async duplicar(
     id: string,
+    empresaDestino: string | undefined,
     ctx: PessoasAuditContext,
   ): Promise<PesquisaDetalhe> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const destino = empresaDestino ?? empresaId;
+    const mesmaEmpresa = destino === empresaId;
+    if (!mesmaEmpresa) {
+      // A conta como está gravada (a empresa própria), não a da sessão.
+      const conta = await this.prisma.accessUser.findUnique({
+        where: { id: ctx.actor.id },
+        select: { id: true, role: true, companyId: true },
+      });
+      if (
+        !conta ||
+        !(await empresaEstaAutorizada(this.prisma, conta, destino))
+      ) {
+        throw new ForbiddenException();
+      }
+    }
     return this.prisma.$transaction(async (tx) => {
       const p = await this.obterLinha(tx, id, empresaId, ctx);
-      const hoje = hojeEmSaoPaulo();
+      const agora = new Date();
+      const erros: ErroDeCampo[] = [];
+      if (totalDePerguntas(p.secoes as unknown as Secao[]) === 0) {
+        erros.push({ campo: "secoes", motivo: "obrigatorio" });
+      }
+      let participantes: string[] = [];
+      if (p.identificacao !== "anonima") {
+        if (!mesmaEmpresa || (p.status === "rascunho" && p.todos)) {
+          participantes = await ativosDaEmpresa(tx, destino);
+        } else {
+          participantes = (
+            await tx.pesquisaParticipante.findMany({
+              where: { pesquisaId: id },
+              select: { colaboradorId: true },
+            })
+          ).map((x) => x.colaboradorId);
+        }
+        if (participantes.length === 0) {
+          erros.push({ campo: "participantes", motivo: "obrigatorio" });
+        }
+      }
+      if (erros.length) throw new CamposRecusadosException(erros);
       const sufixo = " (cópia)";
       const copia = await tx.pesquisa.create({
         data: {
-          empresaId,
+          empresaId: destino,
           nome: `${p.nome.slice(0, LIMITE_NOME - sufixo.length)}${sufixo}`,
           boasVindas: p.boasVindas,
           modelo: p.modelo,
           identificacao: p.identificacao,
           secoes: p.secoes as Prisma.InputJsonValue,
-          todos: p.todos,
+          todos: p.identificacao !== "anonima" && (!mesmaEmpresa || p.todos),
           separarPor: p.separarPor,
           encerraEm:
-            p.encerraEm && diaDe(p.encerraEm) >= hoje ? p.encerraEm : null,
+            p.encerraEm && p.encerraEm.getTime() > agora.getTime()
+              ? p.encerraEm
+              : null,
           minimoPorGrupo: p.minimoPorGrupo,
+          status: "ativa",
+          publicadaEm: agora,
           token: novoToken(),
           criadaPorId: ctx.actor.id,
         },
       });
-      if (!p.todos && p.identificacao !== "anonima") {
-        const participantes = await tx.pesquisaParticipante.findMany({
-          where: { pesquisaId: id },
-          select: { colaboradorId: true },
+      if (participantes.length) {
+        await tx.pesquisaParticipante.createMany({
+          data: participantes.map((colaboradorId) => ({
+            pesquisaId: copia.id,
+            empresaId: destino,
+            colaboradorId,
+          })),
         });
-        if (participantes.length) {
-          await tx.pesquisaParticipante.createMany({
-            data: participantes.map(({ colaboradorId }) => ({
-              pesquisaId: copia.id,
-              empresaId,
-              colaboradorId,
-            })),
-          });
-        }
       }
       await this.auditoria.registrarMutacao(
         tx,
@@ -726,7 +773,7 @@ export class PesquisasService {
         "pesquisas_pesquisa_duplicada",
         "pesquisa",
         copia.id,
-        empresaId,
+        destino,
       );
       return this.detalhe(tx, copia);
     });
@@ -956,10 +1003,13 @@ export class PesquisasService {
         ),
       },
     }));
+    // Exibição: da mais recente para a mais antiga; o número continua sendo
+    // a ordem de chegada (#1 = a primeira).
+    lista.reverse();
     return { p, empresaId, lista };
   }
 
-  /** A lista numerada (auditada). */
+  /** A lista numerada, da mais recente para a mais antiga (auditada). */
   async respostasIndividuais(
     id: string,
     ctx: PessoasAuditContext,
@@ -975,7 +1025,10 @@ export class PesquisasService {
     return lista.map((r) => r.resumo);
   }
 
-  /** Uma resposta comparada com o time, com anterior e próxima (auditada). */
+  /**
+   * Uma resposta comparada com o time, com anterior e próxima na ordem de
+   * exibição da lista (auditada).
+   */
   async respostaIndividual(
     id: string,
     respostaId: string,

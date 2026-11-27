@@ -1,5 +1,7 @@
 import {
   cpfNormalizado,
+  formatarEncerramento,
+  lerEncerramento,
   identificavelPeloLink,
   minutosEstimados,
   motivoIndisponivel,
@@ -12,22 +14,62 @@ import { STATUS_PESQUISA } from "./pesquisas.types";
 
 /** T216 — status calculado, transições e auxiliares da página pública. */
 
-describe("T216 — statusEfetivo", () => {
-  const hoje = "2026-11-27";
+describe("T216 — statusEfetivo (prazo com hora, horário de Brasília)", () => {
+  const agora = new Date("2026-11-27T15:00:00-03:00");
+  const antes = new Date("2026-11-27T14:59:00-03:00");
+  const depois = new Date("2026-11-27T15:01:00-03:00");
 
-  it("ativa ou pausada com prazo vencido conta como finalizada", () => {
-    expect(statusEfetivo("ativa", "2026-11-26", hoje)).toBe("finalizada");
-    expect(statusEfetivo("pausada", "2026-11-26", hoje)).toBe("finalizada");
+  it("ativa ou pausada com o instante do prazo já passado conta como finalizada", () => {
+    expect(statusEfetivo("ativa", antes, agora)).toBe("finalizada");
+    expect(statusEfetivo("pausada", antes, agora)).toBe("finalizada");
   });
 
-  it("o dia do encerramento ainda vale; sem prazo, nunca vence", () => {
-    expect(statusEfetivo("ativa", hoje, hoje)).toBe("ativa");
-    expect(statusEfetivo("ativa", null, hoje)).toBe("ativa");
+  it("antes do instante do prazo ainda vale; sem prazo, nunca vence", () => {
+    expect(statusEfetivo("ativa", depois, agora)).toBe("ativa");
+    expect(statusEfetivo("ativa", agora, agora)).toBe("ativa");
+    expect(statusEfetivo("ativa", null, agora)).toBe("ativa");
   });
 
   it("rascunho e cancelada não mudam pelo prazo", () => {
-    expect(statusEfetivo("rascunho", "2020-01-01", hoje)).toBe("rascunho");
-    expect(statusEfetivo("cancelada", "2020-01-01", hoje)).toBe("cancelada");
+    expect(statusEfetivo("rascunho", antes, agora)).toBe("rascunho");
+    expect(statusEfetivo("cancelada", antes, agora)).toBe("cancelada");
+  });
+});
+
+describe("T216 — encerramento: leitura e formato", () => {
+  it("AAAA-MM-DDTHH:mm no horário de Brasília", () => {
+    expect(lerEncerramento("2026-12-01T18:30")!.toISOString()).toBe(
+      "2026-12-01T21:30:00.000Z",
+    );
+  });
+
+  it("só a data (formato antigo) vale até 23:59 daquele dia", () => {
+    expect(lerEncerramento("2026-12-01")!.toISOString()).toBe(
+      "2026-12-02T02:59:00.000Z",
+    );
+  });
+
+  it("recusa data ou hora que não existe e outros formatos", () => {
+    for (const v of [
+      "2026-02-30T10:00",
+      "2026-12-01T24:00",
+      "2026-12-01T10:60",
+      "2026-12-01 10:00",
+      "01/12/2026",
+      "2026-12-01T10:00:00",
+    ]) {
+      expect(lerEncerramento(v)).toBeNull();
+    }
+  });
+
+  it("saída em ISO com o fuso de Brasília", () => {
+    expect(formatarEncerramento(new Date("2026-12-01T21:30:00.000Z"))).toBe(
+      "2026-12-01T18:30:00-03:00",
+    );
+    // Virada do dia em UTC continua no dia de Brasília.
+    expect(formatarEncerramento(new Date("2026-12-02T02:59:00.000Z"))).toBe(
+      "2026-12-01T23:59:00-03:00",
+    );
   });
 });
 
@@ -59,12 +101,19 @@ describe("T216 — transições", () => {
 });
 
 describe("T216 — página pública", () => {
-  it("motivo do aviso por status", () => {
-    expect(motivoIndisponivel("ativa")).toBeNull();
-    expect(motivoIndisponivel("pausada")).toBe("pausada");
-    expect(motivoIndisponivel("finalizada")).toBe("encerrada");
-    expect(motivoIndisponivel("cancelada")).toBe("cancelada");
-    expect(motivoIndisponivel("rascunho")).toBe("inexistente");
+  it("motivo do aviso: finalizada à mão separada de encerrada pelo prazo", () => {
+    const agora = new Date("2026-11-27T15:00:00-03:00");
+    const vencido = new Date("2026-11-27T14:00:00-03:00");
+    const futuro = new Date("2026-11-28T14:00:00-03:00");
+    expect(motivoIndisponivel("ativa", null, agora)).toBeNull();
+    expect(motivoIndisponivel("ativa", futuro, agora)).toBeNull();
+    expect(motivoIndisponivel("pausada", null, agora)).toBe("pausada");
+    expect(motivoIndisponivel("finalizada", null, agora)).toBe("finalizada");
+    expect(motivoIndisponivel("finalizada", vencido, agora)).toBe("finalizada");
+    expect(motivoIndisponivel("ativa", vencido, agora)).toBe("encerrada");
+    expect(motivoIndisponivel("pausada", vencido, agora)).toBe("encerrada");
+    expect(motivoIndisponivel("cancelada", vencido, agora)).toBe("cancelada");
+    expect(motivoIndisponivel("rascunho", null, agora)).toBe("inexistente");
   });
 
   it("tempo estimado, primeiro nome e CPF", () => {

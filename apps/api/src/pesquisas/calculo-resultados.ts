@@ -354,6 +354,24 @@ export function gruposDoCampo(
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
+const alfabetica = (a: string, b: string) =>
+  a.localeCompare(b, "pt-BR", { sensitivity: "base" }) ||
+  (a < b ? -1 : a > b ? 1 : 0);
+
+/** Textos e "outro" em ordem alfabética. */
+export function emOrdemAlfabetica(r: ResultadoPergunta): ResultadoPergunta {
+  if ("textos" in r) {
+    return {
+      ...r,
+      textos: [...r.textos].sort((a, b) => alfabetica(a.texto, b.texto)),
+    };
+  }
+  if ("outros" in r) {
+    return { ...r, outros: [...r.outros].sort(alfabetica) };
+  }
+  return r;
+}
+
 export interface EntradaDosResultados {
   pesquisaId: string;
   secoes: readonly Secao[];
@@ -407,7 +425,13 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
     (f === null && !e.minimoNaVisaoGeral
       ? true
       : filtradas.length >= e.minimoPorGrupo);
-  const perguntas = visivel ? resultadoDasPerguntas(e.secoes, filtradas) : [];
+  const calculadas = visivel ? resultadoDasPerguntas(e.secoes, filtradas) : [];
+  // Sem autor (confidencial, anônima e o master), os textos saem em ordem
+  // alfabética: a ordem de chegada ajudaria a ligar o texto a quem
+  // respondeu.
+  const perguntas = e.identificada
+    ? calculadas
+    : calculadas.map(emOrdemAlfabetica);
 
   return {
     pesquisaId: e.pesquisaId,

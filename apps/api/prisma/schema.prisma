@@ -3730,7 +3730,9 @@ model Pesquisa {
   secoes         Json
   /// Participantes = todos os ativos da empresa, resolvidos ao publicar.
   todos          Boolean               @default(false)
-  encerraEm      DateTime?             @map("encerra_em") @db.Date
+  /// Data e hora do encerramento (instante). Prazos antigos, só com a data,
+  /// viraram 23:59 daquele dia no horário de Brasília.
+  encerraEm      DateTime?             @map("encerra_em")
   minimoPorGrupo Int                   @default(3) @map("minimo_por_grupo")
   /// Só na anônima: até 2 campos (`departamento`, `centroCusto`, `unidade`)
   /// que quem responde escolhe antes das perguntas.
