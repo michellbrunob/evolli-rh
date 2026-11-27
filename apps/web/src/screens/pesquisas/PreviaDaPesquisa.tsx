@@ -1,26 +1,20 @@
 /**
  * T216 — pré-visualização (`#/pesquisas/<id>/previa`, aberta em outra aba):
- * a experiência real de quem responde — abertura, identificação e uma
- * pergunta por tela — com a pesquisa carregada pela sessão do RH. Uma faixa
- * fixa avisa que é o modo de pré-visualização e que nada é gravado; ao
- * abrir, uma janela explica isso. O "cliente" da página pública é trocado
- * por um que só devolve a pesquisa: identificar e enviar não vão ao
- * servidor.
+ * carrega a pesquisa pela sessão do RH e entrega à página pública no modo
+ * prévia — a experiência real de quem responde (abertura, identificação
+ * simulada, perguntas e agradecimento), com a faixa e a janela que avisam
+ * que nada é gravado. Nenhuma chamada da página pública vai ao servidor.
  */
-import { useEffect, useMemo, useState } from "react";
-import type {
-  ClientePesquisaPublica,
-  PesquisaPublica,
-} from "../../api/pesquisaPublicaClient";
+import { useEffect, useState } from "react";
+import type { PesquisaPublica } from "../../api/pesquisaPublicaClient";
 import type { PesquisaDetalhe } from "../../api/pesquisasClient";
-import { Button } from "../../components";
-import { Dialog } from "../../ui";
 import { Esqueleto } from "../../ui/movimento";
-import { ResponderPesquisa } from "../publico/ResponderPesquisa";
-import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import {
+  ResponderPesquisa,
+  montarPreviaPublica,
+} from "../publico/ResponderPesquisa";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
-import { minutosEstimados } from "./tempoEstimado";
 
 /** A pesquisa como a página pública a recebe. */
 export function pesquisaPublicaDaPrevia(
@@ -28,18 +22,17 @@ export function pesquisaPublicaDaPrevia(
   empresa: string,
   grupos: GruposDaEmpresa | null,
 ): PesquisaPublica {
-  const total = perguntasEmOrdem(d.secoes).length;
-  return {
+  const separar = d.identificacao === "anonima" ? (d.separarPor ?? []) : [];
+  return montarPreviaPublica({
     empresa,
     nome: d.nome,
     boasVindas: d.boasVindas,
     identificacao: d.identificacao,
-    totalPerguntas: total,
-    minutosEstimados: minutosEstimados(total),
+    modelo: d.modelo,
     secoes: d.secoes as PesquisaPublica["secoes"],
-    ...(d.identificacao === "anonima" && (d.separarPor ?? []).length > 0
+    ...(separar.length > 0
       ? {
-          grupos: (d.separarPor ?? []).map((campo) => ({
+          grupos: separar.map((campo) => ({
             campo,
             rotulo:
               CAMPOS_DE_GRUPO.find((c) => c.campo === campo)?.rotulo ?? campo,
@@ -47,19 +40,7 @@ export function pesquisaPublicaDaPrevia(
           })),
         }
       : {}),
-  };
-}
-
-/** Cliente que nunca grava: identificar e enviar só fingem dar certo. */
-export function clienteDaPrevia(
-  pesquisa: PesquisaPublica,
-): ClientePesquisaPublica {
-  return {
-    abrir: () => Promise.resolve(pesquisa),
-    identificar: () =>
-      Promise.resolve({ passe: "previa", primeiroNome: "Pré-visualização" }),
-    enviarRespostas: () => Promise.resolve(),
-  };
+  });
 }
 
 export function PreviaDaPesquisa({
@@ -71,7 +52,6 @@ export function PreviaDaPesquisa({
 }) {
   const [pesquisa, setPesquisa] = useState<PesquisaPublica | null>(null);
   const [falhou, setFalhou] = useState(false);
-  const [explicacao, setExplicacao] = useState(true);
 
   useEffect(() => {
     let vivo = true;
@@ -92,36 +72,20 @@ export function PreviaDaPesquisa({
     };
   }, [servico, pesquisaId]);
 
-  const cliente = useMemo(
-    () => (pesquisa ? clienteDaPrevia(pesquisa) : null),
-    [pesquisa],
-  );
-
+  if (falhou)
+    return (
+      <p className="pesquisas__erro" role="alert">
+        Não foi possível carregar a pesquisa para a pré-visualização.
+      </p>
+    );
+  if (!pesquisa)
+    return <Esqueleto rotulo="Carregando a pré-visualização…" linhas={4} />;
   return (
     <div className="pesquisas__previa-tela">
-      <p className="pesquisas__previa-faixa" role="status">
-        Modo pré-visualização — nada do que for respondido aqui é gravado.
-      </p>
-      {falhou ? (
-        <p className="pesquisas__erro" role="alert">
-          Não foi possível carregar a pesquisa para a pré-visualização.
-        </p>
-      ) : !cliente ? (
-        <Esqueleto rotulo="Carregando a pré-visualização…" linhas={4} />
-      ) : (
-        <ResponderPesquisa token={`previa-${pesquisaId}`} cliente={cliente} />
-      )}
-      <Dialog
-        aberto={explicacao && cliente !== null}
-        titulo="Você está na pré-visualização"
-        onFechar={() => setExplicacao(false)}
-        rodape={<Button onClick={() => setExplicacao(false)}>Entendi</Button>}
-      >
-        <p>
-          É exatamente o que quem responde vai ver, uma pergunta por vez. Pode
-          responder à vontade: nada é gravado e a pesquisa não muda.
-        </p>
-      </Dialog>
+      <ResponderPesquisa
+        previa={pesquisa}
+        aoSairDaPrevia={() => window.close()}
+      />
     </div>
   );
 }

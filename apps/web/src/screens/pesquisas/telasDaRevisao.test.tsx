@@ -136,18 +136,21 @@ describe("Pré-visualização", () => {
     const servico = servicoFalso();
     render(<PreviaDaPesquisa servico={servico} pesquisaId="p-1" />);
     const janela = await screen.findByRole("dialog", {
-      name: "Você está na pré-visualização",
+      name: "Esta é uma pré-visualização",
     });
-    expect(janela).toHaveTextContent("nada é gravado");
-    fireEvent.click(within(janela).getByRole("button", { name: "Entendi" }));
+    expect(janela).toHaveTextContent("Nenhuma resposta é gravada");
+    fireEvent.click(
+      within(janela).getByRole("button", {
+        name: "Começar a pré-visualização",
+      }),
+    );
     expect(
-      screen.getByText(
-        "Modo pré-visualização — nada do que for respondido aqui é gravado.",
-      ),
+      screen.getByText(/nada do que for respondido aqui é gravado/),
     ).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "Clima de novembro" }),
     ).toBeInTheDocument();
+    expect(servico.obterPesquisa).toHaveBeenCalledWith("p-1");
     expect(servico.alterarPesquisa).not.toHaveBeenCalled();
   });
 
@@ -214,8 +217,9 @@ describe("Encerramento automático", () => {
 });
 
 describe("Tempo estimado", () => {
-  it("uma regra só: 1 minuto a cada 3 perguntas, no mínimo 1", () => {
-    expect([0, 1, 3, 4, 9, 10].map(minutosEstimados)).toEqual([
+  it("uma regra só com a página pública: 20 segundos por pergunta, no mínimo 1", () => {
+    // Cerca de 20 segundos por pergunta, arredondado; no mínimo 1 minuto.
+    expect([0, 1, 3, 5, 9, 12].map(minutosEstimados)).toEqual([
       1, 1, 1, 2, 3, 4,
     ]);
     expect(textoDoTempoEstimado(1)).toBe("cerca de 1 minuto");

@@ -5,7 +5,6 @@
  */
 import type { Pergunta, Secao } from "../../api/pesquisasClient";
 import { plural } from "../../format/plural";
-import { minutosEstimados } from "./tempoEstimado";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import {
   ROTULOS_DA_CONCORDANCIA,
