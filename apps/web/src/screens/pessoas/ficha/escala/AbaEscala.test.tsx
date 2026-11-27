@@ -262,6 +262,10 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     expect(dias[4]).toHaveTextContent(/^Sáb, 28\/11Folga/);
     expect(dias[5]).toHaveTextContent("Folga · DSR");
     expect(dias[0]).toHaveTextContent("Não publicado");
+    // T216 — "Não publicado" é o status padrão de atenção.
+    expect(
+      within(dias[0]!).getByText("Não publicado").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--warning");
   });
 
   it("com o quadro: rascunho por cima do padrão, ausência aprovada e feriados da pessoa (7 dias e calendário)", async () => {
@@ -417,6 +421,13 @@ describe("T215 — aba Escala (desenho da referência)", () => {
       "01/11/2026 até atual · Ficha do colaborador · Rita RH em 01/11/2026",
     );
     expect(linhas[1]).toHaveTextContent("Encerrada");
+    // T216 — a situação de cada escala no status padrão do sistema.
+    expect(
+      within(linhas[0]!).getByText("Vigente").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--success");
+    expect(
+      within(linhas[1]!).getByText("Encerrada").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--neutral");
     expect(linhas[1]).toHaveTextContent("01/06/2026 até 31/10/2026");
     expect(linhas[1]).toHaveTextContent("segunda, quarta e sexta");
     expect(linhas[2]).toHaveTextContent("Folga semanal: quarta");

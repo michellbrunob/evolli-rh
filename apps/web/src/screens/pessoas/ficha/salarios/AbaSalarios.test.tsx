@@ -171,6 +171,10 @@ describe("T215 — aba Salários", () => {
     expect(within(item!).getByText("Não informado")).toBeTruthy();
     expect(within(item!).getByText("CLT · Menos de 1 mês")).toBeTruthy();
     expect(within(item!).getByText("Vigente")).toBeTruthy();
+    // T216 — "Vigente" é o status padrão de sucesso.
+    expect(
+      within(item!).getByText("Vigente").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--success");
     expect(within(item!).getByText("Admissão")).toBeTruthy();
     expect(within(tempo).getByText("Próximo reajuste")).toBeTruthy();
     expect(

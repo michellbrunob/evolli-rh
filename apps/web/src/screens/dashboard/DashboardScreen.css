@@ -456,12 +456,6 @@
   background: var(--evolli-verde-agua);
 }
 
-.dashboard__selo--estado {
-  border: 1px solid var(--status-neutral-border);
-  background: var(--status-neutral-surface);
-  color: var(--status-neutral-ink);
-}
-
 /* ---- Indicadores ------------------------------------------------------- */
 .dashboard__indicadores {
   display: grid;

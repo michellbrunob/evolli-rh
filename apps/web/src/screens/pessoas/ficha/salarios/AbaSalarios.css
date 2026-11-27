@@ -95,11 +95,6 @@
   white-space: nowrap;
 }
 
-.salarios__selo--vigente {
-  background: color-mix(in srgb, var(--color-action) 12%, transparent);
-  color: var(--color-action);
-}
-
 .salarios__detalhes {
   display: flex;
   flex-wrap: wrap;

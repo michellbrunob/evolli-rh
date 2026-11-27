@@ -27,7 +27,7 @@ import {
   IconeRelogio,
   IconeSucesso,
 } from "../../ui/icones";
-import { Button, CampoMascarado } from "../../components";
+import { Button, CampoMascarado, StatusBadge } from "../../components";
 import {
   CadastroEmEtapas,
   LinhaDoCadastro,
@@ -399,10 +399,12 @@ export function NovaEmpresaScreen({
                     id="nova-empresa-cnpj-valido"
                     className="nova-empresa__selo-valido"
                   >
-                    <span aria-hidden="true">Válido</span>
-                    <span className="cadastro-etapas__so-leitor">
-                      CNPJ válido
-                    </span>
+                    <StatusBadge variant="success">
+                      <span aria-hidden="true">Válido</span>
+                      <span className="cadastro-etapas__so-leitor">
+                        CNPJ válido
+                      </span>
+                    </StatusBadge>
                   </span>
                 ) : null}
               </div>

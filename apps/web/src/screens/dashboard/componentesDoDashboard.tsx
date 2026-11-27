@@ -2,6 +2,7 @@
  * T207 — peças comuns do Dashboard: "Como calculamos" (V-5, sempre o botão
  * "i" ao lado do título, com a janela de leitura) e o estado de bloco ou aba sem dado no Evolli.
  */
+import { StatusBadge } from "../../components";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 /** T207 — como um bloco com dado real é visto: gráfico ou tabela. */
@@ -113,9 +114,7 @@ export function EstadoIndisponivel({
       <h2 id={id} className="dashboard__subtitulo">
         {titulo}
       </h2>
-      <p className="dashboard__selo dashboard__selo--estado">
-        Indisponível no Evolli
-      </p>
+      <StatusBadge>Indisponível no Evolli</StatusBadge>
       <p className="dashboard__indisponivel-texto">{texto}</p>
     </section>
   );
@@ -146,7 +145,7 @@ export function BlocoSemDado({
         <p className="dashboard__explicacao">{subtitulo}</p>
       </div>
       <div className="dashboard__vazio-quadro">
-        <p className="dashboard__selo dashboard__selo--estado">{selo}</p>
+        <StatusBadge>{selo}</StatusBadge>
         <p className="dashboard__vazio-texto">{children}</p>
       </div>
     </section>

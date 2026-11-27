@@ -2056,9 +2056,10 @@ describe("T178 — 'Nova admissão' e a ficha a partir da linha", () => {
       colaborador2.id,
     );
     // T215 — sem vínculo na empresa ativa, a situação é a do cadastro.
-    expect(ficha.querySelector(".ficha-ref__status-selo")).toHaveTextContent(
-      "Inativo",
-    );
+    // T216 — no status padrão do sistema (neutro para Inativo).
+    const selo = ficha.querySelector(".ficha-ref__status-selo");
+    expect(selo).toHaveTextContent("Inativo");
+    expect(selo).toHaveClass("evolli-badge", "evolli-badge--neutral");
     expect(ficha.querySelector(".ficha-ref__contrato")).toBeNull();
   });
 

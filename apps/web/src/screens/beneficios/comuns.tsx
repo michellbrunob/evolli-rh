@@ -3,6 +3,7 @@
  * opção, segmentado, pessoa com avatar).
  */
 import { type ReactNode, useEffect, useState } from "react";
+import { StatusBadge } from "../../components";
 import { formatarReaisDoCampo, lerReais } from "../../format/moeda";
 import { iniciaisDe } from "../pessoas/iniciais";
 
@@ -214,7 +215,7 @@ export function PessoaNaLinha({
             {detalhe}
             {detalhe && alerta ? " · " : null}
             {alerta ? (
-              <span className="beneficios__alerta">{alerta}</span>
+              <StatusBadge variant="danger">{alerta}</StatusBadge>
             ) : null}
           </span>
         ) : null}

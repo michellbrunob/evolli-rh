@@ -4,6 +4,7 @@
  * para o rascunho do quadro; "Sem data de fim" também troca o padrão de cada
  * pessoa a partir do início.
  */
+import { StatusBadge } from "../../../components";
 import {
   type FormEvent,
   type ReactNode,
@@ -707,12 +708,12 @@ export function AplicarModeloScreen({
                       <small>{rotuloDosDias(x.codigo, mes)}</small>
                     ) : null}
                     {x.codigo === "5x2" ? (
-                      <em className="modelo__selo modelo__selo--ok">
+                      <StatusBadge variant="success">
                         Padrão da EC 141
-                      </em>
+                      </StatusBadge>
                     ) : null}
                     {x.codigo === "6x1" ? (
-                      <em className="modelo__selo modelo__selo--atencao">{`Convenção a partir de ${diaMesCurto(regras.inicioTransicao)}`}</em>
+                      <StatusBadge variant="warning">{`Convenção a partir de ${diaMesCurto(regras.inicioTransicao)}`}</StatusBadge>
                     ) : null}
                   </button>
                 ))}
@@ -1067,11 +1068,15 @@ export function AplicarModeloScreen({
                         {dela.length === 0 ? (
                           "Nenhum"
                         ) : (
-                          <span
-                            className={`modelo__selo modelo__selo--${dela.some((a) => a.categoria === "atencao") ? "perigo" : "atencao"}`}
+                          <StatusBadge
+                            variant={
+                              dela.some((a) => a.categoria === "atencao")
+                                ? "danger"
+                                : "warning"
+                            }
                           >
                             {`${dela.length} · ${dela[0]!.titulo}`}
-                          </span>
+                          </StatusBadge>
                         )}
                       </td>
                       {escolhidas.length > 1 ? (

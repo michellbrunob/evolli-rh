@@ -284,9 +284,12 @@ describe("T215 — ficha: cabeçalho, faixa e Portal", () => {
     const portal = await screen.findByRole("region", {
       name: "Portal do colaborador",
     });
+    // T216 — o selo do portal é o status padrão (neutro).
     expect(
-      await within(portal).findByText("Não convidada"),
-    ).toBeInTheDocument();
+      (await within(portal).findByText("Não convidada")).closest(
+        ".evolli-badge",
+      ),
+    ).toHaveClass("evolli-badge--neutral");
     expect(
       within(portal).getByText(
         "A Maria ainda não tem acesso. Envie o convite para ela criar a conta.",
@@ -303,7 +306,9 @@ describe("T215 — ficha: cabeçalho, faixa e Portal", () => {
     const portal = await screen.findByRole("region", {
       name: "Portal do colaborador",
     });
-    expect(await within(portal).findByText("Sem e-mail")).toBeInTheDocument();
+    expect(
+      (await within(portal).findByText("Sem e-mail")).closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--danger");
     expect(
       within(portal).getByText(
         "Cadastre um e-mail para poder enviar o convite do portal.",

@@ -135,6 +135,10 @@ describe("T209 — Nova empresa: etapa 1 (Dados da empresa)", () => {
     fireEvent.change(cnpj(), { target: { value: "11222333000181" } });
     expect(cnpj()).toHaveValue(CNPJ);
     expect(screen.getByText("Válido")).toBeInTheDocument();
+    // T216 — o selo é o status padrão de sucesso.
+    expect(screen.getByText("Válido").closest(".evolli-badge")).toHaveClass(
+      "evolli-badge--success",
+    );
     expect(cnpj()).toHaveAccessibleDescription(/CNPJ válido/);
   });
 

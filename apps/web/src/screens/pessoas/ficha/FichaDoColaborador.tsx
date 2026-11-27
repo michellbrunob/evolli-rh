@@ -55,7 +55,7 @@ import {
 } from "../../../api/movimentacaoClient";
 import { useTrilhaComplementar } from "../../../app/trilhaComplementar";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../../app/edicoesPendentes";
-import { Button, FormActions } from "../../../components";
+import { Button, FormActions, StatusBadge } from "../../../components";
 import type { StatusVariant } from "../../../components";
 import {
   Dialog,
@@ -679,11 +679,12 @@ export function FichaDoColaborador({
                 </h1>
                 {dados ? (
                   <>
-                    <span
-                      className={`ficha-ref__status-selo ficha-ref__status-selo--${status}`}
+                    <StatusBadge
+                      variant={statusAtual.variante}
+                      className="ficha-ref__status-selo"
                     >
                       {statusAtual.rotulo}
-                    </span>
+                    </StatusBadge>
                     {vinculo ? (
                       <span className="ficha-ref__contrato">
                         {ROTULO_DO_TIPO_DE_VINCULO[vinculo.tipo]}
@@ -917,21 +918,9 @@ export function FichaDoColaborador({
                 </h2>
                 {dados ? (
                   email ? (
-                    <span className="ficha-ref__selo">
-                      <span
-                        className="ficha-ref__selo-ponto"
-                        aria-hidden="true"
-                      />
-                      {`Não ${trato.convidado}`}
-                    </span>
+                    <StatusBadge>{`Não ${trato.convidado}`}</StatusBadge>
                   ) : (
-                    <span className="ficha-ref__selo ficha-ref__selo--perigo">
-                      <span
-                        className="ficha-ref__selo-ponto"
-                        aria-hidden="true"
-                      />
-                      Sem e-mail
-                    </span>
+                    <StatusBadge variant="danger">Sem e-mail</StatusBadge>
                   )
                 ) : null}
               </span>
