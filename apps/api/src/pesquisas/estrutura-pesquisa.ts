@@ -275,7 +275,11 @@ function conferirPergunta(
       erros.push({ campo, motivo: "invalido" });
     } else {
       const ref = anteriores.get(c.perguntaId);
-      if (!ref) {
+      if (!ref && vistos.has(c.perguntaId) && c.perguntaId !== id) {
+        // A anterior foi recusada: o erro já saiu por ela; esta não repete,
+        // mas também não entra sem a condição.
+        return null;
+      } else if (!ref) {
         erros.push({
           campo,
           motivo:

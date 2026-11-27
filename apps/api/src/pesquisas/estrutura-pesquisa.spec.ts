@@ -191,6 +191,16 @@ describe("T216 — conferirSecoes", () => {
       });
     });
 
+    it("condição sobre pergunta anterior recusada: o erro sai só pela anterior", () => {
+      const r = conferirSecoes([
+        secao("s1", [
+          pergunta("q1", { tipo: "sim_nao", texto: "" }),
+          pergunta("q2", { condicao: { perguntaId: "q1", opcaoId: "sim" } }),
+        ]),
+      ]);
+      expect(r.erros).toEqual([{ campo: "q1", motivo: "obrigatorio" }]);
+    });
+
     it("recusa pergunta posterior (fora de ordem), de outro tipo ou opção inexistente", () => {
       const r = conferirSecoes([
         secao("s1", [
