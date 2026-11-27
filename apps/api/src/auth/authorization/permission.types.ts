@@ -190,6 +190,17 @@ export const BENEFICIO_RESOURCES = ["beneficio", "dependente"] as const;
 export type BeneficioResource = (typeof BENEFICIO_RESOURCES)[number];
 
 /**
+ * T216 — Pesquisas: a pesquisa (`pesquisa`: ler, criar e alterar) e as
+ * respostas individuais com a pessoa (`resposta_pesquisa`: só ler — a aba
+ * Respostas da identificada e a aba da ficha). `rh` e `dp` fazem tudo na
+ * empresa ativa; o `master_tecnico` só lê a pesquisa e os agregados, nunca
+ * as respostas com a pessoa; os demais papéis são negados.
+ */
+export const PESQUISA_RESOURCES = ["pesquisa", "resposta_pesquisa"] as const;
+
+export type PesquisaResource = (typeof PESQUISA_RESOURCES)[number];
+
+/**
  * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
  * metadados da Etapa 2 (`documento_metadado`):
  *
@@ -236,7 +247,8 @@ export type AuthorizationResource =
   | ContratoResource
   | AusenciaResource
   | EscalaResource
-  | BeneficioResource;
+  | BeneficioResource
+  | PesquisaResource;
 
 export type AuthorizationAction =
   | "read"
@@ -335,6 +347,12 @@ export function isBeneficioResource(
   resource: AuthorizationResource,
 ): resource is BeneficioResource {
   return (BENEFICIO_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isPesquisaResource(
+  resource: AuthorizationResource,
+): resource is PesquisaResource {
+  return (PESQUISA_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isAusenciaResource(

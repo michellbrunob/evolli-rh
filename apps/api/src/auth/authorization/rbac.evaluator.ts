@@ -6,6 +6,7 @@ import {
   isAusenciaResource,
   isEscalaResource,
   isBeneficioResource,
+  isPesquisaResource,
   isContatosResource,
   isContratoResource,
   isDadosPessoaisResource,
@@ -85,6 +86,9 @@ export function evaluatePermission(
       if (isBeneficioResource(target.resource)) {
         // T215 — mesma matriz das ausências.
         return evaluateAusencia(subject, target);
+      }
+      if (isPesquisaResource(target.resource)) {
+        return evaluatePesquisa(subject, target);
       }
       if (isEscalaResource(target.resource)) {
         // T215 — mesma matriz das ausências (rh e dp operam na empresa
@@ -848,6 +852,26 @@ function evaluateAusencia(
       // gestor, colaborador, financeiro, admin_tecnico, auditor, dpo.
       return false;
   }
+}
+
+/**
+ * T216 — Pesquisas. `pesquisa`: `rh` e `dp` leem, criam e alteram na
+ * empresa ativa; o `master_tecnico` só lê, com empresa ativa.
+ * `resposta_pesquisa` (respostas com a pessoa): só `rh` e `dp`, só leitura.
+ * Os demais papéis, negados.
+ */
+function evaluatePesquisa(
+  subject: AuthorizationSubject,
+  target: AuthorizationTarget,
+): boolean {
+  if (target.resource === "resposta_pesquisa") {
+    if (target.action !== "read") return false;
+    if (subject.role !== "rh" && subject.role !== "dp") return false;
+    return target.targetCompanyId !== undefined
+      ? isSameCompany(subject, target)
+      : subject.companyId !== null;
+  }
+  return evaluateAusencia(subject, target);
 }
 
 function evaluateDocumentos(

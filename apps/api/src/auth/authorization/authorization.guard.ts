@@ -23,6 +23,7 @@ import {
   isAusenciaResource,
   isEscalaResource,
   isBeneficioResource,
+  isPesquisaResource,
 } from "./permission.types";
 import { AuditResource } from "../../audit/audit.types";
 import {
@@ -92,6 +93,10 @@ function toAuditResource(resource: AuthorizationResource): AuditResource {
   // T215 — Benefícios e dependentes.
   if (isBeneficioResource(resource)) {
     return resource === "dependente" ? "dependente_colaborador" : resource;
+  }
+  // T216 — Pesquisas e as respostas individuais.
+  if (isPesquisaResource(resource)) {
+    return resource;
   }
   return "access_user";
 }
