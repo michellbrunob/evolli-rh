@@ -27,6 +27,9 @@ import {
   somarDias,
   somarMeses,
 } from "../src/pessoas/ausencias/calculo-ausencias";
+import { ESTRUTURA_NR1 } from "../src/pesquisas/modelos/copsoq/definicao";
+import { ESTRUTURA_ISFB } from "../src/pesquisas/modelos/isfb/definicao";
+import type { EstruturaFixa } from "../src/pesquisas/modelos/estrutura-fixa";
 import {
   camposObrigatoriosAdmissao,
   lotacaoMinima,
@@ -2614,6 +2617,349 @@ describe("T216 — Pesquisas (e2e)", () => {
       await get(`/v1/pesquisas/${conf.id}/perfil-comportamental`, rhB).expect(
         404,
       );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  describe("modelos com metodologia própria (NR-1 e saúde financeira)", () => {
+    /** As seções do questionário fixo com textos sintéticos. */
+    function secoesFixas(e: EstruturaFixa, semOpcionais = false) {
+      return e.secoes
+        .filter((s) => !(semOpcionais && s.opcional))
+        .map((s) => ({
+          id: `cliente-${s.id}`,
+          titulo: "Título do cliente (ignorado)",
+          descricao: null,
+          perguntas: s.perguntas.map((p) => ({
+            id: p.id,
+            // Tipo e configuração do corpo não valem: a estrutura é do servidor.
+            tipo: "texto_curto",
+            texto: `Enunciado sintético ${p.id}`,
+            rotulo: `Rótulo ${p.id}`,
+            descricao: null,
+            obrigatoria: false,
+            config: p.opcoes
+              ? { opcoes: p.opcoes.map((id) => ({ id, texto: `Opção ${id}` })) }
+              : {},
+            condicao: null,
+          })),
+        }));
+    }
+
+    const ITENS_NR1 = ESTRUTURA_NR1.secoes.flatMap((s) =>
+      s.perguntas.map((p) => p.id),
+    );
+    /** Uma resposta NR-1: a mesma posição em tudo, com ajustes. */
+    const respostasNr1 = (
+      padrao: number,
+      ajustes: Record<string, number> = {},
+    ) =>
+      ITENS_NR1.map((id) => ({ perguntaId: id, valor: ajustes[id] ?? padrao }));
+
+    it("NR-1: estrutura do servidor (76 perguntas), textos do corpo", async () => {
+      const r = await post("/v1/pesquisas", rhA)
+        .send(
+          corpo({
+            modelo: "copsoq",
+            identificacao: "anonima",
+            secoes: secoesFixas(ESTRUTURA_NR1),
+          }),
+        )
+        .expect(201);
+      expect(r.body.secoes).toHaveLength(8);
+      expect(r.body.secoes[0]).toMatchObject({
+        id: "exigencias_laborais",
+        titulo: "Exigências Laborais",
+      });
+      const perguntas = r.body.secoes.flatMap(
+        (s: { perguntas: unknown[] }) => s.perguntas,
+      );
+      expect(perguntas).toHaveLength(76);
+      expect(perguntas[63]).toMatchObject({
+        id: "Q64",
+        tipo: "escala",
+        texto: "Enunciado sintético Q64",
+        rotulo: "Rótulo Q64",
+        obrigatoria: true,
+        config: {
+          minimo: 1,
+          maximo: 5,
+          rotulos: ["Excelente", "Muito boa", "Boa", "Regular", "Fraca"],
+        },
+      });
+
+      // Sem o texto de uma pergunta, ou com pergunta que o modelo não tem.
+      const semTexto = secoesFixas(ESTRUTURA_NR1);
+      semTexto[0]!.perguntas[4]!.texto = "  ";
+      const r1 = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "copsoq", secoes: semTexto }))
+        .expect(422);
+      expect(r1.body.erros).toEqual([{ campo: "Q5", motivo: "obrigatorio" }]);
+      const extra = secoesFixas(ESTRUTURA_NR1);
+      extra[0]!.perguntas.push({ ...extra[0]!.perguntas[0]!, id: "Q77" });
+      const r2 = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "copsoq", secoes: extra }))
+        .expect(422);
+      expect(r2.body.erros).toEqual([{ campo: "secoes", motivo: "invalido" }]);
+    });
+
+    it("NR-1: resultado do time, de uma resposta e o acompanhamento", async () => {
+      const { id, token } = await publicada({
+        modelo: "copsoq",
+        identificacao: "anonima",
+        secoes: secoesFixas(ESTRUTURA_NR1),
+      });
+      const ajustes = { Q1: 5, Q2: 5, Q3: 5 };
+      for (const respostas of [
+        respostasNr1(3, { ...ajustes, Q73: 2 }),
+        respostasNr1(3, ajustes),
+        respostasNr1(3),
+      ]) {
+        await agent()
+          .post(publico(token, "/respostas"))
+          .send({ respostas })
+          .expect(201);
+      }
+      // Fora de 1 a 5: recusado.
+      await agent()
+        .post(publico(token, "/respostas"))
+        .send({ respostas: respostasNr1(6) })
+        .expect(422);
+
+      const r = await get(`/v1/pesquisas/${id}/modelo/resultado`, rhA).expect(
+        200,
+      );
+      expect(r.body).toMatchObject({
+        modelo: "copsoq",
+        respostas: 3,
+        visivel: true,
+        isfb: null,
+        grupos: null,
+      });
+      expect(r.body.nr1.dimensoes).toHaveLength(29);
+      expect(r.body.nr1.dimensoes[0]).toMatchObject({
+        id: "exigencias_quantitativas",
+        escore: 4.33,
+        distribuicao: { risco: 2, intermediario: 1, favoravel: 0 },
+        severidade: 4,
+        prevalencia: 3,
+        nivel: "critico",
+      });
+      expect(r.body.nr1.prioridades[0]).toBe("exigencias_quantitativas");
+      // Anônima: menos de 3 pessoas não aparece (sigilo).
+      expect(r.body.nr1.ofensivos.tipos[0]).toMatchObject({
+        id: "Q73",
+        raramente: null,
+        asVezes: null,
+        frequentementeOuSempre: 0,
+        relataram: 3,
+      });
+
+      // Recorte pedido fora dos disponíveis (anônima sem separação).
+      await get(
+        `/v1/pesquisas/${id}/modelo/resultado?campo=departamento`,
+        rhA,
+      ).expect(422);
+      // O master lê o agregado.
+      await get(`/v1/pesquisas/${id}/modelo/resultado`, masterA).expect(200);
+
+      // Uma resposta: mesma regra das respostas individuais.
+      const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
+      const ultima = lista.body[0].id as string;
+      const ind = await get(
+        `/v1/pesquisas/${id}/modelo/respostas/${ultima}`,
+        rhA,
+      ).expect(200);
+      expect(ind.body.nr1.dimensoes[0]).toMatchObject({
+        id: "exigencias_quantitativas",
+        escore: 3,
+        prevalencia: 2,
+        escoreDoTime: 4.33,
+        comparacao: "abaixo",
+      });
+      await get(
+        `/v1/pesquisas/${id}/modelo/respostas/${randomUUID()}`,
+        rhA,
+      ).expect(404);
+
+      // Acompanhamento: a 1ª etapa conclui com a 1ª resposta (anônima).
+      const a0 = await get(
+        `/v1/pesquisas/${id}/modelo/acompanhamento`,
+        rhA,
+      ).expect(200);
+      expect(a0.body.etapas).toHaveLength(7);
+      expect(a0.body).toMatchObject({ concluidas: 1, proxima: "plano" });
+      expect(a0.body.revisarEm).toMatch(/^\d{4}-\d{2}$/);
+
+      const etapas = (concluir: boolean, marcar: boolean) => [
+        {
+          id: "comunicar",
+          itens: [marcar, false, false],
+          evidencias: null,
+          concluida: concluir,
+        },
+      ];
+      const medida = {
+        id: "m1",
+        dimensaoId: "exigencias_quantitativas",
+        titulo: "Rever a distribuição das tarefas",
+        descricao: null,
+        controle: "administrativo",
+        responsavel: "Coordenação",
+        prazo: "2027-03-31",
+        indicador: "Horas extras por mês",
+        situacao: "planejada",
+      };
+      const semMarca = await put(
+        `/v1/pesquisas/${id}/modelo/acompanhamento`,
+        rhA,
+      )
+        .send({ etapas: etapas(true, false), plano: [], profissionalSst: {} })
+        .expect(422);
+      expect(semMarca.body.erros).toEqual([
+        { campo: "etapas.comunicar", motivo: "obrigatorio" },
+      ]);
+      const invalida = await put(
+        `/v1/pesquisas/${id}/modelo/acompanhamento`,
+        rhA,
+      )
+        .send({
+          etapas: [],
+          plano: [{ ...medida, controle: "outro" }],
+          profissionalSst: {},
+        })
+        .expect(422);
+      expect(invalida.body.erros).toEqual([
+        { campo: "plano.m1", motivo: "invalido" },
+      ]);
+      const a1 = await put(`/v1/pesquisas/${id}/modelo/acompanhamento`, dpA)
+        .send({
+          etapas: etapas(true, true),
+          plano: [medida],
+          profissionalSst: { nome: "Profissional Sintético", registro: "123" },
+        })
+        .expect(200);
+      expect(a1.body).toMatchObject({
+        concluidas: 3,
+        proxima: "validar",
+        plano: [medida],
+        profissionalSst: { nome: "Profissional Sintético", registro: "123" },
+      });
+      const comunicar = a1.body.etapas.find(
+        (e: { id: string }) => e.id === "comunicar",
+      );
+      expect(comunicar.concluidaEm).toEqual(expect.any(String));
+      // O master só lê.
+      await put(`/v1/pesquisas/${id}/modelo/acompanhamento`, masterA)
+        .send({ etapas: [], plano: [], profissionalSst: {} })
+        .expect(403);
+      // Gravado (a data de conclusão se mantém) e auditado.
+      const a2 = await put(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhA)
+        .send({
+          etapas: etapas(true, true),
+          plano: [medida],
+          profissionalSst: {},
+        })
+        .expect(200);
+      expect(a2.body.etapas[2].concluidaEm).toBe(comunicar.concluidaEm);
+      expect(a2.body.profissionalSst).toEqual({ nome: null, registro: null });
+      expect(
+        (await trilha(id)).filter(
+          (e) => e.action === "pesquisas_pesquisa_alterada",
+        ),
+      ).toHaveLength(2);
+      // De outra empresa: 404.
+      await get(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhB).expect(404);
+    });
+
+    it("saúde financeira: autopercepção opcional, nota do time e da resposta", async () => {
+      const sem = await post("/v1/pesquisas", rhA)
+        .send(
+          corpo({
+            modelo: "isfb",
+            identificacao: "anonima",
+            secoes: secoesFixas(ESTRUTURA_ISFB, true),
+          }),
+        )
+        .expect(201);
+      expect(sem.body.secoes.map((s: { id: string }) => s.id)).not.toContain(
+        "autopercepcao",
+      );
+
+      const { id, token } = await publicada({
+        modelo: "isfb",
+        identificacao: "anonima",
+        secoes: secoesFixas(ESTRUTURA_ISFB),
+      });
+      const escalas = ["Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10"];
+      const respostas = [
+        { perguntaId: "Q1", valor: { opcao: "iguais" } as unknown },
+        ...[...escalas, "Q11", "Q12"].map((q) => ({
+          perguntaId: q,
+          valor: 2 as unknown,
+        })),
+        {
+          perguntaId: "Q13",
+          valor: { opcoes: ["conta_corrente", "cartao_credito", "poupanca"] },
+        },
+        { perguntaId: "Q14", valor: { opcao: "renda_3" } },
+        { perguntaId: "Q15", valor: { opcao: "esc_4" } },
+        { perguntaId: "O1", valor: 3 },
+        { perguntaId: "O2", valor: 3 },
+        { perguntaId: "O3", valor: 3 },
+      ];
+      await agent()
+        .post(publico(token, "/respostas"))
+        .send({ respostas })
+        .expect(201);
+      // Autopercepção é opcional; Q13 também (nenhum produto).
+      await agent()
+        .post(publico(token, "/respostas"))
+        .send({
+          respostas: respostas.filter(
+            (x) => !["O1", "O2", "O3", "Q13"].includes(x.perguntaId),
+          ),
+        })
+        .expect(201);
+      // Q14 é obrigatória.
+      await agent()
+        .post(publico(token, "/respostas"))
+        .send({ respostas: respostas.filter((x) => x.perguntaId !== "Q14") })
+        .expect(422);
+
+      const r = await get(`/v1/pesquisas/${id}/modelo/resultado`, rhA).expect(
+        200,
+      );
+      expect(r.body).toMatchObject({ modelo: "isfb", respostas: 2, nr1: null });
+      expect(r.body.isfb).toMatchObject({
+        pessoas: 2,
+        isfb: 56,
+        faixa: "baixa",
+        diferencaDoBrasil: -0.7,
+        mediaDoBrasil: 56.7,
+        comAutopercepcao: 1,
+      });
+      expect(r.body.isfb.sinais.sem_reserva.quantidade).toBe(1);
+      const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
+      const primeira = lista.body[1].id as string;
+      const ind = await get(
+        `/v1/pesquisas/${id}/modelo/respostas/${primeira}`,
+        rhA,
+      ).expect(200);
+      expect(ind.body.isfb).toMatchObject({
+        isfb: 56,
+        autopercepcao: 80,
+        abertura: "sabem_que_precisam",
+        isfbDoTime: 56,
+        mediaDoBrasil: 56.7,
+      });
+      // Sem acompanhamento da NR-1 em outro modelo.
+      await get(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhA).expect(404);
+    });
+
+    it("modelo sem resultado próprio: 404", async () => {
+      const p = await criarPesquisa();
+      await get(`/v1/pesquisas/${p.id}/modelo/resultado`, rhA).expect(404);
     });
   });
 });

@@ -3753,6 +3753,9 @@ model Pesquisa {
   /// prazos, lembretes e quem vê o quê; no onboarding, o envio (agora,
   /// agendado ou automático), o público e o e-mail. Conferida pela aplicação.
   configModelo   Json?                 @map("config_modelo")
+  /// Acompanhamento do modelo (riscos psicossociais: etapas da NR-1 e o
+  /// plano de ação), conferido pela aplicação (`modelos/`).
+  acompanhamento Json?
   token          String                @unique @db.VarChar(64)
   publicadaEm    DateTime?             @map("publicada_em")
   excluidaEm     DateTime?             @map("excluida_em")

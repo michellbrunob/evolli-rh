@@ -227,8 +227,9 @@ export class ResponderDto {
   @IsObject()
   grupos?: Record<string, unknown>;
 
+  // Até 60 perguntas na pesquisa montada; os questionários fixos vão a 76.
   @IsArray()
-  @ArrayMaxSize(60)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => RespostaDto)
   respostas!: RespostaDto[];

@@ -199,7 +199,11 @@ export type CampoPublico =
   | "lembreteDias"
   | "agendadoPara"
   | "publico"
-  | "rodada";
+  | "rodada"
+  // T216 — acompanhamento da NR-1 (etapas, plano de ação e profissional).
+  | "etapas"
+  | "plano"
+  | "profissionalSst";
 
 /**
  * T216 — o id de uma pergunta da pesquisa como campo do erro (o contrato

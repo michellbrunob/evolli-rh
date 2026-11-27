@@ -22,6 +22,8 @@ import {
   NOTIFICADOR_DE_PESQUISAS,
   NotificadorSemEmail,
 } from "./modelos/notificador-de-pesquisas";
+import { ModelosPesquisaController } from "./modelos/modelos-pesquisa.controller";
+import { ModelosPesquisaService } from "./modelos/modelos-pesquisa.service";
 
 /**
  * T216 — Pesquisas (módulo do menu, aba da ficha e a página pública).
@@ -38,10 +40,12 @@ import {
     PesquisasController,
     PesquisasDoColaboradorController,
     PesquisaPublicaController,
+    ModelosPesquisaController,
   ],
   providers: [
     PesquisasService,
     PesquisaPublicaService,
+    ModelosPesquisaService,
     PessoasAuditoriaService,
     AvaliacaoService,
     OnboardingService,

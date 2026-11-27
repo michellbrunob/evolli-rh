@@ -98,7 +98,7 @@ const LIMITE_NOME = 120;
 const LIMITE_BOAS_VINDAS = 1000;
 
 type Db = Prisma.TransactionClient;
-type LinhaPesquisa = Prisma.PesquisaGetPayload<object>;
+export type LinhaPesquisa = Prisma.PesquisaGetPayload<object>;
 
 /** A linha sem a estrutura (a lista não precisa das perguntas). */
 const SEM_SECOES = {
@@ -177,7 +177,7 @@ export function recortesDa(p: {
 }
 
 /** Uma resposta gravada com os grupos e o autor (identificada). */
-interface RespostaCarregada extends RespostaParaCalculo {
+export interface RespostaCarregada extends RespostaParaCalculo {
   id: string;
   respondidaEm: Date;
   colaboradorId: string | null;
@@ -227,7 +227,7 @@ export class PesquisasService {
   }
 
   private resumo(
-    p: Omit<LinhaPesquisa, "secoes">,
+    p: Omit<LinhaPesquisa, "secoes" | "acompanhamento">,
     participantes: number,
     respostas: number,
   ): PesquisaResumo {
@@ -1042,6 +1042,37 @@ export class PesquisasService {
       for (const id of Object.values(r.grupos)) if (id) ids.add(id);
     }
     return nomesDosGrupos(this.prisma, empresaId, [...ids]);
+  }
+
+  /**
+   * Para os modelos com cálculo próprio (`modelos/`): a pesquisa da empresa
+   * ativa com a permissão do uso (leitura ou escrita).
+   */
+  async pesquisaDoModelo(
+    db: Db,
+    id: string,
+    uso: "leitura" | "escrita",
+    ctx: PessoasAuditContext,
+  ): Promise<{ pesquisa: LinhaPesquisa; empresaId: string }> {
+    const empresaId = this.empresaDaSessao(ctx, uso);
+    return {
+      pesquisa: await this.obterLinha(db, id, empresaId, ctx),
+      empresaId,
+    };
+  }
+
+  /** As respostas com os grupos (sem autor) e os nomes dos grupos. */
+  async respostasDoModelo(p: LinhaPesquisa): Promise<{
+    respostas: RespostaCarregada[];
+    nomesDosGrupos: Map<string, string>;
+    recortes: CampoGrupo[];
+  }> {
+    const respostas = await this.carregarRespostas(p, false);
+    return {
+      respostas,
+      nomesDosGrupos: await this.nomesDosGruposDe(p.empresaId, respostas),
+      recortes: recortesDa(p),
+    };
   }
 
   async resultados(
