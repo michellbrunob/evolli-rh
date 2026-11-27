@@ -15,6 +15,7 @@ import { GestorModule } from "./gestor/gestor.module";
 import { SolicitacoesPessoasModule } from "./solicitacoes-pessoas/solicitacoes-pessoas.module";
 import { validateEnv } from "./config/env.validation";
 import { CepModule } from "./cep/cep.module";
+import { PesquisasModule } from "./pesquisas/pesquisas.module";
 
 @Module({
   imports: [
@@ -37,6 +38,8 @@ import { CepModule } from "./cep/cep.module";
     GestorModule,
     // T178 — consulta de CEP para o preenchimento assistido de endereço.
     CepModule,
+    // T216 — Pesquisas (menu, aba da ficha e a página pública).
+    PesquisasModule,
   ],
 })
 export class AppModule {}
