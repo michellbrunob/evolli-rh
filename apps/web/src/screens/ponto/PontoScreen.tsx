@@ -177,8 +177,8 @@ export function PontoScreen({
               aria-controls={`ponto-panel-${aba.id}`}
               className={
                 selecionada
-                  ? "ponto-screen__tab ponto-screen__tab--ativa"
-                  : "ponto-screen__tab"
+                  ? "evolli-aba ponto-screen__tab ponto-screen__tab--ativa"
+                  : "evolli-aba ponto-screen__tab"
               }
               onClick={() =>
                 // T200 — a aba anterior desmonta: com edição pendente nela,

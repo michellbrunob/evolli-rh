@@ -219,8 +219,8 @@ export function CadastrosScreen({
               aria-controls={`cadastros-panel-${aba.id}`}
               className={
                 selecionada
-                  ? "cadastros-screen__tab cadastros-screen__tab--ativa"
-                  : "cadastros-screen__tab"
+                  ? "evolli-aba cadastros-screen__tab cadastros-screen__tab--ativa"
+                  : "evolli-aba cadastros-screen__tab"
               }
               onClick={() =>
                 // T200 — a aba anterior desmonta: com edição pendente nela,

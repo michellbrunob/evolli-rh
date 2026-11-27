@@ -463,8 +463,8 @@ export function PessoasScreen({
                     aria-controls={`pessoas-panel-${aba.id}`}
                     className={
                       selecionada
-                        ? "pessoas-screen__tab pessoas-screen__tab--ativa"
-                        : "pessoas-screen__tab"
+                        ? "evolli-aba pessoas-screen__tab pessoas-screen__tab--ativa"
+                        : "evolli-aba pessoas-screen__tab"
                     }
                     onClick={() =>
                       trocarAbaDePessoas(aba.id, () =>

@@ -120,8 +120,8 @@ export function PortalColaboradorScreen({
               aria-controls={`portal-panel-${aba.id}`}
               className={
                 selecionada
-                  ? "portal-colaborador-screen__tab portal-colaborador-screen__tab--ativa"
-                  : "portal-colaborador-screen__tab"
+                  ? "evolli-aba portal-colaborador-screen__tab portal-colaborador-screen__tab--ativa"
+                  : "evolli-aba portal-colaborador-screen__tab"
               }
               onClick={() => setAbaAtiva(aba.id)}
             >

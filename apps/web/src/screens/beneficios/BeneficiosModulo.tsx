@@ -429,6 +429,7 @@ function ListaDeBeneficios({
               <button
                 key={a.valor}
                 type="button"
+                className="evolli-aba"
                 role="tab"
                 aria-selected={aba === a.valor}
                 onClick={() => setAba(a.valor)}

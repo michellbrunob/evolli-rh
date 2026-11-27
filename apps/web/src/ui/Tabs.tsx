@@ -80,7 +80,7 @@ export function TabsTrigger({
       aria-controls={controls}
       tabIndex={selected ? 0 : -1}
       data-state={selected ? "active" : "inactive"}
-      className={className}
+      className={cn("evolli-aba", className)}
       {...props}
     />
   );

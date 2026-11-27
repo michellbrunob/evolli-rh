@@ -981,8 +981,8 @@ export function FichaDoColaborador({
                 tabIndex={selecionada ? 0 : -1}
                 className={
                   selecionada
-                    ? "ficha-ref__aba ficha-ref__aba--atual"
-                    : "ficha-ref__aba"
+                    ? "evolli-aba ficha-ref__aba ficha-ref__aba--atual"
+                    : "evolli-aba ficha-ref__aba"
                 }
                 onClick={() => !selecionada && onTrocarAba(a)}
               >

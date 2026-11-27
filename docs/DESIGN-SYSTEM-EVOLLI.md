@@ -98,6 +98,40 @@ Valem para o sistema inteiro; a tela não redesenha estes controles.
   `accent-color`, borda ou fundo próprios.
 - **Interruptor** (liga/desliga) — botão com `role="switch"` e
   `aria-checked`, não caixa de seleção.
+- **Status** (situação, estado, selo de andamento) — sempre o `StatusBadge`:
+  pílula de fundo suave, sem borda, com ponto de 6 px antes do rótulo e texto
+  em peso 500. A variante diz o sentido: sucesso (ativo, aprovado, vigente,
+  publicada), atenção (pendente, rascunho, férias), perigo (desligado,
+  reprovado, sem dado obrigatório), informação (programada, em admissão, em
+  verificação) e neutro (inativo, encerrado, indisponível). Quando o elemento
+  precisa ser outro — o gatilho de um menu de status, por exemplo —, ele usa
+  `classesDoStatus()` e `PontoDoStatus` do mesmo componente; a tela não cria
+  selo de estado com CSS próprio, glifo (✓, ×, !) ou ícone no lugar do ponto.
+  A classe extra do `StatusBadge` serve só para posição (margem, grade).
+- **Aba sublinhada** — o indicador é a borda de baixo com a espessura
+  `--aba-indicador`, e a aba leva a classe `evolli-aba` (o `TabsTrigger` já
+  põe): a mesma espessura vai em cima, transparente, e o rótulo fica no centro.
+
+### Texto no centro dos controles
+
+O rótulo de todo botão, aba, pílula, item de menu, campo e célula fica no
+centro vertical da caixa, com o mesmo respiro em cima e embaixo e o ícone
+alinhado pelo meio. A regra mora na base, não na tela:
+
+- **Entrelinha** — controles e textos herdam `--leading-body` (1,47). A
+  altura natural da fonte fica entre 1,43 e 1,46 em; com 1,47 a sobra da
+  linha se divide por igual de 11 a 16 px. Número solto (1,3; 1,4; 1,45) em
+  controle desloca o texto até 2 px para cima. Botão do componente usa
+  entrelinha 1, que também divide por igual.
+- **Bordas** — borda que só existe de um lado conta como respiro: a aba
+  sublinhada recebe a borda igual em cima; a célula de tabela com linha
+  divisória de 1 px tira 1 px do respiro de baixo.
+- **Sem quebra** — rótulo de botão, aba e pílula não quebra linha
+  (`white-space: nowrap`); se não couber, a tela dá espaço ou rolagem, não
+  dois andares dentro do controle.
+- **Como conferir** — na prévia, a 1536 px e a 375 px, compare o retângulo
+  do texto (`Range.getBoundingClientRect()`) com o do elemento: a diferença
+  entre o espaço de cima e o de baixo fica em até 1 px.
 
 ## Padrões de página e movimento
 

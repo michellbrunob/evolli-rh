@@ -82,8 +82,8 @@ export function DocumentosScreen({ onTituloIdChange }: DocumentosScreenProps) {
               aria-controls={`documentos-panel-${aba.id}`}
               className={
                 selecionada
-                  ? "documentos-screen__tab documentos-screen__tab--ativa"
-                  : "documentos-screen__tab"
+                  ? "evolli-aba documentos-screen__tab documentos-screen__tab--ativa"
+                  : "evolli-aba documentos-screen__tab"
               }
               onClick={() => setAbaAtiva(aba.id)}
             >
