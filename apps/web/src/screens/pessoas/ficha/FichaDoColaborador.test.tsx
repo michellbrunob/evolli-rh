@@ -35,6 +35,7 @@ import {
 import { consultarEscalas } from "../../../api/escalaClient";
 import {
   efetivarMovimentacao,
+  listarMovimentacoes,
   registrarMovimentacao,
 } from "../../../api/movimentacaoClient";
 
@@ -479,6 +480,62 @@ describe("T215 — ficha: Mais ações", () => {
     await waitFor(() =>
       expect(efetivarMovimentacao).toHaveBeenCalledWith("mov-1"),
     );
+  });
+
+  it("Em admissão: o aviso e Efetivar admissão (também por Alterar status › Ativo)", async () => {
+    const contrato = await consultarContratoDoColaborador(ID);
+    vi.mocked(consultarContratoDoColaborador).mockResolvedValue({
+      ...contrato,
+      vinculo: {
+        ...contrato.vinculo!,
+        situacao: "previsto",
+        dataAdmissao: "2026-11-03",
+      },
+    } as never);
+    const vinculos = await listarVinculosDoColaborador(ID);
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculos.map((v) => ({
+        ...v,
+        situacao: "previsto",
+        dataAdmissao: "2026-11-03",
+      })) as never,
+    );
+    vi.mocked(listarMovimentacoes).mockResolvedValue({
+      itens: [
+        {
+          id: "adm-1",
+          tipo: "admissao",
+          status: "solicitada",
+          vinculoId: "v-1",
+        },
+      ],
+    } as never);
+    montar();
+    const aviso = await screen.findByRole("region", {
+      name: "Admissão aguardando efetivação",
+    });
+    expect(aviso).toHaveTextContent(
+      "A admissão foi registrada com início em 03/11/2026. Efetive quando a pessoa começar: ela passa a Ativa e entra nas listas, na escala e nos benefícios.",
+    );
+    fireEvent.click(
+      within(aviso).getByRole("button", { name: "Efetivar admissão" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Efetivar a admissão de Maria Teste Santos?",
+    });
+    fireEvent.click(
+      within(janela).getByRole("button", { name: "Efetivar admissão" }),
+    );
+    await waitFor(() =>
+      expect(listarMovimentacoes).toHaveBeenCalledWith({
+        vinculoId: "v-1",
+        tipo: "admissao",
+      }),
+    );
+    await waitFor(() =>
+      expect(efetivarMovimentacao).toHaveBeenCalledWith("adm-1"),
+    );
+    expect(await screen.findByText("Admissão efetivada.")).toBeInTheDocument();
   });
 
   it("Desativar: confirma e desativa (nada é apagado)", async () => {

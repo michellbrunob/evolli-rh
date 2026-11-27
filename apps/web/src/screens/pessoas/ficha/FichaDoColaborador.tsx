@@ -49,6 +49,7 @@ import {
 } from "../../../api/contatosColaboradorClient";
 import {
   efetivarMovimentacao,
+  listarMovimentacoes,
   registrarMovimentacao,
 } from "../../../api/movimentacaoClient";
 import { useTrilhaComplementar } from "../../../app/trilhaComplementar";
@@ -339,7 +340,7 @@ interface Dados {
   readonly contatos: ContatosApi | null;
 }
 
-type Janela = "desligar" | "desativar" | "reativar" | null;
+type Janela = "desligar" | "desativar" | "reativar" | "efetivar" | null;
 
 export function FichaDoColaborador({
   colaboradorId,
@@ -551,8 +552,40 @@ export function FichaDoColaborador({
     }
   }
 
+  /**
+   * Efetivar a admissão: a movimentação de admissão ainda aberta do vínculo
+   * vira efetivada (a pessoa passa a Ativa). Sem isto, quem foi admitido
+   * pela tela ficava para sempre "Em admissão".
+   */
+  async function efetivarAdmissao() {
+    if (!vinculo || trabalhando) return;
+    setTrabalhando(true);
+    try {
+      const { itens } = await listarMovimentacoes({
+        vinculoId: vinculo.id,
+        tipo: "admissao",
+      });
+      const aberta = itens.find(
+        (m) => m.status === "solicitada" || m.status === "programada",
+      );
+      if (!aberta) throw new Error("sem admissão aberta");
+      await efetivarMovimentacao(aberta.id);
+      setJanela(null);
+      setAviso("Admissão efetivada.");
+      void carregar();
+    } catch {
+      setJanela(null);
+      setAviso(
+        "Não foi possível efetivar a admissão agora. Confira a data de admissão e tente de novo.",
+      );
+    } finally {
+      setTrabalhando(false);
+    }
+  }
+
   function escolherStatus(novo: string) {
-    if (novo === "inativo" && !desativado) setJanela("desativar");
+    if (novo === "ativo" && status === "em_admissao") setJanela("efetivar");
+    else if (novo === "inativo" && !desativado) setJanela("desativar");
     else if (novo === "ativo" && desativado) setJanela("reativar");
     else if (novo === "desligado") setJanela("desligar");
     else if (novo === "ferias" || novo === "afastado") setRegistrarAberto(true);
@@ -810,6 +843,25 @@ export function FichaDoColaborador({
               </span>
             </li>
           </ul>
+
+          {status === "em_admissao" && vinculo ? (
+            <section
+              className="ficha-ref__admissao"
+              aria-label="Admissão aguardando efetivação"
+            >
+              <span className="ficha-ref__admissao-textos">
+                <strong>Admissão aguardando efetivação</strong>
+                <span>
+                  {`A admissão foi registrada com início em ${formatarDiaCivil(vinculo.dataAdmissao)}. Efetive quando a pessoa começar: ela passa a Ativa e entra nas listas, na escala e nos benefícios.`}
+                </span>
+              </span>
+              {podeEditar ? (
+                <Button type="button" onClick={() => setJanela("efetivar")}>
+                  Efetivar admissão
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
 
           <section
             className="ficha-ref__portal"
@@ -1146,6 +1198,36 @@ export function FichaDoColaborador({
               onChange={(e) => setDataDesligamento(e.target.value)}
             />
           </label>
+        </Dialog>
+
+        <Dialog
+          aberto={janela === "efetivar"}
+          titulo={`Efetivar a admissão de ${nome}?`}
+          descricao={`${trato.pronome} passa a Ativa a partir de ${vinculo ? formatarDiaCivil(vinculo.dataAdmissao) : "a data de admissão"}. A efetivação entra no histórico funcional.`}
+          onFechar={() => setJanela(null)}
+          bloqueado={trabalhando}
+          rodape={
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setJanela(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={trabalhando}
+                onClick={() => void efetivarAdmissao()}
+              >
+                Efetivar admissão
+              </Button>
+            </FormActions>
+          }
+        >
+          <p className="ficha-ref__janela-texto">
+            Confira antes os dados profissionais e o salário da admissão.
+          </p>
         </Dialog>
 
         <Dialog
