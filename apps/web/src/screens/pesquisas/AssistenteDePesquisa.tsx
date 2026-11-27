@@ -26,12 +26,15 @@ import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { formatarDiaCivil } from "../../format/data";
 import { plural } from "../../format/plural";
 import { Dialog } from "../../ui";
+import { GarantirAvisos } from "./avisos";
+import { IconeDoModelo } from "./componentes";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
-import { SepararRespostasPor } from "./AssistenteDoModelo";
+import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
+import { enderecoDaPrevia } from "./rotasDePesquisas";
+import { SepararRespostasPor } from "./SepararRespostasPor";
 import { EditorDePerguntas } from "./EditorDePerguntas";
 import { EtapaColaboradores } from "./EtapaColaboradores";
 import { lembrarRascunho } from "./rascunhosLocais";
-import type { GruposDaEmpresa } from "./servicoDePesquisas";
 import { CampoDoLink, TelaDeGerada } from "./TelaDeGerada";
 import { PreVisualizacao } from "./PreVisualizacao";
 import {
@@ -84,7 +87,18 @@ const ETAPAS = [
 
 const idTituloDaEtapa = (i: number) => `pesquisa-etapa-${i}`;
 
-export function AssistenteDePesquisa({
+/** A tela sozinha (fora do módulo) ganha o próprio provedor de avisos. */
+export function AssistenteDePesquisa(
+  props: Parameters<typeof AssistenteDePesquisaInterno>[0],
+) {
+  return (
+    <GarantirAvisos>
+      <AssistenteDePesquisaInterno {...props} />
+    </GarantirAvisos>
+  );
+}
+
+function AssistenteDePesquisaInterno({
   servico,
   modelo,
   inicial,
@@ -94,8 +108,11 @@ export function AssistenteDePesquisa({
   onVerResultados,
   onConcluir,
   onEditarGerada,
+  onRascunhoCriado,
 }: {
   readonly servico: ServicoDePesquisas;
+  /** O primeiro rascunho foi gravado (a rota passa a apontar para ele). */
+  readonly onRascunhoCriado?: (id: string) => void;
   /** Nova pesquisa a partir de um modelo (id da galeria ou roteiro). */
   readonly modelo?: string;
   /** Ponto de partida pronto (cópia de outra pesquisa). */
@@ -116,18 +133,22 @@ export function AssistenteDePesquisa({
       ? estadoDoDetalhe(base)
       : (inicial ?? estadoDoModelo(modelo ?? "personalizada", hoje)),
   );
-  const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
   const [referencia, setReferencia] = useState(() =>
     JSON.stringify(entradaDoEstado(estado)),
   );
   const [atual, setAtual] = useState(0);
+  const anonima = estado.identificacao === "anonima";
+  /** Etapas que aparecem (na anônima, sem Participantes). */
+  const chaves = anonima ? [0, 1, 3, 4] : [0, 1, 2, 3, 4];
+  const etapaReal = chaves[Math.min(atual, chaves.length - 1)]!;
+  const etapasVisiveis = chaves.map((c) => ETAPAS[c]!);
   const [alcancada, setAlcancada] = useState(base ? 4 : 0);
   const [mostrarErros, setMostrarErros] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
   const [avisoRascunho, setAvisoRascunho] = useState<string | null>(null);
   const [sair, setSair] = useState(false);
-  const [previa, setPrevia] = useState(false);
+  const [salvoAs, setSalvoAs] = useState<string | null>(null);
   const [publicada, setPublicada] = useState<PesquisaDetalhe | null>(null);
   /** O que o servidor devolveu na última gravação (quem não se identifica). */
   const [gravada, setGravada] = useState<PesquisaDetalhe | null>(base ?? null);
@@ -137,7 +158,7 @@ export function AssistenteDePesquisa({
   const entradaAtual = useMemo(() => entradaDoEstado(estado), [estado]);
   const pendente = JSON.stringify(entradaAtual) !== referencia;
   const erros: Erros | null = mostrarErros
-    ? validarEtapa(estado, atual, hoje)
+    ? validarEtapa(estado, etapaReal, hoje)
     : null;
   const qtdErros = erros ? Object.keys(erros).length : 0;
 
@@ -155,19 +176,6 @@ export function AssistenteDePesquisa({
     setEstado((e) => ({ ...e, ...m }));
     setAvisoRascunho(null);
   };
-
-  useEffect(() => {
-    if (estado.identificacao !== "anonima" || grupos) return;
-    let vivo = true;
-    Promise.resolve(servico.listarGrupos())
-      .then((g) => {
-        if (vivo && g) setGrupos(g);
-      })
-      .catch(() => undefined);
-    return () => {
-      vivo = false;
-    };
-  }, [estado.identificacao, grupos, servico]);
 
   function irPara(indice: number) {
     setAtual(indice);
@@ -188,14 +196,19 @@ export function AssistenteDePesquisa({
       id = criada.id;
       setEstado((e) => ({ ...e, id: criada.id, link: criada.link }));
       setGravada(criada ?? null);
+      onRascunhoCriado?.(criada.id);
     } else {
       const alterada = await servico.alterarPesquisa(id, entrada);
       if (alterada) setGravada(alterada);
     }
     setReferencia(JSON.stringify(entrada));
+    const agora = new Date();
+    setSalvoAs(
+      `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
+    );
     lembrarRascunho(id, {
-      etapa: Math.min(atual + 2, 5),
-      totalDeEtapas: 5,
+      etapa: Math.min(atual + 2, chaves.length),
+      totalDeEtapas: chaves.length,
       salvoEm: new Date().toISOString(),
     });
     return id;
@@ -213,13 +226,13 @@ export function AssistenteDePesquisa({
   async function aoEnviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (salvando) return;
-    const encontrados = validarEtapa(estado, atual, hoje);
+    const encontrados = validarEtapa(estado, etapaReal, hoje);
     if (Object.keys(encontrados).length > 0) {
       setMostrarErros(true);
       return;
     }
     setFalha(null);
-    const ultima = atual === ETAPAS.length - 1;
+    const ultima = atual === etapasVisiveis.length - 1;
     if (!ultima && !rascunho) {
       irPara(atual + 1);
       return;
@@ -250,6 +263,16 @@ export function AssistenteDePesquisa({
       setFalha(mensagemDaFalha(erro, "gravar a pesquisa"));
     } finally {
       setSalvando(false);
+    }
+  }
+
+  /** Grava o que falta e abre a prévia (a experiência real) em outra aba. */
+  async function previsualizar() {
+    try {
+      const id = pendente || estado.id === null ? await gravar() : estado.id;
+      window.open(enderecoDaPrevia(id), "_blank", "noopener");
+    } catch (erro) {
+      setFalha(mensagemDaFalha(erro, "abrir a pré-visualização"));
     }
   }
 
@@ -365,8 +388,8 @@ export function AssistenteDePesquisa({
       </SecaoDoCadastro>
       {estado.identificacao === "anonima" ? (
         <SepararRespostasPor
+          servico={servico}
           separarPor={estado.separarPor}
-          grupos={grupos}
           travado={!rascunho}
           onMudar={(separarPor) => mudar({ separarPor })}
         />
@@ -392,7 +415,7 @@ export function AssistenteDePesquisa({
     <EditorDePerguntas
       secoes={estado.secoes}
       onMudar={(secoes) => mudar({ secoes })}
-      erros={atual === 1 ? erros : null}
+      erros={etapaReal === 1 ? erros : null}
     />
   );
 
@@ -410,13 +433,12 @@ export function AssistenteDePesquisa({
         escolhidos={estado.escolhidos}
         responderam={estado.responderam}
         publicada={!rascunho}
-        erro={atual === 2 ? erros?.participantes : undefined}
+        erro={etapaReal === 2 ? erros?.participantes : undefined}
         onMudar={(m) => mudar(m)}
       />
     );
 
   // ---- etapa 4 --------------------------------------------------------------
-  const idData = `${ids}-data`;
   const idMinimo = `${ids}-minimo`;
   const etapa4 = (
     <>
@@ -432,61 +454,13 @@ export function AssistenteDePesquisa({
           </p>
         )}
       </SecaoDoCadastro>
-      <SecaoDoCadastro
-        titulo="Encerramento"
-        descricao="Depois da data escolhida, a pesquisa não recebe mais respostas e conta como finalizada."
-      >
-        <div
-          className="pesquisas__opcoes-cartao"
-          role="radiogroup"
-          aria-label="Encerramento"
-        >
-          <label className="pesquisas__opcao-cartao">
-            <input
-              type="radio"
-              name={`${ids}-prazo`}
-              checked={estado.encerraEm === null}
-              onChange={() => mudar({ encerraEm: null })}
-            />
-            <span>
-              <strong>Sem prazo</strong>
-              <span className="pesquisas__suave">
-                A pesquisa fica aberta até ser finalizada.
-              </span>
-            </span>
-          </label>
-          <label className="pesquisas__opcao-cartao">
-            <input
-              type="radio"
-              name={`${ids}-prazo`}
-              checked={estado.encerraEm !== null}
-              onChange={() => mudar({ encerraEm: estado.encerraEm ?? "" })}
-            />
-            <span>
-              <strong>Encerrar em uma data</strong>
-              <span className="pesquisas__suave">
-                Encerramento automático no fim do dia.
-              </span>
-            </span>
-          </label>
-        </div>
-        {estado.encerraEm !== null ? (
-          <LinhaDoCadastro rotulo="Data de encerramento" paraId={idData}>
-            <input
-              id={idData}
-              type="date"
-              min={hoje}
-              className="pesquisas__campo pesquisas__campo--curto"
-              value={estado.encerraEm}
-              aria-invalid={erros?.encerraEm ? true : undefined}
-              onChange={(e) => mudar({ encerraEm: e.target.value })}
-            />
-            {erros?.encerraEm ? (
-              <p className="pesquisas__erro">{erros.encerraEm}</p>
-            ) : null}
-          </LinhaDoCadastro>
-        ) : null}
-      </SecaoDoCadastro>
+      <CartaoDeEncerramento
+        data={estado.encerraEm}
+        hora={estado.encerraHora}
+        hoje={hoje}
+        erro={erros?.encerraEm}
+        onMudar={(m) => mudar(m)}
+      />
       <SecaoDoCadastro
         titulo="Privacidade nos recortes"
         descricao="Protege quem responde em grupos pequenos."
@@ -544,17 +518,32 @@ export function AssistenteDePesquisa({
           <LinhaDoResumo rotulo="Perguntas" onAlterar={() => irPara(1)}>
             {`${plural(estado.secoes.length, "seção", "seções")} · ${plural(todas.length, "pergunta", "perguntas")} (${plural(obrigatorias, "obrigatória", "obrigatórias")}${condicionais > 0 ? `, ${plural(condicionais, "condicional", "condicionais")}` : ""})`}
           </LinhaDoResumo>
-          <LinhaDoResumo rotulo="Participantes" onAlterar={() => irPara(2)}>
-            {estado.todos
-              ? "Todo o time (colaboradores ativos)"
-              : plural(qtdEscolhidos, "pessoa escolhida", "pessoas escolhidas")}
+          <LinhaDoResumo
+            rotulo="Participantes"
+            onAlterar={anonima ? undefined : () => irPara(chaves.indexOf(2))}
+          >
+            {anonima
+              ? "Quem tiver o link (anônima)"
+              : estado.todos
+                ? "Todo o time (colaboradores ativos)"
+                : plural(
+                    qtdEscolhidos,
+                    "pessoa escolhida",
+                    "pessoas escolhidas",
+                  )}
           </LinhaDoResumo>
-          <LinhaDoResumo rotulo="Encerramento" onAlterar={() => irPara(3)}>
+          <LinhaDoResumo
+            rotulo="Encerramento"
+            onAlterar={() => irPara(chaves.indexOf(3))}
+          >
             {estado.encerraEm
-              ? formatarDiaCivil(estado.encerraEm)
+              ? `${formatarDiaCivil(estado.encerraEm)} às ${estado.encerraHora} (horário de Brasília)`
               : "Sem prazo"}
           </LinhaDoResumo>
-          <LinhaDoResumo rotulo="Mínimo por grupo" onAlterar={() => irPara(3)}>
+          <LinhaDoResumo
+            rotulo="Mínimo por grupo"
+            onAlterar={() => irPara(chaves.indexOf(3))}
+          >
             {plural(estado.minimoPorGrupo, "resposta", "respostas")}
           </LinhaDoResumo>
         </dl>
@@ -567,7 +556,7 @@ export function AssistenteDePesquisa({
         />
       ) : null}
       <div className="pesquisas__acoes">
-        <Button variant="secondary" onClick={() => setPrevia(true)}>
+        <Button variant="secondary" onClick={() => void previsualizar()}>
           Pré-visualizar como quem responde
         </Button>
       </div>
@@ -583,33 +572,40 @@ export function AssistenteDePesquisa({
     <>
       <CadastroEmEtapas
         tituloId={PESQUISAS_TITULO_ID}
-        titulo={editando ? `Editar ${base.nome}` : "Nova pesquisa"}
+        iconeDoCabecalho={<IconeDoModelo id={estado.modelo} tamanho="lg" />}
+        titulo={
+          editando && !rascunho
+            ? `Editar ${base.nome}`
+            : estado.modelo === "personalizada"
+              ? "Nova pesquisa personalizada"
+              : "Nova pesquisa"
+        }
         descricao={
-          rascunho
-            ? "Configure em 5 etapas. O rascunho é gravado a cada etapa concluída."
-            : "A pesquisa está publicada: algumas mudanças têm limite."
+          !rascunho
+            ? "A pesquisa está publicada: algumas mudanças têm limite."
+            : salvoAs
+              ? `${estado.nome.trim() || "Sem nome"} · rascunho salvo às ${salvoAs}`
+              : `Configure em ${chaves.length} etapas. O rascunho é gravado a cada etapa concluída.`
         }
         rotuloVoltar="Voltar para Pesquisas"
         onVoltarDaPagina={() => (pendente ? setSair(true) : onSair())}
         acaoDoCabecalho={
-          rascunho ? (
-            <Button
-              variant="secondary"
-              disabled={salvando || !estado.nome.trim()}
-              onClick={() => void salvarRascunho()}
-            >
-              Salvar rascunho
-            </Button>
-          ) : undefined
+          <Button
+            variant="secondary"
+            disabled={salvando || !estado.nome.trim()}
+            onClick={() => void previsualizar()}
+          >
+            Pré-visualizar
+          </Button>
         }
-        etapas={ETAPAS}
+        etapas={etapasVisiveis}
         atual={atual}
         alcancada={alcancada}
         onIrParaEtapa={irPara}
         onSubmit={(e) => void aoEnviar(e)}
         rotuloConcluir={rascunho ? "Publicar pesquisa" : "Salvar alterações"}
         ocupado={salvando}
-        paineis={[etapa1, etapa2, etapa3, etapa4, etapa5]}
+        paineis={chaves.map((c) => [etapa1, etapa2, etapa3, etapa4, etapa5][c])}
         idDoTituloDaEtapa={idTituloDaEtapa}
         rotuloDoFormulario={editando ? "Editar pesquisa" : "Nova pesquisa"}
         mensagem={
@@ -633,20 +629,6 @@ export function AssistenteDePesquisa({
           ) : undefined
         }
       />
-
-      <Dialog
-        aberto={previa}
-        titulo="Pré-visualização"
-        subtitulo="Como quem responde vê a pesquisa"
-        onFechar={() => setPrevia(false)}
-        className="pesquisas__janela-previa"
-      >
-        <PreVisualizacao
-          nome={estado.nome}
-          boasVindas={estado.boasVindas}
-          secoes={estado.secoes}
-        />
-      </Dialog>
 
       <Dialog
         aberto={sair}

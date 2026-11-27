@@ -16,7 +16,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { PesquisaEntrada } from "../../api/pesquisasClient";
 import { AssistenteDoModelo } from "./AssistenteDoModelo";
-import { servicoFalso, type ServicoFalso } from "./dadosDeTeste";
+import { ATIVOS, servicoFalso, type ServicoFalso } from "./dadosDeTeste";
 import { modeloDaGaleria, perguntasPrincipais } from "./modelosDePesquisa";
 
 const HOJE = "2026-11-27";
@@ -106,18 +106,31 @@ describe("Assistente do modelo — Configurar", () => {
     const separar = await screen.findByRole("list", {
       name: "Separar respostas por",
     });
-    expect(
-      await within(separar).findByText(/2 opções: Matriz, Filial Sul/),
-    ).toBeInTheDocument();
+    expect(await within(separar).findAllByText("2 opções")).toHaveLength(2);
     fireEvent.click(
       within(separar).getByRole("checkbox", { name: /Departamento/ }),
     );
+    // Marcado: as opções que quem responde vai ver, e como criar outra.
+    const opcoes = within(separar).getByRole("list", {
+      name: "Opções de departamento",
+    });
+    expect(
+      within(opcoes)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Operações", "Financeiro", "Prefiro não informar"]);
+    expect(
+      within(separar).getByRole("button", { name: "Adicionar departamento" }),
+    ).toBeInTheDocument();
     fireEvent.click(
       within(separar).getByRole("checkbox", { name: /Centro de custo/ }),
     );
     expect(
       within(separar).getByRole("checkbox", { name: /Unidade/ }),
     ).toBeDisabled();
+    expect(separar).toHaveTextContent(
+      "Até 2 campos, para ninguém ser reconhecido pela combinação.",
+    );
     await waitFor(() =>
       expect(ultimaEntrada(servico.alterarPesquisa).separarPor).toEqual([
         "departamento",
@@ -173,13 +186,33 @@ describe("Assistente do modelo — Configurar", () => {
     const { servico } = montar();
     await screen.findByText("Rascunho salvo às 09:05");
     fireEvent.click(screen.getByRole("button", { name: "Editar pergunta 1" }));
+    const caixa = screen.getByRole("textbox", {
+      name: "Texto da pergunta 1",
+    }) as HTMLInputElement;
+    // O texto já vem selecionado, com o atalho e o contador.
+    expect(caixa).toHaveFocus();
+    expect(caixa.selectionStart).toBe(0);
+    expect(caixa.selectionEnd).toBe(caixa.value.length);
+    expect(
+      screen.getByText(`Enter salva · Esc cancela · ${caixa.value.length}/300`),
+    ).toBeInTheDocument();
+    // Esc cancela sem mudar nada.
+    fireEvent.change(caixa, { target: { value: "Descartado." } });
+    fireEvent.keyDown(caixa, { key: "Escape" });
+    expect(
+      screen.queryByRole("textbox", { name: "Texto da pergunta 1" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Editar pergunta 1" }));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Texto da pergunta 1" }),
       {
         target: { value: "Texto novo." },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    fireEvent.keyDown(
+      screen.getByRole("textbox", { name: "Texto da pergunta 1" }),
+      { key: "Enter" },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Excluir pergunta 2" }));
     await waitFor(() => {
       const perguntas = ultimaEntrada(servico.alterarPesquisa).secoes[0]!
@@ -189,6 +222,14 @@ describe("Assistente do modelo — Configurar", () => {
         perguntasPrincipais(modeloDaGaleria("pulso")),
       );
     });
+    // Excluir avisa e permite desfazer.
+    expect(await screen.findByText("Pergunta excluída.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+    await waitFor(() =>
+      expect(
+        ultimaEntrada(servico.alterarPesquisa).secoes[0]!.perguntas,
+      ).toHaveLength(perguntasPrincipais(modeloDaGaleria("pulso")) + 1),
+    );
   });
 
   it("nome vazio barra o avanço", async () => {
@@ -270,6 +311,64 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
     );
   });
 
+  it("escolher pessoas começa sem ninguém; marcar todos, limpar e a contagem dentro do filtro", async () => {
+    // O servidor simulado filtra por departamento, como o real.
+    const filtrarPorDepartamento = vi.fn(
+      (q: { departamentos?: readonly string[] }) => {
+        const itens = ATIVOS.itens.filter(
+          (c) =>
+            !q.departamentos?.length ||
+            q.departamentos.includes(
+              (
+                c as unknown as {
+                  vinculos: {
+                    lotacaoVigente: { departamento: { id: string } };
+                  }[];
+                }
+              ).vinculos[0]!.lotacaoVigente.departamento.id,
+            ),
+        );
+        return Promise.resolve({ ...ATIVOS, itens, total: itens.length });
+      },
+    );
+    const servico = servicoFalso({
+      listarAtivos:
+        filtrarPorDepartamento as unknown as ServicoFalso["listarAtivos"],
+    });
+    montar({ servico });
+    proximo(/Próximo: Colaboradores/);
+    fireEvent.click(
+      await screen.findByRole("radio", { name: /Escolher pessoas/ }),
+    );
+    // Ninguém vem marcado ao trocar para "Escolher pessoas".
+    expect(
+      await screen.findByText("0 selecionados de 2 colaboradores"),
+    ).toBeInTheDocument();
+    const todos = screen.getByRole("checkbox", {
+      name: "Marcar todos do filtro",
+    });
+    expect(todos).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Ana Exemplo" }),
+    ).not.toBeChecked();
+    fireEvent.click(todos);
+    expect(
+      await screen.findByText("2 selecionados de 2 colaboradores"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    expect(
+      await screen.findByText("0 selecionados de 2 colaboradores"),
+    ).toBeInTheDocument();
+    // Marca a Ana e filtra o Financeiro: a contagem é a do filtro.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ana Exemplo" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Financeiro" }));
+    expect(
+      await screen.findByText("0 selecionados de 1 colaborador"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 pessoa vai receber")).toBeInTheDocument();
+  });
+
   it("enviar: revisão, encerramento automático validado e gerar", async () => {
     const escrever = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", {
@@ -285,7 +384,7 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
     });
     expect(resumo).toHaveTextContent("Identificada");
     expect(resumo).toHaveTextContent("2 colaboradores");
-    expect(resumo).toHaveTextContent("escala 1–10 + enps 0–10");
+    expect(resumo).toHaveTextContent("escala 1–10 + eNPS 0–10");
     fireEvent.click(
       screen.getByRole("switch", { name: "Encerrar automaticamente" }),
     );
@@ -307,7 +406,9 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
       name: "Pesquisa criada e ativa",
     });
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
-    expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe("2026-12-20");
+    expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe(
+      "2026-12-20T23:59:00-03:00",
+    );
     expect(final).toHaveTextContent("Ativa");
     expect(within(final).getByRole("link", { name: /^Abrir/ })).toHaveAttribute(
       "target",

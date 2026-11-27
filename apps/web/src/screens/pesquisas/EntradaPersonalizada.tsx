@@ -40,9 +40,15 @@ export function EntradaPersonalizada({
   onVoltar,
   onComecar,
   onSobre,
+  onCopiar,
+  onContinuar,
 }: {
   readonly servico: ServicoDePesquisas;
-  readonly aviso: string | null;
+  readonly aviso?: string | null;
+  /** Copiar uma pesquisa pela rota (`copia/<id>`); sem ela, abre aqui. */
+  readonly onCopiar?: (id: string) => void;
+  /** Continuar o rascunho pela rota (`<id>/rascunho`); sem ela, abre aqui. */
+  readonly onContinuar?: (id: string) => void;
   readonly onVoltar: () => void;
   /** Abre o assistente de 5 etapas (em branco, roteiro, cópia ou rascunho). */
   readonly onComecar: (x: {
@@ -77,6 +83,8 @@ export function EntradaPersonalizada({
   }, [servico]);
 
   async function abrir(id: string, comoCopia: boolean) {
+    if (comoCopia && onCopiar) return onCopiar(id);
+    if (!comoCopia && onContinuar) return onContinuar(id);
     try {
       const d = await servico.obterPesquisa(id);
       onComecar(comoCopia ? { inicial: estadoDaCopia(d) } : { base: d });

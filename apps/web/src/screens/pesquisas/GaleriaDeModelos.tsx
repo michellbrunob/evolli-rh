@@ -241,6 +241,7 @@ export function GavetaDoModelo({
   return (
     <Sheet
       aberto={m !== null}
+      className="pesquisas__janela"
       titulo={m?.nome ?? ""}
       subtitulo={
         m

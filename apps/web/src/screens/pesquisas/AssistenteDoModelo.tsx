@@ -17,25 +17,26 @@ import {
   useRef,
   useState,
 } from "react";
-import type {
-  CampoGrupo,
-  Pergunta,
-  PesquisaDetalhe,
-} from "../../api/pesquisasClient";
+import type { Pergunta, PesquisaDetalhe } from "../../api/pesquisasClient";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { Button } from "../../components";
-import { formatarDiaCivil } from "../../format/data";
 import { plural } from "../../format/plural";
-import { Dialog, IconButton } from "../../ui";
+import { IconButton } from "../../ui";
 import {
   IconeArrastar,
   IconeComentario,
   IconeEditar,
+  IconeFechar,
   IconeMais,
   IconeRemover,
+  IconeVisto,
   IconeVoltar,
 } from "../../ui/icones";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
+import { GarantirAvisos, useAvisar } from "./avisos";
+import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
+import { enderecoDaPrevia } from "./rotasDePesquisas";
+import { SepararRespostasPor } from "./SepararRespostasPor";
 import {
   BarraDeEtapas,
   CartaoDeSecao,
@@ -57,9 +58,8 @@ import {
 } from "./estadoDaPesquisa";
 import { EtapaColaboradores } from "./EtapaColaboradores";
 import { modeloDaGaleria, type ModeloDaGaleria } from "./modelosDePesquisa";
-import { PreVisualizacao } from "./PreVisualizacao";
 import { lembrarRascunho } from "./rascunhosLocais";
-import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
+import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { TelaDeGerada } from "./TelaDeGerada";
 import {
   IDENTIFICACOES,
@@ -75,12 +75,12 @@ const ETAPAS_COMPLETAS = [
   { titulo: "Enviar", subtitulo: "Link e prazo" },
 ] as const;
 
-export const CAMPOS_DE_GRUPO: readonly { campo: CampoGrupo; rotulo: string }[] =
-  [
-    { campo: "departamento", rotulo: "Departamento" },
-    { campo: "centroCusto", rotulo: "Centro de custo" },
-    { campo: "unidade", rotulo: "Unidade" },
-  ];
+/** Primeira letra minúscula, sem estragar siglas ("eNPS 0–10"). */
+function minusculaSemSigla(texto: string): string {
+  return /^[A-Z][a-z]/.test(texto)
+    ? texto.charAt(0).toLowerCase() + texto.slice(1)
+    : texto;
+}
 
 /** Selo curto do tipo da pergunta ("Escala 1–10", "eNPS 0–10"). */
 export function seloDoTipo(p: Pergunta): string {
@@ -144,7 +144,18 @@ function explicacaoDaEscala(m: ModeloDaGaleria): {
 const horaDe = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-export function AssistenteDoModelo({
+/** A tela sozinha (fora do módulo) ganha o próprio provedor de avisos. */
+export function AssistenteDoModelo(
+  props: Parameters<typeof AssistenteDoModeloInterno>[0],
+) {
+  return (
+    <GarantirAvisos>
+      <AssistenteDoModeloInterno {...props} />
+    </GarantirAvisos>
+  );
+}
+
+function AssistenteDoModeloInterno({
   servico,
   modeloId,
   base,
@@ -155,8 +166,11 @@ export function AssistenteDoModelo({
   onConcluir,
   onVerResultados,
   onEditarGerada,
+  onRascunhoCriado,
 }: {
   readonly servico: ServicoDePesquisas;
+  /** O primeiro rascunho foi gravado (a rota passa a apontar para ele). */
+  readonly onRascunhoCriado?: (id: string) => void;
   /** Nova pesquisa a partir do modelo pronto. */
   readonly modeloId?: string;
   /** Rascunho retomado ou pesquisa publicada em edição. */
@@ -188,9 +202,8 @@ export function AssistenteDoModelo({
   const [falha, setFalha] = useState<string | null>(null);
   const [gravada, setGravada] = useState<PesquisaDetalhe | null>(base ?? null);
   const [gerada, setGerada] = useState<PesquisaDetalhe | null>(null);
-  const [previa, setPrevia] = useState(false);
+  const [criadaAs, setCriadaAs] = useState<string | null>(null);
   const [totalDoTime, setTotalDoTime] = useState<number | null>(null);
-  const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
   const [referencia, setReferencia] = useState(() =>
     base ? JSON.stringify(entradaDoEstado(estadoDoDetalhe(base))) : "",
   );
@@ -210,19 +223,6 @@ export function AssistenteDoModelo({
     },
   );
 
-  useEffect(() => {
-    if (!anonima) return;
-    let vivo = true;
-    Promise.resolve(servico.listarGrupos())
-      .then((g) => {
-        if (vivo && g) setGrupos(g);
-      })
-      .catch(() => undefined);
-    return () => {
-      vivo = false;
-    };
-  }, [anonima, servico]);
-
   /** Grava o rascunho (cria na primeira vez), em fila. */
   const gravar = useCallback(
     (e: EstadoDaPesquisa): Promise<string | null> => {
@@ -237,6 +237,7 @@ export function AssistenteDoModelo({
             d = await servico.criarPesquisa(corpo);
             idRef.current = d.id;
             setEstado((s) => ({ ...s, id: d.id, link: d.link }));
+            onRascunhoCriado?.(d.id);
           } else {
             d = await servico.alterarPesquisa(idRef.current, corpo);
           }
@@ -253,7 +254,7 @@ export function AssistenteDoModelo({
       filaRef.current = passo.catch(() => undefined);
       return passo;
     },
-    [servico, agora],
+    [servico, agora, onRascunhoCriado],
   );
 
   // Rascunho gravado ao abrir (modelo novo) e a cada mudança, com espera.
@@ -328,7 +329,9 @@ export function AssistenteDoModelo({
       }
       const id = await gravar(estado);
       if (!id) return;
-      setGerada(await servico.publicarPesquisa(id));
+      const publicada = await servico.publicarPesquisa(id);
+      setCriadaAs(horaDe(agora()));
+      setGerada(publicada);
     } catch (erro) {
       const status = (erro as { status?: unknown } | null)?.status;
       setFalha(
@@ -338,6 +341,19 @@ export function AssistenteDoModelo({
             ? "Não foi possível salvar as alterações. Tente de novo."
             : "Não foi possível gerar a pesquisa. Verifique a conexão e tente de novo.",
       );
+    }
+  }
+
+  /** Pré-visualizar: grava o que falta e abre a prévia em outra aba. */
+  async function previsualizar() {
+    try {
+      const id =
+        pendente || idRef.current === null
+          ? await gravar(estado)
+          : idRef.current;
+      if (id) window.open(enderecoDaPrevia(id), "_blank", "noopener");
+    } catch {
+      setFalha("Não foi possível abrir a pré-visualização. Tente de novo.");
     }
   }
 
@@ -364,16 +380,67 @@ export function AssistenteDoModelo({
     ? totalDoTime
     : Object.keys(estado.escolhidos).length;
 
+  const cabecalho = (
+    <header className="pesquisas__cabecalho">
+      <IconButton
+        label="Voltar"
+        icon={<IconeVoltar tamanho={18} />}
+        className="pesquisas__voltar"
+        onClick={() => (gerada ? onConcluir() : void cancelar())}
+      />
+      <IconeDoModelo id={m.id} tamanho="lg" />
+      <div className="pesquisas__titulos">
+        <h1
+          id={PESQUISAS_TITULO_ID}
+          className="pesquisas__titulo"
+          tabIndex={-1}
+        >
+          {publicadaAntes && !gerada
+            ? `Editar ${estado.nome}`
+            : `Nova pesquisa ${m.nome}`}
+        </h1>
+        <p className="pesquisas__subtitulo">{m.descricao}</p>
+      </div>
+      {publicadaAntes && !gerada ? null : (
+        <p className="pesquisas__salvo" role="status">
+          {gerada && criadaAs ? (
+            <>
+              <span
+                className="pesquisas__ponto pesquisas__ponto--sucesso"
+                aria-hidden="true"
+              />
+              {`Pesquisa criada às ${criadaAs}`}
+            </>
+          ) : gravando && !salvoAs ? (
+            "Salvando rascunho…"
+          ) : salvoAs ? (
+            <>
+              <span
+                className="pesquisas__ponto pesquisas__ponto--sucesso"
+                aria-hidden="true"
+              />
+              {`Rascunho salvo às ${salvoAs}`}
+            </>
+          ) : null}
+        </p>
+      )}
+    </header>
+  );
+
   if (gerada) {
     return (
       <div className="pesquisas">
+        {cabecalho}
         <BarraDeEtapas etapas={etapas} atual={etapas.length} />
-        <TelaDeGerada
-          pesquisa={gerada}
-          onVerResultados={(id) => onVerResultados(id)}
-          onEditar={onEditarGerada}
-          onConcluir={onConcluir}
-        />
+        <div className="pesquisas__final">
+          <TelaDeGerada
+            pesquisa={gerada}
+            comCabecalhoDaPagina
+            onVerResultados={(id) => onVerResultados(id)}
+            onEditar={onEditarGerada}
+            onConcluir={onConcluir}
+          />
+        </div>
       </div>
     );
   }
@@ -383,42 +450,7 @@ export function AssistenteDoModelo({
 
   return (
     <div className="pesquisas pesquisas--com-rodape">
-      <header className="pesquisas__cabecalho">
-        <IconButton
-          label="Voltar"
-          icon={<IconeVoltar tamanho={18} />}
-          className="pesquisas__voltar"
-          onClick={() => void cancelar()}
-        />
-        <IconeDoModelo id={m.id} tamanho="lg" />
-        <div className="pesquisas__titulos">
-          <h1
-            id={PESQUISAS_TITULO_ID}
-            className="pesquisas__titulo"
-            tabIndex={-1}
-          >
-            {publicadaAntes
-              ? `Editar ${estado.nome}`
-              : `Nova pesquisa ${m.nome}`}
-          </h1>
-          <p className="pesquisas__subtitulo">{m.descricao}</p>
-        </div>
-        {publicadaAntes ? null : (
-          <p className="pesquisas__salvo" role="status">
-            {gravando && !salvoAs ? (
-              "Salvando rascunho…"
-            ) : salvoAs ? (
-              <>
-                <span
-                  className="pesquisas__ponto pesquisas__ponto--sucesso"
-                  aria-hidden="true"
-                />
-                {`Rascunho salvo às ${salvoAs}`}
-              </>
-            ) : null}
-          </p>
-        )}
-      </header>
+      {cabecalho}
 
       <BarraDeEtapas etapas={etapas} atual={etapa} />
 
@@ -430,7 +462,7 @@ export function AssistenteDoModelo({
           principais={principais}
           comentario={comentario ?? null}
           travado={publicadaAntes && estado.temRespostas}
-          grupos={grupos}
+          servico={servico}
           erros={erros}
           onMudar={mudar}
         />
@@ -452,7 +484,6 @@ export function AssistenteDoModelo({
         </CartaoDeSecao>
       ) : (
         <EtapaEnviar
-          ids={ids}
           estado={estado}
           principais={principais}
           vaoReceber={vaoReceber}
@@ -460,7 +491,7 @@ export function AssistenteDoModelo({
           erros={erros}
           gravada={gravada}
           onMudar={mudar}
-          onPrevia={() => setPrevia(true)}
+          onPrevia={() => void previsualizar()}
         />
       )}
 
@@ -471,45 +502,30 @@ export function AssistenteDoModelo({
       ) : null}
 
       <footer className="pesquisas__rodape">
-        <Button variant="subtle" onClick={() => void cancelar()}>
-          Cancelar
-        </Button>
-        <div className="pesquisas__rodape-direita">
-          {etapa > 0 ? (
-            <>
-              {!anonima && vaoReceber !== null ? (
-                <span className="pesquisas__suave">
-                  {`${plural(vaoReceber, "pessoa vai", "pessoas vão")} receber`}
-                </span>
-              ) : null}
-              <Button variant="secondary" onClick={() => irPara(etapa - 1)}>
-                ‹ Voltar
-              </Button>
-            </>
-          ) : null}
-          <Button disabled={gravando && ultima} onClick={() => void avancar()}>
-            {ultima
-              ? publicadaAntes
-                ? "Salvar alterações"
-                : "✓ Gerar pesquisa"
-              : `Próximo: ${proxima?.titulo ?? ""} →`}
+        {etapa === 0 ? (
+          <Button variant="subtle" onClick={() => void cancelar()}>
+            Cancelar
           </Button>
-        </div>
+        ) : (
+          <div className="pesquisas__rodape-esquerda">
+            <Button variant="secondary" onClick={() => irPara(etapa - 1)}>
+              ‹ Voltar
+            </Button>
+            {!anonima && vaoReceber !== null ? (
+              <span className="pesquisas__suave">
+                {`${plural(vaoReceber, "pessoa vai", "pessoas vão")} receber`}
+              </span>
+            ) : null}
+          </div>
+        )}
+        <Button disabled={gravando && ultima} onClick={() => void avancar()}>
+          {ultima
+            ? publicadaAntes
+              ? "Salvar alterações"
+              : "✓ Gerar pesquisa"
+            : `Próximo: ${proxima?.titulo ?? ""} →`}
+        </Button>
       </footer>
-
-      <Dialog
-        aberto={previa}
-        titulo="Pré-visualização"
-        subtitulo="Como quem responde vê a pesquisa"
-        onFechar={() => setPrevia(false)}
-        className="pesquisas__janela-previa"
-      >
-        <PreVisualizacao
-          nome={estado.nome}
-          boasVindas={estado.boasVindas}
-          secoes={estado.secoes}
-        />
-      </Dialog>
     </div>
   );
 }
@@ -521,7 +537,7 @@ function EtapaConfigurar({
   principais,
   comentario,
   travado,
-  grupos,
+  servico,
   erros,
   onMudar,
 }: {
@@ -531,10 +547,11 @@ function EtapaConfigurar({
   readonly principais: readonly Pergunta[];
   readonly comentario: Pergunta | null;
   readonly travado: boolean;
-  readonly grupos: GruposDaEmpresa | null;
+  readonly servico: ServicoDePesquisas;
   readonly erros: Erros | null;
   readonly onMudar: (m: Partial<EstadoDaPesquisa>) => void;
 }) {
+  const avisar = useAvisar();
   const [adicionando, setAdicionando] = useState(false);
   const [rascunhoDaPergunta, setRascunhoDaPergunta] = useState("");
   const [editando, setEditando] = useState<{
@@ -678,8 +695,8 @@ function EtapaConfigurar({
 
       {estado.identificacao === "anonima" ? (
         <SepararRespostasPor
+          servico={servico}
           separarPor={estado.separarPor}
-          grupos={grupos}
           travado={publicada}
           onMudar={(separarPor) => onMudar({ separarPor })}
         />
@@ -774,31 +791,53 @@ function EtapaConfigurar({
                     {n}
                   </span>
                   {editando?.id === p.id ? (
-                    <div className="pesquisas__caixa-inline">
-                      <textarea
+                    <div className="pesquisas__caixa-inline pesquisas__caixa-inline--linha">
+                      <input
                         className="pesquisas__campo"
                         aria-label={`Texto da pergunta ${i + 1}`}
+                        aria-describedby={`${ids}-dica-${p.id}`}
                         maxLength={LIMITES.textoPergunta}
                         value={editando.texto}
+                        // Abre com o texto selecionado, pronto para trocar.
+                        ref={(el) => {
+                          if (el && document.activeElement !== el) {
+                            el.focus();
+                            el.select();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            salvarEdicao();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditando(null);
+                          }
+                        }}
                         onChange={(e) =>
                           setEditando({ id: p.id, texto: e.target.value })
                         }
                       />
-                      <div className="pesquisas__caixa-inline-rodape">
-                        <span className="pesquisas__suave">{`${editando.texto.length}/${LIMITES.textoPergunta}`}</span>
-                        <Button
-                          variant="subtle"
-                          onClick={() => setEditando(null)}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          disabled={!editando.texto.trim()}
-                          onClick={salvarEdicao}
-                        >
-                          Salvar
-                        </Button>
-                      </div>
+                      <span
+                        id={`${ids}-dica-${p.id}`}
+                        className="pesquisas__suave"
+                      >
+                        {`Enter salva · Esc cancela · ${editando.texto.length}/${LIMITES.textoPergunta}`}
+                      </span>
+                      <IconButton
+                        label="Salvar a pergunta"
+                        icon={<IconeVisto tamanho={14} />}
+                        variant="subtle"
+                        disabled={!editando.texto.trim()}
+                        onClick={salvarEdicao}
+                      />
+                      <IconButton
+                        label="Cancelar a edição"
+                        icon={<IconeFechar tamanho={14} />}
+                        variant="subtle"
+                        onClick={() => setEditando(null)}
+                      />
                     </div>
                   ) : (
                     <span className="pesquisas__linha-texto">
@@ -824,11 +863,16 @@ function EtapaConfigurar({
                         label={`Excluir pergunta ${i + 1}`}
                         icon={<IconeRemover tamanho={14} />}
                         variant="subtle"
-                        onClick={() =>
-                          onMudar({
-                            secoes: excluirPergunta(estado.secoes, p.id),
-                          })
-                        }
+                        onClick={() => {
+                          const antes = estado.secoes;
+                          onMudar({ secoes: excluirPergunta(antes, p.id) });
+                          avisar("Pergunta excluída.", {
+                            acao: {
+                              rotulo: "Desfazer",
+                              onClick: () => onMudar({ secoes: antes }),
+                            },
+                          });
+                        }}
                       />
                     </span>
                   )}
@@ -889,7 +933,6 @@ function EtapaConfigurar({
 }
 
 function EtapaEnviar({
-  ids,
   estado,
   principais,
   vaoReceber,
@@ -899,7 +942,6 @@ function EtapaEnviar({
   onMudar,
   onPrevia,
 }: {
-  readonly ids: string;
   readonly estado: EstadoDaPesquisa;
   readonly principais: readonly Pergunta[];
   readonly vaoReceber: number | null;
@@ -909,11 +951,9 @@ function EtapaEnviar({
   readonly onMudar: (m: Partial<EstadoDaPesquisa>) => void;
   readonly onPrevia: () => void;
 }) {
-  const idData = `${ids}-data`;
   const tipos = [
-    ...new Set(principais.map((p) => seloDoTipo(p).toLowerCase())),
+    ...new Set(principais.map((p) => minusculaSemSigla(seloDoTipo(p)))),
   ];
-  const encerra = estado.encerraEm !== null;
   return (
     <>
       <CartaoDeSecao
@@ -955,50 +995,13 @@ function EtapaEnviar({
         </dl>
       </CartaoDeSecao>
 
-      <CartaoDeSecao
-        titulo="Encerrar automaticamente"
-        descricao="Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada."
-        acao={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={encerra}
-            aria-label="Encerrar automaticamente"
-            className="pesquisas__interruptor"
-            onClick={() => onMudar({ encerraEm: encerra ? null : "" })}
-          >
-            <span
-              className="pesquisas__interruptor-trilho"
-              aria-hidden="true"
-            />
-          </button>
-        }
-      >
-        {encerra ? (
-          <div className="pesquisas__campos">
-            <label htmlFor={idData} className="pesquisas__rotulo">
-              Data de encerramento
-            </label>
-            <input
-              id={idData}
-              type="date"
-              min={hoje}
-              className="pesquisas__campo pesquisas__campo--curto"
-              value={estado.encerraEm ?? ""}
-              aria-invalid={erros?.encerraEm ? true : undefined}
-              onChange={(e) => onMudar({ encerraEm: e.target.value })}
-            />
-            <p className="pesquisas__suave">
-              {estado.encerraEm
-                ? `Depois de ${formatarDiaCivil(estado.encerraEm)}, o link para de aceitar respostas.`
-                : "O link para de aceitar respostas depois do dia escolhido."}
-            </p>
-            {erros?.encerraEm ? (
-              <p className="pesquisas__erro">{erros.encerraEm}</p>
-            ) : null}
-          </div>
-        ) : null}
-      </CartaoDeSecao>
+      <CartaoDeEncerramento
+        data={estado.encerraEm}
+        hora={estado.encerraHora}
+        hoje={hoje}
+        erro={erros?.encerraEm}
+        onMudar={onMudar}
+      />
 
       {gravada ? (
         <AvisoNaoIdentificaveis
@@ -1008,63 +1011,5 @@ function EtapaEnviar({
         />
       ) : null}
     </>
-  );
-}
-
-/** Só na anônima: os campos que quem responde escolhe antes (até 2). */
-export function SepararRespostasPor({
-  separarPor,
-  grupos,
-  travado,
-  onMudar,
-}: {
-  readonly separarPor: readonly CampoGrupo[];
-  readonly grupos: GruposDaEmpresa | null;
-  readonly travado: boolean;
-  readonly onMudar: (separarPor: CampoGrupo[]) => void;
-}) {
-  return (
-    <CartaoDeSecao
-      titulo="Separar respostas por (opcional)"
-      descricao="Quem responde escolhe antes das perguntas, ou prefere não informar. Até 2 campos; grupos pequenos continuam protegidos pelo mínimo."
-    >
-      <ul className="pesquisas__separar" aria-label="Separar respostas por">
-        {CAMPOS_DE_GRUPO.map(({ campo, rotulo }) => {
-          const marcado = separarPor.includes(campo);
-          const opcoes = grupos?.[campo] ?? [];
-          return (
-            <li key={campo}>
-              <label className="pesquisas__escolha">
-                <input
-                  type="checkbox"
-                  checked={marcado}
-                  disabled={travado || (!marcado && separarPor.length >= 2)}
-                  onChange={(e) =>
-                    onMudar(
-                      e.target.checked
-                        ? [...separarPor, campo]
-                        : separarPor.filter((c) => c !== campo),
-                    )
-                  }
-                />
-                <span className="pesquisas__escolha-textos">
-                  <strong>{rotulo}</strong>
-                  <span className="pesquisas__suave">
-                    {grupos === null
-                      ? "Carregando opções…"
-                      : opcoes.length === 0
-                        ? "Nenhuma opção cadastrada"
-                        : `${plural(opcoes.length, "opção", "opções")}: ${opcoes
-                            .slice(0, 3)
-                            .map((o) => o.nome)
-                            .join(", ")}${opcoes.length > 3 ? "…" : ""}`}
-                  </span>
-                </span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-    </CartaoDeSecao>
   );
 }

@@ -89,7 +89,8 @@ describe("Assistente de pesquisa — etapa 1", () => {
     });
     fireEvent.click(screen.getByRole("radio", { name: /Anônima/ }));
     avancar();
-    await screen.findByRole("heading", { name: /Etapa 2 de 5/ });
+    // Anônima: sem a etapa Participantes (4 etapas).
+    await screen.findByRole("heading", { name: /Etapa 2 de 4/ });
     const entrada = ultimaEntrada(servico.criarPesquisa);
     expect(entrada.nome).toBe("Pesquisa de teste");
     expect(entrada.identificacao).toBe("anonima");
@@ -120,6 +121,38 @@ describe("Assistente de pesquisa — perguntas", () => {
       await screen.findByText("Inclua pelo menos uma pergunta."),
     ).toBeVisible();
     expect(servico.alterarPesquisa).not.toHaveBeenCalled();
+  });
+
+  it("tipos em quatro grupos; excluir uma pergunta avisa e permite desfazer", async () => {
+    montar();
+    await irParaPerguntas();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Adicionar pergunta na seção 1" }),
+    );
+    const tipos = screen.getByRole("group", { name: "Tipo da nova pergunta" });
+    expect(within(tipos).getAllByRole("button")).toHaveLength(11);
+    expect(
+      [...tipos.querySelectorAll(".pesquisas__menu-titulo")].map(
+        (t) => t.textContent,
+      ),
+    ).toEqual(["Texto", "Escolha", "Escala", "Outros"]);
+    fireEvent.click(
+      within(tipos).getByRole("button", { name: /^Texto curto/ }),
+    );
+    fireEvent.change(screen.getByLabelText("Texto da pergunta"), {
+      target: { value: "Uma pergunta." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Excluir pergunta 1" }));
+    expect(screen.queryByLabelText("Texto da pergunta")).toBeNull();
+    expect(await screen.findByText("Pergunta excluída.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Excluir pergunta 1" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+    expect(
+      screen.getByRole("button", { name: "Excluir pergunta 1" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Uma pergunta\./).length).toBeGreaterThan(0);
   });
 
   it("pergunta sem texto e opção vazia barram o avanço", async () => {
@@ -357,7 +390,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     await screen.findByRole("heading", { name: /Etapa 4 de 5/ });
     const chamadas = servico.alterarPesquisa.mock.calls.length;
     fireEvent.click(
-      screen.getByRole("radio", { name: /Encerrar em uma data/ }),
+      screen.getByRole("switch", { name: "Encerrar automaticamente" }),
     );
     fireEvent.change(screen.getByLabelText("Data de encerramento"), {
       target: { value: "2026-11-01" },
@@ -385,7 +418,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     avancar();
     await screen.findByRole("heading", { name: /Etapa 4 de 5/ });
     fireEvent.click(
-      screen.getByRole("radio", { name: /Encerrar em uma data/ }),
+      screen.getByRole("switch", { name: "Encerrar automaticamente" }),
     );
     fireEvent.change(screen.getByLabelText("Data de encerramento"), {
       target: { value: "2026-12-15" },
@@ -398,15 +431,19 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     expect(resumo).toHaveTextContent("15/12/2026");
     expect(resumo).toHaveTextContent("Identificada");
 
+    // A prévia abre a experiência real em outra aba.
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
     fireEvent.click(
       screen.getByRole("button", { name: "Pré-visualizar como quem responde" }),
     );
-    const previa = await screen.findByRole("dialog", {
-      name: "Pré-visualização",
-    });
-    expect(previa).toHaveTextContent("O que mais pesou na sua nota?");
-    expect(previa).toHaveTextContent("3 perguntas");
-    fireEvent.click(within(previa).getByRole("button", { name: "Fechar" }));
+    await waitFor(() =>
+      expect(abrir).toHaveBeenCalledWith(
+        expect.stringMatching(/#\/pesquisas\/p-novo\/previa$/),
+        "_blank",
+        "noopener",
+      ),
+    );
+    abrir.mockRestore();
 
     fireEvent.click(screen.getByRole("button", { name: "Publicar pesquisa" }));
     const final = await screen.findByRole("region", {
@@ -432,7 +469,9 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       screen.queryByRole("region", { name: /não conseguem se identificar/ }),
     ).toBeNull();
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
-    expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe("2026-12-15");
+    expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe(
+      "2026-12-15T23:59:00-03:00",
+    );
     expect(
       (screen.getByLabelText("Link da pesquisa") as HTMLInputElement).value,
     ).toMatch(/#\/p\/token-publicado$/);
@@ -507,10 +546,11 @@ describe("Assistente de pesquisa — quem não consegue se identificar", () => {
     montar({ servico, modelo: "enps" });
     if (identificacao === "anonima")
       fireEvent.click(screen.getByRole("radio", { name: /^Anônima/ }));
-    for (let i = 2; i <= 5; i += 1) {
+    const total = identificacao === "anonima" ? 4 : 5;
+    for (let i = 2; i <= total; i += 1) {
       avancar();
       await screen.findByRole("heading", {
-        name: new RegExp(`Etapa ${i} de 5`),
+        name: new RegExp(`Etapa ${i} de ${total}`),
       });
     }
     return servico;
@@ -524,10 +564,15 @@ describe("Assistente de pesquisa — quem não consegue se identificar", () => {
     expect(aviso).toHaveTextContent(
       "2 pessoas não têm CPF ou data de nascimento na ficha e não conseguem confirmar quem são no link. Complete o cadastro antes de enviar.",
     );
-    const ana = within(aviso).getByRole("link", { name: /Ana Exemplo/ });
+    fireEvent.click(within(aviso).getByRole("button", { name: "Ver lista" }));
+    const lista = await screen.findByRole("dialog", {
+      name: "Sem CPF ou data de nascimento",
+    });
+    const ana = within(lista).getByRole("link", { name: /Ana Exemplo/ });
     expect(ana).toHaveAttribute("href", "#/pessoas/colaboradores/c-1/dados");
     expect(ana).toHaveAttribute("target", "_blank");
-    expect(within(aviso).queryByText(/Caio Exemplo/)).toBeNull();
+    expect(within(lista).queryByText(/Caio Exemplo/)).toBeNull();
+    fireEvent.click(within(lista).getByRole("button", { name: "Fechar" }));
     expect(
       screen.getByRole("button", { name: "Publicar pesquisa" }),
     ).toBeEnabled();
@@ -535,11 +580,23 @@ describe("Assistente de pesquisa — quem não consegue se identificar", () => {
     const final = await screen.findByRole("region", {
       name: "Pesquisa criada e ativa",
     });
+    const depois = within(final).getByRole("region", {
+      name: "Pessoas que não conseguem se identificar",
+    });
+    // Publicada: o aviso não fala mais em "antes de enviar".
+    expect(depois).not.toHaveTextContent("antes de enviar");
+  });
+
+  it("anônima: sem a etapa de participantes e a revisão sem 'Todo o time'", async () => {
+    await ateRevisao("anonima");
+    // Quatro etapas: nenhuma delas é a de participantes.
     expect(
-      within(final).getByRole("region", {
-        name: "Pessoas que não conseguem se identificar",
-      }),
+      screen.getByRole("heading", { name: /Etapa 4 de 4/ }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Participantes/ })).toBeNull();
+    const resumo = screen.getByRole("region", { name: "Resumo da pesquisa" });
+    expect(resumo).not.toHaveTextContent("Todo o time");
+    expect(resumo).toHaveTextContent("Quem tiver o link");
   });
 
   it("na anônima não há aviso (ninguém confirma quem é)", async () => {

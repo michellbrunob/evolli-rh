@@ -76,15 +76,22 @@ export function TelaDeGerada({
   onVerResultados,
   onEditar,
   onConcluir,
+  comCabecalhoDaPagina = false,
 }: {
   readonly pesquisa: PesquisaDetalhe;
+  /** O cabeçalho do assistente continua acima: o título vira h2. */
+  readonly comCabecalhoDaPagina?: boolean;
   readonly onVerResultados: (id: string) => void;
   readonly onEditar: (pesquisa: PesquisaDetalhe) => void;
   readonly onConcluir: () => void;
 }) {
+  const idDoTitulo = comCabecalhoDaPagina
+    ? "pesquisa-criada-titulo"
+    : PESQUISAS_TITULO_ID;
   useEffect(() => {
-    document.getElementById(PESQUISAS_TITULO_ID)?.focus();
-  }, []);
+    document.getElementById(idDoTitulo)?.focus();
+  }, [idDoTitulo]);
+  const Titulo = comCabecalhoDaPagina ? "h2" : "h1";
   const anonima = pesquisa.identificacao === "anonima";
   const quantos =
     pesquisa.participantes ?? pesquisa.participantesLista?.length ?? 0;
@@ -109,20 +116,13 @@ export function TelaDeGerada({
     },
   ];
   return (
-    <section
-      className="pesquisas__final-cartao"
-      aria-labelledby={PESQUISAS_TITULO_ID}
-    >
+    <section className="pesquisas__final-cartao" aria-labelledby={idDoTitulo}>
       <span className="pesquisas__final-icone" aria-hidden="true">
         <IconeSucesso tamanho={32} />
       </span>
-      <h1
-        id={PESQUISAS_TITULO_ID}
-        className="pesquisas__final-titulo"
-        tabIndex={-1}
-      >
+      <Titulo id={idDoTitulo} className="pesquisas__final-titulo" tabIndex={-1}>
         Pesquisa criada e ativa
-      </h1>
+      </Titulo>
       <p className="pesquisas__suave">
         {anonima
           ? "Compartilhe o link: quem tiver o link pode responder."
@@ -150,6 +150,7 @@ export function TelaDeGerada({
         identificacao={pesquisa.identificacao}
         naoIdentificaveis={pesquisa.naoIdentificaveis}
         participantes={pesquisa.participantesLista ?? []}
+        publicada
       />
       <ul className="pesquisas__proximas" aria-label="Próximas ações">
         {acoes.map((a) => (

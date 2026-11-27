@@ -1,12 +1,15 @@
 /**
  * T216 — etapa "Colaboradores" (quem vai responder): dois cartões de
  * escolha. "Todo o time" mostra avatares, quantas pessoas recebem, de
- * quantos departamentos, a lista completa e uma pílula por departamento.
- * "Escolher pessoas" tem busca, filtros por departamento, centro de custo e
- * área, a barra "N selecionados de M" com "Selecionar todos" e a tabela.
- * Depois de publicar, quem já respondeu não sai da lista.
+ * quantos departamentos, a lista completa (cargo · departamento) e uma
+ * pílula com ponto colorido por departamento. "Escolher pessoas" começa sem
+ * ninguém marcado e tem busca, filtros por departamento, centro de custo e
+ * área, a barra "N selecionados de M" (contada dentro do filtro) com a caixa
+ * geral, "Selecionar todos" e "Limpar", e a tabela (Colaborador,
+ * Departamento, Centro de custo e Área). Depois de publicar, quem já
+ * respondeu não sai da lista.
  */
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ColaboradorListadoApi } from "../../api/colaboradoresClient";
 import { Button } from "../../components";
 import { plural } from "../../format/plural";
@@ -21,21 +24,37 @@ import {
 import type { PessoaEscolhida } from "./estadoDaPesquisa";
 import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
 
-const TAMANHO = 50;
+const TAMANHO = 100;
+const TETO = 1000;
+
+/** A lotação como a listagem a projeta (centro de custo e área, se vierem). */
+interface LotacaoLida {
+  readonly cargo?: { readonly nome: string } | null;
+  readonly departamento?: { readonly nome: string } | null;
+  readonly centroCusto?: { readonly nome: string } | null;
+  readonly area?: { readonly nome: string } | null;
+}
+
+function lotacaoDe(c: ColaboradorListadoApi): LotacaoLida {
+  return (c.vinculos?.find((v) => v.lotacaoVigente)?.lotacaoVigente ??
+    {}) as LotacaoLida;
+}
 
 export function departamentoDe(c: ColaboradorListadoApi): string | null {
-  return (
-    c.vinculos?.find((v) => v.lotacaoVigente?.departamento)?.lotacaoVigente
-      ?.departamento?.nome ?? null
-  );
+  return lotacaoDe(c).departamento?.nome ?? null;
 }
 
-function cargoDe(c: ColaboradorListadoApi): string | null {
-  return (
-    c.vinculos?.find((v) => v.lotacaoVigente?.cargo)?.lotacaoVigente?.cargo
-      ?.nome ?? null
-  );
-}
+/** Cor do ponto da pílula de um departamento (estável pela ordem). */
+const CORES_DOS_GRUPOS = [
+  "--turno-azul",
+  "--turno-verde",
+  "--turno-laranja",
+  "--turno-roxo",
+  "--turno-ciano",
+  "--turno-mostarda",
+  "--turno-indigo",
+  "--turno-verde-agua",
+];
 
 export function EtapaColaboradores({
   servico,
@@ -73,11 +92,9 @@ export function EtapaColaboradores({
     centroCusto: "",
     area: "",
   });
-  const [pagina, setPagina] = useState(1);
   const [pessoas, setPessoas] = useState<ColaboradorListadoApi[] | null>(null);
-  const [total, setTotal] = useState(0);
   const [falhou, setFalhou] = useState(false);
-  const [selecionandoTodos, setSelecionandoTodos] = useState(false);
+  const geralRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -112,30 +129,40 @@ export function EtapaColaboradores({
     [busca, filtro],
   );
 
+  // Toda a lista do filtro (para contar e marcar dentro dele).
   useEffect(() => {
     if (todos) return;
     let vivo = true;
     setFalhou(false);
-    Promise.resolve(
-      servico.listarAtivos({ ...consulta, pagina, tamanhoPagina: TAMANHO }),
-    )
-      .then((r) => {
-        if (!vivo) return;
-        setTotal(r.total);
-        setPessoas((antes) =>
-          pagina === 1 ? r.itens : [...(antes ?? []), ...r.itens],
+    (async () => {
+      const lista: ColaboradorListadoApi[] = [];
+      for (let pagina = 1; lista.length < TETO; pagina += 1) {
+        const r = await Promise.resolve(
+          servico.listarAtivos({ ...consulta, pagina, tamanhoPagina: TAMANHO }),
         );
-      })
-      .catch(() => {
-        if (vivo) setFalhou(true);
-      });
+        lista.push(...(r?.itens ?? []));
+        if (!r || r.itens.length === 0 || lista.length >= r.total) break;
+      }
+      if (vivo) setPessoas(lista);
+    })().catch(() => {
+      if (vivo) setFalhou(true);
+    });
     return () => {
       vivo = false;
     };
-  }, [servico, todos, consulta, pagina]);
+  }, [servico, todos, consulta]);
 
-  const qtdEscolhidos = Object.keys(escolhidos).length;
-  const respondeu = new Set(responderam);
+  const respondeu = useMemo(() => new Set(responderam), [responderam]);
+  const doFiltro = pessoas ?? [];
+  const marcadosNoFiltro = doFiltro.filter((c) => c.id in escolhidos).length;
+  const todosMarcados =
+    doFiltro.length > 0 && marcadosNoFiltro === doFiltro.length;
+
+  useEffect(() => {
+    if (geralRef.current)
+      geralRef.current.indeterminate = marcadosNoFiltro > 0 && !todosMarcados;
+  }, [marcadosNoFiltro, todosMarcados]);
+
   const porDepartamento = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of time ?? []) {
@@ -148,31 +175,31 @@ export function EtapaColaboradores({
     ([d]) => d !== "Sem departamento",
   ).length;
 
+  const pessoaEscolhida = (c: ColaboradorListadoApi): PessoaEscolhida => ({
+    nome: c.nome,
+    departamento: departamentoDe(c),
+  });
+
+  /** Só quem já respondeu fica (não sai da lista depois de responder). */
+  const soQuemRespondeu = () =>
+    Object.fromEntries(
+      Object.entries(escolhidos).filter(([id]) => respondeu.has(id)),
+    );
+
   function marcar(c: ColaboradorListadoApi, marcado: boolean) {
     const novo = { ...escolhidos };
-    if (marcado) novo[c.id] = { nome: c.nome, departamento: departamentoDe(c) };
+    if (marcado) novo[c.id] = pessoaEscolhida(c);
     else delete novo[c.id];
     onMudar({ escolhidos: novo });
   }
 
-  async function selecionarTodos() {
-    setSelecionandoTodos(true);
-    try {
-      const novo = { ...escolhidos };
-      for (let p = 1; ; p += 1) {
-        const r = await servico.listarAtivos({
-          ...consulta,
-          pagina: p,
-          tamanhoPagina: 100,
-        });
-        for (const c of r.itens)
-          novo[c.id] = { nome: c.nome, departamento: departamentoDe(c) };
-        if (r.itens.length === 0 || p * 100 >= r.total) break;
-      }
-      onMudar({ escolhidos: novo });
-    } finally {
-      setSelecionandoTodos(false);
+  function marcarTodosDoFiltro(marcado: boolean) {
+    const novo = { ...escolhidos };
+    for (const c of doFiltro) {
+      if (marcado) novo[c.id] = pessoaEscolhida(c);
+      else if (!respondeu.has(c.id)) delete novo[c.id];
     }
+    onMudar({ escolhidos: novo });
   }
 
   const filtroLista = (
@@ -191,15 +218,13 @@ export function EtapaColaboradores({
           ...opcoes.map((o) => ({ valor: o.id, rotulo: o.nome })),
         ]}
         valor={filtro[campo]}
-        onMudar={(v) => {
-          setFiltro((f) => ({ ...f, [campo]: v }));
-          setPagina(1);
-        }}
+        onMudar={(v) => setFiltro((f) => ({ ...f, [campo]: v }))}
       />
     </div>
   );
 
   const nTime = time?.length ?? null;
+  const total = doFiltro.length;
 
   return (
     <div className="pesquisas__etapa">
@@ -223,7 +248,9 @@ export function EtapaColaboradores({
             <span className="pesquisas__suave">
               {nTime === null
                 ? "Os colaboradores ativos"
-                : `${nTime === 1 ? "O colaborador ativo" : `Os ${nTime} colaboradores ativos`}`}
+                : nTime === 1
+                  ? "O colaborador ativo"
+                  : `Os ${nTime} colaboradores ativos`}
             </span>
           </span>
         </label>
@@ -233,7 +260,10 @@ export function EtapaColaboradores({
             name={`${base}-quem`}
             checked={!todos}
             disabled={publicada && todos}
-            onChange={() => onMudar({ todos: false })}
+            onChange={() =>
+              // Começa sem ninguém marcado (só quem já respondeu fica).
+              onMudar({ todos: false, escolhidos: soQuemRespondeu() })
+            }
           />
           <span className="pesquisas__escolha-icone" aria-hidden="true">
             <IconeFiltrar tamanho={18} />
@@ -279,8 +309,15 @@ export function EtapaColaboradores({
                 className="pesquisas__chips"
                 aria-label="Pessoas por departamento"
               >
-                {porDepartamento.map(([d, n]) => (
+                {porDepartamento.map(([d, n], i) => (
                   <li key={d} className="pesquisas__chip">
+                    <span
+                      className="pesquisas__ponto"
+                      aria-hidden="true"
+                      style={{
+                        background: `var(${CORES_DOS_GRUPOS[i % CORES_DOS_GRUPOS.length]})`,
+                      }}
+                    />
                     {d}
                     <span className="pesquisas__contagem">{n}</span>
                   </li>
@@ -298,10 +335,7 @@ export function EtapaColaboradores({
             <CampoDeBusca
               rotulo="Buscar pessoa"
               valor={busca}
-              onMudar={(v) => {
-                setBusca(v);
-                setPagina(1);
-              }}
+              onMudar={setBusca}
             />
             {filtroLista(
               "departamento",
@@ -316,18 +350,37 @@ export function EtapaColaboradores({
             {filtroLista("area", "Área", grupos?.area ?? [])}
           </div>
           <div className="pesquisas__barra-selecao">
-            <span role="status">
-              {`${plural(qtdEscolhidos, "selecionado", "selecionados")} de ${plural(total, "colaborador", "colaboradores")}`}
+            <label className="pesquisas__marcacao">
+              <input
+                ref={geralRef}
+                type="checkbox"
+                aria-label="Marcar todos do filtro"
+                checked={todosMarcados}
+                disabled={total === 0}
+                onChange={(e) => marcarTodosDoFiltro(e.target.checked)}
+              />
+              <span role="status">
+                {`${plural(marcadosNoFiltro, "selecionado", "selecionados")} de ${plural(total, "colaborador", "colaboradores")}`}
+              </span>
+            </label>
+            <span className="pesquisas__acoes">
+              {total > 0 && !todosMarcados ? (
+                <Button
+                  variant="subtle"
+                  onClick={() => marcarTodosDoFiltro(true)}
+                >
+                  {`Selecionar todos os ${total}`}
+                </Button>
+              ) : null}
+              {Object.keys(escolhidos).length > 0 ? (
+                <Button
+                  variant="subtle"
+                  onClick={() => onMudar({ escolhidos: soQuemRespondeu() })}
+                >
+                  Limpar
+                </Button>
+              ) : null}
             </span>
-            {total > 0 ? (
-              <Button
-                variant="subtle"
-                disabled={selecionandoTodos}
-                onClick={() => void selecionarTodos()}
-              >
-                {`Selecionar todos os ${total}`}
-              </Button>
-            ) : null}
           </div>
           {falhou ? (
             <p className="pesquisas__erro" role="alert">
@@ -350,14 +403,16 @@ export function EtapaColaboradores({
                     <th scope="col">
                       <span className="pesquisas__so-leitor">Selecionar</span>
                     </th>
-                    <th scope="col">Nome</th>
+                    <th scope="col">Colaborador</th>
                     <th scope="col">Departamento</th>
+                    <th scope="col">Centro de custo</th>
+                    <th scope="col">Área</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pessoas.map((c) => {
                     const ja = respondeu.has(c.id);
-                    const cargo = cargoDe(c);
+                    const l = lotacaoDe(c);
                     return (
                       <tr
                         key={c.id}
@@ -378,14 +433,16 @@ export function EtapaColaboradores({
                             <span className="pesquisas__pessoa-textos">
                               <span>{c.nome}</span>
                               <span className="pesquisas__suave">
-                                {[cargo, ja ? "já respondeu" : null]
+                                {[l.cargo?.nome, ja ? "já respondeu" : null]
                                   .filter(Boolean)
                                   .join(" · ") || "—"}
                               </span>
                             </span>
                           </span>
                         </td>
-                        <td>{departamentoDe(c) ?? "—"}</td>
+                        <td>{l.departamento?.nome ?? "—"}</td>
+                        <td>{l.centroCusto?.nome ?? "—"}</td>
+                        <td>{l.area?.nome ?? "—"}</td>
                       </tr>
                     );
                   })}
@@ -393,16 +450,6 @@ export function EtapaColaboradores({
               </table>
             </div>
           )}
-          {pessoas && pessoas.length < total ? (
-            <div className="pesquisas__acoes">
-              <Button
-                variant="secondary"
-                onClick={() => setPagina((n) => n + 1)}
-              >
-                Carregar mais
-              </Button>
-            </div>
-          ) : null}
         </>
       )}
 
@@ -417,17 +464,22 @@ export function EtapaColaboradores({
         onFechar={() => setVerLista(false)}
       >
         <ul className="pesquisas__lista-pessoas">
-          {(time ?? []).map((c) => (
-            <li key={c.id}>
-              <Avatar texto={iniciaisDe(c.nome)} />
-              <span className="pesquisas__pessoa-textos">
-                <span>{c.nome}</span>
-                <span className="pesquisas__suave">
-                  {departamentoDe(c) ?? "Sem departamento"}
+          {(time ?? []).map((c) => {
+            const l = lotacaoDe(c);
+            return (
+              <li key={c.id}>
+                <Avatar texto={iniciaisDe(c.nome)} />
+                <span className="pesquisas__pessoa-textos">
+                  <span>{c.nome}</span>
+                  <span className="pesquisas__suave">
+                    {[l.cargo?.nome, l.departamento?.nome]
+                      .filter(Boolean)
+                      .join(" · ") || "Sem lotação"}
+                  </span>
                 </span>
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </Sheet>
     </div>

@@ -17,11 +17,19 @@ import { Dialog, IconButton, ListaDeEscolha } from "../../ui";
 import {
   IconeArrastar,
   IconeCopiar,
+  IconeCalendario,
+  IconeComentario,
   IconeDescer,
+  IconeDocumento,
+  IconeEstrela,
   IconeMais,
   IconeRemover,
+  IconeStatus,
   IconeSubir,
+  IconeSucesso,
+  IconeTempo,
 } from "../../ui/icones";
+import { useAvisar } from "./avisos";
 import {
   adicionarPergunta,
   adicionarSecao,
@@ -55,6 +63,37 @@ type MudancaDeConfig = {
   [K in keyof ConfigPergunta]?: ConfigPergunta[K] | undefined;
 };
 
+/** Os tipos agrupados (Texto, Escolha, Escala, Outros), cada um com ícone. */
+const GRUPOS_DE_TIPO: readonly {
+  readonly titulo: string;
+  readonly tipos: readonly TipoPergunta[];
+}[] = [
+  { titulo: "Texto", tipos: ["texto_curto", "paragrafo"] },
+  {
+    titulo: "Escolha",
+    tipos: ["escolha_unica", "multipla_escolha", "sim_nao"],
+  },
+  {
+    titulo: "Escala",
+    tipos: ["escala", "nota_0_10", "concordancia", "estrelas"],
+  },
+  { titulo: "Outros", tipos: ["data", "numero"] },
+];
+
+const ICONE_DO_TIPO: Readonly<Record<TipoPergunta, typeof IconeStatus>> = {
+  texto_curto: IconeComentario,
+  paragrafo: IconeDocumento,
+  escolha_unica: IconeSucesso,
+  multipla_escolha: IconeSucesso,
+  sim_nao: IconeSucesso,
+  escala: IconeStatus,
+  nota_0_10: IconeStatus,
+  concordancia: IconeStatus,
+  estrelas: IconeEstrela,
+  data: IconeCalendario,
+  numero: IconeTempo,
+};
+
 const SEMPRE = "__sempre__";
 const SEPARADOR = "::";
 
@@ -72,6 +111,7 @@ export function EditorDePerguntas({
   /** Erros a mostrar (só depois de tentar avançar). */
   readonly erros: Erros | null;
 }) {
+  const avisar = useAvisar();
   const [aberta, setAberta] = useState<string | null>(null);
   const [escolhendo, setEscolhendo] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<Secao | null>(null);
@@ -268,7 +308,14 @@ export function EditorDePerguntas({
                             variant="subtle"
                             onClick={() => {
                               if (aberta === p.id) setAberta(null);
+                              const antes = secoes;
                               onMudar(excluirPergunta(secoes, p.id));
+                              avisar("Pergunta excluída.", {
+                                acao: {
+                                  rotulo: "Desfazer",
+                                  onClick: () => onMudar([...antes]),
+                                },
+                              });
                             }}
                           />
                         </div>
@@ -297,20 +344,41 @@ export function EditorDePerguntas({
 
             {escolhendo === s.id ? (
               <div
-                className="pesquisas__tipos"
+                className="pesquisas__tipos pesquisas__tipos--agrupados"
                 role="group"
                 aria-label="Tipo da nova pergunta"
               >
-                {TIPOS_DE_PERGUNTA.map((t) => (
-                  <button
-                    key={t.valor}
-                    type="button"
-                    className="pesquisas__tipo"
-                    onClick={() => adicionar(s.id, t.valor)}
-                  >
-                    <span className="pesquisas__forte">{t.rotulo}</span>
-                    <span className="pesquisas__suave">{t.texto}</span>
-                  </button>
+                {GRUPOS_DE_TIPO.map((g) => (
+                  <div key={g.titulo} className="pesquisas__tipos-grupo">
+                    <p className="pesquisas__menu-titulo" aria-hidden="true">
+                      {g.titulo}
+                    </p>
+                    {g.tipos.map((valor) => {
+                      const t = TIPOS_DE_PERGUNTA.find(
+                        (x) => x.valor === valor,
+                      )!;
+                      const Icone = ICONE_DO_TIPO[valor];
+                      return (
+                        <button
+                          key={valor}
+                          type="button"
+                          className="pesquisas__tipo"
+                          onClick={() => adicionar(s.id, valor)}
+                        >
+                          <span
+                            className="pesquisas__tipo-icone"
+                            aria-hidden="true"
+                          >
+                            <Icone tamanho={16} />
+                          </span>
+                          <span className="pesquisas__tipo-textos">
+                            <span className="pesquisas__forte">{t.rotulo}</span>
+                            <span className="pesquisas__suave">{t.texto}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ))}
               </div>
             ) : null}
