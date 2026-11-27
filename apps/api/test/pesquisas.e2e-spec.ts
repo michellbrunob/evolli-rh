@@ -731,6 +731,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         empresa: "Empresa PESA",
         nome: "Pesquisa de clima sintética",
         boasVindas: "Leva poucos minutos.",
+        modelo: "clima",
         identificacao: "identificada",
         totalPerguntas: 5,
         minutosEstimados: 2,

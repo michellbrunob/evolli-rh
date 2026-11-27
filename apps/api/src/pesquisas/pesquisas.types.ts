@@ -294,8 +294,11 @@ export interface PesquisaPublica {
   empresa: string;
   nome: string;
   boasVindas: string | null;
+  /** O modelo (a personalizada mostra uma seção por vez). */
+  modelo: Modelo;
   identificacao: Identificacao;
   totalPerguntas: number;
+  /** 20 s por pergunta, arredondado ao minuto mais próximo; mínimo 1. */
   minutosEstimados: number;
   secoes: Secao[];
   /** Anônima com separação: o que escolher antes das perguntas. */

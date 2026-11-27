@@ -115,9 +115,12 @@ export function motivoIndisponivel(
   }
 }
 
-/** Cerca de 20 segundos por pergunta; no mínimo 1 minuto. */
+/**
+ * 20 segundos por pergunta, arredondado ao minuto mais próximo; no mínimo
+ * 1 minuto. A mesma regra da tela.
+ */
 export function minutosEstimados(totalPerguntas: number): number {
-  return Math.max(1, Math.ceil(totalPerguntas / 3));
+  return Math.max(1, Math.round((totalPerguntas * 20) / 60));
 }
 
 /** Identificada e confidencial validam a pessoa (CPF + nascimento). */

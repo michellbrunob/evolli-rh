@@ -109,6 +109,7 @@ export class PesquisaPublicaService {
       empresa: p.empresa.nome,
       nome: p.nome,
       boasVindas: p.boasVindas,
+      modelo: p.modelo,
       identificacao: p.identificacao,
       totalPerguntas: total,
       minutosEstimados: minutosEstimados(total),

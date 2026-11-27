@@ -315,9 +315,10 @@ interface PesquisaPublica {
   empresa: string;
   nome: string;
   boasVindas: string | null;
+  modelo: Modelo; // a personalizada mostra uma seção por vez
   identificacao: Identificacao;
   totalPerguntas: number;
-  minutosEstimados: number;
+  minutosEstimados: number; // 20 s por pergunta, arredondado ao minuto mais próximo; mínimo 1
   secoes: Secao[];
 }
 type AberturaPublica =
