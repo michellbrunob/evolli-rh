@@ -19,7 +19,7 @@ import {
   totalDePerguntas,
 } from "./modelosDePesquisa";
 import { PesquisasModulo } from "./PesquisasModulo";
-import { RESUMO, lista, servicoFalso } from "./dadosDeTeste";
+import { DETALHE, RESUMO, lista, servicoFalso } from "./dadosDeTeste";
 
 const abrirMenu = (nome: string) =>
   fireEvent.pointerDown(screen.getByRole("button", { name: nome }), {
@@ -96,12 +96,53 @@ describe("Lista de pesquisas", () => {
     expect(segunda).toHaveTextContent("02/11/2026");
   });
 
+  it("linha: ícone e cor do modelo, status com ponto e filtros numa linha só", async () => {
+    render(
+      <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
+    );
+    const tabela = await screen.findByRole("table", { name: "Pesquisas" });
+    const [, pulso, clima] = within(tabela).getAllByRole("row");
+    // Cada linha leva o ícone do próprio modelo, na cor dele.
+    const corDe = (linha: HTMLElement) =>
+      (
+        linha.querySelector(".pesquisas__icone-modelo") as HTMLElement
+      ).style.getPropertyValue("--cor-do-modelo");
+    expect(corDe(pulso!)).not.toBe(corDe(clima!));
+    // Status em pílula com ponto colorido (nada de selo com ícone).
+    const status = clima!.querySelector(".pesquisas__status--ativa")!;
+    expect(status).toHaveTextContent("Ativa");
+    expect(status.querySelector(".pesquisas__ponto")).not.toBeNull();
+    expect(
+      pulso!.querySelector(".pesquisas__status--pausada"),
+    ).toHaveTextContent("Pausada");
+    // Pílulas, busca e Tipo no mesmo contêiner de linha.
+    const linha = document.querySelector(".pesquisas__filtros--linha")!;
+    expect(
+      within(linha as HTMLElement).getByRole("group", { name: "Status" }),
+    ).toBeInTheDocument();
+    expect(
+      within(linha as HTMLElement).getByRole("searchbox", {
+        name: "Buscar pesquisa",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(linha as HTMLElement).getByRole("button", { name: /^Tipo/ }),
+    ).toBeInTheDocument();
+    // O "⋯" com ícone em cada ação.
+    abrirMenu("Ações de Clima de novembro");
+    for (const item of await screen.findAllByRole("menuitem"))
+      expect(item.querySelector("svg")).not.toBeNull();
+  });
+
   it("ordenar por Criada em inverte a ordem", async () => {
     render(
       <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
     );
     const tabela = await screen.findByRole("table", { name: "Pesquisas" });
-    fireEvent.click(screen.getByRole("button", { name: /Criada em/ }));
+    const ordenar = screen.getByRole("button", { name: /Criada em/ });
+    expect(ordenar.closest("th")).toHaveAttribute("aria-sort", "descending");
+    fireEvent.click(ordenar);
+    expect(ordenar.closest("th")).toHaveAttribute("aria-sort", "ascending");
     expect(within(tabela).getAllByRole("row")[1]).toHaveTextContent(
       "Clima de novembro",
     );
@@ -135,10 +176,20 @@ describe("Lista de pesquisas", () => {
       <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
     );
     const tabela = await screen.findByRole("table", { name: "Pesquisas" });
-    fireEvent.click(screen.getByRole("combobox", { name: "Tipo" }));
-    fireEvent.click(screen.getByRole("option", { name: "Pulso" }));
+    // Botão com ícone na mesma linha da busca; abre os modelos presentes.
+    fireEvent.click(screen.getByRole("button", { name: /^Tipo/ }));
+    const modelos = screen.getByRole("group", { name: "Modelos" });
+    expect(
+      within(modelos)
+        .getAllByRole("checkbox")
+        .map((c) => c.closest("label")!.textContent),
+    ).toEqual(["Clima", "Pulso"]);
+    fireEvent.click(within(modelos).getByRole("checkbox", { name: "Pulso" }));
     expect(within(tabela).getAllByRole("row")).toHaveLength(2);
     expect(tabela).toHaveTextContent("Pulso anônimo");
+    expect(screen.getByRole("button", { name: /^Tipo/ })).toHaveTextContent(
+      "1",
+    );
   });
 
   it("a linha inteira abre os resultados", async () => {
@@ -162,13 +213,21 @@ describe("Lista de pesquisas", () => {
     render(<PesquisasModulo servico={servico} podeEditar />);
     await screen.findByRole("table", { name: "Pesquisas" });
     abrirMenu("Ações de Clima de novembro");
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Excluir" }));
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Excluir pesquisa" }),
+    );
     const janela = await screen.findByRole("dialog", {
       name: "Excluir Clima de novembro?",
     });
     expect(janela).toHaveTextContent("o link deixa de funcionar");
-    expect(janela).toHaveTextContent("8 respostas");
-    expect(janela).toHaveTextContent("Não é possível desfazer");
+    expect(janela).toHaveTextContent("não é possível desfazer");
+    expect(within(janela).getByLabelText("O que se perde")).toHaveTextContent(
+      "Respostas8 respostas",
+    );
+    // Ainda ativa: sugere finalizar no lugar de excluir.
+    expect(
+      within(janela).getByRole("button", { name: "Finalizar pesquisa" }),
+    ).toBeInTheDocument();
     expect(servico.excluirPesquisa).not.toHaveBeenCalled();
     fireEvent.click(
       within(janela).getByRole("button", { name: "Excluir pesquisa" }),
@@ -176,9 +235,9 @@ describe("Lista de pesquisas", () => {
     await waitFor(() =>
       expect(servico.excluirPesquisa).toHaveBeenCalledWith("p-1"),
     );
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Pesquisa excluída.",
-    );
+    expect(
+      await screen.findByText('"Clima de novembro" foi excluída.'),
+    ).toBeInTheDocument();
   });
 
   it("menu da linha: editar, duplicar e copiar link", async () => {
@@ -198,7 +257,7 @@ describe("Lista de pesquisas", () => {
       "Editar pesquisa",
       "Duplicar",
       "Copiar link",
-      "Excluir",
+      "Excluir pesquisa",
     ]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Copiar link" }));
     await waitFor(() =>
@@ -206,14 +265,33 @@ describe("Lista de pesquisas", () => {
         expect.stringMatching(/#\/p\/token-de-teste$/),
       ),
     );
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Link copiado.",
-    );
+    expect(await screen.findByText("Link copiado.")).toBeInTheDocument();
     abrirMenu("Ações de Clima de novembro");
     fireEvent.click(await screen.findByRole("menuitem", { name: "Duplicar" }));
-    await waitFor(() =>
-      expect(servico.duplicarPesquisa).toHaveBeenCalledWith("p-1"),
+    // Confirma na gaveta, escolhendo outra empresa: a lista continua.
+    const gaveta = await screen.findByRole("dialog", {
+      name: "Duplicar pesquisa",
+    });
+    fireEvent.click(
+      await within(gaveta).findByRole("combobox", {
+        name: "Empresa de destino",
+      }),
     );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Empresa Beta" }),
+    );
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Confirmar duplicação" }),
+    );
+    await waitFor(() =>
+      expect(servico.duplicarPesquisa).toHaveBeenCalledWith("p-1", "e-2"),
+    );
+    expect(
+      await screen.findByText("Pesquisa duplicada com sucesso!"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Pesquisas" }),
+    ).toBeInTheDocument();
   });
 
   it("master técnico só lê: sem Nova pesquisa e sem menu de ações", async () => {
@@ -293,6 +371,9 @@ describe("Galeria de modelos", () => {
   it("é o passo 1 de 4; cada card mostra a quantidade do modelo", async () => {
     await abrirGaleria();
     expect(screen.getByText("Passo 1 de 4")).toBeInTheDocument();
+    expect(document.querySelectorAll(".pesquisas__pontos > span")).toHaveLength(
+      4,
+    );
     expect(screen.getAllByRole("article")).toHaveLength(
       MODELOS_DE_PESQUISA.length,
     );
@@ -474,6 +555,15 @@ describe("Página da pesquisa personalizada", () => {
     };
     const servico = servicoFalso({
       listarPesquisas: vi.fn(() => Promise.resolve(lista([RESUMO, rascunho]))),
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...DETALHE,
+          id: "p-pr",
+          nome: "Rascunho aberto",
+          modelo: "personalizada" as const,
+          status: "rascunho" as const,
+        }),
+      ),
     });
     await abrirEntrada(servico);
     const aviso = await screen.findByRole("region", {
@@ -486,6 +576,12 @@ describe("Página da pesquisa personalizada", () => {
     await waitFor(() =>
       expect(servico.obterPesquisa).toHaveBeenCalledWith("p-pr"),
     );
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Nova pesquisa personalizada",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("copiar uma pesquisa lista só personalizadas; vazio explica", async () => {
@@ -505,10 +601,112 @@ describe("Página da pesquisa personalizada", () => {
     await abrirEntrada();
     fireEvent.click(screen.getByRole("button", { name: /Começar em branco/ }));
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Nova pesquisa" }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Nova pesquisa personalizada",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pré-visualizar" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Etapas do cadastro" }),
     ).toHaveTextContent("Revisão");
+  });
+});
+
+describe("Rotas do módulo", () => {
+  it("cada tela pede a própria rota; o rascunho criado troca a rota no lugar", async () => {
+    const servico = comLista([RESUMO]);
+    const onNavegar = vi.fn();
+    const { rerender } = render(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={{ tela: "lista" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Nova pesquisa/ }),
+    );
+    expect(onNavegar).toHaveBeenLastCalledWith({ tela: "nova" }, undefined);
+    rerender(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={{ tela: "modelo", modelo: "enps" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Nova pesquisa eNPS",
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(onNavegar).toHaveBeenLastCalledWith(
+        { tela: "rascunho", id: "p-novo" },
+        { substituir: true },
+      ),
+    );
+    // A rota passa ao rascunho: o mesmo assistente continua (sem recarregar).
+    rerender(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={{ tela: "rascunho", id: "p-novo" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Nova pesquisa eNPS" }),
+    ).toBeInTheDocument();
+    expect(servico.obterPesquisa).not.toHaveBeenCalledWith("p-novo");
+  });
+
+  it("resultados abrem direto pela rota, com a aba", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({ ...DETALHE, identificacao: "identificada" as const }),
+      ),
+    });
+    render(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={{ tela: "resultados", id: "p-1", aba: "respostas" }}
+        onNavegar={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("table", { name: "Respostas" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sem empresa ativa (acesso global): pede a escolha e não consulta nada", async () => {
+    const servico = comLista([RESUMO]);
+    render(<PesquisasModulo servico={servico} podeEditar={false} semEmpresa />);
+    expect(
+      screen.getByText(
+        "Escolha uma empresa ativa no menu para ver as pesquisas.",
+      ),
+    ).toBeInTheDocument();
+    expect(servico.listarPesquisas).not.toHaveBeenCalled();
+  });
+
+  it("403 ao listar também pede a escolha da empresa", async () => {
+    const servico = servicoFalso({
+      listarPesquisas: vi.fn(() =>
+        Promise.reject(Object.assign(new Error("proibido"), { status: 403 })),
+      ),
+    });
+    render(<PesquisasModulo servico={servico} podeEditar={false} />);
+    expect(
+      await screen.findByText(
+        "Escolha uma empresa ativa no menu para ver as pesquisas.",
+      ),
+    ).toBeInTheDocument();
   });
 });

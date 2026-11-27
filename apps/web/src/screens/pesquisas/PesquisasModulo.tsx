@@ -1,41 +1,57 @@
 /**
  * T216 — módulo Pesquisas (menu Pessoas › Pesquisas).
  *
- * - Sem pesquisas: "Crie sua primeira pesquisa", os três passos e a galeria.
- * - Com pesquisas: pílulas de status, busca ("/"), filtro por tipo, a tabela
- *   (a linha inteira abre os resultados) e o rodapé da tabela.
- * - "Nova pesquisa" abre a galeria como passo 1; o modelo pronto abre o
- *   assistente de 3 etapas; a personalizada abre a página de entrada e o
- *   assistente de 5 etapas. Rascunhos não entram na lista: retomam-se pelo
- *   próprio modelo (ou pelo aviso da página da personalizada).
+ * Cada tela tem rota própria (`rotasDePesquisas.ts`): lista, galeria (passo
+ * 1), sobre o modelo, página da personalizada, assistentes, rascunho,
+ * resultados (com a aba), editar, resposta individual e prévia. O shell
+ * entrega a rota (`rota`) e grava a navegação (`onNavegar`); sem shell (nos
+ * testes), o módulo guarda a rota sozinho.
  *
- * As subtelas vivem dentro do módulo (a rota é `#/pesquisas`). RH e DP
- * operam; o master técnico só lê. O servidor decide cada pedido.
+ * - Sem pesquisas: "Crie sua primeira pesquisa", os três passos e a galeria.
+ * - Com pesquisas: pílulas de status, busca ("/"), filtro de modelos, a
+ *   tabela (a linha inteira abre os resultados) e o rodapé da tabela.
+ * - Rascunhos não entram na lista: retomam-se pelo próprio modelo (ou pelo
+ *   aviso da página da personalizada).
+ *
+ * RH e DP operam; o master técnico só lê; sem empresa ativa (acesso global),
+ * a tela pede que se escolha uma empresa.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ModeloPesquisa,
   PesquisaDetalhe,
   PesquisaResumo,
   StatusPesquisa,
 } from "../../api/pesquisasClient";
-import { Button, FormActions, StatusBadge } from "../../components";
+import { useTrilhaComplementar } from "../../app/trilhaComplementar";
+import { Button } from "../../components";
 import { diaCivilDeHoje } from "../../format/data";
 import { plural } from "../../format/plural";
 import {
-  Dialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
-  ListaDeEscolha,
 } from "../../ui";
-import { IconeMais, IconeMaisAcoes, IconeVoltar } from "../../ui/icones";
+import {
+  IconeAbrir,
+  IconeCopiar,
+  IconeEditar,
+  IconeFiltrar,
+  IconeLink,
+  IconeMais,
+  IconeMaisAcoes,
+  IconeRemover,
+  IconeVer,
+  IconeVoltar,
+} from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
+import { GavetaDeDuplicar, JanelaDeExclusao } from "./acoesDaPesquisa";
 import { AssistenteDePesquisa } from "./AssistenteDePesquisa";
 import { AssistenteDoModelo } from "./AssistenteDoModelo";
+import { ProvedorDeAvisos, useAvisar } from "./avisos";
 import {
   CampoDeBusca,
   ICONE_DA_IDENTIFICACAO,
@@ -43,23 +59,28 @@ import {
   PassosIniciais,
   Pilulas,
 } from "./componentes";
+import { EditarPesquisa } from "./EditarPesquisa";
 import { EntradaPersonalizada } from "./EntradaPersonalizada";
-import type { EstadoDaPesquisa } from "./estadoDaPesquisa";
+import { estadoDaCopia } from "./estadoDaPesquisa";
 import { GaleriaDeModelos, semAcento } from "./GaleriaDeModelos";
-import { ehModeloPronto, MODELOS_DE_PESQUISA } from "./modelosDePesquisa";
+import { ehModeloPronto, modeloDaGaleria } from "./modelosDePesquisa";
+import { PreviaDaPesquisa } from "./PreviaDaPesquisa";
 import { esquecerRascunho } from "./rascunhosLocais";
 import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
+import {
+  ROTA_DA_LISTA,
+  rotuloDaTrilha,
+  type RotaDePesquisas,
+} from "./rotasDePesquisas";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { SobreOModelo } from "./SobreOModelo";
 import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
   ROTULO_DO_STATUS,
-  TOM_DO_STATUS,
   copiarLink,
   dataDoInstante,
-  enderecoDoLink,
   participacao,
   podeEditarPesquisa,
 } from "./textosDasPesquisas";
@@ -70,215 +91,385 @@ export { PESQUISAS_TITULO_ID };
 
 const TAMANHO_DA_LISTA = 100;
 
-type Tela =
-  | { readonly tipo: "lista" }
-  | { readonly tipo: "galeria" }
-  | { readonly tipo: "sobre"; readonly id: string; readonly volta: Tela }
-  | { readonly tipo: "personalizada" }
+type AssistenteAberto =
+  | { readonly id?: string; readonly tipo: "modelo"; readonly modelo: string }
   | {
-      readonly tipo: "modelo";
-      readonly modeloId: string;
-      readonly base?: PesquisaDetalhe;
-    }
-  | {
+      readonly id?: string;
       readonly tipo: "aberta";
       readonly roteiro?: string;
-      readonly inicial?: EstadoDaPesquisa;
-      readonly base?: PesquisaDetalhe;
-    }
-  | { readonly tipo: "resultados"; readonly id: string }
-  | {
-      readonly tipo: "resposta";
-      readonly pesquisaId: string;
-      readonly respostaId: string;
+      readonly inicial?: ReturnType<typeof estadoDaCopia>;
     };
 
-export function PesquisasModulo({
-  servico,
-  podeEditar,
-}: {
+export interface OpcoesDaNavegacao {
+  /** Troca a entrada atual do histórico (sem empilhar). */
+  readonly substituir?: boolean;
+}
+
+export function PesquisasModulo(props: {
   readonly servico: ServicoDePesquisas;
   /** RH e DP: criam, editam, publicam, mudam status e excluem. */
   readonly podeEditar: boolean;
+  /** A rota da URL (o shell entrega); sem ela, o módulo guarda a sua. */
+  readonly rota?: RotaDePesquisas;
+  readonly onNavegar?: (
+    rota: RotaDePesquisas,
+    opcoes?: OpcoesDaNavegacao,
+  ) => void;
+  /** Acesso global, sem empresa ativa: nada é consultado. */
+  readonly semEmpresa?: boolean;
 }) {
-  const [tela, setTela] = useState<Tela>({ tipo: "lista" });
-  const [aviso, setAviso] = useState<string | null>(null);
+  return (
+    <ProvedorDeAvisos>
+      <Modulo {...props} />
+    </ProvedorDeAvisos>
+  );
+}
+
+function Modulo({
+  servico,
+  podeEditar,
+  rota,
+  onNavegar,
+  semEmpresa = false,
+}: {
+  readonly servico: ServicoDePesquisas;
+  readonly podeEditar: boolean;
+  readonly rota?: RotaDePesquisas;
+  readonly onNavegar?: (
+    rota: RotaDePesquisas,
+    opcoes?: OpcoesDaNavegacao,
+  ) => void;
+  readonly semEmpresa?: boolean;
+}) {
+  const avisar = useAvisar();
+  const [rotaLocal, setRotaLocal] = useState<RotaDePesquisas>(ROTA_DA_LISTA);
+  const atual = rota ?? rotaLocal;
   const hoje = diaCivilDeHoje();
+  /**
+   * O assistente aberto: ao gravar o primeiro rascunho, a rota passa a
+   * `<id>/rascunho`, e o mesmo assistente continua na tela (sem recarregar).
+   */
+  const abertoRef = useRef<AssistenteAberto | null>(null);
+  /** Modelo já conferido (sem rascunho dele para retomar). */
+  const [conferido, setConferido] = useState<string | null>(null);
+  /** A pesquisa copiada (`copia/<id>`), já carregada. */
+  const [copia, setCopia] = useState<{
+    id: string;
+    inicial: ReturnType<typeof estadoDaCopia>;
+  } | null>(null);
+  const [falhaAoAbrir, setFalhaAoAbrir] = useState(false);
 
-  const irPara = useCallback((t: Tela, mensagem?: string) => {
-    setTela(t);
-    setAviso(mensagem ?? null);
-    requestAnimationFrame?.(() =>
-      document.getElementById(PESQUISAS_TITULO_ID)?.focus(),
-    );
-  }, []);
-
-  /** Editar: o assistente do tipo da pesquisa, com a pesquisa carregada. */
-  async function abrirEdicao(id: string) {
-    try {
-      const base = await servico.obterPesquisa(id);
-      irPara(
-        ehModeloPronto(base.modelo)
-          ? { tipo: "modelo", modeloId: base.modelo, base }
-          : { tipo: "aberta", base },
+  const irPara = useCallback(
+    (r: RotaDePesquisas, opcoes?: OpcoesDaNavegacao) => {
+      if (onNavegar) onNavegar(r, opcoes);
+      else setRotaLocal(r);
+      requestAnimationFrame?.(() =>
+        document.getElementById(PESQUISAS_TITULO_ID)?.focus(),
       );
-    } catch {
-      setAviso("Não foi possível abrir a pesquisa. Tente de novo.");
-    }
-  }
+    },
+    [onNavegar],
+  );
 
-  /** Usar um modelo: retoma o rascunho dele, se houver; senão, começa um. */
-  async function usarModelo(id: string) {
-    if (id === "personalizada") {
-      irPara({ tipo: "personalizada" });
-      return;
+  const voltarNaTrilha = useCallback(() => {
+    switch (atual.tela) {
+      case "resposta":
+      case "editar":
+        irPara({ tela: "resultados", id: atual.id, aba: "geral" });
+        break;
+      case "aberta":
+      case "copia":
+        irPara({ tela: "personalizada" });
+        break;
+      default:
+        irPara(ROTA_DA_LISTA);
     }
-    try {
-      const rascunhos = await servico.listarPesquisas({
+  }, [atual, irPara]);
+  useTrilhaComplementar(rotuloDaTrilha(atual), voltarNaTrilha);
+
+  const telaAtual = atual.tela;
+  const modeloAtual = atual.tela === "modelo" ? atual.modelo : null;
+  const copiaAtual = atual.tela === "copia" ? atual.id : null;
+
+  // Fora dos assistentes, esquece o que estava aberto.
+  useEffect(() => {
+    if (!["modelo", "aberta", "copia", "rascunho"].includes(telaAtual)) {
+      abertoRef.current = null;
+      setConferido(null);
+      setCopia(null);
+    }
+    setFalhaAoAbrir(false);
+  }, [telaAtual]);
+
+  // Modelo pronto: retoma o rascunho dele, se houver.
+  useEffect(() => {
+    if (modeloAtual === null || semEmpresa) return;
+    let vivo = true;
+    Promise.resolve(
+      servico.listarPesquisas({
         status: "rascunho",
         tamanhoPagina: TAMANHO_DA_LISTA,
+      }),
+    )
+      .then((r) => {
+        if (!vivo) return;
+        const doModelo = (r?.itens ?? []).find(
+          (p) => p.modelo === (modeloAtual as ModeloPesquisa),
+        );
+        if (doModelo)
+          irPara({ tela: "rascunho", id: doModelo.id }, { substituir: true });
+        else setConferido(modeloAtual);
+      })
+      .catch(() => {
+        if (vivo) setConferido(modeloAtual);
       });
-      const doModelo = (rascunhos?.itens ?? []).find(
-        (p) => p.modelo === (id as ModeloPesquisa),
-      );
-      if (doModelo) {
-        const base = await servico.obterPesquisa(doModelo.id);
-        irPara({ tipo: "modelo", modeloId: id, base });
-        return;
-      }
-    } catch {
-      /* sem a lista de rascunhos, começa do zero */
-    }
-    irPara({ tipo: "modelo", modeloId: id });
+    return () => {
+      vivo = false;
+    };
+    // Uma consulta por modelo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servico, modeloAtual, semEmpresa]);
+
+  // Cópia de uma personalizada: carrega a origem uma vez.
+  useEffect(() => {
+    if (copiaAtual === null || semEmpresa) return;
+    let vivo = true;
+    Promise.resolve(servico.obterPesquisa(copiaAtual))
+      .then((d) => {
+        if (vivo) setCopia({ id: copiaAtual, inicial: estadoDaCopia(d, hoje) });
+      })
+      .catch(() => {
+        if (vivo) setFalhaAoAbrir(true);
+      });
+    return () => {
+      vivo = false;
+    };
+    // Uma consulta por cópia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servico, copiaAtual, semEmpresa]);
+
+  if (semEmpresa) {
+    return (
+      <div className="pesquisas">
+        <header className="pesquisas__cabecalho">
+          <h1
+            id={PESQUISAS_TITULO_ID}
+            className="pesquisas__titulo"
+            tabIndex={-1}
+          >
+            Pesquisas
+          </h1>
+        </header>
+        <div className="pesquisas__nota" role="status">
+          <p>Escolha uma empresa ativa no menu para ver as pesquisas.</p>
+          <p className="pesquisas__suave">
+            Sem empresa ativa, pesquisas de empresas diferentes ficariam
+            misturadas; por isso nada é consultado.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  const voltarAoFim = (mensagem?: string) =>
-    irPara({ tipo: "lista" }, mensagem);
+  const abrirResultados = (id: string, substituir = false) => {
+    esquecerRascunho(id);
+    irPara({ tela: "resultados", id, aba: "geral" }, { substituir });
+  };
+  const aoCriarRascunho = (aberto: AssistenteAberto) => (id: string) => {
+    abertoRef.current = { ...aberto, id };
+    irPara({ tela: "rascunho", id }, { substituir: true });
+  };
+  const editarConformeStatus = (d: PesquisaDetalhe) =>
+    irPara(
+      d.status === "rascunho"
+        ? { tela: "rascunho", id: d.id }
+        : { tela: "editar", id: d.id },
+    );
 
-  switch (tela.tipo) {
+  const assistenteDoModelo = (modeloId: string, base?: PesquisaDetalhe) => (
+    <AssistenteDoModelo
+      key="assistente-do-modelo"
+      servico={servico}
+      modeloId={modeloId}
+      {...(base ? { base } : {})}
+      hoje={hoje}
+      onRascunhoCriado={aoCriarRascunho({ tipo: "modelo", modelo: modeloId })}
+      onCancelar={(mensagem) => {
+        irPara({ tela: "nova" });
+        if (mensagem) avisar(mensagem);
+      }}
+      onConcluir={() => irPara(ROTA_DA_LISTA)}
+      onVerResultados={(id) => abrirResultados(id)}
+      onEditarGerada={(d) => irPara({ tela: "editar", id: d.id })}
+    />
+  );
+  const assistenteAberto = (x: {
+    roteiro?: string | undefined;
+    inicial?: ReturnType<typeof estadoDaCopia> | undefined;
+    base?: PesquisaDetalhe;
+  }) => (
+    <AssistenteDePesquisa
+      key="assistente-aberto"
+      servico={servico}
+      hoje={hoje}
+      {...(x.base ? { base: x.base } : {})}
+      {...(x.inicial ? { inicial: x.inicial } : {})}
+      {...(x.roteiro && x.roteiro !== "branco" ? { modelo: x.roteiro } : {})}
+      onRascunhoCriado={aoCriarRascunho({
+        tipo: "aberta",
+        ...(x.roteiro ? { roteiro: x.roteiro } : {}),
+        ...(x.inicial ? { inicial: x.inicial } : {}),
+      })}
+      onSair={(mensagem) => {
+        irPara({ tela: "personalizada" });
+        if (mensagem) avisar(mensagem);
+      }}
+      onConcluir={() => irPara(ROTA_DA_LISTA)}
+      onVerResultados={(id) => abrirResultados(id)}
+      onEditarGerada={(d) => irPara({ tela: "editar", id: d.id })}
+    />
+  );
+
+  const carregando = (rotulo: string) =>
+    falhaAoAbrir ? (
+      <p className="pesquisas__erro" role="alert">
+        Não foi possível abrir a pesquisa.
+      </p>
+    ) : (
+      <Esqueleto rotulo={rotulo} linhas={4} />
+    );
+  const jaAberto = abertoRef.current;
+
+  switch (atual.tela) {
     case "modelo":
+      return conferido === atual.modelo
+        ? assistenteDoModelo(atual.modelo)
+        : carregando("Abrindo o modelo…");
+    case "rascunho":
+      if (jaAberto?.id === atual.id) {
+        // O assistente aberto acabou de criar este rascunho: continua o mesmo.
+        return jaAberto.tipo === "modelo"
+          ? assistenteDoModelo(jaAberto.modelo)
+          : assistenteAberto({
+              roteiro: jaAberto.roteiro,
+              inicial: jaAberto.inicial,
+            });
+      }
       return (
-        <AssistenteDoModelo
-          key={tela.base?.id ?? tela.modeloId}
+        <CarregarPesquisa
+          key={`rascunho-${atual.id}`}
           servico={servico}
-          modeloId={tela.modeloId}
-          {...(tela.base ? { base: tela.base } : {})}
-          hoje={hoje}
-          onCancelar={(mensagem) =>
-            tela.base && tela.base.status !== "rascunho"
-              ? irPara({ tipo: "resultados", id: tela.base.id })
-              : irPara({ tipo: "galeria" }, mensagem)
-          }
-          onConcluir={() => voltarAoFim()}
-          onVerResultados={(id, mensagem) => {
-            esquecerRascunho(id);
-            irPara({ tipo: "resultados", id }, mensagem);
-          }}
-          onEditarGerada={(base) =>
-            irPara({ tipo: "modelo", modeloId: base.modelo, base })
+          id={atual.id}
+          render={(d) =>
+            d.status !== "rascunho" ? (
+              <Redirecionar
+                para={() =>
+                  irPara({ tela: "editar", id: d.id }, { substituir: true })
+                }
+              />
+            ) : ehModeloPronto(d.modelo) ? (
+              assistenteDoModelo(d.modelo, d)
+            ) : (
+              assistenteAberto({ base: d })
+            )
           }
         />
       );
     case "aberta":
-      return (
-        <AssistenteDePesquisa
-          key={tela.base?.id ?? tela.roteiro ?? "aberta"}
-          servico={servico}
-          hoje={hoje}
-          {...(tela.base ? { base: tela.base } : {})}
-          {...(tela.inicial ? { inicial: tela.inicial } : {})}
-          {...(tela.roteiro ? { modelo: tela.roteiro } : {})}
-          onSair={(mensagem) =>
-            tela.base && tela.base.status !== "rascunho"
-              ? irPara({ tipo: "resultados", id: tela.base.id }, mensagem)
-              : irPara({ tipo: "personalizada" }, mensagem)
-          }
-          onConcluir={() => voltarAoFim()}
-          onVerResultados={(id, mensagem) => {
-            esquecerRascunho(id);
-            irPara({ tipo: "resultados", id }, mensagem);
-          }}
-          onEditarGerada={(base) => irPara({ tipo: "aberta", base })}
-        />
-      );
+      return assistenteAberto({ roteiro: atual.roteiro });
+    case "copia":
+      return copia?.id === atual.id
+        ? assistenteAberto({ inicial: copia.inicial })
+        : carregando("Copiando a pesquisa…");
     case "personalizada":
       return (
         <EntradaPersonalizada
           servico={servico}
-          aviso={aviso}
-          onVoltar={() => irPara({ tipo: "galeria" })}
-          onComecar={(x) => irPara({ tipo: "aberta", ...x })}
-          onSobre={(id) =>
-            irPara({ tipo: "sobre", id, volta: { tipo: "personalizada" } })
+          onVoltar={() => irPara({ tela: "nova" })}
+          onComecar={(x) =>
+            x.base
+              ? irPara({ tela: "rascunho", id: x.base.id })
+              : irPara({ tela: "aberta", roteiro: x.roteiro ?? "branco" })
           }
+          onCopiar={(id) => irPara({ tela: "copia", id })}
+          onContinuar={(id) => irPara({ tela: "rascunho", id })}
+          onSobre={(id) => irPara({ tela: "sobre", modelo: id })}
         />
       );
     case "sobre":
       return (
         <SobreOModelo
-          id={tela.id}
-          onVoltar={() => irPara(tela.volta)}
+          id={atual.modelo}
+          onVoltar={() => irPara({ tela: "nova" })}
           onUsar={(id) =>
-            tela.volta.tipo === "personalizada"
-              ? irPara({ tipo: "aberta", roteiro: id })
-              : void usarModelo(id)
+            modeloDaGaleria(id).modelo === "personalizada"
+              ? irPara(
+                  id === "personalizada"
+                    ? { tela: "personalizada" }
+                    : { tela: "aberta", roteiro: id },
+                )
+              : irPara({ tela: "modelo", modelo: id })
           }
         />
       );
     case "resultados":
       return (
         <ResultadosDaPesquisa
-          key={tela.id}
+          key={atual.id}
           servico={servico}
-          pesquisaId={tela.id}
+          pesquisaId={atual.id}
           podeEditar={podeEditar}
-          avisoInicial={aviso}
-          onVoltar={(mensagem) => voltarAoFim(mensagem)}
-          onEditar={(base) =>
+          abaInicial={atual.aba}
+          onTrocarAba={(aba) =>
             irPara(
-              ehModeloPronto(base.modelo)
-                ? { tipo: "modelo", modeloId: base.modelo, base }
-                : { tipo: "aberta", base },
+              { tela: "resultados", id: atual.id, aba },
+              { substituir: true },
             )
           }
-          onDuplicada={(copia) =>
-            irPara(
-              ehModeloPronto(copia.modelo)
-                ? { tipo: "modelo", modeloId: copia.modelo, base: copia }
-                : { tipo: "aberta", base: copia },
-              "Cópia criada como rascunho.",
-            )
-          }
-          onSobreOModelo={(id) =>
-            irPara({
-              tipo: "sobre",
-              id,
-              volta: { tipo: "resultados", id: tela.id },
-            })
-          }
+          onVoltar={() => irPara(ROTA_DA_LISTA)}
+          onEditar={editarConformeStatus}
+          onDuplicada={(copia) => abrirResultados(copia.id)}
+          onSobreOModelo={(modelo) => irPara({ tela: "sobre", modelo })}
           onAbrirResposta={(respostaId) =>
-            irPara({ tipo: "resposta", pesquisaId: tela.id, respostaId })
+            irPara({ tela: "resposta", id: atual.id, respostaId })
+          }
+        />
+      );
+    case "editar":
+      return (
+        <EditarPesquisa
+          key={atual.id}
+          servico={servico}
+          pesquisaId={atual.id}
+          hoje={hoje}
+          onVoltar={() =>
+            irPara({ tela: "resultados", id: atual.id, aba: "geral" })
+          }
+          onSalvo={(d) =>
+            irPara({ tela: "resultados", id: d.id, aba: "geral" })
           }
         />
       );
     case "resposta":
       return (
         <ResultadoIndividual
-          key={tela.respostaId}
+          key={atual.respostaId}
           servico={servico}
-          pesquisaId={tela.pesquisaId}
-          respostaId={tela.respostaId}
-          onVoltar={() => irPara({ tipo: "resultados", id: tela.pesquisaId })}
+          pesquisaId={atual.id}
+          respostaId={atual.respostaId}
+          onVoltar={() =>
+            irPara({ tela: "resultados", id: atual.id, aba: "respostas" })
+          }
           onIr={(respostaId) =>
-            irPara({
-              tipo: "resposta",
-              pesquisaId: tela.pesquisaId,
-              respostaId,
-            })
+            irPara(
+              { tela: "resposta", id: atual.id, respostaId },
+              { substituir: true },
+            )
           }
         />
       );
-    case "galeria":
+    case "previa":
+      return <PreviaDaPesquisa servico={servico} pesquisaId={atual.id} />;
+    case "nova":
       return (
         <div className="pesquisas">
           <header className="pesquisas__cabecalho">
@@ -286,7 +477,7 @@ export function PesquisasModulo({
               label="Voltar para Pesquisas"
               icon={<IconeVoltar tamanho={18} />}
               className="pesquisas__voltar"
-              onClick={() => irPara({ tipo: "lista" })}
+              onClick={() => irPara(ROTA_DA_LISTA)}
             />
             <div className="pesquisas__titulos">
               <h1
@@ -301,18 +492,15 @@ export function PesquisasModulo({
                 responde e envia.
               </p>
             </div>
-            <span className="pesquisas__selo">Passo 1 de 4</span>
+            <ProgressoDoFluxo passo={1} total={4} />
           </header>
-          {aviso ? (
-            <p className="pesquisas__aviso" role="status">
-              {aviso}
-            </p>
-          ) : null}
           <GaleriaDeModelos
-            onUsar={(id) => void usarModelo(id)}
-            onSobre={(id) =>
-              irPara({ tipo: "sobre", id, volta: { tipo: "galeria" } })
+            onUsar={(id) =>
+              id === "personalizada"
+                ? irPara({ tela: "personalizada" })
+                : irPara({ tela: "modelo", modelo: id })
             }
+            onSobre={(id) => irPara({ tela: "sobre", modelo: id })}
           />
         </div>
       );
@@ -321,18 +509,99 @@ export function PesquisasModulo({
         <ListaDePesquisas
           servico={servico}
           podeEditar={podeEditar}
-          aviso={aviso}
-          onAviso={setAviso}
-          onNova={() => irPara({ tipo: "galeria" })}
-          onUsarModelo={(id) => void usarModelo(id)}
-          onSobre={(id) =>
-            irPara({ tipo: "sobre", id, volta: { tipo: "lista" } })
+          onNova={() => irPara({ tela: "nova" })}
+          onUsarModelo={(id) =>
+            id === "personalizada"
+              ? irPara({ tela: "personalizada" })
+              : irPara({ tela: "modelo", modelo: id })
           }
-          onResultados={(id) => irPara({ tipo: "resultados", id })}
-          onEditar={(id) => void abrirEdicao(id)}
+          onSobre={(id) => irPara({ tela: "sobre", modelo: id })}
+          onResultados={(id) =>
+            irPara({ tela: "resultados", id, aba: "geral" })
+          }
+          onEditar={(p) =>
+            irPara(
+              p.status === "rascunho"
+                ? { tela: "rascunho", id: p.id }
+                : { tela: "editar", id: p.id },
+            )
+          }
+          onAbrirCopia={(copia) => abrirResultados(copia.id)}
         />
       );
   }
+}
+
+/** "Passo 1 de 4" com os pontos do progresso. */
+function ProgressoDoFluxo({
+  passo,
+  total,
+}: {
+  readonly passo: number;
+  readonly total: number;
+}) {
+  return (
+    <span className="pesquisas__progresso-fluxo">
+      {`Passo ${passo} de ${total}`}
+      <span className="pesquisas__pontos" aria-hidden="true">
+        {Array.from({ length: total }, (_, i) => (
+          <span
+            key={i}
+            {...(i === passo - 1
+              ? { "data-atual": "" }
+              : i < passo - 1
+                ? { "data-feito": "" }
+                : {})}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/** Dispara a navegação uma vez (redirecionamento no lugar). */
+function Redirecionar({ para }: { readonly para: () => void }) {
+  useEffect(() => {
+    para();
+    // Uma vez, ao montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
+/** Carrega a pesquisa e entrega ao `render`. */
+function CarregarPesquisa({
+  servico,
+  id,
+  render,
+}: {
+  readonly servico: ServicoDePesquisas;
+  readonly id: string;
+  readonly render: (d: PesquisaDetalhe) => React.ReactNode;
+}) {
+  const [d, setD] = useState<PesquisaDetalhe | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    Promise.resolve(servico.obterPesquisa(id))
+      .then((x) => {
+        if (vivo) setD(x);
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [servico, id]);
+  if (falhou)
+    return (
+      <p className="pesquisas__erro" role="alert">
+        Não foi possível abrir a pesquisa.
+      </p>
+    );
+  if (!d) return <Esqueleto rotulo="Carregando a pesquisa…" linhas={5} />;
+  return <>{render(d)}</>;
 }
 
 type FiltroDeStatus = "todas" | Exclude<StatusPesquisa, "rascunho">;
@@ -371,33 +640,33 @@ const PASSOS = [
 function ListaDePesquisas({
   servico,
   podeEditar,
-  aviso,
-  onAviso,
   onNova,
   onUsarModelo,
   onSobre,
   onResultados,
   onEditar,
+  onAbrirCopia,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly podeEditar: boolean;
-  readonly aviso: string | null;
-  readonly onAviso: (m: string | null) => void;
   readonly onNova: () => void;
   readonly onUsarModelo: (id: string) => void;
   readonly onSobre: (id: string) => void;
   readonly onResultados: (id: string) => void;
-  readonly onEditar: (id: string) => void;
+  readonly onEditar: (p: PesquisaResumo) => void;
+  readonly onAbrirCopia: (copia: PesquisaDetalhe) => void;
 }) {
+  const avisar = useAvisar();
   const [itens, setItens] = useState<PesquisaResumo[] | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  const [falhou, setFalhou] = useState<false | "erro" | "sem-empresa">(false);
   const [versao, setVersao] = useState(0);
   const [status, setStatus] = useState<FiltroDeStatus>("todas");
   const [busca, setBusca] = useState("");
-  const [tipo, setTipo] = useState("");
+  const [tipos, setTipos] = useState<readonly string[]>([]);
+  const [filtroAberto, setFiltroAberto] = useState(false);
   const [crescente, setCrescente] = useState(false);
   const [excluir, setExcluir] = useState<PesquisaResumo | null>(null);
-  const [excluindo, setExcluindo] = useState(false);
+  const [duplicar, setDuplicar] = useState<PesquisaResumo | null>(null);
 
   const recarregar = useCallback(() => setVersao((v) => v + 1), []);
 
@@ -411,8 +680,10 @@ function ListaDePesquisas({
         if (vivo)
           setItens((d?.itens ?? []).filter((p) => p.status !== "rascunho"));
       })
-      .catch(() => {
-        if (vivo) setFalhou(true);
+      .catch((erro: unknown) => {
+        if (!vivo) return;
+        const codigo = (erro as { status?: unknown } | null)?.status;
+        setFalhou(codigo === 403 ? "sem-empresa" : "erro");
       });
     return () => {
       vivo = false;
@@ -421,55 +692,31 @@ function ListaDePesquisas({
 
   const contagem = (s: FiltroDeStatus) =>
     (itens ?? []).filter((p) => s === "todas" || p.status === s).length;
+  const modelosPresentes = useMemo(
+    () => [...new Set((itens ?? []).map((p) => p.modelo))],
+    [itens],
+  );
 
   const visiveis = useMemo(() => {
     const termo = semAcento(busca.trim());
     return (itens ?? [])
       .filter((p) => status === "todas" || p.status === status)
-      .filter((p) => !tipo || p.modelo === tipo)
+      .filter((p) => tipos.length === 0 || tipos.includes(p.modelo))
       .filter((p) => !termo || semAcento(p.nome).includes(termo))
       .sort((a, b) =>
         crescente
           ? a.criadaEm.localeCompare(b.criadaEm)
           : b.criadaEm.localeCompare(a.criadaEm),
       );
-  }, [itens, status, tipo, busca, crescente]);
-
-  async function duplicar(p: PesquisaResumo) {
-    try {
-      const copia = await servico.duplicarPesquisa(p.id);
-      onAviso(
-        `Cópia criada como rascunho: ${copia.nome}. Abra o modelo para continuar.`,
-      );
-      recarregar();
-    } catch {
-      onAviso("Não foi possível duplicar a pesquisa. Tente de novo.");
-    }
-  }
+  }, [itens, status, tipos, busca, crescente]);
 
   async function copiar(p: PesquisaResumo) {
     if (!p.link) return;
-    onAviso(
+    avisar(
       (await copiarLink(p.link))
         ? "Link copiado."
-        : `Não foi possível copiar. Copie o endereço: ${enderecoDoLink(p.link)}`,
+        : "Não foi possível copiar o link.",
     );
-  }
-
-  async function confirmarExclusao() {
-    if (!excluir) return;
-    setExcluindo(true);
-    try {
-      await servico.excluirPesquisa(excluir.id);
-      setExcluir(null);
-      onAviso("Pesquisa excluída.");
-      recarregar();
-    } catch {
-      onAviso("Não foi possível excluir a pesquisa. Tente de novo.");
-      setExcluir(null);
-    } finally {
-      setExcluindo(false);
-    }
   }
 
   const semNenhuma = itens !== null && itens.length === 0;
@@ -518,13 +765,11 @@ function ListaDePesquisas({
         </header>
       )}
 
-      {aviso ? (
-        <p className="pesquisas__aviso" role="status">
-          {aviso}
-        </p>
-      ) : null}
-
-      {falhou ? (
+      {falhou === "sem-empresa" ? (
+        <div className="pesquisas__nota" role="status">
+          <p>Escolha uma empresa ativa no menu para ver as pesquisas.</p>
+        </div>
+      ) : falhou ? (
         <div className="pesquisas__caixa-erro" role="alert">
           <p className="pesquisas__erro">
             Não foi possível carregar as pesquisas.
@@ -558,7 +803,7 @@ function ListaDePesquisas({
         </>
       ) : (
         <>
-          <div className="pesquisas__filtros">
+          <div className="pesquisas__filtros pesquisas__filtros--linha">
             <Pilulas
               rotulo="Status"
               valor={status}
@@ -575,25 +820,55 @@ function ListaDePesquisas({
                 onMudar={setBusca}
                 atalho
               />
-              <div className="pesquisas__filtro-lista">
-                <label
-                  htmlFor="pesquisas-filtro-tipo"
-                  className="pesquisas__so-leitor"
+              <div className="pesquisas__filtro-tipo">
+                <Button
+                  variant="secondary"
+                  aria-expanded={filtroAberto}
+                  aria-controls="pesquisas-filtro-modelos"
+                  onClick={() => setFiltroAberto((a) => !a)}
                 >
+                  <IconeFiltrar tamanho={16} />
                   Tipo
-                </label>
-                <ListaDeEscolha
-                  id="pesquisas-filtro-tipo"
-                  opcoes={[
-                    { valor: "", rotulo: "Tipo: todos" },
-                    ...MODELOS_DE_PESQUISA.map((m) => ({
-                      valor: m.modelo,
-                      rotulo: m.nome,
-                    })),
-                  ]}
-                  valor={tipo}
-                  onMudar={setTipo}
-                />
+                  {tipos.length > 0 ? (
+                    <span className="pesquisas__contagem">{tipos.length}</span>
+                  ) : null}
+                  <IconeAbrir tamanho={12} />
+                </Button>
+                {filtroAberto ? (
+                  <div
+                    id="pesquisas-filtro-modelos"
+                    className="pesquisas__popover"
+                    role="group"
+                    aria-label="Modelos"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setFiltroAberto(false);
+                    }}
+                  >
+                    <p className="pesquisas__menu-titulo">Modelos</p>
+                    {modelosPresentes.map((m) => (
+                      <label key={m} className="pesquisas__marcacao">
+                        <input
+                          type="checkbox"
+                          checked={tipos.includes(m)}
+                          onChange={(e) =>
+                            setTipos((t) =>
+                              e.target.checked
+                                ? [...t, m]
+                                : t.filter((x) => x !== m),
+                            )
+                          }
+                        />
+                        <IconeDoModelo id={m} tamanho="sm" />
+                        {ROTULO_DO_MODELO[m]}
+                      </label>
+                    ))}
+                    {tipos.length > 0 ? (
+                      <Button variant="subtle" onClick={() => setTipos([])}>
+                        Limpar
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -613,9 +888,20 @@ function ListaDePesquisas({
                     <button
                       type="button"
                       className="pesquisas__ordenar"
+                      aria-label={
+                        crescente
+                          ? "Criada em: ordenar das mais recentes para as mais antigas"
+                          : "Criada em: ordenar das mais antigas para as mais recentes"
+                      }
                       onClick={() => setCrescente((c) => !c)}
                     >
-                      Criada em {crescente ? "▴" : "▾"}
+                      Criada em
+                      <span
+                        className="pesquisas__ordenar-seta"
+                        {...(crescente ? { "data-crescente": "" } : {})}
+                      >
+                        <IconeAbrir tamanho={12} />
+                      </span>
                     </button>
                   </th>
                   <th scope="col">Status</th>
@@ -628,7 +914,7 @@ function ListaDePesquisas({
                 {visiveis.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="pesquisas__suave">
-                      {busca || tipo
+                      {busca || tipos.length > 0
                         ? VAZIO_DO_FILTRO.todas
                         : VAZIO_DO_FILTRO[status]}
                     </td>
@@ -640,8 +926,8 @@ function ListaDePesquisas({
                       pesquisa={p}
                       podeEditar={podeEditar}
                       onResultados={() => onResultados(p.id)}
-                      onEditar={() => onEditar(p.id)}
-                      onDuplicar={() => void duplicar(p)}
+                      onEditar={() => onEditar(p)}
+                      onDuplicar={() => setDuplicar(p)}
                       onCopiar={() => void copiar(p)}
                       onExcluir={() => setExcluir(p)}
                     />
@@ -659,40 +945,29 @@ function ListaDePesquisas({
         </>
       )}
 
-      <Dialog
-        aberto={excluir !== null}
-        titulo={excluir ? `Excluir ${excluir.nome}?` : ""}
+      <JanelaDeExclusao
+        pesquisa={excluir}
+        servico={servico}
         onFechar={() => setExcluir(null)}
-        bloqueado={excluindo}
-        rodape={
-          <FormActions>
-            <Button
-              variant="secondary"
-              disabled={excluindo}
-              onClick={() => setExcluir(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="pesquisas__botao-perigo"
-              disabled={excluindo}
-              onClick={() => void confirmarExclusao()}
-            >
-              Excluir pesquisa
-            </Button>
-          </FormActions>
-        }
-      >
-        {excluir ? (
-          <p>
-            {`A pesquisa sai da lista e o link deixa de funcionar. ${
-              excluir.respostas > 0
-                ? `As ${plural(excluir.respostas, "resposta recebida", "respostas recebidas")} e os resultados deixam de aparecer no Evolli. `
-                : ""
-            }Não é possível desfazer.`}
-          </p>
-        ) : null}
-      </Dialog>
+        onExcluida={() => {
+          setExcluir(null);
+          recarregar();
+        }}
+        onFinalizada={() => {
+          setExcluir(null);
+          recarregar();
+        }}
+      />
+      <GavetaDeDuplicar
+        pesquisa={duplicar}
+        servico={servico}
+        onFechar={() => setDuplicar(null)}
+        onDuplicada={(copia, naAtiva) => {
+          setDuplicar(null);
+          if (naAtiva) onAbrirCopia(copia);
+          else recarregar();
+        }}
+      />
     </div>
   );
 }
@@ -717,11 +992,7 @@ export function Participacao({
   }
   const pct = participacao(p.respostas, p.participantes);
   return (
-    <span className="pesquisas__participacao">
-      <span>
-        <span className="pesquisas__forte">{`${p.respostas}/${p.participantes}`}</span>
-        <span className="pesquisas__suave">{` · ${pct}%`}</span>
-      </span>
+    <span className="pesquisas__participacao pesquisas__participacao--linha">
       <span
         className="pesquisas__barra"
         role="progressbar"
@@ -732,6 +1003,8 @@ export function Participacao({
       >
         <span style={{ width: `${pct}%` }} />
       </span>
+      <span className="pesquisas__forte">{`${p.respostas}/${p.participantes}`}</span>
+      <span className="pesquisas__suave">{`${pct}%`}</span>
     </span>
   );
 }
@@ -767,7 +1040,7 @@ function LinhaDaPesquisa({
     >
       <td>
         <span className="pesquisas__pessoa-linha">
-          <IconeDoModelo id={p.modelo} tamanho="sm" />
+          <IconeDoModelo id={p.modelo} />
           <button
             type="button"
             className="pesquisas__nome-botao"
@@ -791,9 +1064,12 @@ function LinhaDaPesquisa({
       </td>
       <td className="pesquisas__numero">{dataDoInstante(p.criadaEm)}</td>
       <td>
-        <StatusBadge variant={TOM_DO_STATUS[p.status]}>
+        <span
+          className={`pesquisas__status pesquisas__status--fixo pesquisas__status--${p.status}`}
+        >
+          <span className="pesquisas__ponto" aria-hidden="true" />
           {ROTULO_DO_STATUS[p.status]}
-        </StatusBadge>
+        </span>
       </td>
       <td data-sem-linha="">
         <div className="pesquisas__acoes-linha">
@@ -807,34 +1083,36 @@ function LinhaDaPesquisa({
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onSelect={onResultados}>
+                  <IconeVer tamanho={16} />
                   Ver resultados
                 </DropdownMenuItem>
-                {podeEditar && podeEditarPesquisa(p.status) ? (
+                {podeEditarPesquisa(p.status) ? (
                   <DropdownMenuItem onSelect={onEditar}>
+                    <IconeEditar tamanho={16} />
                     Editar pesquisa
                   </DropdownMenuItem>
                 ) : null}
-                {podeEditar ? (
-                  <DropdownMenuItem onSelect={onDuplicar}>
-                    Duplicar
-                  </DropdownMenuItem>
-                ) : null}
+                <DropdownMenuItem onSelect={onDuplicar}>
+                  <IconeCopiar tamanho={16} />
+                  Duplicar
+                </DropdownMenuItem>
                 {p.link ? (
-                  <DropdownMenuItem onSelect={onCopiar}>
+                  <DropdownMenuItem
+                    onSelect={onCopiar}
+                    disabled={p.status !== "ativa"}
+                  >
+                    <IconeLink tamanho={16} />
                     Copiar link
                   </DropdownMenuItem>
                 ) : null}
-                {podeEditar ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="pesquisas__menu-perigo"
-                      onSelect={onExcluir}
-                    >
-                      Excluir
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="pesquisas__menu-perigo"
+                  onSelect={onExcluir}
+                >
+                  <IconeRemover tamanho={16} />
+                  Excluir pesquisa
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}

@@ -156,6 +156,12 @@ import {
   PESQUISAS_TITULO_ID,
   PesquisasModulo,
 } from "../screens/pesquisas/PesquisasModulo";
+import {
+  ROTA_DA_LISTA as ROTA_DA_LISTA_DE_PESQUISAS,
+  fragmentoDaRotaDePesquisas,
+  rotaDePesquisasDoFragmento,
+  type RotaDePesquisas,
+} from "../screens/pesquisas/rotasDePesquisas";
 import { servicoDePesquisasDoServidor } from "../screens/pesquisas/servicoDePesquisas";
 import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
@@ -268,7 +274,11 @@ function rotaDoExibido(
   listagem: EstadoDaListagem = ESTADO_INICIAL_DA_LISTAGEM,
   ano: number = anoCorrente(),
   abaDoDashboard: AbaDoDashboard = ABA_INICIAL_DO_DASHBOARD,
+  rotaDePesquisas: RotaDePesquisas = ROTA_DA_LISTA_DE_PESQUISAS,
 ): string | null {
+  // T216 — Pesquisas: cada tela do módulo tem endereço próprio.
+  if (destinoId === "pesquisas")
+    return fragmentoDaRotaDePesquisas(rotaDePesquisas);
   // T205 — o Dashboard leva sempre o ano consultado (forma canônica).
   // T207 — e a aba (a Visão Geral, sem caminho).
   if (destinoId === "dashboard") return rotaDoDashboard(ano, abaDoDashboard);
@@ -563,6 +573,14 @@ function conteudoDoDestino(
     readonly colaboradorEmFoco: string | null;
     readonly onAbrirQuadro: () => void;
   },
+  // T216 — a tela do módulo Pesquisas (da URL) e como trocá-la.
+  pesquisas: {
+    readonly rota: RotaDePesquisas;
+    readonly onNavegar: (
+      rota: RotaDePesquisas,
+      opcoes?: { readonly substituir?: boolean },
+    ) => void;
+  } = { rota: ROTA_DA_LISTA_DE_PESQUISAS, onNavegar: () => undefined },
 ) {
   if (destinoId === "configuracoes") {
     return (
@@ -750,6 +768,10 @@ function conteudoDoDestino(
         servico={servicoDePesquisasDoServidor}
         // T216 — RH e DP operam; o master técnico só lê.
         podeEditar={podeEditarFicha(admissao.papelDoAtor)}
+        rota={pesquisas.rota}
+        onNavegar={pesquisas.onNavegar}
+        // T216 — acesso global (sem empresa ativa): pede a escolha.
+        semEmpresa={empresaAtiva === null}
       />
     );
   }
@@ -1097,6 +1119,10 @@ export function App({
         abaDoDashboard:
           dashboardDaRota(window.location.hash)?.aba ??
           ABA_INICIAL_DO_DASHBOARD,
+        // T216 — a tela de Pesquisas da URL.
+        rotaDePesquisas:
+          rotaDePesquisasDoFragmento(window.location.hash) ??
+          ROTA_DA_LISTA_DE_PESQUISAS,
       };
     }
     return {
@@ -1105,6 +1131,7 @@ export function App({
       listagem: ESTADO_INICIAL_DA_LISTAGEM,
       ano: anoCorrente(),
       abaDoDashboard: ABA_INICIAL_DO_DASHBOARD,
+      rotaDePesquisas: ROTA_DA_LISTA_DE_PESQUISAS,
     };
   });
   const [destinoAtivoId, setDestinoAtivoId] = useState(entradaDaUrl.destino);
@@ -1134,6 +1161,19 @@ export function App({
   /** T207 — a aba do Dashboard, sempre a da URL. */
   const [abaDoDashboard, setAbaDoDashboard] = useState<AbaDoDashboard>(
     entradaDaUrl.abaDoDashboard,
+  );
+  /** T216 — a tela do módulo Pesquisas, sempre a da URL. */
+  const [rotaDePesquisas, setRotaDePesquisas] = useState<RotaDePesquisas>(
+    entradaDaUrl.rotaDePesquisas,
+  );
+  /** T216 — a tela de Pesquisas que, exibida, corrige a URL no lugar. */
+  const correcaoDePesquisasRef = useRef<RotaDePesquisas | null>(null);
+  const navegarEmPesquisas = useCallback(
+    (rota: RotaDePesquisas, opcoes?: { readonly substituir?: boolean }) => {
+      correcaoDePesquisasRef.current = opcoes?.substituir ? rota : null;
+      setRotaDePesquisas(rota);
+    },
+    [],
   );
   /** T200 — a ficha exibida agora, lida pelo manipulador de URL. */
   const fichaAtualRef = useRef(ficha);
@@ -1340,6 +1380,8 @@ export function App({
     // T207 — e na Visão Geral.
     setAnoDoDashboard(anoCorrente());
     setAbaDoDashboard(ABA_INICIAL_DO_DASHBOARD);
+    // T216 — Pesquisas abre pelo menu na lista.
+    setRotaDePesquisas(ROTA_DA_LISTA_DE_PESQUISAS);
     setFocarContatosNaFicha(false);
     setDestinoAtivoId(destinoId);
     setGavetaAberta(false);
@@ -1539,6 +1581,7 @@ export function App({
       listagem,
       anoDoDashboard,
       abaDoDashboard,
+      rotaDePesquisas,
     );
     const atual = window.location.hash;
     const vinhaDeRota = rotaExibidaRef.current !== null;
@@ -1548,6 +1591,10 @@ export function App({
       correcaoDaListagemRef.current !== null &&
       correcaoDaListagemRef.current === listagem;
     if (substituir) correcaoDaListagemRef.current = null;
+    const substituirEmPesquisas =
+      correcaoDePesquisasRef.current !== null &&
+      correcaoDePesquisasRef.current === rotaDePesquisas;
+    if (substituirEmPesquisas) correcaoDePesquisasRef.current = null;
     destinoAtivoRef.current = destinoAtivoId;
     rotaExibidaRef.current = rota;
     if (rota === null) {
@@ -1561,7 +1608,7 @@ export function App({
         }
       }
     } else if (atual !== rota) {
-      if (primeiraExibicao || substituir) {
+      if (primeiraExibicao || substituir || substituirEmPesquisas) {
         escreverNoHistorico("replace", rota);
       } else {
         escreverNoHistorico("push", rota);
@@ -1573,6 +1620,7 @@ export function App({
     listagem,
     anoDoDashboard,
     abaDoDashboard,
+    rotaDePesquisas,
     escreverNoHistorico,
   ]);
 
@@ -1763,6 +1811,12 @@ export function App({
         exibido === "dashboard" && pedido === "dashboard"
           ? (dashboardDaRota(fragmento)?.aba ?? ABA_INICIAL_DO_DASHBOARD)
           : ABA_INICIAL_DO_DASHBOARD;
+      // T216 — em Pesquisas, a URL diz a tela do módulo.
+      const rotaDePesquisasExibida =
+        exibido === "pesquisas" && pedido === "pesquisas"
+          ? (rotaDePesquisasDoFragmento(fragmento) ??
+            ROTA_DA_LISTA_DE_PESQUISAS)
+          : ROTA_DA_LISTA_DE_PESQUISAS;
       // T200 — com edição pendente no que esta navegação desmontaria (ou com
       // a guarda já perguntando), a URL volta ao que a tela descreve e a
       // guarda pergunta; só a escolha explícita refaz o mesmo passo.
@@ -1811,12 +1865,14 @@ export function App({
       setListagem(listagemExibida);
       setAnoDoDashboard(anoExibido);
       setAbaDoDashboard(abaExibida);
+      setRotaDePesquisas(rotaDePesquisasExibida);
       const rotaExibida = rotaDoExibido(
         exibido,
         fichaExibida,
         listagemExibida,
         anoExibido,
         abaExibida,
+        rotaDePesquisasExibida,
       );
       if (rotaExibida !== null) {
         if (fragmento !== rotaExibida) {
@@ -2209,6 +2265,7 @@ export function App({
                     irPara("jornadas-trabalho");
                   },
                 },
+                { rota: rotaDePesquisas, onNavegar: navegarEmPesquisas },
               )}
             </main>
 

@@ -40,6 +40,8 @@
  * capacidade de sempre, e o servidor decide cada requisição.
  */
 
+import { rotaDePesquisasDoFragmento } from "../screens/pesquisas/rotasDePesquisas";
+
 /** Destinos com URL própria. Fechada: destino fora dela não tem rota. */
 const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T178 — o id segue `pessoas` (o contêiner, aberto na aba Colaboradores).
@@ -709,6 +711,8 @@ export function rotaDoDashboard(
  */
 export function destinoDaRota(fragmento: string): string | null {
   if (dashboardDaRota(fragmento) !== null) return "dashboard";
+  // T216 — toda tela do módulo Pesquisas (lista, assistentes, resultados...).
+  if (rotaDePesquisasDoFragmento(fragmento) !== null) return "pesquisas";
   if (fragmento === ROTA_DO_MODULO_CONFIGURACOES) return "configuracoes";
   const alternativa = ROTAS_ALTERNATIVAS[fragmento];
   if (alternativa) return alternativa;

@@ -90,8 +90,12 @@
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -2555,6 +2559,423 @@ textarea.pesquisas__campo {
   .pesquisas__busca {
     flex: 1 1 100%;
     margin-left: 0;
+  }
+}
+
+/* T216 — rodada de revisão. */
+
+/* Filtro de modelos na mesma linha da busca. */
+.pesquisas__filtros--linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.pesquisas__filtro-tipo {
+  position: relative;
+}
+
+.pesquisas__popover {
+  position: absolute;
+  top: calc(100% + var(--space-xxs));
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 14rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.pesquisas__menu-titulo {
+  margin: 0;
+  padding: var(--space-xxs) var(--space-xs);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Menu "Mudar status": ponto colorido e a descrição. */
+.pesquisas__menu-status {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  background: transparent;
+}
+
+.pesquisas__menu-status.pesquisas__status--ativa {
+  color: var(--status-success-ink);
+}
+
+.pesquisas__menu-status.pesquisas__status--pausada {
+  color: var(--status-warning-ink);
+}
+
+.pesquisas__menu-status.pesquisas__status--finalizada {
+  color: var(--color-action);
+}
+
+.pesquisas__menu-status.pesquisas__status--cancelada {
+  color: var(--status-danger-ink);
+}
+
+/* Exclusão: o que se perde e a sugestão de finalizar. */
+.pesquisas__perdas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.pesquisas__perdas > div {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-sm);
+}
+
+.pesquisas__perdas dt {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.pesquisas__perdas dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisas__sugestao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+/* Sem respostas ainda. */
+.pesquisas__sem-respostas {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-lg);
+  border: 1px dashed var(--divisor-cor);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.pesquisas__filtro-aplicado {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+/* Encerramento com data e hora. */
+.pesquisas__encerramento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-sm);
+}
+
+/* Separar por: as opções que quem responde vai ver. */
+.pesquisas__separar-opcoes {
+  display: grid;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 0 calc(1rem + var(--space-sm));
+}
+
+.pesquisas__separar [data-bloqueado] {
+  opacity: 0.6;
+}
+
+.pesquisas__chip--suave {
+  border-style: dashed;
+  color: var(--color-ink-subtle);
+}
+
+/* Edição na própria linha da pergunta. */
+.pesquisas__caixa-inline--linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.pesquisas__caixa-inline--linha input {
+  flex: 1 1 16rem;
+}
+
+/* Rodapé do assistente: voltar e quantos recebem à esquerda. */
+.pesquisas__rodape-esquerda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Passo 1 de 4, numa pílula com os pontos (o atual, alongado). */
+.pesquisas__progresso-fluxo {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-xs);
+  margin-left: auto;
+  padding: var(--space-xxs) var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.pesquisas__pontos {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pesquisas__pontos > span {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--borda-controle);
+}
+
+.pesquisas__pontos > span[data-feito] {
+  background: var(--color-action);
+}
+
+.pesquisas__pontos > span[data-atual] {
+  width: 0.875rem;
+  background: var(--color-action);
+}
+
+/* Lista: pílulas à esquerda; busca e Tipo à direita, na mesma linha. */
+.pesquisas__filtros--linha {
+  flex-wrap: nowrap;
+}
+
+.pesquisas__filtros--linha .pesquisas__filtros-direita {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.pesquisas__filtros--linha .pesquisas__busca {
+  flex: 0 0 12.5rem;
+  margin-left: 0;
+}
+
+/* Participação em linha: barra, fração e percentual. */
+.pesquisas__participacao--linha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  white-space: nowrap;
+}
+
+.pesquisas__participacao--linha .pesquisas__barra {
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+}
+
+/* Status da linha: pílula com ponto, sem menu. */
+.pesquisas__status--fixo {
+  cursor: default;
+}
+
+/* Ordenar por "Criada em": a seta acompanha o sentido. */
+.pesquisas__ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pesquisas__ordenar-seta {
+  display: inline-flex;
+  transition: transform var(--movimento-curto);
+}
+
+.pesquisas__ordenar-seta[data-crescente] {
+  transform: rotate(180deg);
+}
+
+/* Tela final: três próximas ações lado a lado. */
+.pesquisas__final .pesquisas__proximas {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  overflow: visible;
+  border: 0;
+}
+
+.pesquisas__final .pesquisas__proximas li + li {
+  border-top: 0;
+}
+
+.pesquisas__final .pesquisas__proximas button {
+  align-items: flex-start;
+  height: 100%;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+/* Seletor de tipos agrupado. */
+.pesquisas__tipos--agrupados {
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  align-items: start;
+}
+
+.pesquisas__tipos-grupo {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.pesquisas__tipos--agrupados .pesquisas__tipo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.pesquisas__tipo-icone {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+  color: var(--color-action);
+}
+
+.pesquisas__tipo-textos {
+  display: grid;
+  gap: 2px;
+}
+
+/* Resultado individual. */
+.pesquisas__seletor-resposta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-botao, var(--radius-sm));
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pesquisas__item-resposta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.pesquisas__indicador--largo {
+  grid-column: span 2;
+}
+
+.pesquisas__comentario {
+  margin: 0;
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--divisor-cor);
+  color: var(--color-ink);
+  white-space: pre-line;
+}
+
+.pesquisas__linha-escala-pontos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pesquisas__linha-escala-pontos > span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.pesquisas__linha-escala-pontos > span[data-faixa="baixa"] {
+  border-color: var(--status-danger-ink);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisas__linha-escala-pontos > span[data-faixa="media"] {
+  border-color: var(--status-warning-ink);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisas__linha-escala-pontos > span[data-faixa="alta"] {
+  border-color: var(--status-success-ink);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Pré-visualização: a página de quem responde, com a faixa no topo. */
+.pesquisas__previa-tela {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  background: var(--surface-pearl);
+}
+
+.pesquisas__previa-faixa {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-weight: var(--weight-strong);
+  text-align: center;
+}
+
+/* Gaveta do modelo: o subtítulo quebra a linha em vez de ser cortado. */
+.pesquisas__janela header p {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+@media (max-width: 48rem) {
+  .pesquisas__filtros--linha,
+  .pesquisas__filtros--linha .pesquisas__filtros-direita {
+    flex-wrap: wrap;
+  }
+
+  .pesquisas__final .pesquisas__proximas,
+  .pesquisas__perdas {
+    grid-template-columns: 1fr;
+  }
+
+  .pesquisas__indicador--largo {
+    grid-column: auto;
   }
 }
 
