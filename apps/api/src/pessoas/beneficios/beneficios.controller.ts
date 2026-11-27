@@ -24,6 +24,7 @@ import { extractRequestMetadata } from "../../auth/request-metadata.util";
 import {
   AdicionarPessoasDto,
   AlterarEmLoteDto,
+  ConferirImportacaoDto,
   BeneficioDto,
   CompetenciaQueryDto,
   DependenteDto,
@@ -218,6 +219,57 @@ export class BeneficiosController {
       id,
       colaboradorId,
       dto,
+      ctx(actor, req),
+    );
+  }
+
+  @Post(":beneficioId/pessoas/:colaboradorId/dependentes/simular")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("beneficio", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Impacto de dependentes no plano, sem gravar" })
+  simularDependentes(
+    @Param("beneficioId", ParseUUIDPipe) id: string,
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Body() dto: DependentesNoPlanoDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.simularDependentes(
+      id,
+      colaboradorId,
+      dto,
+      ctx(actor, req),
+    );
+  }
+
+  @Post(":beneficioId/importacao/conferir")
+  @HttpCode(200)
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("beneficio", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Confere a planilha de valores, sem gravar" })
+  conferirImportacao(
+    @Param("beneficioId", ParseUUIDPipe) id: string,
+    @Body() dto: ConferirImportacaoDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.conferirImportacao(
+      id,
+      {
+        competencia: dto.competencia,
+        linhas: dto.linhas.map((l) => ({
+          linha: l.linha,
+          cpf: l.cpf,
+          valores: Object.fromEntries(
+            Object.entries(l.valores ?? {})
+              .filter(([, v]) => v === null || typeof v === "string")
+              .map(([k, v]) => [k, v === null ? null : String(v).slice(0, 40)]),
+          ),
+        })),
+      },
       ctx(actor, req),
     );
   }

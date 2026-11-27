@@ -18,6 +18,13 @@ import {
 } from "./calculo-beneficios";
 import { diasPeloModelo, diasUteisDoMes } from "./dias-beneficio";
 import {
+  type ColunaDaImportacao,
+  type LinhaConferida,
+  type LinhaInformada,
+  colunasDaImportacao,
+  conferirLinhas,
+} from "./importacao-beneficio";
+import {
   type BeneficioConferido,
   type BeneficioInformado,
   conferirBeneficio,
@@ -30,9 +37,10 @@ import {
  * alteração em massa, pessoas, dependentes no plano, pausar, encerrar,
  * reativar, excluir (lógico), duplicar, histórico e o resumo da ficha.
  *
- * Sem módulo de Folha no Evolli: toda competência é "valores previstos"; as
- * regras atuais valem para todas as competências (o histórico registra a
- * partir de quando cada mudança foi pedida).
+ * Sem módulo de Folha no Evolli: toda competência é "valores previstos". As
+ * regras de valor têm versões por competência ("Vale a partir de"): cada mês
+ * usa a versão que começou nele ou antes; sem versão, as do próprio
+ * benefício.
  *
  * `rh` e `dp` operam; o `master_tecnico` só lê; os demais papéis são negados
  * pelo guard. A trilha leva só ação, recurso (id) e empresa.
@@ -59,6 +67,8 @@ export interface BeneficioApi {
 export interface PessoaDoBeneficioApi extends CalculoDaPessoa {
   colaboradorId: string;
   nome: string;
+  /** Só para RH e DP (busca por CPF, colar lista, importar). */
+  cpf: string | null;
   cargo: string | null;
   departamento: string | null;
   departamentoId: string | null;
@@ -67,6 +77,9 @@ export interface PessoaDoBeneficioApi extends CalculoDaPessoa {
   planoId: string | null;
   valorIndividual: number | null;
   ajustado: boolean;
+  /** Digitados no mês (reais), para os campos da tela. */
+  coparticipacao: number | null;
+  antecipado: number | null;
   dependentesCadastrados: number;
   desligado: boolean;
 }
@@ -97,13 +110,50 @@ export interface LinhaDaListaApi {
   situacao: "ativo" | "pausado" | "encerrado";
   suspensoAPartirDe: Competencia | null;
   pessoas: number;
+  /** Dependentes no plano (faixa etária). */
+  dependentes: number;
   empresa: number;
   desconto: number;
+}
+
+export interface ResumoDaListaApi {
+  /** Pessoas distintas nos benefícios ativos do mês. */
+  pessoas: number;
+  /** Pessoas com desconto em folha no mês. */
+  comDesconto: number;
+  empresa: number;
+  desconto: number;
+  beneficiosAtivos: number;
+  /** Pessoas ativas da empresa. */
+  ativos: number;
+  semBeneficio: { colaboradorId: string; nome: string; cargo: string | null }[];
 }
 
 export interface ListaDeBeneficiosApi {
   competencia: Competencia;
   beneficios: LinhaDaListaApi[];
+  resumo: ResumoDaListaApi;
+}
+
+export interface ImportacaoConferidaApi {
+  competencia: Competencia;
+  colunas: ColunaDaImportacao[];
+  linhas: (LinhaConferida & {
+    antes: { valor: number; empresa: number; desconto: number } | null;
+    depois: { valor: number; empresa: number; desconto: number } | null;
+  })[];
+}
+
+export interface SimulacaoDeDependentesApi {
+  competencia: Competencia;
+  antes: { valor: number; empresa: number; desconto: number };
+  depois: { valor: number; empresa: number; desconto: number };
+}
+
+/** Ajustes e dependentes "e se" (importação e simulação), por pessoa. */
+interface Sobreposicao {
+  ajustes?: ReadonlyMap<string, AjusteDoMes>;
+  dependentes?: ReadonlyMap<string, { nascimento: string | null }[]>;
 }
 
 export interface PreviaApi {
@@ -151,6 +201,7 @@ export interface HistoricoApi {
 interface PessoaCarregada {
   colaboradorId: string;
   nome: string;
+  cpf: string | null;
   tipo: TipoVinculo;
   situacao: string;
   cargo: string | null;
@@ -341,6 +392,7 @@ export class BeneficiosService {
       mapa.set(v.colaborador.id, {
         colaboradorId: v.colaborador.id,
         nome: v.colaborador.nome,
+        cpf: null,
         tipo: v.tipo,
         situacao: v.situacao,
         cargo: alocacao?.cargo?.nome ?? null,
@@ -359,7 +411,7 @@ export class BeneficiosService {
     const [perfis, escalas, publicados, dependentes] = await Promise.all([
       db.perfilPessoalColaborador.findMany({
         where: { empresaId, colaboradorId: { in: todos } },
-        select: { colaboradorId: true, dataNascimento: true },
+        select: { colaboradorId: true, dataNascimento: true, cpf: true },
       }),
       db.escalaColaborador.findMany({
         where: {
@@ -389,8 +441,9 @@ export class BeneficiosService {
     ]);
     for (const p of perfis) {
       const pessoa = mapa.get(p.colaboradorId);
-      if (pessoa && p.dataNascimento)
-        pessoa.nascimento = diaDe(p.dataNascimento);
+      if (!pessoa) continue;
+      if (p.dataNascimento) pessoa.nascimento = diaDe(p.dataNascimento);
+      pessoa.cpf = p.cpf ?? null;
     }
     for (const e of escalas) {
       const pessoa = mapa.get(e.colaboradorId);
@@ -496,6 +549,7 @@ export class BeneficiosService {
           ...calculo,
           colaboradorId: pessoa.colaboradorId,
           nome: pessoa.nome,
+          cpf: pessoa.cpf,
           cargo: pessoa.cargo,
           departamento: pessoa.departamento,
           departamentoId: pessoa.departamentoId,
@@ -504,6 +558,8 @@ export class BeneficiosService {
           planoId,
           valorIndividual,
           ajustado,
+          coparticipacao: ajuste?.coparticipacao ?? null,
+          antecipado: ajuste?.antecipado ?? null,
           dependentesCadastrados: pessoa.dependentesCadastrados,
           desligado: pessoa.situacao === "encerrado",
         };
@@ -517,6 +573,7 @@ export class BeneficiosService {
     b: LinhaBeneficio,
     c: Competencia,
     apenas?: readonly string[],
+    sobre: Sobreposicao = {},
   ): Promise<PessoaDoBeneficioApi[]> {
     const inicio = inicioDa(c);
     const vinculos = await db.beneficioPessoa.findMany({
@@ -554,40 +611,118 @@ export class BeneficiosService {
         },
       }),
     ]);
-    const regras = b.regras as unknown as RegrasDoBeneficio;
+    const regras = (await this.vigenteNa(db, b, c))
+      .regras as unknown as RegrasDoBeneficio;
     const linhas = vinculos
       .map((v) => {
         const pessoa = pessoas.get(v.colaboradorId);
         if (!pessoa) return null;
         const a = ajustes.find((x) => x.colaboradorId === v.colaboradorId);
+        const gravado: AjusteDoMes | null = a
+          ? {
+              dias: a.dias,
+              valorDia: numero(a.valorDia),
+              valorMes: numero(a.valorMes),
+              coparticipacao: numero(a.coparticipacao),
+              antecipado: numero(a.antecipado),
+            }
+          : null;
+        const extra = sobre.ajustes?.get(v.colaboradorId);
+        const ajuste = extra ? { ...(gravado ?? {}), ...extra } : gravado;
         return {
           pessoa,
           planoId: v.planoId,
           valorIndividual: numero(v.valorIndividual),
-          ajuste: a
-            ? {
-                dias: a.dias,
-                valorDia: numero(a.valorDia),
-                valorMes: numero(a.valorMes),
-                coparticipacao: numero(a.coparticipacao),
-                antecipado: numero(a.antecipado),
-              }
-            : null,
+          ajuste,
           ajustado:
-            !!a &&
-            (a.dias !== null || a.valorDia !== null || a.valorMes !== null),
-          dependentes: deps
-            .filter((d) => d.colaboradorId === v.colaboradorId)
-            .map((d) => ({
-              nascimento: d.dependente.dataNascimento
-                ? diaDe(d.dependente.dataNascimento)
-                : null,
-            })),
+            !!ajuste &&
+            ((ajuste.dias ?? null) !== null ||
+              (ajuste.valorDia ?? null) !== null ||
+              (ajuste.valorMes ?? null) !== null),
+          dependentes:
+            sobre.dependentes?.get(v.colaboradorId) ??
+            deps
+              .filter((d) => d.colaboradorId === v.colaboradorId)
+              .map((d) => ({
+                nascimento: d.dependente.dataNascimento
+                  ? diaDe(d.dependente.dataNascimento)
+                  : null,
+              })),
         };
       })
       .filter((l): l is NonNullable<typeof l> => l !== null)
       .sort((x, y) => x.pessoa.nome.localeCompare(y.pessoa.nome, "pt-BR"));
     return this.calcularTodos(regras, c, cal, linhas);
+  }
+
+  /** O benefício com as regras de valor da versão vigente no mês. */
+  private async vigenteNa(
+    db: Prisma.TransactionClient,
+    b: LinhaBeneficio,
+    c: Competencia,
+  ): Promise<LinhaBeneficio> {
+    const v = await db.beneficioVersao.findFirst({
+      where: {
+        beneficioId: b.id,
+        substituidaEm: null,
+        aPartirDe: { lte: inicioDa(c) },
+      },
+      orderBy: [{ aPartirDe: "desc" }, { criadoEm: "desc" }],
+    });
+    return v ? { ...b, tipoValor: v.tipoValor, regras: v.regras } : b;
+  }
+
+  /**
+   * Novas regras de valor a partir de `c`. Antes do início do benefício (ou
+   * nele), trocam as do próprio benefício. As versões que começavam em `c`
+   * ou depois ficam substituídas.
+   */
+  private async gravarVersao(
+    tx: Prisma.TransactionClient,
+    b: LinhaBeneficio,
+    c: Competencia,
+    tipoValor: LinhaBeneficio["tipoValor"],
+    regras: RegrasDoBeneficio,
+    ctx: PessoasAuditContext,
+  ): Promise<void> {
+    const desdeOInicio = c <= competenciaDe(b.inicio);
+    await tx.beneficioVersao.updateMany({
+      where: {
+        beneficioId: b.id,
+        substituidaEm: null,
+        ...(desdeOInicio ? {} : { aPartirDe: { gte: inicioDa(c) } }),
+      },
+      data: { substituidaEm: new Date() },
+    });
+    if (desdeOInicio) {
+      await tx.beneficio.update({
+        where: { id: b.id },
+        data: {
+          tipoValor,
+          regras: regras as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return;
+    }
+    await tx.beneficioVersao.create({
+      data: {
+        beneficioId: b.id,
+        empresaId: b.empresaId,
+        aPartirDe: inicioDa(c),
+        tipoValor,
+        regras: regras as unknown as Prisma.InputJsonValue,
+        criadoPorId: ctx.actor.id,
+      },
+    });
+  }
+
+  /** O CPF só vai para RH e DP. */
+  private comCpf<T extends { cpf: string | null }>(
+    lista: T[],
+    ctx: PessoasAuditContext,
+  ): T[] {
+    const ve = ctx.actor.role === "rh" || ctx.actor.role === "dp";
+    return ve ? lista : lista.map((p) => ({ ...p, cpf: null }));
   }
 
   private paraApi(b: LinhaBeneficio): BeneficioApi {
@@ -656,10 +791,18 @@ export class BeneficiosService {
       orderBy: { criadoEm: "asc" },
     });
     const linhas: LinhaDaListaApi[] = [];
+    const comBeneficio = new Set<string>();
+    const comDesconto = new Set<string>();
+    let beneficiosAtivos = 0;
     for (const b of beneficios) {
       const pessoas = ativoNa(b, c)
         ? await this.pessoasDoBeneficio(this.prisma, b, c)
         : [];
+      if (ativoNa(b, c)) beneficiosAtivos += 1;
+      for (const p of pessoas) {
+        comBeneficio.add(p.colaboradorId);
+        if (p.desconto > 0) comDesconto.add(p.colaboradorId);
+      }
       const t = totaisDe(pessoas);
       linhas.push({
         id: b.id,
@@ -674,11 +817,37 @@ export class BeneficiosService {
           : await this.prisma.beneficioPessoa.count({
               where: { beneficioId: b.id, removidoEm: null },
             }),
+        dependentes: t.dependentes,
         empresa: t.empresa,
         desconto: t.desconto,
       });
     }
-    return { competencia: c, beneficios: linhas };
+    const ativos = await this.carregarPessoas(this.prisma, empresaId, c, null);
+    const doMes = linhas.filter((l) =>
+      ativoNa(
+        beneficios.find((b) => b.id === l.id)!,
+        c,
+      ),
+    );
+    return {
+      competencia: c,
+      beneficios: linhas,
+      resumo: {
+        pessoas: comBeneficio.size,
+        comDesconto: comDesconto.size,
+        empresa: doMes.reduce((t, l) => t + l.empresa, 0),
+        desconto: doMes.reduce((t, l) => t + l.desconto, 0),
+        beneficiosAtivos,
+        ativos: ativos.size,
+        semBeneficio: [...ativos.values()]
+          .filter((p) => !comBeneficio.has(p.colaboradorId))
+          .map((p) => ({
+            colaboradorId: p.colaboradorId,
+            nome: p.nome,
+            cargo: p.cargo,
+          })),
+      },
+    };
   }
 
   /**
@@ -793,7 +962,7 @@ export class BeneficiosService {
       ans:
         regras.tipoValor === "faixa_etaria" ? regrasAns(regras.faixas) : null,
       pat: limitePat(regras),
-      pessoas: lista,
+      pessoas: this.comCpf(lista, ctx),
       totais: totaisDe(lista),
     };
   }
@@ -851,7 +1020,11 @@ export class BeneficiosService {
   ): Promise<DetalheDoBeneficioApi> {
     const empresaId = this.empresaDaSessao(ctx, "leitura");
     const c = this.competencia(competencia);
-    const b = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    const b = await this.vigenteNa(
+      this.prisma,
+      await this.obterLinha(this.prisma, id, empresaId, ctx),
+      c,
+    );
     const [pessoas, historico, cal] = await Promise.all([
       ativoNa(b, c)
         ? this.pessoasDoBeneficio(this.prisma, b, c)
@@ -870,7 +1043,7 @@ export class BeneficiosService {
           .map((f) => f.data),
       ),
       totais: totaisDe(pessoas),
-      pessoas,
+      pessoas: this.comCpf(pessoas, ctx),
       historico,
     };
   }
@@ -919,7 +1092,8 @@ export class BeneficiosService {
       this.calendario(this.prisma, empresaId, c),
     ]);
     const lista = this.calcularTodos(
-      b.regras as unknown as RegrasDoBeneficio,
+      (await this.vigenteNa(this.prisma, b, c))
+        .regras as unknown as RegrasDoBeneficio,
       c,
       cal,
       [...pessoas.values()]
@@ -933,7 +1107,7 @@ export class BeneficiosService {
           dependentes: [],
         })),
     );
-    return { competencia: c, pessoas: lista };
+    return { competencia: c, pessoas: this.comCpf(lista, ctx) };
   }
 
   /** O resumo da aba Benefícios da ficha. */
@@ -1106,27 +1280,61 @@ export class BeneficiosService {
     const aPartirDe = this.competencia(dto.aPartirDe);
     const linha = await this.prisma.$transaction(async (tx) => {
       const atual = await this.obterLinha(tx, id, empresaId, ctx);
-      const alterada = await tx.beneficio.update({
+      const antes = await this.vigenteNa(tx, atual, aPartirDe);
+      const basicosMudaram =
+        atual.nome !== b.nome ||
+        atual.categoria !== b.categoria ||
+        atual.folha !== b.folha ||
+        diaDe(atual.inicio) !== b.inicio ||
+        (atual.fim ? diaDe(atual.fim) : null) !== b.fim ||
+        atual.observacao !== b.observacao;
+      const valoresMudaram =
+        antes.tipoValor !== b.tipoValor ||
+        JSON.stringify(antes.regras) !== JSON.stringify(b.regras);
+      let alterada = await tx.beneficio.update({
         where: { id: atual.id },
         data: {
           nome: b.nome,
           categoria: b.categoria,
           folha: b.folha,
-          tipoValor: b.tipoValor,
           inicio: new Date(`${b.inicio}T00:00:00Z`),
           fim: b.fim ? new Date(`${b.fim}T00:00:00Z`) : null,
           observacao: b.observacao,
-          regras: b.regras as unknown as Prisma.InputJsonValue,
         },
       });
-      await this.historico(
-        tx,
-        alterada,
-        "configuracao",
-        aPartirDe,
-        "Configuração do benefício alterada.",
-        ctx,
-      );
+      if (valoresMudaram) {
+        await this.gravarVersao(
+          tx,
+          alterada,
+          aPartirDe,
+          b.tipoValor,
+          b.regras,
+          ctx,
+        );
+        alterada = await this.vigenteNa(
+          tx,
+          await tx.beneficio.findUniqueOrThrow({ where: { id: atual.id } }),
+          aPartirDe,
+        );
+        await this.historico(
+          tx,
+          alterada,
+          "valores",
+          aPartirDe,
+          `Valores do benefício alterados a partir de ${mesCurto(aPartirDe)}.`,
+          ctx,
+        );
+      }
+      if (basicosMudaram || !valoresMudaram) {
+        await this.historico(
+          tx,
+          alterada,
+          "configuracao",
+          aPartirDe,
+          "Dados básicos do benefício alterados.",
+          ctx,
+        );
+      }
       await this.auditoria.registrarMutacao(
         tx,
         ctx,
@@ -1175,7 +1383,8 @@ export class BeneficiosService {
           { campo: "pessoas", motivo: "ja_recebe" },
         ]);
       }
-      const regras = b.regras as unknown as RegrasDoBeneficio;
+      const regras = (await this.vigenteNa(tx, b, aPartirDe))
+        .regras as unknown as RegrasDoBeneficio;
       for (const p of dto.pessoas) {
         await tx.beneficioPessoa.create({
           data: {
@@ -1252,6 +1461,7 @@ export class BeneficiosService {
     id: string,
     dto: {
       competencia: string;
+      origem?: "tela" | "importacao";
       linhas: {
         colaboradorId: string;
         dias?: number | null;
@@ -1267,9 +1477,15 @@ export class BeneficiosService {
   ): Promise<{ alteradas: number }> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const c = this.competencia(dto.competencia);
+    if (dto.linhas.length === 0) {
+      throw new CamposRecusadosException([
+        { campo: "pessoas", motivo: "obrigatorio" },
+      ]);
+    }
     return this.prisma.$transaction(async (tx) => {
       const b = await this.obterLinha(tx, id, empresaId, ctx);
-      const regras = b.regras as unknown as RegrasDoBeneficio;
+      const regras = (await this.vigenteNa(tx, b, c))
+        .regras as unknown as RegrasDoBeneficio;
       for (const l of dto.linhas) {
         const v = await tx.beneficioPessoa.findFirst({
           where: {
@@ -1330,7 +1546,7 @@ export class BeneficiosService {
         b,
         "valores",
         c,
-        `Valores de ${mesCurto(c)} alterados para ${n} ${n === 1 ? "pessoa" : "pessoas"}.`,
+        `Valores de ${mesCurto(c)} ${dto.origem === "importacao" ? "importados da planilha" : "alterados"} para ${n} ${n === 1 ? "pessoa" : "pessoas"}.`,
         ctx,
       );
       await this.auditoria.registrarMutacao(
@@ -1343,6 +1559,141 @@ export class BeneficiosService {
       );
       return { alteradas: n };
     });
+  }
+
+  /**
+   * "Importar valores" › Revisar: cada linha da planilha conferida (CPF,
+   * valores) e, nas prontas, o valor, a parte da empresa e o desconto antes
+   * e depois. Nada é gravado; importar usa "Salvar valores".
+   */
+  async conferirImportacao(
+    id: string,
+    dto: { competencia: string; linhas: LinhaInformada[] },
+    ctx: PessoasAuditContext,
+  ): Promise<ImportacaoConferidaApi> {
+    const empresaId = this.empresaDaSessao(ctx, "escrita");
+    const c = this.competencia(dto.competencia);
+    const b = await this.vigenteNa(
+      this.prisma,
+      await this.obterLinha(this.prisma, id, empresaId, ctx),
+      c,
+    );
+    const regras = b.regras as unknown as RegrasDoBeneficio;
+    const colunas = colunasDaImportacao(regras);
+    if (colunas.length === 0) {
+      throw new CamposRecusadosException([
+        { campo: "tipoValor", motivo: "nao_se_aplica" },
+      ]);
+    }
+    const [ativos, pessoas] = await Promise.all([
+      this.carregarPessoas(this.prisma, empresaId, c, null),
+      ativoNa(b, c)
+        ? this.pessoasDoBeneficio(this.prisma, b, c)
+        : Promise.resolve([]),
+    ]);
+    const empresa = new Map<string, { colaboradorId: string; nome: string }>();
+    for (const p of ativos.values()) {
+      if (p.cpf)
+        empresa.set(p.cpf, { colaboradorId: p.colaboradorId, nome: p.nome });
+    }
+    const atuais = new Map(
+      pessoas.map((p) => [
+        p.colaboradorId,
+        {
+          dias: p.dias,
+          valorDia: p.valorDia === null ? null : p.valorDia / 100,
+          valorMes: p.valor / 100,
+          coparticipacao: p.coparticipacao ?? 0,
+          antecipado: p.antecipado ?? 0,
+        },
+      ]),
+    );
+    const conferidas = conferirLinhas({
+      linhas: dto.linhas.slice(0, 1000),
+      colunas,
+      empresa,
+      doBeneficio: new Set(pessoas.map((p) => p.colaboradorId)),
+      atuais,
+    });
+    const prontas = conferidas.filter((l) => l.situacao === "pronta");
+    const depois = prontas.length
+      ? await this.pessoasDoBeneficio(
+          this.prisma,
+          b,
+          c,
+          prontas.map((l) => l.colaboradorId!),
+          {
+            ajustes: new Map(
+              prontas.map((l) => [l.colaboradorId!, { ...l.valores }]),
+            ),
+          },
+        )
+      : [];
+    const resumo = (p?: PessoaDoBeneficioApi) =>
+      p ? { valor: p.valor, empresa: p.empresa, desconto: p.desconto } : null;
+    return {
+      competencia: c,
+      colunas,
+      linhas: conferidas.map((l) => ({
+        ...l,
+        antes:
+          l.situacao === "pronta"
+            ? resumo(pessoas.find((p) => p.colaboradorId === l.colaboradorId))
+            : null,
+        depois:
+          l.situacao === "pronta"
+            ? resumo(depois.find((p) => p.colaboradorId === l.colaboradorId))
+            : null,
+      })),
+    };
+  }
+
+  /** "Dependentes no plano" › o impacto antes e depois, sem gravar. */
+  async simularDependentes(
+    id: string,
+    colaboradorId: string,
+    dto: { dependenteIds: string[]; aPartirDe: string },
+    ctx: PessoasAuditContext,
+  ): Promise<SimulacaoDeDependentesApi> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const c = this.competencia(dto.aPartirDe);
+    const b = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    const deps = await this.prisma.dependenteColaborador.findMany({
+      where: {
+        empresaId,
+        colaboradorId,
+        removidoEm: null,
+        id: { in: dto.dependenteIds },
+      },
+      select: { dataNascimento: true },
+    });
+    const [antes] = await this.pessoasDoBeneficio(this.prisma, b, c, [
+      colaboradorId,
+    ]);
+    if (!antes)
+      return this.auditoria.negarAcesso(ctx, "beneficio", b.id, empresaId);
+    const [depois] = await this.pessoasDoBeneficio(
+      this.prisma,
+      b,
+      c,
+      [colaboradorId],
+      {
+        dependentes: new Map([
+          [
+            colaboradorId,
+            deps.map((d) => ({
+              nascimento: d.dataNascimento ? diaDe(d.dataNascimento) : null,
+            })),
+          ],
+        ]),
+      },
+    );
+    const r = (p: PessoaDoBeneficioApi) => ({
+      valor: p.valor,
+      empresa: p.empresa,
+      desconto: p.desconto,
+    });
+    return { competencia: c, antes: r(antes), depois: r(depois!) };
   }
 
   /**
@@ -1381,7 +1732,8 @@ export class BeneficiosService {
     if (erros.length) throw new CamposRecusadosException(erros);
     return this.prisma.$transaction(async (tx) => {
       const b = await this.obterLinha(tx, id, empresaId, ctx);
-      const regras = b.regras as unknown as RegrasDoBeneficio;
+      const regras = (await this.vigenteNa(tx, b, c))
+        .regras as unknown as RegrasDoBeneficio;
       if (regras.tipoValor !== "dia_util") {
         throw new CamposRecusadosException([
           { campo: "tipoValor", motivo: "nao_se_aplica" },
@@ -1395,15 +1747,14 @@ export class BeneficiosService {
             ? Math.round(base * (1 + dto.reajustePercentual / 100) * 100) / 100
             : null;
       if (dto.duracao === "em_diante") {
-        await tx.beneficio.update({
-          where: { id: b.id },
-          data: {
-            regras: {
-              ...regras,
-              valorDia: novoValor,
-            } as unknown as Prisma.InputJsonValue,
-          },
-        });
+        await this.gravarVersao(
+          tx,
+          b,
+          c,
+          "dia_util",
+          { ...regras, valorDia: novoValor },
+          ctx,
+        );
         await this.historico(
           tx,
           b,
@@ -1499,7 +1850,11 @@ export class BeneficiosService {
     const c = this.competencia(dto.aPartirDe);
     const inicio = inicioDa(c);
     return this.prisma.$transaction(async (tx) => {
-      const b = await this.obterLinha(tx, id, empresaId, ctx);
+      const b = await this.vigenteNa(
+        tx,
+        await this.obterLinha(tx, id, empresaId, ctx),
+        c,
+      );
       if (b.tipoValor !== "faixa_etaria") {
         throw new CamposRecusadosException([
           { campo: "dependenteIds", motivo: "nao_se_aplica" },
@@ -1727,8 +2082,12 @@ export class BeneficiosService {
   async duplicar(id: string, ctx: PessoasAuditContext): Promise<BeneficioApi> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const linha = await this.prisma.$transaction(async (tx) => {
-      const b = await this.obterLinha(tx, id, empresaId, ctx);
       const hoje = hojeEmSaoPaulo();
+      const b = await this.vigenteNa(
+        tx,
+        await this.obterLinha(tx, id, empresaId, ctx),
+        hoje.slice(0, 7),
+      );
       const nome = `${b.nome} (cópia)`.slice(0, 120);
       const copia = await tx.beneficio.create({
         data: {

@@ -59,6 +59,14 @@ describe("T215 — cálculo dos benefícios: valor fixo e quem paga", () => {
     });
   });
 
+  it("fixo: o valor digitado no mês (importado) vale por cima da regra", () => {
+    expect(calc({}, { ajuste: { valorMes: 500 } })).toMatchObject({
+      valor: 50000,
+      empresa: 40000,
+      desconto: 10000,
+    });
+  });
+
   it("empresa paga R$ por mês (limitado ao valor) e colaborador paga tudo", () => {
     expect(
       calc({

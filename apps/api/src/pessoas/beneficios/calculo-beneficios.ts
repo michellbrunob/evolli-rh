@@ -223,7 +223,11 @@ function valorDoMes(
   switch (r.tipoValor) {
     case "fixo":
       return {
-        valor: centavos(r.valorMensal),
+        valor: centavos(
+          ajuste.valorMes !== null && ajuste.valorMes !== undefined
+            ? ajuste.valorMes
+            : r.valorMensal,
+        ),
         dias: null,
         origemDias: null,
         valorDia: null,

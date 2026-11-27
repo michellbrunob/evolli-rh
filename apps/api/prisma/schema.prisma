@@ -135,6 +135,7 @@ model AccessUser {
   beneficioPessoasCriadas   BeneficioPessoa[]       @relation("BeneficioPessoaCriadaPor")
   beneficioAjustes          BeneficioAjuste[]       @relation("BeneficioAjustePor")
   beneficioHistorico        BeneficioHistorico[]    @relation("BeneficioHistoricoPor")
+  beneficioVersoes          BeneficioVersao[]       @relation("BeneficioVersaoPor")
   dependentesCriados        DependenteColaborador[] @relation("DependenteCriadoPor")
   /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
   diasDeEscalaCriados       EscalaDia[]             @relation("EscalaDiaCriadoPor")
@@ -889,6 +890,7 @@ model Empresa {
   beneficioAjustes     BeneficioAjuste[]
   beneficioDependentes BeneficioDependente[]
   beneficioHistorico   BeneficioHistorico[]
+  beneficioVersoes     BeneficioVersao[]
   dependentes          DependenteColaborador[]
   diasDeEscala         EscalaDia[]
   publicacoesDeEscala  EscalaPublicacao[]
@@ -3469,9 +3471,35 @@ model Beneficio {
   ajustes     BeneficioAjuste[]
   dependentes BeneficioDependente[]
   historico   BeneficioHistorico[]
+  versoes     BeneficioVersao[]
 
   @@index([empresaId])
   @@map("beneficio")
+}
+
+/// T215 — versão das regras de valor de um benefício a partir de uma
+/// competência ("Vale a partir de"). Sem versão, valem as regras do
+/// próprio benefício (desde o início). Uma versão nova substitui as que
+/// começavam depois dela (`substituidaEm`); nada é apagado.
+model BeneficioVersao {
+  id            String             @id @default(uuid())
+  beneficioId   String             @map("beneficio_id")
+  empresaId     String             @map("empresa_id")
+  /// Competência (1º dia) em que a versão começa.
+  aPartirDe     DateTime           @map("a_partir_de") @db.Date
+  tipoValor     TipoValorBeneficio @map("tipo_valor")
+  regras        Json
+  substituidaEm DateTime?          @map("substituida_em")
+  criadoPorId   String             @map("criado_por_id")
+  criadoEm      DateTime           @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioVersaoPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId, aPartirDe])
+  @@index([empresaId])
+  @@map("beneficio_versao")
 }
 
 /// T215 — quem recebe o benefício, a partir de uma competência (e até a

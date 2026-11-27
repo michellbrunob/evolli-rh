@@ -220,6 +220,10 @@ export class SalvarValoresDto {
   @Matches(COMPETENCIA)
   competencia!: string;
 
+  @IsOptional()
+  @IsIn(["tela", "importacao"])
+  origem?: "tela" | "importacao";
+
   @IsArray()
   @ArrayMaxSize(5000)
   @ValidateNested({ each: true })
@@ -287,6 +291,32 @@ export class DependentesNoPlanoDto {
 
   @Matches(COMPETENCIA)
   aPartirDe!: string;
+}
+
+/** Uma linha da planilha de valores: o texto de cada célula. */
+export class LinhaDaPlanilhaDto {
+  @IsInt()
+  @Min(2)
+  @Max(100_000)
+  linha!: number;
+
+  @IsString()
+  @MaxLength(30)
+  cpf!: string;
+
+  @IsObject()
+  valores!: Record<string, string | null>;
+}
+
+export class ConferirImportacaoDto {
+  @Matches(COMPETENCIA)
+  competencia!: string;
+
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @ValidateNested({ each: true })
+  @Type(() => LinhaDaPlanilhaDto)
+  linhas!: LinhaDaPlanilhaDto[];
 }
 
 export class DependenteDto {

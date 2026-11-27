@@ -348,6 +348,7 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
         "beneficio_ajuste",
         "beneficio_dependente",
         "beneficio_historico",
+        "beneficio_versao",
         "dependente_colaborador",
       ]) {
         const linhas = await prisma.$queryRawUnsafe<{ pode: boolean }[]>(
@@ -907,6 +908,317 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
       await post(`/v1/beneficios/${bB.body.id}/pessoas`, rhB)
         .send({ aPartirDe: C, pessoas: [{ colaboradorId: a.id }] })
         .expect(422);
+    });
+  });
+  describe("competências, resumo da lista, importação e impacto", () => {
+    const comCpf = async (colaboradorId: string, cpf: string) => {
+      const r = await prisma.perfilPessoalColaborador.updateMany({
+        where: { colaboradorId },
+        data: { cpf },
+      });
+      expect(r.count).toBe(1);
+    };
+
+    it("valores mudam a partir da competência escolhida; meses antes ficam", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          ...VR,
+          inicio: "2026-11-01",
+          pessoas: [{ colaboradorId: p.id }],
+        })
+        .expect(201);
+      // Nova regra de valor a partir de 12/2026.
+      await put(`/v1/beneficios/${b.body.id}`, rhA)
+        .send({
+          ...VR,
+          inicio: "2026-11-01",
+          regras: { ...VR.regras, valorDia: 40 },
+          aPartirDe: "2026-12",
+        })
+        .expect(200);
+      const em = async (c: string) =>
+        (
+          await get(`/v1/beneficios/${b.body.id}?competencia=${c}`, rhA).expect(
+            200,
+          )
+        ).body;
+      expect((await em("2026-11")).beneficio.regras.valorDia).toBe(30);
+      expect((await em("2026-11")).pessoas[0]).toMatchObject({
+        valorDia: 3000,
+      });
+      expect((await em("2026-12")).beneficio.regras.valorDia).toBe(40);
+      expect((await em("2027-03")).pessoas[0]).toMatchObject({
+        valorDia: 4000,
+      });
+
+      // "Daqui em diante" no lote também é uma versão: 12/2026 fica com 40.
+      await post(`/v1/beneficios/${b.body.id}/valores/lote`, rhA)
+        .send({
+          competencia: "2027-01",
+          para: "todos",
+          valorDia: 45,
+          duracao: "em_diante",
+        })
+        .expect(200);
+      expect((await em("2026-12")).beneficio.regras.valorDia).toBe(40);
+      expect((await em("2027-01")).beneficio.regras.valorDia).toBe(45);
+
+      // Uma versão nova substitui as que começavam depois dela.
+      await put(`/v1/beneficios/${b.body.id}`, rhA)
+        .send({
+          ...VR,
+          inicio: "2026-11-01",
+          regras: { ...VR.regras, valorDia: 50 },
+          aPartirDe: "2026-12",
+        })
+        .expect(200);
+      expect((await em("2027-01")).beneficio.regras.valorDia).toBe(50);
+      expect((await em("2026-11")).beneficio.regras.valorDia).toBe(30);
+
+      // Desde o início: troca a regra do próprio benefício.
+      await put(`/v1/beneficios/${b.body.id}`, rhA)
+        .send({
+          ...VR,
+          inicio: "2026-11-01",
+          regras: { ...VR.regras, valorDia: 25 },
+          aPartirDe: "2026-11",
+        })
+        .expect(200);
+      expect((await em("2026-11")).beneficio.regras.valorDia).toBe(25);
+      expect((await em("2027-06")).beneficio.regras.valorDia).toBe(25);
+
+      const h = await get(`/v1/beneficios/${b.body.id}/historico`, rhA).expect(
+        200,
+      );
+      expect(h.body.itens[0]).toMatchObject({
+        tipo: "valores",
+        aPartirDe: "2026-11",
+        descricao: "Valores do benefício alterados a partir de 11/2026.",
+      });
+      const versoes = await prisma.beneficioVersao.findMany({
+        where: { beneficioId: b.body.id },
+      });
+      expect(versoes.length).toBe(3);
+      expect(versoes.every((v) => v.substituidaEm !== null)).toBe(true);
+    });
+
+    it("lista: dependentes, pessoas distintas, cobertura e quem está sem benefício", async () => {
+      const titular = await admitir(rhA, empresaA);
+      const plano = await post("/v1/beneficios", rhA)
+        .send({
+          nome: "Saúde da lista",
+          categoria: "saude",
+          folha: "desconto",
+          tipoValor: "faixa_etaria",
+          inicio: "2026-01-01",
+          fim: "2027-12-31",
+          regras: {
+            faixas: [100, 120, 140, 160, 180, 200, 230, 260, 300, 529],
+            colaboradorPaga: {
+              calculo: "percentual",
+              titular: 20,
+              dependente: 30,
+            },
+          },
+          pessoas: [{ colaboradorId: titular.id }],
+        })
+        .expect(201);
+      const dep = await post(`/v1/colaboradores/${titular.id}/dependentes`, rhA)
+        .send({
+          nome: "Dependente Lista",
+          parentesco: "filho",
+          dataNascimento: "2018-05-10",
+        })
+        .expect(201);
+      await put(
+        `/v1/beneficios/${plano.body.id}/pessoas/${titular.id}/dependentes`,
+        rhA,
+      )
+        .send({ dependenteIds: [dep.body.id], aPartirDe: C })
+        .expect(200);
+      const lista = await get(`/v1/beneficios?competencia=${C}`, rhA).expect(
+        200,
+      );
+      const r = lista.body.resumo;
+      expect(r.ativos).toBeGreaterThan(0);
+      expect(r.ativos - r.semBeneficio.length).toBeLessThanOrEqual(r.pessoas);
+      expect(r.pessoas).toBeLessThanOrEqual(
+        lista.body.beneficios.reduce(
+          (t: number, b: { pessoas: number }) => t + b.pessoas,
+          0,
+        ),
+      );
+      const ativos = lista.body.beneficios.filter(
+        (b: { situacao: string }) => b.situacao === "ativo",
+      );
+      expect(r.empresa).toBeLessThanOrEqual(
+        ativos.reduce((t: number, b: { empresa: number }) => t + b.empresa, 0),
+      );
+      expect(r.semBeneficio[0]).toEqual({
+        colaboradorId: expect.any(String),
+        nome: expect.any(String),
+        cargo: expect.anything(),
+      });
+      const comDep = lista.body.beneficios.find(
+        (b: { id: string }) => b.id === plano.body.id,
+      );
+      expect(comDep).toMatchObject({ pessoas: 1, dependentes: 1 });
+      // Outra empresa: só o que é dela.
+      const deB = await get(`/v1/beneficios?competencia=${C}`, rhB).expect(200);
+      const idsDeA = new Set(
+        r.semBeneficio.map((p: { colaboradorId: string }) => p.colaboradorId),
+      );
+      expect(
+        deB.body.resumo.semBeneficio.some((p: { colaboradorId: string }) =>
+          idsDeA.has(p.colaboradorId),
+        ),
+      ).toBe(false);
+    });
+
+    it("importar valores: conferência por CPF, antes e depois; importa só as prontas", async () => {
+      const a = await admitir(rhA, empresaA);
+      const fora = await admitir(rhA, empresaA);
+      await comCpf(a.id, "11144477735");
+      await comCpf(fora.id, "52998224725");
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR, pessoas: [{ colaboradorId: a.id }] })
+        .expect(201);
+      const d = await get(
+        `/v1/beneficios/${b.body.id}?competencia=${C}`,
+        rhA,
+      ).expect(200);
+      expect(d.body.pessoas[0].cpf).toBe("11144477735");
+      // O master só lê: sem CPF.
+      const dm = await get(
+        `/v1/beneficios/${b.body.id}?competencia=${C}`,
+        masterA,
+      ).expect(200);
+      expect(dm.body.pessoas[0].cpf).toBeNull();
+
+      const r = await post(
+        `/v1/beneficios/${b.body.id}/importacao/conferir`,
+        rhA,
+      )
+        .send({
+          competencia: C,
+          linhas: [
+            {
+              linha: 2,
+              cpf: "111.444.777-35",
+              valores: { dias: "15", valorDia: "30,00" },
+            },
+            { linha: 3, cpf: "529.982.247-25", valores: { dias: "10" } },
+            { linha: 4, cpf: "123", valores: { dias: "10" } },
+          ],
+        })
+        .expect(200);
+      expect(r.body.colunas).toEqual(["dias", "valorDia"]);
+      expect(r.body.linhas[0]).toMatchObject({
+        situacao: "pronta",
+        nome: a.nome,
+        valores: { dias: 15, valorDia: 30 },
+        antes: { valor: 57000, desconto: 11400 },
+        depois: { valor: 45000, desconto: 9000 },
+      });
+      expect(r.body.linhas[1]).toMatchObject({
+        situacao: "pendencia",
+        problemas: [{ campo: "cpf", motivo: "nao_recebe" }],
+      });
+      expect(r.body.linhas[2].problemas).toEqual([
+        { campo: "cpf", motivo: "invalido" },
+      ]);
+      // Conferir não grava.
+      const d2 = await get(
+        `/v1/beneficios/${b.body.id}?competencia=${C}`,
+        rhA,
+      ).expect(200);
+      expect(d2.body.pessoas[0]).toMatchObject({ dias: 19, ajustado: false });
+      // O master não importa.
+      await post(`/v1/beneficios/${b.body.id}/importacao/conferir`, masterA)
+        .send({ competencia: C, linhas: [] })
+        .expect(403);
+      // Importar = salvar valores com a origem.
+      await put(`/v1/beneficios/${b.body.id}/valores`, rhA)
+        .send({
+          competencia: C,
+          origem: "importacao",
+          linhas: [{ colaboradorId: a.id, dias: 15, valorDia: 30 }],
+        })
+        .expect(200);
+      const h = await get(`/v1/beneficios/${b.body.id}/historico`, rhA).expect(
+        200,
+      );
+      expect(h.body.itens[0].descricao).toBe(
+        "Valores de 11/2026 importados da planilha para 1 pessoa.",
+      );
+      await put(`/v1/beneficios/${b.body.id}/valores`, rhA)
+        .send({ competencia: C, linhas: [] })
+        .expect(422);
+    });
+
+    it("coparticipação digitada volta na tela; impacto dos dependentes sem gravar", async () => {
+      const titular = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          nome: "Saúde impacto",
+          categoria: "saude",
+          folha: "desconto",
+          tipoValor: "faixa_etaria",
+          inicio: "2026-01-01",
+          fim: "2027-12-31",
+          regras: {
+            faixas: [100, 120, 140, 160, 180, 200, 230, 260, 300, 529],
+            colaboradorPaga: {
+              calculo: "percentual",
+              titular: 20,
+              dependente: 30,
+            },
+            coparticipacao: true,
+          },
+          pessoas: [{ colaboradorId: titular.id }],
+        })
+        .expect(201);
+      await put(`/v1/beneficios/${b.body.id}/valores`, rhA)
+        .send({
+          competencia: C,
+          linhas: [{ colaboradorId: titular.id, coparticipacao: 50 }],
+        })
+        .expect(200);
+      const d = await get(
+        `/v1/beneficios/${b.body.id}?competencia=${C}`,
+        rhA,
+      ).expect(200);
+      expect(d.body.pessoas[0]).toMatchObject({
+        coparticipacao: 50,
+        desconto: 3600 + 5000,
+      });
+
+      const dep = await post(`/v1/colaboradores/${titular.id}/dependentes`, rhA)
+        .send({
+          nome: "Dependente Impacto",
+          parentesco: "filho",
+          dataNascimento: "2018-05-10",
+        })
+        .expect(201);
+      const sim = await post(
+        `/v1/beneficios/${b.body.id}/pessoas/${titular.id}/dependentes/simular`,
+        rhA,
+      )
+        .send({ dependenteIds: [dep.body.id], aPartirDe: C })
+        .expect(200);
+      expect(sim.body).toEqual({
+        competencia: C,
+        // O valor inclui a coparticipação do mês (R$ 50,00).
+        antes: { valor: 23000, empresa: 14400, desconto: 8600 },
+        depois: { valor: 33000, empresa: 21400, desconto: 11600 },
+      });
+      // Simular não grava.
+      const d2 = await get(
+        `/v1/beneficios/${b.body.id}?competencia=${C}`,
+        rhA,
+      ).expect(200);
+      expect(d2.body.pessoas[0].dependentesNoPlano).toBe(0);
     });
   });
 });
