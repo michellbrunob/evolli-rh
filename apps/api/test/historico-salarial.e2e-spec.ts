@@ -616,21 +616,44 @@ describe("T215 — histórico salarial (e2e)", () => {
   });
 
   describe("edição do contrato (Dados profissionais)", () => {
-    it("trocar o salário corrige o período vigente; sem histórico, cria a linha da admissão", async () => {
+    it("com histórico, salário diferente é recusado (422 nao_se_aplica) e o período vigente fica intacto", async () => {
       const p = await admitir("2000.00");
-      await put(`/v1/colaboradores/${p.id}/contrato`, rhA)
+      const r = await put(`/v1/colaboradores/${p.id}/contrato`, rhA)
         .send({ salarioBruto: "2200.00" })
-        .expect(200);
-      let h = await historico(p.id);
-      expect(h.alteracoes.map((a) => [a.origem, a.salarioBruto])).toEqual([
-        ["admissao", "2200.00"],
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "salarioBruto", motivo: "nao_se_aplica" },
       ]);
+      const h = await historico(p.id);
+      expect(h.alteracoes.map((a) => [a.origem, a.salarioBruto])).toEqual([
+        ["admissao", "2000.00"],
+      ]);
+      expect(await salarioDoContrato(p.vinculoId)).toBe("2000.00");
+    });
 
+    it("aumento não vira retroativo: o reajuste segue pela aba Salários e o contrato só espelha", async () => {
+      const p = await admitir("2000.00");
+      await registrar(p.id, { vigenciaInicio: HOJE, salarioBruto: "2500.00" });
+      // Sem o salário no corpo (a tela não o envia mais): nada muda nele.
+      const r = await put(`/v1/colaboradores/${p.id}/contrato`, rhA)
+        .send({ nivel: "pleno" })
+        .expect(200);
+      expect(r.body.contrato.salarioBruto).toBe("2500.00");
+      const h = await historico(p.id);
+      expect(
+        h.alteracoes.map((a) => [a.vigenciaInicio, a.salarioBruto]),
+      ).toEqual([
+        [HOJE, "2500.00"],
+        [ADMISSAO, "2000.00"],
+      ]);
+    });
+
+    it("sem histórico, o salário do contrato cria a linha da admissão", async () => {
       const semSalario = await admitirSemSalario();
       await put(`/v1/colaboradores/${semSalario.id}/contrato`, rhA)
         .send({ salarioBruto: "1900.00" })
         .expect(200);
-      h = await historico(semSalario.id);
+      const h = await historico(semSalario.id);
       expect(h.alteracoes).toEqual([
         expect.objectContaining({
           origem: "admissao",
@@ -638,6 +661,7 @@ describe("T215 — histórico salarial (e2e)", () => {
           salarioBruto: "1900.00",
         }),
       ]);
+      expect(await salarioDoContrato(semSalario.vinculoId)).toBe("1900.00");
     });
 
     it("com histórico, apagar o salário no contrato é recusado (422 obrigatorio)", async () => {
@@ -648,6 +672,107 @@ describe("T215 — histórico salarial (e2e)", () => {
       expect(r.body.erros).toEqual([
         { campo: "salarioBruto", motivo: "obrigatorio" },
       ]);
+    });
+  });
+
+  describe("admissão futura", () => {
+    it("antes do primeiro dia, a linha da admissão não é vigente", async () => {
+      sequencia += 1;
+      const futura = somarDias(HOJE, 10);
+      const r = await post("/v1/colaboradores", rhA)
+        .send({
+          ...camposObrigatoriosAdmissao(),
+          ...(await lotacaoMinima(appUrl, empresaA)),
+          nome: `Pessoa Salario Futura ${sequencia}`,
+          empresaId: empresaA,
+          tipo: "clt",
+          dataAdmissao: futura,
+          motivoCodigo: "admissao_inicial",
+          contrato: { salarioBruto: "3000.00" },
+        })
+        .expect(201);
+      const h = await historico(r.body.id as string);
+      expect(h.alteracoes).toEqual([
+        expect.objectContaining({
+          origem: "admissao",
+          vigenciaInicio: futura,
+          vigenciaFim: null,
+          salarioBruto: "3000.00",
+          vigente: false,
+        }),
+      ]);
+    });
+  });
+
+  describe("readmissão (POST /v1/vinculos)", () => {
+    async function desligado() {
+      const p = await admitir("2000.00");
+      await prisma.vinculoFuncional.update({
+        where: { id: p.vinculoId },
+        data: {
+          situacao: "encerrado",
+          dataDesligamento: new Date(`${ANO_PASSADO}T00:00:00Z`),
+        },
+      });
+      return p;
+    }
+
+    it("sem salário: 422 contrato.salarioBruto obrigatorio e nenhum vínculo novo", async () => {
+      const p = await desligado();
+      const lotacao = await lotacaoMinima(appUrl, empresaA);
+      const r = await post("/v1/vinculos", rhA)
+        .send({
+          colaboradorId: p.id,
+          empresaId: empresaA,
+          matricula: `READM-${sequencia}`,
+          tipo: "clt",
+          dataAdmissao: HOJE,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: lotacao.departamentoId,
+          cargoId: lotacao.cargoId,
+        })
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "contrato.salarioBruto", motivo: "obrigatorio" },
+      ]);
+      expect(
+        await prisma.vinculoFuncional.count({ where: { colaboradorId: p.id } }),
+      ).toBe(1);
+    });
+
+    it("com salário: o vínculo novo abre a própria linha do tempo, com a tag Admissão e o cargo", async () => {
+      const p = await desligado();
+      const lotacao = await lotacaoMinima(appUrl, empresaA);
+      const cargo = await prisma.cargo.findUniqueOrThrow({
+        where: { id: lotacao.cargoId },
+      });
+      const r = await post("/v1/vinculos", rhA)
+        .send({
+          colaboradorId: p.id,
+          empresaId: empresaA,
+          matricula: `READM-OK-${sequencia}`,
+          tipo: "clt",
+          dataAdmissao: HOJE,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: lotacao.departamentoId,
+          cargoId: lotacao.cargoId,
+          contrato: { salarioBruto: "2800.00" },
+        })
+        .expect(201);
+      const novo = r.body.id as string;
+      const linhas = await prisma.alteracaoSalarial.findMany({
+        where: { vinculoId: novo },
+      });
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]).toMatchObject({
+        origem: "admissao",
+        cargo: cargo.nome,
+      });
+      expect(linhas[0]!.salarioBruto.toFixed(2)).toBe("2800.00");
+      expect(linhas[0]!.vigenciaInicio.toISOString().slice(0, 10)).toBe(HOJE);
+      expect(await salarioDoContrato(novo)).toBe("2800.00");
+      // O vínculo antigo guarda o próprio histórico.
+      expect(await salarioDoContrato(p.vinculoId)).toBe("2000.00");
     });
   });
 

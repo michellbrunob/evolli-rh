@@ -339,7 +339,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
     });
   });
 
-  it("PUT cria a linha quando falta, devolve o gravado e a trilha não leva valores", async () => {
+  it("PUT devolve o gravado e a trilha não leva valores", async () => {
     const { id, vinculoId } = await admitir(rhA, empresaA);
     const r = await put(rota(id), rhA)
       .send({
@@ -347,7 +347,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
         gestorDiretoId: gestorA,
         jornadaSemanalHoras: 40,
         escala: "6x1",
-        salarioBruto: "7321.45",
+        salarioBruto: SALARIO_DA_ADMISSAO,
         conselhoProfissional: "crea",
         registroProfissional: " 98765/RJ ",
         dependentesIrrf: 1,
@@ -360,7 +360,7 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
       gestorDiretoId: gestorA,
       jornadaSemanalHoras: 40,
       escala: "6x1",
-      salarioBruto: "7321.45",
+      salarioBruto: SALARIO_DA_ADMISSAO,
       conselhoProfissional: "crea",
       registroProfissional: "98765/RJ",
       dependentesIrrf: 1,
@@ -380,26 +380,24 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
       companyId: empresaA,
       result: "success",
     });
-    expect(JSON.stringify(trilha)).not.toMatch(/7321|98765/);
+    expect(JSON.stringify(trilha)).not.toMatch(/1621|98765/);
   });
 
-  it("PUT substitui o bloco inteiro: ausente e null limpam", async () => {
+  it("PUT substitui o bloco inteiro: ausente e null limpam (menos o salário, espelho do vigente)", async () => {
     const { id } = await admitir(rhA, empresaA, {
       contrato: { nivel: "junior", salarioBruto: "3000.00", escala: "5x2" },
     });
-    const r = await put(rota(id), rhA)
-      .send({ salarioBruto: "3500.00", escala: null })
-      .expect(200);
+    const r = await put(rota(id), rhA).send({ escala: null }).expect(200);
     expect(r.body.contrato).toEqual({
       ...CONTRATO_VAZIO,
-      salarioBruto: "3500.00",
+      salarioBruto: "3000.00",
     });
     const lido = await get(rota(id), rhA).expect(200);
     expect(lido.body.contrato).toEqual(r.body.contrato);
   });
 
-  it("PUT só com o salário limpa os demais campos; sem o salário, é recusado", async () => {
-    const { id } = await admitir(rhA, empresaA, {
+  it("salário: o mesmo passa, diferente é 422 nao_se_aplica, null é 422 obrigatorio — nada sobrescreve o vigente", async () => {
+    const { id, vinculoId } = await admitir(rhA, empresaA, {
       contrato: { nivel: "junior" },
     });
     const r = await put(rota(id), rhA)
@@ -409,10 +407,84 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
       ...CONTRATO_VAZIO,
       salarioBruto: SALARIO_DA_ADMISSAO,
     });
-    const recusa = await put(rota(id), rhA).send({}).expect(422);
-    expect(recusa.body.erros).toEqual([
+    const diferente = await put(rota(id), rhA)
+      .send({ nivel: "pleno", salarioBruto: "9999.00" })
+      .expect(422);
+    expect(diferente.body.erros).toEqual([
+      { campo: "salarioBruto", motivo: "nao_se_aplica" },
+    ]);
+    const apagado = await put(rota(id), rhA)
+      .send({ salarioBruto: null })
+      .expect(422);
+    expect(apagado.body.erros).toEqual([
       { campo: "salarioBruto", motivo: "obrigatorio" },
     ]);
+    const linhas = await prisma.alteracaoSalarial.findMany({
+      where: { vinculoId },
+    });
+    expect(linhas.map((l) => l.salarioBruto.toFixed(2))).toEqual([
+      SALARIO_DA_ADMISSAO,
+    ]);
+    const contrato = await prisma.contratoVinculo.findUniqueOrThrow({
+      where: { vinculoId },
+    });
+    expect(contrato.nivel).toBeNull();
+    expect(contrato.salarioBruto?.toFixed(2)).toBe(SALARIO_DA_ADMISSAO);
+  });
+
+  it("formulário aberto antes de um reajuste: salvar só o nível não apaga o reajuste", async () => {
+    const { id, vinculoId } = await admitir(rhA, empresaA);
+    // A tela abriu com o contrato do momento (salário da admissão)...
+    const aberto = await get(rota(id), rhA).expect(200);
+    expect(aberto.body.contrato.salarioBruto).toBe(SALARIO_DA_ADMISSAO);
+    // ...e, enquanto isso, a aba Salários registrou um reajuste (direto no
+    // banco, como ela o grava: a linha e o espelho no contrato — a admissão
+    // desta suíte é futura, e a API recusaria a data).
+    const rh = await prisma.accessUser.findFirstOrThrow({
+      where: { email: "rh.ctra@example.test" },
+    });
+    await prisma.alteracaoSalarial.create({
+      data: {
+        vinculoId,
+        empresaId: empresaA,
+        origem: "alteracao",
+        vigenciaInicio: new Date("2026-12-15T00:00:00Z"),
+        salarioBruto: "1900.00",
+        registradaPorUserId: rh.id,
+      },
+    });
+    await prisma.contratoVinculo.update({
+      where: { vinculoId },
+      data: { salarioBruto: "1900.00" },
+    });
+
+    // A tela de hoje não envia o salário: só o nível muda.
+    const salvo = await put(rota(id), rhA).send({ nivel: "pleno" }).expect(200);
+    expect(salvo.body.contrato).toMatchObject({
+      nivel: "pleno",
+      salarioBruto: "1900.00",
+    });
+    // Uma tela antiga, que reenvia o salário de quando abriu, é recusada
+    // por campo em vez de apagar o reajuste.
+    const antiga = await put(rota(id), rhA)
+      .send({ nivel: "senior", salarioBruto: SALARIO_DA_ADMISSAO })
+      .expect(422);
+    expect(antiga.body.erros).toEqual([
+      { campo: "salarioBruto", motivo: "nao_se_aplica" },
+    ]);
+    const linhas = await prisma.alteracaoSalarial.findMany({
+      where: { vinculoId, removidaEm: null },
+      orderBy: { vigenciaInicio: "asc" },
+    });
+    expect(linhas.map((l) => [l.origem, l.salarioBruto.toFixed(2)])).toEqual([
+      ["admissao", SALARIO_DA_ADMISSAO],
+      ["alteracao", "1900.00"],
+    ]);
+    expect(
+      (
+        await prisma.contratoVinculo.findUniqueOrThrow({ where: { vinculoId } })
+      ).salarioBruto?.toFixed(2),
+    ).toBe("1900.00");
   });
 
   it("matrícula: ausente mantém, nova grava, null apaga; em uso na empresa é 409 por campo sem o valor", async () => {
@@ -513,10 +585,11 @@ describe("T215 — contrato do colaborador na edição (e2e)", () => {
   it("DP lê e edita", async () => {
     const { id } = await admitir(rhA, empresaA);
     await get(rota(id), dpA).expect(200);
-    const r = await put(rota(id), dpA)
-      .send({ salarioBruto: "2500.00" })
-      .expect(200);
-    expect(r.body.contrato.salarioBruto).toBe("2500.00");
+    const r = await put(rota(id), dpA).send({ nivel: "pleno" }).expect(200);
+    expect(r.body.contrato).toMatchObject({
+      nivel: "pleno",
+      salarioBruto: SALARIO_DA_ADMISSAO,
+    });
   });
 
   it("master técnico lê (global) e não edita", async () => {

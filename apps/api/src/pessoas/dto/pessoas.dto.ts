@@ -339,6 +339,18 @@ export class CriarVinculoDto extends DestinoOrganizacionalDto {
 
   @IsIn(MOTIVOS)
   motivoCodigo!: MotivoMovimentacao;
+
+  /**
+   * T215 — o contrato da readmissão, com as mesmas validações da admissão.
+   * Opcional na forma; o serviço exige o salário (422
+   * `contrato.salarioBruto` `obrigatorio`): ninguém é admitido sem o
+   * primeiro salário, que abre a linha do tempo do vínculo novo.
+   */
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ContratoAdmissaoDto)
+  contrato?: ContratoAdmissaoDto;
 }
 
 /**

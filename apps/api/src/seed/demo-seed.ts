@@ -1101,6 +1101,8 @@ export async function semearDemonstracao(
           dataAdmissao: "2026-03-02",
           motivoCodigo: "admissao_inicial",
           departamentoId: operacoes.id,
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
         }),
     );
 

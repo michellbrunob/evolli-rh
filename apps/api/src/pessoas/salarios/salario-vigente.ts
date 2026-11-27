@@ -1,4 +1,43 @@
 import { Prisma } from "@prisma/client";
+import { CamposRecusadosException } from "../../common/erros/recusa-por-campo";
+
+/** T215 — o que a edição do contrato faz com o salário. */
+export type DecisaoDoSalarioDoContrato =
+  /** Há linha do tempo: o contrato só espelha o período vigente. */
+  | { acao: "manter" }
+  /** Sem linha do tempo (admitido antes da regra): o enviado abre a admissão. */
+  | { acao: "abrir_admissao"; salarioBruto: string }
+  /** Sem linha do tempo e sem salário: nada muda no salário. */
+  | { acao: "nenhuma" };
+
+/**
+ * T215 — o salário na edição do contrato (Dados profissionais). Com linha do
+ * tempo, o salário NÃO muda por aqui: mudar é registrar uma alteração com
+ * data na aba Salários (o período anterior fica como estava). Por isso:
+ * ausente ou igual ao vigente mantém; diferente é recusado (`nao_se_aplica`,
+ * em vez de reescrever o período vigente — um aumento viraria retroativo e o
+ * valor antigo sumiria); apagado (`null`) é recusado (`obrigatorio`).
+ *
+ * `vigente` e `enviado` em reais com 2 casas ("2000.00"); `enviado`
+ * `undefined` é o campo ausente do corpo.
+ */
+export function decidirSalarioDoContrato(
+  vigente: string | null,
+  enviado: string | null | undefined,
+): DecisaoDoSalarioDoContrato {
+  if (vigente !== null) {
+    if (enviado === undefined || enviado === vigente) return { acao: "manter" };
+    throw new CamposRecusadosException([
+      {
+        campo: "salarioBruto",
+        motivo: enviado === null ? "obrigatorio" : "nao_se_aplica",
+      },
+    ]);
+  }
+  return enviado === undefined || enviado === null
+    ? { acao: "nenhuma" }
+    : { acao: "abrir_admissao", salarioBruto: enviado };
+}
 
 /**
  * T215 — o salário VIGENTE (a linha viva de maior vigência) espelhado em

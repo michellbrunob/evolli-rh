@@ -18,7 +18,11 @@ import {
 import { RegistrarContratoColaboradorDto } from "./contrato-colaborador.dto";
 import { escolherVinculoPrincipal } from "./vinculo-principal";
 import { DesativacaoColaboradorService } from "./desativacao-colaborador.service";
-import { registrarSalarioDaAdmissao } from "../salarios/salario-vigente";
+import {
+  decidirSalarioDoContrato,
+  espelharSalarioVigente,
+  registrarSalarioDaAdmissao,
+} from "../salarios/salario-vigente";
 
 /** O vínculo principal como a edição o mostra (só leitura, menos a matrícula). */
 export interface VinculoDoContrato {
@@ -197,19 +201,6 @@ export class ContratoColaboradorService {
       }
     }
 
-    // T215 — com linha do tempo salarial, o contrato espelha o período
-    // vigente: trocar o salário aqui CORRIGE esse período; apagá-lo não.
-    const salarioVigente = await this.prisma.alteracaoSalarial.findFirst({
-      where: { vinculoId: principal.id, removidaEm: null },
-      orderBy: { vigenciaInicio: "desc" },
-      select: { id: true, salarioBruto: true },
-    });
-    if (salarioVigente && enviado.salarioBruto === null) {
-      throw new CamposRecusadosException([
-        { campo: "salarioBruto", motivo: "obrigatorio" },
-      ]);
-    }
-
     const novaMatricula =
       dto.matricula === undefined ? principal.matricula : dto.matricula;
 
@@ -240,6 +231,21 @@ export class ContratoColaboradorService {
           });
         }
 
+        // T215 — o salário NÃO muda por aqui: com linha do tempo salarial,
+        // o contrato espelha o período vigente (gravado pela aba Salários) e
+        // o enviado só passa se for o mesmo; sem linha do tempo, o enviado
+        // abre a linha da admissão. Lido na transação: um reajuste gravado
+        // depois que o formulário abriu continua intacto.
+        const vigente = await tx.alteracaoSalarial.findFirst({
+          where: { vinculoId: principal.id, removidaEm: null },
+          orderBy: { vigenciaInicio: "desc" },
+          select: { salarioBruto: true },
+        });
+        const decisao = decidirSalarioDoContrato(
+          vigente?.salarioBruto.toFixed(2) ?? null,
+          dto.salarioBruto === undefined ? undefined : enviado.salarioBruto,
+        );
+
         const existente = await tx.contratoVinculo.findUnique({
           where: { vinculoId: principal.id },
           select: { vinculoId: true },
@@ -249,14 +255,18 @@ export class ContratoColaboradorService {
           gestorDiretoColaboradorId: enviado.gestorDiretoId,
           jornadaSemanalHoras: enviado.jornadaSemanalHoras,
           escala: enviado.escala,
-          salarioBruto: enviado.salarioBruto,
           conselhoProfissional: enviado.conselhoProfissional,
           registroProfissional: enviado.registroProfissional,
           dependentesIrrf: enviado.dependentesIrrf,
           pensaoAlimenticiaPercentual: enviado.pensaoAlimenticiaPercentual,
+          // Com linha do tempo, o espelho vem do vigente (abaixo), nunca do
+          // corpo.
+          ...(decisao.acao === "abrir_admissao"
+            ? { salarioBruto: decisao.salarioBruto }
+            : {}),
         };
         // Sem linha e sem nenhum valor, a linha não nasce (como na admissão).
-        const linha = existente
+        let linha = existente
           ? await tx.contratoVinculo.update({
               where: { vinculoId: principal.id },
               data: dados,
@@ -266,6 +276,17 @@ export class ContratoColaboradorService {
                 data: { vinculoId: principal.id, empresaId, ...dados },
               })
             : null;
+        if (decisao.acao === "manter") {
+          // Depois do update (a linha do contrato já está travada nesta
+          // transação): o salário do contrato é o do período vigente.
+          await espelharSalarioVigente(tx, {
+            vinculoId: principal.id,
+            empresaId,
+          });
+          linha = await tx.contratoVinculo.findUnique({
+            where: { vinculoId: principal.id },
+          });
+        }
 
         await this.auditoria.registrarMutacao(
           tx,
@@ -276,44 +297,27 @@ export class ContratoColaboradorService {
           empresaId,
         );
 
-        // T215 — o salário na linha do tempo: sem nenhum período, nasce o da
-        // admissão; com período vigente e valor diferente, ele é corrigido.
-        if (enviado.salarioBruto !== null) {
-          if (!salarioVigente) {
-            const alteracaoId = await registrarSalarioDaAdmissao(
-              tx,
-              {
-                vinculoId: principal.id,
-                empresaId,
-                dataAdmissao: principal.dataAdmissao,
-                registradaPorUserId: ctx.actor.id,
-              },
-              enviado.salarioBruto,
-            );
-            await this.auditoria.registrarMutacao(
-              tx,
-              ctx,
-              "pessoas_salario_registrado",
-              "alteracao_salarial",
-              alteracaoId!,
+        // T215 — sem nenhum período, o salário enviado abre a linha da
+        // admissão, na data de admissão.
+        if (decisao.acao === "abrir_admissao") {
+          const alteracaoId = await registrarSalarioDaAdmissao(
+            tx,
+            {
+              vinculoId: principal.id,
               empresaId,
-            );
-          } else if (
-            salarioVigente.salarioBruto.toFixed(2) !== enviado.salarioBruto
-          ) {
-            await tx.alteracaoSalarial.update({
-              where: { id: salarioVigente.id },
-              data: { salarioBruto: enviado.salarioBruto },
-            });
-            await this.auditoria.registrarMutacao(
-              tx,
-              ctx,
-              "pessoas_salario_atualizado",
-              "alteracao_salarial",
-              salarioVigente.id,
-              empresaId,
-            );
-          }
+              dataAdmissao: principal.dataAdmissao,
+              registradaPorUserId: ctx.actor.id,
+            },
+            decisao.salarioBruto,
+          );
+          await this.auditoria.registrarMutacao(
+            tx,
+            ctx,
+            "pessoas_salario_registrado",
+            "alteracao_salarial",
+            alteracaoId!,
+            empresaId,
+          );
         }
 
         return {

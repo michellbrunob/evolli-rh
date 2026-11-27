@@ -36,14 +36,21 @@ function vespera(data: Date): string {
 
 /**
  * T215 — a linha do tempo salarial: da mais nova para a mais antiga. A mais
- * nova é a vigente (aberta); cada outra vai até a véspera da seguinte. Só
- * recebe linhas vivas (não removidas).
+ * nova fica aberta; cada outra vai até a véspera da seguinte. Vigente é só a
+ * mais nova que JÁ começou (início até `hoje`, dia civil de São Paulo): numa
+ * admissão futura, nenhuma linha é vigente antes do primeiro dia. Só recebe
+ * linhas vivas (não removidas).
  */
 export function montarLinhaDoTempo(
   linhas: readonly LinhaGravada[],
+  /** Dia civil `AAAA-MM-DD` de hoje (São Paulo). */
+  hoje: string,
 ): AlteracaoSalarialDevolvida[] {
   const ordenadas = [...linhas].sort(
     (a, b) => b.vigenciaInicio.getTime() - a.vigenciaInicio.getTime(),
+  );
+  const indiceVigente = ordenadas.findIndex(
+    (l) => diaCivil(l.vigenciaInicio) <= hoje,
   );
   return ordenadas.map((l, i) => {
     const seguinte = ordenadas[i - 1];
@@ -55,7 +62,7 @@ export function montarLinhaDoTempo(
       salarioBruto: l.salarioBruto.toFixed(2),
       cargo: l.cargo,
       modeloContrato: l.modeloContrato,
-      vigente: i === 0,
+      vigente: i === indiceVigente,
     };
   });
 }

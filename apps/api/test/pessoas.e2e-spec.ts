@@ -634,6 +634,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           tipo: "clt",
           dataAdmissao: "2026-06-01",
           motivoCodigo: "admissao_inicial",
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
           departamentoId: departamentoA,
         })
         .expect(201);
@@ -971,6 +973,8 @@ describe("Colaboradores e Vida Funcional (e2e)", () => {
           tipo: "pj",
           dataAdmissao: ADMISSAO,
           motivoCodigo: "admissao_inicial",
+          // T215 — a readmissão exige o primeiro salário.
+          contrato: { salarioBruto: "1621.00" },
           departamentoId: departamentoA,
         })
         .expect(201);

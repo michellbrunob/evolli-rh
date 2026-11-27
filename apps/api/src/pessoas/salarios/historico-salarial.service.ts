@@ -36,7 +36,10 @@ export interface HistoricoSalarial {
   /** Do contrato, para o líquido estimado da tela. */
   dependentesIrrf: number | null;
   pensaoAlimenticiaPercentual: string | null;
-  /** Da mais nova para a mais antiga; a primeira é a vigente. */
+  /**
+   * Da mais nova para a mais antiga; a vigente é a mais nova que já começou
+   * (numa admissão futura, nenhuma).
+   */
   alteracoes: AlteracaoSalarialDevolvida[];
 }
 
@@ -313,7 +316,7 @@ export class HistoricoSalarialService {
       dependentesIrrf: contrato?.dependentesIrrf ?? null,
       pensaoAlimenticiaPercentual:
         contrato?.pensaoAlimenticiaPercentual?.toFixed(2) ?? null,
-      alteracoes: montarLinhaDoTempo(linhas),
+      alteracoes: montarLinhaDoTempo(linhas, hojeEmSaoPaulo()),
     };
   }
 
