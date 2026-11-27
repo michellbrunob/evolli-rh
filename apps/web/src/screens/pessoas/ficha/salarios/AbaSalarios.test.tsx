@@ -144,7 +144,7 @@ describe("T215 — aba Salários", () => {
     const resumo = cartao("Resumo");
     expect(within(resumo).getByText("Desde o primeiro registro")).toBeTruthy();
     expect(
-      within(resumo).getByText("Aparece após o primeiro reajuste"),
+      within(resumo).getByText("Aparece após a primeira alteração"),
     ).toBeTruthy();
     const linha = (rotulo: string) =>
       within(resumo).getByText(rotulo).closest("div")!;
@@ -212,9 +212,204 @@ describe("T215 — aba Salários", () => {
     expect(within(itens[0]!).getByText("Coordenadora")).toBeTruthy();
     expect(within(itens[1]!).getByText("até 31/12/2025")).toBeTruthy();
     expect(within(itens[1]!).getByText("+25,0%")).toBeTruthy();
-    expect(within(itens[1]!).getByText("CLT · 9 meses")).toBeTruthy();
+    // 01/03/2025 a 31/12/2025: 10 meses (o último dia conta).
+    expect(within(itens[1]!).getByText("CLT · 10 meses")).toBeTruthy();
     expect(within(itens[2]!).getByText("CLT · 1 ano e 1 mês")).toBeTruthy();
     expect(within(itens[1]!).queryByText("Vigente")).toBeNull();
+  });
+
+  it("percentual em centavos, meio para cima: 2.000 → 2.045 é +2,3%", async () => {
+    montar(
+      servico(
+        historico([
+          alt({
+            id: "b",
+            vigenciaInicio: "2026-03-01",
+            salarioBruto: "2045.00",
+          }),
+          alt({
+            id: "adm",
+            origem: "admissao",
+            vigenciaInicio: "2024-01-05",
+            vigenciaFim: "2026-02-28",
+            salarioBruto: "2000.00",
+            vigente: false,
+          }),
+        ]),
+      ),
+    );
+    const atual = await screen.findByRole("region", { name: "Salário atual" });
+    expect(within(atual).getByText("+2,3% sobre o anterior")).toBeTruthy();
+    const resumo = cartao("Resumo");
+    const linha = (rotulo: string) =>
+      within(resumo).getByText(rotulo).closest("div")!;
+    expect(within(linha("Aumento acumulado")).getByText("+2,3%")).toBeTruthy();
+    expect(within(linha("Média por reajuste")).getByText("+2,3%")).toBeTruthy();
+  });
+
+  it("variação que arredonda a zero aparece como 0,0%, sem sinal", async () => {
+    montar(
+      servico(
+        historico([
+          alt({
+            id: "b",
+            vigenciaInicio: "2026-03-01",
+            salarioBruto: "2000.01",
+          }),
+          alt({
+            id: "adm",
+            origem: "admissao",
+            vigenciaInicio: "2024-01-05",
+            vigenciaFim: "2026-02-28",
+            salarioBruto: "2000.00",
+            vigente: false,
+          }),
+        ]),
+      ),
+    );
+    const atual = await screen.findByRole("region", { name: "Salário atual" });
+    expect(within(atual).getByText("0,0% sobre o anterior")).toBeTruthy();
+  });
+
+  it("redução e troca só de cargo são Alteração, não Reajuste (nem na contagem)", async () => {
+    montar(
+      servico(
+        historico([
+          alt({
+            id: "c",
+            vigenciaInicio: "2026-06-01",
+            salarioBruto: "1800.00",
+            cargo: "Analista",
+          }),
+          alt({
+            id: "b",
+            vigenciaInicio: "2025-03-01",
+            vigenciaFim: "2026-05-31",
+            salarioBruto: "2000.00",
+            cargo: "Assistente Sênior",
+            vigente: false,
+          }),
+          alt({
+            id: "adm",
+            origem: "admissao",
+            vigenciaInicio: "2024-01-05",
+            vigenciaFim: "2025-02-28",
+            salarioBruto: "2000.00",
+            cargo: "Assistente",
+            vigente: false,
+          }),
+        ]),
+      ),
+    );
+    const atual = await screen.findByRole("region", { name: "Salário atual" });
+    expect(within(atual).getByText("Alteração")).toBeTruthy();
+    expect(within(atual).queryByText("Reajuste")).toBeNull();
+    expect(within(atual).getByText("-10,0% sobre o anterior")).toBeTruthy();
+    expect(
+      within(atual).getByText("Sem reajustes desde a admissão"),
+    ).toBeTruthy();
+    const resumo = cartao("Resumo");
+    const linha = (rotulo: string) =>
+      within(resumo).getByText(rotulo).closest("div")!;
+    expect(within(linha("Reajustes")).getByText("0")).toBeTruthy();
+    expect(within(linha("Média por reajuste")).getByText("—")).toBeTruthy();
+    expect(within(linha("Aumento acumulado")).getByText("-10,0%")).toBeTruthy();
+  });
+
+  it("admissão futura: sem Vigente, a partir da data e sem duração", async () => {
+    montar(
+      servico(
+        historico([
+          alt({
+            id: "adm",
+            origem: "admissao",
+            vigenciaInicio: "2026-12-01",
+            salarioBruto: "3000.00",
+            vigente: false,
+          }),
+        ]),
+      ),
+    );
+    const atual = await screen.findByRole("region", { name: "Salário atual" });
+    expect(within(atual).getByText("A partir de")).toBeTruthy();
+    expect(within(atual).queryByText("Vigente desde")).toBeNull();
+    const [item] = within(cartao("Linha do tempo salarial")).getAllByRole(
+      "listitem",
+    );
+    expect(within(item!).getByText("a partir de 01/12/2026")).toBeTruthy();
+    expect(within(item!).queryByText("até hoje")).toBeNull();
+    expect(within(item!).queryByText("Vigente")).toBeNull();
+    expect(within(item!).getByText("CLT")).toBeTruthy();
+    const resumo = cartao("Resumo");
+    expect(
+      within(
+        within(resumo).getByText("Tempo no salário atual").closest("div")!,
+      ).getByText("—"),
+    ).toBeTruthy();
+  });
+
+  it("desligado: só leitura — nada de Nova alteração, ⋯ ou Registrar reajuste", async () => {
+    const encerrado = {
+      ...COM_REAJUSTES,
+      vinculo: { ...COM_REAJUSTES.vinculo, situacao: "encerrado" },
+    };
+    montar(servico(encerrado));
+    await screen.findByRole("region", { name: "Salário atual" });
+    expect(screen.queryByRole("button", { name: "Nova alteração" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Registrar reajuste" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Ações do registro/ }),
+    ).toBeNull();
+    expect(
+      screen.getByText("Só consulta: o vínculo foi encerrado."),
+    ).toBeTruthy();
+  });
+
+  it("desligado sem salário: o estado vazio não oferece Nova alteração", async () => {
+    montar(
+      servico({
+        ...historico([]),
+        vinculo: { ...historico([]).vinculo, situacao: "encerrado" },
+      }),
+    );
+    expect(await screen.findByText("Nenhum salário registrado")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Nova alteração" })).toBeNull();
+  });
+
+  it.each([
+    [
+      409,
+      "Não dá para excluir: o vínculo foi encerrado e a linha do tempo ficou só para consulta.",
+    ],
+    [
+      404,
+      "Este registro já tinha sido excluído. A linha do tempo foi atualizada.",
+    ],
+    [500, "Não foi possível excluir. Tente de novo."],
+  ])("excluir recusado com %i: %s", async (status, texto) => {
+    const remover = vi.fn(() => Promise.reject(new ApiError(status, "x")));
+    const s = servico(COM_REAJUSTES, { remover });
+    montar(s);
+    fireEvent.pointerDown(
+      await screen.findByRole("button", {
+        name: "Ações do registro de 01/01/2026",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Excluir" }));
+    const confirmacao = await screen.findByRole("dialog", {
+      name: "Excluir alteração salarial?",
+    });
+    fireEvent.click(
+      within(confirmacao).getByRole("button", { name: "Excluir" }),
+    );
+    expect(await within(confirmacao).findByText(texto)).toBeTruthy();
+    // 409 e 404: a linha do tempo é lida de novo (o estado mudou no servidor).
+    await waitFor(() =>
+      expect(s.consultar).toHaveBeenCalledTimes(status === 500 ? 1 : 2),
+    );
   });
 
   it("Nova alteração: registra com o que foi digitado e mostra a linha do tempo devolvida", async () => {

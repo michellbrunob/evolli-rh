@@ -9,8 +9,10 @@
  * - **Linha do tempo salarial:** os períodos, do mais novo ao mais antigo,
  *   com "Nova alteração", ⋯ Editar/Excluir e "Registrar reajuste".
  *
- * Quem não edita o contrato (`contrato_vinculo`) só lê. Gravar devolve a
- * linha do tempo inteira, já reorganizada pelo servidor.
+ * Quem não edita o contrato (`contrato_vinculo`) só lê; vínculo encerrado
+ * também (a API recusa gravar depois do desligamento). Reajuste é só a
+ * alteração em que o salário sobe; percentuais em centavos inteiros. Gravar
+ * devolve a linha do tempo inteira, já reorganizada pelo servidor.
  */
 import { Esqueleto, NumeroSuave, Revelar } from "../../../../ui/movimento";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -55,6 +57,8 @@ import {
 } from "../../salarioLiquido";
 import {
   duracaoDoPeriodo,
+  formatarPercentual as percentual,
+  idsDeReajuste,
   mesCurto,
   percentualSobreAnterior,
   pontosDoGrafico,
@@ -112,12 +116,6 @@ interface Props {
 }
 
 const VAZIO = "—";
-
-/** "+20,0%" / "-5,0%". */
-function percentual(valor: number): string {
-  const texto = Math.abs(valor).toFixed(1).replace(".", ",");
-  return `${valor < 0 ? "-" : "+"}${texto}%`;
-}
 
 /** "1.621" (sem centavos), para o rótulo do gráfico. */
 function reaisInteiros(valor: number): string {
@@ -190,8 +188,21 @@ export function AbaSalarios({
       const historico = await servico.remover(colaboradorId, excluindo.id);
       setCarga({ estado: "pronto", historico });
       setExcluindo(null);
-    } catch {
-      setErroAoRemover("Não foi possível excluir. Tente de novo.");
+    } catch (erro) {
+      const status = erro instanceof ApiError ? erro.status : null;
+      if (status === 409) {
+        setErroAoRemover(
+          "Não dá para excluir: o vínculo foi encerrado e a linha do tempo ficou só para consulta.",
+        );
+      } else if (status === 404) {
+        setErroAoRemover(
+          "Este registro já tinha sido excluído. A linha do tempo foi atualizada.",
+        );
+      } else {
+        setErroAoRemover("Não foi possível excluir. Tente de novo.");
+      }
+      // O estado mudou no servidor: a linha do tempo é lida de novo.
+      if (status === 409 || status === 404) carregar();
     } finally {
       setRemovendo(false);
     }
@@ -218,6 +229,9 @@ export function AbaSalarios({
   }
 
   const { historico } = carga;
+  // Depois do desligamento, a API recusa toda gravação (409): só consulta.
+  const encerrado = historico.vinculo.situacao === "encerrado";
+  const podeAlterar = podeEditar && !encerrado;
   const modeloPadrao =
     ROTULO_DO_TIPO_DE_VINCULO[
       historico.vinculo.tipo as keyof typeof ROTULO_DO_TIPO_DE_VINCULO
@@ -237,7 +251,7 @@ export function AbaSalarios({
             <p className="salarios__vazio-texto">
               {`Registre o salário para acompanhar a evolução ${deQuem}.`}
             </p>
-            {podeEditar ? (
+            {podeAlterar ? (
               <button
                 type="button"
                 className="ficha-ref__editar"
@@ -259,7 +273,8 @@ export function AbaSalarios({
               hoje={hoje}
               deQuem={deQuem}
               modeloPadrao={modeloPadrao}
-              podeEditar={podeEditar}
+              podeEditar={podeAlterar}
+              encerrado={encerrado}
               onNova={() => setGaveta({ modo: "nova" })}
               onEditar={(alteracao) => setGaveta({ modo: "editar", alteracao })}
               onExcluir={(alteracao) => {
@@ -382,8 +397,11 @@ function SalarioAtual({
   const sobreAnterior = percentualSobreAnterior(historico.alteracoes).get(
     vigente.id,
   );
-  const reajustes = historico.alteracoes.length - 1;
+  const ids = idsDeReajuste(historico.alteracoes);
+  const reajustes = ids.size;
   const primeiro = historico.alteracoes[historico.alteracoes.length - 1]!;
+  // Admissão futura: o salário ainda não vale.
+  const futuro = vigente.vigenciaInicio > hoje;
 
   return (
     <section className="ficha-ref__cartao salarios__atual" aria-labelledby={id}>
@@ -406,7 +424,11 @@ function SalarioAtual({
           </p>
           <p className="salarios__origem">
             <span className="salarios__selo">
-              {vigente.origem === "admissao" ? "Salário inicial" : "Reajuste"}
+              {vigente.origem === "admissao"
+                ? "Salário inicial"
+                : ids.has(vigente.id)
+                  ? "Reajuste"
+                  : "Alteração"}
             </span>
             <span className="salarios__origem-texto">
               {vigente.origem === "admissao" || sobreAnterior == null
@@ -424,7 +446,7 @@ function SalarioAtual({
               </dd>
             </div>
             <div className="salarios__detalhe">
-              <dt>Vigente desde</dt>
+              <dt>{futuro ? "A partir de" : "Vigente desde"}</dt>
               <dd>{formatarDiaCivil(vigente.vigenciaInicio)}</dd>
             </div>
           </dl>
@@ -560,7 +582,7 @@ function Resumo({
   const barra =
     resumo.aumentoAcumulado === null
       ? 0
-      : Math.max(0, Math.min(100, resumo.aumentoAcumulado));
+      : Math.max(0, Math.min(100, resumo.aumentoAcumulado / 10));
   return (
     <section
       className="ficha-ref__cartao salarios__resumo"
@@ -585,7 +607,7 @@ function Resumo({
           </span>
           {resumo.aumentoAcumulado === null ? (
             <span className="salarios__ajuda">
-              Aparece após o primeiro reajuste
+              Aparece após a primeira alteração
             </span>
           ) : null}
         </div>
@@ -618,6 +640,7 @@ function LinhaDoTempo({
   deQuem,
   modeloPadrao,
   podeEditar,
+  encerrado,
   onNova,
   onEditar,
   onExcluir,
@@ -627,6 +650,8 @@ function LinhaDoTempo({
   readonly deQuem: string;
   readonly modeloPadrao: string;
   readonly podeEditar: boolean;
+  /** Vínculo encerrado: a linha do tempo é só consulta. */
+  readonly encerrado: boolean;
   readonly onNova: () => void;
   readonly onEditar: (a: AlteracaoSalarialApi) => void;
   readonly onExcluir: (a: AlteracaoSalarialApi) => void;
@@ -641,7 +666,11 @@ function LinhaDoTempo({
       <CabecaDoCartao
         id={id}
         titulo="Linha do tempo salarial"
-        subtitulo="Alterações de salário, cargo e contrato"
+        subtitulo={
+          encerrado
+            ? "Só consulta: o vínculo foi encerrado."
+            : "Alterações de salário, cargo e contrato"
+        }
         icone={<IconeTempo tamanho={18} />}
         {...(podeEditar
           ? {
@@ -661,19 +690,21 @@ function LinhaDoTempo({
       <ol className="salarios__periodos">
         {historico.alteracoes.map((a) => {
           const p = percentuais.get(a.id);
-          const fim = a.vigenciaFim ?? hoje;
+          // Ainda não começou (admissão futura): nem vigente, nem duração.
+          const futuro = a.vigenciaInicio > hoje;
+          const vigente = a.vigente && !futuro;
           return (
             <li
               key={a.id}
               className={
-                a.vigente
+                vigente
                   ? "salarios__periodo salarios__periodo--vigente"
                   : "salarios__periodo"
               }
             >
               <span className="salarios__trilho" aria-hidden="true">
                 <span className="salarios__marco">
-                  {a.vigente ? <span className="salarios__pulso" /> : null}
+                  {vigente ? <span className="salarios__pulso" /> : null}
                   <span className="salarios__ponto" />
                 </span>
                 <span className="salarios__conector" />
@@ -686,7 +717,9 @@ function LinhaDoTempo({
                   <span className="salarios__suave">
                     {a.vigenciaFim
                       ? `até ${formatarDiaCivil(a.vigenciaFim)}`
-                      : "até hoje"}
+                      : futuro
+                        ? `a partir de ${formatarDiaCivil(a.vigenciaInicio)}`
+                        : "até hoje"}
                   </span>
                 </span>
                 <span className="salarios__coluna">
@@ -706,11 +739,13 @@ function LinhaDoTempo({
                     {a.cargo ?? "Não informado"}
                   </span>
                   <span className="salarios__suave salarios__cortado">
-                    {`${a.modeloContrato ?? modeloPadrao} · ${duracaoDoPeriodo(a.vigenciaInicio, fim)}`}
+                    {futuro
+                      ? (a.modeloContrato ?? modeloPadrao)
+                      : `${a.modeloContrato ?? modeloPadrao} · ${duracaoDoPeriodo(a.vigenciaInicio, a.vigenciaFim ?? hoje)}`}
                   </span>
                 </span>
                 <span className="salarios__selos">
-                  {a.vigente ? (
+                  {vigente ? (
                     <span className="salarios__selo salarios__selo--vigente">
                       Vigente
                     </span>
