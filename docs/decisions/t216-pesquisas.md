@@ -439,3 +439,19 @@ interface RespostaDetalhe extends RespostaResumo {
 }
 // A aba da ficha abre o RespostaDetalhe da pessoa (GET /colaboradores/:id/pesquisas devolve também respostaId).
 ```
+
+Notas da implementação (API):
+
+- `ResultadosPesquisa.participantes` também é `null` na anônima (como no resumo).
+- Acréscimos em `ResultadosPesquisa`: `grupos` (os grupos de cada recorte disponível, no formato de
+  `departamentos`) e `filtro.campo`/`filtro.grupoId` (além de `departamentoId`). Recorte fora dos
+  disponíveis responde `visivel=false` e sem números; `analises` com `campo` fora deles é 422.
+- `PesquisaDetalhe.separarPor` devolve os campos gravados. `separarPor` muda só enquanto não houver
+  resposta (409 `com_respostas`), como as perguntas.
+- Perguntas de escala da média geral: concordância, estrelas, escala e a nota 0–10 sem eNPS. A
+  conversão para 0–10 é proporcional ao máximo (`valor × 10 ÷ máximo`); `maiorMedia`/`menorMedia` e o
+  mapa das análises também vão em 0–10. Faixas: escalas de 5 pontos 1–2 · 3 · 4–5; as demais em terços
+  (1–10 e 0–10: favorável 8 a 10).
+- `RespostaDetalhe.valores[].mediaTime` vai na escala da própria pergunta (escalas e número; `null`
+  nas demais). Na anônima, `RespostaResumo.departamento` é `null` (a escolha de grupo não aparece por
+  resposta).
