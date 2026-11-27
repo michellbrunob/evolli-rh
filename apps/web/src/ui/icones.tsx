@@ -18,11 +18,13 @@ import {
   ArrowLeft2,
   ArrowRight,
   ArrowRight2,
+  ArrowUp2,
   Building,
   Calendar,
   Clock,
   Copy,
   Danger,
+  HambergerMenu,
   ColorSwatch,
   Cup,
   DocumentDownload,
@@ -226,6 +228,11 @@ export const IconeMaisAcoes = decorativo(More, "Linear");
 export const IconeVoltar = decorativo(ArrowLeft2, "Linear");
 export const IconeAvancar = decorativo(ArrowRight2, "Linear");
 export const IconeAbrir = decorativo(ArrowDown2, "Linear");
+/** T216 — mover um item da lista para cima ou para baixo. */
+export const IconeSubir = decorativo(ArrowUp2, "Linear");
+export const IconeDescer = decorativo(ArrowDown2, "Linear");
+/** T216 — o pegador de arrastar (reordenar). */
+export const IconeArrastar = decorativo(HambergerMenu, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");
