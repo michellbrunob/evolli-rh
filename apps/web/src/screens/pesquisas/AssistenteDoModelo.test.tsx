@@ -117,11 +117,13 @@ describe("Assistente do modelo — Configurar", () => {
     const separar = await screen.findByRole("list", {
       name: "Separar respostas por",
     });
-    expect(await within(separar).findAllByText("2 opções")).toHaveLength(2);
+    expect(
+      await within(separar).findByText("2 opções: Operações, Financeiro"),
+    ).toBeInTheDocument();
     fireEvent.click(
-      within(separar).getByRole("checkbox", { name: /Departamento/ }),
+      within(separar).getByRole("switch", { name: "Departamento" }),
     );
-    // Marcado: as opções que quem responde vai ver, e como criar outra.
+    // Ligado: as opções que quem responde vai ver, e como criar outra.
     const opcoes = within(separar).getByRole("list", {
       name: "Opções de departamento",
     });
@@ -129,15 +131,15 @@ describe("Assistente do modelo — Configurar", () => {
       within(opcoes)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["Operações", "Financeiro", "Prefiro não informar"]);
+    ).toEqual(["Operações", "Financeiro"]);
     expect(
       within(separar).getByRole("button", { name: "Adicionar departamento" }),
     ).toBeInTheDocument();
     fireEvent.click(
-      within(separar).getByRole("checkbox", { name: /Centro de custo/ }),
+      within(separar).getByRole("switch", { name: "Centro de custo" }),
     );
     expect(
-      within(separar).getByRole("checkbox", { name: /Unidade/ }),
+      within(separar).getByRole("switch", { name: "Unidade" }),
     ).toBeDisabled();
     expect(separar).toHaveTextContent(
       "Até 2 campos, para ninguém ser reconhecido pela combinação.",

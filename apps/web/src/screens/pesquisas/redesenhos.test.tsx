@@ -6,10 +6,12 @@
  * pergunta embaixo do título) e rodapés dos cartões. Servidor simulado;
  * dados sintéticos.
  */
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { RESULTADOS, servicoFalso } from "./dadosDeTeste";
+import type { CampoGrupo } from "../../api/pesquisasClient";
+import { GRUPOS, RESULTADOS, servicoFalso } from "./dadosDeTeste";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
+import { SepararRespostasPor } from "./SepararRespostasPor";
 
 function montarResultados(extra: Parameters<typeof servicoFalso>[0] = {}) {
   render(
@@ -149,5 +151,91 @@ describe("B8 — comentários e rodapés dos cartões", () => {
         ".pesquisas__cartao-pergunta-corpo > .pesquisas__cartao-pergunta-resumo",
       ),
     ).not.toBeNull();
+  });
+});
+
+describe("B9 — Separar respostas por", () => {
+  function montarSeparar(
+    separarPor: CampoGrupo[],
+    travado = false,
+    grupos = GRUPOS,
+  ) {
+    const onMudar = vi.fn();
+    render(
+      <SepararRespostasPor
+        servico={servicoFalso({
+          listarGrupos: vi.fn(() => Promise.resolve(grupos)),
+        })}
+        separarPor={separarPor}
+        travado={travado}
+        motivoDoTravamento="A pesquisa já tem respostas: os campos não mudam mais."
+        onMudar={onMudar}
+      />,
+    );
+    return onMudar;
+  }
+
+  it("lista vertical: cada campo com as opções resumidas e o interruptor à direita", async () => {
+    const onMudar = montarSeparar([], false, {
+      ...GRUPOS,
+      unidade: [
+        { id: "u-1", nome: "Matriz" },
+        { id: "u-2", nome: "Filial Sul" },
+        { id: "u-3", nome: "Filial Norte" },
+        { id: "u-4", nome: "Loja Centro" },
+      ],
+    });
+    const lista = screen.getByRole("list", { name: "Separar respostas por" });
+    const itens = within(lista).getAllByRole("listitem");
+    expect(itens).toHaveLength(3);
+    expect(
+      await within(itens[2]!).findByText(
+        "4 opções: Matriz, Filial Sul, Filial Norte…",
+      ),
+    ).toBeInTheDocument();
+    const interruptor = within(itens[0]!).getByRole("switch", {
+      name: "Departamento",
+    });
+    expect(interruptor).toHaveAttribute("aria-checked", "false");
+    // O interruptor vem depois dos textos (fica à direita).
+    expect(
+      interruptor.closest(".pesquisas__separar-cabeca")!.lastElementChild,
+    ).toBe(interruptor);
+    fireEvent.click(interruptor);
+    expect(onMudar).toHaveBeenCalledWith(["departamento"]);
+    expect(
+      screen.getByRole("region", { name: "Separar respostas por" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ligado: as opções dentro do cartão e o '+ Adicionar' na mesma linha", async () => {
+    montarSeparar(["departamento"]);
+    const opcoes = await screen.findByRole("list", {
+      name: "Opções de departamento",
+    });
+    const item = opcoes.closest("li")!;
+    expect(item).toHaveTextContent("Opções que aparecem para quem responde");
+    const adicionar = within(item).getByRole("button", {
+      name: "Adicionar departamento",
+    });
+    expect(adicionar.parentElement).toBe(opcoes.parentElement);
+  });
+
+  it("travado na edição: o campo ligado não parece ativo nem oferece adicionar", async () => {
+    montarSeparar(["departamento"], true);
+    const lista = screen.getByRole("list", { name: "Separar respostas por" });
+    const ligado = within(lista).getByRole("switch", { name: "Departamento" });
+    expect(ligado).toBeDisabled();
+    expect(ligado).toHaveAttribute("aria-checked", "true");
+    expect(ligado.closest("li")).toHaveAttribute("data-travado");
+    expect(
+      await screen.findByRole("list", { name: "Opções de departamento" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Adicionar departamento" }),
+    ).toBeNull();
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "A pesquisa já tem respostas: os campos não mudam mais.",
+    );
   });
 });

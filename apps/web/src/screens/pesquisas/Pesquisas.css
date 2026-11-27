@@ -1739,13 +1739,65 @@ textarea.pesquisas__campo {
   gap: 2px;
 }
 
+/* Separar por: lista vertical; cada campo numa faixa cinza com o
+   interruptor à direita e, ligado, as opções dentro da própria faixa. */
 .pesquisas__separar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.pesquisas__separar > li {
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.pesquisas__separar-cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 13px var(--space-md);
+}
+
+.pesquisas__separar-textos {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pesquisas__separar-textos strong {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisas__separar-textos .pesquisas__suave {
+  overflow: hidden;
+  font-size: 0.78125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pesquisas__separar [data-bloqueado] .pesquisas__separar-textos strong,
+.pesquisas__separar
+  [data-travado]:not([data-ligado])
+  .pesquisas__separar-textos
+  strong {
+  color: var(--color-ink-muted);
+}
+
+/* A nota cinza (ex.: por que os campos não mudam mais). */
+.pesquisas__nota-cinza {
+  margin: 0;
+  padding: 10px var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
 }
 
 .pesquisas__faixa-escala {
@@ -2831,15 +2883,60 @@ textarea.pesquisas__campo {
   gap: var(--space-sm);
 }
 
-/* Separar por: as opções que quem responde vai ver. */
+/* Separar por: as opções que quem responde vai ver, dentro da faixa. */
 .pesquisas__separar-opcoes {
   display: grid;
   gap: var(--space-xs);
-  margin: var(--space-xs) 0 0 calc(1rem + var(--space-sm));
+  margin: 0 var(--space-md);
+  padding: var(--space-sm) 0 var(--space-md);
+  border-top: 1px solid var(--divisor-cor);
 }
 
-.pesquisas__separar [data-bloqueado] {
-  opacity: 0.6;
+.pesquisas__separar-opcoes > p {
+  margin: 0;
+  font-size: 0.78125rem;
+}
+
+.pesquisas__separar-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pesquisas__separar-chips {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pesquisas__separar-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-size: 0.78125rem;
+  font-weight: var(--weight-medium);
+}
+
+.pesquisas__separar-linha .pesquisas__acao-texto {
+  margin-left: var(--space-xxs);
+  font-size: 0.78125rem;
+}
+
+/* Desligado por regra (limite) ou travado (já há respostas): o interruptor
+   esmaece — mesmo ligado, não parece um controle ativo. */
+.pesquisas__interruptor:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.pesquisas__interruptor:disabled[aria-checked="true"]
+  .pesquisas__interruptor-trilho {
+  background: var(--color-ink-muted);
 }
 
 .pesquisas__chip--suave {

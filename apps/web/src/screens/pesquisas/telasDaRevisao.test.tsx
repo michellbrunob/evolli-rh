@@ -131,7 +131,7 @@ describe("Editar pesquisa publicada", () => {
       name: "Separar respostas por",
     });
     expect(
-      within(separar).getByRole("checkbox", { name: /Departamento/ }),
+      within(separar).getByRole("switch", { name: "Departamento" }),
     ).toBeDisabled();
     expect(screen.queryByLabelText("Totais de participantes")).toBeNull();
   });
