@@ -462,6 +462,7 @@ describe("T215 — Registrar ausência (gaveta)", () => {
         { regra: "minimo_5" as const, dias: 3 },
         { regra: "ate_3_periodos" as const, ordem: 4 },
         { regra: "um_com_14" as const },
+        { regra: "coletiva_minimo_10" as const, dias: 5 },
         {
           regra: "inicio_antes_de_descanso" as const,
           antesDe: "feriado" as const,
@@ -484,6 +485,7 @@ describe("T215 — Registrar ausência (gaveta)", () => {
       "3 dias corridos; a lei pede pelo menos 5 por período (CLT art. 134, § 1º).",
       "Seria o 4º período de férias deste período aquisitivo; a lei permite até 3 (CLT art. 134, § 1º).",
       "Nenhum período chegaria a 14 dias; a lei pede um com pelo menos 14 (CLT art. 134, § 1º).",
+      "Férias coletivas de 5 dias corridos; a lei pede pelo menos 10 por período (CLT art. 139, § 1º).",
       "Início em 04/12, nos 2 dias antes do feriado de 25/12 (CLT art. 134, § 3º).",
     ]);
     // Com um período só, não há o que trocar.

@@ -328,6 +328,8 @@ export type AvisoClt =
   | { regra: "minimo_5"; dias: number }
   | { regra: "um_com_14" }
   | { regra: "ate_3_periodos"; ordem: number }
+  /** Férias coletivas: nenhum período abaixo de 10 dias corridos (art. 139, § 1º). */
+  | { regra: "coletiva_minimo_10"; dias: number }
   | {
       regra: "inicio_antes_de_descanso";
       antesDe: "domingo" | "feriado";
@@ -348,6 +350,29 @@ export function diasEmDobro(
   return diasCorridos(de, fim);
 }
 
+/** Fracionamento das férias individuais (CLT art. 134, § 1º). */
+function avisosDoFracionamento(
+  entrada: {
+    periodo: PeriodoAquisitivo;
+    outrasFerias: readonly { inicio: Dia; fim: Dia }[];
+    diasVendidos?: number;
+  },
+  dias: number,
+  avisos: AvisoClt[],
+): void {
+  if (dias < 5) avisos.push({ regra: "minimo_5", dias });
+  const ordem = entrada.outrasFerias.length + 1;
+  if (ordem > 3) avisos.push({ regra: "ate_3_periodos", ordem });
+  const jaHouve14 = entrada.outrasFerias.some(
+    (f) => diasCorridos(f.inicio, f.fim) >= 14,
+  );
+  const sobra =
+    entrada.periodo.disponiveis - dias - (entrada.diasVendidos ?? 0);
+  if (dias < 14 && !jaHouve14 && sobra < 14) {
+    avisos.push({ regra: "um_com_14" });
+  }
+}
+
 export function avisosDaClt(entrada: {
   inicio: Dia;
   fim: Dia;
@@ -357,6 +382,12 @@ export function avisosDaClt(entrada: {
   outrasFerias: readonly { inicio: Dia; fim: Dia }[];
   /** Os dias vendidos nestas férias (também saem do saldo). */
   diasVendidos?: number;
+  /**
+   * Férias coletivas: valem as regras do art. 139 (até 2 períodos por ano,
+   * nenhum com menos de 10 dias), não as do fracionamento individual
+   * (art. 134, § 1º: mínimo de 5, um com 14, até 3 períodos).
+   */
+  coletiva?: boolean;
 }): AvisoClt[] {
   const avisos: AvisoClt[] = [];
   for (const d of [1, 2]) {
@@ -379,16 +410,10 @@ export function avisosDaClt(entrada: {
     }
   }
   const dias = diasCorridos(entrada.inicio, entrada.fim);
-  if (dias < 5) avisos.push({ regra: "minimo_5", dias });
-  const ordem = entrada.outrasFerias.length + 1;
-  if (ordem > 3) avisos.push({ regra: "ate_3_periodos", ordem });
-  const jaHouve14 = entrada.outrasFerias.some(
-    (f) => diasCorridos(f.inicio, f.fim) >= 14,
-  );
-  const sobra =
-    entrada.periodo.disponiveis - dias - (entrada.diasVendidos ?? 0);
-  if (dias < 14 && !jaHouve14 && sobra < 14) {
-    avisos.push({ regra: "um_com_14" });
+  if (entrada.coletiva) {
+    if (dias < 10) avisos.push({ regra: "coletiva_minimo_10", dias });
+  } else {
+    avisosDoFracionamento(entrada, dias, avisos);
   }
   const emDobro = diasEmDobro(entrada.periodo, entrada.inicio, entrada.fim);
   if (emDobro > 0) {

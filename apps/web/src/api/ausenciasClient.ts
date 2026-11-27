@@ -216,6 +216,8 @@ export type AvisoCltApi =
   | { regra: "minimo_5"; dias: number }
   | { regra: "um_com_14" }
   | { regra: "ate_3_periodos"; ordem: number }
+  /** T215 — férias coletivas com menos de 10 dias (art. 139, § 1º). */
+  | { regra: "coletiva_minimo_10"; dias: number }
   | {
       regra: "inicio_antes_de_descanso";
       antesDe: "domingo" | "feriado";

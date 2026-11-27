@@ -432,6 +432,51 @@ describe("T215 — cálculos de ausências", () => {
       ).toEqual([]);
     });
 
+    it("férias coletivas seguem o art. 139: mínimo de 10 dias, sem a regra dos 14", () => {
+      // Coletiva de 5 dias (segunda a sexta): pede 10, não 5 nem 14.
+      const curta = avisosDaClt({
+        inicio: "2026-12-14",
+        fim: "2026-12-18",
+        periodo,
+        outrasFerias: [],
+        coletiva: true,
+      });
+      expect(curta).toEqual([{ regra: "coletiva_minimo_10", dias: 5 }]);
+      // 3 dias: só o mínimo das coletivas (o de 5 das individuais não vale).
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-15",
+          fim: "2026-12-17",
+          periodo,
+          outrasFerias: [],
+          coletiva: true,
+        }),
+      ).toEqual([{ regra: "coletiva_minimo_10", dias: 3 }]);
+      // 10 dias: nada (nem a regra dos 14, nem a dos 3 períodos).
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-14",
+          fim: "2026-12-23",
+          periodo,
+          outrasFerias: [
+            { inicio: "2026-02-02", fim: "2026-02-06" },
+            { inicio: "2026-04-06", fim: "2026-04-10" },
+            { inicio: "2026-06-01", fim: "2026-06-05" },
+          ],
+          coletiva: true,
+        }),
+      ).toEqual([]);
+      // Individual com os mesmos 5 dias: continua pedindo um com 14.
+      expect(
+        avisosDaClt({
+          inicio: "2026-12-14",
+          fim: "2026-12-18",
+          periodo: { ...periodo, disponiveis: 10 },
+          outrasFerias: [],
+        }),
+      ).toContainEqual({ regra: "um_com_14" });
+    });
+
     it("até 3 períodos no mesmo período aquisitivo (art. 134, § 1º)", () => {
       const outras = [
         { inicio: "2026-02-02", fim: "2026-02-15" },

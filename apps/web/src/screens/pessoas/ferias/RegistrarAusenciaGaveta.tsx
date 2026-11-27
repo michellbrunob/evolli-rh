@@ -85,6 +85,8 @@ function textoDoAvisoClt(a: AvisoCltApi, inicio: string): string {
       return `${a.dias === 1 ? "1 dia corrido" : `${a.dias} dias corridos`}; a lei pede pelo menos 5 por período (CLT art. 134, § 1º).`;
     case "ate_3_periodos":
       return `Seria o ${a.ordem}º período de férias deste período aquisitivo; a lei permite até 3 (CLT art. 134, § 1º).`;
+    case "coletiva_minimo_10":
+      return `Férias coletivas de ${a.dias === 1 ? "1 dia corrido" : `${a.dias} dias corridos`}; a lei pede pelo menos 10 por período (CLT art. 139, § 1º).`;
     case "um_com_14":
       return "Nenhum período chegaria a 14 dias; a lei pede um com pelo menos 14 (CLT art. 134, § 1º).";
     case "pagamento_em_dobro":

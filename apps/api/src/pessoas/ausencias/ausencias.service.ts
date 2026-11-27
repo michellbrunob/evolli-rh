@@ -1176,6 +1176,7 @@ export class AusenciasService {
         periodo,
         outrasFerias,
         diasVendidos: query.diasVendidos ?? 0,
+        coletiva,
       }),
       periodosDisponiveis,
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
