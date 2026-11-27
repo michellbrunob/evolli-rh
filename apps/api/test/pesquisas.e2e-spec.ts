@@ -7,6 +7,7 @@ import {
   VersioningType,
 } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { PrismaClient } from "@prisma/client";
 import cookieParser from "cookie-parser";
 import request from "supertest";
@@ -20,6 +21,7 @@ import {
 } from "../src/pessoas/documentos-colaborador/verificador-de-arquivos";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
+import { aplicarLimiteDoCorpo } from "../src/common/corpo-json";
 import {
   hojeEmSaoPaulo,
   somarDias,
@@ -429,7 +431,11 @@ describe("T216 — Pesquisas (e2e)", () => {
       .overrideProvider(VERIFICADOR_DE_ARQUIVOS)
       .useValue(new VerificadorFalso())
       .compile();
-    app = moduleRef.createNestApplication();
+    const expressApp =
+      moduleRef.createNestApplication<NestExpressApplication>();
+    // O mesmo limite do bootstrap (src/main.ts).
+    aplicarLimiteDoCorpo(expressApp);
+    app = expressApp;
     app.use(requestIdMiddleware);
     app.use(cookieParser());
     app.useGlobalPipes(
@@ -942,6 +948,8 @@ describe("T216 — Pesquisas (e2e)", () => {
   describe("confidencial", () => {
     it("valida a pessoa, mas a resposta não guarda quem respondeu", async () => {
       const a = await admitir(rhA, empresaA);
+      const b = await admitir(rhA, empresaA);
+      const c = await admitir(rhA, empresaA);
       const ativos = await prisma.vinculoFuncional.count({
         where: { empresaId: empresaA, situacao: "ativo" },
       });
@@ -989,14 +997,29 @@ describe("T216 — Pesquisas (e2e)", () => {
       );
       expect(linha.respondeu).toBe(true);
       await get(`/v1/pesquisas/${rascunho.id}/respostas`, rhA).expect(404);
-      const res = await get(
-        `/v1/pesquisas/${rascunho.id}/resultados`,
-        rhA,
-      ).expect(200);
+
+      // Abaixo do mínimo (3), nem a visão geral mostra números: com uma
+      // resposta e a lista de quem respondeu, o agregado seria a pessoa.
+      const resultados = () =>
+        get(`/v1/pesquisas/${rascunho.id}/resultados`, rhA).expect(200);
+      const poucas = await resultados();
+      expect(poucas.body).toMatchObject({
+        respostas: 1,
+        participantes: ativos,
+        filtro: { departamentoId: null, visivel: false },
+        perguntas: [],
+      });
+      await responderComo(token, b);
+      expect((await resultados()).body.filtro.visivel).toBe(false);
+      await responderComo(token, c);
+      const res = await resultados();
+      expect(res.body.filtro).toEqual({ departamentoId: null, visivel: true });
       const porque = res.body.perguntas.find(
         (p: { perguntaId: string }) => p.perguntaId === "porque",
       );
       expect(porque.textos).toEqual([
+        { texto: "Mais reuniões curtas.", autor: null },
+        { texto: "Mais reuniões curtas.", autor: null },
         { texto: "Mais reuniões curtas.", autor: null },
       ]);
       const ficha = await get(
@@ -1031,6 +1054,11 @@ describe("T216 — Pesquisas (e2e)", () => {
       const det = await get(`/v1/pesquisas/${id}`, rhA).expect(200);
       expect(det.body.participantesLista[0].respondeu).toBeNull();
       expect(det.body).toMatchObject({ participantes: 1, respostas: 2 });
+      // Sem vínculo pessoa↔resposta: a visão geral aparece mesmo abaixo do
+      // mínimo por grupo.
+      const res = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(200);
+      expect(res.body.filtro).toEqual({ departamentoId: null, visivel: true });
+      expect(res.body.perguntas).toHaveLength(5);
       await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(404);
     });
   });
@@ -1253,6 +1281,45 @@ describe("T216 — Pesquisas (e2e)", () => {
       await post("/v1/pesquisas", rhA)
         .send(corpo({ minimoPorGrupo: 2 }))
         .expect(400);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  describe("pesquisa grande (limite do corpo JSON)", () => {
+    it("60 perguntas × 20 opções × 150 caracteres: 201", async () => {
+      const opcoes = Array.from({ length: 20 }, (_, i) => ({
+        id: `o${i}`,
+        texto: `${i} `.padEnd(150, "x"),
+      }));
+      const perguntas = Array.from({ length: 60 }, (_, i) => ({
+        id: `grande-${i}`,
+        tipo: "multipla_escolha",
+        texto: `Pergunta grande ${i}`,
+        descricao: null,
+        obrigatoria: false,
+        config: { opcoes, outro: true },
+        condicao: null,
+      }));
+      const secoes = [
+        {
+          id: "s1",
+          titulo: null,
+          descricao: null,
+          perguntas: perguntas.slice(0, 30),
+        },
+        {
+          id: "s2",
+          titulo: null,
+          descricao: null,
+          perguntas: perguntas.slice(30),
+        },
+      ];
+      const corpoGrande = corpo({ secoes });
+      // Acima do padrão do Express (100 KB).
+      expect(JSON.stringify(corpoGrande).length).toBeGreaterThan(150_000);
+      const r = await post("/v1/pesquisas", rhA).send(corpoGrande).expect(201);
+      expect(r.body.secoes[1].perguntas).toHaveLength(30);
+      expect(r.body.secoes[1].perguntas[29].config.opcoes).toHaveLength(20);
     });
   });
 

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ConfigService } from "@nestjs/config";
 import { Logger } from "nestjs-pino";
 import cookieParser from "cookie-parser";
@@ -10,9 +11,14 @@ import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { requestIdMiddleware } from "./common/request-id";
 import { setupOpenApi } from "./openapi/openapi";
 import { resolverHostDeEscuta } from "./config/env.validation";
+import { aplicarLimiteDoCorpo } from "./common/corpo-json";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+  // T216 — corpo JSON até 1 MB (a pesquisa no tamanho máximo do assistente).
+  aplicarLimiteDoCorpo(app);
 
   // Precisa ser o primeiro middleware: define req.requestId antes do
   // middleware de log do pino-http e de qualquer outro handler, garantindo
