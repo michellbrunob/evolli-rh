@@ -53,6 +53,58 @@ describe("Resultado individual", () => {
     expect(linha).toHaveTextContent("+0,8time 4,3");
   });
 
+  it("faixa da média, últimos pulsos, comentário livre e o seletor de respostas", async () => {
+    const onIr = vi.fn();
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({ ...DETALHE, identificacao: "identificada" as const }),
+      ),
+      respostaDaPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...RESPOSTA_DETALHE,
+          indicadores: {
+            ...RESPOSTA_DETALHE.indicadores,
+            mediaUltimosPulsos: 7.5,
+          },
+        }),
+      ),
+    });
+    render(
+      <ResultadoIndividual
+        servico={servico}
+        pesquisaId="p-1"
+        respostaId="r-1"
+        onVoltar={vi.fn()}
+        onIr={onIr}
+      />,
+    );
+    const ind = await screen.findByRole("region", {
+      name: "Indicadores da resposta",
+    });
+    expect(ind).toHaveTextContent("Média geral10,0 /108 ou mais");
+    expect(ind).toHaveTextContent("Média nos últimos pulsos7,5 /10");
+    expect(ind).toHaveTextContent("Comentário livreNenhum comentário deixado.");
+    // "1 de 2 ⌄": todas as respostas, da mais recente, com a média.
+    fireEvent.pointerDown(
+      await screen.findByRole("button", {
+        name: "Resposta 1 de 2. Escolher outra",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    const itens = await screen.findAllByRole("menuitem");
+    expect(itens.map((i) => i.textContent)).toEqual([
+      "Bruno ExemploMédia 5,5",
+      "Ana ExemploMédia 9,0",
+    ]);
+    fireEvent.click(itens[0]!);
+    expect(onIr).toHaveBeenCalledWith("r-2");
+    // Aba Respostas: cada escala com a régua e a nota marcada na cor da faixa.
+    fireEvent.click(screen.getByRole("tab", { name: /Respostas/ }));
+    const marcadas = document.querySelectorAll("[data-marcado]");
+    expect([...marcadas].map((m) => m.textContent)).toEqual(["10", "5"]);
+    expect(marcadas[0]).toHaveAttribute("data-faixa", "alta");
+  });
+
   it("anônima: numerada e sem pessoa; paginação entre respostas", async () => {
     const onIr = vi.fn();
     render(

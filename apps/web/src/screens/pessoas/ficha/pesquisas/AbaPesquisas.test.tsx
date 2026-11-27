@@ -49,7 +49,13 @@ describe("AbaPesquisas (T216)", () => {
     const respostas = screen.getByRole("region", {
       name: "Respostas de Onboarding de outubro",
     });
-    expect(respostas).toHaveTextContent("Quanto você indicaria a empresa?8");
+    // Escala: a régua inteira, com a nota marcada (e lida como texto).
+    expect(respostas).toHaveTextContent(
+      "Quanto você indicaria a empresa?Nota 8 de 10",
+    );
+    const marcada = respostas.querySelector("[data-marcado]");
+    expect(marcada).toHaveTextContent("8");
+    expect(marcada).toHaveAttribute("data-faixa", "alta");
     expect(respostas).toHaveTextContent("Recomendaria a área?Não");
     expect(respostas).toHaveTextContent("Faltou o crachá.");
     expect(respostas).toHaveTextContent("Qual canal você prefere?Sem resposta");

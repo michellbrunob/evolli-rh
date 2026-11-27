@@ -21,13 +21,15 @@ import type {
   RespostaResumo,
   ResultadoPergunta,
   ResultadosPesquisa,
-  StatusPesquisa,
 } from "../../api/pesquisasClient";
-import { Button, FormActions } from "../../components";
-import { formatarDiaCivil, formatarInstante } from "../../format/data";
+import { Button } from "../../components";
+import {
+  diaCivilDeHoje,
+  formatarDiaCivil,
+  formatarInstante,
+} from "../../format/data";
 import { plural } from "../../format/plural";
 import {
-  Dialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,6 +37,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   ListaDeEscolha,
+  Sheet,
 } from "../../ui";
 import {
   IconeAbrir,
@@ -42,14 +45,26 @@ import {
   IconeBaixarArquivo,
   IconeCadeado,
   IconeComentario,
+  IconeCopiar,
   IconeEditar,
+  IconeInformacao,
   IconeMaisAcoes,
+  IconeRemover,
+  IconeStatus,
   IconeVoltar,
 } from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
 import { baixarArquivo } from "../dashboard/exportacao";
 import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
-import { CAMPOS_DE_GRUPO, seloDoTipo } from "./AssistenteDoModelo";
+import { seloDoTipo } from "./AssistenteDoModelo";
+import {
+  GavetaDeDuplicar,
+  JanelaDeExclusao,
+  MenuDeStatus,
+} from "./acoesDaPesquisa";
+import { GarantirAvisos, useAvisar } from "./avisos";
+import { modeloDaGaleria } from "./modelosDePesquisa";
+import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
@@ -66,8 +81,9 @@ import {
   Rosca,
 } from "./graficos";
 import {
+  ROTULO_DA_FAIXA_DA_MEDIA,
   ROTULO_DA_ZONA,
-  corDaNota,
+  corEmDegrade,
   ehDeEscala,
   escalaDe,
   faixaDaMedia10,
@@ -79,42 +95,20 @@ import {
   textoDoFavoravel,
 } from "./indicadores";
 import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
-import { CampoDoLink } from "./TelaDeGerada";
 import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
-  ROTULO_DO_STATUS,
   copiarLink,
   dataDoInstante,
   participacao,
   percentual,
   podeEditarPesquisa,
-  proximosStatus,
   umaCasa,
 } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import "./Pesquisas.css";
 
 type Aba = "geral" | "analises" | "respostas";
-
-const CONFIRMACAO: Readonly<
-  Partial<
-    Record<StatusPesquisa, { titulo: string; texto: string; botao: string }>
-  >
-> = {
-  finalizada: {
-    titulo: "Finalizar a pesquisa?",
-    texto:
-      "O link deixa de aceitar respostas e a pesquisa não volta a ficar ativa. Os resultados recebidos continuam aqui.",
-    botao: "Finalizar pesquisa",
-  },
-  cancelada: {
-    titulo: "Cancelar a pesquisa?",
-    texto:
-      "O link deixa de aceitar respostas e a pesquisa não volta a ficar ativa. As respostas recebidas continuam guardadas.",
-    botao: "Cancelar pesquisa",
-  },
-};
 
 const COR_DA_FAIXA = {
   baixa: "var(--status-danger-ink)",
@@ -127,6 +121,20 @@ export function diaEHora(iso: string): string {
   return formatarInstante(iso).replace(/^(\d{2}\/\d{2})\/\d{4} às /, "$1 · ");
 }
 
+/** Da mais recente para a mais antiga (#3, #2, #1). */
+export function emOrdemDeChegada(
+  respostas: readonly RespostaResumo[],
+): RespostaResumo[] {
+  return [...respostas].sort((a, b) =>
+    b.respondidaEm.localeCompare(a.respondidaEm),
+  );
+}
+
+/** O dia civil (Brasília) de um instante. */
+function diaDoInstante(iso: string): string {
+  return diaCivilDeHoje(new Date(iso));
+}
+
 /** Quem pode ver respostas individuais: identificada e anônima, RH e DP. */
 export function temRespostasIndividuais(
   detalhe: Pick<PesquisaDetalhe, "identificacao">,
@@ -135,38 +143,59 @@ export function temRespostasIndividuais(
   return podeEditar && detalhe.identificacao !== "confidencial";
 }
 
-export function ResultadosDaPesquisa({
+export function ResultadosDaPesquisa(
+  props: Parameters<typeof ResultadosInterno>[0],
+) {
+  return (
+    <GarantirAvisos>
+      <ResultadosInterno {...props} />
+    </GarantirAvisos>
+  );
+}
+
+function ResultadosInterno({
   servico,
   pesquisaId,
   podeEditar,
-  avisoInicial = null,
+  abaInicial = "geral",
+  hoje = diaCivilDeHoje(),
   onVoltar,
   onEditar,
   onDuplicada,
   onSobreOModelo,
   onAbrirResposta,
+  onTrocarAba,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly pesquisaId: string;
   /** RH e DP: mudam status, editam, exportam respostas e as leem. */
   readonly podeEditar: boolean;
-  readonly avisoInicial?: string | null;
-  readonly onVoltar: (mensagem?: string) => void;
+  readonly abaInicial?: Aba;
+  readonly hoje?: string;
+  readonly onVoltar: () => void;
   readonly onEditar: (detalhe: PesquisaDetalhe) => void;
+  /** A cópia criada na empresa ativa (abre os resultados dela). */
   readonly onDuplicada?: (copia: PesquisaDetalhe) => void;
   readonly onSobreOModelo?: (modelo: string) => void;
   readonly onAbrirResposta?: (respostaId: string) => void;
+  readonly onTrocarAba?: (aba: Aba) => void;
 }) {
+  const avisar = useAvisar();
   const [detalhe, setDetalhe] = useState<PesquisaDetalhe | null>(null);
   const [geral, setGeral] = useState<ResultadosPesquisa | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
-  const [aba, setAba] = useState<Aba>("geral");
-  const [aviso, setAviso] = useState<string | null>(avisoInicial);
-  const [confirmar, setConfirmar] = useState<StatusPesquisa | null>(null);
+  const [aba, setAbaLocal] = useState<Aba>(abaInicial);
   const [excluir, setExcluir] = useState(false);
-  const [mudando, setMudando] = useState(false);
+  const [duplicar, setDuplicar] = useState(false);
+  const [convidados, setConvidados] = useState(false);
   const [respostas, setRespostas] = useState<RespostaResumo[] | null>(null);
+
+  useEffect(() => setAbaLocal(abaInicial), [abaInicial]);
+  const setAba = (a: Aba) => {
+    setAbaLocal(a);
+    onTrocarAba?.(a);
+  };
 
   useEffect(() => {
     let vivo = true;
@@ -197,7 +226,7 @@ export function ResultadosDaPesquisa({
     let vivo = true;
     Promise.resolve(servico.respostasDaPesquisa(pesquisaId))
       .then((r) => {
-        if (vivo) setRespostas(r ?? []);
+        if (vivo) setRespostas(emOrdemDeChegada(r ?? []));
       })
       .catch(() => {
         if (vivo) setRespostas([]);
@@ -206,45 +235,6 @@ export function ResultadosDaPesquisa({
       vivo = false;
     };
   }, [individuais, servico, pesquisaId]);
-
-  async function mudarStatus(status: StatusPesquisa) {
-    setMudando(true);
-    try {
-      const d = await servico.alterarStatusDaPesquisa(pesquisaId, status);
-      setDetalhe(d);
-      setAviso(`Status alterado para ${ROTULO_DO_STATUS[status]}.`);
-    } catch {
-      setAviso(
-        "Não foi possível mudar o status. Atualize a página e tente de novo.",
-      );
-    } finally {
-      setMudando(false);
-      setConfirmar(null);
-    }
-  }
-
-  async function duplicar() {
-    try {
-      const copia = await servico.duplicarPesquisa(pesquisaId);
-      if (onDuplicada) onDuplicada(copia);
-      else setAviso(`Cópia criada como rascunho: ${copia.nome}.`);
-    } catch {
-      setAviso("Não foi possível duplicar a pesquisa. Tente de novo.");
-    }
-  }
-
-  async function confirmarExclusao() {
-    setMudando(true);
-    try {
-      await servico.excluirPesquisa(pesquisaId);
-      onVoltar("Pesquisa excluída.");
-    } catch {
-      setAviso("Não foi possível excluir a pesquisa. Tente de novo.");
-      setExcluir(false);
-    } finally {
-      setMudando(false);
-    }
-  }
 
   async function exportar(formato: "xlsx" | "pdf") {
     if (!detalhe || !geral) return;
@@ -271,8 +261,14 @@ export function ResultadosDaPesquisa({
         TIPO_MIME_XLSX,
       );
     } catch {
-      setAviso("Não foi possível exportar. Tente de novo.");
+      avisar("Não foi possível exportar.", { texto: "Tente de novo." });
     }
+  }
+
+  async function copiar() {
+    if (!detalhe?.link) return;
+    if (await copiarLink(detalhe.link)) avisar("Link copiado.");
+    else avisar("Não foi possível copiar o link.");
   }
 
   if (falhou) {
@@ -313,7 +309,12 @@ export function ResultadosDaPesquisa({
   }
 
   const anonima = detalhe.identificacao === "anonima";
-  const proximos = podeEditar ? proximosStatus(detalhe.status) : [];
+  const semRespostas = detalhe.respostas === 0;
+  const linkVivo =
+    detalhe.link !== null &&
+    (detalhe.status === "ativa" || detalhe.status === "pausada");
+  const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
+  const participantes = detalhe.participantesTotal ?? detalhe.participantes;
   const abas: { valor: Aba; rotulo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral" },
     {
@@ -361,40 +362,16 @@ export function ResultadosDaPesquisa({
             {detalhe.nome}
           </h1>
           <div className="pesquisas__subtitulo pesquisas__linha-status">
-            {proximos.length > 0 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={`pesquisas__status pesquisas__status--${detalhe.status}`}
-                  aria-label={`Mudar status, hoje ${ROTULO_DO_STATUS[detalhe.status]}`}
-                  disabled={mudando}
-                >
-                  <span className="pesquisas__ponto" aria-hidden="true" />
-                  {ROTULO_DO_STATUS[detalhe.status]}
-                  <IconeAbrir tamanho={12} />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {proximos.map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      onSelect={() =>
-                        CONFIRMACAO[s] ? setConfirmar(s) : void mudarStatus(s)
-                      }
-                    >
-                      {ROTULO_DO_STATUS[s]}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span
-                className={`pesquisas__status pesquisas__status--${detalhe.status}`}
-              >
-                <span className="pesquisas__ponto" aria-hidden="true" />
-                {ROTULO_DO_STATUS[detalhe.status]}
-              </span>
-            )}
+            <MenuDeStatus
+              pesquisa={detalhe}
+              servico={servico}
+              podeEditar={podeEditar}
+              onMudou={setDetalhe}
+            />
             <span>
-              {`${ROTULO_DO_MODELO[detalhe.modelo]} · ${plural(detalhe.respostas, "resposta", "respostas")} até agora`}
+              {semRespostas
+                ? `${ROTULO_DO_MODELO[detalhe.modelo]} · ${criadaHoje ? "criada hoje" : `criada em ${dataDoInstante(detalhe.criadaEm)}`} · nenhuma resposta ainda`
+                : `${ROTULO_DO_MODELO[detalhe.modelo]} · ${plural(detalhe.respostas, "resposta", "respostas")}${detalhe.status === "ativa" ? " até agora" : ""}`}
             </span>
           </div>
         </div>
@@ -408,14 +385,16 @@ export function ResultadosDaPesquisa({
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {podeEditar ? (
-                <DropdownMenuItem onSelect={() => void duplicar()}>
+                <DropdownMenuItem onSelect={() => setDuplicar(true)}>
+                  <IconeCopiar tamanho={16} />
                   Duplicar pesquisa
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuItem
                 onSelect={() => onSobreOModelo?.(detalhe.modelo)}
               >
-                Sobre o modelo
+                <IconeInformacao tamanho={16} />
+                {`Sobre o modelo ${modeloDaGaleria(detalhe.modelo).nome}`}
               </DropdownMenuItem>
               {podeEditar ? (
                 <>
@@ -424,6 +403,7 @@ export function ResultadosDaPesquisa({
                     className="pesquisas__menu-perigo"
                     onSelect={() => setExcluir(true)}
                   >
+                    <IconeRemover tamanho={16} />
                     Excluir pesquisa
                   </DropdownMenuItem>
                 </>
@@ -440,6 +420,7 @@ export function ResultadosDaPesquisa({
             <DropdownMenuTrigger
               className="evolli-button evolli-button--secondary"
               aria-label="Exportar"
+              disabled={semRespostas}
             >
               <IconeBaixarArquivo tamanho={16} />
               Exportar
@@ -466,28 +447,16 @@ export function ResultadosDaPesquisa({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {detalhe.link &&
-          (detalhe.status === "ativa" || detalhe.status === "pausada") ? (
+          {linkVivo ? (
             <Button
-              onClick={async () =>
-                setAviso(
-                  (await copiarLink(detalhe.link!))
-                    ? "Link copiado."
-                    : "Não foi possível copiar o link.",
-                )
-              }
+              disabled={detalhe.status === "pausada"}
+              onClick={() => void copiar()}
             >
               Copiar link
             </Button>
           ) : null}
         </div>
       </header>
-
-      {aviso ? (
-        <p className="pesquisas__aviso" role="status">
-          {aviso}
-        </p>
-      ) : null}
 
       <dl className="pesquisas__faixa" aria-label="Sobre a pesquisa">
         <div>
@@ -505,24 +474,36 @@ export function ResultadosDaPesquisa({
         <div>
           <dt>Participação</dt>
           <dd>
-            {anonima || detalhe.participantes === null
-              ? `${plural(detalhe.respostas, "resposta", "respostas")} · link aberto`
-              : `${detalhe.respostas} de ${detalhe.participantes} · ${participacao(detalhe.respostas, detalhe.participantes)}%`}
+            {anonima || participantes === null ? (
+              `${plural(detalhe.respostas, "resposta", "respostas")} · link aberto`
+            ) : (
+              <span className="pesquisas__participacao">
+                <span>{`${detalhe.respostas} de ${plural(participantes, "pessoa", "pessoas")} · ${participacao(detalhe.respostas, participantes)}%`}</span>
+                <span
+                  className="pesquisas__barra"
+                  role="progressbar"
+                  aria-label="Participação"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={participacao(detalhe.respostas, participantes)}
+                >
+                  <span
+                    style={{
+                      width: `${participacao(detalhe.respostas, participantes)}%`,
+                    }}
+                  />
+                </span>
+              </span>
+            )}
           </dd>
         </div>
       </dl>
-
-      {detalhe.link && detalhe.status === "ativa" ? (
-        <details className="pesquisas__detalhes-link">
-          <summary>Ver o link da pesquisa</summary>
-          <CampoDoLink link={detalhe.link} />
-        </details>
-      ) : null}
 
       <AvisoNaoIdentificaveis
         identificacao={detalhe.identificacao}
         naoIdentificaveis={detalhe.naoIdentificaveis}
         participantes={detalhe.participantesLista ?? []}
+        publicada
       />
 
       <div role="tablist" aria-label="Resultados" className="pesquisas__abas">
@@ -541,7 +522,44 @@ export function ResultadosDaPesquisa({
 
       <div role="tabpanel" className="pesquisas__resultados">
         {aba === "geral" ? (
-          <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
+          semRespostas ? (
+            <section
+              className="pesquisas__sem-respostas"
+              aria-label="Ainda sem respostas"
+            >
+              <span className="pesquisas__vazio-circulo" aria-hidden="true">
+                <IconeStatus tamanho={22} />
+              </span>
+              <h2 className="pesquisas__cartao-secao-titulo">
+                Ainda sem respostas
+              </h2>
+              <p className="pesquisas__suave">
+                {anonima
+                  ? "Os resultados aparecem aqui assim que alguém responder pelo link."
+                  : "Os resultados aparecem aqui assim que as pessoas convidadas responderem."}
+              </p>
+              <div className="pesquisas__acoes">
+                {linkVivo ? (
+                  <Button
+                    disabled={detalhe.status === "pausada"}
+                    onClick={() => void copiar()}
+                  >
+                    Copiar link
+                  </Button>
+                ) : null}
+                {anonima ? null : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setConvidados(true)}
+                  >
+                    Ver quem foi convidado
+                  </Button>
+                )}
+              </div>
+            </section>
+          ) : (
+            <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
+          )
         ) : aba === "analises" ? (
           <Analises servico={servico} detalhe={detalhe} geral={geral} />
         ) : (
@@ -553,57 +571,50 @@ export function ResultadosDaPesquisa({
         )}
       </div>
 
-      <Dialog
-        aberto={confirmar !== null}
-        titulo={confirmar ? (CONFIRMACAO[confirmar]?.titulo ?? "") : ""}
-        onFechar={() => setConfirmar(null)}
-        bloqueado={mudando}
-        rodape={
-          <FormActions>
-            <Button variant="secondary" onClick={() => setConfirmar(null)}>
-              Voltar
-            </Button>
-            <Button
-              className="pesquisas__botao-perigo"
-              disabled={mudando}
-              onClick={() => confirmar && void mudarStatus(confirmar)}
-            >
-              {confirmar ? CONFIRMACAO[confirmar]?.botao : ""}
-            </Button>
-          </FormActions>
-        }
+      <Sheet
+        aberto={convidados}
+        titulo="Quem foi convidado"
+        subtitulo={plural(
+          (detalhe.participantesLista ?? []).length,
+          "pessoa",
+          "pessoas",
+        )}
+        onFechar={() => setConvidados(false)}
       >
-        <p>{confirmar ? CONFIRMACAO[confirmar]?.texto : ""}</p>
-      </Dialog>
+        <ul className="pesquisas__lista-pessoas">
+          {(detalhe.participantesLista ?? []).map((p) => (
+            <li key={p.colaboradorId}>
+              <Avatar texto={iniciaisDe(p.nome)} />
+              <span className="pesquisas__pessoa-textos">
+                <span>{p.nome}</span>
+                <span className="pesquisas__suave">
+                  {p.departamento ?? "Sem departamento"}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Sheet>
 
-      <Dialog
-        aberto={excluir}
-        titulo={`Excluir ${detalhe.nome}?`}
+      <JanelaDeExclusao
+        pesquisa={excluir ? detalhe : null}
+        servico={servico}
         onFechar={() => setExcluir(false)}
-        bloqueado={mudando}
-        rodape={
-          <FormActions>
-            <Button variant="secondary" onClick={() => setExcluir(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="pesquisas__botao-perigo"
-              disabled={mudando}
-              onClick={() => void confirmarExclusao()}
-            >
-              Excluir pesquisa
-            </Button>
-          </FormActions>
-        }
-      >
-        <p>
-          {`A pesquisa sai da lista e o link deixa de funcionar. ${
-            detalhe.respostas > 0
-              ? `As ${plural(detalhe.respostas, "resposta recebida", "respostas recebidas")} e os resultados deixam de aparecer no Evolli. `
-              : ""
-          }Não é possível desfazer.`}
-        </p>
-      </Dialog>
+        onExcluida={() => onVoltar()}
+        onFinalizada={(d) => {
+          setDetalhe(d);
+          setExcluir(false);
+        }}
+      />
+      <GavetaDeDuplicar
+        pesquisa={duplicar ? detalhe : null}
+        servico={servico}
+        onFechar={() => setDuplicar(false)}
+        onDuplicada={(copia, naAtiva) => {
+          setDuplicar(false);
+          if (naAtiva) onDuplicada?.(copia);
+        }}
+      />
     </div>
   );
 }
@@ -681,6 +692,8 @@ function VisaoGeral({
   async function filtrar(campo: CampoGrupo, grupoId: string) {
     const novo = grupoId ? { campo, grupoId } : null;
     setRecorte(novo);
+    // Sem recorte, volta ao resultado geral (já carregado).
+    if (!novo) return setAtual(geral);
     setFiltrando(true);
     try {
       setAtual(
@@ -703,15 +716,6 @@ function VisaoGeral({
   const todas = perguntasEmOrdem(detalhe.secoes);
   const textoDaPergunta = (id: string | undefined) =>
     todas.find((p) => p.id === id)?.texto ?? "";
-  const mediasDeEscala = todas
-    .filter((p) => ehDeEscala(p) && !(p.tipo === "nota_0_10" && p.config.enps))
-    .map((p) => {
-      const r = geral.perguntas.find((x) => x.perguntaId === p.id);
-      return r && "media" in r && r.media !== null && r.media !== undefined
-        ? mediaNa10(r.media, escalaDe(p))
-        : null;
-    })
-    .filter((m): m is number => m !== null);
   const enps = indicadores.enps;
 
   return (
@@ -726,10 +730,17 @@ function VisaoGeral({
                 : umaCasa(indicadores.mediaGeral)}
               <span className="pesquisas__suave"> /10</span>
             </p>
-            {mediasDeEscala.length > 1 ? (
-              <p className="pesquisas__suave">
-                {`De ${umaCasa(Math.min(...mediasDeEscala))} a ${umaCasa(Math.max(...mediasDeEscala))}`}
-              </p>
+            {indicadores.mediaGeral !== null ? (
+              <span
+                className="pesquisas__nota-colorida"
+                data-faixa={faixaDaMedia10(indicadores.mediaGeral)}
+              >
+                {
+                  ROTULO_DA_FAIXA_DA_MEDIA[
+                    faixaDaMedia10(indicadores.mediaGeral)
+                  ]
+                }
+              </span>
             ) : null}
             <p className="pesquisas__suave">
               {`Média das ${plural(indicadores.perguntasDeEscala, "pergunta de escala", "perguntas de escala")}, com ${plural(geral.respostas, "resposta", "respostas")}`}
@@ -850,6 +861,20 @@ function VisaoGeral({
           </div>
         ) : null}
       </div>
+
+      {recorte ? (
+        <p className="pesquisas__filtro-aplicado" role="status">
+          {`Mostrando ${plural(atual.respostas, "resposta", "respostas")} de ${geral.respostas}`}
+          {" · "}
+          <button
+            type="button"
+            className="pesquisas__acao-texto pesquisas__acao-texto--primaria"
+            onClick={() => void filtrar(recorte.campo, "")}
+          >
+            Limpar filtros
+          </button>
+        </p>
+      ) : null}
 
       <div
         className="pesquisas__resultados"
@@ -1088,7 +1113,6 @@ function CartaoDaPergunta({
               fracao={m === null ? 0 : (m - e.minimo) / (e.maximo - e.minimo)}
               centro={m === null ? "—" : umaCasa(m)}
               sufixo={`/${e.maximo}`}
-              legenda="Média do time"
               cor={
                 m === null
                   ? "var(--surface-neutral)"
@@ -1096,7 +1120,9 @@ function CartaoDaPergunta({
               }
               rotulo={`Média ${m === null ? "sem dado" : umaCasa(m)} de ${e.maximo}`}
             />
-            <p className="pesquisas__forte">{`Média ${m === null ? "—" : umaCasa(m)}`}</p>
+            <p className="pesquisas__suave pesquisas__rotulo-curto">
+              Média do time
+            </p>
             {favoravel !== null ? (
               <span className="pesquisas__selo pesquisas__selo--sucesso">{`${favoravel}% favorável`}</span>
             ) : null}
@@ -1123,7 +1149,7 @@ function CartaoDaPergunta({
           </div>
           <BarrasPorNota
             valores={valores}
-            cor={(v) => corDaNota(v, e)}
+            cor={(v) => corEmDegrade(v, e)}
             {...(p.tipo === "escala" && p.config.rotuloMinimo
               ? { rotuloMinimo: p.config.rotuloMinimo }
               : {})}
@@ -1537,6 +1563,12 @@ function ListaDeRespostas({
             })}
           </tbody>
         </table>
+        <div className="pesquisas__tabela-rodape">
+          <span>{plural(respostas.length, "resposta", "respostas")}</span>
+          <span className="pesquisas__suave">
+            Da mais recente para a mais antiga
+          </span>
+        </div>
       </div>
     </>
   );

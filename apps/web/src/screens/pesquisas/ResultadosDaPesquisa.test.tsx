@@ -91,7 +91,7 @@ describe("Resultados — cabeçalho e faixa", () => {
     expect(info).toHaveTextContent("ModeloClima");
     expect(info).toHaveTextContent("Criada em02/11/2026");
     expect(info).toHaveTextContent("IdentificaçãoConfidencial");
-    expect(info).toHaveTextContent("Participação8 de 10 · 80%");
+    expect(info).toHaveTextContent("Participação8 de 10 pessoas · 80%");
   });
 
   it("na anônima, a participação é 'respostas · link aberto'", async () => {
@@ -107,7 +107,31 @@ describe("Resultados — cabeçalho e faixa", () => {
     fireEvent.click(
       await screen.findByRole("menuitem", { name: "Duplicar pesquisa" }),
     );
-    await waitFor(() => expect(onDuplicada).toHaveBeenCalled());
+    // Gaveta de confirmação: empresa de destino e o aviso do link novo.
+    const gaveta = await screen.findByRole("dialog", {
+      name: "Duplicar pesquisa",
+    });
+    expect(
+      await within(gaveta).findByRole("combobox", {
+        name: "Empresa de destino",
+      }),
+    ).toHaveTextContent("Empresa Alfa");
+    expect(gaveta).toHaveTextContent("link novo");
+    expect(servico.duplicarPesquisa).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Confirmar duplicação" }),
+    );
+    await waitFor(() =>
+      // A cópia nasce ativa e abre (na empresa ativa).
+      expect(onDuplicada).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "p-copia", status: "ativa" }),
+      ),
+    );
+    // Na própria empresa, o corpo vai sem empresaId.
+    expect(servico.duplicarPesquisa).toHaveBeenCalledWith("p-1", undefined);
+    expect(
+      await screen.findByText("Pesquisa duplicada com sucesso!"),
+    ).toBeInTheDocument();
     abrirMenu("Mais ações");
     fireEvent.click(
       await screen.findByRole("menuitem", { name: "Excluir pesquisa" }),
@@ -115,32 +139,43 @@ describe("Resultados — cabeçalho e faixa", () => {
     const janela = await screen.findByRole("dialog", {
       name: "Excluir Clima de novembro?",
     });
+    // O que se perde e a sugestão de finalizar (ainda ativa).
+    const perdas = within(janela).getByLabelText("O que se perde");
+    expect(perdas).toHaveTextContent("Respostas8 respostas");
+    expect(perdas).toHaveTextContent("Participantes10 pessoas");
+    expect(
+      await within(perdas).findByText(/^\d+ perguntas?$/),
+    ).toBeInTheDocument();
+    expect(
+      within(janela).getByRole("button", { name: "Finalizar pesquisa" }),
+    ).toBeInTheDocument();
     fireEvent.click(
       within(janela).getByRole("button", { name: "Excluir pesquisa" }),
     );
     await waitFor(() =>
       expect(servico.excluirPesquisa).toHaveBeenCalledWith("p-1"),
     );
-    expect(onVoltar).toHaveBeenCalledWith("Pesquisa excluída.");
+    expect(onVoltar).toHaveBeenCalled();
   });
 
   it("pausar muda o status direto; finalizar pede confirmação", async () => {
     const { servico } = montar();
     await screen.findByRole("heading", { level: 1, name: "Clima de novembro" });
     abrirMenu(/Mudar status/);
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Pausada" }));
+    expect(await screen.findByText("Mudar status")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Pausada/ }));
     await waitFor(() =>
       expect(servico.alterarStatusDaPesquisa).toHaveBeenCalledWith(
         "p-1",
         "pausada",
       ),
     );
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Status alterado para Pausada.",
-    );
+    expect(await screen.findByText("Pesquisa pausada.")).toBeInTheDocument();
+    // Pausada: o link não está recebendo respostas.
+    expect(screen.getByRole("button", { name: "Copiar link" })).toBeDisabled();
     abrirMenu(/Mudar status/);
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Finalizada" }),
+      await screen.findByRole("menuitem", { name: /^Finalizada/ }),
     );
     const janela = await screen.findByRole("dialog", {
       name: "Finalizar a pesquisa?",
@@ -167,7 +202,7 @@ describe("Resultados — cabeçalho e faixa", () => {
     abrirMenu("Mais ações");
     expect(
       (await screen.findAllByRole("menuitem")).map((m) => m.textContent),
-    ).toEqual(["Sobre o modelo"]);
+    ).toEqual(["Sobre o modelo Clima"]);
   });
 });
 
@@ -217,7 +252,9 @@ describe("Resultados — Visão geral", () => {
     const cartao = await screen.findByRole("region", {
       name: "2. Tenho clareza das prioridades.",
     });
-    expect(cartao).toHaveTextContent("Média 4,3");
+    // A média fica na rosca; embaixo, só o rótulo (sem repetir o número).
+    expect(cartao).toHaveTextContent("4,3/5Média do time");
+    expect(cartao).not.toHaveTextContent("Média 4,3");
     expect(cartao).toHaveTextContent("100% favorável");
     expect(cartao).toHaveTextContent("Favorável = notas 4 e 5");
     expect(
@@ -306,6 +343,85 @@ describe("Resultados — Visão geral", () => {
   });
 });
 
+describe("Resultados — sem respostas e recortes", () => {
+  it("sem respostas: Exportar desligado, sem filtros e o cartão 'Ainda sem respostas'", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...DETALHE,
+          identificacao: "identificada",
+          respostas: 0,
+          participantes: 1,
+          participantesLista: [
+            {
+              colaboradorId: "c-1",
+              nome: "Ana Exemplo",
+              departamento: "Operações",
+              respondeu: false,
+            },
+          ],
+        } as PesquisaDetalhe),
+      ),
+      resultadosDaPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...RESULTADOS,
+          respostas: 0,
+          participantes: 1,
+          perguntas: [],
+        }),
+      ),
+    });
+    render(
+      <ResultadosDaPesquisa
+        servico={servico}
+        pesquisaId="p-1"
+        podeEditar
+        hoje="2026-11-02"
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText("Clima · criada hoje · nenhuma resposta ainda"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
+    expect(screen.queryByRole("combobox", { name: "Departamento" })).toBeNull();
+    expect(screen.getByLabelText("Sobre a pesquisa")).toHaveTextContent(
+      "0 de 1 pessoa · 0%",
+    );
+    const vazio = screen.getByRole("region", { name: "Ainda sem respostas" });
+    expect(
+      within(vazio).getByRole("button", { name: "Copiar link" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(vazio).getByRole("button", { name: "Ver quem foi convidado" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Quem foi convidado" }),
+    ).toHaveTextContent("Ana Exemplo");
+  });
+
+  it("média geral com a faixa; recorte mostra 'Mostrando N de M · Limpar filtros'", async () => {
+    const { servico } = montar({
+      resultadosDaPesquisa: vi.fn((_id: string, recorte?: unknown) =>
+        Promise.resolve(recorte ? { ...RESULTADOS, respostas: 6 } : RESULTADOS),
+      ),
+    });
+    const ind = await screen.findByRole("region", { name: "Indicadores" });
+    expect(ind).toHaveTextContent("8 ou mais");
+    fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
+    fireEvent.click(screen.getByRole("option", { name: "Operações" }));
+    expect(
+      await screen.findByText(/Mostrando 6 respostas de 8/),
+    ).toBeInTheDocument();
+    const chamadas = servico.resultadosDaPesquisa.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    // Limpar volta ao geral já carregado, sem nova consulta.
+    expect(servico.resultadosDaPesquisa.mock.calls.length).toBe(chamadas);
+    await waitFor(() => expect(screen.queryByText(/Mostrando/)).toBeNull());
+  });
+});
+
 describe("Resultados — Análises e Respostas", () => {
   it("mapa de médias com 'Toda a empresa', faixa por cor e grupo oculto", async () => {
     montar();
@@ -339,7 +455,9 @@ describe("Resultados — Análises e Respostas", () => {
     const { onAbrirResposta } = montar(comIdentificacao("identificada"));
     fireEvent.click(await screen.findByRole("tab", { name: /Respostas/ }));
     const tabela = await screen.findByRole("table", { name: "Respostas" });
-    const [, ana] = within(tabela).getAllByRole("row");
+    // Da mais recente para a mais antiga.
+    const [, bruno, ana] = within(tabela).getAllByRole("row");
+    expect(bruno).toHaveTextContent("Bruno Exemplo");
     expect(ana).toHaveTextContent("Ana Exemplo");
     expect(ana).toHaveTextContent("9,0 /10");
     expect(ana).toHaveTextContent("20/11 · 11:23");
@@ -401,6 +519,23 @@ describe("Resultados — Exportar", () => {
     expect(JSON.stringify(abas["Respostas"])).not.toContain("Ana Exemplo");
   });
 
+  it("Excel: data da resposta e notas saem como número, não texto", async () => {
+    montar(comIdentificacao("identificada"));
+    await screen.findByRole("region", { name: "Indicadores" });
+    abrirMenu("Exportar");
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Excel/ }));
+    await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
+    const abas = await lerAbasXlsx(
+      vi.mocked(baixarArquivo).mock.calls[0]![0] as Uint8Array,
+    );
+    const [cabecalho, ana] = abas["Respostas"]!;
+    expect(cabecalho![2]).toBe("Respondida em");
+    // 20/11/2026 11:23 (Brasília) como data serial do Excel.
+    expect(Number(ana![2])).toBeCloseTo(46346 + (11 * 60 + 23) / 1440, 5);
+    const nota = cabecalho!.findIndex((c) => c.startsWith("1."));
+    expect(ana![nota]).toBe("10");
+  });
+
   it("PDF do relatório", async () => {
     montar();
     await screen.findByRole("region", { name: "Indicadores" });
@@ -410,8 +545,12 @@ describe("Resultados — Exportar", () => {
     const [bytes, nome, tipo] = vi.mocked(baixarArquivo).mock.calls[0]!;
     expect(nome).toBe("clima-de-novembro-resultados.pdf");
     expect(tipo).toBe("application/pdf");
-    expect(
-      new TextDecoder().decode(bytes as Uint8Array).startsWith("%PDF"),
-    ).toBe(true);
+    const texto = new TextDecoder("latin1").decode(bytes as Uint8Array);
+    expect(texto.startsWith("%PDF")).toBe(true);
+    // Indicadores (média, maior e menor média, eNPS com a zona) e barras.
+    expect(texto).toContain("eNPS");
+    expect(texto).toContain("Zona de qualidade");
+    expect(texto).toContain("8,5 /10");
+    expect(texto.match(/ re f/g)?.length ?? 0).toBeGreaterThan(4);
   });
 });

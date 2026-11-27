@@ -10,19 +10,37 @@ import type {
   Identificacao,
   PesquisaDetalhe,
   RespostaDetalhe,
+  RespostaResumo,
   Secao,
 } from "../../api/pesquisasClient";
 import { Button } from "../../components";
 import { formatarInstante } from "../../format/data";
-import { IconButton } from "../../ui";
-import { IconeAvancar, IconeBaixarArquivo, IconeVoltar } from "../../ui/icones";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+} from "../../ui";
+import {
+  IconeAvancar,
+  IconeBaixarArquivo,
+  IconeAbrir,
+  IconeVoltar,
+} from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
 import { baixarArquivo } from "../dashboard/exportacao";
 import { Avatar, iniciaisDe } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { nomeDaExportacao, pdfDaResposta } from "./exportarResultados";
 import { Regua } from "./graficos";
-import { ehDeEscala, escalaDe, faixaDaMedia10, mediaNa10 } from "./indicadores";
+import {
+  ROTULO_DA_FAIXA_DA_MEDIA,
+  ehDeEscala,
+  escalaDe,
+  faixaDaMedia10,
+  mediaNa10,
+} from "./indicadores";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { umaCasa } from "./textosDasPesquisas";
@@ -80,6 +98,7 @@ export function ResultadoIndividual({
       secoes={pesquisa.secoes}
       respostaId={respostaId}
       carregar={(id) => servico.respostaDaPesquisa(pesquisaId, id)}
+      listar={() => servico.respostasDaPesquisa(pesquisaId)}
       rotuloVoltar="Voltar para os resultados"
       onVoltar={onVoltar}
       onIr={onIr}
@@ -93,6 +112,7 @@ export function PaginaDaResposta({
   secoes,
   respostaId,
   carregar,
+  listar,
   rotuloVoltar,
   onVoltar,
   onIr,
@@ -102,6 +122,8 @@ export function PaginaDaResposta({
   readonly secoes: readonly Secao[];
   readonly respostaId: string;
   readonly carregar: (respostaId: string) => Promise<RespostaDetalhe>;
+  /** Todas as respostas (o seletor "N de M"); sem ele, só anterior/próxima. */
+  readonly listar?: () => Promise<readonly RespostaResumo[]>;
   readonly rotuloVoltar: string;
   readonly onVoltar: () => void;
   /** Sem `onIr`, não há paginação (ex.: ficha). */
@@ -110,6 +132,29 @@ export function PaginaDaResposta({
   const [r, setR] = useState<RespostaDetalhe | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [aba, setAba] = useState<"geral" | "respostas">("geral");
+  const [todasAsRespostas, setTodasAsRespostas] = useState<
+    readonly RespostaResumo[] | null
+  >(null);
+
+  useEffect(() => {
+    if (!listar || !onIr) return;
+    let vivo = true;
+    Promise.resolve(listar())
+      .then((l) => {
+        if (vivo)
+          setTodasAsRespostas(
+            [...(l ?? [])].sort((a, b) =>
+              b.respondidaEm.localeCompare(a.respondidaEm),
+            ),
+          );
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Uma vez: a lista não muda ao trocar de resposta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -148,6 +193,13 @@ export function PaginaDaResposta({
   const textoDe = (id: string | undefined) =>
     todas.find((p) => p.id === id)?.texto ?? "";
   const ind = r.indicadores;
+  /** O texto livre respondido (o último parágrafo com conteúdo). */
+  const comentario =
+    todas
+      .filter((p) => p.tipo === "paragrafo" || p.tipo === "texto_curto")
+      .map((p) => porId.get(p.id)?.valor)
+      .filter((v): v is string => typeof v === "string" && v.trim() !== "")
+      .at(-1) ?? null;
   const escalas = todas.filter(
     (p) =>
       ehDeEscala(p) &&
@@ -199,7 +251,41 @@ export function PaginaDaResposta({
                 disabled={!r.anteriorId}
                 onClick={() => r.anteriorId && onIr(r.anteriorId)}
               />
-              <span>{`${r.posicao} de ${r.total}`}</span>
+              {todasAsRespostas && todasAsRespostas.length > 0 ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className="pesquisas__seletor-resposta"
+                    aria-label={`Resposta ${r.posicao} de ${r.total}. Escolher outra`}
+                  >
+                    {`${r.posicao} de ${r.total}`}
+                    <IconeAbrir tamanho={14} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {todasAsRespostas.map((x) => (
+                      <DropdownMenuItem
+                        key={x.id}
+                        onSelect={() => x.id !== r.id && onIr(x.id)}
+                        {...(x.id === r.id ? { "aria-current": "true" } : {})}
+                      >
+                        <span className="pesquisas__item-resposta">
+                          <span>
+                            {identificacao === "identificada" && x.nome
+                              ? x.nome
+                              : `Resposta #${x.numero}`}
+                          </span>
+                          <span className="pesquisas__suave">
+                            {x.media === null
+                              ? "—"
+                              : `Média ${umaCasa(x.media)}`}
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <span>{`${r.posicao} de ${r.total}`}</span>
+              )}
               <IconButton
                 label="Próxima resposta"
                 icon={<IconeAvancar tamanho={16} />}
@@ -253,6 +339,14 @@ export function PaginaDaResposta({
                 {ind.media === null ? "—" : umaCasa(ind.media)}
                 <span className="pesquisas__suave"> /10</span>
               </p>
+              {ind.media !== null ? (
+                <span
+                  className="pesquisas__nota-colorida"
+                  data-faixa={faixaDaMedia10(ind.media)}
+                >
+                  {ROTULO_DA_FAIXA_DA_MEDIA[faixaDaMedia10(ind.media)]}
+                </span>
+              ) : null}
               {ind.media !== null && ind.mediaTime !== null ? (
                 <p className="pesquisas__suave">
                   {`${diferenca(ind.media, ind.mediaTime)} ${ind.media >= ind.mediaTime ? "acima" : "abaixo"} do time (${umaCasa(ind.mediaTime)})`}
@@ -312,6 +406,34 @@ export function PaginaDaResposta({
                 </div>
               );
             })}
+            <div className="pesquisas__indicador">
+              <h3>Média nos últimos pulsos</h3>
+              {typeof ind.mediaUltimosPulsos === "number" ? (
+                <>
+                  <p className="pesquisas__indicador-valor">
+                    {umaCasa(ind.mediaUltimosPulsos)}
+                    <span className="pesquisas__suave"> /10</span>
+                  </p>
+                  {ind.media !== null ? (
+                    <p className="pesquisas__suave">{`${diferenca(ind.media, ind.mediaUltimosPulsos)} nesta resposta`}</p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="pesquisas__suave">
+                  Sem pulsos anteriores para comparar.
+                </p>
+              )}
+            </div>
+            <div className="pesquisas__indicador pesquisas__indicador--largo">
+              <h3>Comentário livre</h3>
+              {comentario ? (
+                <blockquote className="pesquisas__comentario">
+                  {comentario}
+                </blockquote>
+              ) : (
+                <p className="pesquisas__suave">Nenhum comentário deixado.</p>
+              )}
+            </div>
           </section>
 
           <section

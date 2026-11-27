@@ -9,6 +9,7 @@
  */
 import type {
   Identificacao,
+  IndicadoresDosResultados,
   Pergunta,
   PesquisaDetalhe,
   RespostaDetalhe,
@@ -26,6 +27,7 @@ import { plural } from "../../format/plural";
 import { nomeDoArquivo } from "../dashboard/exportacao";
 import { type AbaXlsx, montarXlsx } from "../pessoas/importacao/planilhaXlsx";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import { ROTULO_DA_ZONA, ehDeEscala, escalaDe, mediaNa10 } from "./indicadores";
 import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
@@ -37,6 +39,49 @@ import {
 } from "./textosDasPesquisas";
 
 export const SEM_RESPOSTA = "Sem resposta";
+
+const DIA_EM_MS = 86_400_000;
+/** 1970-01-01 no sistema de datas do Excel (1900). */
+const EPOCA_DO_EXCEL = 25_569;
+/** Brasília: UTC−3 (sem horário de verão desde 2019). */
+const FUSO_DE_BRASILIA_MS = 3 * 3_600_000;
+
+/** Um instante como data e hora seriais do Excel, no horário de Brasília. */
+export function serialDoInstante(iso: string): number | null {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  return (ms - FUSO_DE_BRASILIA_MS) / DIA_EM_MS + EPOCA_DO_EXCEL;
+}
+
+/** Um dia civil (`AAAA-MM-DD`) como data serial do Excel. */
+export function serialDoDia(dia: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dia);
+  if (!m) return null;
+  return (
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / DIA_EM_MS +
+    EPOCA_DO_EXCEL
+  );
+}
+
+/** Tipos cuja resposta vai à planilha como número. */
+function respostaNumerica(p: Pergunta): boolean {
+  return ehDeEscala(p) || p.tipo === "numero";
+}
+
+/** A célula da resposta: número, data serial ou texto. */
+function celulaDaResposta(p: Pergunta, valor: unknown): string | number {
+  if (valor === null || valor === undefined || valor === "")
+    return SEM_RESPOSTA;
+  if (respostaNumerica(p)) {
+    const n = typeof valor === "number" ? valor : Number(valor);
+    if (Number.isFinite(n)) return n;
+  }
+  if (p.tipo === "data") {
+    const serial = serialDoDia(String(valor));
+    if (serial !== null) return serial;
+  }
+  return textoDoValor(p, valor);
+}
 
 const numero = (n: number) => String(n).replace(".", ",");
 
@@ -225,9 +270,14 @@ export function planilhaDosResultados(
   if (individuais) {
     const perguntas = perguntasEmOrdem(detalhe.secoes);
     const identificada = detalhe.identificacao === "identificada";
+    const formatos: Record<number, "data" | "dataHora"> = { 2: "dataHora" };
+    perguntas.forEach((p, i) => {
+      if (p.tipo === "data") formatos[3 + i] = "data";
+    });
     abas.push({
       nome: "Respostas",
       cabecalho: true,
+      formatos,
       larguras: [26, 20, 20, ...perguntas.map(() => 30)],
       linhas: [
         [
@@ -243,10 +293,11 @@ export function planilhaDosResultados(
           return [
             identificada ? (r.nome ?? "") : `Resposta #${r.numero}`,
             identificada ? (r.departamento ?? "") : "",
-            formatarInstante(r.respondidaEm),
+            serialDoInstante(r.respondidaEm) ??
+              formatarInstante(r.respondidaEm),
             ...perguntas.map((p) =>
               valores.has(p.id)
-                ? textoDoValor(p, valores.get(p.id))
+                ? celulaDaResposta(p, valores.get(p.id))
                 : SEM_RESPOSTA,
             ),
           ];
@@ -281,10 +332,8 @@ function quebrar(texto: string, largura: number, tamanho: number): string[] {
 export function pdfDosResultados(
   detalhe: PesquisaDetalhe,
   resultados: ResultadosPesquisa,
-  indicadores: {
-    readonly mediaGeral: number | null;
-    readonly enps: { readonly indice: number } | null;
-  },
+  indicadores: Pick<IndicadoresDosResultados, "mediaGeral" | "enps"> &
+    Partial<Pick<IndicadoresDosResultados, "maiorMedia" | "menorMedia">>,
 ): Uint8Array {
   const doc = new DocumentoPdf(detalhe.nome);
   let pg = doc.novaPagina();
@@ -301,14 +350,8 @@ export function pdfDosResultados(
     `${ROTULO_DO_MODELO[detalhe.modelo]} · ${ROTULO_DA_IDENTIFICACAO[detalhe.identificacao]} · ${plural(resultados.respostas, "resposta", "respostas")} · criada em ${dataDoInstante(detalhe.criadaEm)}`,
     { tamanho: 9, cor: SUAVE },
   );
-  y += 22;
-  pg.texto(
-    MARGEM,
-    y,
-    `Média geral: ${indicadores.mediaGeral === null ? "—" : `${umaCasa(indicadores.mediaGeral)} de 10`}    eNPS: ${indicadores.enps ? indicadores.enps.indice : "—"}`,
-    { tamanho: 11, negrito: true, cor: TINTA },
-  );
-  y += 16;
+  y += 20;
+  y = quadrosDeIndicadores(pg, y, detalhe, indicadores);
   pg.linha(MARGEM, y, pg.largura - MARGEM, y, LINHA);
   y += 18;
   const resumo = linhasDoResumo(detalhe, resultados);
@@ -319,10 +362,16 @@ export function pdfDosResultados(
     });
   }
   const largura = pg.largura - MARGEM * 2;
+  const perguntas = perguntasEmOrdem(detalhe.secoes);
+  const porId = new Map(resultados.perguntas.map((r) => [r.perguntaId, r]));
   for (const l of resumo) {
     const titulo = quebrar(`${l.numero}. ${l.pergunta}`, largura, 10);
     const corpo = quebrar(l.resultado || "Sem respostas", largura, 8);
-    const altura = titulo.length * 13 + corpo.length * 11 + 12;
+    const p = perguntas[l.numero - 1];
+    const r = p ? porId.get(p.id) : undefined;
+    const barras = p && r ? barrasDaPergunta(p, r) : [];
+    const altura =
+      titulo.length * 13 + corpo.length * 11 + barras.length * 14 + 12;
     if (y + altura > pg.altura - MARGEM) {
       pg = doc.novaPagina();
       y = 50;
@@ -335,9 +384,167 @@ export function pdfDosResultados(
       pg.texto(MARGEM, y, t, { tamanho: 8, cor: SUAVE });
       y += 11;
     }
+    y = desenharBarras(pg, y, barras);
     y += 12;
   }
   return doc.bytes();
+}
+
+type PaginaPdf = ReturnType<DocumentoPdf["novaPagina"]>;
+
+const VERMELHO: Cor = [196, 50, 50];
+const AMARELO: Cor = [214, 160, 30];
+const VERDE: Cor = [38, 140, 80];
+const AZUL: Cor = [40, 100, 200];
+const TRILHO: Cor = [236, 236, 240];
+
+/** Do vermelho (nota baixa) ao verde (nota alta), passando pelo amarelo. */
+function corDaNotaNoPdf(fracao: number): Cor {
+  const f = Math.max(0, Math.min(1, fracao));
+  const [a, b, t] =
+    f <= 0.5 ? [VERMELHO, AMARELO, f / 0.5] : [AMARELO, VERDE, (f - 0.5) / 0.5];
+  return [0, 1, 2].map((i) =>
+    Math.round(a[i]! + (b[i]! - a[i]!) * t),
+  ) as unknown as Cor;
+}
+
+interface BarraDoPdf {
+  readonly rotulo: string;
+  readonly quantidade: number;
+  readonly total: number;
+  readonly cor: Cor;
+}
+
+/** As barras de uma pergunta: distribuição das notas ou das opções. */
+function barrasDaPergunta(p: Pergunta, r: ResultadoPergunta): BarraDoPdf[] {
+  if ("media" in r && r.distribuicao && r.distribuicao.length > 0) {
+    const e = ehDeEscala(p) ? escalaDe(p) : null;
+    const total = r.distribuicao.reduce((s, d) => s + d.quantidade, 0);
+    return r.distribuicao.map((d) => ({
+      rotulo: String(d.valor),
+      quantidade: d.quantidade,
+      total,
+      cor: e
+        ? corDaNotaNoPdf(
+            (d.valor - e.minimo) / Math.max(1, e.maximo - e.minimo),
+          )
+        : AZUL,
+    }));
+  }
+  if ("opcoes" in r) {
+    return r.opcoes.map((o) => ({
+      rotulo:
+        p.config.opcoes?.find((x) => x.id === o.opcaoId)?.texto ??
+        "Opção removida",
+      quantidade: o.quantidade,
+      total: r.respondidas,
+      cor: AZUL,
+    }));
+  }
+  if ("sim" in r) {
+    const total = r.sim + r.nao;
+    return [
+      { rotulo: "Sim", quantidade: r.sim, total, cor: VERDE },
+      { rotulo: "Não", quantidade: r.nao, total, cor: VERMELHO },
+    ];
+  }
+  return [];
+}
+
+/** Desenha as barras horizontais (rótulo, trilho, barra e percentual). */
+function desenharBarras(
+  pg: PaginaPdf,
+  y0: number,
+  barras: readonly BarraDoPdf[],
+): number {
+  let y = y0 + (barras.length > 0 ? 4 : 0);
+  const xTrilho = MARGEM + 110;
+  const largura = pg.largura - MARGEM - 60 - xTrilho;
+  for (const b of barras) {
+    pg.texto(MARGEM, y + 7, cortarTexto(b.rotulo, 104, 8), {
+      tamanho: 8,
+      cor: SUAVE,
+    });
+    pg.retangulo(xTrilho, y, largura, 8, { preenchimento: TRILHO });
+    const fracao = b.total > 0 ? b.quantidade / b.total : 0;
+    if (fracao > 0)
+      pg.retangulo(xTrilho, y, largura * fracao, 8, { preenchimento: b.cor });
+    pg.texto(
+      xTrilho + largura + 8,
+      y + 7,
+      `${b.quantidade} · ${percentual(b.quantidade, b.total)}%`,
+      {
+        tamanho: 8,
+        cor: TINTA,
+      },
+    );
+    y += 14;
+  }
+  return y;
+}
+
+/** Quatro quadros: média geral, maior e menor média e eNPS (com a zona). */
+function quadrosDeIndicadores(
+  pg: PaginaPdf,
+  y: number,
+  detalhe: PesquisaDetalhe,
+  ind: Pick<IndicadoresDosResultados, "mediaGeral" | "enps"> &
+    Partial<Pick<IndicadoresDosResultados, "maiorMedia" | "menorMedia">>,
+): number {
+  const perguntas = perguntasEmOrdem(detalhe.secoes);
+  const textoDa = (id: string | undefined) => {
+    const p = perguntas.find((x) => x.id === id);
+    return p ? p.rotulo || p.texto : "";
+  };
+  const na10 = (
+    x: { perguntaId: string; media: number } | null | undefined,
+  ) => {
+    if (!x) return null;
+    const p = perguntas.find((q) => q.id === x.perguntaId);
+    return p && ehDeEscala(p) ? mediaNa10(x.media, escalaDe(p)) : x.media;
+  };
+  const quadros: { titulo: string; valor: string; nota: string }[] = [
+    {
+      titulo: "Média geral",
+      valor: ind.mediaGeral === null ? "—" : `${umaCasa(ind.mediaGeral)} /10`,
+      nota: "Perguntas de escala, de 0 a 10",
+    },
+    {
+      titulo: "Maior média",
+      valor: ind.maiorMedia ? umaCasa(na10(ind.maiorMedia) ?? 0) : "—",
+      nota: textoDa(ind.maiorMedia?.perguntaId),
+    },
+    {
+      titulo: "Menor média",
+      valor: ind.menorMedia ? umaCasa(na10(ind.menorMedia) ?? 0) : "—",
+      nota: textoDa(ind.menorMedia?.perguntaId),
+    },
+    {
+      titulo: "eNPS",
+      valor: ind.enps ? String(ind.enps.indice) : "—",
+      nota: ind.enps
+        ? ROTULO_DA_ZONA[ind.enps.zona]
+        : "Sem a pergunta de recomendação",
+    },
+  ];
+  const vao = 8;
+  const largura = (pg.largura - MARGEM * 2 - vao * 3) / 4;
+  const altura = 52;
+  quadros.forEach((q, i) => {
+    const x = MARGEM + i * (largura + vao);
+    pg.retangulo(x, y, largura, altura, { contorno: LINHA, espessura: 0.6 });
+    pg.texto(x + 8, y + 14, q.titulo, { tamanho: 8, cor: SUAVE });
+    pg.texto(x + 8, y + 31, q.valor, {
+      tamanho: 14,
+      negrito: true,
+      cor: TINTA,
+    });
+    pg.texto(x + 8, y + 45, cortarTexto(q.nota, largura - 16, 7), {
+      tamanho: 7,
+      cor: SUAVE,
+    });
+  });
+  return y + altura + 14;
 }
 
 /** O PDF de uma resposta: cada pergunta e o que foi respondido. */

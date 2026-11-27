@@ -51,6 +51,12 @@ export interface AbaXlsx {
   readonly listaDeTipos?: boolean;
   /** Texto quebrado na largura da coluna (Instruções). */
   readonly quebrarTexto?: boolean;
+  /**
+   * T216 — colunas (índice a partir de 0) cujos números são datas seriais
+   * do Excel: "data" (dia) ou "dataHora" (dia e hora). O valor continua
+   * número (ordena e filtra como data); só o formato de exibição muda.
+   */
+  readonly formatos?: Readonly<Record<number, "data" | "dataHora">>;
 }
 
 export interface OpcoesDoXlsx {
@@ -362,7 +368,8 @@ function indiceDaColuna(referencia: string): number {
 }
 
 // Estilos: 0 normal; 1 texto (@); 2 cabeçalho (negrito, fundo, texto);
-// 3 texto quebrado (Instruções); 4 título das instruções (negrito).
+// 3 texto quebrado (Instruções); 4 título das instruções (negrito);
+// 5 data (formato embutido 14); 6 data e hora (formato embutido 22).
 const ESTILOS =
   CABECALHO_XML +
   `<styleSheet xmlns="${NS_MAIN}">` +
@@ -373,12 +380,14 @@ const ESTILOS =
   '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FB"/><bgColor indexed="64"/></patternFill></fill></fills>' +
   '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="5">' +
+  '<cellXfs count="7">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   '<xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
   '<xf numFmtId="49" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' +
   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+  '<xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
   "</cellXfs>" +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   "</styleSheet>";
@@ -421,7 +430,10 @@ function folhaXml(
           const ref = `${letras(j)}${numero}`;
           const s = destaque ? ` s="${destaque}"` : "";
           if (typeof celula === "number") {
-            return `<c r="${ref}"${s}><v>${celula}</v></c>`;
+            const formato =
+              i > 0 || !aba.cabecalho ? aba.formatos?.[j] : undefined;
+            const sNumero = formato ? ` s="${formato === "data" ? 5 : 6}"` : s;
+            return `<c r="${ref}"${sNumero}><v>${celula}</v></c>`;
           }
           if (typeof celula === "object") {
             const valor = celula.valor ?? "";
