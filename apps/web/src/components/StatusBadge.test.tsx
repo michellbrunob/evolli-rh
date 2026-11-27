@@ -20,7 +20,7 @@ describe("StatusBadge (UI-F02)", () => {
     );
   });
 
-  it("cada variante acrescenta um glifo de forma distinta, marcado como decorativo", () => {
+  it("cada variante mostra um ponto colorido decorativo, sem símbolo (padrão do sistema)", () => {
     const variantes: StatusVariant[] = [
       "neutral",
       "success",
@@ -28,22 +28,19 @@ describe("StatusBadge (UI-F02)", () => {
       "danger",
       "info",
     ];
-    const glifos = new Set<string>();
-
     for (const variante of variantes) {
       const { container, unmount } = render(
         <StatusBadge variant={variante}>Rótulo</StatusBadge>,
       );
-      const glyph = container.querySelector(".evolli-badge__glyph");
-      expect(glyph).not.toBeNull();
-      expect(glyph).toHaveAttribute("aria-hidden", "true");
-      // O rótulo textual permanece legível (fora do elemento decorativo).
-      expect(screen.getByText("Rótulo")).toBeInTheDocument();
-      glifos.add(glyph?.textContent ?? "");
+      const ponto = container.querySelector(".evolli-badge__ponto");
+      expect(ponto).not.toBeNull();
+      expect(ponto).toHaveAttribute("aria-hidden", "true");
+      // Só o ponto: nenhum ✓, ×, ! ou i ao lado do rótulo.
+      expect(ponto?.textContent).toBe("");
+      expect(container.querySelector(".evolli-badge")?.textContent).toBe(
+        "Rótulo",
+      );
       unmount();
     }
-
-    // Glifos distintos entre as cinco variantes → forma comunica o estado.
-    expect(glifos.size).toBe(variantes.length);
   });
 });
