@@ -838,6 +838,27 @@ function numeroComoTexto(texto: string): string {
 }
 
 /**
+ * T215 — salário em célula numérica: o Excel guarda o número binário (às
+ * vezes com ruído, como 2045.0000000000002, ou com casas a mais). Na
+ * leitura, arredonda a 2 casas, meio para cima, a partir dos 15 algarismos
+ * que o Excel mostra; devolve "2045.00". Texto digitado não passa por aqui
+ * (casas a mais no texto continuam recusadas na conferência).
+ */
+function reaisComoTexto(texto: string): string {
+  const n = Number(texto);
+  if (!Number.isFinite(n) || n < 0 || n >= 1e15) return numeroComoTexto(texto);
+  const [inteiro = "0", fracao = ""] = Number(n.toPrecision(15))
+    .toFixed(10)
+    .split(".");
+  let centavos = BigInt(inteiro) * 100n + BigInt(fracao.slice(0, 2) || "0");
+  if (Number(fracao[2] ?? "0") >= 5) centavos += 1n;
+  return `${centavos / 100n}.${String(centavos % 100n).padStart(2, "0")}`;
+}
+
+/** Colunas de valor em reais (célula numérica arredonda a centavos). */
+const COLUNAS_DE_REAIS = new Set<Coluna>(["salario"]);
+
+/**
  * Lê a aba Colaboradores para a mesma estrutura do CSV (`PlanilhaLida`), ou
  * devolve o erro que recusa o arquivo inteiro.
  */
@@ -906,7 +927,9 @@ export async function lerPlanilhaXlsx(
         if (celula.numerica) {
           texto = COLUNAS_DE_DATA.has(coluna)
             ? (dataDoExcel(Number(texto), folha.datas1904) ?? texto)
-            : numeroComoTexto(texto);
+            : COLUNAS_DE_REAIS.has(coluna)
+              ? reaisComoTexto(texto)
+              : numeroComoTexto(texto);
         }
         valores[coluna] = texto;
       }

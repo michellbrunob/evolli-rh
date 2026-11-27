@@ -263,6 +263,36 @@ describe("T212 — leitura: a mesma conferência do CSV", () => {
     expect(lida.linhas[0]!.valores.matricula).toBe("1234");
   });
 
+  it.each([
+    [2045.0000000000002, "2045.00"], // ruído de ponto flutuante do Excel
+    [1621.555, "1621.56"], // meio para cima
+    [1621.554, "1621.55"],
+    [3000.1, "3000.10"],
+    [1621, "1621.00"],
+    [0.005, "0.01"],
+  ])(
+    "salário em célula numérica (%p) arredonda a 2 casas na leitura: %s",
+    async (numero, texto) => {
+      const linha: CelulaXlsx[] = [...LINHA_VALIDA];
+      linha[6] = numero;
+      const lida = await lerPlanilhaXlsx(pasta([CABECALHO, linha]));
+      if ("erro" in lida) throw new Error(lida.erro);
+      expect(lida.linhas[0]!.valores.salario).toBe(texto);
+      const [conferida] = conferirPlanilha(lida, REFERENCIAS, "2026-11-18");
+      expect(conferida!.erros).toEqual([]);
+      expect(lerSalarioDaPlanilha(texto)).toBe(texto);
+    },
+  );
+
+  it("salário em TEXTO com casas extras continua recusado (foi digitado assim)", async () => {
+    const linha: CelulaXlsx[] = [...LINHA_VALIDA];
+    linha[6] = "1621,555";
+    const lida = await lerPlanilhaXlsx(pasta([CABECALHO, linha]));
+    if ("erro" in lida) throw new Error(lida.erro);
+    const [conferida] = conferirPlanilha(lida, REFERENCIAS, "2026-11-18");
+    expect(conferida!.erros.map((e) => e.campo)).toContain("Salário");
+  });
+
   it("textos compartilhados (como o Excel grava) também são lidos", async () => {
     const lida = await lerPlanilhaXlsx(
       pasta([CABECALHO, LINHA_VALIDA], { textosCompartilhados: true }),

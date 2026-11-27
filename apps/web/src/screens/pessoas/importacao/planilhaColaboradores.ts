@@ -348,13 +348,17 @@ function dataIso(texto: string): string | null {
 
 /**
  * T215 — o salário da planilha: "1.621,00", "1621,00", "1621.00", "1621" ou
- * "R$ 1.621,00" (célula numérica do .xlsx chega como "1621" ou "1621.5").
+ * "R$ 1.621,00" (célula numérica do .xlsx chega já arredondada a centavos,
+ * como "1621.50").
  * Devolve "1621.00", ou `null` se não for um valor em reais.
  */
 export function lerSalarioDaPlanilha(texto: string): string | null {
   const limpo = texto.replace(/^R\$\s*/i, "").replace(/\s/g, "");
   let normal: string;
-  if (/^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(limpo) || /^\d+,\d{1,2}$/.test(limpo)) {
+  if (
+    /^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(limpo) ||
+    /^\d+,\d{1,2}$/.test(limpo)
+  ) {
     normal = limpo.replace(/\./g, "").replace(",", ".");
   } else if (/^\d{1,3}(\.\d{3})+$/.test(limpo)) {
     normal = limpo.replace(/\./g, "");
