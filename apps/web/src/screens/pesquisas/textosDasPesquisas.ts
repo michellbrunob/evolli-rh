@@ -81,6 +81,13 @@ export const ROTULO_DO_MODELO: Readonly<Record<ModeloPesquisa, string>> = {
   beneficios: "Satisfação com benefícios",
   treinamento: "Avaliação de treinamento",
   personalizada: "Personalizada",
+  pulso_clima: "Pulso e Clima",
+  tad: "Motivação (TAD)",
+  copsoq: "Riscos psicossociais (NR-1)",
+  isfb: "Saúde financeira",
+  avaliacao90: "Avaliação 90°",
+  avaliacao180: "Avaliação 180°",
+  disc: "Perfil comportamental (DISC)",
 };
 
 export const TIPOS_DE_PERGUNTA: readonly {

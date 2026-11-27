@@ -87,7 +87,14 @@ export type ModeloPublico =
   | "desligamento"
   | "beneficios"
   | "treinamento"
-  | "personalizada";
+  | "personalizada"
+  | "pulso_clima"
+  | "tad"
+  | "copsoq"
+  | "isfb"
+  | "avaliacao90"
+  | "avaliacao180"
+  | "disc";
 
 export interface PesquisaPublica {
   /** Ausente numa API que ainda não o devolve: uma pergunta por tela. */

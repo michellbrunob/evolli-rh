@@ -29,6 +29,15 @@ export const MODELOS = [
   "beneficios",
   "treinamento",
   "personalizada",
+  // Modelos da galeria completa (5 categorias): clima e engajamento, saúde e
+  // NR-1, desempenho e perfil comportamental.
+  "pulso_clima",
+  "tad",
+  "copsoq",
+  "isfb",
+  "avaliacao90",
+  "avaliacao180",
+  "disc",
 ] as const;
 export type Modelo = (typeof MODELOS)[number];
 

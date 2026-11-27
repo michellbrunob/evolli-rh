@@ -3713,6 +3713,13 @@ enum ModeloPesquisa {
   beneficios
   treinamento
   personalizada
+  pulso_clima
+  tad
+  copsoq
+  isfb
+  avaliacao90
+  avaliacao180
+  disc
 }
 
 /// T216 — a pesquisa da empresa. As seções e perguntas ficam em `secoes`

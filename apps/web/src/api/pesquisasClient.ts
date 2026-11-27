@@ -26,7 +26,14 @@ export type ModeloPesquisa =
   | "desligamento"
   | "beneficios"
   | "treinamento"
-  | "personalizada";
+  | "personalizada"
+  | "pulso_clima"
+  | "tad"
+  | "copsoq"
+  | "isfb"
+  | "avaliacao90"
+  | "avaliacao180"
+  | "disc";
 /** Campos que a anônima pode pedir para separar as respostas. */
 export type CampoGrupo = "departamento" | "centroCusto" | "unidade";
 
