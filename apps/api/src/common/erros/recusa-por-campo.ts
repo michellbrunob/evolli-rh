@@ -70,7 +70,10 @@ export type MotivoDoCampo =
   | "com_respostas"
   // T216 — publicar sem nenhum participante identificável pelo link (sem
   // CPF e nascimento): só com confirmação explícita.
-  | "ninguem_identificavel";
+  | "ninguem_identificavel"
+  // T216 — modelo de metodologia fixa (Pulso e Clima, Clima, TAD): os itens
+  // do modelo precisam estar todos, com o tipo e a escala do modelo.
+  | "estrutura_do_modelo";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o

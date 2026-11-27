@@ -37,6 +37,10 @@ import {
   nomesDosGrupos,
 } from "./pessoas-da-pesquisa";
 import { conferirSecoes, totalDePerguntas } from "./estrutura-pesquisa";
+import {
+  errosDaEstruturaDoModelo,
+  resultadoIndividualDoModelo,
+} from "./modelos/indice";
 import { semDesativacaoVigente } from "../pessoas/colaborador/desativacao";
 import {
   type AnalisesPesquisa,
@@ -536,6 +540,10 @@ export class PesquisasService {
     }
     const estrutura = conferirSecoes(dto.secoes);
     erros.push(...estrutura.erros);
+    // Metodologia fixa (Pulso e Clima, Clima, TAD): os itens do modelo.
+    if (estrutura.erros.length === 0) {
+      erros.push(...errosDaEstruturaDoModelo(dto.modelo, estrutura.secoes));
+    }
     // Data e hora no horário de Brasília, no futuro (o prazo já gravado
     // pode ficar como está).
     let encerraEm: Date | null = null;
@@ -1054,6 +1062,7 @@ export class PesquisasService {
     return montarResultados({
       pesquisaId: id,
       secoes: p.secoes as unknown as Secao[],
+      modelo: p.modelo,
       respostas,
       participantes,
       nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
@@ -1273,6 +1282,12 @@ export class PesquisasService {
       total: lista.length,
       valores: comparacao.valores,
       indicadores: { ...comparacao.indicadores, mediaUltimosPulsos },
+      // O resultado da pessoa no modelo (ex.: os pilares da TAD).
+      modelo: resultadoIndividualDoModelo(
+        p.modelo,
+        p.secoes as unknown as Secao[],
+        new Map(lista[i]!.valores.map((v) => [v.perguntaId, v.valor])),
+      ),
     };
   }
 

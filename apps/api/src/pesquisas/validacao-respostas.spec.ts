@@ -54,6 +54,8 @@ describe("T216 — conferirValor (tabela dos 11 tipos)", () => {
     ],
     [p("s", "sim_nao"), ["sim", "nao"], ["Sim", true, 1]],
     [p("c", "concordancia"), [1, 5], [0, 6, 2.5, "3"]],
+    [p("c4", "concordancia_4"), [1, 4], [0, 5, 2.5, "3"]],
+    [p("s4", "satisfacao_4"), [1, 2, 3, 4], [0, 5, null, "4"]],
     [p("n", "nota_0_10"), [0, 10], [-1, 11, 9.5]],
     [p("e", "estrelas"), [1, 5], [0, 6]],
     [p("x", "escala", { minimo: 0, maximo: 7 }), [0, 7], [-1, 8, 3.2]],

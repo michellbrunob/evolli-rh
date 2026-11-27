@@ -24,7 +24,8 @@ export const ID_DA_ESTRUTURA = /^[A-Za-z0-9_-]{1,40}$/;
 
 export const LIMITES = {
   secoes: 20,
-  perguntas: 60,
+  /** A Pesquisa de Clima tem 62 perguntas (60 afirmações + 2 abertas). */
+  perguntas: 100,
   textoPergunta: 300,
   descricaoPergunta: 500,
   /** Rótulo curto da pergunta (tabelas de análise). */
@@ -86,6 +87,30 @@ function conferirOpcoes(v: unknown): Opcao[] | null {
   return opcoes;
 }
 
+/** O texto das pontas (escala e nota): aparado; vazio vira `null`. */
+function conferirPontas(c: Registro): {
+  rotuloMinimo: string | null;
+  rotuloMaximo: string | null;
+} | null {
+  const rotuloMinimo = textoOpcional(c.rotuloMinimo, LIMITES.rotulo);
+  const rotuloMaximo = textoOpcional(c.rotuloMaximo, LIMITES.rotulo);
+  if (rotuloMinimo === undefined || rotuloMaximo === undefined) return null;
+  return { rotuloMinimo, rotuloMaximo };
+}
+
+/** O rótulo de cada ponto da escala: um por ponto, nenhum vazio. */
+function conferirRotulos(v: unknown, pontos: number): string[] | null {
+  if (!Array.isArray(v) || v.length !== pontos) return null;
+  const rotulos: string[] = [];
+  for (const r of v) {
+    if (typeof r !== "string") return null;
+    const t = r.trim();
+    if (t === "" || t.length > LIMITES.rotulo) return null;
+    rotulos.push(t);
+  }
+  return rotulos;
+}
+
 /** A configuração própria de cada tipo; `null` se inválida. */
 export function conferirConfig(
   tipo: TipoPergunta,
@@ -116,19 +141,30 @@ export function conferirConfig(
     }
     case "nota_0_10": {
       if (c.enps !== undefined && typeof c.enps !== "boolean") return null;
-      return { enps: c.enps === true };
+      if (c.lnps !== undefined && typeof c.lnps !== "boolean") return null;
+      // eNPS (empresa) e LNPS (liderança direta) não se somam na mesma nota.
+      if (c.enps === true && c.lnps === true) return null;
+      const pontas = conferirPontas(c);
+      if (!pontas) return null;
+      return {
+        enps: c.enps === true,
+        ...(c.lnps === true ? { lnps: true } : {}),
+        ...(pontas.rotuloMinimo ? { rotuloMinimo: pontas.rotuloMinimo } : {}),
+        ...(pontas.rotuloMaximo ? { rotuloMaximo: pontas.rotuloMaximo } : {}),
+      };
     }
     case "escala": {
       const minimo = c.minimo ?? 1;
       const maximo = c.maximo ?? 5;
       if (minimo !== 0 && minimo !== 1) return null;
       if (!inteiroEntre(maximo, 2, 10)) return null;
-      const rotuloMinimo = textoOpcional(c.rotuloMinimo, LIMITES.rotulo);
-      const rotuloMaximo = textoOpcional(c.rotuloMaximo, LIMITES.rotulo);
-      if (rotuloMinimo === undefined || rotuloMaximo === undefined) {
-        return null;
+      const pontas = conferirPontas(c);
+      if (!pontas) return null;
+      if (c.rotulos === undefined || c.rotulos === null) {
+        return { minimo, maximo, ...pontas };
       }
-      return { minimo, maximo, rotuloMinimo, rotuloMaximo };
+      const rotulos = conferirRotulos(c.rotulos, maximo - minimo + 1);
+      return rotulos ? { minimo, maximo, ...pontas, rotulos } : null;
     }
     case "numero": {
       const minimo = c.minimo ?? null;
@@ -263,6 +299,11 @@ function conferirPergunta(
   if (descricao === undefined) erros.push({ campo, motivo: "limite" });
   const rotulo = textoOpcional(bruta.rotulo, LIMITES.rotuloPergunta);
   if (rotulo === undefined) erros.push({ campo, motivo: "limite" });
+  // A chave do item do modelo: o mesmo formato dos ids.
+  const chave = bruta.chave ?? null;
+  if (chave !== null && !idValido(chave)) {
+    erros.push({ campo, motivo: "invalido" });
+  }
   if (
     bruta.obrigatoria !== undefined &&
     typeof bruta.obrigatoria !== "boolean"
@@ -304,6 +345,7 @@ function conferirPergunta(
   if (erros.length > antes || !config) return null;
   return {
     id,
+    ...(typeof chave === "string" ? { chave } : {}),
     tipo,
     texto,
     rotulo: rotulo ?? null,

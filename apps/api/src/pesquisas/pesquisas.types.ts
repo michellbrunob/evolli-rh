@@ -1,3 +1,13 @@
+import type {
+  ResultadoDoModelo,
+  ResultadoIndividualDoModelo,
+} from "./modelos/tipos";
+
+export type {
+  ResultadoDoModelo,
+  ResultadoIndividualDoModelo,
+} from "./modelos/tipos";
+
 /**
  * T216 — Pesquisas: os tipos do contrato da API (apêndice de
  * `docs/decisions/t216-pesquisas.md`). As telas são feitas contra estes
@@ -53,6 +63,10 @@ export const TIPOS_PERGUNTA = [
   "escala",
   "data",
   "numero",
+  // Escalas de 4 pontos, sem ponto neutro (modelo de Onboarding e a
+  // Personalizada): concordância e satisfação.
+  "concordancia_4",
+  "satisfacao_4",
 ] as const;
 export type TipoPergunta = (typeof TIPOS_PERGUNTA)[number];
 
@@ -80,9 +94,17 @@ export interface ConfigPergunta {
   maximo?: number | null;
   respostaBoa?: "sim" | "nao" | null;
   enps?: boolean;
+  /**
+   * Nota 0–10 de recomendação da liderança direta (LNPS): mesmo cálculo do
+   * eNPS (promotores 9–10 menos detratores 0–6), indicador próprio.
+   */
+  lnps?: boolean;
   minimo?: number | null;
+  /** Escala e nota 0–10: o texto das pontas. */
   rotuloMinimo?: string | null;
   rotuloMaximo?: string | null;
+  /** Escala: o rótulo de cada ponto, do mínimo ao máximo (opcional). */
+  rotulos?: string[] | null;
   inteiro?: boolean;
 }
 
@@ -93,6 +115,11 @@ export interface Condicao {
 
 export interface Pergunta {
   id: string;
+  /**
+   * O item do modelo (ex.: `pc_ae_01`): liga a pergunta à dimensão, ao pilar
+   * ou à regra de pontuação do modelo. Ausente nas perguntas livres.
+   */
+  chave?: string | null;
   tipo: TipoPergunta;
   texto: string;
   /** Rótulo curto (até 40) para as tabelas de análise. */
@@ -216,19 +243,23 @@ export interface DepartamentoDoResultado {
   oculto: MotivoOculto | null;
 }
 
+export interface IndicadorNps {
+  indice: number;
+  zona: ZonaEnps;
+  promotores: number;
+  neutros: number;
+  detratores: number;
+}
+
 export interface IndicadoresPesquisa {
   /** Média das perguntas de escala, na escala 0–10. */
   mediaGeral: number | null;
   perguntasDeEscala: number;
   maiorMedia: { perguntaId: string; media: number } | null;
   menorMedia: { perguntaId: string; media: number } | null;
-  enps: {
-    indice: number;
-    zona: ZonaEnps;
-    promotores: number;
-    neutros: number;
-    detratores: number;
-  } | null;
+  enps: IndicadorNps | null;
+  /** A recomendação da liderança direta (perguntas com `lnps`). */
+  lnps?: IndicadorNps | null;
 }
 
 export interface ResultadosPesquisa {
@@ -250,6 +281,12 @@ export interface ResultadosPesquisa {
   indicadores: IndicadoresPesquisa;
   recortes: CampoGrupo[];
   perguntas: ResultadoPergunta[];
+  /**
+   * O resultado próprio do modelo (dimensões, pilares, níveis), quando o
+   * modelo tem cálculo próprio; `null` sem respostas visíveis. Ver
+   * `modelos/tipos.ts`.
+   */
+  modelo?: ResultadoDoModelo | null;
 }
 
 export interface AnalisesPesquisa {
@@ -313,6 +350,8 @@ export interface RespostaDetalhe extends RespostaResumo {
     maior: { perguntaId: string; valor: number } | null;
     menor: { perguntaId: string; valor: number } | null;
   };
+  /** O resultado da pessoa no modelo (ex.: os pilares da TAD), se houver. */
+  modelo?: ResultadoIndividualDoModelo | null;
 }
 
 /** `GET /pesquisas/candidatos`: um colaborador ativo e a lotação vigente. */

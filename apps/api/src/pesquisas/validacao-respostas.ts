@@ -108,6 +108,9 @@ export function conferirValor(p: Pergunta, valor: unknown): Conferido {
     case "concordancia":
     case "estrelas":
       return inteiroEntre(valor, 1, 5) ? { ok: true, valor } : recusa;
+    case "concordancia_4":
+    case "satisfacao_4":
+      return inteiroEntre(valor, 1, 4) ? { ok: true, valor } : recusa;
     case "nota_0_10":
       return inteiroEntre(valor, 0, 10) ? { ok: true, valor } : recusa;
     case "escala":

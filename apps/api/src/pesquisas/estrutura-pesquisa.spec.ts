@@ -97,7 +97,7 @@ describe("T216 — conferirSecoes", () => {
     expect(conferirSecoes("x").erros[0]!.motivo).toBe("limite");
   });
 
-  it("recusa mais de 60 perguntas no total", () => {
+  it("recusa mais perguntas que o limite", () => {
     const perguntas = Array.from({ length: LIMITES.perguntas + 1 }, (_, i) =>
       pergunta(`p${i}`),
     );
@@ -263,5 +263,121 @@ describe("T216 — rótulo curto da pergunta", () => {
     expect(conf("x".repeat(41)).erros).toEqual([
       { campo: "p1", motivo: "limite" },
     ]);
+  });
+});
+
+describe("T216 — modelos: chave, LNPS, rótulos dos pontos e escalas de 4 pontos", () => {
+  const uma = (pergunta: Record<string, unknown>) =>
+    conferirSecoes([
+      {
+        id: "s1",
+        titulo: null,
+        descricao: null,
+        perguntas: [{ id: "p1", texto: "Pergunta", ...pergunta }],
+      },
+    ]);
+
+  it("guarda a chave do item do modelo; sem chave, o campo não aparece", () => {
+    const r = uma({ tipo: "concordancia", chave: "pc_ae_01" });
+    expect(r.erros).toEqual([]);
+    expect(r.secoes[0]!.perguntas[0]!.chave).toBe("pc_ae_01");
+    expect(
+      "chave" in uma({ tipo: "concordancia" }).secoes[0]!.perguntas[0]!,
+    ).toBe(false);
+    expect(
+      uma({ tipo: "concordancia", chave: "__comentario_x__" }).erros,
+    ).toEqual([]);
+  });
+
+  it("recusa chave fora do formato", () => {
+    for (const chave of ["com espaço", "x".repeat(41), 7, ""]) {
+      expect(uma({ tipo: "concordancia", chave }).erros).toEqual([
+        { campo: "p1", motivo: "invalido" },
+      ]);
+    }
+  });
+
+  it("nota 0–10: LNPS e o texto das pontas; eNPS e LNPS juntos não", () => {
+    const lnps = uma({
+      tipo: "nota_0_10",
+      config: {
+        lnps: true,
+        rotuloMinimo: " Pouco provável ",
+        rotuloMaximo: "Muito provável",
+      },
+    });
+    expect(lnps.erros).toEqual([]);
+    expect(lnps.secoes[0]!.perguntas[0]!.config).toEqual({
+      enps: false,
+      lnps: true,
+      rotuloMinimo: "Pouco provável",
+      rotuloMaximo: "Muito provável",
+    });
+    expect(
+      uma({ tipo: "nota_0_10", config: { enps: true } }).secoes[0]!
+        .perguntas[0]!.config,
+    ).toEqual({ enps: true });
+    expect(
+      uma({ tipo: "nota_0_10", config: { enps: true, lnps: true } }).erros,
+    ).toEqual([{ campo: "p1", motivo: "invalido" }]);
+    expect(uma({ tipo: "nota_0_10", config: { lnps: "sim" } }).erros).toEqual([
+      { campo: "p1", motivo: "invalido" },
+    ]);
+  });
+
+  it("escala: um rótulo por ponto, aparados; quantidade errada ou vazio recusa", () => {
+    const rotulos = ["Nada", " Pouco ", "Médio", "Muito"];
+    const ok = uma({
+      tipo: "escala",
+      config: { minimo: 1, maximo: 4, rotulos },
+    });
+    expect(ok.erros).toEqual([]);
+    expect(ok.secoes[0]!.perguntas[0]!.config.rotulos).toEqual([
+      "Nada",
+      "Pouco",
+      "Médio",
+      "Muito",
+    ]);
+    const recusa = [{ campo: "p1", motivo: "invalido" }];
+    expect(
+      uma({ tipo: "escala", config: { minimo: 1, maximo: 5, rotulos } }).erros,
+    ).toEqual(recusa);
+    expect(
+      uma({
+        tipo: "escala",
+        config: { minimo: 0, maximo: 3, rotulos: ["a", "", "c", "d"] },
+      }).erros,
+    ).toEqual(recusa);
+    expect(
+      uma({ tipo: "escala", config: { maximo: 2, rotulos: "a,b" } }).erros,
+    ).toEqual(recusa);
+    expect(
+      uma({ tipo: "escala", config: { maximo: 5, rotulos: null } }).secoes[0]!
+        .perguntas[0]!.config,
+    ).toEqual({ minimo: 1, maximo: 5, rotuloMinimo: null, rotuloMaximo: null });
+  });
+
+  it("concordância e satisfação de 4 pontos são tipos aceitos", () => {
+    expect(uma({ tipo: "concordancia_4" }).erros).toEqual([]);
+    expect(uma({ tipo: "satisfacao_4" }).erros).toEqual([]);
+    expect(uma({ tipo: "satisfacao_5" }).erros).toEqual([
+      { campo: "p1", motivo: "invalido" },
+    ]);
+  });
+
+  it("aceita 62 perguntas (Pesquisa de Clima) e recusa acima de 100", () => {
+    const n = (q: number) =>
+      conferirSecoes([
+        secao(
+          "s1",
+          Array.from({ length: q }, (_, i) =>
+            pergunta(`p${i}`, { tipo: "concordancia" }),
+          ),
+        ),
+      ]).erros;
+    expect(LIMITES.perguntas).toBe(100);
+    expect(n(62)).toEqual([]);
+    expect(n(100)).toEqual([]);
+    expect(n(101)).toEqual([{ campo: "secoes", motivo: "limite" }]);
   });
 });

@@ -1,10 +1,12 @@
 import { perguntasEmOrdem } from "./estrutura-pesquisa";
+import { resultadoDoModelo } from "./modelos/indice";
 import type {
   CampoGrupo,
   DepartamentoDoResultado,
   Faixas,
   GruposDaResposta,
   IndicadoresPesquisa,
+  Modelo,
   MotivoOculto,
   Pergunta,
   ResultadoPergunta,
@@ -44,6 +46,9 @@ export function faixaDaEscala(p: Pergunta): [number, number] | null {
     case "concordancia":
     case "estrelas":
       return [1, 5];
+    case "concordancia_4":
+    case "satisfacao_4":
+      return [1, 4];
     case "nota_0_10":
       return [0, 10];
     case "escala":
@@ -55,6 +60,8 @@ export function faixaDaEscala(p: Pergunta): [number, number] | null {
 
 const NUMERICOS = new Set([
   "concordancia",
+  "concordancia_4",
+  "satisfacao_4",
   "estrelas",
   "nota_0_10",
   "escala",
@@ -66,12 +73,20 @@ export function temFaixas(p: Pergunta): boolean {
   return faixaDaEscala(p) !== null;
 }
 
+/** Nota 0–10 de recomendação: eNPS (empresa) ou LNPS (liderança). */
+export function ehRecomendacao(p: Pergunta): boolean {
+  return (
+    p.tipo === "nota_0_10" && (p.config.enps === true || p.config.lnps === true)
+  );
+}
+
 /**
  * Entra na média geral: as perguntas de escala (concordância, estrelas,
- * escala e a nota 0–10 que não é eNPS). O eNPS tem indicador próprio.
+ * escala e a nota 0–10 que não é de recomendação). O eNPS e o LNPS têm
+ * indicador próprio.
  */
 export function ehDeEscala(p: Pergunta): boolean {
-  return temFaixas(p) && !(p.tipo === "nota_0_10" && p.config.enps === true);
+  return temFaixas(p) && !ehRecomendacao(p);
 }
 
 /** O valor na escala 0–10 (proporcional ao máximo da escala). */
@@ -82,8 +97,9 @@ export function paraDez(p: Pergunta, valor: number): number {
 
 /**
  * A faixa do valor. Escalas de 5 pontos: os dois de baixo, o do meio e os
- * dois de cima (concordância e estrelas: 4 e 5 favoráveis); as demais, em
- * terços (1–10 e 0–10: 8 a 10 favoráveis).
+ * dois de cima (concordância e estrelas: 4 e 5 favoráveis); de 4 pontos,
+ * sem meio-termo: os dois de baixo e os dois de cima (3 e 4 favoráveis); as
+ * demais, em terços (1–10 e 0–10: 8 a 10 favoráveis).
  */
 export function faixaDoValor(p: Pergunta, valor: number): keyof Faixas {
   const [minimo, maximo] = faixaDaEscala(p) ?? [0, 10];
@@ -92,6 +108,7 @@ export function faixaDoValor(p: Pergunta, valor: number): keyof Faixas {
   if (pontos === 5) {
     return posicao <= 1 ? "baixa" : posicao === 2 ? "media" : "alta";
   }
+  if (pontos === 4) return posicao <= 1 ? "baixa" : "alta";
   if (posicao < pontos / 3) return "baixa";
   if (posicao < (2 * pontos) / 3) return "media";
   return "alta";
@@ -172,7 +189,7 @@ function resultadoDaPergunta(
       };
     }
     let enps = null;
-    if (p.tipo === "nota_0_10" && p.config.enps === true) {
+    if (ehRecomendacao(p)) {
       const e = calcularEnps(numeros);
       enps = { ...e, zona: e.indice === null ? null : zonaDoEnps(e.indice) };
     }
@@ -294,27 +311,32 @@ export function calcularIndicadores(
     if (maiorMedia === null || m.media > maiorMedia.media) maiorMedia = m;
     if (menorMedia === null || m.media < menorMedia.media) menorMedia = m;
   }
-  let enps: IndicadoresPesquisa["enps"] = null;
-  for (const p of perguntasEmOrdem(secoes)) {
-    if (p.tipo !== "nota_0_10" || p.config.enps !== true) continue;
-    const r = porId.get(p.id) as { enps?: EnpsDoResultado } | undefined;
-    if (r?.enps && r.enps.indice !== null) {
-      enps = {
-        indice: r.enps.indice,
-        zona: zonaDoEnps(r.enps.indice),
-        promotores: r.enps.promotores,
-        neutros: r.enps.neutros,
-        detratores: r.enps.detratores,
-      };
-      break;
+  /** A primeira pergunta de recomendação do tipo com resposta. */
+  const indicador = (chave: "enps" | "lnps"): IndicadoresPesquisa["enps"] => {
+    for (const p of perguntasEmOrdem(secoes)) {
+      if (p.tipo !== "nota_0_10" || p.config[chave] !== true) continue;
+      const r = porId.get(p.id) as { enps?: EnpsDoResultado } | undefined;
+      if (r?.enps && r.enps.indice !== null) {
+        return {
+          indice: r.enps.indice,
+          zona: zonaDoEnps(r.enps.indice),
+          promotores: r.enps.promotores,
+          neutros: r.enps.neutros,
+          detratores: r.enps.detratores,
+        };
+      }
     }
-  }
+    return null;
+  };
+  const lnps = indicador("lnps");
   return {
     mediaGeral,
     perguntasDeEscala: deEscala.length,
     maiorMedia,
     menorMedia,
-    enps,
+    enps: indicador("enps"),
+    // Só aparece quando a pesquisa tem a recomendação da liderança.
+    ...(lnps ? { lnps } : {}),
   };
 }
 
@@ -428,6 +450,8 @@ export interface EntradaDosResultados {
   recortes: readonly CampoGrupo[];
   /** Só a identificada mostra o autor dos textos. */
   identificada: boolean;
+  /** O modelo da pesquisa (o cálculo próprio, quando houver). */
+  modelo?: Modelo;
   /**
    * Confidencial: a visão geral também respeita o mínimo por grupo (com
    * poucas respostas, o agregado e a lista de quem respondeu identificariam
@@ -480,6 +504,18 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
     ? calculadas
     : calculadas.map(emOrdemAlfabetica);
 
+  // O resultado próprio do modelo, sobre as mesmas respostas visíveis.
+  const doModelo =
+    e.modelo && visivel && filtradas.length > 0
+      ? resultadoDoModelo(
+          e.modelo,
+          e.secoes,
+          filtradas.map((r) => ({
+            valores: new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+          })),
+        )
+      : null;
+
   return {
     pesquisaId: e.pesquisaId,
     respostas: respostas.length,
@@ -496,5 +532,6 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
     indicadores: calcularIndicadores(e.secoes, perguntas),
     recortes: [...e.recortes],
     perguntas,
+    ...(e.modelo ? { modelo: doModelo } : {}),
   };
 }

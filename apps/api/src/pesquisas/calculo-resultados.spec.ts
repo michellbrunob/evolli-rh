@@ -740,3 +740,123 @@ describe("T216 — suprimirGrupos (supressão secundária)", () => {
     );
   });
 });
+
+describe("T216 — escalas de 4 pontos, LNPS e o resultado do modelo", () => {
+  it("4 pontos: 1–2 desfavoráveis e 3–4 favoráveis, sem meio-termo", () => {
+    for (const tipo of ["concordancia_4", "satisfacao_4"] as const) {
+      const q = p("q", tipo);
+      expect([1, 2, 3, 4].map((v) => faixaDoValor(q, v))).toEqual([
+        "baixa",
+        "baixa",
+        "alta",
+        "alta",
+      ]);
+    }
+    const s: Secao[] = [
+      {
+        id: "s",
+        titulo: null,
+        descricao: null,
+        perguntas: [p("q", "satisfacao_4")],
+      },
+    ];
+    const [r] = resultadoDasPerguntas(s, [
+      { valores: [{ perguntaId: "q", valor: 4 }], autor: null },
+      { valores: [{ perguntaId: "q", valor: 2 }], autor: null },
+      { valores: [{ perguntaId: "q", valor: 3 }], autor: null },
+    ]);
+    expect(r).toMatchObject({
+      media: 3,
+      favoravel: 67,
+      faixas: { baixa: 1, media: 0, alta: 2 },
+      distribuicao: [
+        { valor: 1, quantidade: 0 },
+        { valor: 2, quantidade: 1 },
+        { valor: 3, quantidade: 1 },
+        { valor: 4, quantidade: 1 },
+      ],
+    });
+    // Média geral: 4 pontos em 0–10 (3 × 10 ÷ 4).
+    expect(calcularIndicadores(s, [r!]).mediaGeral).toBe(7.5);
+  });
+
+  it("LNPS: fora da média geral, com promotores/detratores e indicador próprio", () => {
+    const s: Secao[] = [
+      {
+        id: "s",
+        titulo: null,
+        descricao: null,
+        perguntas: [
+          p("lid", "nota_0_10", { lnps: true }),
+          p("emp", "nota_0_10", { enps: true }),
+          p("conc", "concordancia"),
+        ],
+      },
+    ];
+    const perguntas = resultadoDasPerguntas(s, [
+      {
+        valores: [
+          { perguntaId: "lid", valor: 10 },
+          { perguntaId: "emp", valor: 0 },
+          { perguntaId: "conc", valor: 5 },
+        ],
+        autor: null,
+      },
+    ]);
+    expect(perguntas[0]).toMatchObject({
+      enps: { promotores: 1, detratores: 0, indice: 100 },
+    });
+    const ind = calcularIndicadores(s, perguntas);
+    expect(ind.perguntasDeEscala).toBe(1);
+    expect(ind.mediaGeral).toBe(10);
+    expect(ind.enps).toMatchObject({ indice: -100, zona: "critica" });
+    expect(ind.lnps).toMatchObject({ indice: 100, zona: "excelencia" });
+    // Sem LNPS na pesquisa, o indicador não aparece.
+    const semLnps = calcularIndicadores(
+      [{ ...s[0]!, perguntas: s[0]!.perguntas.slice(1) }],
+      perguntas.slice(1),
+    );
+    expect("lnps" in semLnps).toBe(false);
+  });
+
+  it("montarResultados: o modelo com cálculo próprio ganha `modelo`", () => {
+    const tad: Secao[] = [
+      {
+        id: "s",
+        titulo: null,
+        descricao: null,
+        perguntas: [
+          { ...p("a", "escala", { minimo: 1, maximo: 7 }), chave: "tad_01" },
+        ],
+      },
+    ];
+    const entrada = {
+      pesquisaId: "x",
+      secoes: tad,
+      respostas: [
+        {
+          valores: [{ perguntaId: "a", valor: 6 }],
+          autor: null,
+          grupos: {},
+        },
+      ],
+      participantes: null,
+      nomesDosGrupos: new Map<string, string>(),
+      minimoPorGrupo: 3,
+      filtro: null,
+      recortes: [],
+      identificada: false,
+      minimoNaVisaoGeral: false,
+    };
+    const comModelo = montarResultados({ ...entrada, modelo: "tad" });
+    expect(comModelo.modelo).toMatchObject({ modelo: "tad", geral: 6 });
+    // Sem cálculo próprio: `modelo` nulo; sem informar o modelo, nem aparece.
+    expect(montarResultados({ ...entrada, modelo: "pulso" }).modelo).toBeNull();
+    expect("modelo" in montarResultados(entrada)).toBe(false);
+    // Sem resposta visível (confidencial abaixo do mínimo): nulo.
+    expect(
+      montarResultados({ ...entrada, modelo: "tad", minimoNaVisaoGeral: true })
+        .modelo,
+    ).toBeNull();
+  });
+});
