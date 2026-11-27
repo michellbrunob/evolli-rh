@@ -725,6 +725,7 @@ export function FichaDoColaborador({
                   <p className="ficha-ref__menu-grupo">Colaborador</p>
                   <DropdownMenuItem
                     className="ficha-ref__menu-item"
+                    disabled={status === "desligado"}
                     onSelect={() => setRegistrarAberto(true)}
                   >
                     <IconeRegistrarAusencia tamanho={18} />
@@ -1133,7 +1134,8 @@ export function FichaDoColaborador({
                 pessoa={pessoaDaGaveta}
                 quem={trato.oNomeNaFrase}
                 deQuem={trato.doNome}
-                podeEditar={podeEditar}
+                // Desligado: o histórico fica, sem registrar nem editar.
+                podeEditar={podeEditar && status !== "desligado"}
                 servico={servicoDeAusencias}
               />
             ) : null

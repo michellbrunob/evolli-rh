@@ -483,6 +483,47 @@ describe("T215 — ficha: Mais ações", () => {
     );
   });
 
+  it("Desligar: a ficha passa a Desligado na hora, com o último cargo e os dados bloqueados", async () => {
+    montar();
+    await screen.findByText("Analista de RH");
+    const vinculos = await listarVinculosDoColaborador(ID);
+    const alocacoes = await listarAlocacoesVinculo("v-1");
+    const menu = await abrirMenu();
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: "Desligar colaborador" }),
+    );
+    const janela = await screen.findByRole("dialog", {
+      name: "Desligar Maria Teste Santos?",
+    });
+    // O servidor encerra o vínculo, fecha a lotação e bloqueia os dados.
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculos.map((v) => ({
+        ...v,
+        situacao: "encerrado",
+        dataDesligamento: HOJE,
+      })) as never,
+    );
+    vi.mocked(listarAlocacoesVinculo).mockResolvedValue(
+      alocacoes.map((a) => ({ ...a, vigenteAte: HOJE })) as never,
+    );
+    vi.mocked(consultarDadosPessoaisDoColaborador).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      situacao: "bloqueado",
+      perfilPessoal: null,
+      endereco: null,
+    } as never);
+    fireEvent.click(
+      within(janela).getByRole("button", { name: "Desligar colaborador" }),
+    );
+    expect(await screen.findByText("Desligado")).toBeInTheDocument();
+    expect(screen.queryByText("Ativo")).toBeNull();
+    expect(screen.getAllByText("Analista de RH").length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText(/bloqueados depois do desligamento/),
+    ).toBeInTheDocument();
+  });
+
   it("Em admissão: o aviso e Efetivar admissão (também por Alterar status › Ativo)", async () => {
     const contrato = await consultarContratoDoColaborador(ID);
     vi.mocked(consultarContratoDoColaborador).mockResolvedValue({
@@ -623,6 +664,11 @@ describe("T215 — ficha: Mais ações", () => {
     expect(
       screen.queryByRole("button", { name: /Adicionar e-mail/ }),
     ).toBeNull();
+    // Depois da saída não há ausência nova a registrar.
+    const menu = await abrirMenu();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Registrar ausência" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("Desativar: confirma e desativa (nada é apagado)", async () => {

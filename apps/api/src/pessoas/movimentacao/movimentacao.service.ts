@@ -365,6 +365,13 @@ export class MovimentacaoService {
             vinculo.id,
             vinculo.empresaId,
           );
+          await this.ajustarAusenciasAoDesligamento(
+            tx,
+            ctx,
+            vinculo.id,
+            vinculo.empresaId,
+            movimentacao.vigenciaInicio,
+          );
         }
 
         const efetivada = await tx.movimentacaoFuncional.update({
@@ -558,5 +565,74 @@ export class MovimentacaoService {
     }
 
     return vinculo;
+  }
+
+  /**
+   * T215 — desligamento: as ausências vivas do vínculo que começam depois do
+   * último dia são canceladas (férias marcadas para depois da saída não
+   * acontecem) e as que passam dele (afastamento sem volta, férias em curso)
+   * terminam no último dia. O motivo fica na ausência e na trilha.
+   */
+  private async ajustarAusenciasAoDesligamento(
+    tx: Prisma.TransactionClient,
+    ctx: PessoasAuditContext,
+    vinculoId: string,
+    empresaId: string,
+    desligamento: Date,
+  ): Promise<void> {
+    const dia = desligamento.toISOString().slice(0, 10);
+    const motivo = `Cancelada pelo desligamento em ${dia.split("-").reverse().join("/")}.`;
+    const vivas = await tx.ausencia.findMany({
+      where: {
+        vinculoId,
+        empresaId,
+        excluidaEm: null,
+        status: {
+          in: [
+            "aguardando_gestor",
+            "aguardando_rh",
+            "aprovada",
+            "cancelamento_pedido",
+            "ajuste_sugerido",
+          ],
+        },
+        OR: [{ fim: null }, { fim: { gt: desligamento } }],
+      },
+      select: { id: true, inicio: true },
+    });
+    for (const a of vivas) {
+      if (a.inicio > desligamento) {
+        await tx.ausencia.update({
+          where: { id: a.id },
+          data: {
+            status: "cancelada",
+            motivoDecisao: motivo,
+            decididoPorId: ctx.actor.id,
+            decididoEm: new Date(),
+          },
+        });
+        await this.auditoria.registrarMutacao(
+          tx,
+          ctx,
+          "pessoas_ausencia_cancelada",
+          "ausencia",
+          a.id,
+          empresaId,
+        );
+      } else {
+        await tx.ausencia.update({
+          where: { id: a.id },
+          data: { fim: desligamento },
+        });
+        await this.auditoria.registrarMutacao(
+          tx,
+          ctx,
+          "pessoas_ausencia_alterada",
+          "ausencia",
+          a.id,
+          empresaId,
+        );
+      }
+    }
   }
 }

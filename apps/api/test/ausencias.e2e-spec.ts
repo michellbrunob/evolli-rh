@@ -2658,6 +2658,67 @@ describe("T215 — Férias e ausências (e2e)", () => {
         .expect(200);
     });
 
+    it("desligamento: cancela o que começa depois e encerra no dia o que passa dele", async () => {
+      const { id: pessoa } = await admitir(rhA, empresaA);
+      const registrar = async (corpo: Record<string, unknown>) =>
+        (
+          await post("/v1/ausencias", rhA)
+            .send({ colaboradorId: pessoa, aprovada: true, ...corpo })
+            .expect(201)
+        ).body.id as string;
+      const futura = await registrar({
+        tipo: "ferias",
+        inicio: somarDias(HOJE, 20),
+        fim: somarDias(HOJE, 29),
+      });
+      const afastamento = await registrar({
+        tipo: "afastamento",
+        motivoAfastamento: "licenca_nao_remunerada",
+        // Começa no último dia: fica (só aquele dia), não é cancelado.
+        inicio: HOJE,
+        fim: somarDias(HOJE, 5),
+      });
+      const passada = await registrar({
+        tipo: "day_off",
+        inicio: somarDias(HOJE, -10),
+        fim: somarDias(HOJE, -10),
+      });
+      const vinculos = (
+        await get(`/v1/colaboradores/${pessoa}/vinculos`, rhA).expect(200)
+      ).body as { id: string }[];
+      const mov = await post("/v1/movimentacoes", rhA)
+        .send({
+          vinculoId: vinculos[0]!.id,
+          tipo: "desligamento",
+          motivoCodigo: "encerramento_de_vinculo",
+          vigenciaInicio: HOJE,
+        })
+        .expect(201);
+      await post(`/v1/movimentacoes/${mov.body.id}/efetivar`, rhA)
+        .send()
+        .expect(201);
+      const lida = (id: string) =>
+        prisma.ausencia.findUniqueOrThrow({ where: { id } });
+      const f = await lida(futura);
+      expect(f.status).toBe("cancelada");
+      expect(f.motivoDecisao).toBe(
+        `Cancelada pelo desligamento em ${HOJE.split("-").reverse().join("/")}.`,
+      );
+      const a = await lida(afastamento);
+      expect(a.status).toBe("aprovada");
+      expect(a.fim?.toISOString().slice(0, 10)).toBe(HOJE);
+      const d = await lida(passada);
+      expect(d.status).toBe("aprovada");
+      expect(d.fim?.toISOString().slice(0, 10)).toBe(somarDias(HOJE, -10));
+      // Cada mudança fica na trilha da ausência.
+      expect((await trilha(futura)).map((e) => e.action)).toContain(
+        "pessoas_ausencia_cancelada",
+      );
+      expect((await trilha(afastamento)).map((e) => e.action)).toContain(
+        "pessoas_ausencia_alterada",
+      );
+    });
+
     it("fora do vínculo: antes da admissão no registro; vínculo encerrado na edição", async () => {
       const { id: pessoa } = await admitir(rhA, empresaA);
       const antes = await post("/v1/ausencias", rhA)

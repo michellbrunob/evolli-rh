@@ -61,7 +61,13 @@ export function useLotacaoVigente(
     void (async () => {
       try {
         const alocacoes = await listarAlocacoesVinculo(vinculoId);
-        const v = alocacoes.find((a) => a.vigenteAte === null);
+        // A aberta; sem ela (desligamento fecha a lotação), a última que
+        // valeu: o cargo e o departamento de quando a pessoa saiu.
+        const v =
+          alocacoes.find((a) => a.vigenteAte === null) ??
+          [...alocacoes].sort((a, b) =>
+            a.vigenteDe < b.vigenteDe ? 1 : -1,
+          )[0];
         if (!v) {
           if (vivo) setLotacao({ ...VAZIA, carregada: true });
           return;
