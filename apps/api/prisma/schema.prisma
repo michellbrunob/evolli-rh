@@ -1868,6 +1868,7 @@ model TabelaHorario {
   /// T182 — código único na empresa; NULLs distintos (tabelas antigas).
   @@unique([empresaId, codigo])
   @@index([empresaId, ativo])
+  @@index([empresaId, unidadeOrganizacionalId], map: "tabela_horario_unidade_idx")
   @@map("tabela_horario")
 }
 
@@ -2887,7 +2888,7 @@ model Ausencia {
   politicaFerias PoliticaFerias?  @relation(fields: [politicaFeriasId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   /// T215 — o atestado ou documento da ausência (um vivo por vez).
-  anexos AnexoAusencia[]
+  anexos    AnexoAusencia[]
   /// T215 — o reinício que a coletiva abriu (desfeito junto com ela).
   reinicios ReinicioPeriodoAquisitivo[]
 
