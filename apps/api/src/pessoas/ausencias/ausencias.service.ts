@@ -1115,6 +1115,7 @@ export class AusenciasService {
           this.prisma,
           principal.id,
           empresaId,
+          query.ignorar,
         )),
         ...(coletiva ? [reinicioDaColetiva(query.inicio)] : []),
       ],
@@ -1483,7 +1484,12 @@ export class AusenciasService {
         hoje,
         a.inicio > hoje ? a.inicio : hoje,
         [
-          ...(await this.reiniciosDoVinculo(db, a.principal.id, a.empresaId)),
+          ...(await this.reiniciosDoVinculo(
+            db,
+            a.principal.id,
+            a.empresaId,
+            a.ignorar,
+          )),
           ...(coletiva ? [reinicioDaColetiva(a.inicio)] : []),
         ],
       );
@@ -1679,14 +1685,31 @@ export class AusenciasService {
     return linhas.map(paraSaldo);
   }
 
-  /** Os reinícios vivos do vínculo, na forma do cálculo. */
+  /**
+   * Os reinícios vivos do vínculo, na forma do cálculo. Editando uma
+   * coletiva (`ignorarAusencia`), o reinício que ela abriu não conta: a
+   * simulação usa o da nova data.
+   */
   private async reiniciosDoVinculo(
     db: Prisma.TransactionClient,
     vinculoId: string,
     empresaId: string,
+    ignorarAusencia?: string,
   ): Promise<ReinicioDoSaldo[]> {
     const linhas = await db.reinicioPeriodoAquisitivo.findMany({
-      where: { vinculoId, empresaId, removidoEm: null },
+      where: {
+        vinculoId,
+        empresaId,
+        removidoEm: null,
+        ...(ignorarAusencia
+          ? {
+              OR: [
+                { ausenciaId: null },
+                { ausenciaId: { not: ignorarAusencia } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { inicio: "asc" },
     });
     return linhas.map((l) => ({

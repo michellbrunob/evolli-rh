@@ -2289,6 +2289,18 @@ describe("T215 — Férias e ausências (e2e)", () => {
       it("editar: mudar a data troca o reinício; deixar de ser férias o desfaz", async () => {
         const { pessoa, ausencia } = await coletiva();
         const novoInicio = somarDias(inicio, 5);
+        // A simulação da edição usa a nova data, não o reinício antigo.
+        const simulada = (
+          await get(
+            `/v1/ausencias/simulacao?colaboradorId=${pessoa}&tipo=ferias&inicio=${novoInicio}&fim=${somarDias(novoInicio, 9)}&feriasColetivas=true&ignorar=${ausencia}`,
+            rhA,
+          ).expect(200)
+        ).body;
+        expect(simulada.periodo).toEqual({
+          inicio: NOVATO,
+          fim: somarDias(novoInicio, -1),
+        });
+        expect(simulada.coletiva).toMatchObject({ novoPeriodo: novoInicio });
         const r = await patch(`/v1/ausencias/${ausencia}`, rhA)
           .send({
             tipo: "ferias",
