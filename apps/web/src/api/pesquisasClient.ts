@@ -86,6 +86,10 @@ export interface ConfigPergunta {
   /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */
   rotulos?: string[] | null;
   inteiro?: boolean;
+  /** Escala dos questionários fixos: o rótulo de cada ponto, na ordem. */
+  rotulos?: string[];
+  /** Escala que mostra só os rótulos (sem os números). */
+  somenteRotulos?: boolean;
 }
 
 export interface CondicaoPergunta {

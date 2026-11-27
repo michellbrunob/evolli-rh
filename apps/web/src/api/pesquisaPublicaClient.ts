@@ -57,6 +57,10 @@ export interface ConfigPergunta {
   /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */
   readonly rotulos?: readonly string[] | null;
   readonly inteiro?: boolean;
+  /** Escala dos questionários fixos: o rótulo de cada ponto, na ordem. */
+  readonly rotulos?: readonly string[];
+  /** Escala que mostra só os rótulos (sem os números). */
+  readonly somenteRotulos?: boolean;
 }
 
 export interface Pergunta {
