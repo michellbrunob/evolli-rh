@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import type { PesquisaDetalhe } from "../../api/pesquisasClient";
-import { Button } from "../../components";
+import { Button, StatusBadge } from "../../components";
 import {
   IconeAvancar,
   IconeEditar,
@@ -133,10 +133,7 @@ export function TelaDeGerada({
       <div className="pesquisas__final-link">
         <p className="pesquisas__grupo-titulo">
           <span>Link da pesquisa</span>
-          <span className="pesquisas__selo pesquisas__selo--sucesso">
-            <span className="pesquisas__ponto" aria-hidden="true" />
-            Ativa
-          </span>
+          <StatusBadge variant="success">Ativa</StatusBadge>
         </p>
         {pesquisa.link ? (
           <CampoDoLink link={pesquisa.link} principal />

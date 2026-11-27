@@ -11,7 +11,7 @@ import type {
   PesquisaResumo,
   StatusPesquisa,
 } from "../../api/pesquisasClient";
-import { Button, FormActions } from "../../components";
+import { Button, FormActions, StatusBadge } from "../../components";
 import { plural } from "../../format/plural";
 import {
   Dialog,
@@ -26,7 +26,11 @@ import { IconeAbrir, IconeCopiar, IconeRemover } from "../../ui/icones";
 import { useAvisar } from "./avisos";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
-import { ROTULO_DO_STATUS, proximosStatus } from "./textosDasPesquisas";
+import {
+  ROTULO_DO_STATUS,
+  TOM_DO_STATUS,
+  proximosStatus,
+} from "./textosDasPesquisas";
 
 export const TEXTO_DO_STATUS: Readonly<Record<StatusPesquisa, string>> = {
   rascunho: "Ainda não publicada",
@@ -96,31 +100,29 @@ export function MenuDeStatus({
     }
   }
 
-  const pilula = (
-    <>
-      <span className="pesquisas__ponto" aria-hidden="true" />
-      {ROTULO_DO_STATUS[pesquisa.status]}
-    </>
-  );
+  const tom = TOM_DO_STATUS[pesquisa.status];
 
+  // Sem mudança possível: a pílula de status do sistema.
   if (proximos.length === 0) {
     return (
-      <span
-        className={`pesquisas__status pesquisas__status--${pesquisa.status}`}
-      >
-        {pilula}
-      </span>
+      <StatusBadge variant={tom}>
+        {ROTULO_DO_STATUS[pesquisa.status]}
+      </StatusBadge>
     );
   }
   return (
     <>
       <DropdownMenu>
+        {/* O gatilho é um botão com as classes da pílula do sistema. */}
         <DropdownMenuTrigger
-          className={`pesquisas__status pesquisas__status--${pesquisa.status}`}
+          className={`evolli-badge evolli-badge--${tom} pesquisas__status-gatilho`}
           aria-label={`Mudar status, hoje ${ROTULO_DO_STATUS[pesquisa.status]}`}
           disabled={mudando}
         >
-          {pilula}
+          <span className="evolli-badge__ponto" aria-hidden="true" />
+          <span className="evolli-badge__label">
+            {ROTULO_DO_STATUS[pesquisa.status]}
+          </span>
           <IconeAbrir tamanho={12} />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
@@ -134,13 +136,10 @@ export function MenuDeStatus({
                 CONFIRMACAO[s] ? setConfirmar(s) : void mudar(s)
               }
             >
-              <span
-                className={`pesquisas__menu-status pesquisas__status--${s}`}
-              >
-                <span className="pesquisas__ponto" aria-hidden="true" />
-              </span>
               <span className="pesquisas__menu-opcao">
-                <strong>{ROTULO_DO_STATUS[s]}</strong>
+                <StatusBadge variant={TOM_DO_STATUS[s]}>
+                  {ROTULO_DO_STATUS[s]}
+                </StatusBadge>
                 <span className="pesquisas__suave">{TEXTO_DO_STATUS[s]}</span>
               </span>
             </DropdownMenuItem>

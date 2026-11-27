@@ -24,7 +24,7 @@ import type {
   StatusPesquisa,
 } from "../../api/pesquisasClient";
 import { useTrilhaComplementar } from "../../app/trilhaComplementar";
-import { Button } from "../../components";
+import { Button, StatusBadge } from "../../components";
 import { diaCivilDeHoje } from "../../format/data";
 import { plural } from "../../format/plural";
 import {
@@ -79,6 +79,7 @@ import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
   ROTULO_DO_STATUS,
+  TOM_DO_STATUS,
   copiarLink,
   dataDoInstante,
   participacao,
@@ -1064,12 +1065,9 @@ function LinhaDaPesquisa({
       </td>
       <td className="pesquisas__numero">{dataDoInstante(p.criadaEm)}</td>
       <td>
-        <span
-          className={`pesquisas__status pesquisas__status--fixo pesquisas__status--${p.status}`}
-        >
-          <span className="pesquisas__ponto" aria-hidden="true" />
+        <StatusBadge variant={TOM_DO_STATUS[p.status]}>
           {ROTULO_DO_STATUS[p.status]}
-        </span>
+        </StatusBadge>
       </td>
       <td data-sem-linha="">
         <div className="pesquisas__acoes-linha">

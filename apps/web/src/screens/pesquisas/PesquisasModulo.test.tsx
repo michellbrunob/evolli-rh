@@ -109,12 +109,13 @@ describe("Lista de pesquisas", () => {
       ).style.getPropertyValue("--cor-do-modelo");
     expect(corDe(pulso!)).not.toBe(corDe(clima!));
     // Status em pílula com ponto colorido (nada de selo com ícone).
-    const status = clima!.querySelector(".pesquisas__status--ativa")!;
+    // A pílula de status do sistema (ponto + rótulo), na cor do status.
+    const status = clima!.querySelector(".evolli-badge--success")!;
     expect(status).toHaveTextContent("Ativa");
-    expect(status.querySelector(".pesquisas__ponto")).not.toBeNull();
-    expect(
-      pulso!.querySelector(".pesquisas__status--pausada"),
-    ).toHaveTextContent("Pausada");
+    expect(status.querySelector(".evolli-badge__ponto")).not.toBeNull();
+    expect(pulso!.querySelector(".evolli-badge--warning")).toHaveTextContent(
+      "Pausada",
+    );
     // Pílulas, busca e Tipo no mesmo contêiner de linha.
     const linha = document.querySelector(".pesquisas__filtros--linha")!;
     expect(

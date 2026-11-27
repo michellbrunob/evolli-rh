@@ -133,7 +133,13 @@
 }
 
 .pesquisas__pilulas button {
-  padding: 0.25rem var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.875rem;
+  padding: 0 var(--space-sm);
+  line-height: 1.3;
+  white-space: nowrap;
   border: 1px solid var(--divisor-cor);
   border-radius: var(--radius-pill);
   background: var(--surface-canvas);
@@ -150,10 +156,13 @@
 }
 
 .pesquisas__contagem {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 1.25rem;
-  margin-left: 0.25rem;
+  height: 1.125rem;
   padding: 0 0.3rem;
+  line-height: 1;
   border-radius: var(--radius-pill);
   background: var(--surface-neutral);
   color: var(--color-ink-muted);
@@ -1231,6 +1240,7 @@ textarea.pesquisas__campo {
 .pesquisas__acao-texto {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
   gap: var(--space-xxs);
   min-height: var(--touch-target);
   padding: 0;
@@ -2096,42 +2106,6 @@ textarea.pesquisas__campo {
   gap: var(--space-sm);
 }
 
-.pesquisas__status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  min-height: 1.75rem;
-  padding: 0 var(--space-sm);
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: var(--status-neutral-surface);
-  color: var(--status-neutral-ink);
-  font: inherit;
-  font-size: var(--text-caption);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.pesquisas__status--ativa {
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-}
-
-.pesquisas__status--pausada {
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
-}
-
-.pesquisas__status--finalizada {
-  background: var(--status-info-surface);
-  color: var(--status-info-ink);
-}
-
-.pesquisas__status--cancelada {
-  background: var(--status-danger-surface);
-  color: var(--status-danger-ink);
-}
-
 .pesquisas__menu-opcao {
   display: grid;
   gap: 2px;
@@ -2602,30 +2576,6 @@ textarea.pesquisas__campo {
   text-transform: uppercase;
 }
 
-/* Menu "Mudar status": ponto colorido e a descrição. */
-.pesquisas__menu-status {
-  display: inline-grid;
-  place-items: center;
-  width: 1rem;
-  background: transparent;
-}
-
-.pesquisas__menu-status.pesquisas__status--ativa {
-  color: var(--status-success-ink);
-}
-
-.pesquisas__menu-status.pesquisas__status--pausada {
-  color: var(--status-warning-ink);
-}
-
-.pesquisas__menu-status.pesquisas__status--finalizada {
-  color: var(--color-action);
-}
-
-.pesquisas__menu-status.pesquisas__status--cancelada {
-  color: var(--status-danger-ink);
-}
-
 /* Exclusão: o que se perde e a sugestão de finalizar. */
 .pesquisas__perdas {
   display: grid;
@@ -2788,9 +2738,15 @@ textarea.pesquisas__campo {
   width: 4.5rem;
 }
 
-/* Status da linha: pílula com ponto, sem menu. */
-.pesquisas__status--fixo {
-  cursor: default;
+/* Gatilho do "Mudar status": a pílula do sistema, como botão. */
+.pesquisas__status-gatilho {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pesquisas__status-gatilho:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 /* Ordenar por "Criada em": a seta acompanha o sentido. */
@@ -2942,18 +2898,6 @@ textarea.pesquisas__campo {
   z-index: 50;
   overflow-y: auto;
   background: var(--surface-pearl);
-}
-
-.pesquisas__previa-faixa {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  margin: 0;
-  padding: var(--space-xs) var(--space-md);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
-  font-weight: var(--weight-strong);
-  text-align: center;
 }
 
 /* Gaveta do modelo: o subtítulo quebra a linha em vez de ser cortado. */
