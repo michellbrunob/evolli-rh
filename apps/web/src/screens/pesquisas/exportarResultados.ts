@@ -36,6 +36,7 @@ import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_TIPO,
   ROTULOS_DA_CONCORDANCIA,
+  rotulosDosPontos,
   percentual,
   umaCasa,
 } from "./textosDasPesquisas";
@@ -111,9 +112,17 @@ export function textoDoValor(p: Pergunta, valor: unknown): string {
     }
     case "sim_nao":
       return valor === "sim" ? "Sim" : valor === "nao" ? "Não" : SEM_RESPOSTA;
-    case "concordancia": {
+    case "concordancia":
+    case "concordancia_4":
+    case "satisfacao_4": {
       const n = Number(valor);
-      return `${n} · ${ROTULOS_DA_CONCORDANCIA[n - 1] ?? ""}`.trim();
+      const rotulos = rotulosDosPontos(p) ?? ROTULOS_DA_CONCORDANCIA;
+      return `${n} · ${rotulos[n - 1] ?? ""}`.trim();
+    }
+    case "escala": {
+      const n = Number(valor);
+      const rotulo = rotulosDosPontos(p)?.[n - (p.config.minimo ?? 1)];
+      return rotulo ? `${n} · ${rotulo}` : numero(n);
     }
     case "estrelas":
       return plural(Number(valor), "estrela", "estrelas");

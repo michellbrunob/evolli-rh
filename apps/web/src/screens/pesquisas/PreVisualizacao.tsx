@@ -8,6 +8,7 @@ import { plural } from "../../format/plural";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import {
   ROTULOS_DA_CONCORDANCIA,
+  rotulosDosPontos,
   opcoesDaCondicao,
 } from "./textosDasPesquisas";
 import { minutosEstimados } from "./tempoEstimado";
@@ -152,9 +153,11 @@ function JeitoDeResponder({ pergunta: p }: { readonly pergunta: Pergunta }) {
         </div>
       );
     case "concordancia":
+    case "concordancia_4":
+    case "satisfacao_4":
       return (
         <div className="pesquisas__previa-escala" aria-hidden="true">
-          {ROTULOS_DA_CONCORDANCIA.map((r, i) => (
+          {(rotulosDosPontos(p) ?? ROTULOS_DA_CONCORDANCIA).map((r, i) => (
             <span key={r} title={r}>
               {i + 1}
             </span>
@@ -184,8 +187,7 @@ function JeitoDeResponder({ pergunta: p }: { readonly pergunta: Pergunta }) {
               <span key={v}>{v}</span>
             ))}
           </div>
-          {p.tipo === "escala" &&
-          (p.config.rotuloMinimo || p.config.rotuloMaximo) ? (
+          {p.config.rotuloMinimo || p.config.rotuloMaximo ? (
             <span className="pesquisas__suave">
               {`${min}: ${p.config.rotuloMinimo || "—"} · ${max}: ${p.config.rotuloMaximo || "—"}`}
             </span>

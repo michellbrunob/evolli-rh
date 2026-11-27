@@ -26,10 +26,28 @@ const OUTRO = "__outro";
 const CONCORDANCIA = [
   "Discordo totalmente",
   "Discordo",
-  "Não concordo nem discordo",
+  "Neutro",
   "Concordo",
   "Concordo totalmente",
 ] as const;
+
+/** Escalas de 4 pontos, sem meio-termo. */
+const PONTOS_4: Readonly<
+  Record<"concordancia_4" | "satisfacao_4", readonly string[]>
+> = {
+  concordancia_4: [
+    "Discordo totalmente",
+    "Discordo parcialmente",
+    "Concordo parcialmente",
+    "Concordo totalmente",
+  ],
+  satisfacao_4: [
+    "Muito insatisfeito",
+    "Insatisfeito",
+    "Satisfeito",
+    "Muito satisfeito",
+  ],
+};
 
 export interface CampoDaPerguntaProps {
   readonly pergunta: Pergunta;
@@ -359,6 +377,24 @@ export function CampoDaPergunta({
       );
       break;
 
+    case "concordancia_4":
+    case "satisfacao_4":
+      controle = (
+        <GrupoDeRadios
+          base={base}
+          descritores={descritores}
+          erro={erro}
+          disposicao="lista"
+          marcado={typeof valor === "number" ? String(valor) : null}
+          aoMarcar={(v) => aoMudar(Number(v))}
+          opcoes={PONTOS_4[tipo].map((rotulo, i) => ({
+            valor: String(i + 1),
+            rotulo,
+          }))}
+        />
+      );
+      break;
+
     case "concordancia":
       controle = (
         <GrupoDeRadios
@@ -398,12 +434,21 @@ export function CampoDaPergunta({
     case "escala": {
       const de = tipo === "escala" ? (config.minimo ?? 1) : 0;
       const ate = tipo === "escala" ? (config.maximo ?? 5) : 10;
+      // O rótulo de cada ponto (escala com rótulos): número e texto no botão.
+      const rotulos =
+        tipo === "escala" &&
+        config.rotulos &&
+        config.rotulos.length === ate - de + 1
+          ? config.rotulos
+          : null;
       const extremos: readonly [string, string] =
-        tipo === "escala"
+        config.rotuloMinimo || config.rotuloMaximo
           ? [config.rotuloMinimo || "Mínimo", config.rotuloMaximo || "Máximo"]
-          : config.enps
-            ? ["Nada provável", "Muito provável"]
-            : ["Mínimo", "Máximo"];
+          : tipo === "nota_0_10" && config.lnps
+            ? ["Pouco provável", "Muito provável"]
+            : tipo === "nota_0_10" && config.enps
+              ? ["Nada provável", "Muito provável"]
+              : ["Mínimo", "Máximo"];
       controle = (
         <GrupoDeRadios
           base={base}
@@ -412,10 +457,17 @@ export function CampoDaPergunta({
           disposicao="linha"
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
-          extremos={extremos}
+          extremos={rotulos ? null : extremos}
           opcoes={intervalo(de, ate).map((n) => ({
             valor: String(n),
-            rotulo: String(n),
+            rotulo: rotulos ? (
+              <span className="pesquisa-opcao__ponto">
+                <strong>{n}</strong>
+                <span>{rotulos[n - de]}</span>
+              </span>
+            ) : (
+              String(n)
+            ),
           }))}
         />
       );

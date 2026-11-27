@@ -26,6 +26,8 @@ export function ehDeEscala(p: Pergunta): boolean {
   return (
     p.tipo === "escala" ||
     p.tipo === "concordancia" ||
+    p.tipo === "concordancia_4" ||
+    p.tipo === "satisfacao_4" ||
     p.tipo === "estrelas" ||
     p.tipo === "nota_0_10"
   );
@@ -36,6 +38,9 @@ export function escalaDe(p: Pergunta): EscalaDaPergunta {
     case "concordancia":
     case "estrelas":
       return { minimo: 1, maximo: 5 };
+    case "concordancia_4":
+    case "satisfacao_4":
+      return { minimo: 1, maximo: 4 };
     case "nota_0_10":
       return { minimo: 0, maximo: 10 };
     default:
@@ -52,6 +57,8 @@ export function limitesDasFaixas(e: EscalaDaPergunta): {
 } {
   if (e.maximo === 10) return { baixaAte: 4, altaDesde: 8 };
   if (e.minimo === 1 && e.maximo === 5) return { baixaAte: 2, altaDesde: 4 };
+  // 4 pontos, sem meio-termo: 1–2 desfavoráveis, 3–4 favoráveis.
+  if (e.minimo === 1 && e.maximo === 4) return { baixaAte: 2, altaDesde: 3 };
   const n = e.maximo - e.minimo + 1;
   const terco = Math.max(1, Math.floor(n / 3));
   return {
@@ -160,7 +167,13 @@ export function indicadoresDe(
   let enps: IndicadoresDosResultados["enps"] = null;
   for (const p of perguntasEmOrdem(detalhe.secoes)) {
     const r = porId.get(p.id);
-    if (r && "enps" in r && r.enps.indice !== null && !enps) {
+    if (
+      r &&
+      "enps" in r &&
+      p.config.lnps !== true &&
+      r.enps.indice !== null &&
+      !enps
+    ) {
       enps = {
         indice: r.enps.indice,
         zona: r.enps.zona ?? zonaDoEnps(r.enps.indice),
@@ -169,7 +182,11 @@ export function indicadoresDe(
         detratores: r.enps.detratores,
       };
     }
-    if (!ehDeEscala(p) || (p.tipo === "nota_0_10" && p.config.enps)) continue;
+    if (
+      !ehDeEscala(p) ||
+      (p.tipo === "nota_0_10" && (p.config.enps || p.config.lnps))
+    )
+      continue;
     const m = mediaDe(r);
     if (m !== null)
       medias.push({ perguntaId: p.id, media: mediaNa10(m, escalaDe(p)) });

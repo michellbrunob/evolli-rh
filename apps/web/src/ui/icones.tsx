@@ -106,6 +106,18 @@ import {
   Speedometer,
   Smileys,
   Hashtag,
+  Flash,
+  Activity,
+  EmojiHappy,
+  Like1,
+  UserTick,
+  LampOn,
+  EmptyWallet,
+  MedalStar,
+  UserOctagon,
+  Magicpen,
+  Note,
+  Chart,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -279,3 +291,28 @@ export const IconeEscala = decorativo(Slider, "Bulk");
 export const IconeNota = decorativo(Speedometer, "Bulk");
 export const IconeConcordancia = decorativo(Smileys, "Bulk");
 export const IconeNumero = decorativo(Hashtag, "Bulk");
+
+// ---- T216 — Pesquisas: os modelos da galeria e os fatos dos cards (Bulk) ----
+export const IconeModeloPulso = decorativo(Flash, "Bulk");
+export const IconeModeloPulsoClima = decorativo(Activity, "Bulk");
+export const IconeModeloClima = decorativo(EmojiHappy, "Bulk");
+export const IconeModeloEnps = decorativo(Like1, "Bulk");
+export const IconeModeloOnboarding = decorativo(UserTick, "Bulk");
+export const IconeModeloMotivacao = decorativo(LampOn, "Bulk");
+export const IconeModeloRiscos = decorativo(ShieldTick, "Bulk");
+export const IconeModeloSaudeFinanceira = decorativo(EmptyWallet, "Bulk");
+export const IconeModeloAvaliacao90 = decorativo(MedalStar, "Bulk");
+export const IconeModeloAvaliacao180 = decorativo(Profile2User, "Bulk");
+export const IconeModeloPerfil = decorativo(UserOctagon, "Bulk");
+export const IconeModeloPersonalizada = decorativo(Magicpen, "Bulk");
+/** Fatos do card: perguntas, escala, dimensões, competências e envio. */
+export const IconeFatoPerguntas = decorativo(Note, "Bulk");
+export const IconeFatoEscala = decorativo(Chart, "Bulk");
+export const IconeFatoDimensoes = decorativo(Category, "Bulk");
+export const IconeFatoCompetencias = decorativo(MedalStar, "Bulk");
+export const IconeFatoAutomatico = decorativo(Timer1, "Bulk");
+export const IconeFatoDuasPessoas = decorativo(Profile2User, "Bulk");
+export const IconeFatoPerfis = decorativo(UserOctagon, "Bulk");
+export const IconeFatoPersonalizada = decorativo(Magicpen, "Bulk");
+/** O escudo do quadro "Precisa cumprir a NR-1?". */
+export const IconeEscudoNr1 = decorativo(ShieldTick, "Bulk");

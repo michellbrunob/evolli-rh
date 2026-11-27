@@ -29,7 +29,9 @@ export type TipoPergunta =
   | "estrelas"
   | "escala"
   | "data"
-  | "numero";
+  | "numero"
+  | "concordancia_4"
+  | "satisfacao_4";
 
 export interface Opcao {
   readonly id: string;
@@ -42,14 +44,19 @@ export interface ConfigPergunta {
   readonly maximo?: number;
   readonly respostaBoa?: "sim" | "nao" | null;
   readonly enps?: boolean;
+  readonly lnps?: boolean;
   readonly minimo?: number;
-  readonly rotuloMinimo?: string;
-  readonly rotuloMaximo?: string;
+  readonly rotuloMinimo?: string | null;
+  readonly rotuloMaximo?: string | null;
+  /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */
+  readonly rotulos?: readonly string[] | null;
   readonly inteiro?: boolean;
 }
 
 export interface Pergunta {
   readonly id: string;
+  /** O item do modelo (ex.: o comentário de uma dimensão). */
+  readonly chave?: string | null;
   readonly tipo: TipoPergunta;
   readonly texto: string;
   readonly descricao: string | null;

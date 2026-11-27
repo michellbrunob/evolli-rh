@@ -575,3 +575,19 @@ textarea.pesquisa-campo {
 .pesquisa-grupo > .pesquisa-extremos {
   margin-bottom: var(--space-xxs);
 }
+
+/* T216 — escala com o rótulo de cada ponto (ex.: 1 a 7 da TAD): o número em
+   cima e o texto curto embaixo, no mesmo botão. */
+.pesquisa-opcao__ponto {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xxs);
+  text-align: center;
+}
+
+.pesquisa-opcao__ponto > span {
+  font-size: var(--text-caption, 0.75rem);
+  font-weight: var(--weight-regular, 400);
+  line-height: 1.2;
+}

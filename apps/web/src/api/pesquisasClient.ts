@@ -15,6 +15,13 @@ import {
   refreshCsrfToken,
 } from "./csrfClient";
 
+import type {
+  ResultadoDoModelo,
+  ResultadoIndividualDoModelo,
+} from "./resultadosDosModelos";
+
+export type * from "./resultadosDosModelos";
+
 export type Identificacao = "identificada" | "confidencial" | "anonima";
 export type StatusPesquisa =
   "rascunho" | "ativa" | "pausada" | "finalizada" | "cancelada";
@@ -48,7 +55,9 @@ export type TipoPergunta =
   | "estrelas"
   | "escala"
   | "data"
-  | "numero";
+  | "numero"
+  | "concordancia_4"
+  | "satisfacao_4";
 
 /** `id` gerado no navegador (até 40 caracteres). */
 export interface Opcao {
@@ -63,9 +72,13 @@ export interface ConfigPergunta {
   maximo?: number;
   respostaBoa?: "sim" | "nao" | null;
   enps?: boolean;
+  /** Nota 0–10 de recomendação da liderança direta (LNPS). */
+  lnps?: boolean;
   minimo?: number;
-  rotuloMinimo?: string;
-  rotuloMaximo?: string;
+  rotuloMinimo?: string | null;
+  rotuloMaximo?: string | null;
+  /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */
+  rotulos?: string[] | null;
   inteiro?: boolean;
 }
 
@@ -78,6 +91,8 @@ export interface CondicaoPergunta {
 export interface Pergunta {
   /** Gerado no navegador (uuid); estável entre gravações. */
   id: string;
+  /** O item do modelo (dimensão, pilar, regra de pontuação). */
+  chave?: string | null;
   tipo: TipoPergunta;
   texto: string;
   descricao: string | null;
@@ -272,6 +287,8 @@ export interface ResultadosPesquisa {
   indicadores?: IndicadoresDosResultados;
   /** Recortes disponíveis (anônima: os de `separarPor`). */
   recortes?: CampoGrupo[];
+  /** O resultado próprio do modelo (dimensões, pilares, níveis). */
+  modelo?: ResultadoDoModelo | null;
 }
 
 export interface IndicadoresDosResultados {
@@ -281,6 +298,14 @@ export interface IndicadoresDosResultados {
   maiorMedia: { perguntaId: string; media: number } | null;
   menorMedia: { perguntaId: string; media: number } | null;
   enps: {
+    indice: number;
+    zona: ZonaEnps;
+    promotores: number;
+    neutros: number;
+    detratores: number;
+  } | null;
+  /** A recomendação da liderança direta (só com pergunta de LNPS). */
+  lnps?: {
     indice: number;
     zona: ZonaEnps;
     promotores: number;
@@ -351,6 +376,8 @@ export interface RespostaDetalhe extends RespostaResumo {
      */
     mediaUltimosPulsos: number | null;
   };
+  /** O resultado da pessoa no modelo (ex.: os pilares da TAD). */
+  modelo?: ResultadoIndividualDoModelo | null;
 }
 
 export interface ValorRespondido {

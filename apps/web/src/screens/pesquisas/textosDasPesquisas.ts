@@ -126,6 +126,16 @@ export const TIPOS_DE_PERGUNTA: readonly {
     texto: "De discordo totalmente (1) a concordo totalmente (5).",
   },
   {
+    valor: "concordancia_4",
+    rotulo: "Concordância · 4 pontos",
+    texto: "Sem meio-termo: de discordo totalmente a concordo totalmente.",
+  },
+  {
+    valor: "satisfacao_4",
+    rotulo: "Satisfação · 4 pontos",
+    texto: "Sem meio-termo: de muito insatisfeito a muito satisfeito.",
+  },
+  {
     valor: "nota_0_10",
     rotulo: "Nota de 0 a 10",
     texto: "Pode calcular o eNPS.",
@@ -152,10 +162,51 @@ export const ROTULO_DO_TIPO: Readonly<Record<TipoPergunta, string>> =
 export const ROTULOS_DA_CONCORDANCIA = [
   "Discordo totalmente",
   "Discordo",
-  "Nem concordo nem discordo",
+  "Neutro",
   "Concordo",
   "Concordo totalmente",
 ] as const;
+
+/** Concordância de 4 pontos, sem ponto neutro. */
+export const ROTULOS_DA_CONCORDANCIA_4 = [
+  "Discordo totalmente",
+  "Discordo parcialmente",
+  "Concordo parcialmente",
+  "Concordo totalmente",
+] as const;
+
+/** Satisfação de 4 pontos, sem ponto neutro. */
+export const ROTULOS_DA_SATISFACAO_4 = [
+  "Muito insatisfeito",
+  "Insatisfeito",
+  "Satisfeito",
+  "Muito satisfeito",
+] as const;
+
+/**
+ * O rótulo de cada ponto da pergunta (do menor ao maior), quando ela tem:
+ * concordância (5 e 4 pontos), satisfação de 4 pontos e a escala com os
+ * rótulos de todos os pontos. `null` nas demais.
+ */
+export function rotulosDosPontos(p: {
+  readonly tipo: TipoPergunta;
+  readonly config: { readonly rotulos?: readonly string[] | null };
+}): readonly string[] | null {
+  switch (p.tipo) {
+    case "concordancia":
+      return ROTULOS_DA_CONCORDANCIA;
+    case "concordancia_4":
+      return ROTULOS_DA_CONCORDANCIA_4;
+    case "satisfacao_4":
+      return ROTULOS_DA_SATISFACAO_4;
+    case "escala":
+      return p.config.rotulos && p.config.rotulos.length > 0
+        ? p.config.rotulos
+        : null;
+    default:
+      return null;
+  }
+}
 
 export const LIMITES = {
   nome: 120,

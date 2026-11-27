@@ -101,6 +101,56 @@
   --turno-oliva: #6f8f2a;
   --turno-mostarda: #b08a18;
   --turno-violeta: #b24fc9;
+  /* T216 — Pesquisas: o par fundo/tinta do ícone de cada modelo da galeria,
+     os selos (novo, NR-1) e o quadro da NR-1. */
+  --modelo-rosa-fundo: #ffeaf3;
+  --modelo-rosa: #e4488a;
+  --modelo-coral-fundo: #ffede8;
+  --modelo-coral: #e5533d;
+  --modelo-azul-fundo: #eaf1ff;
+  --modelo-azul: #3667e0;
+  --modelo-teal-fundo: #e3f6f3;
+  --modelo-teal: #0e9384;
+  --modelo-verde-fundo: #e6f6ec;
+  --modelo-verde: #16a34a;
+  --modelo-roxo-fundo: #f2edff;
+  --modelo-roxo: #7c4ddb;
+  --modelo-laranja-fundo: #ffefe3;
+  --modelo-laranja: #ea6c0a;
+  --modelo-esmeralda-fundo: #e4f6ee;
+  --modelo-esmeralda: #0f8f5c;
+  --modelo-celeste-fundo: #e3f3fc;
+  --modelo-celeste: #0284c7;
+  --modelo-ambar-fundo: #fff3dc;
+  --modelo-ambar: #d97706;
+  --modelo-cinza-fundo: #f0f0f3;
+  --modelo-cinza: #4b4b57;
+  --selo-novo-fundo: #ffeaf3;
+  --selo-novo-tinta: #c8306f;
+  --selo-nr1-fundo: #e8f6ee;
+  --selo-nr1-tinta: #1f7a48;
+  --quadro-nr1-borda: #bfe6cd;
+  --quadro-nr1-fundo: #e8f7ed;
+  --cartao-modelo-borda: #eaeaee;
+  --cartao-modelo-foco: #f4a3c5;
+  /* Faixas dos resultados dos modelos (score 0–100, níveis). */
+  --faixa-critico: #ef4444;
+  --faixa-critico-fundo: #fee2e2;
+  --faixa-atencao: #f59e0b;
+  --faixa-atencao-fundo: #fef3c7;
+  --faixa-saudavel: #22c55e;
+  --faixa-saudavel-fundo: #dcfce7;
+  --faixa-forte: #16a34a;
+  --faixa-forte-fundo: #bbf7d0;
+  /* Cores das dimensões e pilares dos modelos (paleta de gráfico). */
+  --grafico-1: #3b82f6;
+  --grafico-2: #8b5cf6;
+  --grafico-3: #f59e0b;
+  --grafico-4: #10b981;
+  --grafico-5: #ef4444;
+  --grafico-6: #06b6d4;
+  --grafico-7: #ec4899;
+  --grafico-8: #059669;
   --status-success-surface: #eaf6ee;
   --status-success-border: #b7dfc5;
   --status-warning-ink: #8a5a00;

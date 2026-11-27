@@ -62,6 +62,7 @@ import {
 import {
   LIMITES,
   ROTULOS_DA_CONCORDANCIA,
+  rotulosDosPontos,
   ROTULO_DO_TIPO,
   TIPOS_DE_PERGUNTA,
   configInicial,
@@ -89,7 +90,14 @@ const GRUPOS_DE_TIPO: readonly {
   },
   {
     titulo: "Escala",
-    tipos: ["escala", "nota_0_10", "concordancia", "estrelas"],
+    tipos: [
+      "escala",
+      "nota_0_10",
+      "concordancia",
+      "concordancia_4",
+      "satisfacao_4",
+      "estrelas",
+    ],
   },
   { titulo: "Outros", tipos: ["data", "numero"] },
 ];
@@ -104,6 +112,8 @@ const ICONE_DO_TIPO: Readonly<Record<TipoPergunta, IconeDoEcossistema>> = {
   escala: IconeEscala,
   nota_0_10: IconeNota,
   concordancia: IconeConcordancia,
+  concordancia_4: IconeConcordancia,
+  satisfacao_4: IconeConcordancia,
   estrelas: IconeEstrela,
   data: IconeCalendario,
   numero: IconeNumero,
@@ -823,14 +833,43 @@ function ConfiguracaoDoTipo({
       );
     case "nota_0_10":
       return (
-        <label className="pesquisas__marcacao">
-          <input
-            type="checkbox"
-            checked={p.config.enps === true}
-            onChange={(e) => config({ enps: e.target.checked })}
-          />
-          Calcular o eNPS (promotores 9–10, neutros 7–8, detratores 0–6)
-        </label>
+        <div className="pesquisas__lado-a-lado">
+          <label className="pesquisas__marcacao">
+            <input
+              type="checkbox"
+              checked={p.config.enps === true}
+              onChange={(e) =>
+                config({
+                  enps: e.target.checked,
+                  ...(e.target.checked ? { lnps: undefined } : {}),
+                })
+              }
+            />
+            Calcular o eNPS (promotores 9–10, neutros 7–8, detratores 0–6)
+          </label>
+          <Rotulado rotulo="Rótulo do 0 (opcional)">
+            {(id) => (
+              <input
+                id={id}
+                className="pesquisas__campo"
+                placeholder="Ex.: Nada"
+                value={p.config.rotuloMinimo ?? ""}
+                onChange={(e) => config({ rotuloMinimo: e.target.value })}
+              />
+            )}
+          </Rotulado>
+          <Rotulado rotulo="Rótulo do 10 (opcional)">
+            {(id) => (
+              <input
+                id={id}
+                className="pesquisas__campo"
+                placeholder="Ex.: Muito"
+                value={p.config.rotuloMaximo ?? ""}
+                onChange={(e) => config({ rotuloMaximo: e.target.value })}
+              />
+            )}
+          </Rotulado>
+        </div>
       );
     case "escala":
       return (
@@ -922,6 +961,13 @@ function ConfiguracaoDoTipo({
       return (
         <p className="pesquisas__suave">
           {`Quem responde escolhe de 1 a 5: ${ROTULOS_DA_CONCORDANCIA.join(", ").toLowerCase()}.`}
+        </p>
+      );
+    case "concordancia_4":
+    case "satisfacao_4":
+      return (
+        <p className="pesquisas__suave">
+          {`Escala de 4 pontos, sem meio-termo: ${(rotulosDosPontos(p) ?? []).join(", ").toLowerCase()}.`}
         </p>
       );
     case "estrelas":
