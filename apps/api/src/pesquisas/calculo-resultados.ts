@@ -206,12 +206,19 @@ export interface EntradaDosResultados {
   departamentoId: string | null;
   /** Só a identificada mostra o autor dos textos. */
   identificada: boolean;
+  /**
+   * Confidencial: a visão geral também respeita o mínimo por grupo (com
+   * poucas respostas, o agregado e a lista de quem respondeu identificariam
+   * a pessoa).
+   */
+  minimoNaVisaoGeral: boolean;
 }
 
 /**
  * Monta a resposta de `GET /pesquisas/:id/resultados`. Sem filtro, todas as
  * respostas; com `departamentoId`, só as do grupo, e nada de número quando o
- * grupo tem menos respostas que o mínimo.
+ * grupo tem menos respostas que o mínimo (na confidencial, vale também sem
+ * filtro).
  */
 export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
   const respostas = e.respostas.map((r) => ({
@@ -241,7 +248,9 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
       ? respostas
       : respostas.filter((r) => r.departamentoId === e.departamentoId);
   const visivel =
-    e.departamentoId === null || filtradas.length >= e.minimoPorGrupo;
+    e.departamentoId === null && !e.minimoNaVisaoGeral
+      ? true
+      : filtradas.length >= e.minimoPorGrupo;
 
   return {
     pesquisaId: e.pesquisaId,

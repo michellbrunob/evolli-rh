@@ -229,6 +229,7 @@ describe("T216 — montarResultados (recorte e mínimo por grupo)", () => {
     minimoPorGrupo: 3,
     departamentoId: null,
     identificada: true,
+    minimoNaVisaoGeral: false,
   };
 
   it("sem filtro: tudo, com os grupos e a visibilidade de cada um", () => {
@@ -265,6 +266,46 @@ describe("T216 — montarResultados (recorte e mínimo por grupo)", () => {
     const conf = montarResultados({ ...base, identificada: false });
     expect(conf.perguntas[1]).toMatchObject({
       textos: [{ texto: "bom", autor: null }],
+    });
+  });
+
+  describe("visão geral da confidencial também respeita o mínimo", () => {
+    const confidencial = {
+      ...base,
+      identificada: false,
+      minimoNaVisaoGeral: true,
+    };
+
+    it("abaixo do mínimo: sem números, mas com as contagens", () => {
+      const res = montarResultados({
+        ...confidencial,
+        respostas: respostas.slice(0, 2),
+        minimoPorGrupo: 3,
+      });
+      expect(res.filtro).toEqual({ departamentoId: null, visivel: false });
+      expect(res.perguntas).toEqual([]);
+      expect(res.respostas).toBe(2);
+      expect(res.participantes).toBe(8);
+    });
+
+    it("no mínimo: mostra", () => {
+      const res = montarResultados({
+        ...confidencial,
+        respostas: respostas.slice(0, 3),
+        minimoPorGrupo: 3,
+      });
+      expect(res.filtro.visivel).toBe(true);
+      expect(res.perguntas[0]).toMatchObject({ respondidas: 3 });
+    });
+
+    it("identificada e anônima (sem a regra) mostram a visão geral com 1 resposta", () => {
+      const res = montarResultados({
+        ...base,
+        respostas: respostas.slice(0, 1),
+        minimoNaVisaoGeral: false,
+      });
+      expect(res.filtro.visivel).toBe(true);
+      expect(res.perguntas).toHaveLength(2);
     });
   });
 });

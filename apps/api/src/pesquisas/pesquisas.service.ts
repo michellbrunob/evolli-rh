@@ -723,6 +723,7 @@ export class PesquisasService {
       minimoPorGrupo: p.minimoPorGrupo,
       departamentoId,
       identificada: comAutor,
+      minimoNaVisaoGeral: p.identificacao === "confidencial",
     });
   }
 
