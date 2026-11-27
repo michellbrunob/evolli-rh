@@ -6,6 +6,8 @@ import { vi, type Mock } from "vitest";
 import type { ListagemColaboradoresApi } from "../../api/colaboradoresClient";
 import type {
   AnalisesPesquisa,
+  CandidatoPesquisa,
+  ListarCandidatosQuery,
   RespostaDetalhe,
   RespostaResumo,
   ListaDePesquisasApi,
@@ -219,6 +221,59 @@ export const ATIVOS: ListagemColaboradoresApi = {
   contadores: {} as ListagemColaboradoresApi["contadores"],
 };
 
+/** Candidatos para "Escolher pessoas" (lotação vigente). */
+export const CANDIDATOS: CandidatoPesquisa[] = [
+  {
+    colaboradorId: "c-1",
+    nome: "Ana Exemplo",
+    cargo: "Analista",
+    departamento: "Operações",
+    centroCusto: "Administrativo",
+    unidade: "Matriz",
+  },
+  {
+    colaboradorId: "c-2",
+    nome: "Bruno Exemplo",
+    cargo: null,
+    departamento: "Financeiro",
+    centroCusto: null,
+    unidade: "Filial Sul",
+  },
+];
+
+const NOME_DO_GRUPO: Readonly<Record<string, string>> = {
+  "d-1": "Operações",
+  "d-2": "Financeiro",
+  "cc-1": "Administrativo",
+  "u-1": "Matriz",
+  "u-2": "Filial Sul",
+};
+
+/** O servidor simulado filtra e pagina como o real. */
+export function listarCandidatosFalso(
+  todos: readonly CandidatoPesquisa[] = CANDIDATOS,
+) {
+  return (q: ListarCandidatosQuery = {}) => {
+    const casa = (valor: string | null, id?: string) =>
+      !id || valor === NOME_DO_GRUPO[id];
+    const filtrados = todos.filter(
+      (c) =>
+        (!q.busca || c.nome.toLowerCase().includes(q.busca.toLowerCase())) &&
+        casa(c.departamento, q.departamentoId) &&
+        casa(c.centroCusto, q.centroCustoId) &&
+        casa(c.unidade, q.unidadeId),
+    );
+    const pagina = q.pagina ?? 1;
+    const tamanho = q.tamanhoPagina ?? 20;
+    return Promise.resolve({
+      itens: filtrados.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: filtrados.length,
+    });
+  };
+}
+
 export const GRUPOS: GruposDaEmpresa = {
   departamento: [
     { id: "d-1", nome: "Operações" },
@@ -272,6 +327,7 @@ export const RESPOSTA_DETALHE: RespostaDetalhe = {
     enpsTime: 50,
     maior: { perguntaId: "q-conc", valor: 5 },
     menor: { perguntaId: "q-conc", valor: 5 },
+    mediaUltimosPulsos: null,
   },
 };
 
@@ -371,6 +427,8 @@ export function servicoFalso(
     ),
     analisesDaPesquisa: vi.fn(() => Promise.resolve(ANALISES)),
     listarAtivos: vi.fn(() => Promise.resolve(ATIVOS)),
+    listarCandidatos: vi.fn(listarCandidatosFalso()),
+    listarTodosCandidatos: vi.fn(() => Promise.resolve(CANDIDATOS)),
     listarTodosAtivos: vi.fn(() => Promise.resolve(ATIVOS.itens)),
     listarGrupos: vi.fn(() => Promise.resolve(GRUPOS)),
     listarEmpresas: vi.fn(() =>

@@ -16,8 +16,19 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { PesquisaEntrada } from "../../api/pesquisasClient";
 import { AssistenteDoModelo } from "./AssistenteDoModelo";
-import { ATIVOS, servicoFalso, type ServicoFalso } from "./dadosDeTeste";
+import type { CandidatoPesquisa } from "../../api/pesquisasClient";
+import {
+  listarCandidatosFalso,
+  servicoFalso,
+  type ServicoFalso,
+} from "./dadosDeTeste";
 import { modeloDaGaleria, perguntasPrincipais } from "./modelosDePesquisa";
+
+/**
+ * O prazo como a API recebe: dia e hora de Brasília, sem fuso no texto
+ * (contrato da T216); montado aqui para não virar literal de instante.
+ */
+const prazoDaApi = (dia: string, hora: string) => `${dia}T${hora}`;
 
 const HOJE = "2026-11-27";
 const AGORA = () => new Date(2026, 10, 27, 9, 5);
@@ -292,12 +303,20 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
       await screen.findByRole("option", { name: "Administrativo" }),
     );
     await waitFor(() =>
-      expect(servico.listarAtivos).toHaveBeenLastCalledWith(
-        expect.objectContaining({ centrosCusto: ["cc-1"] }),
+      expect(servico.listarCandidatos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ centroCustoId: "cc-1" }),
       ),
     );
+    // No centro de custo Administrativo só está a Ana (já marcada).
+    expect(
+      await screen.findByText("1 selecionado de 1 colaborador"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: "Centro de custo" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Selecionar todos os 2" }),
+      await screen.findByRole("option", { name: "Centro de custo: todos" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Selecionar todos os 2" }),
     );
     expect(
       await screen.findByText("2 selecionados de 2 colaboradores"),
@@ -312,29 +331,7 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
   });
 
   it("escolher pessoas começa sem ninguém; marcar todos, limpar e a contagem dentro do filtro", async () => {
-    // O servidor simulado filtra por departamento, como o real.
-    const filtrarPorDepartamento = vi.fn(
-      (q: { departamentos?: readonly string[] }) => {
-        const itens = ATIVOS.itens.filter(
-          (c) =>
-            !q.departamentos?.length ||
-            q.departamentos.includes(
-              (
-                c as unknown as {
-                  vinculos: {
-                    lotacaoVigente: { departamento: { id: string } };
-                  }[];
-                }
-              ).vinculos[0]!.lotacaoVigente.departamento.id,
-            ),
-        );
-        return Promise.resolve({ ...ATIVOS, itens, total: itens.length });
-      },
-    );
-    const servico = servicoFalso({
-      listarAtivos:
-        filtrarPorDepartamento as unknown as ServicoFalso["listarAtivos"],
-    });
+    const servico = servicoFalso();
     montar({ servico });
     proximo(/Próximo: Colaboradores/);
     fireEvent.click(
@@ -367,6 +364,78 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
       await screen.findByText("0 selecionados de 1 colaborador"),
     ).toBeInTheDocument();
     expect(screen.getByText("1 pessoa vai receber")).toBeInTheDocument();
+  });
+
+  it("escolher pessoas: colunas da lotação vindas dos candidatos e 'Selecionar todos' sobre o total do filtro", async () => {
+    // 150 ativos de Operações (duas páginas de 100) e a Bruna no Financeiro.
+    const muitos: CandidatoPesquisa[] = [
+      ...Array.from({ length: 150 }, (_, i) => ({
+        colaboradorId: `c-op-${i}`,
+        nome: `Pessoa ${String(i).padStart(3, "0")}`,
+        cargo: "Operador",
+        departamento: "Operações",
+        centroCusto: "Administrativo",
+        unidade: "Matriz",
+      })),
+      {
+        colaboradorId: "c-fi",
+        nome: "Bruna Exemplo",
+        cargo: "Analista",
+        departamento: "Financeiro",
+        centroCusto: null,
+        unidade: "Filial Sul",
+      },
+    ];
+    const servico = servicoFalso({
+      listarCandidatos: vi.fn(listarCandidatosFalso(muitos)),
+      listarTodosCandidatos: vi.fn(() => Promise.resolve(muitos)),
+    });
+    montar({ servico });
+    proximo(/Próximo: Colaboradores/);
+    fireEvent.click(
+      await screen.findByRole("radio", { name: /Escolher pessoas/ }),
+    );
+    const tabela = await screen.findByRole("table", {
+      name: "Colaboradores ativos",
+    });
+    expect(
+      within(tabela)
+        .getAllByRole("columnheader")
+        .map((c) => c.textContent),
+    ).toEqual([
+      "Selecionar",
+      "Colaborador",
+      "Departamento",
+      "Centro de custo",
+      "Unidade",
+    ]);
+    const bruna = within(tabela)
+      .getByRole("checkbox", { name: "Bruna Exemplo" })
+      .closest("tr")!;
+    expect(bruna).toHaveTextContent("Analista");
+    expect(
+      within(bruna)
+        .getAllByRole("cell")
+        .map((c) => c.textContent),
+    ).toEqual(["", "BEBruna ExemploAnalista", "Financeiro", "—", "Filial Sul"]);
+    // Filtro por unidade vai ao servidor; a contagem é a do filtro.
+    fireEvent.click(screen.getByRole("combobox", { name: "Unidade" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Matriz" }));
+    await waitFor(() =>
+      expect(servico.listarCandidatos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ unidadeId: "u-1", pagina: 2 }),
+      ),
+    );
+    expect(
+      await screen.findByText("0 selecionados de 150 colaboradores"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Selecionar todos os 150" }),
+    );
+    expect(
+      await screen.findByText("150 selecionados de 150 colaboradores"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("150 pessoas vão receber")).toBeInTheDocument();
   });
 
   it("enviar: revisão, encerramento automático validado e gerar", async () => {
@@ -407,7 +476,7 @@ describe("Assistente do modelo — Colaboradores e Enviar", () => {
     });
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
     expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe(
-      "2026-12-20T23:59",
+      prazoDaApi("2026-12-20", "23:59"),
     );
     expect(final).toHaveTextContent("Ativa");
     expect(within(final).getByRole("link", { name: /^Abrir/ })).toHaveAttribute(

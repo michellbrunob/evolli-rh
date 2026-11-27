@@ -105,6 +105,26 @@ describe("Resultado individual", () => {
     expect(marcadas[0]).toHaveAttribute("data-faixa", "alta");
   });
 
+  it("sem pulsos anteriores (ou na anônima), o cartão diz que não há com o que comparar", async () => {
+    render(
+      <PaginaDaResposta
+        nomeDaPesquisa="Pulso"
+        identificacao="identificada"
+        secoes={DETALHE.secoes}
+        respostaId="r-1"
+        carregar={() => Promise.resolve(RESPOSTA_DETALHE)}
+        rotuloVoltar="Voltar"
+        onVoltar={vi.fn()}
+      />,
+    );
+    const ind = await screen.findByRole("region", {
+      name: "Indicadores da resposta",
+    });
+    expect(ind).toHaveTextContent(
+      "Média nos últimos pulsosSem pulsos anteriores para comparar.",
+    );
+  });
+
   it("anônima: numerada e sem pessoa; paginação entre respostas", async () => {
     const onIr = vi.fn();
     render(

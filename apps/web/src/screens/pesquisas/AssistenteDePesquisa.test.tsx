@@ -19,6 +19,12 @@ import type {
 import { AssistenteDePesquisa } from "./AssistenteDePesquisa";
 import { DETALHE, servicoFalso, type ServicoFalso } from "./dadosDeTeste";
 
+/**
+ * O prazo como a API recebe: dia e hora de Brasília, sem fuso no texto
+ * (contrato da T216); montado aqui para não virar literal de instante.
+ */
+const prazoDaApi = (dia: string, hora: string) => `${dia}T${hora}`;
+
 const HOJE = "2026-11-27";
 
 const avancar = () =>
@@ -371,15 +377,15 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       { target: { value: "Ana" } },
     );
     await waitFor(() =>
-      expect(servico.listarAtivos).toHaveBeenLastCalledWith(
+      expect(servico.listarCandidatos).toHaveBeenLastCalledWith(
         expect.objectContaining({ busca: "Ana" }),
       ),
     );
     fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
     fireEvent.click(await screen.findByRole("option", { name: "Financeiro" }));
     await waitFor(() =>
-      expect(servico.listarAtivos).toHaveBeenLastCalledWith(
-        expect.objectContaining({ departamentos: ["d-2"] }),
+      expect(servico.listarCandidatos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ departamentoId: "d-2" }),
       ),
     );
   });
@@ -470,7 +476,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     ).toBeNull();
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
     expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe(
-      "2026-12-15T23:59",
+      prazoDaApi("2026-12-15", "23:59"),
     );
     expect(
       (screen.getByLabelText("Link da pesquisa") as HTMLInputElement).value,

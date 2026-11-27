@@ -4,13 +4,15 @@
  * quantos departamentos, a lista completa (cargo · departamento) e uma
  * pílula com ponto colorido por departamento. "Escolher pessoas" começa sem
  * ninguém marcado e tem busca, filtros por departamento, centro de custo e
- * área, a barra "N selecionados de M" (contada dentro do filtro) com a caixa
- * geral, "Selecionar todos" e "Limpar", e a tabela (Colaborador,
- * Departamento, Centro de custo e Área). Depois de publicar, quem já
- * respondeu não sai da lista.
+ * unidade (no servidor, `GET /pesquisas/candidatos`), a barra "N
+ * selecionados de M" (contada dentro do filtro) com a caixa geral,
+ * "Selecionar todos" (sobre o total do filtro, todas as páginas) e
+ * "Limpar", e a tabela (Colaborador, Departamento, Centro de custo e
+ * Unidade). Depois de publicar, quem já respondeu não sai da lista.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ColaboradorListadoApi } from "../../api/colaboradoresClient";
+import type { CandidatoPesquisa } from "../../api/pesquisasClient";
 import { Button } from "../../components";
 import { plural } from "../../format/plural";
 import { ListaDeEscolha, Sheet } from "../../ui";
@@ -22,10 +24,11 @@ import {
   iniciaisDe,
 } from "./componentes";
 import type { PessoaEscolhida } from "./estadoDaPesquisa";
-import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
-
-const TAMANHO = 100;
-const TETO = 1000;
+import {
+  todosOsCandidatos,
+  type GruposDaEmpresa,
+  type ServicoDePesquisas,
+} from "./servicoDePesquisas";
 
 /** A lotação como a listagem a projeta (centro de custo e área, se vierem). */
 interface LotacaoLida {
@@ -40,6 +43,7 @@ function lotacaoDe(c: ColaboradorListadoApi): LotacaoLida {
     {}) as LotacaoLida;
 }
 
+/** O departamento vigente na listagem de colaboradores (edição da pesquisa). */
 export function departamentoDe(c: ColaboradorListadoApi): string | null {
   return lotacaoDe(c).departamento?.nome ?? null;
 }
@@ -81,24 +85,22 @@ export function EtapaColaboradores({
   readonly onTotalDoTime?: (n: number) => void;
 }) {
   const base = useId();
-  const [time, setTime] = useState<readonly ColaboradorListadoApi[] | null>(
-    null,
-  );
+  const [time, setTime] = useState<readonly CandidatoPesquisa[] | null>(null);
   const [verLista, setVerLista] = useState(false);
   const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState({
     departamento: "",
     centroCusto: "",
-    area: "",
+    unidade: "",
   });
-  const [pessoas, setPessoas] = useState<ColaboradorListadoApi[] | null>(null);
+  const [pessoas, setPessoas] = useState<CandidatoPesquisa[] | null>(null);
   const [falhou, setFalhou] = useState(false);
   const geralRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let vivo = true;
-    Promise.resolve(servico.listarTodosAtivos())
+    Promise.resolve(servico.listarTodosCandidatos())
       .then((t) => {
         if (!vivo) return;
         setTime(t ?? []);
@@ -122,31 +124,29 @@ export function EtapaColaboradores({
   const consulta = useMemo(
     () => ({
       ...(busca.trim() ? { busca: busca.trim() } : {}),
-      ...(filtro.departamento ? { departamentos: [filtro.departamento] } : {}),
-      ...(filtro.centroCusto ? { centrosCusto: [filtro.centroCusto] } : {}),
-      ...(filtro.area ? { areas: [filtro.area] } : {}),
+      ...(filtro.departamento ? { departamentoId: filtro.departamento } : {}),
+      ...(filtro.centroCusto ? { centroCustoId: filtro.centroCusto } : {}),
+      ...(filtro.unidade ? { unidadeId: filtro.unidade } : {}),
     }),
     [busca, filtro],
   );
 
-  // Toda a lista do filtro (para contar e marcar dentro dele).
+  // Todo o filtro, página a página no servidor (para contar e marcar
+  // dentro dele, e "Selecionar todos" valer para o total).
   useEffect(() => {
     if (todos) return;
     let vivo = true;
     setFalhou(false);
-    (async () => {
-      const lista: ColaboradorListadoApi[] = [];
-      for (let pagina = 1; lista.length < TETO; pagina += 1) {
-        const r = await Promise.resolve(
-          servico.listarAtivos({ ...consulta, pagina, tamanhoPagina: TAMANHO }),
-        );
-        lista.push(...(r?.itens ?? []));
-        if (!r || r.itens.length === 0 || lista.length >= r.total) break;
-      }
-      if (vivo) setPessoas(lista);
-    })().catch(() => {
-      if (vivo) setFalhou(true);
-    });
+    todosOsCandidatos(
+      (q) => Promise.resolve(servico.listarCandidatos(q)),
+      consulta,
+    )
+      .then((lista) => {
+        if (vivo) setPessoas(lista);
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
     return () => {
       vivo = false;
     };
@@ -154,7 +154,9 @@ export function EtapaColaboradores({
 
   const respondeu = useMemo(() => new Set(responderam), [responderam]);
   const doFiltro = pessoas ?? [];
-  const marcadosNoFiltro = doFiltro.filter((c) => c.id in escolhidos).length;
+  const marcadosNoFiltro = doFiltro.filter(
+    (c) => c.colaboradorId in escolhidos,
+  ).length;
   const todosMarcados =
     doFiltro.length > 0 && marcadosNoFiltro === doFiltro.length;
 
@@ -166,7 +168,7 @@ export function EtapaColaboradores({
   const porDepartamento = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of time ?? []) {
-      const d = departamentoDe(c) ?? "Sem departamento";
+      const d = c.departamento ?? "Sem departamento";
       m.set(d, (m.get(d) ?? 0) + 1);
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
@@ -175,9 +177,9 @@ export function EtapaColaboradores({
     ([d]) => d !== "Sem departamento",
   ).length;
 
-  const pessoaEscolhida = (c: ColaboradorListadoApi): PessoaEscolhida => ({
+  const pessoaEscolhida = (c: CandidatoPesquisa): PessoaEscolhida => ({
     nome: c.nome,
-    departamento: departamentoDe(c),
+    departamento: c.departamento,
   });
 
   /** Só quem já respondeu fica (não sai da lista depois de responder). */
@@ -186,18 +188,18 @@ export function EtapaColaboradores({
       Object.entries(escolhidos).filter(([id]) => respondeu.has(id)),
     );
 
-  function marcar(c: ColaboradorListadoApi, marcado: boolean) {
+  function marcar(c: CandidatoPesquisa, marcado: boolean) {
     const novo = { ...escolhidos };
-    if (marcado) novo[c.id] = pessoaEscolhida(c);
-    else delete novo[c.id];
+    if (marcado) novo[c.colaboradorId] = pessoaEscolhida(c);
+    else delete novo[c.colaboradorId];
     onMudar({ escolhidos: novo });
   }
 
   function marcarTodosDoFiltro(marcado: boolean) {
     const novo = { ...escolhidos };
     for (const c of doFiltro) {
-      if (marcado) novo[c.id] = pessoaEscolhida(c);
-      else if (!respondeu.has(c.id)) delete novo[c.id];
+      if (marcado) novo[c.colaboradorId] = pessoaEscolhida(c);
+      else if (!respondeu.has(c.colaboradorId)) delete novo[c.colaboradorId];
     }
     onMudar({ escolhidos: novo });
   }
@@ -273,7 +275,7 @@ export function EtapaColaboradores({
             <span className="pesquisas__suave">
               {publicada && todos
                 ? "Publicada para todo o time, não volta a ser só para algumas pessoas."
-                : "Por nome, departamento, centro de custo ou área"}
+                : "Por nome, departamento, centro de custo ou unidade"}
             </span>
           </span>
         </label>
@@ -347,7 +349,7 @@ export function EtapaColaboradores({
               "Centro de custo",
               grupos?.centroCusto ?? [],
             )}
-            {filtroLista("area", "Área", grupos?.area ?? [])}
+            {filtroLista("unidade", "Unidade", grupos?.unidade ?? [])}
           </div>
           <div className="pesquisas__barra-selecao">
             <label className="pesquisas__marcacao">
@@ -406,23 +408,23 @@ export function EtapaColaboradores({
                     <th scope="col">Colaborador</th>
                     <th scope="col">Departamento</th>
                     <th scope="col">Centro de custo</th>
-                    <th scope="col">Área</th>
+                    <th scope="col">Unidade</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pessoas.map((c) => {
-                    const ja = respondeu.has(c.id);
-                    const l = lotacaoDe(c);
+                    const marcada = c.colaboradorId in escolhidos;
+                    const ja = respondeu.has(c.colaboradorId);
                     return (
                       <tr
-                        key={c.id}
-                        {...(c.id in escolhidos ? { "data-marcada": "" } : {})}
+                        key={c.colaboradorId}
+                        {...(marcada ? { "data-marcada": "" } : {})}
                       >
                         <td>
                           <input
                             type="checkbox"
                             aria-label={c.nome}
-                            checked={c.id in escolhidos}
+                            checked={marcada}
                             disabled={ja}
                             onChange={(e) => marcar(c, e.target.checked)}
                           />
@@ -433,16 +435,16 @@ export function EtapaColaboradores({
                             <span className="pesquisas__pessoa-textos">
                               <span>{c.nome}</span>
                               <span className="pesquisas__suave">
-                                {[l.cargo?.nome, ja ? "já respondeu" : null]
+                                {[c.cargo, ja ? "já respondeu" : null]
                                   .filter(Boolean)
                                   .join(" · ") || "—"}
                               </span>
                             </span>
                           </span>
                         </td>
-                        <td>{l.departamento?.nome ?? "—"}</td>
-                        <td>{l.centroCusto?.nome ?? "—"}</td>
-                        <td>{l.area?.nome ?? "—"}</td>
+                        <td>{c.departamento ?? "—"}</td>
+                        <td>{c.centroCusto ?? "—"}</td>
+                        <td>{c.unidade ?? "—"}</td>
                       </tr>
                     );
                   })}
@@ -465,14 +467,13 @@ export function EtapaColaboradores({
       >
         <ul className="pesquisas__lista-pessoas">
           {(time ?? []).map((c) => {
-            const l = lotacaoDe(c);
             return (
-              <li key={c.id}>
+              <li key={c.colaboradorId}>
                 <Avatar texto={iniciaisDe(c.nome)} />
                 <span className="pesquisas__pessoa-textos">
                   <span>{c.nome}</span>
                   <span className="pesquisas__suave">
-                    {[l.cargo?.nome, l.departamento?.nome]
+                    {[c.cargo, c.departamento, c.unidade]
                       .filter(Boolean)
                       .join(" · ") || "Sem lotação"}
                   </span>

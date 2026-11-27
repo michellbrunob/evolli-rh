@@ -46,7 +46,12 @@ export type ServicoDePesquisas = Pick<
   | "respostasDaPesquisa"
   | "analisesDaPesquisa"
   | "respostaDaPesquisa"
+  | "listarCandidatos"
 > & {
+  /** Todos os candidatos (para "Todo o time": contagem, grupos e lista). */
+  readonly listarTodosCandidatos: () => Promise<
+    readonly cliente.CandidatoPesquisa[]
+  >;
   /** Colaboradores ativos da empresa (busca, filtros e página). */
   readonly listarAtivos: (
     query: Pick<
@@ -74,7 +79,21 @@ export type ServicoDePesquisas = Pick<
   readonly empresaAtiva: () => Promise<{ id: string; nome: string } | null>;
 };
 
-const TETO_DE_PESSOAS = 1000;
+const TETO_DE_PESSOAS = 5000;
+
+/** Todas as páginas de candidatos de um filtro (até o teto). */
+export async function todosOsCandidatos(
+  listar: ServicoDePesquisas["listarCandidatos"],
+  filtro: Omit<cliente.ListarCandidatosQuery, "pagina" | "tamanhoPagina"> = {},
+): Promise<cliente.CandidatoPesquisa[]> {
+  const todos: cliente.CandidatoPesquisa[] = [];
+  for (let pagina = 1; todos.length < TETO_DE_PESSOAS; pagina += 1) {
+    const r = await listar({ ...filtro, pagina, tamanhoPagina: 100 });
+    todos.push(...(r?.itens ?? []));
+    if (!r || r.itens.length === 0 || todos.length >= r.total) break;
+  }
+  return todos;
+}
 
 const ativos = (query: Parameters<ServicoDePesquisas["listarAtivos"]>[0]) =>
   listarColaboradores({ ...query, grupo: "ativos" });
@@ -95,6 +114,8 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   respostasDaPesquisa: cliente.respostasDaPesquisa,
   analisesDaPesquisa: cliente.analisesDaPesquisa,
   respostaDaPesquisa: cliente.respostaDaPesquisa,
+  listarCandidatos: cliente.listarCandidatos,
+  listarTodosCandidatos: () => todosOsCandidatos(cliente.listarCandidatos),
   listarAtivos: ativos,
   listarTodosAtivos: async () => {
     const todos: ColaboradorListadoApi[] = [];

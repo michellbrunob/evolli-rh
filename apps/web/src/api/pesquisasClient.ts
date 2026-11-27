@@ -312,8 +312,11 @@ export interface RespostaDetalhe extends RespostaResumo {
     enpsTime: number | null;
     maior: { perguntaId: string; valor: number } | null;
     menor: { perguntaId: string; valor: number } | null;
-    /** Média da pessoa nos pulsos anteriores (API ampliada; opcional). */
-    mediaUltimosPulsos?: number | null;
+    /**
+     * Média geral (0–10) da mesma pessoa nas pesquisas anteriores do mesmo
+     * modelo; `null` sem anterior e sempre na anônima.
+     */
+    mediaUltimosPulsos: number | null;
   };
 }
 
@@ -393,6 +396,55 @@ export function listarPesquisas(
     params.set("tamanhoPagina", String(query.tamanhoPagina));
   const qs = params.toString();
   return pedir(`/pesquisas${qs ? `?${qs}` : ""}`, "GET");
+}
+
+/** `GET /pesquisas/candidatos`: um colaborador ativo e a lotação vigente. */
+export interface CandidatoPesquisa {
+  colaboradorId: string;
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+  centroCusto: string | null;
+  unidade: string | null;
+}
+
+export interface ListaDeCandidatos {
+  itens: CandidatoPesquisa[];
+  pagina: number;
+  tamanhoPagina: number;
+  total: number;
+}
+
+export interface ListarCandidatosQuery {
+  /** Parte do nome. */
+  busca?: string;
+  departamentoId?: string;
+  centroCustoId?: string;
+  unidadeId?: string;
+  pagina?: number;
+  /** Até 100. */
+  tamanhoPagina?: number;
+}
+
+/** Ativos da empresa ativa para "Escolher pessoas" (filtros no servidor). */
+export function listarCandidatos(
+  query: ListarCandidatosQuery = {},
+): Promise<ListaDeCandidatos> {
+  const params = new URLSearchParams();
+  for (const chave of [
+    "busca",
+    "departamentoId",
+    "centroCustoId",
+    "unidadeId",
+  ] as const) {
+    const valor = query[chave];
+    if (valor) params.set(chave, valor);
+  }
+  if (query.pagina !== undefined) params.set("pagina", String(query.pagina));
+  if (query.tamanhoPagina !== undefined)
+    params.set("tamanhoPagina", String(query.tamanhoPagina));
+  const qs = params.toString();
+  return pedir(`/pesquisas/candidatos${qs ? `?${qs}` : ""}`, "GET");
 }
 
 export const criarPesquisa = (entrada: PesquisaEntrada) =>

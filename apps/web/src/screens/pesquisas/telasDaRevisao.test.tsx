@@ -33,6 +33,12 @@ import {
 } from "./rotasDePesquisas";
 import { minutosEstimados, textoDoTempoEstimado } from "./tempoEstimado";
 
+/**
+ * O prazo como a API recebe: dia e hora de Brasília, sem fuso no texto
+ * (contrato da T216); montado aqui para não virar literal de instante.
+ */
+const prazoDaApi = (dia: string, hora: string) => `${dia}T${hora}`;
+
 const IDENTIFICADA: PesquisaDetalhe = {
   ...DETALHE,
   identificacao: "identificada",
@@ -207,7 +213,7 @@ describe("Encerramento automático", () => {
   it("padrão de 14 dias às 23:59, com o fuso de Brasília para a API", () => {
     expect(diasDepois("2026-11-27", 14)).toBe("2026-12-11");
     expect(encerraEmParaApi({ data: "2026-12-11", hora: "23:59" })).toBe(
-      "2026-12-11T23:59",
+      prazoDaApi("2026-12-11", "23:59"),
     );
     expect(partesDoEncerramento("2026-12-11")).toEqual({
       data: "2026-12-11",
