@@ -1702,3 +1702,84 @@
   resize: vertical;
   font-variant-numeric: tabular-nums;
 }
+
+/* Importar valores › resultado (etapa 3). */
+.beneficios__resultado {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  width: min(100%, 32rem);
+  margin: var(--space-lg) auto 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  text-align: center;
+}
+
+.beneficios__resultado h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+}
+
+.beneficios__resultado p {
+  margin: 0;
+}
+
+.beneficios__resultado-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-pill);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.beneficios__resultado-numeros {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+}
+
+.beneficios__resultado-numeros > div {
+  display: grid;
+  padding: var(--space-sm);
+}
+
+.beneficios__resultado-numeros > div + div {
+  border-left: 1px solid var(--divisor-cor);
+}
+
+.beneficios__resultado-numeros dt {
+  order: 2;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.beneficios__resultado-numeros dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.beneficios__resultado-fora {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  text-align: left;
+}
+
+.beneficios__resultado > .evolli-button:last-child {
+  width: 100%;
+}

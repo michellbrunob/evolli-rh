@@ -349,6 +349,7 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
         "beneficio_dependente",
         "beneficio_historico",
         "beneficio_versao",
+        "beneficio_pausa",
         "dependente_colaborador",
       ]) {
         const linhas = await prisma.$queryRawUnsafe<{ pode: boolean }[]>(
@@ -1117,7 +1118,9 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
       expect(r.body.linhas[0]).toMatchObject({
         situacao: "pronta",
         nome: a.nome,
-        valores: { dias: 15, valorDia: 30 },
+        // Só o que muda vai para o lançamento.
+        valores: { dias: 15 },
+        atuais: { dias: 19, valorDia: 30 },
         antes: { valor: 57000, desconto: 11400 },
         depois: { valor: 45000, desconto: 9000 },
       });
@@ -1225,6 +1228,243 @@ describe("T215 — Benefícios e dependentes (e2e)", () => {
         rhA,
       ).expect(200);
       expect(d2.body.pessoas[0].dependentesNoPlano).toBe(0);
+    });
+  });
+  describe("revisão: o passado não muda", () => {
+    const em = async (id: string, c: string, cred = rhA) =>
+      (await get(`/v1/beneficios/${id}?competencia=${c}`, cred).expect(200))
+        .body;
+    const ANTES = "2026-10";
+
+    it("editar só o nome não apaga o reajuste que já estava marcado", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      await post(`/v1/beneficios/${b.body.id}/valores/lote`, rhA)
+        .send({
+          competencia: "2027-01",
+          para: "todos",
+          valorDia: 35,
+          duracao: "em_diante",
+        })
+        .expect(200);
+      // O formulário reenvia as regras de 11/2026 (iguais), só o nome muda.
+      const d = await em(b.body.id, C);
+      await put(`/v1/beneficios/${b.body.id}`, rhA)
+        .send({
+          nome: "VR sintético renomeado",
+          categoria: d.beneficio.categoria,
+          folha: d.beneficio.folha,
+          tipoValor: d.beneficio.tipoValor,
+          inicio: d.beneficio.inicio,
+          fim: d.beneficio.fim,
+          observacao: d.beneficio.observacao,
+          regras: d.beneficio.regras,
+          aPartirDe: "2026-01",
+        })
+        .expect(200);
+      expect((await em(b.body.id, "2027-01")).beneficio.regras.valorDia).toBe(
+        35,
+      );
+      expect((await em(b.body.id, C)).beneficio.nome).toBe(
+        "VR sintético renomeado",
+      );
+    });
+
+    it("remover a pessoa vale deste mês em diante; dá para adicionar de novo", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      const atual = HOJE.slice(0, 7);
+      const anterior = somarMeses(`${atual}-01`, -1).slice(0, 7);
+      await post(`/v1/beneficios/${b.body.id}/pessoas/${p.id}/remover`, rhA)
+        .send()
+        .expect(200);
+      expect((await em(b.body.id, anterior)).pessoas).toHaveLength(1);
+      expect((await em(b.body.id, atual)).pessoas).toHaveLength(0);
+      await post(`/v1/beneficios/${b.body.id}/pessoas`, rhA)
+        .send({ aPartirDe: atual, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      expect((await em(b.body.id, atual)).pessoas).toHaveLength(1);
+      // A mesma pessoa duas vezes no pedido: recusa por campo.
+      await post(`/v1/beneficios/${b.body.id}/pessoas`, rhA)
+        .send({
+          aPartirDe: atual,
+          pessoas: [{ colaboradorId: p.id }, { colaboradorId: p.id }],
+        })
+        .expect(422);
+    });
+
+    it("reativar não devolve o benefício aos meses em que ficou pausado", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      const atual = HOJE.slice(0, 7);
+      const doisAntes = somarMeses(`${atual}-01`, -2).slice(0, 7);
+      const umAntes = somarMeses(`${atual}-01`, -1).slice(0, 7);
+      const tresAntes = somarMeses(`${atual}-01`, -3).slice(0, 7);
+      await post(`/v1/beneficios/${b.body.id}/pausar`, rhA)
+        .send({ aPartirDe: doisAntes })
+        .expect(200);
+      await post(`/v1/beneficios/${b.body.id}/reativar`, rhA)
+        .send()
+        .expect(200);
+      expect((await em(b.body.id, tresAntes)).pessoas).toHaveLength(1);
+      expect((await em(b.body.id, doisAntes)).pessoas).toHaveLength(0);
+      expect((await em(b.body.id, umAntes)).pessoas).toHaveLength(0);
+      expect((await em(b.body.id, atual)).pessoas).toHaveLength(1);
+      const lista = await get(
+        `/v1/beneficios?competencia=${umAntes}`,
+        rhA,
+      ).expect(200);
+      expect(
+        lista.body.beneficios.find((l: { id: string }) => l.id === b.body.id),
+      ).toMatchObject({ empresa: 0 });
+    });
+
+    it("trocar o plano vale do mês em diante; o mês anterior fica com o de antes", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          nome: "Academia sintética",
+          categoria: "bem_estar",
+          folha: "desconto",
+          tipoValor: "individual",
+          inicio: "2026-01-01",
+          regras: {
+            individualModo: "plano",
+            planos: [
+              { id: "p1", nome: "Básico", valor: 100 },
+              { id: "p2", nome: "Completo", valor: 200 },
+            ],
+            quemPaga: { modo: "colaborador_tudo" },
+          },
+          pessoas: [{ colaboradorId: p.id, planoId: "p1" }],
+        })
+        .expect(201);
+      await put(`/v1/beneficios/${b.body.id}/valores`, rhA)
+        .send({
+          competencia: "2026-12",
+          linhas: [{ colaboradorId: p.id, planoId: "p2" }],
+        })
+        .expect(200);
+      expect((await em(b.body.id, C)).pessoas[0]).toMatchObject({
+        planoId: "p1",
+        valor: 10000,
+      });
+      expect((await em(b.body.id, "2026-12")).pessoas[0]).toMatchObject({
+        planoId: "p2",
+        valor: 20000,
+      });
+      // A ficha mostra o benefício uma vez só.
+      const ficha = await get(
+        `/v1/colaboradores/${p.id}/beneficios?competencia=2026-12`,
+        rhA,
+      ).expect(200);
+      expect(
+        ficha.body.beneficios.filter((x: { id: string }) => x.id === b.body.id),
+      ).toHaveLength(1);
+    });
+
+    it("dependente: sem nascimento não entra no plano; removido some só daqui em diante; CPF só para RH", async () => {
+      const titular = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({
+          nome: "Saúde revisão",
+          categoria: "saude",
+          folha: "desconto",
+          tipoValor: "faixa_etaria",
+          inicio: "2026-01-01",
+          fim: "2027-12-31",
+          regras: {
+            faixas: [100, 120, 140, 160, 180, 200, 230, 260, 300, 529],
+            colaboradorPaga: {
+              calculo: "percentual",
+              titular: 20,
+              dependente: 30,
+            },
+          },
+          pessoas: [{ colaboradorId: titular.id }],
+        })
+        .expect(201);
+      const semNasc = await post(
+        `/v1/colaboradores/${titular.id}/dependentes`,
+        rhA,
+      )
+        .send({ nome: "Sem Nascimento", parentesco: "filho" })
+        .expect(201);
+      await put(
+        `/v1/beneficios/${b.body.id}/pessoas/${titular.id}/dependentes`,
+        rhA,
+      )
+        .send({ dependenteIds: [semNasc.body.id], aPartirDe: ANTES })
+        .expect(422);
+      const dep = await post(`/v1/colaboradores/${titular.id}/dependentes`, rhA)
+        .send({
+          nome: "Com Nascimento",
+          parentesco: "filho",
+          dataNascimento: "2018-05-10",
+          cpf: "529.982.247-25",
+        })
+        .expect(201);
+      await post(`/v1/colaboradores/${titular.id}/dependentes`, rhA)
+        .send({
+          nome: "Data Errada",
+          parentesco: "filho",
+          dataNascimento: "2020-02-30",
+        })
+        .expect(422);
+      await put(
+        `/v1/beneficios/${b.body.id}/pessoas/${titular.id}/dependentes`,
+        rhA,
+      )
+        .send({ dependenteIds: [dep.body.id], aPartirDe: ANTES })
+        .expect(200);
+      // O master só lê: dependentes sem CPF.
+      const doMaster = await get(
+        `/v1/colaboradores/${titular.id}/dependentes`,
+        masterA,
+      ).expect(200);
+      expect(
+        doMaster.body.dependentes.every(
+          (d: { cpf: unknown }) => d.cpf === null,
+        ),
+      ).toBe(true);
+      await post(
+        `/v1/colaboradores/${titular.id}/dependentes/${dep.body.id}/remover`,
+        rhA,
+      )
+        .send()
+        .expect(200);
+      const atual = HOJE.slice(0, 7);
+      const anterior = somarMeses(`${atual}-01`, -1).slice(0, 7);
+      if (anterior >= ANTES) {
+        expect(
+          (await em(b.body.id, anterior)).pessoas[0].dependentesNoPlano,
+        ).toBe(1);
+      }
+      expect((await em(b.body.id, atual)).pessoas[0].dependentesNoPlano).toBe(
+        0,
+      );
+    });
+
+    it("desligada antes do mês sai do benefício; no mês da saída ainda conta", async () => {
+      const p = await admitir(rhA, empresaA);
+      const b = await post("/v1/beneficios", rhA)
+        .send({ ...VR, pessoas: [{ colaboradorId: p.id }] })
+        .expect(201);
+      await prisma.vinculoFuncional.updateMany({
+        where: { colaboradorId: p.id },
+        data: {
+          situacao: "encerrado",
+          dataDesligamento: new Date("2026-09-15T00:00:00Z"),
+        },
+      });
+      expect((await em(b.body.id, "2026-09")).pessoas).toHaveLength(1);
+      expect((await em(b.body.id, "2026-10")).pessoas).toHaveLength(0);
     });
   });
 });

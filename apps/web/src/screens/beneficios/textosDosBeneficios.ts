@@ -20,6 +20,7 @@ import {
 } from "../../ui/icones";
 import { modeloDe } from "../pessoas/ficha/escala/modelosDeEscala";
 import type {
+  SituacaoBeneficio,
   CategoriaBeneficio,
   FolhaBeneficio,
   ObservacaoBeneficio,
@@ -256,6 +257,8 @@ export const ROTULO_DA_ORIGEM: Readonly<Record<OrigemDosDias, string>> = {
 export const TEXTO_DA_PENDENCIA: Readonly<Record<PendenciaBeneficio, string>> =
   {
     sem_nascimento: "Sem nascimento: completar cadastro",
+    dependente_sem_nascimento:
+      "Dependente sem nascimento: completar o cadastro dele",
     sem_salario: "Sem salário: completar cadastro",
     sem_plano: "Sem plano: escolha o plano da pessoa",
     sem_valor: "Sem valor: digite o valor da pessoa",
@@ -332,4 +335,19 @@ export function faixaNaCompetencia(nascimento: string, competencia: string) {
   const limites = [18, 23, 28, 33, 38, 43, 48, 53, 58];
   const i = limites.findIndex((l) => idade <= l);
   return FAIXAS_DA_ANS[i === -1 ? 9 : i]!;
+}
+
+/**
+ * A situação no mês: pausado ou encerrado só a partir de um mês seguinte
+ * ainda está ativo no mês aberto.
+ */
+export function situacaoNoMes(
+  b: { situacao: SituacaoBeneficio; suspensoAPartirDe: string | null },
+  competencia: string,
+): SituacaoBeneficio {
+  return b.situacao !== "ativo" &&
+    b.suspensoAPartirDe !== null &&
+    b.suspensoAPartirDe > competencia
+    ? "ativo"
+    : b.situacao;
 }

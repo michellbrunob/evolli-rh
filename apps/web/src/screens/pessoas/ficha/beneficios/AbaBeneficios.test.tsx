@@ -99,7 +99,7 @@ describe("AbaBeneficios (T215)", () => {
       ],
     });
     expect(await screen.findByRole("note")).toHaveTextContent(
-      "1 benefício está fora da conta até completar o cadastro: Saúde teste (sem nascimento: completar cadastro).",
+      "1 benefício tem pendência no cadastro, e o valor do mês pode não estar completo: Saúde teste (sem nascimento: completar cadastro).",
     );
     expect(screen.getByText("Pendente")).toBeInTheDocument();
   });

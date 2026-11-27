@@ -106,7 +106,11 @@ export interface BeneficioApi {
 
 export type OrigemDosDias = "uteis" | "escala" | "catalogo" | "digitado";
 export type PendenciaBeneficio =
-  "sem_nascimento" | "sem_salario" | "sem_plano" | "sem_valor";
+  | "sem_nascimento"
+  | "dependente_sem_nascimento"
+  | "sem_salario"
+  | "sem_plano"
+  | "sem_valor";
 export type ObservacaoBeneficio = "estagio_sem_desconto" | "limitado_ao_vt";
 
 export interface CalculoApi {
@@ -140,6 +144,7 @@ export interface PessoaDoBeneficioApi extends CalculoApi {
   /** Digitados no mês (reais). */
   coparticipacao: number | null;
   antecipado: number | null;
+  valorMes: number | null;
   dependentesCadastrados: number;
   desligado: boolean;
 }
@@ -230,6 +235,8 @@ export interface LinhaConferidaApi {
   situacao: "pronta" | "sem_mudanca" | "pendencia";
   problemas: ProblemaDaLinhaApi[];
   valores: Partial<Record<ColunaDaImportacao, number>>;
+  /** O que está lançado hoje (prontas e sem mudança). */
+  atuais: Partial<Record<ColunaDaImportacao, number | null>> | null;
   antes: ValoresDaPessoaApi | null;
   depois: ValoresDaPessoaApi | null;
 }

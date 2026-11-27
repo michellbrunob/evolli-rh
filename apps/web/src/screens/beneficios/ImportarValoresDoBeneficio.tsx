@@ -37,7 +37,7 @@ import {
 } from "../../ui/icones";
 import { competenciaVizinha } from "../../app/rotasDoShell";
 import { baixarArquivo } from "../dashboard/exportacao";
-import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
+import { TIPO_MIME_XLSX, montarXlsx } from "../pessoas/importacao/planilhaXlsx";
 import {
   ROTULO_DA_COLUNA,
   baseDoArquivo,
@@ -51,6 +51,8 @@ import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
 export const IMPORTAR_TITULO_ID = "beneficio-importar-titulo";
 
 export interface PlanilhaEnviada {
+  /** O nome do benefício (título e nome dos arquivos). */
+  readonly beneficio: string;
   readonly arquivo: string;
   readonly competencia: string;
   readonly linhas: LinhaDaPlanilhaDto[];
@@ -63,7 +65,8 @@ export function GavetaDeImportacao({
   nome,
   colunas,
   competenciaInicial,
-  pessoas,
+  pessoas: pessoasIniciais,
+  pessoasDoMes,
   onFechar,
   onRevisar,
 }: {
@@ -71,11 +74,33 @@ export function GavetaDeImportacao({
   readonly colunas: readonly ColunaDaImportacao[];
   readonly competenciaInicial: string;
   readonly pessoas: readonly PessoaDoBeneficioApi[];
+  /** Trocar o mês: as pessoas e os valores daquele mês (para o modelo). */
+  readonly pessoasDoMes?: (
+    competencia: string,
+  ) => Promise<readonly PessoaDoBeneficioApi[]>;
   readonly onFechar: () => void;
   readonly onRevisar: (p: PlanilhaEnviada) => void;
 }) {
   const [competencia, setCompetencia] = useState(competenciaInicial);
+  const [pessoas, setPessoas] = useState(pessoasIniciais);
   const [trocarMes, setTrocarMes] = useState(false);
+
+  // O modelo traz as pessoas e os valores do mês escolhido.
+  useEffect(() => {
+    if (competencia === competenciaInicial || !pessoasDoMes) {
+      setPessoas(pessoasIniciais);
+      return;
+    }
+    let vivo = true;
+    pessoasDoMes(competencia)
+      .then((lista) => {
+        if (vivo) setPessoas(lista);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [competencia, competenciaInicial, pessoasDoMes, pessoasIniciais]);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [lendo, setLendo] = useState(false);
   const [recusa, setRecusa] = useState<string | null>(null);
@@ -113,6 +138,7 @@ export function GavetaDeImportacao({
       return;
     }
     onRevisar({
+      beneficio: nome,
       arquivo: arquivo.name,
       competencia,
       linhas: lida.linhas,
@@ -345,7 +371,12 @@ export function RevisaoDaImportacao({
   readonly onCancelar: () => void;
   readonly onImportado: (mensagem: string) => void;
 }) {
+  const [atual, setAtual] = useState(planilha);
   const [linhas, setLinhas] = useState(planilha.linhas);
+  const [resultado, setResultado] = useState<{
+    readonly importadas: number;
+    readonly pendentes: LinhaConferidaApi[];
+  } | null>(null);
   const [conferida, setConferida] = useState<ImportacaoConferidaApi | null>(
     null,
   );
@@ -357,6 +388,8 @@ export function RevisaoDaImportacao({
   const [importando, setImportando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const mes = formatarCompetenciaPorExtenso(planilha.competencia, "barra");
+  const mensagemFinal = (n: number) =>
+    `Valores de ${formatarMesReferencia(planilha.competencia)} importados para ${plural(n, "pessoa", "pessoas")}.`;
 
   const conferir = async (lista: LinhaDaPlanilhaDto[]) => {
     try {
@@ -442,13 +475,66 @@ export function RevisaoDaImportacao({
         prontas.map((l) => ({ colaboradorId: l.colaboradorId!, ...l.valores })),
         "importacao",
       );
-      onImportado(
-        `Valores de ${formatarMesReferencia(planilha.competencia)} importados para ${plural(prontas.length, "pessoa", "pessoas")}.`,
-      );
+      setResultado({ importadas: prontas.length, pendentes });
     } catch {
       setErro("Não foi possível importar. Tente de novo.");
+    } finally {
       setImportando(false);
     }
+  }
+
+  /** "Corrigir agora": a revisão de novo, só com as linhas que ficaram de fora. */
+  function corrigirAgora() {
+    const fora = new Set(resultado?.pendentes.map((l) => l.linha) ?? []);
+    const restantes = linhas.filter((l) => fora.has(l.linha));
+    setAtual({ ...atual, linhas: restantes });
+    setLinhas(restantes);
+    setIgnoradas([]);
+    setFiltro(null);
+    setResultado(null);
+    setConferida(null);
+    void conferir(restantes);
+  }
+
+  function baixarPendencias() {
+    if (!resultado || !conferida) return;
+    const colunas = conferida.colunas;
+    const porLinha = new Map(linhas.map((l) => [l.linha, l]));
+    baixarArquivo(
+      montarXlsx([
+        {
+          nome: "Pendências",
+          cabecalho: true,
+          larguras: [8, 18, 30, ...colunas.map(() => 16), 26, 40],
+          linhas: [
+            [
+              "Linha",
+              "CPF",
+              "Colaborador",
+              ...colunas.map((c) => ROTULO_DA_COLUNA[c]),
+              "Problema",
+              "Detalhe",
+            ],
+            ...resultado.pendentes.map((l) => {
+              const informada = porLinha.get(l.linha);
+              const t = l.problemas[0]
+                ? textoDoProblema(l.problemas[0])
+                : { problema: "", detalhe: "" };
+              return [
+                l.linha,
+                informada?.cpf ?? l.cpf,
+                l.nome ?? atual.nomes[l.linha] ?? "",
+                ...colunas.map((c) => informada?.valores[c] ?? ""),
+                t.problema,
+                t.detalhe,
+              ];
+            }),
+          ],
+        },
+      ]),
+      `pendencias-${baseDoArquivo(planilha.beneficio, planilha.competencia)}.xlsx`,
+      TIPO_MIME_XLSX,
+    );
   }
 
   return (
@@ -457,21 +543,27 @@ export function RevisaoDaImportacao({
         <IconButton
           label="Voltar para o benefício"
           icon={<IconeVoltar tamanho={18} />}
-          onClick={onCancelar}
+          onClick={() =>
+            resultado
+              ? onImportado(mensagemFinal(resultado.importadas))
+              : onCancelar()
+          }
         />
         <div className="beneficios__titulos">
           <h1 id={IMPORTAR_TITULO_ID} className="beneficios__titulo">
             Importar valores
           </h1>
           <p className="beneficios__subtitulo">
-            {`${planilha.arquivo} · ${plural(planilha.linhas.length, "linha", "linhas")} · ${mes} `}
-            <button
-              type="button"
-              className="beneficios__link"
-              onClick={onTrocarArquivo}
-            >
-              Trocar arquivo
-            </button>
+            {`${planilha.arquivo} · ${plural(atual.linhas.length, "linha", "linhas")} · ${mes} `}
+            {resultado ? null : (
+              <button
+                type="button"
+                className="beneficios__link"
+                onClick={onTrocarArquivo}
+              >
+                Trocar arquivo
+              </button>
+            )}
           </p>
         </div>
         <ol className="beneficios__etapas-importar" aria-label="Etapas">
@@ -481,18 +573,97 @@ export function RevisaoDaImportacao({
             </span>
             Enviar planilha
           </li>
-          <li aria-current="step">
-            <span aria-hidden="true">2</span>
-            Revisar
-          </li>
-          <li>
-            <span aria-hidden="true">3</span>
-            Importar
-          </li>
+          {resultado ? (
+            <>
+              <li data-feita>
+                <span aria-hidden="true">
+                  <IconeSucesso tamanho={14} />
+                </span>
+                Revisar
+              </li>
+              <li data-feita aria-current="step">
+                <span aria-hidden="true">
+                  <IconeSucesso tamanho={14} />
+                </span>
+                Importar
+              </li>
+            </>
+          ) : (
+            <>
+              <li aria-current="step">
+                <span aria-hidden="true">2</span>
+                Revisar
+              </li>
+              <li>
+                <span aria-hidden="true">3</span>
+                Importar
+              </li>
+            </>
+          )}
         </ol>
       </header>
 
-      {falhou ? (
+      {resultado ? (
+        <section className="beneficios__resultado" aria-label="Resultado">
+          <span className="beneficios__resultado-icone" aria-hidden="true">
+            <IconeSucesso tamanho={24} />
+          </span>
+          <h2>
+            {resultado.importadas === 1
+              ? "1 valor importado"
+              : `${resultado.importadas} valores importados`}
+          </h2>
+          <p className="beneficios__suave">
+            {`Os valores ficam lançados em ${mes} (valores previstos).`}
+          </p>
+          <dl className="beneficios__resultado-numeros">
+            <div>
+              <dt>
+                {resultado.importadas === 1 ? "atualizado" : "atualizados"}
+              </dt>
+              <dd>{resultado.importadas}</dd>
+            </div>
+            <div>
+              <dt>com pendência</dt>
+              <dd>{resultado.pendentes.length}</dd>
+            </div>
+          </dl>
+          {resultado.pendentes.length > 0 ? (
+            <div className="beneficios__resultado-fora">
+              <strong>
+                {resultado.pendentes.length === 1
+                  ? "1 linha ficou de fora"
+                  : `${resultado.pendentes.length} linhas ficaram de fora`}
+              </strong>
+              <span>
+                {`${[
+                  ...new Set(
+                    resultado.pendentes.flatMap((l) =>
+                      l.problemas.map((p) => textoDoProblema(p).problema),
+                    ),
+                  ),
+                ].join(
+                  ", ",
+                )}. Corrija aqui ou baixe a lista, ajuste e envie de novo.`}
+              </span>
+              <span className="beneficios__acoes-topo">
+                <Button variant="secondary" onClick={baixarPendencias}>
+                  <IconeBaixarArquivo tamanho={16} />
+                  Baixar pendências
+                </Button>
+                <Button variant="secondary" onClick={corrigirAgora}>
+                  Corrigir agora
+                </Button>
+              </span>
+            </div>
+          ) : null}
+          <Button
+            onClick={() => onImportado(mensagemFinal(resultado.importadas))}
+          >
+            Ver o benefício
+          </Button>
+        </section>
+      ) : falhou ? (
         <div className="beneficios__erro" role="alert">
           <p>Não foi possível conferir a planilha.</p>
           <Button variant="secondary" onClick={() => void conferir(linhas)}>
@@ -630,27 +801,29 @@ export function RevisaoDaImportacao({
         </>
       )}
 
-      <div className="beneficios__rodape-fixo">
-        <span className="beneficios__suave">
-          {pendentes.length > 0
-            ? `${pendentes.length === 1 ? "A linha com pendência não entra" : `As ${pendentes.length} linhas com pendência não entram`}: corrija agora ou envie de novo depois.`
-            : "Tudo conferido."}
-        </span>
-        {erro ? (
-          <span className="beneficios__erro" role="alert">
-            {erro}
+      {resultado ? null : (
+        <div className="beneficios__rodape-fixo">
+          <span className="beneficios__suave">
+            {pendentes.length > 0
+              ? `${pendentes.length === 1 ? "A linha com pendência fica" : `As ${pendentes.length} linhas com pendência ficam`} para corrigir depois: baixe a lista no fim da importação.`
+              : "Tudo conferido."}
           </span>
-        ) : null}
-        <Button variant="secondary" onClick={onCancelar}>
-          Cancelar
-        </Button>
-        <Button
-          disabled={prontas.length === 0 || importando}
-          onClick={() => void importar()}
-        >
-          {`Importar ${plural(prontas.length, "linha", "linhas")}`}
-        </Button>
-      </div>
+          {erro ? (
+            <span className="beneficios__erro" role="alert">
+              {erro}
+            </span>
+          ) : null}
+          <Button variant="secondary" onClick={onCancelar}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={prontas.length === 0 || importando}
+            onClick={() => void importar()}
+          >
+            {`Importar ${plural(prontas.length, "linha", "linhas")}`}
+          </Button>
+        </div>
+      )}
 
       {emCorrecao && conferida ? (
         <GavetaDeCorrecao
@@ -715,14 +888,7 @@ function LinhaDaRevisao({
         </>
       ) : l.situacao === "pronta" ? (
         <>
-          <td>
-            {(Object.keys(l.valores) as ColunaDaImportacao[])
-              .map(
-                (c) =>
-                  `${ROTULO_DA_COLUNA[c]}: ${c === "dias" ? l.valores[c] : formatarCentavos(Math.round((l.valores[c] ?? 0) * 100))}`,
-              )
-              .join(" · ")}
-          </td>
+          <td>{oQueMuda(l)}</td>
           <td className="beneficios__numero">
             {l.antes && l.depois
               ? `${formatarCentavos(l.antes.desconto)} → ${formatarCentavos(l.depois.desconto)}`
@@ -841,4 +1007,22 @@ function GavetaDeCorrecao({
       </div>
     </Sheet>
   );
+}
+
+const valorDaColuna = (c: ColunaDaImportacao, v: number | null | undefined) =>
+  v === null || v === undefined
+    ? "—"
+    : c === "dias"
+      ? String(v)
+      : formatarCentavos(Math.round(v * 100));
+
+/** "Dias no mês: 15 → 14" — só as colunas que mudam. */
+export function oQueMuda(l: LinhaConferidaApi): string {
+  return (Object.keys(l.valores) as ColunaDaImportacao[])
+    .filter((c) => (l.atuais?.[c] ?? null) !== l.valores[c])
+    .map(
+      (c) =>
+        `${ROTULO_DA_COLUNA[c]}: ${valorDaColuna(c, l.atuais?.[c])} → ${valorDaColuna(c, l.valores[c])}`,
+    )
+    .join(" · ");
 }

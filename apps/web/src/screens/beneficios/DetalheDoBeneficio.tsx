@@ -6,7 +6,7 @@
  * Sem Folha no Evolli, toda competência é "valores previstos".
  */
 import { Esqueleto } from "../../ui/movimento";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import type {
   AlterarEmLoteDto,
@@ -84,6 +84,7 @@ import {
   TEXTO_DA_OBSERVACAO,
   TEXTO_DA_PENDENCIA,
   faixaNaCompetencia,
+  situacaoNoMes,
   maiuscula,
   nomeDaEscala,
   pessoas as nPessoas,
@@ -153,12 +154,17 @@ export function DetalheDoBeneficio({
     depois: TotaisApi;
   } | null>(null);
 
+  const pedido = useRef(0);
   const carregar = useCallback(async () => {
+    // Só a resposta do último pedido vale (troca rápida de mês).
+    const meu = ++pedido.current;
     try {
-      setDados(await servico.obterBeneficio(beneficioId, competencia));
+      const d = await servico.obterBeneficio(beneficioId, competencia);
+      if (meu !== pedido.current) return;
+      setDados(d);
       setFalhou(false);
     } catch {
-      setFalhou(true);
+      if (meu === pedido.current) setFalhou(true);
     }
   }, [servico, beneficioId, competencia]);
 
@@ -297,10 +303,11 @@ export function DetalheDoBeneficio({
     }
   }
 
+  const noMes = situacaoNoMes(b, competencia);
   const situacaoBadge =
-    b.situacao === "ativo" ? (
+    noMes === "ativo" ? (
       <StatusBadge variant="success">Ativo</StatusBadge>
-    ) : b.situacao === "pausado" ? (
+    ) : noMes === "pausado" ? (
       <StatusBadge variant="warning">Pausado</StatusBadge>
     ) : (
       <StatusBadge variant="neutral">Encerrado</StatusBadge>
@@ -310,6 +317,10 @@ export function DetalheDoBeneficio({
     info.terminoObrigatorio && b.fim
       ? `${info.curta} · contrato ${formatarDiaCivil(b.inicio)} → ${formatarDiaCivil(b.fim)}`
       : `${info.curta} · desde ${formatarDiaCivil(b.inicio)}${b.fim ? ` até ${formatarDiaCivil(b.fim)}` : ""}`;
+  const pausaMarcada =
+    b.suspensoAPartirDe && noMes === "ativo"
+      ? ` · ${b.situacao === "pausado" ? "pausa" : "encerramento"} a partir de ${formatarMesReferencia(b.suspensoAPartirDe)}`
+      : "";
 
   const pilulas: { valor: typeof filtro; rotulo: string; n: number }[] =
     tipo === "faixa_etaria"
@@ -409,7 +420,7 @@ export function DetalheDoBeneficio({
           <h1 id={DETALHE_TITULO_ID} className="beneficios__titulo">
             {b.nome} {situacaoBadge}
           </h1>
-          <p className="beneficios__subtitulo">{subtitulo}</p>
+          <p className="beneficios__subtitulo">{`${subtitulo}${pausaMarcada}`}</p>
         </div>
         {podeEditar ? (
           <div className="beneficios__acoes-topo">
@@ -626,7 +637,7 @@ export function DetalheDoBeneficio({
           </span>
           <h2>Ninguém recebe este benefício ainda</h2>
           <p>{`Adicione as pessoas que vão receber o ${b.nome}. Os valores já vêm calculados para cada pessoa.`}</p>
-          {podeEditar && b.situacao === "ativo" ? (
+          {podeEditar && noMes === "ativo" ? (
             <div className="beneficios__acoes-topo">
               <Button onClick={() => onAdicionar(b.nome)}>
                 <IconeAdicionarPessoa tamanho={16} />
@@ -695,7 +706,7 @@ export function DetalheDoBeneficio({
                   Alterar valor por dia
                 </Button>
               ) : null}
-              {b.situacao === "ativo" ? (
+              {noMes === "ativo" ? (
                 <Button variant="secondary" onClick={() => onAdicionar(b.nome)}>
                   <IconeAdicionarPessoa tamanho={16} />
                   Adicionar pessoas
@@ -910,14 +921,14 @@ export function DetalheDoBeneficio({
                             </select>
                           ) : podeEditar ? (
                             <CampoReais
-                              rotulo={`Valor de ${p.nome}`}
+                              rotulo={`Valor de ${p.nome} no mês`}
                               valor={
-                                ed.valorIndividual !== undefined
-                                  ? (ed.valorIndividual ?? null)
-                                  : p.valorIndividual
+                                ed.valorMes !== undefined
+                                  ? (ed.valorMes ?? null)
+                                  : (p.valorMes ?? p.valorIndividual)
                               }
-                              onMudar={(valorIndividual) =>
-                                editar(p.colaboradorId, { valorIndividual })
+                              onMudar={(valorMes) =>
+                                editar(p.colaboradorId, { valorMes })
                               }
                             />
                           ) : (
@@ -1121,6 +1132,9 @@ export function DetalheDoBeneficio({
       {importando && onImportar ? (
         <GavetaDeImportacao
           nome={b.nome}
+          pessoasDoMes={async (c) =>
+            (await servico.obterBeneficio(b.id, c)).pessoas
+          }
           colunas={colunasImportaveis}
           competenciaInicial={competencia}
           pessoas={dados.pessoas}
@@ -1150,7 +1164,7 @@ export function DetalheDoBeneficio({
       <Dialog
         aberto={aRemover !== null}
         titulo={aRemover ? `Remover ${aRemover.nome} do benefício?` : ""}
-        descricao="A pessoa deixa de receber o benefício a partir de agora. O histórico fica guardado."
+        descricao="A pessoa deixa de receber o benefício a partir deste mês. Os meses anteriores ficam como estão."
         onFechar={() => setARemover(null)}
         rodape={
           <FormActions>
@@ -1164,7 +1178,9 @@ export function DetalheDoBeneficio({
                   b.id,
                   aRemover.colaboradorId,
                 );
-                setAviso(`${aRemover.nome} removida do benefício.`);
+                setAviso(
+                  `${aRemover.nome} saiu do benefício a partir de ${formatarMesReferencia(competenciaDoMesAtual())}.`,
+                );
                 setARemover(null);
                 await carregar();
               }}
@@ -1688,6 +1704,8 @@ function GavetaDeDependentes({
                 <label key={d.id} className="beneficios__dependente">
                   <input
                     type="checkbox"
+                    // Sem nascimento não há faixa da ANS: completar antes.
+                    disabled={!d.dataNascimento && !marcados.includes(d.id)}
                     checked={marcados.includes(d.id)}
                     onChange={(e) =>
                       setMarcados((m) =>
@@ -1700,7 +1718,7 @@ function GavetaDeDependentes({
                   <span className="beneficios__pessoa-textos">
                     <span className="beneficios__pessoa-nome">{d.nome}</span>
                     <span className="beneficios__suave">
-                      {`${rotuloDoParentesco(d.parentesco)}${d.dataNascimento ? ` · nasceu em ${formatarDiaCivil(d.dataNascimento)} · faixa ${faixaNaCompetencia(d.dataNascimento, aPartirDe)}` : " · sem data de nascimento"}`}
+                      {`${rotuloDoParentesco(d.parentesco)}${d.dataNascimento ? ` · nasceu em ${formatarDiaCivil(d.dataNascimento)} · faixa ${faixaNaCompetencia(d.dataNascimento, aPartirDe)}` : " · sem data de nascimento: complete o cadastro para incluir no plano"}`}
                     </span>
                   </span>
                 </label>

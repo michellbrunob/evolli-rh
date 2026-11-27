@@ -122,7 +122,11 @@ export interface PessoaDoCalculo {
 
 export type OrigemDosDias = "uteis" | "escala" | "catalogo" | "digitado";
 export type Pendencia =
-  "sem_nascimento" | "sem_salario" | "sem_plano" | "sem_valor";
+  | "sem_nascimento"
+  | "dependente_sem_nascimento"
+  | "sem_salario"
+  | "sem_plano"
+  | "sem_valor";
 export type Observacao = "estagio_sem_desconto" | "limitado_ao_vt";
 
 export interface CalculoDaPessoa {
@@ -305,6 +309,16 @@ export function calcularPessoa(
       return { ...ZERO, pendencia: "sem_nascimento", observacao: null };
     }
     const faixa = faixaDaIdade(idadeNaCompetencia(p.nascimento, competencia));
+    // Dependente no plano sem nascimento: sem faixa, a conta fica pendente.
+    if (p.dependentes.some((d) => !d.nascimento)) {
+      return {
+        ...ZERO,
+        faixa: faixa.rotulo,
+        dependentesNoPlano: p.dependentes.length,
+        pendencia: "dependente_sem_nascimento",
+        observacao: null,
+      };
+    }
     const titular = centavos(r.faixas[faixa.indice] ?? 0);
     const deps = p.dependentes
       .filter((d) => d.nascimento)
@@ -338,6 +352,9 @@ export function calcularPessoa(
   // Antecipação de salário: o antecipado sempre sai do holerite.
   if (r.tipoValor === "antecipacao") {
     const a = r.antecipacao;
+    if (a?.modo === "percentual" && p.salarioBase === null) {
+      return { ...ZERO, pendencia: "sem_salario", observacao: null };
+    }
     const mensalidade = centavos(a?.mensalidade ?? 0);
     const antecipado =
       a?.modo === "percentual"

@@ -47,9 +47,10 @@ export function lerNumeroBr(
     normal = t.replace(/\./g, "").replace(",", ".");
   } else {
     const partes = t.split(".");
-    // "50.5" é decimal (Excel); "1.234" é milhar.
+    // Um ponto só: com 3 casas é milhar ("1.234"); com outra quantidade é
+    // decimal, como o Excel grava ("50.5", "33.299999999999997").
     normal =
-      partes.length === 2 && partes[1]!.length <= 2 ? t : t.replace(/\./g, "");
+      partes.length === 2 && partes[1]!.length !== 3 ? t : t.replace(/\./g, "");
   }
   const n = Number(normal);
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : "invalido";
@@ -155,9 +156,15 @@ export function conferirLinhas(entrada: {
     };
     if (problemas.length > 0) return { ...base, situacao: "pendencia" };
     const atual = entrada.atuais.get(pessoa!.colaboradorId) ?? {};
-    const muda = (Object.keys(valores) as ColunaDaImportacao[]).some(
+    const mudam = (Object.keys(valores) as ColunaDaImportacao[]).filter(
       (c) => (atual[c] ?? null) !== valores[c],
     );
-    return { ...base, situacao: muda ? "pronta" : "sem_mudanca" };
+    if (mudam.length === 0) return { ...base, situacao: "sem_mudanca" };
+    // Só o que muda vai para o lançamento do mês.
+    return {
+      ...base,
+      valores: Object.fromEntries(mudam.map((c) => [c, valores[c]])),
+      situacao: "pronta",
+    };
   });
 }

@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
+import { diaValido } from "./regras-beneficio";
 import { ParentescoDependente, Prisma } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import {
@@ -74,7 +75,7 @@ export function conferirDependente(dto: DependenteInformado): {
   }
   const nasc = dto.dataNascimento || null;
   if (nasc !== null) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(nasc) || Number.isNaN(Date.parse(nasc))) {
+    if (!diaValido(nasc)) {
       erros.push({ campo: "dataNascimento", motivo: "invalido" });
     } else if (nasc > hojeEmSaoPaulo()) {
       erros.push({ campo: "dataNascimento", motivo: "futura" });
@@ -186,7 +187,13 @@ export class DependentesService {
       where: { empresaId, colaboradorId, removidoEm: null },
       orderBy: [{ criadoEm: "asc" }],
     });
-    return { dependentes: linhas.map(paraApi) };
+    // O CPF só vai para RH e DP (o master só lê, sem dado pessoal a mais).
+    const veCpf = ctx.actor.role === "rh" || ctx.actor.role === "dp";
+    return {
+      dependentes: linhas
+        .map(paraApi)
+        .map((d) => (veCpf ? d : { ...d, cpf: null })),
+    };
   }
 
   async criar(

@@ -100,6 +100,10 @@ describe("leitura das células", () => {
     expect(lerNumeroBr("abc")).toBe("invalido");
     expect(lerNumeroBr("-5")).toBe("invalido");
     expect(lerNumeroBr("1,2,3")).toBe("invalido");
+    // O Excel grava o número cru: 33,30 vira "33.299999999999997".
+    expect(lerNumeroBr("33.299999999999997")).toBe(33.3);
+    expect(lerNumeroBr("1.234.567")).toBe(1234567);
+    expect(lerNumeroBr("1.2345")).toBe(1.23);
   });
 
   it("dias: inteiro de 0 a 31", () => {
@@ -152,6 +156,11 @@ describe("conferirLinhas", () => {
       valores: { dias: 15 },
       problemas: [],
     });
+    // Só o que muda vai para o lançamento (o igual não congela a escala).
+    const [so] = conferir([
+      { linha: 2, cpf: "11144477735", valores: { dias: "15", valorDia: "30" } },
+    ]);
+    expect(so!.valores).toEqual({ dias: 15 });
     expect(b!.situacao).toBe("pendencia");
     expect(b!.problemas).toEqual([{ campo: "cpf", motivo: "duplicado" }]);
 

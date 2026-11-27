@@ -1,4 +1,8 @@
-import { conferirBeneficio, tiposDeValorDa } from "./regras-beneficio";
+import {
+  conferirBeneficio,
+  diaValido,
+  tiposDeValorDa,
+} from "./regras-beneficio";
 
 /**
  * T215 — conferência do benefício antes de gravar (como a referência): o tipo
@@ -201,5 +205,18 @@ describe("T215 — conferência do benefício", () => {
       calculo: "percentual",
       empresa: 100,
     });
+  });
+});
+
+describe("T215 — datas que não existem", () => {
+  it("30/02 não passa no início nem no término", () => {
+    expect(
+      conferir({ inicio: "2026-02-30" }).erros.map((e) => e.campo),
+    ).toContain("inicio");
+    expect(conferir({ fim: "2026-02-30" }).erros.map((e) => e.campo)).toContain(
+      "fim",
+    );
+    expect(diaValido("2028-02-29")).toBe(true);
+    expect(diaValido("2027-02-29")).toBe(false);
   });
 });

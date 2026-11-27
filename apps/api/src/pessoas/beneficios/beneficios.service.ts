@@ -80,6 +80,7 @@ export interface PessoaDoBeneficioApi extends CalculoDaPessoa {
   /** Digitados no mês (reais), para os campos da tela. */
   coparticipacao: number | null;
   antecipado: number | null;
+  valorMes: number | null;
   dependentesCadastrados: number;
   desligado: boolean;
 }
@@ -139,6 +140,8 @@ export interface ImportacaoConferidaApi {
   competencia: Competencia;
   colunas: ColunaDaImportacao[];
   linhas: (LinhaConferida & {
+    /** O que está lançado hoje nas colunas da planilha (pessoa do benefício). */
+    atuais: Partial<Record<ColunaDaImportacao, number | null>> | null;
     antes: { valor: number; empresa: number; desconto: number } | null;
     depois: { valor: number; empresa: number; desconto: number } | null;
   })[];
@@ -202,6 +205,8 @@ interface PessoaCarregada {
   colaboradorId: string;
   nome: string;
   cpf: string | null;
+  /** Data do desligamento (AAAA-MM-DD), se a pessoa saiu. */
+  desligamento: string | null;
   tipo: TipoVinculo;
   situacao: string;
   cargo: string | null;
@@ -291,15 +296,54 @@ function totaisDe(pessoas: readonly PessoaDoBeneficioApi[]): TotaisApi {
   );
 }
 
+/** Um intervalo em que o benefício ficou fora (pausa desfeita depois). */
+interface PausaDoBeneficio {
+  de: Date;
+  ate: Date;
+}
+
 /** O benefício está nas folhas da competência? */
-function ativoNa(b: LinhaBeneficio, c: Competencia): boolean {
+function ativoNa(
+  b: LinhaBeneficio,
+  c: Competencia,
+  pausas: readonly PausaDoBeneficio[] = [],
+): boolean {
   if (b.excluidoEm) return false;
+  const inicio = inicioDa(c);
+  if (pausas.some((p) => p.de <= inicio && inicio < p.ate)) return false;
   if (competenciaDe(b.inicio) > c) return false;
   if (b.fim && competenciaDe(b.fim) < c) return false;
   if (b.suspensoAPartirDe && competenciaDe(b.suspensoAPartirDe) <= c) {
     return false;
   }
   return true;
+}
+
+/** JSON com as chaves em ordem (comparar sem depender da ordem do JSONB). */
+function estavel(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(estavel).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v as object)
+      .sort()
+      .map(
+        (k) =>
+          `${JSON.stringify(k)}:${estavel((v as Record<string, unknown>)[k])}`,
+      )
+      .join(",")}}`;
+  }
+  return JSON.stringify(v ?? null);
+}
+
+/** As regras sem folha e categoria (que são do benefício, não da versão). */
+function semBasicos(regras: unknown): unknown {
+  const {
+    folha: _f,
+    categoria: _c,
+    ...resto
+  } = (regras ?? {}) as Record<string, unknown>;
+  void _f;
+  void _c;
+  return resto;
 }
 
 @Injectable()
@@ -332,6 +376,15 @@ export class BeneficiosService {
       ]);
     }
     return c;
+  }
+
+  /** A mesma pessoa duas vezes no pedido: recusa por campo (não erro 500). */
+  private semRepetidos(ids: readonly string[]): void {
+    if (new Set(ids).size !== ids.length) {
+      throw new CamposRecusadosException([
+        { campo: "pessoas", motivo: "ja_existe" },
+      ]);
+    }
   }
 
   private conferir(dto: BeneficioInformado): BeneficioConferido {
@@ -370,6 +423,7 @@ export class BeneficiosService {
       select: {
         tipo: true,
         situacao: true,
+        dataDesligamento: true,
         colaborador: { select: { id: true, nome: true } },
         contrato: { select: { salarioBruto: true, escala: true } },
         alocacoes: {
@@ -393,6 +447,7 @@ export class BeneficiosService {
         colaboradorId: v.colaborador.id,
         nome: v.colaborador.nome,
         cpf: null,
+        desligamento: v.dataDesligamento ? diaDe(v.dataDesligamento) : null,
         tipo: v.tipo,
         situacao: v.situacao,
         cargo: alocacao?.cargo?.nome ?? null,
@@ -560,6 +615,7 @@ export class BeneficiosService {
           ajustado,
           coparticipacao: ajuste?.coparticipacao ?? null,
           antecipado: ajuste?.antecipado ?? null,
+          valorMes: ajuste?.valorMes ?? null,
           dependentesCadastrados: pessoa.dependentesCadastrados,
           desligado: pessoa.situacao === "encerrado",
         };
@@ -603,7 +659,6 @@ export class BeneficiosService {
           colaboradorId: { in: ids },
           aPartirDe: { lte: inicio },
           OR: [{ ate: null }, { ate: { gt: inicio } }],
-          dependente: { removidoEm: null },
         },
         select: {
           colaboradorId: true,
@@ -617,6 +672,8 @@ export class BeneficiosService {
       .map((v) => {
         const pessoa = pessoas.get(v.colaboradorId);
         if (!pessoa) return null;
+        // Desligada antes do mês: o benefício para no mês seguinte à saída.
+        if (pessoa.desligamento && pessoa.desligamento < `${c}-01`) return null;
         const a = ajustes.find((x) => x.colaboradorId === v.colaboradorId);
         const gravado: AjusteDoMes | null = a
           ? {
@@ -655,7 +712,10 @@ export class BeneficiosService {
     return this.calcularTodos(regras, c, cal, linhas);
   }
 
-  /** O benefício com as regras de valor da versão vigente no mês. */
+  /**
+   * O benefício com as regras de valor da versão vigente no mês. Folha e
+   * categoria são do benefício (valem para todos os meses).
+   */
   private async vigenteNa(
     db: Prisma.TransactionClient,
     b: LinhaBeneficio,
@@ -669,7 +729,56 @@ export class BeneficiosService {
       },
       orderBy: [{ aPartirDe: "desc" }, { criadoEm: "desc" }],
     });
-    return v ? { ...b, tipoValor: v.tipoValor, regras: v.regras } : b;
+    const regras = (v ? v.regras : b.regras) as unknown as RegrasDoBeneficio;
+    return {
+      ...b,
+      tipoValor: v ? v.tipoValor : b.tipoValor,
+      regras: {
+        ...regras,
+        folha: b.folha,
+        categoria: b.categoria,
+      } as unknown as Prisma.JsonValue,
+    };
+  }
+
+  /** As pausas desfeitas do benefício (meses que seguem sem ele). */
+  private pausas(
+    db: Prisma.TransactionClient,
+    beneficioId: string,
+  ): Promise<PausaDoBeneficio[]> {
+    return db.beneficioPausa.findMany({
+      where: { beneficioId },
+      select: { de: true, ate: true },
+    });
+  }
+
+  /** O benefício entra nas folhas do mês (vigência, pausa, exclusão)? */
+  private async ativoEm(
+    db: Prisma.TransactionClient,
+    b: LinhaBeneficio,
+    c: Competencia,
+  ): Promise<boolean> {
+    if (!ativoNa(b, c)) return false;
+    return ativoNa(b, c, await this.pausas(db, b.id));
+  }
+
+  /** O vínculo da pessoa que vale no mês (ou null). */
+  private vinculoNoMes(
+    db: Prisma.TransactionClient,
+    beneficioId: string,
+    colaboradorId: string,
+    c: Competencia,
+  ) {
+    const inicio = inicioDa(c);
+    return db.beneficioPessoa.findFirst({
+      where: {
+        beneficioId,
+        colaboradorId,
+        removidoEm: null,
+        aPartirDe: { lte: inicio },
+        OR: [{ ate: null }, { ate: { gt: inicio } }],
+      },
+    });
   }
 
   /**
@@ -794,11 +903,14 @@ export class BeneficiosService {
     const comBeneficio = new Set<string>();
     const comDesconto = new Set<string>();
     let beneficiosAtivos = 0;
+    const ativosNoMes = new Set<string>();
     for (const b of beneficios) {
-      const pessoas = ativoNa(b, c)
+      const ativo = await this.ativoEm(this.prisma, b, c);
+      if (ativo) ativosNoMes.add(b.id);
+      const pessoas = ativo
         ? await this.pessoasDoBeneficio(this.prisma, b, c)
         : [];
-      if (ativoNa(b, c)) beneficiosAtivos += 1;
+      if (ativo) beneficiosAtivos += 1;
       for (const p of pessoas) {
         comBeneficio.add(p.colaboradorId);
         if (p.desconto > 0) comDesconto.add(p.colaboradorId);
@@ -812,10 +924,10 @@ export class BeneficiosService {
         suspensoAPartirDe: b.suspensoAPartirDe
           ? competenciaDe(b.suspensoAPartirDe)
           : null,
-        pessoas: ativoNa(b, c)
+        pessoas: ativo
           ? t.pessoas
           : await this.prisma.beneficioPessoa.count({
-              where: { beneficioId: b.id, removidoEm: null },
+              where: { beneficioId: b.id, removidoEm: null, ate: null },
             }),
         dependentes: t.dependentes,
         empresa: t.empresa,
@@ -823,12 +935,7 @@ export class BeneficiosService {
       });
     }
     const ativos = await this.carregarPessoas(this.prisma, empresaId, c, null);
-    const doMes = linhas.filter((l) =>
-      ativoNa(
-        beneficios.find((b) => b.id === l.id)!,
-        c,
-      ),
-    );
+    const doMes = linhas.filter((l) => ativosNoMes.has(l.id));
     return {
       competencia: c,
       beneficios: linhas,
@@ -1025,10 +1132,9 @@ export class BeneficiosService {
       await this.obterLinha(this.prisma, id, empresaId, ctx),
       c,
     );
+    const ativo = await this.ativoEm(this.prisma, b, c);
     const [pessoas, historico, cal] = await Promise.all([
-      ativoNa(b, c)
-        ? this.pessoasDoBeneficio(this.prisma, b, c)
-        : Promise.resolve([]),
+      ativo ? this.pessoasDoBeneficio(this.prisma, b, c) : Promise.resolve([]),
       this.prisma.beneficioHistorico.count({ where: { beneficioId: b.id } }),
       this.calendario(this.prisma, empresaId, c),
     ]);
@@ -1079,10 +1185,15 @@ export class BeneficiosService {
     const empresaId = this.empresaDaSessao(ctx, "leitura");
     const c = this.competencia(competencia);
     const b = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    // Já recebe: vínculo vivo ou que ainda vale no mês.
     const ja = new Set(
       (
         await this.prisma.beneficioPessoa.findMany({
-          where: { beneficioId: b.id, removidoEm: null },
+          where: {
+            beneficioId: b.id,
+            removidoEm: null,
+            OR: [{ ate: null }, { ate: { gt: inicioDa(c) } }],
+          },
           select: { colaboradorId: true },
         })
       ).map((v) => v.colaboradorId),
@@ -1141,8 +1252,12 @@ export class BeneficiosService {
       select: { beneficio: true },
     });
     const beneficios: FichaDeBeneficiosApi["beneficios"] = [];
+    const vistos = new Set<string>();
     for (const { beneficio: b } of ligados) {
-      if (!ativoNa(b, c)) continue;
+      // Um benefício pode ter mais de um vínculo (troca de plano no meio).
+      if (vistos.has(b.id)) continue;
+      vistos.add(b.id);
+      if (!(await this.ativoEm(this.prisma, b, c))) continue;
       const [p] = await this.pessoasDoBeneficio(this.prisma, b, c, [
         colaboradorId,
       ]);
@@ -1202,6 +1317,7 @@ export class BeneficiosService {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const b = this.conferir(dto);
     const pessoas = dto.pessoas ?? [];
+    this.semRepetidos(pessoas.map((p) => p.colaboradorId));
     const aPartirDe = b.inicio.slice(0, 7);
     const criado = await this.prisma.$transaction(async (tx) => {
       await this.conferirPessoas(
@@ -1288,9 +1404,11 @@ export class BeneficiosService {
         diaDe(atual.inicio) !== b.inicio ||
         (atual.fim ? diaDe(atual.fim) : null) !== b.fim ||
         atual.observacao !== b.observacao;
+      // JSONB devolve as chaves em outra ordem: compara sem depender dela.
+      // Folha e categoria são do benefício (não são versão de valor).
       const valoresMudaram =
         antes.tipoValor !== b.tipoValor ||
-        JSON.stringify(antes.regras) !== JSON.stringify(b.regras);
+        estavel(semBasicos(antes.regras)) !== estavel(semBasicos(b.regras));
       let alterada = await tx.beneficio.update({
         where: { id: atual.id },
         data: {
@@ -1367,15 +1485,18 @@ export class BeneficiosService {
         { campo: "pessoas", motivo: "obrigatorio" },
       ]);
     }
+    this.semRepetidos(dto.pessoas.map((p) => p.colaboradorId));
     return this.prisma.$transaction(async (tx) => {
       const b = await this.obterLinha(tx, id, empresaId, ctx);
       const ids = dto.pessoas.map((p) => p.colaboradorId);
       await this.conferirPessoas(tx, empresaId, ids);
+      // Já recebe: vínculo vivo, ou um que ainda vale a partir do mês pedido.
       const ja = await tx.beneficioPessoa.count({
         where: {
           beneficioId: b.id,
           removidoEm: null,
           colaboradorId: { in: ids },
+          OR: [{ ate: null }, { ate: { gt: inicioDa(aPartirDe) } }],
         },
       });
       if (ja > 0) {
@@ -1428,13 +1549,22 @@ export class BeneficiosService {
     return this.prisma.$transaction(async (tx) => {
       const b = await this.obterLinha(tx, id, empresaId, ctx);
       const v = await tx.beneficioPessoa.findFirst({
-        where: { beneficioId: b.id, colaboradorId, removidoEm: null },
+        where: {
+          beneficioId: b.id,
+          colaboradorId,
+          removidoEm: null,
+          ate: null,
+        },
       });
       if (!v)
         return this.auditoria.negarAcesso(ctx, "beneficio", b.id, empresaId);
+      // Sai a partir deste mês: os meses passados continuam com a pessoa.
+      // Se o vínculo começa neste mês ou depois, ele nunca valeu.
+      const agora = inicioDa(competenciaAtual());
       await tx.beneficioPessoa.update({
         where: { id: v.id },
-        data: { removidoEm: new Date() },
+        data:
+          v.aPartirDe >= agora ? { removidoEm: new Date() } : { ate: agora },
       });
       await this.historico(
         tx,
@@ -1486,30 +1616,47 @@ export class BeneficiosService {
       const b = await this.obterLinha(tx, id, empresaId, ctx);
       const regras = (await this.vigenteNa(tx, b, c))
         .regras as unknown as RegrasDoBeneficio;
+      const inicio = inicioDa(c);
       for (const l of dto.linhas) {
-        const v = await tx.beneficioPessoa.findFirst({
-          where: {
-            beneficioId: b.id,
-            colaboradorId: l.colaboradorId,
-            removidoEm: null,
-          },
-        });
+        const v = await this.vinculoNoMes(tx, b.id, l.colaboradorId, c);
         if (!v)
           throw new CamposRecusadosException([
             { campo: "pessoas", motivo: "indisponivel" },
           ]);
         if (l.planoId !== undefined || l.valorIndividual !== undefined) {
-          await tx.beneficioPessoa.update({
-            where: { id: v.id },
-            data: {
-              ...(l.planoId !== undefined
-                ? { planoId: this.planoValido(regras, l.planoId) }
-                : {}),
-              ...(l.valorIndividual !== undefined
-                ? { valorIndividual: l.valorIndividual }
-                : {}),
-            },
-          });
+          const novo = {
+            ...(l.planoId !== undefined
+              ? { planoId: this.planoValido(regras, l.planoId) }
+              : {}),
+            ...(l.valorIndividual !== undefined
+              ? { valorIndividual: l.valorIndividual }
+              : {}),
+          };
+          if (v.aPartirDe.getTime() === inicio.getTime()) {
+            await tx.beneficioPessoa.update({
+              where: { id: v.id },
+              data: novo,
+            });
+          } else {
+            // Do mês em diante: os meses anteriores ficam com o plano de antes.
+            await tx.beneficioPessoa.update({
+              where: { id: v.id },
+              data: { ate: inicio },
+            });
+            await tx.beneficioPessoa.create({
+              data: {
+                beneficioId: b.id,
+                empresaId,
+                colaboradorId: l.colaboradorId,
+                aPartirDe: inicio,
+                ate: v.ate,
+                planoId: v.planoId,
+                valorIndividual: v.valorIndividual,
+                ...novo,
+                criadoPorId: ctx.actor.id,
+              },
+            });
+          }
         }
         const campos = {
           ...(l.dias !== undefined ? { dias: l.dias } : {}),
@@ -1587,9 +1734,9 @@ export class BeneficiosService {
     }
     const [ativos, pessoas] = await Promise.all([
       this.carregarPessoas(this.prisma, empresaId, c, null),
-      ativoNa(b, c)
-        ? this.pessoasDoBeneficio(this.prisma, b, c)
-        : Promise.resolve([]),
+      this.ativoEm(this.prisma, b, c).then((ativo) =>
+        ativo ? this.pessoasDoBeneficio(this.prisma, b, c) : [],
+      ),
     ]);
     const empresa = new Map<string, { colaboradorId: string; nome: string }>();
     for (const p of ativos.values()) {
@@ -1636,6 +1783,15 @@ export class BeneficiosService {
       colunas,
       linhas: conferidas.map((l) => ({
         ...l,
+        atuais:
+          l.colaboradorId && l.situacao !== "pendencia"
+            ? Object.fromEntries(
+                colunas.map((c) => [
+                  c,
+                  atuais.get(l.colaboradorId!)?.[c] ?? null,
+                ]),
+              )
+            : null,
         antes:
           l.situacao === "pronta"
             ? resumo(pessoas.find((p) => p.colaboradorId === l.colaboradorId))
@@ -1815,7 +1971,7 @@ export class BeneficiosService {
           empresaId,
         );
         const todos = await tx.beneficioPessoa.count({
-          where: { beneficioId: b.id, removidoEm: null },
+          where: { beneficioId: b.id, removidoEm: null, ate: null },
         });
         return { alteradas: todos };
       }
@@ -1903,9 +2059,7 @@ export class BeneficiosService {
           { campo: "dependenteIds", motivo: "nao_se_aplica" },
         ]);
       }
-      const v = await tx.beneficioPessoa.findFirst({
-        where: { beneficioId: b.id, colaboradorId, removidoEm: null },
-      });
+      const v = await this.vinculoNoMes(tx, b.id, colaboradorId, c);
       if (!v)
         return this.auditoria.negarAcesso(ctx, "beneficio", b.id, empresaId);
       const validos = await tx.dependenteColaborador.findMany({
@@ -1915,11 +2069,17 @@ export class BeneficiosService {
           removidoEm: null,
           id: { in: dto.dependenteIds },
         },
-        select: { id: true },
+        select: { id: true, dataNascimento: true },
       });
       if (validos.length !== new Set(dto.dependenteIds).size) {
         throw new CamposRecusadosException([
           { campo: "dependenteIds", motivo: "indisponivel" },
+        ]);
+      }
+      // Sem nascimento não há faixa da ANS: completar o cadastro antes.
+      if (validos.some((d) => d.dataNascimento === null)) {
+        throw new CamposRecusadosException([
+          { campo: "dependenteIds", motivo: "invalido" },
         ]);
       }
       const vigentes = await tx.beneficioDependente.findMany({
@@ -2072,6 +2232,19 @@ export class BeneficiosService {
         throw new CamposRecusadosException([
           { campo: "aPartirDe", motivo: "nao_se_aplica" },
         ]);
+      }
+      // Os meses que já ficaram sem o benefício continuam sem ele.
+      const agora = inicioDa(competenciaAtual());
+      if (b.suspensoAPartirDe && b.suspensoAPartirDe < agora) {
+        await tx.beneficioPausa.create({
+          data: {
+            beneficioId: b.id,
+            empresaId,
+            de: b.suspensoAPartirDe,
+            ate: agora,
+            criadoPorId: ctx.actor.id,
+          },
+        });
       }
       const alterada = await tx.beneficio.update({
         where: { id: b.id },

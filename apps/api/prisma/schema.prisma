@@ -136,6 +136,7 @@ model AccessUser {
   beneficioAjustes          BeneficioAjuste[]       @relation("BeneficioAjustePor")
   beneficioHistorico        BeneficioHistorico[]    @relation("BeneficioHistoricoPor")
   beneficioVersoes          BeneficioVersao[]       @relation("BeneficioVersaoPor")
+  beneficioPausas           BeneficioPausa[]        @relation("BeneficioPausaPor")
   dependentesCriados        DependenteColaborador[] @relation("DependenteCriadoPor")
   /// T215 — dias do quadro da escala gravados ou alterados por esta conta.
   diasDeEscalaCriados       EscalaDia[]             @relation("EscalaDiaCriadoPor")
@@ -891,6 +892,7 @@ model Empresa {
   beneficioDependentes BeneficioDependente[]
   beneficioHistorico   BeneficioHistorico[]
   beneficioVersoes     BeneficioVersao[]
+  beneficioPausas      BeneficioPausa[]
   dependentes          DependenteColaborador[]
   diasDeEscala         EscalaDia[]
   publicacoesDeEscala  EscalaPublicacao[]
@@ -3472,9 +3474,32 @@ model Beneficio {
   dependentes BeneficioDependente[]
   historico   BeneficioHistorico[]
   versoes     BeneficioVersao[]
+  pausas      BeneficioPausa[]
 
   @@index([empresaId])
   @@map("beneficio")
+}
+
+/// T215 — meses em que o benefício ficou fora (pausado ou encerrado e
+/// depois reativado): de `de` (inclusive) até `ate` (exclusive), 1º dia de
+/// cada mês. Reativar guarda o intervalo; os meses dele continuam sem o
+/// benefício.
+model BeneficioPausa {
+  id          String   @id @default(uuid())
+  beneficioId String   @map("beneficio_id")
+  empresaId   String   @map("empresa_id")
+  de          DateTime @db.Date
+  ate         DateTime @db.Date
+  criadoPorId String   @map("criado_por_id")
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  beneficio Beneficio  @relation(fields: [beneficioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  criadoPor AccessUser @relation("BeneficioPausaPor", fields: [criadoPorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([beneficioId])
+  @@index([empresaId])
+  @@map("beneficio_pausa")
 }
 
 /// T215 — versão das regras de valor de um benefício a partir de uma

@@ -37,7 +37,10 @@ import {
   IconeMais,
   IconeMaisAcoes,
 } from "../../ui/icones";
-import { competenciaDoMesAtual } from "../../app/rotasDoShell";
+import {
+  competenciaDoMesAtual,
+  competenciaVizinha,
+} from "../../app/rotasDoShell";
 import { baixarArquivo } from "../dashboard/exportacao";
 import { SeletorDePeriodo } from "../horarios/quadro/SeletorDePeriodo";
 import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
@@ -55,7 +58,11 @@ import {
   RevisaoDaImportacao,
 } from "./ImportarValoresDoBeneficio";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
-import { CATEGORIAS, ICONE_DA_CATEGORIA } from "./textosDosBeneficios";
+import {
+  CATEGORIAS,
+  ICONE_DA_CATEGORIA,
+  situacaoNoMes,
+} from "./textosDosBeneficios";
 import "./Beneficios.css";
 
 export const BENEFICIOS_TITULO_ID = "beneficios-titulo";
@@ -73,7 +80,12 @@ type Tela =
       readonly id: string;
       readonly planilha: PlanilhaEnviada;
     }
-  | { readonly tipo: "editar"; readonly base: BeneficioApi }
+  | {
+      readonly tipo: "editar";
+      readonly base: BeneficioApi;
+      /** O mês das regras abertas (padrão de "Vale a partir de"). */
+      readonly competencia: string;
+    }
   | { readonly tipo: "adicionar"; readonly id: string; readonly nome: string };
 
 export function BeneficiosModulo({
@@ -95,6 +107,19 @@ export function BeneficiosModulo({
     window.scrollTo?.(0, 0);
   };
 
+  /**
+   * Editar abre as regras do mês em que a mudança pode começar: este mês ou
+   * os dois seguintes (o mês do detalhe, se estiver nessa faixa).
+   */
+  async function abrirEdicao(id: string) {
+    const atual = competenciaDoMesAtual();
+    const limite = competenciaVizinha(atual, 2);
+    const c =
+      competencia < atual ? atual : competencia > limite ? limite : competencia;
+    const d = await servico.obterBeneficio(id, c);
+    irPara({ tipo: "editar", base: d.beneficio, competencia: c });
+  }
+
   if (tela.tipo === "novo" || tela.tipo === "editar") {
     return (
       <AssistenteDeBeneficio
@@ -102,7 +127,7 @@ export function BeneficiosModulo({
         {...(tela.tipo === "editar"
           ? {
               base: tela.base,
-              competenciaDaEdicao: competencia,
+              competenciaDaEdicao: tela.competencia,
               onVerPessoas: () => irPara({ tipo: "detalhe", id: tela.base.id }),
             }
           : {})}
@@ -148,7 +173,7 @@ export function BeneficiosModulo({
         competenciaInicial={competencia}
         avisoInicial={aviso}
         onVoltar={(mensagem) => irPara({ tipo: "lista" }, mensagem)}
-        onEditar={(base) => irPara({ tipo: "editar", base })}
+        onEditar={(base) => void abrirEdicao(base.id)}
         onAdicionar={(nome) => irPara({ tipo: "adicionar", id: tela.id, nome })}
         onAbrirOutro={(id, mensagem) =>
           irPara({ tipo: "detalhe", id }, mensagem)
@@ -180,10 +205,7 @@ export function BeneficiosModulo({
       aviso={aviso}
       onNovo={() => irPara({ tipo: "novo" })}
       onAbrir={(id) => irPara({ tipo: "detalhe", id })}
-      onEditar={async (id) => {
-        const d = await servico.obterBeneficio(id, competencia);
-        irPara({ tipo: "editar", base: d.beneficio });
-      }}
+      onEditar={abrirEdicao}
       onAbrirOutro={(id, mensagem) => irPara({ tipo: "detalhe", id }, mensagem)}
       onAviso={setAviso}
       onAbrirFicha={onAbrirFicha}
@@ -244,9 +266,14 @@ function ListaDeBeneficios({
     void carregar();
   }, [carregar]);
 
-  const linhas = (dados?.beneficios ?? []).filter((b) => b.situacao === aba);
+  // As abas pela situação NO MÊS: pausado só a partir do mês seguinte ainda
+  // está ativo (e somado) no mês aberto.
+  const linhas = (dados?.beneficios ?? []).filter(
+    (b) => situacaoNoMes(b, competencia) === aba,
+  );
   const contagem = (s: SituacaoBeneficio) =>
-    (dados?.beneficios ?? []).filter((b) => b.situacao === s).length;
+    (dados?.beneficios ?? []).filter((b) => situacaoNoMes(b, competencia) === s)
+      .length;
   const vazio = dados !== null && dados.beneficios.length === 0;
   const resumo = dados?.resumo ?? null;
   const mesCurto = formatarMesReferencia(competencia);
@@ -686,7 +713,7 @@ function ResumoDaCompetencia({
         </div>
         <p className="beneficios__painel-valor">
           {cobertos}
-          <span className="beneficios__suave">{`de ${resumo.ativos} ativos`}</span>
+          <span className="beneficios__suave">{`de ${resumo.ativos} ${resumo.ativos === 1 ? "ativo" : "ativos"}`}</span>
         </p>
         <div className="beneficios__painel-barra">
           <span

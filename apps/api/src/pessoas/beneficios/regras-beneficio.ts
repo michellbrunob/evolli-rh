@@ -87,7 +87,14 @@ function objeto(v: unknown): Record<string, unknown> {
     : {};
 }
 
-const DIA = /^\d{4}-\d{2}-\d{2}$/;
+const FORMATO_DIA = /^\d{4}-\d{2}-\d{2}$/;
+/** `AAAA-MM-DD` de um dia que existe (30/02 não passa). */
+export function diaValido(texto: string): boolean {
+  if (!FORMATO_DIA.test(texto)) return false;
+  const d = new Date(`${texto}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
+}
+const DIA = { test: (t: string) => diaValido(t) };
 
 export function conferirBeneficio(dto: BeneficioInformado): {
   erros: ErroDeCampo[];

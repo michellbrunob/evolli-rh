@@ -436,3 +436,49 @@ describe("T215 — limite do PAT (alimentação)", () => {
     expect(limitePat({ ...BASE, categoria: "mobilidade" })).toBeNull();
   });
 });
+
+describe("T215 — pente fino: pendências que faltavam", () => {
+  const faixas = [100, 120, 140, 160, 180, 200, 230, 260, 300, 529];
+  it("dependente no plano sem nascimento: pendência, nada entra na conta", () => {
+    expect(
+      calc(
+        {
+          categoria: "saude",
+          tipoValor: "faixa_etaria",
+          faixas,
+          colaboradorPaga: {
+            calculo: "percentual",
+            titular: 20,
+            dependente: 30,
+          },
+        },
+        { dependentes: [{ nascimento: "2018-05-10" }, { nascimento: null }] },
+      ),
+    ).toMatchObject({
+      pendencia: "dependente_sem_nascimento",
+      valor: 0,
+      empresa: 0,
+      desconto: 0,
+      dependentesNoPlano: 2,
+    });
+  });
+
+  it("antecipação por % do salário, sem salário: pendência", () => {
+    expect(
+      calc(
+        {
+          categoria: "antecipacao",
+          tipoValor: "antecipacao",
+          antecipacao: {
+            mensalidade: null,
+            mensalidadeQuemPaga: "empresa",
+            modo: "percentual",
+            percentual: 10,
+            diaDesconto: 5,
+          },
+        },
+        { salarioBase: null },
+      ),
+    ).toMatchObject({ pendencia: "sem_salario", desconto: 0 });
+  });
+});

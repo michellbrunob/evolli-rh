@@ -22,7 +22,7 @@ import type {
 import { baixarArquivo } from "../dashboard/exportacao";
 import { lerAbasXlsx } from "../pessoas/importacao/planilhaXlsx";
 import { BeneficiosModulo } from "./BeneficiosModulo";
-import { faixaNaCompetencia } from "./textosDosBeneficios";
+import { faixaNaCompetencia, situacaoNoMes } from "./textosDosBeneficios";
 import type { ServicoDeBeneficios } from "./servicoDeBeneficios";
 
 vi.mock("../dashboard/exportacao", async (original) => {
@@ -64,6 +64,7 @@ const pessoa = (
   ajustado: false,
   coparticipacao: null,
   antecipado: null,
+  valorMes: null,
   dependentesCadastrados: 0,
   desligado: false,
   ...extra,
@@ -172,7 +173,7 @@ function servico(
           nome: "Academia teste",
           categoria: "bem_estar",
           situacao: "pausado",
-          suspensoAPartirDe: "2026-12",
+          suspensoAPartirDe: "2026-10",
           pessoas: 1,
           dependentes: 0,
           empresa: 0,
@@ -324,7 +325,7 @@ describe("Benefícios (T215) — lista", () => {
     expect(screen.getByRole("tab", { name: "Pausados 1" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Pausados 1" }));
     expect(
-      screen.getByText(/pausado a partir de 12\/2026/),
+      screen.getByText(/pausado a partir de 10\/2026/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Ativos 2" }));
     abrirMenu("Ações de VR teste");
@@ -404,6 +405,27 @@ describe("Benefícios (T215) — lista", () => {
     expect(gaveta).toHaveTextContent("Davi TesteVendedor");
     fireEvent.click(within(gaveta).getByRole("button", { name: /Eva Teste/ }));
     expect(onAbrirFicha).toHaveBeenCalledWith("c-8");
+  });
+
+  it("pausa marcada para um mês seguinte: no mês aberto ainda é ativo", () => {
+    expect(
+      situacaoNoMes(
+        { situacao: "pausado", suspensoAPartirDe: "2026-12" },
+        "2026-11",
+      ),
+    ).toBe("ativo");
+    expect(
+      situacaoNoMes(
+        { situacao: "pausado", suspensoAPartirDe: "2026-12" },
+        "2026-12",
+      ),
+    ).toBe("pausado");
+    expect(
+      situacaoNoMes(
+        { situacao: "encerrado", suspensoAPartirDe: "2026-10" },
+        "2026-11",
+      ),
+    ).toBe("encerrado");
   });
 
   it("abas vazias com o texto de cada situação", async () => {
@@ -782,6 +804,7 @@ describe("Benefícios (T215) — detalhe", () => {
             situacao: "pronta",
             problemas: [],
             valores: { dias: 15 },
+            atuais: { dias: 19, valorDia: 30 },
             antes: { valor: 57000, empresa: 45600, desconto: 11400 },
             depois: { valor: 45000, empresa: 36000, desconto: 9000 },
           },
@@ -793,6 +816,7 @@ describe("Benefícios (T215) — detalhe", () => {
             situacao: "pendencia",
             problemas: [{ campo: "cpf", motivo: "nao_encontrado" }],
             valores: { dias: 10 },
+            atuais: null,
             antes: null,
             depois: null,
           },
@@ -876,9 +900,10 @@ describe("Benefícios (T215) — detalhe", () => {
       screen.getByRole("table", { name: "Linhas da planilha" }),
     ).toHaveTextContent("Ignorada");
     fireEvent.click(screen.getByRole("tab", { name: /Prontas/ }));
-    expect(
-      screen.getByRole("table", { name: "Linhas da planilha" }),
-    ).toHaveTextContent("R$ 114,00 → R$ 90,00");
+    const prontas = screen.getByRole("table", { name: "Linhas da planilha" });
+    expect(prontas).toHaveTextContent("Dias no mês: 19 → 15");
+    expect(prontas).not.toHaveTextContent("Valor por dia");
+    expect(prontas).toHaveTextContent("R$ 114,00 → R$ 90,00");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Importar 1 linha" }));
     });
@@ -888,9 +913,120 @@ describe("Benefícios (T215) — detalhe", () => {
       [{ colaboradorId: "c-1", dias: 15 }],
       "importacao",
     );
+    const resultado = await screen.findByRole("region", { name: "Resultado" });
+    expect(resultado).toHaveTextContent("1 valor importado");
+    expect(resultado).toHaveTextContent("atualizado1");
+    expect(resultado).toHaveTextContent("com pendência0");
+    // A linha ignorada não volta como pendência.
+    expect(resultado).not.toHaveTextContent("ficou de fora");
+    fireEvent.click(
+      within(resultado).getByRole("button", { name: "Ver o benefício" }),
+    );
     expect(
       await screen.findByText("Valores de 11/2026 importados para 1 pessoa."),
     ).toBeInTheDocument();
+  });
+
+  it("importar com pendência: o que ficou de fora, baixar a lista e corrigir agora", async () => {
+    vi.mocked(baixarArquivo).mockClear();
+    const conferir = vi.fn(async () => ({
+      competencia: "2026-11",
+      colunas: ["dias", "valorDia"] as const,
+      linhas: [
+        {
+          linha: 2,
+          cpf: "11144477735",
+          colaboradorId: "c-1",
+          nome: "Ana Teste",
+          situacao: "pronta" as const,
+          problemas: [],
+          valores: { dias: 15 },
+          atuais: { dias: 19, valorDia: 30 },
+          antes: { valor: 57000, empresa: 45600, desconto: 11400 },
+          depois: { valor: 45000, empresa: 36000, desconto: 9000 },
+        },
+        {
+          linha: 3,
+          cpf: "123",
+          colaboradorId: null,
+          nome: null,
+          situacao: "pendencia" as const,
+          problemas: [{ campo: "cpf" as const, motivo: "invalido" as const }],
+          valores: { dias: 10 },
+          atuais: null,
+          antes: null,
+          depois: null,
+        },
+      ],
+    }));
+    const s = servico({ conferirImportacaoDoBeneficio: conferir });
+    await abrirDetalhe(s);
+    fireEvent.click(screen.getByRole("button", { name: /Importar valores/ }));
+    const gaveta = screen.getByRole("dialog", { name: "Importar valores" });
+    fireEvent.change(within(gaveta).getByLabelText("Planilha de valores"), {
+      target: {
+        files: [
+          new File(
+            [
+              "CPF;Colaborador;Dias no mês\n111.444.777-35;Ana;15\n123;Linha Planilha;10\n",
+            ],
+            "valores.csv",
+          ),
+        ],
+      },
+    });
+    await act(async () => {
+      fireEvent.click(
+        within(gaveta).getByRole("button", { name: "Revisar planilha" }),
+      );
+    });
+    await screen.findByRole("heading", {
+      name: "1 de 2 linhas prontas para importar",
+    });
+    expect(
+      screen.getByRole("table", { name: "Linhas da planilha" }),
+    ).toHaveTextContent("Linha Planilha");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Importar 1 linha" }));
+    });
+    const resultado = await screen.findByRole("region", { name: "Resultado" });
+    expect(resultado).toHaveTextContent("1 linha ficou de fora");
+    expect(resultado).toHaveTextContent(
+      "CPF inválido. Corrija aqui ou baixe a lista, ajuste e envie de novo.",
+    );
+    fireEvent.click(
+      within(resultado).getByRole("button", { name: /Baixar pendências/ }),
+    );
+    const [bytes, nome] = vi.mocked(baixarArquivo).mock.calls[0]!;
+    expect(nome).toBe("pendencias-vr-teste-2026-11.xlsx");
+    expect((await lerAbasXlsx(bytes as Uint8Array))["Pendências"]).toEqual([
+      [
+        "Linha",
+        "CPF",
+        "Colaborador",
+        "Dias no mês",
+        "Valor por dia",
+        "Problema",
+        "Detalhe",
+      ],
+      [
+        "3",
+        "123",
+        "Linha Planilha",
+        "10",
+        "",
+        "CPF inválido",
+        "Confira os números do CPF",
+      ],
+    ]);
+    await act(async () => {
+      fireEvent.click(
+        within(resultado).getByRole("button", { name: "Corrigir agora" }),
+      );
+    });
+    expect(conferir).toHaveBeenLastCalledWith("b-1", "2026-11", [
+      { linha: 3, cpf: "123", valores: { dias: "10" } },
+    ]);
   });
 
   it("editar: os valores mudam a partir da competência escolhida", async () => {
@@ -927,6 +1063,8 @@ describe("Benefícios (T215) — detalhe", () => {
     expect(dto.aPartirDe).toBe(
       `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, "0")}`,
     );
+    // As regras daquele mês foram carregadas no formulário.
+    expect(s.obterBeneficio).toHaveBeenCalledWith("b-1", dto.aPartirDe);
     expect(
       await screen.findByText(/Mudanças nos valores valem a partir de/),
     ).toBeInTheDocument();

@@ -385,6 +385,35 @@ export function AssistenteDeBeneficio({
       : mesesDaMudanca[0]!,
   );
 
+  const [avisoDoMes, setAvisoDoMes] = useState<string | null>(null);
+
+  /** Outro mês: as regras daquele mês entram no formulário (dados básicos ficam). */
+  async function mudarValeAPartirDe(c: string) {
+    setValeAPartirDe(c);
+    if (!base) return;
+    try {
+      const d = await servico.obterBeneficio(base.id, c);
+      const daquele = estadoDe(d.beneficio);
+      setEstado((e) => ({
+        ...daquele,
+        nome: e.nome,
+        categoria: e.categoria,
+        folha: e.folha,
+        inicio: e.inicio,
+        fim: e.fim,
+        observacao: e.observacao,
+        marcados: e.marcados,
+      }));
+      setAvisoDoMes(
+        `Valores de ${formatarMesReferencia(c)} carregados. As mudanças valem desse mês em diante.`,
+      );
+    } catch {
+      setAvisoDoMes(
+        "Não foi possível carregar os valores desse mês. Tente de novo.",
+      );
+    }
+  }
+
   const mudar = (parcial: Partial<EstadoDoAssistente>) =>
     setEstado((e) => ({ ...e, ...parcial }));
 
@@ -802,12 +831,17 @@ export function AssistenteDeBeneficio({
             <ListaDeEscolha
               aria-label="Vale a partir de"
               valor={valeAPartirDe}
-              onMudar={setValeAPartirDe}
+              onMudar={(c) => void mudarValeAPartirDe(c)}
               opcoes={mesesDaMudanca.map((c) => ({
                 valor: c,
                 rotulo: `${formatarMesReferencia(c)} · valores previstos`,
               }))}
             />
+            {avisoDoMes ? (
+              <p className="beneficios__suave" role="status">
+                {avisoDoMes}
+              </p>
+            ) : null}
           </LinhaDoCadastro>
         </SecaoDoCadastro>
       ) : null}

@@ -252,7 +252,7 @@ export function AbaBeneficios({
         </header>
         {pendentes.length ? (
           <p className="aba-beneficios__pendencia" role="note">
-            {`${pendentes.length === 1 ? "1 benefício está" : `${pendentes.length} benefícios estão`} fora da conta até completar o cadastro: ${pendentes.map((b) => `${b.nome} (${TEXTO_DA_PENDENCIA[b.pendencia!].toLowerCase()})`).join("; ")}.`}
+            {`${pendentes.length === 1 ? "1 benefício tem" : `${pendentes.length} benefícios têm`} pendência no cadastro, e o valor do mês pode não estar completo: ${pendentes.map((b) => `${b.nome} (${TEXTO_DA_PENDENCIA[b.pendencia!].toLowerCase()})`).join("; ")}.`}
           </p>
         ) : null}
         <ul className="aba-beneficios__lista">
