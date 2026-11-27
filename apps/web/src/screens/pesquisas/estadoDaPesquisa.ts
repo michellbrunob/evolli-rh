@@ -17,6 +17,11 @@ import {
   diaCivilDeHoje,
   formatarCompetenciaPorExtenso,
 } from "../../format/data";
+import {
+  HORA_PADRAO,
+  encerraEmParaApi,
+  partesDoEncerramento,
+} from "./encerramento";
 import { modeloDaGaleria, secoesDoModelo } from "./modelosDePesquisa";
 import {
   LIMITES,
@@ -41,7 +46,10 @@ export interface EstadoDaPesquisa {
   readonly secoes: readonly Secao[];
   readonly todos: boolean;
   readonly escolhidos: Readonly<Record<string, PessoaEscolhida>>;
+  /** Dia do encerramento automático (`AAAA-MM-DD`); `null` sem prazo. */
   readonly encerraEm: string | null;
+  /** Hora de Brasília do encerramento (`HH:MM`). */
+  readonly encerraHora: string;
   readonly minimoPorGrupo: number;
   /** Só na anônima: o que quem responde escolhe antes (até 2). */
   readonly separarPor: readonly CampoGrupo[];
@@ -87,6 +95,7 @@ export function estadoDoModelo(
     todos: true,
     escolhidos: {},
     encerraEm: null,
+    encerraHora: HORA_PADRAO,
     minimoPorGrupo: 3,
     separarPor: [],
     comentarioId: m.comentarioFinal ? comentarioDe(secoes) : null,
@@ -128,13 +137,18 @@ export function estadoDoDetalhe(d: PesquisaDetalhe): EstadoDaPesquisa {
     identificacao: d.identificacao,
     secoes,
     todos: d.todos,
-    escolhidos: Object.fromEntries(
-      (d.participantesLista ?? []).map((p) => [
-        p.colaboradorId,
-        { nome: p.nome, departamento: p.departamento },
-      ]),
-    ),
-    encerraEm: d.encerraEm,
+    // "Todo o time" resolvido no servidor não vira escolha de pessoas: quem
+    // troca para "Escolher pessoas" começa do zero.
+    escolhidos: d.todos
+      ? {}
+      : Object.fromEntries(
+          (d.participantesLista ?? []).map((p) => [
+            p.colaboradorId,
+            { nome: p.nome, departamento: p.departamento },
+          ]),
+        ),
+    encerraEm: partesDoEncerramento(d.encerraEm)?.data ?? null,
+    encerraHora: partesDoEncerramento(d.encerraEm)?.hora ?? HORA_PADRAO,
     minimoPorGrupo: d.minimoPorGrupo,
     separarPor: d.separarPor ?? [],
     comentarioId: d.modelo !== "personalizada" ? comentarioDe(secoes) : null,
@@ -171,7 +185,9 @@ export function entradaDoEstado(e: EstadoDaPesquisa): PesquisaEntrada {
       e.todos || anonima
         ? { todos: true }
         : { todos: false, colaboradorIds: Object.keys(e.escolhidos) },
-    encerraEm: e.encerraEm,
+    encerraEm: e.encerraEm
+      ? encerraEmParaApi({ data: e.encerraEm, hora: e.encerraHora })
+      : null,
     minimoPorGrupo: e.minimoPorGrupo,
     ...(anonima ? { separarPor: [...e.separarPor] } : {}),
   };
@@ -495,6 +511,8 @@ export function validarEnvio(e: EstadoDaPesquisa, hoje: string): Erros {
       erros.encerraEm = "Informe a data de encerramento.";
     else if (e.encerraEm < hoje)
       erros.encerraEm = "A data de encerramento não pode ser anterior a hoje.";
+    else if (!/^\d{2}:\d{2}$/.test(e.encerraHora))
+      erros.encerraEm = "Informe a hora de encerramento.";
   }
   const m = e.minimoPorGrupo;
   if (

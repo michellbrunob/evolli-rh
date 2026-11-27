@@ -24,6 +24,11 @@ import {
 import { minutosEstimados } from "./PreVisualizacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 
+/** Primeira letra minúscula, sem estragar siglas ("Recomendação (eNPS)"). */
+function minusculaSemSigla(texto: string): string {
+  return texto.charAt(0).toLowerCase() + texto.slice(1);
+}
+
 /** Como a pergunta é respondida, em poucas palavras (grupo da lista). */
 export function grupoDaPergunta(p: Pergunta): string {
   switch (p.tipo) {
@@ -77,7 +82,7 @@ export function SobreOModelo({
   const numeros: { valor: string; rotulo: string }[] = [
     ...[...grupos.entries()].slice(0, 2).map(([g, ps]) => ({
       valor: String(ps.length),
-      rotulo: `${ps.length === 1 ? "pergunta" : "perguntas"} · ${g.toLowerCase()}`,
+      rotulo: `${ps.length === 1 ? "pergunta" : "perguntas"} · ${minusculaSemSigla(g)}`,
     })),
     ...(m.comentarioFinal ? [{ valor: "1", rotulo: "comentário livre" }] : []),
     { valor: m.frequencia, rotulo: "frequência sugerida" },
@@ -137,8 +142,12 @@ export function SobreOModelo({
                 <span>{g}</span>
                 <span className="pesquisas__suave">
                   {ps.every((p) => p.obrigatoria)
-                    ? "Obrigatórias"
-                    : "Opcional em parte"}
+                    ? ps.length === 1
+                      ? "Obrigatória"
+                      : "Obrigatórias"
+                    : ps.every((p) => !p.obrigatoria)
+                      ? "Opcional"
+                      : "Algumas opcionais"}
                 </span>
               </p>
               <ol className="pesquisas__lista-numerada">

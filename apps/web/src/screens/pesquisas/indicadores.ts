@@ -103,6 +103,27 @@ export function corDaNota(v: number, e: EscalaDaPergunta): string {
   return v < meio ? "var(--turno-laranja)" : "var(--turno-mostarda)";
 }
 
+/**
+ * A cor de uma nota em degradê contínuo: vermelho no mínimo, amarelo no
+ * meio e verde no máximo (barras por nota dos resultados).
+ */
+export function corEmDegrade(v: number, e: EscalaDaPergunta): string {
+  const f = e.maximo === e.minimo ? 1 : (v - e.minimo) / (e.maximo - e.minimo);
+  if (f <= 0.5) {
+    const pct = Math.round((f / 0.5) * 100);
+    return `color-mix(in srgb, var(--turno-mostarda) ${pct}%, var(--status-danger-ink))`;
+  }
+  const pct = Math.round(((f - 0.5) / 0.5) * 100);
+  return `color-mix(in srgb, var(--turno-verde) ${pct}%, var(--turno-mostarda))`;
+}
+
+/** O rótulo da faixa de uma média de 0 a 10 ("6,5 a 7,9"). */
+export const ROTULO_DA_FAIXA_DA_MEDIA: Readonly<Record<Faixa, string>> = {
+  baixa: "Abaixo de 6,5",
+  media: "6,5 a 7,9",
+  alta: "8 ou mais",
+};
+
 /** Faixa de uma média na escala de 0 a 10 (mapa de calor e réguas). */
 export function faixaDaMedia10(m: number): Faixa {
   return m < 6.5 ? "baixa" : m < 8 ? "media" : "alta";

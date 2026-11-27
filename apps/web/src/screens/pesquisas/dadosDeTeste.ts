@@ -360,7 +360,7 @@ export function servicoFalso(
         ...DETALHE,
         id: "p-copia",
         nome: "Clima de novembro (cópia)",
-        status: "rascunho",
+        status: "ativa",
       } as PesquisaDetalhe),
     ),
     excluirPesquisa: vi.fn(() => Promise.resolve(undefined)),
@@ -373,6 +373,15 @@ export function servicoFalso(
     listarAtivos: vi.fn(() => Promise.resolve(ATIVOS)),
     listarTodosAtivos: vi.fn(() => Promise.resolve(ATIVOS.itens)),
     listarGrupos: vi.fn(() => Promise.resolve(GRUPOS)),
+    listarEmpresas: vi.fn(() =>
+      Promise.resolve([
+        { id: "e-1", nome: "Empresa Alfa" },
+        { id: "e-2", nome: "Empresa Beta" },
+      ]),
+    ),
+    empresaAtiva: vi.fn(() =>
+      Promise.resolve({ id: "e-1", nome: "Empresa Alfa" }),
+    ),
     listarDepartamentos: vi.fn(() =>
       Promise.resolve([
         { id: "d-1", codigo: "OP", nome: "Operações" },

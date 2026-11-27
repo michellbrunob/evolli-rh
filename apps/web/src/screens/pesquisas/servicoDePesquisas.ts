@@ -16,6 +16,8 @@ import {
   listarUnidades,
   type DepartamentoApi,
 } from "../../api/organizacaoClient";
+import { listarEmpresasDoContexto } from "../../api/contextoEmpresarialClient";
+import { listarEmpresas } from "../../api/organizacaoClient";
 import * as cliente from "../../api/pesquisasClient";
 import type { CampoGrupo } from "../../api/pesquisasClient";
 
@@ -64,6 +66,12 @@ export type ServicoDePesquisas = Pick<
   readonly listarDepartamentos: () => Promise<readonly DepartamentoApi[]>;
   /** Departamentos, centros de custo, unidades e áreas ativos. */
   readonly listarGrupos: () => Promise<GruposDaEmpresa>;
+  /** Empresas em que a pessoa pode criar a cópia (duplicar). */
+  readonly listarEmpresas: () => Promise<
+    readonly { id: string; nome: string }[]
+  >;
+  /** A empresa ativa (para cadastrar um grupo na hora). */
+  readonly empresaAtiva: () => Promise<{ id: string; nome: string } | null>;
 };
 
 const TETO_DE_PESSOAS = 1000;
@@ -112,5 +120,11 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
       unidade: opcoes(un.itens),
       area: opcoes(ar.itens),
     };
+  },
+  listarEmpresas: async () => opcoes(await listarEmpresasDoContexto()),
+  empresaAtiva: async () => {
+    const r = await listarEmpresas();
+    const e = r.itens[0];
+    return e ? { id: e.id, nome: e.nome } : null;
   },
 };

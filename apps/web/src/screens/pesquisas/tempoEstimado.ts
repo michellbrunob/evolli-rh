@@ -4,6 +4,14 @@
  * resposta: cerca de 20 segundos por pergunta, arredondado, no mínimo 1
  * minuto.
  */
+import { plural } from "../../format/plural";
+
 export function minutosEstimados(totalDePerguntas: number): number {
   return Math.max(1, Math.round((totalDePerguntas * 20) / 60));
+}
+
+/** "cerca de 3 minutos" (ou "menos de 1 minuto" sem perguntas). */
+export function textoDoTempoEstimado(minutos: number): string {
+  if (minutos < 1) return "menos de 1 minuto";
+  return `cerca de ${plural(Math.round(minutos), "minuto", "minutos")}`;
 }

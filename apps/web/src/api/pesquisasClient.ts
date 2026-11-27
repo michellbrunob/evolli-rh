@@ -148,6 +148,10 @@ export interface PesquisaDetalhe extends PesquisaResumo {
    */
   naoIdentificaveis?: number;
   separarPor?: CampoGrupo[];
+  /** Totais de quem foi convidado (API ampliada). */
+  participantesTotal?: number;
+  responderam?: number;
+  pendentes?: number;
 }
 
 export type ContagensDePesquisas = Record<"todas" | StatusPesquisa, number>;
@@ -308,6 +312,8 @@ export interface RespostaDetalhe extends RespostaResumo {
     enpsTime: number | null;
     maior: { perguntaId: string; valor: number } | null;
     menor: { perguntaId: string; valor: number } | null;
+    /** Média da pessoa nos pulsos anteriores (API ampliada; opcional). */
+    mediaUltimosPulsos?: number | null;
   };
 }
 
@@ -409,8 +415,13 @@ export const alterarStatusDaPesquisa = (
     status,
   });
 
-export const duplicarPesquisa = (pesquisaId: string) =>
-  pedir<PesquisaDetalhe>(`/pesquisas/${id(pesquisaId)}/duplicar`, "POST");
+/** Duplicar: a cópia nasce ativa, na empresa escolhida (padrão: a mesma). */
+export const duplicarPesquisa = (pesquisaId: string, empresaId?: string) =>
+  pedir<PesquisaDetalhe>(
+    `/pesquisas/${id(pesquisaId)}/duplicar`,
+    "POST",
+    empresaId ? { empresaId } : {},
+  );
 
 export const excluirPesquisa = (pesquisaId: string) =>
   pedir<void>(`/pesquisas/${id(pesquisaId)}`, "DELETE");

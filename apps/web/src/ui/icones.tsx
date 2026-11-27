@@ -65,6 +65,7 @@ import {
   Setting,
   ShieldTick,
   TickCircle,
+  TickSquare,
   Trash,
   UserAdd,
   Warning2,
@@ -90,6 +91,7 @@ import {
   MessageText1,
   Money2,
   Sms,
+  Link1,
   Teacher,
   Timer1,
 } from "iconsax-react";
@@ -236,6 +238,10 @@ export const IconeDescer = decorativo(ArrowDown2, "Linear");
 export const IconeArrastar = decorativo(HambergerMenu, "Linear");
 /** T216 — abrir em outra aba (link público da pesquisa). */
 export const IconeNovaAba = decorativo(ExportSquare, "Linear");
+/** T216 — copiar o link de uma pesquisa. */
+export const IconeLink = decorativo(Link1, "Linear");
+/** T216 — confirmar uma edição na própria linha. */
+export const IconeVisto = decorativo(TickSquare, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");

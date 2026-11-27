@@ -44,6 +44,8 @@ export interface CadastroEmEtapasProps {
   readonly rotuloVoltar: string;
   readonly onVoltarDaPagina: () => void;
   readonly acaoDoCabecalho?: ReactNode;
+  /** T216 — ícone ao lado do título (ex.: o do modelo da pesquisa). */
+  readonly iconeDoCabecalho?: ReactNode;
   readonly etapas: readonly EtapaDoCadastro[];
   /** Índice da etapa atual. */
   readonly atual: number;
@@ -90,6 +92,7 @@ export function CadastroEmEtapas({
   rotuloVoltar,
   onVoltarDaPagina,
   acaoDoCabecalho,
+  iconeDoCabecalho,
   etapas,
   atual,
   alcancada,
@@ -152,6 +155,7 @@ export function CadastroEmEtapas({
           className="cadastro-etapas__voltar"
           onClick={onVoltarDaPagina}
         />
+        {iconeDoCabecalho}
         <PageHeader
           headingLevel={1}
           titleId={tituloId}

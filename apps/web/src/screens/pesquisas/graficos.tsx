@@ -150,23 +150,25 @@ export function BarrasPorNota({
           <span>{rotuloMaximo}</span>
         </div>
       ) : null}
-      <table className="pesquisas__so-leitor">
-        <caption>{rotulo}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Nota</th>
-            <th scope="col">Respostas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {valores.map((v) => (
-            <tr key={v.valor}>
-              <td>{v.valor}</td>
-              <td>{v.quantidade}</td>
+      <div className="pesquisas__so-leitor">
+        <table>
+          <caption>{rotulo}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Nota</th>
+              <th scope="col">Respostas</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {valores.map((v) => (
+              <tr key={v.valor}>
+                <td>{v.valor}</td>
+                <td>{v.quantidade}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

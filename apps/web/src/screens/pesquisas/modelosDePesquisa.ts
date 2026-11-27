@@ -196,6 +196,7 @@ export const MODELOS_DE_PESQUISA: readonly ModeloDaGaleria[] = [
             rotulo: "Recomendação",
             texto:
               "De 0 a 10, quanto você recomendaria a empresa como lugar para trabalhar?",
+            obrigatoria: false,
             config: { enps: true },
           },
         ],
