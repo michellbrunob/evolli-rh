@@ -5,6 +5,7 @@ import {
   formatarReaisDoCampo,
   lerReais,
 } from "./moeda";
+import { completarReais, mascararReais } from "./moeda";
 import {
   formatarCompetenciaAbreviada,
   formatarCompetenciaPorExtenso,
@@ -43,5 +44,32 @@ describe("T215 — dinheiro e competência", () => {
     expect(formatarCompetenciaAbreviada("2026-11")).toBe("nov/2026");
     expect(formatarCompetenciaPorExtenso("2026-13")).toBe("—");
     expect(formatarCompetenciaAbreviada("2026-11-01")).toBe("—");
+  });
+});
+
+describe("T215 — digitação de valores em reais (como em Benefícios)", () => {
+  it("o que se digita é reais: separa o milhar enquanto digita", () => {
+    expect(mascararReais("3520")).toBe("3.520");
+    expect(mascararReais("1621")).toBe("1.621");
+    expect(mascararReais("950")).toBe("950");
+    expect(mascararReais("1234567")).toBe("1.234.567");
+    expect(mascararReais("")).toBe("");
+  });
+
+  it("a vírgula abre os centavos (até 2); pontos digitados são ignorados", () => {
+    expect(mascararReais("3520,5")).toBe("3.520,5");
+    expect(mascararReais("3.520,507")).toBe("3.520,50");
+    expect(mascararReais(",5")).toBe("0,5");
+    expect(mascararReais("3520,")).toBe("3.520,");
+    expect(mascararReais("1,2,3")).toBe("1,23");
+    expect(mascararReais("R$ 00012")).toBe("12");
+  });
+
+  it("ao sair do campo, completa os centavos", () => {
+    expect(completarReais("3.520")).toBe("3.520,00");
+    expect(completarReais("3.520,5")).toBe("3.520,50");
+    expect(completarReais("0,5")).toBe("0,50");
+    expect(completarReais("")).toBe("");
+    expect(completarReais("3.520,")).toBe("3.520,00");
   });
 });

@@ -37,3 +37,33 @@ export function formatarPercentual(valor: number): string {
   const r = Math.round(valor * 100) / 100;
   return String(r).replace(".", ",");
 }
+
+/**
+ * Campo de valor enquanto se digita: o que se digita é reais (como nos
+ * benefícios). Separa o milhar; a vírgula abre até 2 casas de centavos;
+ * pontos digitados são ignorados (o ponto é só o separador de milhar).
+ * "3520" → "3.520"; "3520,5" → "3.520,5".
+ */
+export function mascararReais(texto: string): string {
+  const limpo = texto.replace(/[^\d,]/g, "");
+  if (limpo === "") return "";
+  const virgula = limpo.indexOf(",");
+  const inteiro = (virgula === -1 ? limpo : limpo.slice(0, virgula))
+    .replace(/^0+(?=\d)/, "")
+    .slice(0, 10);
+  const milhar = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (virgula === -1) return milhar;
+  const centavos = limpo
+    .slice(virgula + 1)
+    .replace(/,/g, "")
+    .slice(0, 2);
+  return `${milhar || "0"},${centavos}`;
+}
+
+/** Ao sair do campo: completa os centavos ("3.520" → "3.520,00"). */
+export function completarReais(texto: string): string {
+  const mascarado = mascararReais(texto);
+  if (mascarado === "") return "";
+  const [inteiro, centavos = ""] = mascarado.split(",");
+  return `${inteiro || "0"},${centavos.padEnd(2, "0")}`;
+}

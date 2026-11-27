@@ -377,7 +377,7 @@ async function preencherLotacao() {
   fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
   await escolher(unidadeSel(), unidade);
   // T209 — o salário bruto é obrigatório na etapa 2.
-  fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+  fireEvent.change(salarioBruto(), { target: { value: "5000" } });
 }
 
 async function preencherValido() {
@@ -521,7 +521,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.click(salvar());
     await waitFor(() => expect(salarioBruto()).toHaveFocus());
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(salvar());
     // Sem Departamento nem Unidade, o formulário está completo: abre a
     // confirmação.
@@ -659,7 +659,7 @@ describe("Nova admissão — página própria", () => {
     fireEvent.change(data(), { target: { value: "2026-11-04" } });
     // T209 — da lotação, só o cargo (digitado); e o salário bruto.
     fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     const [dto, opcoes] = vi.mocked(admitirColaborador).mock.calls[0]!;
@@ -3419,7 +3419,7 @@ describe("T180 — cadastro rápido de referências na Nova admissão", () => {
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
     fireEvent.change(cargoSel(), { target: { value: `  ${cargoNovo.nome} ` } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     await salvarEConfirmar();
     await waitFor(() => expect(admitirColaborador).toHaveBeenCalledTimes(1));
     // Sem cargo com esse nome no cadastro: o RH o cria, só com nome e empresa.
@@ -3629,7 +3629,7 @@ describe("T195 — quatro etapas: voltar, revisitar e não saltar", () => {
     fireEvent.change(cargoSel(), { target: { value: cargo.nome } });
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.change(matricula(), { target: { value: "x" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
@@ -4094,7 +4094,7 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
     abrirLotacao();
     fireEvent.change(tipo(), { target: { value: "clt" } });
     fireEvent.change(data(), { target: { value: "2026-11-03" } });
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Dados profissionais$/);
     await waitFor(() => expect(cargoSel()).toHaveFocus());
@@ -4122,7 +4122,7 @@ describe("T209 — etapa 2: cargo digitado, ao menos uma referência e salário 
       "Informe o salário bruto. Ele é usado na folha de pagamento.",
     );
     expect(cargoSel()).not.toHaveAttribute("aria-invalid");
-    fireEvent.change(salarioBruto(), { target: { value: "500000" } });
+    fireEvent.change(salarioBruto(), { target: { value: "5000" } });
     fireEvent.click(botaoContinuar());
     expect(tituloDaEtapa()).toHaveTextContent(/Endereço$/);
   });

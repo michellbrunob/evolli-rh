@@ -149,6 +149,7 @@ import {
   formatarReais,
   lerValorEmReais,
 } from "./salarioLiquido";
+import { completarReais, mascararReais } from "../../format/moeda";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
@@ -1154,15 +1155,6 @@ export const OPCOES_CONSELHO = [
 /** Dica da matrícula (ícone de ajuda ao lado do rótulo). */
 const DICA_DA_MATRICULA =
   "Código da pessoa na folha ou na contabilidade (matrícula, registro ou chapa). Serve para achar a pessoa quando um documento não traz o CPF.";
-
-/** "500000" → "5.000,00", conforme se digita (centavos à direita). */
-export function mascararReais(texto: string): string {
-  const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, 12);
-  if (digitos === "") return "";
-  const completo = digitos.padStart(3, "0");
-  const inteiros = completo.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${inteiros},${completo.slice(-2)}`;
-}
 
 /** T209 — o cargo digitado não pôde virar cargo do cadastro. */
 class CargoIndisponivel extends Error {}
@@ -3379,7 +3371,7 @@ export function NovaAdmissaoScreen({
                   <span aria-hidden="true">R$</span>
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     placeholder="0,00"
                     aria-required="true"
                     value={campos.salarioBruto}
@@ -3390,6 +3382,11 @@ export function NovaAdmissaoScreen({
                         "salarioBruto",
                       )
                     }
+                    onBlur={(e) => {
+                      const completo = completarReais(e.target.value);
+                      if (completo !== campos.salarioBruto)
+                        atualizar("salarioBruto", completo, "salarioBruto");
+                    }}
                     {...propsDoCampo("salarioBruto")}
                   />
                 </div>

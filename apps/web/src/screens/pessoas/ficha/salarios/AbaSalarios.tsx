@@ -49,7 +49,7 @@ import {
 } from "../../../../ui/icones";
 import { diaCivilDeHoje, formatarDiaCivil } from "../../../../format/data";
 import { ROTULO_DO_TIPO_DE_VINCULO } from "../../edicao/dadosProfissionais";
-import { mascararReais } from "../../NovaAdmissaoScreen";
+import { completarReais, mascararReais } from "../../../../format/moeda";
 import {
   calcularSalarioLiquido,
   formatarReais,
@@ -1048,10 +1048,11 @@ function GavetaDeAlteracao({
           <span>Salário</span>
           <input
             id={`${base}-salario`}
-            inputMode="numeric"
+            inputMode="decimal"
             placeholder="0,00"
             value={salario}
             onChange={(e) => setSalario(mascararReais(e.target.value))}
+            onBlur={(e) => setSalario(completarReais(e.target.value))}
           />
         </label>
         {avisos.length > 0 ? (

@@ -437,8 +437,13 @@ describe("T215 — aba Salários", () => {
       target: { value: "2026-01-01" },
     });
     fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-      target: { value: "300000" },
+      target: { value: "3000" },
     });
+    // O que se digita é reais; ao sair do campo, completa os centavos.
+    expect(
+      (within(gaveta).getByLabelText("Salário") as HTMLInputElement).value,
+    ).toBe("3.000");
+    fireEvent.blur(within(gaveta).getByLabelText("Salário"));
     expect(
       (within(gaveta).getByLabelText("Salário") as HTMLInputElement).value,
     ).toBe("3.000,00");
@@ -487,7 +492,7 @@ describe("T215 — aba Salários", () => {
         target: { value: "2026-01-01" },
       });
       fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-        target: { value: "200000" },
+        target: { value: "2000" },
       });
       fireEvent.click(
         within(gaveta).getByRole("button", { name: "Registrar alteração" }),
@@ -539,9 +544,9 @@ describe("T215 — aba Salários", () => {
     fireEvent.change(within(gaveta).getByLabelText("Data de início"), {
       target: { value: "2026-11-20" },
     });
-    // Digitado sem os centavos: 3520 vira 35,20.
+    // Engano de digitação: faltou um algarismo (352 em vez de 3520).
     fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-      target: { value: "3520" },
+      target: { value: "352" },
     });
     const aviso = within(gaveta).getByRole("note", { name: "Confira o valor" });
     expect(aviso).toHaveTextContent(
@@ -559,7 +564,7 @@ describe("T215 — aba Salários", () => {
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith(
         "c1",
-        expect.objectContaining({ salarioBruto: "35.20" }),
+        expect.objectContaining({ salarioBruto: "352.00" }),
       ),
     );
   });
@@ -574,7 +579,7 @@ describe("T215 — aba Salários", () => {
       target: { value: "2026-11-20" },
     });
     fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-      target: { value: "320000" },
+      target: { value: "3200" },
     });
     expect(within(gaveta).queryByRole("note")).toBeNull();
     expect(
@@ -597,7 +602,7 @@ describe("T215 — aba Salários", () => {
       name: "Editar alteração salarial",
     });
     fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-      target: { value: "240000" },
+      target: { value: "2400" },
     });
     expect(
       within(gaveta).getByRole("note", { name: "Confira o valor" }),
@@ -645,7 +650,7 @@ describe("T215 — aba Salários", () => {
       (within(gaveta).getByLabelText("Salário") as HTMLInputElement).value,
     ).toBe("1.621,00");
     fireEvent.change(within(gaveta).getByLabelText("Salário"), {
-      target: { value: "170000" },
+      target: { value: "1700" },
     });
     fireEvent.click(
       within(gaveta).getByRole("button", { name: "Salvar alterações" }),
