@@ -8,7 +8,8 @@
  *   janela fica aberta, como a referência).
  * - Quatro perguntas: a data do novo período (depois da admissão), o motivo
  *   (férias coletivas já marcada), os dias que o período anterior deu
- *   (em branco, o proporcional — "Calculado: N") e uma observação interna.
+ *   (em branco, o proporcional — "Calculado: N" —, com meio dia arredondado
+ *   para cima; na perda do direito, 0) e uma observação interna.
  * - "Períodos hoje" e, com a data, "Como os períodos vão ficar" — quem
  *   calcula é sempre o servidor.
  */
@@ -381,9 +382,11 @@ export function AjustarPeriodoGaveta({
               diasValidos ? "ausencias-gaveta__ajuda" : "ajustar-periodo__erro"
             }
           >
-            {diasValidos
-              ? "Em branco, o Evolli calcula pelos meses trabalhados (2,5 dias por mês)."
-              : "Informe de 0 a 30 dias."}
+            {!diasValidos
+              ? "Informe de 0 a 30 dias."
+              : motivo === "perda_direito"
+                ? "Em branco, o período anterior fica com 0 dias (perda do direito)."
+                : "Em branco, o Evolli calcula pelos meses trabalhados: 2,5 dias por mês (15 dias ou mais contam como mês), e meio dia arredonda para cima."}
           </p>
         </li>
 

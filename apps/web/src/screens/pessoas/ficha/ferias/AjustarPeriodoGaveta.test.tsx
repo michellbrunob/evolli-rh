@@ -130,7 +130,7 @@ describe("AjustarPeriodoGaveta (T215)", () => {
       "Nas férias coletivas, é o primeiro dia da coletiva.",
       "Por que a contagem recomeça?",
       "Quantos dias de férias o período anterior deu?",
-      "Em branco, o Evolli calcula pelos meses trabalhados (2,5 dias por mês).",
+      "Em branco, o Evolli calcula pelos meses trabalhados: 2,5 dias por mês (15 dias ou mais contam como mês), e meio dia arredonda para cima.",
       "Observação interna",
     ]) {
       expect(within(janela()).getByText(texto), texto).toBeInTheDocument();
@@ -371,5 +371,20 @@ describe("AjustarPeriodoGaveta (T215)", () => {
     expect(within(janela()).getByRole("alert")).toHaveTextContent(
       "Há férias lançadas num período que deixaria de existir.",
     );
+  });
+
+  it("perda do direito: em branco o período anterior fica com 0 dias", async () => {
+    montar();
+    fireEvent.click(
+      within(janela()).getByRole("radio", { name: /^Perda do direito/ }),
+    );
+    expect(
+      within(janela()).getByText(
+        "Em branco, o período anterior fica com 0 dias (perda do direito).",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(janela()).queryByText(/calcula pelos meses trabalhados/),
+    ).toBeNull();
   });
 });

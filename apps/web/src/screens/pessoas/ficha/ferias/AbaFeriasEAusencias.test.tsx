@@ -449,6 +449,55 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     expect(
       within(saldo).getByText("prazo para gozo: 01/10/2026"),
     ).toBeInTheDocument();
+    // CLT art. 137: o período vencido ainda se agenda, pago em dobro.
+    expect(
+      within(saldo).getByText(
+        "Período vencido: a CLT manda conceder estas férias, com pagamento em dobro (art. 137).",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(saldo).getByRole("button", { name: "Agendar férias" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ajuste sugerido no histórico: a sugestão aparece e o ⋯ tem Responder", async () => {
+    const base = ferias();
+    montar(
+      ferias({
+        historico: [
+          ausencia({
+            id: "a-9",
+            tipo: "day_off",
+            inicio: "2026-12-14",
+            fim: "2026-12-14",
+            dias: 1,
+            diasUteis: 1,
+            diasVendidos: 1,
+            periodoAquisitivo: null,
+            status: "ajuste_sugerido",
+            sugestao: { inicio: "2026-12-15", fim: "2026-12-16" },
+          }),
+          ...base.historico,
+        ],
+      }),
+    );
+    const hist = await screen.findByRole("region", {
+      name: "Histórico de ausências",
+    });
+    expect(
+      within(hist).getByText("Sugerido: 15/12 – 16/12/2026"),
+    ).toBeInTheDocument();
+    expect(within(hist).getByText(/\+ 1 vendido$/)).toBeInTheDocument();
+    fireEvent.pointerDown(
+      within(hist).getByRole("button", {
+        name: "Ações de Day off aniversário de 14/12/2026",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Responder" }),
+    ).toBeInTheDocument();
   });
 
   it.each([
@@ -496,7 +545,7 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     expect(within(proxima).getByText("13 dias úteis")).toBeInTheDocument();
   });
 
-  it("próxima ausência vazia: o texto da referência", async () => {
+  it("próxima ausência vazia: o texto diz o que o sistema faz hoje", async () => {
     montar(ferias({ proximaAusencia: null }));
     const proxima = await screen.findByRole("region", {
       name: "Próxima ausência",
@@ -509,7 +558,7 @@ describe("T215 — aba Férias e ausências da ficha", () => {
     ).toBeInTheDocument();
     expect(
       within(proxima).getByText(
-        "Quando a Ana solicitar férias ou day off, a solicitação aparece aqui para você aprovar.",
+        "Quando houver férias ou outra ausência agendada, ela aparece aqui.",
       ),
     ).toBeInTheDocument();
   });

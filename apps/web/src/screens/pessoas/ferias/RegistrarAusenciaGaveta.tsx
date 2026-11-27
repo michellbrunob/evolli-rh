@@ -87,6 +87,8 @@ function textoDoAvisoClt(a: AvisoCltApi, inicio: string): string {
       return `Seria o ${a.ordem}º período de férias deste período aquisitivo; a lei permite até 3 (CLT art. 134, § 1º).`;
     case "um_com_14":
       return "Nenhum período chegaria a 14 dias; a lei pede um com pelo menos 14 (CLT art. 134, § 1º).";
+    case "pagamento_em_dobro":
+      return `${plural(a.dias, "dia", "dias")} depois do prazo de gozo (${formatarDiaCivil(a.prazoGozo)}): pagamento em dobro (CLT art. 137).`;
   }
 }
 import {
@@ -133,6 +135,20 @@ function mensagemDaRecusa(
       return "A venda passa do limite de dias deste período.";
     case "fim_antes_do_inicio":
       return "O último dia não pode ser antes do primeiro.";
+    case "antes_da_admissao":
+      return `A ausência não pode começar antes da admissão de ${nome}.`;
+    case "fora_do_vinculo":
+      return `Essas datas ficam fora do vínculo de ${nome} com a empresa.`;
+    case "ferias_sem_periodo":
+      return "A coletiva tiraria o período de férias já lançadas. Ajuste essas férias antes.";
+    case "abaixo_das_ferias":
+      return "O período ficaria com menos dias do que as férias já lançadas nele.";
+    case "nao_se_aplica":
+      return detalhe.erros?.[0]?.campo === "feriasColetivas"
+        ? `${nome} não tem férias coletivas nessas datas (só com menos de 12 meses de casa).`
+        : editando
+          ? "Não foi possível salvar a ausência. Confira os dados e tente de novo."
+          : "Não foi possível registrar a ausência. Confira os dados e tente de novo.";
     default:
       return editando
         ? "Não foi possível salvar a ausência. Confira os dados e tente de novo."
@@ -152,6 +168,8 @@ function respostasDe(a: AusenciaApi) {
     diasVendidos: a.diasVendidos > 0 ? String(a.diasVendidos) : "",
     aprovada: a.status === "aprovada" || a.status === "cancelamento_pedido",
     observacao: a.observacao ?? "",
+    coletiva: a.feriasColetivas === true,
+    motivoFora: a.motivoForaDaPolitica ?? "",
   };
 }
 
@@ -281,8 +299,8 @@ export function RegistrarAusenciaGaveta({
     setInicio(r?.inicio ?? "");
     setPeriodoEscolhido(null);
     setTrocandoPeriodo(false);
-    setColetiva(false);
-    setMotivoFora("");
+    setColetiva(r?.coletiva ?? false);
+    setMotivoFora(r?.motivoFora ?? "");
     setFim(r?.fim ?? "");
     setComVolta(r?.comVolta ?? false);
     setVender(r?.vender ?? false);
@@ -399,6 +417,8 @@ export function RegistrarAusenciaGaveta({
     original.diasVendidos !== (vendidos > 0 ? String(vendidos) : "") ||
     original.aprovada !== aprovada ||
     original.observacao !== observacao.trim() ||
+    original.coletiva !== coletiva ||
+    original.motivoFora !== motivoFora.trim() ||
     arquivo !== null;
 
   async function registrar() {
@@ -455,6 +475,10 @@ export function RegistrarAusenciaGaveta({
   const ano = simulacao?.periodo ? nomeDoPeriodo(simulacao.periodo) : null;
   // A coletiva só vale enquanto o servidor diz que cabe.
   const coletivaValida = coletiva && simulacao?.podeSerColetiva === true;
+  // Venda: o que ainda dá para vender no período (o servidor desconta o
+  // que as outras férias do mesmo período já venderam).
+  const podeVender = simulacao?.maxVendaveis ?? 10;
+  const jaVendidos = simulacao?.vendidosNoPeriodo ?? 0;
 
   return (
     <Sheet
@@ -749,8 +773,10 @@ export function RegistrarAusenciaGaveta({
           simulacao.volta !== null ? (
             <div className="ausencias-gaveta__resumo" role="status">
               <p className="ausencias-gaveta__resumo-titulo">
-                {`${simulacao.dias === 1 ? "1 dia" : `${simulacao.dias} dias`} de ${TIPO_NA_FRASE[tipo]} (${simulacao.diasUteis === 1 ? "1 dia útil" : `${simulacao.diasUteis} dias úteis`})${
-                  vendidos > 0 ? ` + ${vendidos} vendidos` : ""
+                {`${plural(simulacao.dias, "dia", "dias")} de ${TIPO_NA_FRASE[tipo]} (${plural(simulacao.diasUteis ?? 0, "dia útil", "dias úteis")})${
+                  vendidos > 0
+                    ? ` + ${plural(vendidos, "vendido", "vendidos")}`
+                    : ""
                 }`}
               </p>
               <p className="ausencias-gaveta__ajuda">
@@ -892,6 +918,16 @@ export function RegistrarAusenciaGaveta({
                   </div>
                 </div>
               ) : null}
+              {simulacao?.maxVendaveis === 0 &&
+              (simulacao.vendidosNoPeriodo ?? 0) > 0 ? (
+                <p className="ausencias-gaveta__ajuda" role="note">
+                  {`A venda deste período já chegou ao limite: ${plural(
+                    simulacao.vendidosNoPeriodo ?? 0,
+                    "dia vendido",
+                    "dias vendidos",
+                  )}.`}
+                </p>
+              ) : null}
               {(simulacao?.maxVendaveis ?? 10) > 0 ? (
                 <div className="ausencias-gaveta__venda">
                   <div className="ausencias-gaveta__venda-cabeca">
@@ -903,9 +939,15 @@ export function RegistrarAusenciaGaveta({
                         Vender dias destas férias?
                       </span>
                       <span className="ausencias-gaveta__ajuda">
-                        {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${
-                          simulacao?.maxVendaveis ?? 10
-                        } dias por dinheiro (CLT art. 143, 1/3 das férias).`}
+                        {`Abono pecuniário: ${nome || "a pessoa"} pode trocar até ${plural(
+                          podeVender,
+                          "dia",
+                          "dias",
+                        )} por dinheiro (CLT art. 143, 1/3 das férias).${
+                          jaVendidos > 0
+                            ? ` Já ${jaVendidos === 1 ? "foi vendido" : "foram vendidos"} ${plural(jaVendidos, "dia", "dias")} neste período.`
+                            : ""
+                        }`}
                       </span>
                     </span>
                     <button
@@ -926,16 +968,22 @@ export function RegistrarAusenciaGaveta({
                         <input
                           type="number"
                           min={1}
-                          max={simulacao?.maxVendaveis ?? 10}
+                          max={podeVender}
                           className="ausencias-gaveta__campo"
                           value={diasVendidos}
                           onChange={(e) => setDiasVendidos(e.target.value)}
                         />
                       </label>
                       <p className="ausencias-gaveta__ajuda">
-                        {`Pela CLT, dá para vender até ${
-                          simulacao?.maxVendaveis ?? 10
-                        } dias deste período (1/3 do direito).`}
+                        {`Pela CLT, dá para vender até ${plural(
+                          podeVender,
+                          "dia",
+                          "dias",
+                        )} deste período (1/3 do direito${
+                          jaVendidos > 0
+                            ? `, menos ${plural(jaVendidos, "dia", "dias")} já ${jaVendidos === 1 ? "vendido" : "vendidos"}`
+                            : ""
+                        }).`}
                       </p>
                       {simulacao?.prazoAbono ? (
                         <p className="ausencias-gaveta__ajuda">

@@ -8,11 +8,19 @@
  *   opcional. O pedido fica em "Ajuste sugerido".
  * - **Recusar:** o motivo é obrigatório.
  *
+ * Sem o Portal, ninguém responde à sugestão: no "Ajuste sugerido" só cabe
+ * recusar (ou editar a ausência com as novas datas). Mensagens e motivos
+ * ficam registrados; não há aviso à pessoa.
+ *
  * Os dias e a volta vêm sempre do servidor (a mesma simulação do registro).
  */
 import { useEffect, useId, useState } from "react";
 import { FormActions } from "../../../components";
-import { diaEMesAbreviado, formatarDiaCivil } from "../../../format/data";
+import {
+  diaEMesAbreviado,
+  formatarDiaCivil,
+  formatarIntervaloDeDias,
+} from "../../../format/data";
 import { Button, Sheet } from "../../../ui";
 import { IconeRegistrarAusencia } from "../../../ui/icones";
 import {
@@ -51,6 +59,8 @@ function mensagemDaRecusa(erro: unknown, nome: string): string {
       return "Escolha datas diferentes das que foram pedidas.";
     case "fim_antes_do_inicio":
       return "O último dia não pode ser antes do primeiro.";
+    case "aguardando_resposta":
+      return `A sugestão de outras datas ainda espera a resposta de ${nome}. Edite as datas ou recuse o pedido.`;
     default:
       return "Não foi possível responder agora. Tente de novo.";
   }
@@ -87,10 +97,13 @@ export function ResponderAusenciaJanela({
   const [falha, setFalha] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Ajuste sugerido: a sugestão espera quem pediu (Portal); só recusar.
+  const emAjuste = a?.status === "ajuste_sugerido";
+
   // Abrir começa do zero, nas datas do pedido.
   useEffect(() => {
     if (!a) return;
-    setResposta("aprovar");
+    setResposta(a.status === "ajuste_sugerido" ? "recusar" : "aprovar");
     setMensagem("");
     setMotivo("");
     setInicio(a.inicio);
@@ -190,31 +203,40 @@ export function ResponderAusenciaJanela({
   }
 
   const data = a ? diaEMesAbreviado(a.inicio) : null;
+  const recusar = {
+    valor: "recusar" as const,
+    titulo: "Recusar",
+    ajuda: "Informe o motivo. Ele fica registrado na ausência.",
+  };
   const opcoes: readonly {
     readonly valor: Resposta;
     readonly titulo: string;
     readonly ajuda: string;
-  }[] = [
-    {
-      valor: "aprovar",
-      titulo: "Aprovar",
-      ajuda: `O período entra no calendário e ${nome} recebe o aviso.`,
-    },
-    ...(servico.sugerir
-      ? [
-          {
-            valor: "sugerir" as const,
-            titulo: "Sugerir outras datas",
-            ajuda: `Proponha um novo período para ${nome} avaliar.`,
-          },
-        ]
-      : []),
-    {
-      valor: "recusar",
-      titulo: "Recusar",
-      ajuda: `Explique o motivo para ${nome}.`,
-    },
-  ];
+  }[] = emAjuste
+    ? [recusar]
+    : [
+        {
+          valor: "aprovar",
+          titulo: "Aprovar",
+          ajuda: "O período entra no calendário.",
+        },
+        ...(servico.sugerir
+          ? [
+              {
+                valor: "sugerir" as const,
+                titulo: "Sugerir outras datas",
+                ajuda:
+                  "O pedido fica em ajuste sugerido até você editar as datas ou recusar.",
+              },
+            ]
+          : []),
+        recusar,
+      ];
+  const sugerida = a?.sugestao
+    ? a.sugestao.inicio === a.sugestao.fim
+      ? formatarDiaCivil(a.sugestao.inicio)
+      : formatarIntervaloDeDias(a.sugestao.inicio, a.sugestao.fim)
+    : null;
   const rotuloDoBotao =
     resposta === "aprovar"
       ? "Aprovar pedido"
@@ -275,6 +297,12 @@ export function ResponderAusenciaJanela({
               ) : null}
             </span>
           </div>
+
+          {emAjuste ? (
+            <p className="ausencias-gaveta__ajuda" role="note">
+              {`${sugerida ? `Você sugeriu ${sugerida}. ` : ""}Sem o Portal, ${nome} ainda não responde à sugestão: para ficar com as novas datas, edite a ausência; para encerrar o pedido, recuse.`}
+            </p>
+          ) : null}
 
           <h3
             className="ausencias-gaveta__titulo responder__pergunta"
@@ -365,34 +393,30 @@ export function ResponderAusenciaJanela({
                 onChange={(e) => setMotivo(e.target.value)}
               />
               <p className="ausencias-gaveta__ajuda">
-                {`${nome} verá esta mensagem.`}
+                O motivo fica registrado na ausência.
               </p>
             </div>
           ) : (
             <div className="responder__bloco">
               <label className="responder__rotulo" htmlFor={`${base}-msg`}>
-                {resposta === "sugerir"
-                  ? "Por que outras datas?"
-                  : `Mensagem para ${nome}`}{" "}
+                {resposta === "sugerir" ? "Por que outras datas?" : "Mensagem"}{" "}
                 <span className="ausencias-gaveta__opcional">Opcional</span>
               </label>
               <textarea
                 id={`${base}-msg`}
                 className="ausencias-gaveta__campo ausencias-gaveta__observacao"
                 aria-label={
-                  resposta === "sugerir"
-                    ? "Por que outras datas?"
-                    : `Mensagem para ${nome}`
+                  resposta === "sugerir" ? "Por que outras datas?" : "Mensagem"
                 }
                 maxLength={1000}
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
               />
-              {resposta === "sugerir" ? (
-                <p className="ausencias-gaveta__ajuda">
-                  {`${nome} recebe a sugestão e pode aceitar ou pedir outra data.`}
-                </p>
-              ) : null}
+              <p className="ausencias-gaveta__ajuda">
+                {resposta === "sugerir"
+                  ? `A sugestão fica registrada. ${nome} poderá aceitar ou pedir outra data quando o Portal existir.`
+                  : "A mensagem fica registrada na ausência."}
+              </p>
             </div>
           )}
 

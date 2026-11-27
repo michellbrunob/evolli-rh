@@ -93,7 +93,7 @@ import "./AbaFeriasEAusencias.css";
 
 interface Props {
   readonly pessoa: PessoaParaAusencia;
-  /** "a Ana", "o João", "Sam" — o trato da ficha. */
+  /** "a Ana", "o João", "Sam" — o trato da ficha (a ficha sempre passa). */
   readonly quem: string;
   /** "da Ana", "do João", "de Sam". */
   readonly deQuem: string;
@@ -142,10 +142,15 @@ const VARIANTE_DA_SITUACAO = {
   vencido: "danger",
 } as const;
 
-/** Os status que esperam a resposta de quem decide ("Responder"). */
+/**
+ * Os status que esperam a resposta de quem decide ("Responder"). O ajuste
+ * sugerido entra para poder ser recusado (aprovar, não: a sugestão espera
+ * a resposta de quem pediu, pelo Portal, quando ele existir).
+ */
 const ESPERANDO_RESPOSTA: ReadonlySet<StatusAusencia> = new Set([
   "aguardando_rh",
   "aguardando_gestor",
+  "ajuste_sugerido",
 ]);
 
 const ENCERRADAS: ReadonlySet<StatusAusencia> = new Set([
@@ -196,7 +201,6 @@ function diasAte(de: string, ate: string): number {
 
 export function AbaFeriasEAusencias({
   pessoa,
-  quem,
   deQuem,
   podeEditar,
   servico,
@@ -359,7 +363,7 @@ export function AbaFeriasEAusencias({
               ? { onAjustar: () => setAjustando(true) }
               : {})}
           />
-          <ProximaAusencia dados={dados} hoje={hoje} quem={quem} />
+          <ProximaAusencia dados={dados} hoje={hoje} />
         </div>
 
         <Historico
@@ -787,6 +791,15 @@ function Saldo({
                 </Button>
               ) : null}
             </div>
+            {atual.situacao === "vencido" && atual.disponiveis > 0 ? (
+              <p className="ferias-ficha__nota">
+                <IconeInformacao tamanho={16} />
+                <span>
+                  Período vencido: a CLT manda conceder estas férias, com
+                  pagamento em dobro (art. 137).
+                </span>
+              </p>
+            ) : null}
             {outros.length > 0 ? (
               <ul
                 className="ferias-ficha__periodos"
@@ -815,11 +828,9 @@ function Saldo({
 function ProximaAusencia({
   dados,
   hoje,
-  quem,
 }: {
   readonly dados: FeriasDoColaboradorApi;
   readonly hoje: string;
-  readonly quem: string;
 }) {
   const a = dados.proximaAusencia;
   const faltam = a ? diasAte(hoje, a.inicio) : null;
@@ -873,7 +884,7 @@ function ProximaAusencia({
               Nenhuma ausência agendada
             </span>
             <span className="ferias-ficha__suave">
-              {`Quando ${quem} solicitar férias ou day off, a solicitação aparece aqui para você aprovar.`}
+              Quando houver férias ou outra ausência agendada, ela aparece aqui.
             </span>
           </span>
         )}
@@ -1058,8 +1069,15 @@ function LinhaDoHistorico({
         <span>{datas(a)}</span>
         <span className="ferias-ficha__suave">
           {a.dias !== null ? diasUteis(a.diasUteis) : "Sem data de volta"}
-          {a.diasVendidos > 0 ? ` + ${a.diasVendidos} vendidos` : null}
+          {a.diasVendidos > 0
+            ? ` + ${a.diasVendidos} ${a.diasVendidos === 1 ? "vendido" : "vendidos"}`
+            : null}
         </span>
+        {a.status === "ajuste_sugerido" && a.sugestao ? (
+          <span className="ferias-ficha__suave">
+            {`Sugerido: ${formatarIntervaloDeDias(a.sugestao.inicio, a.sugestao.fim)}`}
+          </span>
+        ) : null}
       </span>
       <span className="ferias-ficha__item-fim">
         {a.anexo ? (

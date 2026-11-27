@@ -57,6 +57,7 @@ import {
 import { ResponderAusenciaJanela } from "./ResponderAusenciaJanela";
 import { COR_DO_TIPO } from "./aparenciaDoTipo";
 import { formatarIntervaloDeDias } from "../../../format/data";
+import { plural } from "../../../format/plural";
 import { FotoDoColaborador } from "../FotoDoColaborador";
 import { iniciaisDe } from "../iniciais";
 import "./FeriasEAusencias.css";
@@ -181,16 +182,25 @@ function FiltroDaBarra<T extends string>({
 
 /** A segunda linha do período: os dias úteis (como a referência). */
 function diasDaLinha(a: AusenciaApi): string {
+  // Ajuste sugerido: as datas propostas, que ainda esperam resposta.
+  if (a.status === "ajuste_sugerido" && a.sugestao) {
+    return `Sugerido: ${formatarIntervaloDeDias(a.sugestao.inicio, a.sugestao.fim)}`;
+  }
   if (!a.fim || a.diasUteis === null) return "Sem data de volta";
-  const uteis = a.diasUteis === 1 ? "1 dia útil" : `${a.diasUteis} dias úteis`;
+  const uteis = plural(a.diasUteis, "dia útil", "dias úteis");
   if (a.diasVendidos === 0) return uteis;
-  return `${uteis} · ${a.diasVendidos} ${a.diasVendidos === 1 ? "vendido" : "vendidos"}`;
+  return `${uteis} · ${plural(a.diasVendidos, "vendido", "vendidos")}`;
 }
 
-/** Os status que esperam a resposta de quem decide ("Responder"). */
+/**
+ * Os status que esperam a resposta de quem decide ("Responder"). O ajuste
+ * sugerido entra para poder ser recusado (aprovar, não: a sugestão espera
+ * a resposta de quem pediu).
+ */
 const ESPERANDO_RESPOSTA: ReadonlySet<StatusAusencia> = new Set([
   "aguardando_rh",
   "aguardando_gestor",
+  "ajuste_sugerido",
 ]);
 
 /** Editar: só o que ainda vale (cancelada e recusada só saem). */

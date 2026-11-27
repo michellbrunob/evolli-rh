@@ -10,7 +10,9 @@
  *
  * As regras só apontam o que não segue: o RH registra mesmo assim, com
  * motivo. Quem aprova pelo gestor e os pedidos do colaborador dependem do
- * Portal (ligação pendente): ficam gravados para quando ele existir.
+ * Portal (ligação pendente): ficam gravados para quando ele existir, e a
+ * tela diz isso. Além do saldo, nunca (o servidor recusa); o lembrete não
+ * aparece, porque nada o usa ainda.
  */
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
@@ -236,8 +238,7 @@ function ListaDePoliticas({
             Políticas de férias
           </h1>
           <p className="politicas__subtitulo">
-            O sistema confere estas regras em cada pedido do colaborador e em
-            cada registro do RH.
+            O Evolli confere estas regras em cada registro de férias do RH.
           </p>
         </div>
         {podeEditar ? (
@@ -373,9 +374,16 @@ function ListaDePoliticas({
                             className={`politicas__ponto politicas__ponto--${p.foraDaPolitica}`}
                             aria-hidden="true"
                           />
-                          {p.foraDaPolitica === "avisar"
-                            ? "Avisa e deixa enviar"
-                            : "Não deixa enviar"}
+                          <span className="politicas__duas-linhas">
+                            <span>
+                              {p.foraDaPolitica === "avisar"
+                                ? "Avisa e deixa enviar"
+                                : "Não deixa enviar"}
+                            </span>
+                            <span className="politicas__suave">
+                              Quando o Portal existir
+                            </span>
+                          </span>
                         </span>
                       </td>
                       <td>
@@ -625,7 +633,8 @@ function EditorDePolitica({
           ? alvos.map((a) => ({ tipo: a.tipo, id: a.id }))
           : [],
       valeAPartirDe,
-      regras,
+      // Além do saldo, o servidor sempre recusa: grava o que ele cumpre.
+      regras: { ...regras, alemDoSaldo: "nao_aceitar" },
       aprovacao,
       rascunho,
     };
@@ -639,8 +648,8 @@ function EditorDePolitica({
       if (editandoId) await servico.alterar(editandoId, dto(rascunho));
       else await servico.criar(dto(rascunho));
       onSair(rascunho ? "Rascunho salvo." : "Política salva.");
-    } catch {
-      setFalha("Não foi possível salvar a política. Confira e tente de novo.");
+    } catch (erro) {
+      setFalha(mensagemDaRecusa(erro));
     } finally {
       setSalvando(false);
     }
@@ -728,7 +737,7 @@ function EditorDePolitica({
       </LinhaDoCadastro>
       <LinhaDoCadastro
         rotulo="Texto para o colaborador opcional"
-        ajuda='Aparece em "Ver a política da empresa" no pedido do Portal.'
+        ajuda="Vai aparecer no pedido de férias do Portal, quando ele existir."
         paraId={`${id}-texto`}
       >
         <textarea
@@ -917,29 +926,10 @@ function EditorDePolitica({
           </span>
         </LinhaDoCadastro>
         <LinhaDoCadastro rotulo="Pedido além do saldo">
-          <div
-            role="radiogroup"
-            aria-label="Pedido além do saldo"
-            className="politicas__opcoes politicas__opcoes--linha"
-          >
-            {(
-              [
-                ["nao_aceitar", "Não aceitar"],
-                ["aceitar", "Aceitar, e quem aprova decide"],
-              ] as const
-            ).map(([valor, rotulo]) => (
-              <button
-                key={valor}
-                type="button"
-                role="radio"
-                aria-checked={regras.alemDoSaldo === valor}
-                className="politicas__opcao"
-                onClick={() => regra("alemDoSaldo", valor)}
-              >
-                {rotulo}
-              </button>
-            ))}
-          </div>
+          <p className="politicas__nota">
+            Não aceita. O Evolli não registra férias além do saldo do período
+            (CLT).
+          </p>
         </LinhaDoCadastro>
       </SecaoDoCadastro>
       <SecaoDoCadastro titulo="Divisão em períodos" descricao="">
@@ -1161,44 +1151,33 @@ function EditorDePolitica({
               [
                 "gestor_rh",
                 "Gestor direto e depois o RH",
-                "O gestor responde pelo Portal, em Férias e ausências. Sem gestor marcado, o pedido vai direto para o RH.",
+                "Quando o Portal existir.",
               ],
-              [
-                "gestor",
-                "Só o gestor direto",
-                "O RH acompanha, mas não precisa aprovar.",
-              ],
+              ["gestor", "Só o gestor direto", "Quando o Portal existir."],
             ] as const
-          ).map(([valor, titulo, ajuda]) => (
-            <button
-              key={valor}
-              type="button"
-              role="radio"
-              aria-checked={aprovacao.quem === valor}
-              className="politicas__opcao"
-              onClick={() => setAprovacao((a) => ({ ...a, quem: valor }))}
-            >
-              <span className="politicas__opcao-titulo">{titulo}</span>
-              <span className="politicas__suave">{ajuda}</span>
-            </button>
-          ))}
+          ).map(([valor, titulo, ajuda]) => {
+            // Sem o Portal, o gestor não responde: só o RH aprova hoje.
+            const semPortal = valor !== "rh";
+            return (
+              <button
+                key={valor}
+                type="button"
+                role="radio"
+                aria-checked={aprovacao.quem === valor}
+                disabled={semPortal}
+                className="politicas__opcao"
+                onClick={() => setAprovacao((a) => ({ ...a, quem: valor }))}
+              >
+                <span className="politicas__opcao-titulo">{titulo}</span>
+                <span className="politicas__suave">{ajuda}</span>
+              </button>
+            );
+          })}
         </div>
       </LinhaDoCadastro>
       <LinhaDoCadastro
-        rotulo="Lembrete opcional"
-        ajuda="Para quem ainda não respondeu."
-      >
-        <span className="politicas__com-sufixo">
-          avisar depois de
-          {campoNumero("Dias sem resposta", aprovacao.lembreteDias, (v) =>
-            setAprovacao((a) => ({ ...a, lembreteDias: v })),
-          )}
-          dias sem resposta
-        </span>
-      </LinhaDoCadastro>
-      <LinhaDoCadastro
-        rotulo="Pedido fora da política"
-        ajuda="Quando o pedido do colaborador não segue alguma regra."
+        rotulo="Pedido do colaborador fora da política"
+        ajuda="Vale para os pedidos do colaborador, quando o Portal existir. Hoje, o RH registra com motivo."
       >
         <div
           role="radiogroup"
@@ -1210,12 +1189,12 @@ function EditorDePolitica({
               [
                 "avisar",
                 "Avisar e deixar enviar",
-                "O colaborador vê o que não segue a política, e quem aprova decide.",
+                "No Portal, o colaborador verá o que não segue, e quem aprova decide.",
               ],
               [
                 "bloquear",
                 "Não deixar enviar",
-                "O botão Enviar só funciona quando o pedido segue todas as regras.",
+                "No Portal, o pedido só irá se seguir todas as regras.",
               ],
             ] as const
           ).map(([valor, titulo, ajuda]) => (
@@ -1265,7 +1244,7 @@ function EditorDePolitica({
       titulo={
         editandoId ? "Editar política de férias" : "Nova política de férias"
       }
-      descricao="O sistema confere estas regras em cada pedido do colaborador e em cada registro do RH."
+      descricao="O Evolli confere estas regras em cada registro de férias do RH."
       rotuloVoltar="Voltar para Políticas de férias"
       onVoltarDaPagina={() => onSair()}
       acaoDoCabecalho={
@@ -1394,10 +1373,7 @@ function Revisao({
             "Sem limite de períodos",
           ),
         ],
-        [
-          "Pedido além do saldo",
-          r.alemDoSaldo === "aceitar" ? "Aceita" : "Não aceita",
-        ],
+        ["Pedido além do saldo", "Não aceita (a CLT não deixa)"],
       ])}
       {bloco("Datas e equipe", 3, [
         [
@@ -1446,22 +1422,16 @@ function Revisao({
           aprovacao.quem === "rh"
             ? "RH"
             : aprovacao.quem === "gestor_rh"
-              ? "Gestor direto e depois o RH"
-              : "Só o gestor direto",
+              ? "Gestor direto e depois o RH (quando o Portal existir)"
+              : "Só o gestor direto (quando o Portal existir)",
         ],
         [
-          "Lembrete",
-          ou(
-            aprovacao.lembreteDias,
-            (n) => `Depois de ${n} ${n === 1 ? "dia" : "dias"} sem resposta`,
-            "Sem lembrete",
-          ),
-        ],
-        [
-          "Pedido fora da política",
-          aprovacao.foraDaPolitica === "avisar"
-            ? "Avisa e deixa enviar"
-            : "Não deixa enviar",
+          "Pedido do colaborador fora da política",
+          `${
+            aprovacao.foraDaPolitica === "avisar"
+              ? "Avisa e deixa enviar"
+              : "Não deixa enviar"
+          } (quando o Portal existir)`,
         ],
         ["Registro pelo RH", "O RH registra com motivo"],
       ])}
@@ -1470,6 +1440,23 @@ function Revisao({
       </p>
     </div>
   );
+}
+
+/** A recusa do servidor ao salvar, na voz da tela (sem repetir valor). */
+function mensagemDaRecusa(erro: unknown): string {
+  const primeiro = (
+    erro as { erros?: readonly { campo: string; motivo: string }[] }
+  ).erros?.[0];
+  switch (`${primeiro?.campo}:${primeiro?.motivo}`) {
+    case "regras.bloqueios:fim_antes_do_inicio":
+      return "Um período bloqueado termina antes de começar. Confira as datas ou marque Todo ano.";
+    case "regras.duracaoMaximaDias:fora_de_ordem":
+      return "A duração mínima de cada período passa da máxima.";
+    case "alvos:indisponivel":
+      return "Algum departamento, unidade ou pessoa não é desta empresa. Escolha de novo.";
+    default:
+      return "Não foi possível salvar a política. Confira e tente de novo.";
+  }
 }
 
 /** A duração de cada período na revisão: os dois limites, só um ou nenhum. */

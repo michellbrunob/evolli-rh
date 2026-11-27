@@ -16,6 +16,7 @@ import type {
   ListaDePoliticasApi,
   PoliticaFeriasApi,
 } from "../../../../api/politicasFeriasClient";
+import { ApiError } from "../../../../api/colaboradoresClient";
 import { PoliticasFeriasScreen } from "./PoliticasFeriasScreen";
 import type { ServicoDePoliticas } from "./servicoDePoliticas";
 
@@ -148,7 +149,7 @@ describe("PoliticasFeriasScreen (T215) — lista", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "O sistema confere estas regras em cada pedido do colaborador e em cada registro do RH.",
+        "O Evolli confere estas regras em cada registro de férias do RH.",
       ),
     ).toBeInTheDocument();
     const faixa = await screen.findByRole("region", {
@@ -181,6 +182,7 @@ describe("PoliticasFeriasScreen (T215) — lista", () => {
     expect(ativa).toHaveTextContent("Antecedência de 30 dias");
     expect(ativa).toHaveTextContent("Até 2 períodos · e mais 4");
     expect(ativa).toHaveTextContent("Avisa e deixa enviar");
+    expect(ativa).toHaveTextContent("Quando o Portal existir");
     expect(inativa).toHaveTextContent("Inativa");
     expect(inativa).toHaveTextContent("CLT, Estágio");
     expect(inativa).toHaveTextContent("Todas as pessoas · 0 pessoas");
@@ -303,6 +305,15 @@ describe("PoliticasFeriasScreen (T215) — assistente", () => {
       ),
     ).toBeVisible();
     proxima();
+    // O servidor nunca registra férias além do saldo: não há o que escolher.
+    expect(
+      screen.queryByRole("radio", { name: /Aceitar, e quem aprova decide/ }),
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        "Não aceita. O Evolli não registra férias além do saldo do período (CLT).",
+      ),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Antecedência mínima em dias"), {
       target: { value: "30" },
     });
@@ -315,9 +326,26 @@ describe("PoliticasFeriasScreen (T215) — assistente", () => {
     proxima();
     fireEvent.click(screen.getByLabelText("Em sexta-feira"));
     proxima();
-    fireEvent.click(screen.getByRole("radio", { name: /^Só o gestor direto/ }));
+    // Aprovação pelo gestor depende do Portal: aparece, mas não se escolhe.
+    const gestor = screen.getByRole("radio", { name: /^Só o gestor direto/ });
+    expect(gestor).toBeDisabled();
+    expect(gestor).toHaveTextContent("Quando o Portal existir.");
+    fireEvent.click(gestor);
+    // Lembrete: nada o usa hoje, não aparece.
+    expect(screen.queryByText(/Lembrete/)).toBeNull();
+    expect(
+      screen.getByText(
+        "Vale para os pedidos do colaborador, quando o Portal existir. Hoje, o RH registra com motivo.",
+      ),
+    ).toBeInTheDocument();
     proxima();
     const revisao = screen.getByRole("region", { name: "Pedido e períodos" });
+    expect(revisao).toHaveTextContent(
+      "Pedido além do saldoNão aceita (a CLT não deixa)",
+    );
+    expect(
+      screen.getByRole("region", { name: "Aprovação" }),
+    ).not.toHaveTextContent("Lembrete");
     expect(revisao).toHaveTextContent("30 dias, no mínimo");
     expect(revisao).toHaveTextContent("Duração de cada período5 dias ou mais");
     expect(revisao).toHaveTextContent("até 2 períodos por ano");
@@ -339,7 +367,7 @@ describe("PoliticasFeriasScreen (T215) — assistente", () => {
           periodosPorAno: 2,
           voltaNaoNaSexta: true,
         }),
-        aprovacao: expect.objectContaining({ quem: "gestor" }),
+        aprovacao: expect.objectContaining({ quem: "rh" }),
       }),
     );
     expect(await screen.findByText("Política salva.")).toBeInTheDocument();
@@ -428,6 +456,59 @@ describe("PoliticasFeriasScreen (T215) — assistente", () => {
     });
     expect(s.criar).toHaveBeenCalledWith(
       expect.objectContaining({ nome: "Time do escritório (cópia)" }),
+    );
+  });
+
+  it.each([
+    [
+      { campo: "regras.bloqueios", motivo: "fim_antes_do_inicio" },
+      "Um período bloqueado termina antes de começar. Confira as datas ou marque Todo ano.",
+    ],
+    [
+      { campo: "regras.duracaoMaximaDias", motivo: "fora_de_ordem" },
+      "A duração mínima de cada período passa da máxima.",
+    ],
+    [
+      { campo: "alvos", motivo: "indisponivel" },
+      "Algum departamento, unidade ou pessoa não é desta empresa. Escolha de novo.",
+    ],
+  ])("recusa do servidor ao salvar: %o", async (erro, texto) => {
+    const s = servico();
+    s.alterar.mockRejectedValueOnce(new ApiError(422, "x", { erros: [erro] }));
+    montar(s);
+    await screen.findByRole("table", { name: "Políticas de férias" });
+    abrirMenu("Time do escritório");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Etapa 6: Revisão/ }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salvar política" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(texto);
+  });
+
+  it("política antiga com 'aceitar além do saldo' grava o que o sistema cumpre", async () => {
+    const s = servico();
+    s.obter.mockResolvedValueOnce({
+      ...POLITICA,
+      regras: { ...REGRAS, alemDoSaldo: "aceitar" as const },
+    });
+    montar(s);
+    await screen.findByRole("table", { name: "Políticas de férias" });
+    abrirMenu("Time do escritório");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Etapa 6: Revisão/ }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salvar política" }));
+    });
+    expect(s.alterar).toHaveBeenCalledWith(
+      "p-1",
+      expect.objectContaining({
+        regras: expect.objectContaining({ alemDoSaldo: "nao_aceitar" }),
+      }),
     );
   });
 });

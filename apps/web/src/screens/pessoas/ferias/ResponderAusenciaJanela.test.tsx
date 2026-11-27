@@ -96,16 +96,16 @@ describe("ResponderAusenciaJanela (T215)", () => {
     ).toBeInTheDocument();
     const opcoes = within(janela()).getAllByRole("radio");
     expect(opcoes.map((o) => o.textContent)).toEqual([
-      "AprovarO período entra no calendário e Pedro recebe o aviso.",
-      "Sugerir outras datasProponha um novo período para Pedro avaliar.",
-      "RecusarExplique o motivo para Pedro.",
+      "AprovarO período entra no calendário.",
+      "Sugerir outras datasO pedido fica em ajuste sugerido até você editar as datas ou recusar.",
+      "RecusarInforme o motivo. Ele fica registrado na ausência.",
     ]);
     expect(opcoes[0]).toHaveAttribute("aria-checked", "true");
   });
 
   it("aprovar: mensagem opcional, aprova e avisa", async () => {
     const { s, onRespondida } = montar();
-    fireEvent.change(within(janela()).getByLabelText("Mensagem para Pedro"), {
+    fireEvent.change(within(janela()).getByLabelText("Mensagem"), {
       target: { value: "  Boa folga!  " },
     });
     await act(async () => {
@@ -127,7 +127,7 @@ describe("ResponderAusenciaJanela (T215)", () => {
     const { s, onRespondida } = montar();
     fireEvent.click(within(janela()).getByRole("radio", { name: /^Recusar/ }));
     expect(
-      within(janela()).getByText("Pedro verá esta mensagem."),
+      within(janela()).getByText("O motivo fica registrado na ausência."),
     ).toBeInTheDocument();
     expect(botao("Recusar pedido")).toBeDisabled();
     const motivo = within(janela()).getByLabelText("Motivo da recusa");
@@ -166,7 +166,7 @@ describe("ResponderAusenciaJanela (T215)", () => {
     ).toBeInTheDocument();
     expect(
       within(janela()).getByText(
-        "Pedro recebe a sugestão e pode aceitar ou pedir outra data.",
+        "A sugestão fica registrada. Pedro poderá aceitar ou pedir outra data quando o Portal existir.",
       ),
     ).toBeInTheDocument();
     fireEvent.change(within(janela()).getByLabelText("Por que outras datas?"), {
@@ -233,5 +233,48 @@ describe("ResponderAusenciaJanela (T215)", () => {
       "Já existe uma ausência de Pedro nessas datas.",
     );
     expect(onRespondida).not.toHaveBeenCalled();
+  });
+
+  it("ajuste sugerido: só recusar, e a janela diz por quê", async () => {
+    const s = servico();
+    render(
+      <ResponderAusenciaJanela
+        ausencia={{
+          ...AUSENCIA,
+          status: "ajuste_sugerido",
+          sugestao: { inicio: "2026-12-01", fim: "2026-12-01" },
+        }}
+        servico={s as unknown as ServicoDeAusencias}
+        onFechar={vi.fn()}
+        onRespondida={vi.fn()}
+      />,
+    );
+    expect(within(janela()).getByRole("note")).toHaveTextContent(
+      "Você sugeriu 01/12/2026. Sem o Portal, Pedro ainda não responde à sugestão: para ficar com as novas datas, edite a ausência; para encerrar o pedido, recuse.",
+    );
+    const opcoes = within(janela()).getAllByRole("radio");
+    expect(opcoes.map((o) => o.textContent)).toEqual([
+      "RecusarInforme o motivo. Ele fica registrado na ausência.",
+    ]);
+    expect(opcoes[0]).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(janela()).queryByRole("button", { name: "Aprovar pedido" }),
+    ).toBeNull();
+  });
+
+  it("aprovar recusado pelo servidor (ajuste sugerido): o motivo aparece", async () => {
+    const s = servico();
+    s.aprovar.mockRejectedValueOnce(
+      new ApiError(422, "x", {
+        erros: [{ campo: "sugestao", motivo: "aguardando_resposta" }],
+      }),
+    );
+    montar(s);
+    await act(async () => {
+      fireEvent.click(botao("Aprovar pedido"));
+    });
+    expect(within(janela()).getByRole("alert")).toHaveTextContent(
+      "A sugestão de outras datas ainda espera a resposta de Pedro. Edite as datas ou recuse o pedido.",
+    );
   });
 });

@@ -19,6 +19,7 @@ import type {
   IndicadoresDeAusencias,
   ServicoDeAusencias,
 } from "./tiposAusencia";
+import { textoDaExclusao } from "./tiposAusencia";
 
 const MARIA = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -1089,6 +1090,291 @@ describe("T215 — resumo da gaveta no singular", () => {
     });
     expect(
       await screen.findByText("1 dia de day off (1 dia útil)"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("T215 — correções da revisão (gaveta e lista)", () => {
+  const simulacaoDeFerias = (extra: Record<string, unknown> = {}) => ({
+    dias: 20,
+    diasUteis: 14,
+    volta: "2027-01-25",
+    periodo: { inicio: "2026-01-01", fim: "2026-12-31" },
+    saldoAntes: 30,
+    saldoDepois: 10,
+    maxVendaveis: 10,
+    prazoAbono: null,
+    regraDeFerias: "calculada" as const,
+    ...extra,
+  });
+
+  function montarEdicao(editando: AusenciaApi) {
+    const onAlterada = vi.fn();
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        editando={editando}
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        onAlterada={onAlterada}
+      />,
+    );
+    return { onAlterada };
+  }
+
+  it("editar coletiva fora da política: a coletiva e o motivo vêm da ausência e vão no salvar", async () => {
+    vi.mocked(servico.simular).mockImplementation(async (c) =>
+      simulacaoDeFerias({
+        podeSerColetiva: true,
+        coletiva: c.feriasColetivas
+          ? { dias: 23, novoPeriodo: "2027-01-05" }
+          : null,
+        politica: {
+          id: "p-1",
+          nome: "Política do time",
+          violacoes: [{ regra: "antecedencia_minima", dias: 4, minimo: 30 }],
+        },
+      }),
+    );
+    const { onAlterada } = montarEdicao(
+      ausencia({
+        status: "aprovada",
+        feriasColetivas: true,
+        motivoForaDaPolitica: "Combinado com a gestão",
+      }),
+    );
+    const coletiva = await screen.findByRole("switch", {
+      name: "São férias coletivas?",
+    });
+    expect(coletiva).toHaveAttribute("aria-checked", "true");
+    await waitFor(() =>
+      expect(servico.simular).toHaveBeenLastCalledWith(
+        expect.objectContaining({ feriasColetivas: true, ignorar: "a-1" }),
+        expect.anything(),
+      ),
+    );
+    expect(
+      screen.getByLabelText("Por que registrar fora da política?"),
+    ).toHaveValue("Combinado com a gestão");
+    fireEvent.change(screen.getByLabelText("Observação"), {
+      target: { value: "nova observação" },
+    });
+    const salvar = screen.getByRole("button", { name: "Salvar alterações" });
+    await waitFor(() => expect(salvar).toBeEnabled());
+    fireEvent.click(salvar);
+    await waitFor(() =>
+      expect(servico.alterar).toHaveBeenCalledWith(
+        "a-1",
+        expect.objectContaining({
+          feriasColetivas: true,
+          motivoForaDaPolitica: "Combinado com a gestão",
+          observacao: "nova observação",
+        }),
+      ),
+    );
+    await waitFor(() => expect(onAlterada).toHaveBeenCalled());
+  });
+
+  it("venda em frações: diz quanto ainda dá para vender no período", async () => {
+    vi.mocked(servico.simular).mockImplementation(async () =>
+      simulacaoDeFerias({ maxVendaveis: 4, vendidosNoPeriodo: 6 }),
+    );
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={MARIA}
+        tipoInicial="ferias"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-24" },
+    });
+    expect(
+      await screen.findByText(
+        "Abono pecuniário: Maria pode trocar até 4 dias por dinheiro (CLT art. 143, 1/3 das férias). Já foram vendidos 6 dias neste período.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Vender dias destas férias?" }),
+    );
+    expect(
+      screen.getByText(
+        "Pela CLT, dá para vender até 4 dias deste período (1/3 do direito, menos 6 dias já vendidos).",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Dias vendidos")).toHaveAttribute("max", "4");
+  });
+
+  it("venda no limite: sem a pergunta, com o porquê", async () => {
+    vi.mocked(servico.simular).mockImplementation(async () =>
+      simulacaoDeFerias({ maxVendaveis: 0, vendidosNoPeriodo: 10 }),
+    );
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={MARIA}
+        tipoInicial="ferias"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-24" },
+    });
+    expect(
+      await screen.findByText(
+        "A venda deste período já chegou ao limite: 10 dias vendidos.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Vender dias destas férias?" }),
+    ).toBeNull();
+  });
+
+  it("plurais: + 1 vendido e até 1 dia", async () => {
+    vi.mocked(servico.simular).mockImplementation(async () =>
+      simulacaoDeFerias({ maxVendaveis: 1 }),
+    );
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={MARIA}
+        tipoInicial="ferias"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-24" },
+    });
+    expect(
+      await screen.findByText(
+        "Abono pecuniário: Maria pode trocar até 1 dia por dinheiro (CLT art. 143, 1/3 das férias).",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Vender dias destas férias?" }),
+    );
+    fireEvent.change(screen.getByLabelText("Dias vendidos"), {
+      target: { value: "1" },
+    });
+    expect(
+      await screen.findByText("20 dias de férias (14 dias úteis) + 1 vendido"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Pela CLT, dá para vender até 1 dia deste período (1/3 do direito).",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("período vencido: o aviso de pagamento em dobro nas Regras da CLT", async () => {
+    vi.mocked(servico.simular).mockImplementation(async () =>
+      simulacaoDeFerias({
+        avisosClt: [
+          {
+            regra: "pagamento_em_dobro",
+            dias: 20,
+            prazoGozo: "2026-12-31",
+          },
+        ],
+      }),
+    );
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={MARIA}
+        tipoInicial="ferias"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-24" },
+    });
+    const regras = await screen.findByRole("note", { name: "Regras da CLT" });
+    expect(regras).toHaveTextContent(
+      "20 dias depois do prazo de gozo (31/12/2026): pagamento em dobro (CLT art. 137).",
+    );
+  });
+
+  it("recusas novas do servidor, na voz da tela", async () => {
+    vi.mocked(servico.registrar).mockRejectedValueOnce({
+      status: 422,
+      erros: [{ campo: "inicio", motivo: "antes_da_admissao" }],
+    });
+    render(
+      <RegistrarAusenciaGaveta
+        aberta
+        servico={servico}
+        onFechar={vi.fn()}
+        onRegistrada={vi.fn()}
+        pessoaInicial={MARIA}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Day off" }));
+    fireEvent.change(screen.getByLabelText("Primeiro dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.change(screen.getByLabelText("Último dia"), {
+      target: { value: "2027-01-05" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar ausência" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A ausência não pode começar antes da admissão de Maria.",
+    );
+  });
+
+  it("excluir coletiva: o texto diz que o período volta a contar como antes", () => {
+    expect(
+      textoDaExclusao(
+        ausencia({ feriasColetivas: true }),
+        "Maria Teste Santos",
+      ),
+    ).toBe(
+      "As férias de Maria Teste Santos (05/01 – 24/01/2027) serão removidas do histórico e do calendário, e o novo período aquisitivo que a coletiva abriu é desfeito. Essa ação não pode ser desfeita.",
+    );
+  });
+
+  it("lista: ajuste sugerido mostra a sugestão e tem Responder", async () => {
+    servico = servicoFalso([
+      ausencia({
+        status: "ajuste_sugerido",
+        sugestao: { inicio: "2027-01-12", fim: "2027-01-31" },
+      }),
+    ]);
+    render(<FeriasEAusenciasAba servico={servico} podeRegistrar podeDecidir />);
+    expect(
+      await screen.findByText("Sugerido: 12/01 – 31/01/2027"),
+    ).toBeInTheDocument();
+    fireEvent.pointerDown(
+      screen.getByRole("button", {
+        name: "Ações da ausência de Maria Teste Santos",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Responder" }),
     ).toBeInTheDocument();
   });
 });

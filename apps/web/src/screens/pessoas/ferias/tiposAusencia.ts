@@ -83,6 +83,12 @@ export interface AusenciaApi {
     readonly tamanhoBytes: number;
     readonly enviadoEm: string;
   } | null;
+  /** T215 — "Sugerir outras datas": o período proposto, se houver. */
+  readonly sugestao?: { readonly inicio: string; readonly fim: string } | null;
+  /** T215 — férias coletivas (art. 140), que abrem um novo período. */
+  readonly feriasColetivas?: boolean;
+  /** T215 — registrada fora da política de férias: o porquê. */
+  readonly motivoForaDaPolitica?: string | null;
 }
 
 export interface IndicadoresDeAusencias {
@@ -135,7 +141,10 @@ export interface SimulacaoDeAusencia {
   readonly periodo: { readonly inicio: string; readonly fim: string } | null;
   readonly saldoAntes: number | null;
   readonly saldoDepois: number | null;
+  /** O que ainda dá para vender no período (o limite menos o já vendido). */
   readonly maxVendaveis: number | null;
+  /** T215 — dias já vendidos por outras férias do mesmo período. */
+  readonly vendidosNoPeriodo?: number | null;
   readonly prazoAbono: string | null;
   /**
    * T215 — a regra de férias do vínculo: calculada (CLT, Estágio),
@@ -381,7 +390,14 @@ const EXCLUSAO_NA_FRASE: Readonly<
   home_office: { artigo: "O", verbo: "será removido" },
 };
 
+/**
+ * O texto da confirmação de excluir. Nas férias coletivas, o reinício do
+ * período aquisitivo que elas abriram é desfeito junto (o servidor faz).
+ */
 export function textoDaExclusao(a: AusenciaApi, nome: string): string {
   const { artigo, verbo } = EXCLUSAO_NA_FRASE[a.tipo];
-  return `${artigo} ${NA_FRASE_DA_LISTA[a.tipo]} de ${nome} (${formatarIntervaloDeDias(a.inicio, a.fim)}) ${verbo} do histórico e do calendário. Essa ação não pode ser desfeita.`;
+  const coletiva = a.feriasColetivas
+    ? ", e o novo período aquisitivo que a coletiva abriu é desfeito"
+    : "";
+  return `${artigo} ${NA_FRASE_DA_LISTA[a.tipo]} de ${nome} (${formatarIntervaloDeDias(a.inicio, a.fim)}) ${verbo} do histórico e do calendário${coletiva}. Essa ação não pode ser desfeita.`;
 }

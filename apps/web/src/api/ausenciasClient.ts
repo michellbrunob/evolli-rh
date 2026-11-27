@@ -75,6 +75,12 @@ export interface AusenciaApi {
   decididoEm: string | null;
   /** T215 — o atestado ou documento anexado, sem nome nem chave. */
   anexo: AnexoDaAusenciaApi | null;
+  /** T215 — "Sugerir outras datas": o período proposto, se houver. */
+  sugestao?: { inicio: string; fim: string } | null;
+  /** T215 — férias coletivas (art. 140), que abrem um novo período. */
+  feriasColetivas?: boolean;
+  /** T215 — registrada fora da política de férias: o porquê. */
+  motivoForaDaPolitica?: string | null;
 }
 
 /** T215 — formatos do anexo (os da referência). */
@@ -133,6 +139,10 @@ export interface RegistrarAusenciaDto {
   /** Já aprovada, ou aguardando o RH (o afastamento é sempre aprovado). */
   aprovada: boolean;
   observacao?: string;
+  /** T215 — férias coletivas de quem tem menos de 12 meses (art. 140). */
+  feriasColetivas?: boolean;
+  /** T215 — por que registrar fora da política de férias. */
+  motivoForaDaPolitica?: string;
 }
 
 export interface SimularAusenciaQuery {
@@ -144,6 +154,8 @@ export interface SimularAusenciaQuery {
   periodoAquisitivoInicio?: string;
   /** Editando: a própria ausência não conta (sobreposição e saldo). */
   ignorar?: string;
+  /** T215 — simular como férias coletivas (art. 140). */
+  feriasColetivas?: boolean;
 }
 
 export interface SimulacaoDeAusenciaApi {
@@ -154,7 +166,10 @@ export interface SimulacaoDeAusenciaApi {
   /** Férias: saldo do período antes e depois; fora das férias, `null`. */
   saldoAntes: number | null;
   saldoDepois: number | null;
+  /** O que ainda dá para vender no período (o limite menos o já vendido). */
   maxVendaveis: number | null;
+  /** T215 — dias já vendidos por outras férias do mesmo período. */
+  vendidosNoPeriodo?: number | null;
   /** Último dia para pedir o abono sem a empresa poder negar. */
   prazoAbono: string | null;
   /** T215 — a regra de férias do vínculo da pessoa. */
@@ -205,7 +220,9 @@ export type AvisoCltApi =
       regra: "inicio_antes_de_descanso";
       antesDe: "domingo" | "feriado";
       dia: string;
-    };
+    }
+  /** T215 — dias depois do prazo de gozo: pagos em dobro (art. 137). */
+  | { regra: "pagamento_em_dobro"; dias: number; prazoGozo: string };
 
 export type SituacaoDoPeriodoAquisitivo =
   "em_aquisicao" | "disponivel" | "vencido";
@@ -381,6 +398,7 @@ export function simularAusencia(
       diasVendidos: query.diasVendidos,
       periodoAquisitivoInicio: query.periodoAquisitivoInicio,
       ignorar: query.ignorar,
+      feriasColetivas: query.feriasColetivas ? "true" : undefined,
     }),
   );
 }

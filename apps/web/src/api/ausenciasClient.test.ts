@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AusenciaApi,
+  alterarAusencia,
   aprovarAusencia,
   cancelarAusencia,
   consultarFeriasDoColaborador,
@@ -14,6 +15,7 @@ import {
 } from "./ausenciasClient";
 import { ApiError } from "./colaboradoresClient";
 import { clearCsrfToken, getCsrfToken, setCsrfToken } from "./csrfClient";
+import { servicoDeAusenciasDoServidor } from "../screens/pessoas/ferias/servicoDeAusenciasDoServidor";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -185,6 +187,66 @@ describe("ausenciasClient (T215)", () => {
     expect(url).toBe(
       `/v1/ausencias/simulacao?colaboradorId=${COLABORADOR}&tipo=ferias&inicio=2027-01-05&fim=2027-01-24&diasVendidos=0`,
     );
+  });
+
+  it("simula férias coletivas: a consulta leva feriasColetivas (cliente real e serviço da tela)", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        jsonResponse(200, { dias: 10, periodo: null }),
+      );
+    await simularAusencia({
+      colaboradorId: COLABORADOR,
+      tipo: "ferias",
+      inicio: "2027-01-05",
+      fim: "2027-01-14",
+      feriasColetivas: true,
+    });
+    const [url] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(new URL(url, "http://x").searchParams.get("feriasColetivas")).toBe(
+      "true",
+    );
+    // O caminho da tela: o serviço que a gaveta usa repassa o pedido.
+    await servicoDeAusenciasDoServidor.simular({
+      colaboradorId: COLABORADOR,
+      tipo: "ferias",
+      inicio: "2027-01-05",
+      fim: "2027-01-14",
+      feriasColetivas: true,
+    });
+    const [urlDaTela] = fetchMock.mock.calls[1]! as [string, RequestInit];
+    expect(
+      new URL(urlDaTela, "http://x").searchParams.get("feriasColetivas"),
+    ).toBe("true");
+    // Sem coletiva, o parâmetro não vai.
+    await simularAusencia({
+      colaboradorId: COLABORADOR,
+      tipo: "ferias",
+      inicio: "2027-01-05",
+      fim: "2027-01-14",
+    });
+    const [semColetiva] = fetchMock.mock.calls[2]! as [string, RequestInit];
+    expect(semColetiva).not.toContain("feriasColetivas");
+  });
+
+  it("edita: PATCH com o motivo fora da política e a coletiva", async () => {
+    setCsrfToken("token-sintetico");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse(200, ITEM));
+    const dto = {
+      tipo: "ferias" as const,
+      inicio: "2027-01-05",
+      fim: "2027-01-24",
+      aprovada: true,
+      feriasColetivas: false,
+      motivoForaDaPolitica: "Combinado com a gestão",
+    };
+    await alterarAusencia(AUSENCIA, dto);
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(`/v1/ausencias/${AUSENCIA}`);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual(dto);
   });
 
   it("férias do colaborador: GET do saldo e do histórico", async () => {
