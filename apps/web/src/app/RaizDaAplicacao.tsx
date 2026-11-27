@@ -19,8 +19,14 @@ export function RaizDaAplicacao() {
   useEffect(() => {
     const aoMudar = () =>
       setToken(tokenDaPesquisaPublica(window.location.hash));
+    // Colar o link na barra troca só o fragmento: o navegador avisa com
+    // `popstate` e `hashchange` (a ordem varia); os dois valem.
+    window.addEventListener("popstate", aoMudar);
     window.addEventListener("hashchange", aoMudar);
-    return () => window.removeEventListener("hashchange", aoMudar);
+    return () => {
+      window.removeEventListener("popstate", aoMudar);
+      window.removeEventListener("hashchange", aoMudar);
+    };
   }, []);
 
   if (token !== null) return <ResponderPesquisa key={token} token={token} />;

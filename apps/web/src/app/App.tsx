@@ -215,6 +215,7 @@ import {
 } from "./rotasDoShell";
 import { AREAS_DE_EDICAO, type AreaDeEdicaoId } from "./edicoesPendentes";
 import { focarRegiaoPrincipal, useGuardaDeSaida } from "./guardaDeSaida";
+import { tokenDaPesquisaPublica } from "./rotaPublica";
 
 /**
  * T200 — índice próprio de cada entrada do histórico criada pelo shell, em
@@ -1666,6 +1667,9 @@ export function App({
     }
 
     function aoMudarUrl() {
+      // T216 — a rota pública (`#/p/<token>`) é da raiz da aplicação: o
+      // shell nunca a corrige nem a reescreve, e a raiz troca a árvore.
+      if (tokenDaPesquisaPublica(window.location.hash) !== null) return;
       const fragmento = window.location.hash;
       const urlPedida = window.location.href;
       const indiceLido = indiceDoEstado(window.history.state);
