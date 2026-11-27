@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,7 +9,7 @@ import {
   type Pergunta,
   type PesquisaPublica,
 } from "../../api/pesquisaPublicaClient";
-import { ResponderPesquisa } from "./ResponderPesquisa";
+import { ResponderPesquisa, montarPreviaPublica } from "./ResponderPesquisa";
 
 // CPF sintético com dígitos verificadores válidos.
 const CPF_TESTE = "20743195841";
@@ -251,7 +252,7 @@ describe("T216 — abertura", () => {
       within(meta)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["11 perguntas", "cerca de 5 minutos", "Anônima"]);
+    ).toEqual(["11 perguntas", "cerca de 4 minutos", "Anônima"]);
     expect(
       screen.getByRole("button", { name: "Iniciar pesquisa" }),
     ).toBeEnabled();
@@ -309,7 +310,8 @@ describe("T216 — abertura", () => {
 describe("T216 — pesquisa indisponível", () => {
   it.each([
     ["pausada", "Esta pesquisa está pausada"],
-    ["encerrada", "Esta pesquisa foi encerrada"],
+    ["encerrada", "O prazo desta pesquisa terminou"],
+    ["finalizada", "Esta pesquisa foi encerrada pelo RH"],
     ["cancelada", "Esta pesquisa foi cancelada"],
     ["inexistente", "Pesquisa não encontrada"],
   ] as const)(
@@ -346,7 +348,9 @@ describe("T216 — separação por grupo (anônima)", () => {
     iniciar();
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.enviarRespostas).toHaveBeenCalledWith(
       TOKEN,
       expect.objectContaining({
@@ -362,7 +366,9 @@ describe("T216 — separação por grupo (anônima)", () => {
     iniciar();
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
       string,
       Record<string, unknown>,
@@ -775,7 +781,9 @@ describe("T216 — tipos de pergunta", () => {
       target: { value: "Tudo certo." },
     });
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.enviarRespostas).toHaveBeenCalledWith(TOKEN, {
       respostas: [
         { perguntaId: "q-conc", valor: 4 },
@@ -824,7 +832,9 @@ describe("T216 — lógica condicional", () => {
     expect(idAtual()).toBe("q-nota");
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
       string,
       { respostas: { perguntaId: string }[] },
@@ -850,7 +860,7 @@ describe("T216 — envio", () => {
     expect(
       await screen.findByRole("heading", {
         level: 1,
-        name: "Respostas enviadas",
+        name: "Agradecemos a sua participação!",
       }),
     ).toHaveFocus();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
@@ -878,7 +888,9 @@ describe("T216 — envio", () => {
     ).toBeChecked();
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.enviarRespostas).toHaveBeenCalledTimes(2);
     expect(cliente.enviarRespostas.mock.calls[1]).toEqual(
       cliente.enviarRespostas.mock.calls[0],
@@ -899,7 +911,9 @@ describe("T216 — envio", () => {
     await screen.findByRole("heading", { name: /Tenho clareza/ });
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.enviarRespostas).toHaveBeenCalledWith(
       TOKEN,
       expect.objectContaining({ passe: "passe-1" }),
@@ -989,7 +1003,9 @@ describe("T216 — envio", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Enviar respostas" }),
     );
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.enviarRespostas).toHaveBeenLastCalledWith(
       TOKEN,
       expect.objectContaining({ passe: "passe-2" }),
@@ -1008,7 +1024,9 @@ describe("T216 — anônima", () => {
     expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
     irAoFim();
     enviar();
-    await screen.findByRole("heading", { name: "Respostas enviadas" });
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
     expect(cliente.identificar).not.toHaveBeenCalled();
     expect(window.localStorage.getItem(CHAVE)).toBe("1");
     const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
@@ -1051,7 +1069,9 @@ describe("T216 — anônima", () => {
     irAoFim();
     enviar();
     expect(
-      await screen.findByRole("heading", { name: "Respostas enviadas" }),
+      await screen.findByRole("heading", {
+        name: "Agradecemos a sua participação!",
+      }),
     ).toBeInTheDocument();
   });
 });
@@ -1120,5 +1140,280 @@ describe("T216 — rascunho no sessionStorage", () => {
     expect(
       within(radios(/Tenho clareza/)).getByRole("radio", { name: "Concordo" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("T216 — revisão lado a lado", () => {
+  it("o título da aba é '<nome> | Pesquisa' e volta ao sair", async () => {
+    document.title = "Antes";
+    const { unmount } = await abrir();
+    expect(document.title).toBe("Pulso do trimestre | Pesquisa");
+    unmount();
+    expect(document.title).toBe("Antes");
+  });
+
+  it("o tempo estimado segue a regra única, não o número da API", async () => {
+    await abrir(
+      criarCliente(
+        pesquisaDeTeste("anonima", { totalPerguntas: 30, minutosEstimados: 2 }),
+      ),
+    );
+    expect(screen.getByText("cerca de 10 minutos")).toBeInTheDocument();
+  });
+
+  it("Continuar fica desabilitado até CPF e data estarem completos", async () => {
+    await abrir(criarCliente(pesquisaDeTeste("identificada")));
+    iniciar();
+    const continuar = screen.getByRole("button", { name: "Continuar" });
+    expect(continuar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("CPF"), {
+      target: { value: CPF_TESTE },
+    });
+    expect(continuar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), {
+      target: { value: "150419" },
+    });
+    expect(continuar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), {
+      target: { value: "15041990" },
+    });
+    expect(continuar).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("CPF"), {
+      target: { value: "2074319584" },
+    });
+    expect(continuar).toBeDisabled();
+  });
+
+  it("Mínimo e Máximo ficam acima da fileira da escala", async () => {
+    await abrir();
+    iniciar();
+    irAte("q-esc");
+    const g = radios(/comunicação interna/);
+    const extremo = within(g).getByText("Muito ruim");
+    const primeiro = within(g).getAllByRole("radio")[0]!;
+    expect(
+      extremo.compareDocumentPosition(primeiro) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("o foco programático nos títulos não desenha contorno", () => {
+    const css = readFileSync(
+      "src/screens/publico/ResponderPesquisa.css",
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+    const regra =
+      /\.pesquisa-publica__titulo:focus-visible,\n\.pesquisa-pergunta__texto:focus,\n\.pesquisa-pergunta__texto:focus-visible \{\n {2}outline: none;/;
+    expect(css).toMatch(regra);
+  });
+});
+
+describe("T216 — Personalizada: uma seção por vez", () => {
+  const PERSONALIZADA = pesquisaDeTeste("anonima", { modelo: "personalizada" });
+
+  async function comecar(cliente = criarCliente(PERSONALIZADA)) {
+    await abrir(cliente);
+    iniciar();
+    return cliente;
+  }
+
+  it("mostra a seção inteira, com 'Seção N de M' e o título focado", async () => {
+    await comecar();
+    expect(screen.getByText("Seção 1 de 3")).toBeInTheDocument();
+    const titulo = screen.getByRole("heading", {
+      level: 1,
+      name: "Sobre o trabalho",
+    });
+    expect(titulo).toHaveFocus();
+    expect(screen.getByText("Pense nas últimas semanas.")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.id),
+    ).toEqual(["q-q-conc-titulo", "q-q-sn-titulo", "q-q-nota-titulo"]);
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuetext",
+      "Seção 1 de 3",
+    );
+  });
+
+  it("Próximo espera todas as obrigatórias da seção, inclusive a condicional", async () => {
+    await comecar();
+    const proximoBotao = () => screen.getByRole("button", { name: "Próximo" });
+    marcar(/Tenho clareza/, "Concordo");
+    marcar(/De 0 a 10/, "9");
+    expect(proximoBotao()).toBeDisabled();
+    marcar(/Participou/, "Sim");
+    expect(screen.getByLabelText(/Qual treinamento/)).toBeInTheDocument();
+    expect(proximoBotao()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Qual treinamento/), {
+      target: { value: "Primeiros socorros" },
+    });
+    expect(proximoBotao()).toBeEnabled();
+    marcar(/Participou/, "Não");
+    expect(screen.queryByLabelText(/Qual treinamento/)).not.toBeInTheDocument();
+    proximo();
+    expect(screen.getByText("Seção 2 de 3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Detalhes" }),
+    ).toHaveFocus();
+  });
+
+  it("valida a seção inteira e mostra o resumo do erro", async () => {
+    await comecar();
+    marcar(/Tenho clareza/, "Concordo");
+    marcar(/Participou/, "Não");
+    marcar(/De 0 a 10/, "9");
+    proximo();
+    marcar(/comunicação interna/, "4");
+    marcar(/Qual o seu turno/, "Outro");
+    proximo();
+    expect(
+      screen.getByText("Revise a pergunta indicada antes de continuar."),
+    ).toHaveAttribute("role", "alert");
+    expect(emAlerta("Escreva qual é a outra opção.")).not.toBeNull();
+    expect(screen.getByText("Seção 2 de 3")).toBeInTheDocument();
+  });
+
+  it("Anterior volta à seção anterior e a última envia tudo", async () => {
+    const cliente = await comecar();
+    marcar(/Tenho clareza/, "Concordo");
+    marcar(/Participou/, "Não");
+    marcar(/De 0 a 10/, "9");
+    proximo();
+    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    expect(screen.getByText("Seção 1 de 3")).toBeInTheDocument();
+    expect(
+      within(radios(/De 0 a 10/)).getByRole("radio", { name: "9" }),
+    ).toBeChecked();
+    proximo();
+    marcar(/comunicação interna/, "4");
+    marcar(/Qual o seu turno/, "Tarde");
+    proximo();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Seção 3" }),
+    ).toBeInTheDocument();
+    enviar();
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
+    const [, envio] = cliente.enviarRespostas.mock.calls[0] as unknown as [
+      string,
+      { respostas: { perguntaId: string }[] },
+    ];
+    expect(envio.respostas.map((r) => r.perguntaId)).toEqual([
+      "q-conc",
+      "q-sn",
+      "q-nota",
+      "q-esc",
+      "q-uni",
+    ]);
+  });
+
+  it("modelo pronto continua com uma pergunta por tela", async () => {
+    await abrir(criarCliente(pesquisaDeTeste("anonima", { modelo: "pulso" })));
+    iniciar();
+    expect(screen.getByText(/Pergunta 1 de 10/)).toBeInTheDocument();
+  });
+});
+
+describe("T216 — pré-visualização do RH", () => {
+  function previa(identificacao: Identificacao = "identificada") {
+    const p = pesquisaDeTeste(identificacao);
+    return montarPreviaPublica({
+      empresa: p.empresa,
+      nome: p.nome,
+      boasVindas: p.boasVindas,
+      identificacao,
+      modelo: "pulso",
+      secoes: p.secoes,
+    });
+  }
+
+  it("monta a estrutura com a contagem e o tempo da regra única", () => {
+    const p = previa();
+    expect(p.totalPerguntas).toBe(11);
+    expect(p.minutosEstimados).toBe(4);
+    expect(p.modelo).toBe("pulso");
+    expect(p).not.toHaveProperty("grupos");
+  });
+
+  it("faixa, diálogo inicial, fluxo real e agradecimento sem gravar nada", async () => {
+    const espiao = vi.spyOn(globalThis, "fetch");
+    const sair = vi.fn();
+    render(<ResponderPesquisa previa={previa()} aoSairDaPrevia={sair} />);
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Pré-visualização: nada do que for respondido aqui é gravado.",
+    );
+    const dialogo = screen.getByRole("dialog", {
+      name: "Esta é uma pré-visualização",
+    });
+    fireEvent.click(
+      within(dialogo).getByRole("button", {
+        name: "Começar a pré-visualização",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Pulso do trimestre",
+      }),
+    ).toHaveFocus();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    iniciar();
+    expect(screen.getByText(/a confirmação é simulada/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("CPF"), {
+      target: { value: CPF_TESTE },
+    });
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), {
+      target: { value: "01012000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(idAtual()).toBe("q-conc");
+    marcar(/Tenho clareza/, "Concordo");
+    proximo();
+    marcar(/Participou/, "Sim");
+    proximo();
+    expect(idAtual()).toBe("q-cond");
+    PADRAO["q-cond"]!();
+    proximo();
+    irAoFim();
+    enviar();
+    expect(
+      screen.getByRole("heading", {
+        name: "Agradecemos a sua participação!",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Esta foi uma pré-visualização: nenhuma resposta foi gravada.",
+      ),
+    ).toBeInTheDocument();
+    expect(espiao).not.toHaveBeenCalled();
+    expect(window.sessionStorage.length).toBe(0);
+    expect(window.localStorage.length).toBe(0);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sair da pré-visualização" }),
+    );
+    expect(sair).toHaveBeenCalledTimes(1);
+  });
+
+  it("CPF inválido continua recusado na prévia", () => {
+    render(<ResponderPesquisa previa={previa()} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Começar a pré-visualização" }),
+    );
+    iniciar();
+    fireEvent.change(screen.getByLabelText("CPF"), {
+      target: { value: "20743195842" },
+    });
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), {
+      target: { value: "01012000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(emAlerta("Informe um CPF válido, com 11 números.")).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Sair da pré-visualização" }),
+    ).not.toBeInTheDocument();
   });
 });

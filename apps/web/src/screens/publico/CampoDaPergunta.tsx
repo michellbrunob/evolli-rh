@@ -38,6 +38,11 @@ export interface CampoDaPerguntaProps {
   readonly aoMudar: (valor: ValorRascunho) => void;
   /** O título da pergunta: recebe o foco a cada troca de tela. */
   readonly tituloRef?: Ref<HTMLHeadingElement>;
+  /**
+   * Nível do título: 1 quando a pergunta é a tela inteira (uma por tela);
+   * 2 quando aparece dentro de uma seção (Personalizada).
+   */
+  readonly nivel?: 1 | 2;
 }
 
 function intervalo(de: number, ate: number): number[] {
@@ -123,6 +128,13 @@ function GrupoDeRadios({
       aria-invalid={erro ? true : undefined}
       className="pesquisa-grupo"
     >
+      {/* Os extremos ficam ACIMA da fileira, alinhados às pontas. */}
+      {extremos ? (
+        <p id={`${base}-extremos`} className="pesquisa-extremos">
+          <span>{extremos[0]}</span>
+          <span>{extremos[1]}</span>
+        </p>
+      ) : null}
       <div
         className={`pesquisa-opcoes pesquisa-opcoes--${disposicao}`}
         style={
@@ -171,12 +183,6 @@ function GrupoDeRadios({
           );
         })}
       </div>
-      {extremos ? (
-        <p id={`${base}-extremos`} className="pesquisa-extremos">
-          <span>{extremos[0]}</span>
-          <span>{extremos[1]}</span>
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -257,7 +263,9 @@ export function CampoDaPergunta({
   erro,
   aoMudar,
   tituloRef,
+  nivel = 1,
 }: CampoDaPerguntaProps) {
+  const Titulo = nivel === 1 ? "h1" : "h2";
   const { tipo, config } = pergunta;
   const base = `q-${pergunta.id}`;
   const ajuda = ajudaDoTipo(pergunta, valor);
@@ -523,15 +531,15 @@ export function CampoDaPergunta({
 
   return (
     <div className="pesquisa-pergunta" data-pergunta={pergunta.id}>
-      <h1
+      <Titulo
         id={`${base}-titulo`}
-        ref={tituloRef}
-        tabIndex={-1}
-        className="pesquisa-pergunta__texto"
+        ref={nivel === 1 ? tituloRef : undefined}
+        tabIndex={nivel === 1 ? -1 : undefined}
+        className={`pesquisa-pergunta__texto pesquisa-pergunta__texto--${nivel}`}
       >
         {pergunta.texto}
         <MarcaObrigatoria obrigatoria={pergunta.obrigatoria} />
-      </h1>
+      </Titulo>
       {pergunta.descricao ? (
         <p id={`${base}-desc`} className="pesquisa-pergunta__descricao">
           {pergunta.descricao}

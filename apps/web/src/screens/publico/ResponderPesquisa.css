@@ -18,11 +18,34 @@
   font-size: var(--text-body);
 }
 
-/* Barra de progresso fina, de ponta a ponta, no topo da página. */
-.pesquisa-progresso {
+/* Faixa da prévia e barra de progresso: presas ao topo da página. */
+.pesquisa-publica__fixo {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.pesquisa-previa-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--status-warning-border);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-align: center;
+}
+
+.pesquisa-previa-faixa__sair {
+  min-height: var(--botao-icone);
+}
+
+/* Barra de progresso fina, de ponta a ponta, no topo da página. */
+.pesquisa-progresso {
   height: var(--space-xxs);
   background: var(--divider-soft);
 }
@@ -129,9 +152,16 @@
   color: var(--status-info-ink);
 }
 
+/* Agradecimento: o visto grande, em círculo verde cheio. */
 .pesquisa-publica__simbolo--sucesso {
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
+  width: calc(var(--touch-target) * 2);
+  height: calc(var(--touch-target) * 2);
+  margin-bottom: var(--space-xs);
+  background: var(--status-success-ink);
+  color: var(--color-on-action);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: 1;
 }
 
 .pesquisa-publica__titulo {
@@ -146,15 +176,16 @@
   font-size: var(--text-display);
 }
 
+/*
+ * Os títulos (tabIndex -1) só recebem foco por programa, a cada tela nova,
+ * para o leitor de tela anunciar onde se está: sem contorno visível. Nenhum
+ * deles é alcançável pelo Tab.
+ */
 .pesquisa-publica__titulo:focus,
-.pesquisa-pergunta__texto:focus {
-  outline: none;
-}
-
 .pesquisa-publica__titulo:focus-visible,
+.pesquisa-pergunta__texto:focus,
 .pesquisa-pergunta__texto:focus-visible {
-  outline: var(--foco-anel);
-  outline-offset: var(--space-xxs);
+  outline: none;
 }
 
 .pesquisa-publica__texto {
@@ -501,4 +532,37 @@ textarea.pesquisa-campo {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Perguntas sem cartão em volta: página limpa, de ponta a ponta. */
+.pesquisa-publica--limpa {
+  background: var(--surface-canvas);
+}
+
+.pesquisa-publica--limpa .pesquisa-publica__cartao {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Dentro de uma seção (Personalizada), cada pergunta é um subtítulo. */
+.pesquisa-pergunta__texto--2 {
+  font-size: var(--text-lead);
+}
+
+.pesquisa-publica__perguntas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.pesquisa-publica__perguntas > .pesquisa-pergunta + .pesquisa-pergunta {
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--divider-soft);
+}
+
+/* Os extremos da escala ficam acima da fileira de quadrados. */
+.pesquisa-grupo > .pesquisa-extremos {
+  margin-bottom: var(--space-xxs);
 }
