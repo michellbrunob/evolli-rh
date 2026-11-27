@@ -292,6 +292,8 @@ export function AbaSalarios({
             colaboradorId={colaboradorId}
             dataAdmissao={historico.vinculo.dataAdmissao}
             primeiroSalario={historico.alteracoes.length === 0}
+            alteracoes={historico.alteracoes}
+            tipoVinculo={historico.vinculo.tipo}
             cargoAtual={cargoAtual || historico.alteracoes[0]?.cargo || ""}
             modeloPadrao={
               historico.alteracoes[0]?.modeloContrato ?? modeloPadrao
@@ -821,11 +823,64 @@ const MENSAGEM_DA_DATA: Readonly<Record<string, string>> = {
   nao_se_aplica: "A data da admissão não muda.",
 };
 
+/** Salário mínimo nacional por ano (para o aviso da gaveta). */
+const SALARIO_MINIMO: Readonly<Record<string, number>> = {
+  "2025": 1518,
+  "2026": 1621,
+};
+
+/** Vínculos em que o salário mínimo vale (estágio e PJ ficam de fora). */
+const COM_SALARIO_MINIMO = new Set([
+  "clt",
+  "aprendiz",
+  "temporario",
+  "part_time",
+]);
+
+/**
+ * O que conferir antes de gravar: redução frente ao período anterior (a
+ * Constituição só permite com acordo ou convenção coletiva) e valor abaixo do
+ * mínimo do ano. Só aviso: quem decide é o RH, com confirmação explícita.
+ */
+function avisosDoValor(entrada: {
+  valor: number | null;
+  data: string;
+  alteracoes: readonly AlteracaoSalarialApi[];
+  ignorar: string | null;
+  tipoVinculo: string;
+}): string[] {
+  const { valor, data } = entrada;
+  if (valor === null || valor <= 0 || data === "") return [];
+  const avisos: string[] = [];
+  const anterior = entrada.alteracoes
+    .filter((a) => a.id !== entrada.ignorar && a.vigenciaInicio < data)
+    .sort((a, b) => (a.vigenciaInicio < b.vigenciaInicio ? 1 : -1))[0];
+  if (anterior && valor < Number(anterior.salarioBruto)) {
+    avisos.push(
+      `Menor que o salário anterior (R$ ${formatarReais(Number(anterior.salarioBruto))}). Redução salarial só com acordo ou convenção coletiva (CF art. 7º, VI).`,
+    );
+  }
+  const ano = data.slice(0, 4);
+  const minimo = SALARIO_MINIMO[ano];
+  if (
+    minimo !== undefined &&
+    COM_SALARIO_MINIMO.has(entrada.tipoVinculo) &&
+    valor < minimo
+  ) {
+    avisos.push(
+      `Abaixo do salário mínimo de ${ano} (R$ ${formatarReais(minimo)}): só cabe em jornada parcial, proporcional às horas.`,
+    );
+  }
+  return avisos;
+}
+
 function GavetaDeAlteracao({
   gaveta,
   colaboradorId,
   dataAdmissao,
   primeiroSalario,
+  alteracoes,
+  tipoVinculo,
   modeloPadrao,
   cargoAtual,
   servico,
@@ -837,6 +892,9 @@ function GavetaDeAlteracao({
   readonly dataAdmissao: string;
   /** Sem nenhum período: o primeiro salário é o da admissão, na data dela. */
   readonly primeiroSalario: boolean;
+  /** Os períodos já gravados (para comparar com o anterior). */
+  readonly alteracoes: readonly AlteracaoSalarialApi[];
+  readonly tipoVinculo: string;
   readonly modeloPadrao: string;
   /** Cargo que vem preenchido numa alteração nova. */
   readonly cargoAtual: string;
@@ -864,6 +922,13 @@ function GavetaDeAlteracao({
 
   const valor = lerValorEmReais(salario);
   const completo = data !== "" && valor !== null && valor > 0;
+  const avisos = avisosDoValor({
+    valor,
+    data,
+    alteracoes,
+    ignorar: editando?.id ?? null,
+    tipoVinculo,
+  });
   const alterado = editando
     ? data !== editando.vigenciaInicio ||
       salario !== formatarReais(Number(editando.salarioBruto)) ||
@@ -932,7 +997,13 @@ function GavetaDeAlteracao({
             disabled={!completo || enviando}
             onClick={() => void gravar()}
           >
-            {editando ? "Salvar alterações" : "Registrar alteração"}
+            {avisos.length > 0
+              ? editando
+                ? "Salvar mesmo assim"
+                : "Registrar mesmo assim"
+              : editando
+                ? "Salvar alterações"
+                : "Registrar alteração"}
           </Button>
         </FormActions>
       }
@@ -983,6 +1054,20 @@ function GavetaDeAlteracao({
             onChange={(e) => setSalario(mascararReais(e.target.value))}
           />
         </label>
+        {avisos.length > 0 ? (
+          <div
+            className="salarios-gaveta__confira"
+            role="note"
+            aria-labelledby={`${base}-confira`}
+          >
+            <strong id={`${base}-confira`}>Confira o valor</strong>
+            <ul>
+              {avisos.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <label className="salarios-gaveta__campo" htmlFor={`${base}-cargo`}>
           <span>Cargo</span>
           <input

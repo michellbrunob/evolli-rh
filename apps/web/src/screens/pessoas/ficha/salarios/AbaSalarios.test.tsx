@@ -529,6 +529,84 @@ describe("T215 — aba Salários", () => {
     ).toBe("Coordenadora");
   });
 
+  it("redução ou valor abaixo do mínimo: aviso na gaveta e confirmação explícita", async () => {
+    const registrar = vi.fn(() => Promise.resolve(SO_ADMISSAO));
+    montar(servico(SO_ADMISSAO, { registrar }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Nova alteração" }),
+    );
+    const gaveta = await screen.findByRole("dialog");
+    fireEvent.change(within(gaveta).getByLabelText("Data de início"), {
+      target: { value: "2026-11-20" },
+    });
+    // Digitado sem os centavos: 3520 vira 35,20.
+    fireEvent.change(within(gaveta).getByLabelText("Salário"), {
+      target: { value: "3520" },
+    });
+    const aviso = within(gaveta).getByRole("note", { name: "Confira o valor" });
+    expect(aviso).toHaveTextContent(
+      "Menor que o salário anterior (R$ 1.621,00). Redução salarial só com acordo ou convenção coletiva (CF art. 7º, VI).",
+    );
+    expect(aviso).toHaveTextContent(
+      "Abaixo do salário mínimo de 2026 (R$ 1.621,00): só cabe em jornada parcial, proporcional às horas.",
+    );
+    expect(
+      within(gaveta).queryByRole("button", { name: "Registrar alteração" }),
+    ).toBeNull();
+    fireEvent.click(
+      within(gaveta).getByRole("button", { name: "Registrar mesmo assim" }),
+    );
+    await waitFor(() =>
+      expect(registrar).toHaveBeenCalledWith(
+        "c1",
+        expect.objectContaining({ salarioBruto: "35.20" }),
+      ),
+    );
+  });
+
+  it("aumento: sem aviso; na edição, compara com o período anterior ao editado", async () => {
+    montar(servico(COM_REAJUSTES));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Nova alteração" }),
+    );
+    let gaveta = await screen.findByRole("dialog");
+    fireEvent.change(within(gaveta).getByLabelText("Data de início"), {
+      target: { value: "2026-11-20" },
+    });
+    fireEvent.change(within(gaveta).getByLabelText("Salário"), {
+      target: { value: "320000" },
+    });
+    expect(within(gaveta).queryByRole("note")).toBeNull();
+    expect(
+      within(gaveta).getByRole("button", { name: "Registrar alteração" }),
+    ).toBeTruthy();
+    fireEvent.click(within(gaveta).getByRole("button", { name: "Cancelar" }));
+    const descartar = screen.queryByRole("button", {
+      name: "Descartar alterações",
+    });
+    if (descartar) fireEvent.click(descartar);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // Edita o de 3.000 (anterior: 2.500) para 2.400: é redução.
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Ações do registro de 01/01/2026" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    gaveta = await screen.findByRole("dialog", {
+      name: "Editar alteração salarial",
+    });
+    fireEvent.change(within(gaveta).getByLabelText("Salário"), {
+      target: { value: "240000" },
+    });
+    expect(
+      within(gaveta).getByRole("note", { name: "Confira o valor" }),
+    ).toHaveTextContent("Menor que o salário anterior (R$ 2.500,00).");
+    expect(
+      within(gaveta).getByRole("button", { name: "Salvar mesmo assim" }),
+    ).toBeTruthy();
+  });
+
   it("sem data ou sem salário, o botão de registrar fica desabilitado", async () => {
     montar(servico(SO_ADMISSAO));
     fireEvent.click(
