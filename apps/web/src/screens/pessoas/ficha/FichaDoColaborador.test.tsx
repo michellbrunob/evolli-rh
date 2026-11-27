@@ -689,6 +689,29 @@ describe("T215 — ficha: Mais ações", () => {
   });
 });
 
+describe("T215 — desligado: abas só leitura", () => {
+  it("Escala sem Definir escala", async () => {
+    const vinculos = await listarVinculosDoColaborador(ID);
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculos.map((v) => ({
+        ...v,
+        situacao: "encerrado",
+        dataDesligamento: "2026-10-31",
+      })) as never,
+    );
+    vi.mocked(consultarEscalas).mockResolvedValue({
+      colaboradorId: ID,
+      empresaId: EMPRESA,
+      vinculo: { dataAdmissao: "2024-01-01", situacao: "encerrado" },
+      escalaDoCadastro: null,
+      escalas: [],
+    } as never);
+    montar({ aba: "escala", podeOperarEscala: true } as never);
+    expect(await screen.findByText(/ainda não tem escala/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Definir escala" })).toBeNull();
+  });
+});
+
 describe("T215 — cabeçalho com a escala da ficha", () => {
   it("a escala vigente definida na ficha vale no lugar da do contrato", async () => {
     vi.mocked(consultarEscalas).mockResolvedValue({

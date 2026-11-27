@@ -1157,7 +1157,7 @@ export function FichaDoColaborador({
                 colaboradorId={colaboradorId}
                 nome={nome}
                 primeiroNome={primeiroNome(nome)}
-                podeOperar={podeOperarEscala}
+                podeOperar={podeOperarEscala && status !== "desligado"}
                 detalhe={[
                   lotacao.cargo,
                   vinculo ? ROTULO_DO_TIPO_DE_VINCULO[vinculo.tipo] : null,
@@ -1177,7 +1177,7 @@ export function FichaDoColaborador({
               <AbaBeneficios
                 colaboradorId={colaboradorId}
                 primeiroNome={primeiroNome(nome)}
-                {...(podeEditar
+                {...(podeEditar && status !== "desligado"
                   ? {
                       onAbrirBeneficios: () => {
                         window.location.hash =
