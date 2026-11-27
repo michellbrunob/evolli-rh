@@ -22,25 +22,44 @@ import {
   diaDe,
   hojeEmSaoPaulo,
 } from "../pessoas/ausencias/calculo-ausencias";
-import { montarResultados } from "./calculo-resultados";
-import { ativosDaEmpresa, departamentosVigentes } from "./pessoas-da-pesquisa";
+import {
+  mediaDaResposta,
+  montarResultados,
+  type RespostaParaCalculo,
+} from "./calculo-resultados";
+import {
+  compararComOTime,
+  mediaGeralVisivel,
+  montarAnalises,
+} from "./analises-pesquisa";
+import {
+  ativosDaEmpresa,
+  departamentosVigentes,
+  lotacoesVigentes,
+  nomesDosGrupos,
+} from "./pessoas-da-pesquisa";
 import { conferirSecoes, totalDePerguntas } from "./estrutura-pesquisa";
-import type {
-  ContagensPorStatus,
-  Identificacao,
-  ListaDePesquisas,
-  Modelo,
-  ParticipanteDaLista,
-  PesquisaDaFicha,
-  PesquisaDetalhe,
-  PesquisaResumo,
-  RespostaIndividual,
-  ResultadosPesquisa,
-  Secao,
-  StatusPesquisa,
-  ValorRespondido,
+import {
+  type AnalisesPesquisa,
+  CAMPOS_GRUPO,
+  type CampoGrupo,
+  type ContagensPorStatus,
+  type GruposDaResposta,
+  type Identificacao,
+  type ListaDePesquisas,
+  type Modelo,
+  type ParticipanteDaLista,
+  type PesquisaDaFicha,
+  type PesquisaDetalhe,
+  type PesquisaResumo,
+  type RespostaDetalhe,
+  type RespostaResumo,
+  type ResultadosPesquisa,
+  type Secao,
+  STATUS_PESQUISA,
+  type StatusPesquisa,
+  type ValorRespondido,
 } from "./pesquisas.types";
-import { STATUS_PESQUISA } from "./pesquisas.types";
 import {
   identificavelPeloLink,
   podeEditar,
@@ -51,11 +70,15 @@ import {
 /**
  * T216 — Pesquisas da empresa ativa: lista com contagens por status, criar
  * (rascunho), detalhe, editar (com as regras depois de publicar), publicar,
- * status, duplicar, excluir (lógico), resultados agregados, respostas
- * individuais (só identificada, auditado) e a aba da ficha.
+ * status, duplicar, excluir (lógico), resultados agregados com indicadores e
+ * recortes, análises (mapa por grupo e evolução), respostas individuais
+ * (identificada e anônima, auditadas) e a aba da ficha.
+ *
+ * A anônima não tem participantes (quem tiver o link responde) e pode
+ * separar as respostas por até 2 grupos que quem responde escolhe.
  *
  * `rh` e `dp` operam; o `master_tecnico` só lê a pesquisa e os agregados;
- * respostas com a pessoa, só `rh` e `dp`. A trilha leva só ação, recurso
+ * respostas individuais, só `rh` e `dp`. A trilha leva só ação, recurso
  * (id) e empresa — nunca nome, perguntas ou respostas.
  */
 
@@ -78,6 +101,7 @@ const SEM_SECOES = {
   todos: true,
   encerraEm: true,
   minimoPorGrupo: true,
+  separarPor: true,
   token: true,
   publicadaEm: true,
   excluidaEm: true,
@@ -93,7 +117,8 @@ export interface PesquisaInformada {
   modelo: Modelo;
   identificacao: Identificacao;
   secoes: unknown[];
-  participantes: { todos: boolean; colaboradorIds?: string[] };
+  participantes?: { todos: boolean; colaboradorIds?: string[] };
+  separarPor?: CampoGrupo[];
   encerraEm?: string | null;
   minimoPorGrupo: number;
 }
@@ -104,6 +129,10 @@ interface EntradaConferida {
   secoes: Secao[];
   encerraEm: string | null;
   minimoPorGrupo: number;
+  separarPor: CampoGrupo[];
+  /** Na anônima, sempre `{ todos: false, colaboradorIds: [] }`. */
+  todos: boolean;
+  colaboradorIds: string[];
 }
 
 /** JSON com as chaves em ordem (o JSONB não guarda a ordem das chaves). */
@@ -129,6 +158,24 @@ function diaValido(v: string): boolean {
 /** O link público: 32 bytes aleatórios em base64url. */
 export function novoToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+/** Os recortes disponíveis: na anônima, só os escolhidos por quem responde. */
+export function recortesDa(p: {
+  identificacao: Identificacao;
+  separarPor: string[];
+}): CampoGrupo[] {
+  return p.identificacao === "anonima"
+    ? (p.separarPor as CampoGrupo[])
+    : [...CAMPOS_GRUPO];
+}
+
+/** Uma resposta gravada com os grupos e o autor (identificada). */
+interface RespostaCarregada extends RespostaParaCalculo {
+  id: string;
+  respondidaEm: Date;
+  colaboradorId: string | null;
+  departamento: string | null;
 }
 
 @Injectable()
@@ -188,7 +235,7 @@ export class PesquisasService {
       modelo: p.modelo,
       identificacao: p.identificacao,
       status: this.efetivo(p),
-      participantes,
+      participantes: p.identificacao === "anonima" ? null : participantes,
       respostas,
       criadaEm: p.criadaEm.toISOString(),
       publicadaEm: p.publicadaEm ? p.publicadaEm.toISOString() : null,
@@ -270,12 +317,13 @@ export class PesquisasService {
     const respostas = await db.pesquisaResposta.count({
       where: { pesquisaId: p.id },
     });
-    const anonima = p.identificacao === "anonima";
-    let lista: { colaboradorId: string; respondeu: boolean | null }[];
-    if (p.status === "rascunho" && p.todos) {
+    let lista: { colaboradorId: string; respondeu: boolean | null }[] = [];
+    if (p.identificacao === "anonima") {
+      lista = []; // sem participantes: quem tiver o link responde
+    } else if (p.status === "rascunho" && p.todos) {
       lista = (await ativosDaEmpresa(db, p.empresaId)).map((colaboradorId) => ({
         colaboradorId,
-        respondeu: anonima ? null : false,
+        respondeu: false,
       }));
     } else {
       const linhas = await db.pesquisaParticipante.findMany({
@@ -284,7 +332,7 @@ export class PesquisasService {
       });
       lista = linhas.map((l) => ({
         colaboradorId: l.colaboradorId,
-        respondeu: anonima ? null : l.respondeuEm !== null,
+        respondeu: l.respondeuEm !== null,
       }));
     }
     const ids = lista.map((l) => l.colaboradorId);
@@ -296,12 +344,10 @@ export class PesquisasService {
       departamentosVigentes(db, p.empresaId, ids),
       // Só para saber se o link consegue identificar a pessoa: CPF e
       // nascimento nunca saem na resposta.
-      anonima
-        ? Promise.resolve([])
-        : db.perfilPessoalColaborador.findMany({
-            where: { empresaId: p.empresaId, colaboradorId: { in: ids } },
-            select: { colaboradorId: true, cpf: true, dataNascimento: true },
-          }),
+      db.perfilPessoalColaborador.findMany({
+        where: { empresaId: p.empresaId, colaboradorId: { in: ids } },
+        select: { colaboradorId: true, cpf: true, dataNascimento: true },
+      }),
     ]);
     const nomeDe = new Map(nomes.map((c) => [c.id, c.nome]));
     const perfilDe = new Map(perfis.map((x) => [x.colaboradorId, x]));
@@ -322,6 +368,7 @@ export class PesquisasService {
       boasVindas: p.boasVindas,
       secoes: p.secoes as unknown as Secao[],
       minimoPorGrupo: p.minimoPorGrupo,
+      separarPor: p.separarPor as CampoGrupo[],
       todos: p.todos,
       participantesLista,
       naoIdentificaveis: participantesLista.filter((x) => !x.identificavel)
@@ -333,7 +380,7 @@ export class PesquisasService {
   // ---------------------------------------------------------------------
   // Escrita
 
-  /** Nome, boas-vindas, estrutura e prazo, com os erros por campo. */
+  /** Nome, boas-vindas, estrutura, prazo e grupos, com erros por campo. */
   private conferirEntrada(
     dto: PesquisaInformada,
     encerraEmAtual: string | null,
@@ -358,12 +405,22 @@ export class PesquisasService {
         erros.push({ campo: "encerraEm", motivo: "invalido" });
       }
     }
-    if (
-      !dto.participantes.todos &&
-      dto.participantes.colaboradorIds !== undefined &&
-      new Set(dto.participantes.colaboradorIds).size !==
-        dto.participantes.colaboradorIds.length
-    ) {
+    const anonima = dto.identificacao === "anonima";
+    const separarPor = dto.separarPor ?? [];
+    if (separarPor.length && !anonima) {
+      erros.push({ campo: "separarPor", motivo: "nao_se_aplica" });
+    } else if (separarPor.length > 2) {
+      erros.push({ campo: "separarPor", motivo: "limite" });
+    } else if (new Set(separarPor).size !== separarPor.length) {
+      erros.push({ campo: "separarPor", motivo: "invalido" });
+    }
+    const participantes = anonima
+      ? { todos: false, colaboradorIds: [] }
+      : (dto.participantes ?? { todos: false, colaboradorIds: [] });
+    const colaboradorIds = participantes.todos
+      ? []
+      : (participantes.colaboradorIds ?? []);
+    if (new Set(colaboradorIds).size !== colaboradorIds.length) {
       erros.push({ campo: "participantes", motivo: "invalido" });
     }
     if (erros.length) throw new CamposRecusadosException(erros);
@@ -373,6 +430,9 @@ export class PesquisasService {
       secoes: estrutura.secoes,
       encerraEm,
       minimoPorGrupo: dto.minimoPorGrupo,
+      separarPor: anonima ? separarPor : [],
+      todos: participantes.todos,
+      colaboradorIds,
     };
   }
 
@@ -397,11 +457,8 @@ export class PesquisasService {
   ): Promise<PesquisaDetalhe> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     const e = this.conferirEntrada(dto, null);
-    const ids = dto.participantes.todos
-      ? []
-      : (dto.participantes.colaboradorIds ?? []);
     return this.prisma.$transaction(async (tx) => {
-      await this.conferirNovosParticipantes(tx, empresaId, ids);
+      await this.conferirNovosParticipantes(tx, empresaId, e.colaboradorIds);
       const p = await tx.pesquisa.create({
         data: {
           empresaId,
@@ -410,16 +467,17 @@ export class PesquisasService {
           modelo: dto.modelo,
           identificacao: dto.identificacao,
           secoes: e.secoes as unknown as Prisma.InputJsonValue,
-          todos: dto.participantes.todos,
+          todos: e.todos,
+          separarPor: e.separarPor,
           encerraEm: e.encerraEm ? dataDoDia(e.encerraEm) : null,
           minimoPorGrupo: e.minimoPorGrupo,
           token: novoToken(),
           criadaPorId: ctx.actor.id,
         },
       });
-      if (ids.length) {
+      if (e.colaboradorIds.length) {
         await tx.pesquisaParticipante.createMany({
-          data: ids.map((colaboradorId) => ({
+          data: e.colaboradorIds.map((colaboradorId) => ({
             pesquisaId: p.id,
             empresaId,
             colaboradorId,
@@ -459,28 +517,33 @@ export class PesquisasService {
       );
       const temRespostas =
         (await tx.pesquisaResposta.count({ where: { pesquisaId: id } })) > 0;
-      if (
-        temRespostas &&
-        jsonCanonico(e.secoes) !== jsonCanonico(atual.secoes)
-      ) {
-        throw new ConflitoDeCamposException([
-          { campo: "secoes", motivo: "com_respostas" },
-        ]);
+      if (temRespostas) {
+        const travados: ErroDeCampo[] = [];
+        if (jsonCanonico(e.secoes) !== jsonCanonico(atual.secoes)) {
+          travados.push({ campo: "secoes", motivo: "com_respostas" });
+        }
+        if (jsonCanonico(e.separarPor) !== jsonCanonico(atual.separarPor)) {
+          travados.push({ campo: "separarPor", motivo: "com_respostas" });
+        }
+        if (travados.length) throw new ConflitoDeCamposException(travados);
       }
 
-      // Participantes: incluir sempre; retirar só quem não respondeu.
+      // Participantes: incluir sempre; retirar só quem não respondeu. A
+      // anônima não tem participantes.
       const existentes = await tx.pesquisaParticipante.findMany({
         where: { pesquisaId: id },
         select: { id: true, colaboradorId: true, respondeuEm: true },
       });
       const jaEstao = new Set(existentes.map((x) => x.colaboradorId));
       let desejados: Set<string>;
-      if (dto.participantes.todos) {
+      if (dto.identificacao === "anonima") {
+        desejados = new Set();
+      } else if (e.todos) {
         desejados = publicada
           ? new Set([...jaEstao, ...(await ativosDaEmpresa(tx, empresaId))])
           : new Set(); // no rascunho, "todos" se resolve ao publicar
       } else {
-        desejados = new Set(dto.participantes.colaboradorIds ?? []);
+        desejados = new Set(e.colaboradorIds);
       }
       const novos = [...desejados].filter((c) => !jaEstao.has(c));
       const saem = existentes.filter((x) => !desejados.has(x.colaboradorId));
@@ -489,7 +552,7 @@ export class PesquisasService {
           { campo: "participantes", motivo: "com_respostas" },
         ]);
       }
-      if (!dto.participantes.todos) {
+      if (!e.todos) {
         await this.conferirNovosParticipantes(tx, empresaId, novos);
       }
       if (saem.length) {
@@ -516,7 +579,8 @@ export class PesquisasService {
           modelo: dto.modelo,
           ...(publicada ? {} : { identificacao: dto.identificacao }),
           secoes: e.secoes as unknown as Prisma.InputJsonValue,
-          todos: dto.participantes.todos,
+          todos: e.todos,
+          separarPor: e.separarPor,
           encerraEm: e.encerraEm ? dataDoDia(e.encerraEm) : null,
           minimoPorGrupo: e.minimoPorGrupo,
         },
@@ -548,24 +612,27 @@ export class PesquisasService {
       if (atual.encerraEm && diaDe(atual.encerraEm) < hojeEmSaoPaulo()) {
         erros.push({ campo: "encerraEm", motivo: "invalido" });
       }
-      if (atual.todos) {
-        const ativos = await ativosDaEmpresa(tx, empresaId);
-        if (ativos.length) {
-          await tx.pesquisaParticipante.createMany({
-            data: ativos.map((colaboradorId) => ({
-              pesquisaId: id,
-              empresaId,
-              colaboradorId,
-            })),
-            skipDuplicates: true,
-          });
+      // A anônima não tem participantes: quem tiver o link responde.
+      if (atual.identificacao !== "anonima") {
+        if (atual.todos) {
+          const ativos = await ativosDaEmpresa(tx, empresaId);
+          if (ativos.length) {
+            await tx.pesquisaParticipante.createMany({
+              data: ativos.map((colaboradorId) => ({
+                pesquisaId: id,
+                empresaId,
+                colaboradorId,
+              })),
+              skipDuplicates: true,
+            });
+          }
         }
-      }
-      const participantes = await tx.pesquisaParticipante.count({
-        where: { pesquisaId: id },
-      });
-      if (participantes === 0) {
-        erros.push({ campo: "participantes", motivo: "obrigatorio" });
+        const participantes = await tx.pesquisaParticipante.count({
+          where: { pesquisaId: id },
+        });
+        if (participantes === 0) {
+          erros.push({ campo: "participantes", motivo: "obrigatorio" });
+        }
       }
       if (erros.length) throw new CamposRecusadosException(erros);
       const publicada = await tx.pesquisa.update({
@@ -630,6 +697,7 @@ export class PesquisasService {
           identificacao: p.identificacao,
           secoes: p.secoes as Prisma.InputJsonValue,
           todos: p.todos,
+          separarPor: p.separarPor,
           encerraEm:
             p.encerraEm && diaDe(p.encerraEm) >= hoje ? p.encerraEm : null,
           minimoPorGrupo: p.minimoPorGrupo,
@@ -637,7 +705,7 @@ export class PesquisasService {
           criadaPorId: ctx.actor.id,
         },
       });
-      if (!p.todos) {
+      if (!p.todos && p.identificacao !== "anonima") {
         const participantes = await tx.pesquisaParticipante.findMany({
           where: { pesquisaId: id },
           select: { colaboradorId: true },
@@ -684,91 +752,219 @@ export class PesquisasService {
   }
 
   // ---------------------------------------------------------------------
-  // Resultados e respostas
+  // Resultados, análises e respostas
 
-  async resultados(
-    id: string,
-    departamentoId: string | null,
-    ctx: PessoasAuditContext,
-  ): Promise<ResultadosPesquisa> {
-    const empresaId = this.empresaDaSessao(ctx, "leitura");
-    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+  /**
+   * As respostas com os grupos: na identificada, pela lotação vigente (e o
+   * autor, se pedido); na confidencial, os gravados no envio; na anônima, a
+   * escolha de quem respondeu. Ordem: respondida em, depois id.
+   */
+  private async carregarRespostas(
+    p: { id: string; empresaId: string; identificacao: Identificacao },
+    comAutor: boolean,
+  ): Promise<RespostaCarregada[]> {
     const linhas = await this.prisma.pesquisaResposta.findMany({
-      where: { pesquisaId: id },
+      where: { pesquisaId: p.id },
       orderBy: [{ respondidaEm: "asc" }, { id: "asc" }],
-      select: { valores: true, colaboradorId: true, departamentoId: true },
+      select: {
+        id: true,
+        respondidaEm: true,
+        valores: true,
+        colaboradorId: true,
+        departamentoId: true,
+        centroCustoId: true,
+        unidadeId: true,
+      },
     });
     const identificada = p.identificacao === "identificada";
-    // O autor dos textos é dado individual: só RH e DP (o master lê o
-    // agregado, sem a pessoa).
-    const comAutor =
-      identificada && (ctx.actor.role === "rh" || ctx.actor.role === "dp");
     const pessoas = identificada
       ? [...new Set(linhas.map((l) => l.colaboradorId!))]
       : [];
-    const [nomes, deps] = await Promise.all([
+    const [nomes, lotacoes] = await Promise.all([
       this.prisma.colaborador.findMany({
         where: { id: { in: pessoas } },
         select: { id: true, nome: true },
       }),
-      departamentosVigentes(this.prisma, empresaId, pessoas),
+      lotacoesVigentes(this.prisma, p.empresaId, pessoas),
     ]);
     const nomeDe = new Map(nomes.map((c) => [c.id, c.nome]));
-    const respostas = linhas.map((l) => ({
-      valores: l.valores as unknown as ValorRespondido[],
-      autor: comAutor ? (nomeDe.get(l.colaboradorId!) ?? null) : null,
-      departamentoId: identificada
-        ? (deps.get(l.colaboradorId!)?.id ?? null)
-        : l.departamentoId,
-    }));
-    const idsDeps = [
-      ...new Set(respostas.map((r) => r.departamentoId).filter(Boolean)),
-    ] as string[];
-    const departamentos = await this.prisma.departamento.findMany({
-      where: { id: { in: idsDeps }, empresaId },
-      select: { id: true, nome: true },
+    return linhas.map((l) => {
+      const lot = identificada ? lotacoes.get(l.colaboradorId!) : undefined;
+      const grupos: GruposDaResposta = identificada
+        ? {
+            departamento: lot?.departamento?.id ?? null,
+            centroCusto: lot?.centroCusto?.id ?? null,
+            unidade: lot?.unidade?.id ?? null,
+          }
+        : {
+            departamento: l.departamentoId,
+            centroCusto: l.centroCustoId,
+            unidade: l.unidadeId,
+          };
+      return {
+        id: l.id,
+        respondidaEm: l.respondidaEm,
+        colaboradorId: l.colaboradorId,
+        departamento: lot?.departamento?.nome ?? null,
+        valores: l.valores as unknown as ValorRespondido[],
+        autor:
+          identificada && comAutor
+            ? (nomeDe.get(l.colaboradorId!) ?? null)
+            : null,
+        grupos,
+      };
     });
-    const participantes =
-      p.status === "rascunho" && p.todos
-        ? (await ativosDaEmpresa(this.prisma, empresaId)).length
-        : await this.prisma.pesquisaParticipante.count({
-            where: { pesquisaId: id },
-          });
+  }
+
+  private async nomesDosGruposDe(
+    empresaId: string,
+    respostas: readonly { grupos: GruposDaResposta }[],
+  ): Promise<Map<string, string>> {
+    const ids = new Set<string>();
+    for (const r of respostas) {
+      for (const id of Object.values(r.grupos)) if (id) ids.add(id);
+    }
+    return nomesDosGrupos(this.prisma, empresaId, [...ids]);
+  }
+
+  async resultados(
+    id: string,
+    filtro: { campo: CampoGrupo; grupoId: string } | null,
+    ctx: PessoasAuditContext,
+  ): Promise<ResultadosPesquisa> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    // O autor dos textos é dado individual: só RH e DP (o master lê o
+    // agregado, sem a pessoa).
+    const comAutor =
+      p.identificacao === "identificada" &&
+      (ctx.actor.role === "rh" || ctx.actor.role === "dp");
+    const respostas = await this.carregarRespostas(p, comAutor);
+    let participantes: number | null = null;
+    if (p.identificacao !== "anonima") {
+      participantes =
+        p.status === "rascunho" && p.todos
+          ? (await ativosDaEmpresa(this.prisma, empresaId)).length
+          : await this.prisma.pesquisaParticipante.count({
+              where: { pesquisaId: id },
+            });
+    }
     return montarResultados({
       pesquisaId: id,
       secoes: p.secoes as unknown as Secao[],
       respostas,
       participantes,
-      nomesDosDepartamentos: new Map(departamentos.map((d) => [d.id, d.nome])),
+      nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
       minimoPorGrupo: p.minimoPorGrupo,
-      departamentoId,
+      filtro,
+      recortes: recortesDa(p),
       identificada: comAutor,
       minimoNaVisaoGeral: p.identificacao === "confidencial",
     });
   }
 
-  /** Só identificada: cada pessoa e as respostas dela (auditado). */
+  /** Mapa de médias por grupo e a evolução entre pesquisas do mesmo modelo. */
+  async analises(
+    id: string,
+    campo: CampoGrupo,
+    ctx: PessoasAuditContext,
+  ): Promise<AnalisesPesquisa> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    if (!recortesDa(p).includes(campo)) {
+      throw new CamposRecusadosException([
+        { campo: "campo", motivo: "nao_se_aplica" },
+      ]);
+    }
+    const respostas = await this.carregarRespostas(p, false);
+
+    const mesmas = await this.prisma.pesquisa.findMany({
+      where: {
+        empresaId,
+        modelo: p.modelo,
+        excluidaEm: null,
+        publicadaEm: { not: null },
+      },
+      orderBy: [{ publicadaEm: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        nome: true,
+        publicadaEm: true,
+        secoes: true,
+        identificacao: true,
+        minimoPorGrupo: true,
+      },
+    });
+    const valoresDe = await this.prisma.pesquisaResposta.findMany({
+      where: { pesquisaId: { in: mesmas.map((m) => m.id) } },
+      select: { pesquisaId: true, valores: true },
+    });
+    const evolucao = mesmas.map((m) => ({
+      pesquisaId: m.id,
+      nome: m.nome,
+      publicadaEm: m.publicadaEm!.toISOString(),
+      mediaGeral: mediaGeralVisivel(
+        m.secoes as unknown as Secao[],
+        valoresDe
+          .filter((v) => v.pesquisaId === m.id)
+          .map((v) => ({
+            valores: v.valores as unknown as ValorRespondido[],
+            grupos: {},
+          })),
+        m.minimoPorGrupo,
+        m.identificacao === "confidencial",
+      ),
+    }));
+
+    return montarAnalises({
+      campo,
+      secoes: p.secoes as unknown as Secao[],
+      respostas,
+      nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
+      minimoPorGrupo: p.minimoPorGrupo,
+      minimoNaVisaoGeral: p.identificacao === "confidencial",
+      evolucao,
+    });
+  }
+
+  /** Identificada e anônima; a confidencial nunca mostra (404). */
+  private async respostasNumeradas(
+    id: string,
+    ctx: PessoasAuditContext,
+  ): Promise<{
+    p: LinhaPesquisa;
+    empresaId: string;
+    lista: (RespostaCarregada & { resumo: RespostaResumo })[];
+  }> {
+    const empresaId = this.empresaDaSessao(ctx, "respostas");
+    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    if (p.identificacao === "confidencial") throw new NotFoundException();
+    const secoes = p.secoes as unknown as Secao[];
+    const respostas = await this.carregarRespostas(p, true);
+    const lista = respostas.map((r, i) => ({
+      ...r,
+      resumo: {
+        id: r.id,
+        numero: i + 1,
+        colaboradorId: r.colaboradorId,
+        nome: r.autor,
+        departamento: r.departamento,
+        respondidaEm: r.respondidaEm.toISOString(),
+        media: mediaDaResposta(
+          secoes,
+          new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+        ),
+      },
+    }));
+    return { p, empresaId, lista };
+  }
+
+  /** A lista numerada (auditada). */
   async respostasIndividuais(
     id: string,
     ctx: PessoasAuditContext,
-  ): Promise<RespostaIndividual[]> {
-    const empresaId = this.empresaDaSessao(ctx, "respostas");
-    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
-    if (p.identificacao !== "identificada") throw new NotFoundException();
-    const linhas = await this.prisma.pesquisaResposta.findMany({
-      where: { pesquisaId: id, colaboradorId: { not: null } },
-      select: {
-        colaboradorId: true,
-        respondidaEm: true,
-        valores: true,
-        colaborador: { select: { nome: true } },
-      },
-    });
-    const deps = await departamentosVigentes(
-      this.prisma,
-      empresaId,
-      linhas.map((l) => l.colaboradorId!),
-    );
+  ): Promise<RespostaResumo[]> {
+    const { empresaId, lista } = await this.respostasNumeradas(id, ctx);
     await this.auditoria.registrarLeitura(
       ctx,
       "pesquisas_respostas_consultadas",
@@ -776,15 +972,38 @@ export class PesquisasService {
       id,
       empresaId,
     );
-    return linhas
-      .map((l) => ({
-        colaboradorId: l.colaboradorId!,
-        nome: l.colaborador?.nome ?? "",
-        departamento: deps.get(l.colaboradorId!)?.nome ?? null,
-        respondidaEm: l.respondidaEm.toISOString(),
-        valores: l.valores as unknown as ValorRespondido[],
-      }))
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return lista.map((r) => r.resumo);
+  }
+
+  /** Uma resposta comparada com o time, com anterior e próxima (auditada). */
+  async respostaIndividual(
+    id: string,
+    respostaId: string,
+    ctx: PessoasAuditContext,
+  ): Promise<RespostaDetalhe> {
+    const { p, empresaId, lista } = await this.respostasNumeradas(id, ctx);
+    const i = lista.findIndex((r) => r.id === respostaId);
+    if (i < 0) throw new NotFoundException();
+    await this.auditoria.registrarLeitura(
+      ctx,
+      "pesquisas_respostas_consultadas",
+      "resposta_pesquisa",
+      respostaId,
+      empresaId,
+    );
+    const comparacao = compararComOTime(
+      p.secoes as unknown as Secao[],
+      lista,
+      i,
+    );
+    return {
+      ...lista[i]!.resumo,
+      anteriorId: i > 0 ? lista[i - 1]!.id : null,
+      proximaId: i < lista.length - 1 ? lista[i + 1]!.id : null,
+      posicao: i + 1,
+      total: lista.length,
+      ...comparacao,
+    };
   }
 
   /** Aba da ficha: as identificadas que a pessoa respondeu (auditado). */
@@ -813,6 +1032,7 @@ export class PesquisasService {
       },
       orderBy: [{ respondidaEm: "desc" }, { id: "asc" }],
       select: {
+        id: true,
         respondidaEm: true,
         valores: true,
         pesquisa: {
@@ -828,6 +1048,7 @@ export class PesquisasService {
       empresaId,
     );
     return linhas.map((l) => ({
+      respostaId: l.id,
       pesquisaId: l.pesquisa.id,
       nome: l.pesquisa.nome,
       modelo: l.pesquisa.modelo,

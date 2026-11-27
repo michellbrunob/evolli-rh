@@ -23,6 +23,7 @@ import { RequirePermission } from "../auth/authorization/require-permission.deco
 import { CurrentUser } from "../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
 import {
+  AnalisesQueryDto,
   IdentificarDto,
   ListarPesquisasQueryDto,
   PesquisaDto,
@@ -168,24 +169,57 @@ export class PesquisasController {
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.service.resultados(
-      id,
-      q.departamentoId ?? null,
-      ctx(actor, req),
-    );
+    // `campo` + `grupoId`; `departamentoId` continua como atalho.
+    const filtro =
+      q.campo && q.grupoId
+        ? { campo: q.campo, grupoId: q.grupoId }
+        : q.departamentoId
+          ? { campo: "departamento" as const, grupoId: q.departamentoId }
+          : null;
+    return this.service.resultados(id, filtro, ctx(actor, req));
+  }
+
+  @Get(":pesquisaId/analises")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Mapa de médias por grupo e a evolução" })
+  analises(
+    @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Query() q: AnalisesQueryDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.analises(id, q.campo, ctx(actor, req));
   }
 
   @Get(":pesquisaId/respostas")
   @UseGuards(AuthorizationGuard)
   @RequirePermission("resposta_pesquisa", "read")
   @Header("Cache-Control", "no-store")
-  @ApiOperation({ summary: "Respostas por pessoa (só identificada)" })
+  @ApiOperation({
+    summary: "Respostas individuais numeradas (identificada e anônima)",
+  })
   respostas(
     @Param("pesquisaId", ParseUUIDPipe) id: string,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
     return this.service.respostasIndividuais(id, ctx(actor, req));
+  }
+
+  @Get(":pesquisaId/respostas/:respostaId")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("resposta_pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Uma resposta comparada com o time" })
+  resposta(
+    @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Param("respostaId", ParseUUIDPipe) respostaId: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.respostaIndividual(id, respostaId, ctx(actor, req));
   }
 }
 

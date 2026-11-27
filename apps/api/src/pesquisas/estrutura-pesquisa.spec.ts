@@ -56,6 +56,7 @@ describe("T216 — conferirSecoes", () => {
             id: "p1",
             tipo: "escala",
             texto: "Como está?",
+            rotulo: null,
             descricao: null,
             obrigatoria: false,
             config: {
@@ -70,6 +71,7 @@ describe("T216 — conferirSecoes", () => {
             id: "p2",
             tipo: "nota_0_10",
             texto: "Pergunta p2",
+            rotulo: null,
             descricao: null,
             obrigatoria: false,
             config: { enps: true },
@@ -232,5 +234,34 @@ describe("T216 — conferirSecoes", () => {
         { campo: "propria", motivo: "fora_de_ordem" },
       ]);
     });
+  });
+});
+
+describe("T216 — rótulo curto da pergunta", () => {
+  it("aparado, até 40; vazio vira nulo; acima de 40, limite", () => {
+    const conf = (rotulo: unknown) =>
+      conferirSecoes([
+        {
+          id: "s1",
+          titulo: null,
+          descricao: null,
+          perguntas: [
+            {
+              id: "p1",
+              tipo: "concordancia",
+              texto: "Pergunta",
+              rotulo,
+              config: {},
+            },
+          ],
+        },
+      ]);
+    expect(conf("  Clareza  ").secoes[0]!.perguntas[0]!.rotulo).toBe("Clareza");
+    expect(conf("").secoes[0]!.perguntas[0]!.rotulo).toBeNull();
+    expect(conf(undefined).secoes[0]!.perguntas[0]!.rotulo).toBeNull();
+    expect(conf("x".repeat(40)).erros).toEqual([]);
+    expect(conf("x".repeat(41)).erros).toEqual([
+      { campo: "p1", motivo: "limite" },
+    ]);
   });
 });

@@ -3732,6 +3732,9 @@ model Pesquisa {
   todos          Boolean               @default(false)
   encerraEm      DateTime?             @map("encerra_em") @db.Date
   minimoPorGrupo Int                   @default(3) @map("minimo_por_grupo")
+  /// Só na anônima: até 2 campos (`departamento`, `centroCusto`, `unidade`)
+  /// que quem responde escolhe antes das perguntas.
+  separarPor     String[]              @default([]) @map("separar_por")
   token          String                @unique @db.VarChar(64)
   publicadaEm    DateTime?             @map("publicada_em")
   excluidaEm     DateTime?             @map("excluida_em")
@@ -3772,8 +3775,8 @@ model PesquisaParticipante {
 }
 
 /// T216 — uma resposta. `colaborador_id` só na identificada (o banco recusa
-/// nas outras, por gatilho); `departamento_id` só na confidencial (o
-/// departamento no envio, para o recorte, sem a pessoa). Na confidencial,
+/// nas outras, por gatilho); os grupos (departamento, centro de custo e
+/// unidade) só na confidencial e na anônima (o recorte, sem a pessoa). Na confidencial,
 /// `respondida_em` guarda só o dia. Imutável: a aplicação não altera nem
 /// apaga resposta.
 model PesquisaResposta {
@@ -3782,6 +3785,10 @@ model PesquisaResposta {
   empresaId      String   @map("empresa_id")
   colaboradorId  String?  @map("colaborador_id")
   departamentoId String?  @map("departamento_id")
+  /// Confidencial: gravados no envio (lotação); anônima: a escolha de quem
+  /// respondeu. Nunca na identificada (o recorte usa a lotação vigente).
+  centroCustoId  String?  @map("centro_custo_id")
+  unidadeId      String?  @map("unidade_id")
   valores        Json
   respondidaEm   DateTime @map("respondida_em")
 

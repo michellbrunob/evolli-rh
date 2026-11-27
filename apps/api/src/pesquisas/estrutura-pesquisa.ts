@@ -27,6 +27,8 @@ export const LIMITES = {
   perguntas: 60,
   textoPergunta: 300,
   descricaoPergunta: 500,
+  /** Rótulo curto da pergunta (tabelas de análise). */
+  rotuloPergunta: 40,
   tituloSecao: 120,
   descricaoSecao: 500,
   opcoesMinimo: 2,
@@ -259,6 +261,8 @@ function conferirPergunta(
   }
   const descricao = textoOpcional(bruta.descricao, LIMITES.descricaoPergunta);
   if (descricao === undefined) erros.push({ campo, motivo: "limite" });
+  const rotulo = textoOpcional(bruta.rotulo, LIMITES.rotuloPergunta);
+  if (rotulo === undefined) erros.push({ campo, motivo: "limite" });
   if (
     bruta.obrigatoria !== undefined &&
     typeof bruta.obrigatoria !== "boolean"
@@ -302,6 +306,7 @@ function conferirPergunta(
     id,
     tipo,
     texto,
+    rotulo: rotulo ?? null,
     descricao: descricao ?? null,
     obrigatoria: bruta.obrigatoria === true,
     config,

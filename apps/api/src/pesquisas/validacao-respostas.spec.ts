@@ -17,6 +17,7 @@ function p(
     id,
     tipo,
     texto: id,
+    rotulo: null,
     descricao: null,
     obrigatoria: false,
     config,

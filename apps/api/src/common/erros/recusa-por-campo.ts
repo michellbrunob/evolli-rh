@@ -166,6 +166,10 @@ export type CampoPublico =
   | "minimoPorGrupo"
   | "respostas"
   | "status"
+  // T216 — ampliação: separação por grupo (anônima) e o recorte das análises.
+  | "separarPor"
+  | "grupos"
+  | "campo"
   | CampoDePergunta;
 
 /**

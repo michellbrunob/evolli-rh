@@ -19,7 +19,13 @@ import {
   hojeEmSaoPaulo,
 } from "../pessoas/ausencias/calculo-ausencias";
 import { totalDePerguntas } from "./estrutura-pesquisa";
-import type { AberturaPublica, Secao } from "./pesquisas.types";
+import {
+  type AberturaPublica,
+  CAMPOS_GRUPO,
+  type CampoGrupo,
+  ROTULOS_DOS_CAMPOS,
+  type Secao,
+} from "./pesquisas.types";
 import {
   cpfNormalizado,
   exigeIdentificacao,
@@ -28,13 +34,15 @@ import {
   primeiroNome,
   statusEfetivo,
 } from "./regras-pesquisa";
-import { departamentosVigentes } from "./pessoas-da-pesquisa";
+import { catalogoAtivo, lotacoesVigentes } from "./pessoas-da-pesquisa";
 import { conferirRespostas } from "./validacao-respostas";
 
 /**
  * T216 — a página pública da pesquisa (sem sessão; o token na rota).
  *
  * - Abertura: empresa, nome, boas-vindas, estrutura — nunca participantes.
+ *   Na anônima com separação, os grupos que quem responde escolhe (os
+ *   itens ativos dos catálogos da empresa; "prefiro não informar" é `null`).
  * - Identificação (identificada e confidencial): CPF + nascimento de um
  *   participante. Erro genérico (401), sem dizer qual dado falhou; no máximo
  *   5 tentativas erradas por IP e pesquisa em 15 minutos (429). Deu certo:
@@ -100,6 +108,14 @@ export class PesquisaPublicaService {
     if (motivo) return { indisponivel: motivo };
     const secoes = p.secoes as unknown as Secao[];
     const total = totalDePerguntas(secoes);
+    const grupos = [];
+    for (const campo of this.separarPor(p)) {
+      grupos.push({
+        campo,
+        rotulo: ROTULOS_DOS_CAMPOS[campo],
+        opcoes: await catalogoAtivo(this.prisma, p.empresaId, campo),
+      });
+    }
     return {
       empresa: p.empresa.nome,
       nome: p.nome,
@@ -108,7 +124,42 @@ export class PesquisaPublicaService {
       totalPerguntas: total,
       minutosEstimados: minutosEstimados(total),
       secoes,
+      grupos,
     };
+  }
+
+  /** Os campos de separação (só a anônima os tem). */
+  private separarPor(p: PesquisaDoLink): CampoGrupo[] {
+    return p.identificacao === "anonima" ? (p.separarPor as CampoGrupo[]) : [];
+  }
+
+  /**
+   * A escolha de grupo da anônima: só os campos da pesquisa, cada um com um
+   * item ativo do catálogo ou `null` ("prefiro não informar").
+   */
+  private async conferirGrupos(
+    p: PesquisaDoLink,
+    enviados: Record<string, unknown> | undefined,
+  ): Promise<Record<CampoGrupo, string | null>> {
+    const escolhidos: Record<CampoGrupo, string | null> = {
+      departamento: null,
+      centroCusto: null,
+      unidade: null,
+    };
+    const campos = this.separarPor(p);
+    if (!enviados) return escolhidos;
+    const recusa = () =>
+      new CamposRecusadosException([{ campo: "grupos", motivo: "invalido" }]);
+    for (const [chave, valor] of Object.entries(enviados)) {
+      const campo = chave as CampoGrupo;
+      if (!(CAMPOS_GRUPO as readonly string[]).includes(chave)) throw recusa();
+      if (valor === null || valor === undefined || valor === "") continue;
+      if (!campos.includes(campo) || typeof valor !== "string") throw recusa();
+      const ativos = await catalogoAtivo(this.prisma, p.empresaId, campo);
+      if (!ativos.some((g) => g.id === valor)) throw recusa();
+      escolhidos[campo] = valor;
+    }
+    return escolhidos;
   }
 
   async identificar(
@@ -202,6 +253,7 @@ export class PesquisaPublicaService {
     token: string,
     dados: {
       passe?: string;
+      grupos?: Record<string, unknown>;
       respostas: { perguntaId: string; valor: unknown }[];
     },
     metadata: SessionRequestMetadata,
@@ -247,10 +299,19 @@ export class PesquisaPublicaService {
     if (conferidas.erros.length) {
       throw new CamposRecusadosException(conferidas.erros);
     }
+    // Só a anônima recebe a escolha de grupo; nas outras, é ignorada.
+    const escolhidos =
+      p.identificacao === "anonima"
+        ? await this.conferirGrupos(p, dados.grupos)
+        : null;
 
     const hoje = hojeEmSaoPaulo();
     await this.prisma.$transaction(async (tx) => {
-      let departamentoId: string | null = null;
+      let grupos: Record<CampoGrupo, string | null> = escolhidos ?? {
+        departamento: null,
+        centroCusto: null,
+        unidade: null,
+      };
       if (passe) {
         // Uso único: só um envio consome o passe.
         const consumido = await tx.pesquisaPasse.deleteMany({
@@ -267,10 +328,15 @@ export class PesquisaPublicaService {
           where: { participanteId: passe.participanteId },
         });
         if (p.identificacao === "confidencial") {
-          const deps = await departamentosVigentes(tx, p.empresaId, [
-            passe.colaboradorId,
-          ]);
-          departamentoId = deps.get(passe.colaboradorId)?.id ?? null;
+          // Os grupos da lotação no envio, sem a pessoa.
+          const lot = (
+            await lotacoesVigentes(tx, p.empresaId, [passe.colaboradorId])
+          ).get(passe.colaboradorId);
+          grupos = {
+            departamento: lot?.departamento?.id ?? null,
+            centroCusto: lot?.centroCusto?.id ?? null,
+            unidade: lot?.unidade?.id ?? null,
+          };
         }
       }
       await tx.pesquisaResposta.create({
@@ -281,7 +347,9 @@ export class PesquisaPublicaService {
             p.identificacao === "identificada" && passe
               ? passe.colaboradorId
               : null,
-          departamentoId,
+          departamentoId: grupos.departamento,
+          centroCustoId: grupos.centroCusto,
+          unidadeId: grupos.unidade,
           valores: conferidas.valores as unknown as Prisma.InputJsonValue,
           // Na confidencial, só o dia.
           respondidaEm:

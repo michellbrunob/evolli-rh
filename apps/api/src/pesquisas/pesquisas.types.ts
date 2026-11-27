@@ -47,6 +47,19 @@ export const TIPOS_PERGUNTA = [
 ] as const;
 export type TipoPergunta = (typeof TIPOS_PERGUNTA)[number];
 
+/** Campos de separação por grupo (recortes e a escolha na anônima). */
+export const CAMPOS_GRUPO = ["departamento", "centroCusto", "unidade"] as const;
+export type CampoGrupo = (typeof CAMPOS_GRUPO)[number];
+
+export const ROTULOS_DOS_CAMPOS: Readonly<Record<CampoGrupo, string>> = {
+  departamento: "Departamento",
+  centroCusto: "Centro de custo",
+  unidade: "Unidade",
+};
+
+/** Grupos de uma resposta: o id escolhido (ou da lotação), `null` sem grupo. */
+export type GruposDaResposta = Partial<Record<CampoGrupo, string | null>>;
+
 export interface Opcao {
   id: string;
   texto: string;
@@ -73,6 +86,8 @@ export interface Pergunta {
   id: string;
   tipo: TipoPergunta;
   texto: string;
+  /** Rótulo curto (até 40) para as tabelas de análise. */
+  rotulo: string | null;
   descricao: string | null;
   obrigatoria: boolean;
   config: ConfigPergunta;
@@ -97,7 +112,8 @@ export interface PesquisaResumo {
   modelo: Modelo;
   identificacao: Identificacao;
   status: StatusPesquisa;
-  participantes: number;
+  /** `null` na anônima (sem participantes: quem tiver o link responde). */
+  participantes: number | null;
   respostas: number;
   criadaEm: string;
   publicadaEm: string | null;
@@ -118,6 +134,8 @@ export interface PesquisaDetalhe extends PesquisaResumo {
   boasVindas: string | null;
   secoes: Secao[];
   minimoPorGrupo: number;
+  /** Só na anônima: os grupos que quem responde escolhe (0 a 2). */
+  separarPor: CampoGrupo[];
   todos: boolean;
   participantesLista: ParticipanteDaLista[];
   /** Participantes que não conseguem se identificar pelo link (0 na anônima). */
@@ -135,6 +153,15 @@ export interface ListaDePesquisas {
   contagens: ContagensPorStatus;
 }
 
+export type ZonaEnps =
+  "critica" | "aperfeicoamento" | "qualidade" | "excelencia";
+
+export interface Faixas {
+  baixa: number;
+  media: number;
+  alta: number;
+}
+
 export type ResultadoPergunta = {
   perguntaId: string;
   tipo: TipoPergunta;
@@ -144,11 +171,15 @@ export type ResultadoPergunta = {
   | {
       media: number | null;
       distribuicao: { valor: number; quantidade: number }[];
+      /** Escalas, nota e estrelas: % na faixa alta (0–100). */
+      favoravel?: number | null;
+      faixas?: Faixas;
       enps?: {
         promotores: number;
         neutros: number;
         detratores: number;
         indice: number | null;
+        zona: ZonaEnps | null;
       };
     }
   | { opcoes: { opcaoId: string; quantidade: number }[]; outros: string[] }
@@ -164,24 +195,88 @@ export interface DepartamentoDoResultado {
   visivel: boolean;
 }
 
+export interface IndicadoresPesquisa {
+  /** Média das perguntas de escala, na escala 0–10. */
+  mediaGeral: number | null;
+  perguntasDeEscala: number;
+  maiorMedia: { perguntaId: string; media: number } | null;
+  menorMedia: { perguntaId: string; media: number } | null;
+  enps: {
+    indice: number;
+    zona: ZonaEnps;
+    promotores: number;
+    neutros: number;
+    detratores: number;
+  } | null;
+}
+
 export interface ResultadosPesquisa {
   pesquisaId: string;
   respostas: number;
-  participantes: number;
+  /** `null` na anônima. */
+  participantes: number | null;
   departamentos: DepartamentoDoResultado[];
-  filtro: { departamentoId: string | null; visivel: boolean };
+  /** Os grupos de cada recorte disponível (mesmo formato de `departamentos`). */
+  grupos: Partial<Record<CampoGrupo, DepartamentoDoResultado[]>>;
+  filtro: {
+    campo: CampoGrupo | null;
+    grupoId: string | null;
+    departamentoId: string | null;
+    visivel: boolean;
+  };
+  indicadores: IndicadoresPesquisa;
+  recortes: CampoGrupo[];
   perguntas: ResultadoPergunta[];
 }
 
-export interface RespostaIndividual {
-  colaboradorId: string;
-  nome: string;
+export interface AnalisesPesquisa {
+  campo: CampoGrupo;
+  colunas: { perguntaId: string; rotulo: string }[];
+  linhas: {
+    grupoId: string | null;
+    nome: string;
+    respostas: number;
+    visivel: boolean;
+    media: number | null;
+    medias: (number | null)[];
+  }[];
+  evolucao: {
+    pesquisaId: string;
+    nome: string;
+    publicadaEm: string;
+    mediaGeral: number | null;
+  }[];
+}
+
+export interface RespostaResumo {
+  id: string;
+  numero: number;
+  colaboradorId: string | null;
+  nome: string | null;
   departamento: string | null;
   respondidaEm: string;
-  valores: ValorRespondido[];
+  /** Média da resposta nas perguntas de escala (0–10). */
+  media: number | null;
+}
+
+export interface RespostaDetalhe extends RespostaResumo {
+  anteriorId: string | null;
+  proximaId: string | null;
+  posicao: number;
+  total: number;
+  valores: { perguntaId: string; valor: unknown; mediaTime: number | null }[];
+  indicadores: {
+    media: number | null;
+    mediaTime: number | null;
+    recomendacao: number | null;
+    enpsTime: number | null;
+    maior: { perguntaId: string; valor: number } | null;
+    menor: { perguntaId: string; valor: number } | null;
+  };
 }
 
 export interface PesquisaDaFicha {
+  respostaId: string;
   pesquisaId: string;
   nome: string;
   modelo: Modelo;
@@ -198,6 +293,12 @@ export interface PesquisaPublica {
   totalPerguntas: number;
   minutosEstimados: number;
   secoes: Secao[];
+  /** Anônima com separação: o que escolher antes das perguntas. */
+  grupos: {
+    campo: CampoGrupo;
+    rotulo: string;
+    opcoes: { id: string; nome: string }[];
+  }[];
 }
 
 export type MotivoIndisponivel =

@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -20,6 +21,8 @@ import {
   TAMANHO_PAGINA_PADRAO,
 } from "../pessoas/pessoas.types";
 import {
+  CAMPOS_GRUPO,
+  type CampoGrupo,
   IDENTIFICACOES,
   type Identificacao,
   MODELOS,
@@ -70,9 +73,18 @@ export class PesquisaDto {
   @ArrayMaxSize(50)
   secoes!: unknown[];
 
+  /** Ignorado na anônima (sem participantes: quem tiver o link responde). */
+  @IsOptional()
   @ValidateNested()
   @Type(() => ParticipantesDto)
-  participantes!: ParticipantesDto;
+  participantes?: ParticipantesDto;
+
+  /** Só na anônima: 0 a 2 campos (conferidos no serviço). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsIn(CAMPOS_GRUPO, { each: true })
+  separarPor?: CampoGrupo[];
 
   @IsOptional()
   @Transform(nulo)
@@ -111,10 +123,25 @@ export class ListarPesquisasQueryDto {
 }
 
 export class ResultadosQueryDto {
+  /** Atalho antigo para `campo=departamento&grupoId=`. */
   @IsOptional()
   @Transform(nulo)
   @IsUUID()
   departamentoId?: string | null;
+
+  @IsOptional()
+  @IsIn(CAMPOS_GRUPO)
+  campo?: CampoGrupo;
+
+  @IsOptional()
+  @Transform(nulo)
+  @IsUUID()
+  grupoId?: string | null;
+}
+
+export class AnalisesQueryDto {
+  @IsIn(CAMPOS_GRUPO)
+  campo!: CampoGrupo;
 }
 
 export class IdentificarDto {
@@ -142,6 +169,11 @@ export class ResponderDto {
   @IsString()
   @MaxLength(100)
   passe?: string;
+
+  /** Anônima com separação: o grupo escolhido (`null` = prefere não informar). */
+  @IsOptional()
+  @IsObject()
+  grupos?: Record<string, unknown>;
 
   @IsArray()
   @ArrayMaxSize(60)

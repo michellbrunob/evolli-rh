@@ -139,6 +139,7 @@ function estrutura() {
           id: "gosta",
           tipo: "sim_nao",
           texto: "Você recomendaria trabalhar aqui?",
+          rotulo: null,
           descricao: null,
           obrigatoria: true,
           config: { respostaBoa: "sim" },
@@ -148,6 +149,7 @@ function estrutura() {
           id: "porque",
           tipo: "paragrafo",
           texto: "O que precisa melhorar?",
+          rotulo: null,
           descricao: null,
           obrigatoria: true,
           config: {},
@@ -157,6 +159,7 @@ function estrutura() {
           id: "clima",
           tipo: "concordancia",
           texto: "O ambiente de trabalho é respeitoso.",
+          rotulo: "Respeito",
           descricao: null,
           obrigatoria: true,
           config: {},
@@ -173,6 +176,7 @@ function estrutura() {
           id: "enps",
           tipo: "nota_0_10",
           texto: "De 0 a 10, quanto recomendaria a empresa?",
+          rotulo: null,
           descricao: null,
           obrigatoria: false,
           config: { enps: true },
@@ -182,6 +186,7 @@ function estrutura() {
           id: "comentario",
           tipo: "texto_curto",
           texto: "Comentário",
+          rotulo: null,
           descricao: null,
           obrigatoria: false,
           config: {},
@@ -285,6 +290,7 @@ describe("T216 — Pesquisas (e2e)", () => {
     cred: Credencial,
     empresaId: string,
     departamentoId?: string,
+    centroCustoId?: string,
   ): Promise<Pessoa> {
     sequencia += 1;
     const nome = `Pessoa Pesquisa ${String.fromCharCode(65 + (sequencia % 26))}${sequencia}`;
@@ -293,6 +299,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         ...camposObrigatoriosAdmissao(),
         ...(await lotacaoMinima(appUrl, empresaId)),
         ...(departamentoId ? { departamentoId } : {}),
+        ...(centroCustoId ? { centroCustoId } : {}),
         nome,
         empresaId,
         tipo: "clt",
@@ -713,6 +720,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         totalPerguntas: 5,
         minutosEstimados: 2,
         secoes: estrutura(),
+        grupos: [],
       });
       expect(JSON.stringify(pub.body)).not.toContain(a.id);
     });
@@ -822,10 +830,39 @@ describe("T216 — Pesquisas (e2e)", () => {
         viram: 1,
         textos: [{ texto: "Mais reuniões curtas.", autor: a.nome }],
       });
-      expect(porId.clima).toMatchObject({ media: 3 });
-      expect(porId.enps).toMatchObject({
-        enps: { promotores: 1, neutros: 0, detratores: 1, indice: 0 },
+      expect(porId.clima).toMatchObject({
+        media: 3,
+        favoravel: 50,
+        faixas: { baixa: 1, media: 0, alta: 1 },
       });
+      expect(porId.enps).toMatchObject({
+        enps: {
+          promotores: 1,
+          neutros: 0,
+          detratores: 1,
+          indice: 0,
+          zona: "aperfeicoamento",
+        },
+      });
+      // Só a concordância é de escala (o eNPS fica fora): 3 de 5 → 6 de 10.
+      expect(r.body.indicadores).toEqual({
+        mediaGeral: 6,
+        perguntasDeEscala: 1,
+        maiorMedia: { perguntaId: "clima", media: 6 },
+        menorMedia: { perguntaId: "clima", media: 6 },
+        enps: {
+          indice: 0,
+          zona: "aperfeicoamento",
+          promotores: 1,
+          neutros: 0,
+          detratores: 1,
+        },
+      });
+      expect(r.body.recortes).toEqual([
+        "departamento",
+        "centroCusto",
+        "unidade",
+      ]);
       // O master lê o agregado, sem a pessoa.
       const m = await get(`/v1/pesquisas/${id}/resultados`, masterA).expect(
         200,
@@ -849,22 +886,83 @@ describe("T216 — Pesquisas (e2e)", () => {
         where: { action: "pesquisas_respostas_consultadas" },
       });
       const r = await get(`/v1/pesquisas/${id}/respostas`, dpA).expect(200);
-      expect(r.body).toHaveLength(2);
-      const deA = r.body.find(
-        (x: { colaboradorId: string }) => x.colaboradorId === a.id,
-      );
-      expect(deA).toMatchObject({
+      expect(r.body).toEqual([
+        {
+          id: expect.any(String),
+          numero: 1,
+          colaboradorId: a.id,
+          nome: a.nome,
+          departamento: "Departamento T179 Sintetico",
+          respondidaEm: expect.any(String),
+          media: 8,
+        },
+        {
+          id: expect.any(String),
+          numero: 2,
+          colaboradorId: b.id,
+          nome: b.nome,
+          departamento: "Departamento T179 Sintetico",
+          respondidaEm: expect.any(String),
+          media: 4,
+        },
+      ]);
+      const [primeira, segunda] = r.body as { id: string }[];
+      const det = await get(
+        `/v1/pesquisas/${id}/respostas/${primeira!.id}`,
+        rhA,
+      ).expect(200);
+      expect(det.body).toMatchObject({
+        id: primeira!.id,
+        numero: 1,
+        anteriorId: null,
+        proximaId: segunda!.id,
+        posicao: 1,
+        total: 2,
         nome: a.nome,
-        departamento: "Departamento T179 Sintetico",
-        respondidaEm: expect.any(String),
+        valores: [
+          { perguntaId: "gosta", valor: "nao", mediaTime: null },
+          {
+            perguntaId: "porque",
+            valor: "Mais reuniões curtas.",
+            mediaTime: null,
+          },
+          { perguntaId: "clima", valor: 4, mediaTime: 3 },
+          { perguntaId: "enps", valor: 9, mediaTime: 6 },
+          { perguntaId: "comentario", valor: "Tudo certo.", mediaTime: null },
+        ],
+        indicadores: {
+          media: 8,
+          mediaTime: 6,
+          recomendacao: 9,
+          enpsTime: 0,
+          maior: { perguntaId: "clima", valor: 4 },
+          menor: { perguntaId: "clima", valor: 4 },
+        },
       });
-      expect(deA.valores).toEqual(RESPOSTAS_BOAS);
+      const ultima = await get(
+        `/v1/pesquisas/${id}/respostas/${segunda!.id}`,
+        rhA,
+      ).expect(200);
+      expect(ultima.body).toMatchObject({
+        anteriorId: primeira!.id,
+        proximaId: null,
+        posicao: 2,
+      });
+      // Resposta de outra pesquisa (ou inexistente): 404; o master não lê.
+      await get(`/v1/pesquisas/${id}/respostas/${randomUUID()}`, rhA).expect(
+        404,
+      );
+      await get(
+        `/v1/pesquisas/${id}/respostas/${primeira!.id}`,
+        masterA,
+      ).expect(403);
       const ficha = await get(
         `/v1/colaboradores/${a.id}/pesquisas`,
         rhA,
       ).expect(200);
       expect(ficha.body).toEqual([
         {
+          respostaId: primeira!.id,
           pesquisaId: id,
           nome: "Pesquisa de clima sintética",
           modelo: "clima",
@@ -877,9 +975,10 @@ describe("T216 — Pesquisas (e2e)", () => {
         where: { action: "pesquisas_respostas_consultadas" },
         orderBy: { occurredAt: "asc" },
       });
-      expect(depois.length - antes).toBe(2);
+      // Lista, 2 detalhes e a ficha (o 404 não chega a ler).
+      expect(depois.length - antes).toBe(4);
       expect(depois.map((e) => e.resourceId)).toEqual(
-        expect.arrayContaining([id, a.id]),
+        expect.arrayContaining([id, a.id, primeira!.id, segunda!.id]),
       );
       expect(depois.every((e) => e.resource === "resposta_pesquisa")).toBe(
         true,
@@ -974,6 +1073,8 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect(respostas).toHaveLength(1);
       expect(respostas[0]!.colaboradorId).toBeNull();
       expect(respostas[0]!.departamentoId).not.toBeNull();
+      expect(respostas[0]!.unidadeId).not.toBeNull();
+      expect(respostas[0]!.centroCustoId).toBeNull();
       // Só o dia: nada de horário na resposta nem no participante.
       expect(respostas[0]!.respondidaEm.toISOString()).toBe(
         `${HOJE}T00:00:00.000Z`,
@@ -1013,7 +1114,10 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect((await resultados()).body.filtro.visivel).toBe(false);
       await responderComo(token, c);
       const res = await resultados();
-      expect(res.body.filtro).toEqual({ departamentoId: null, visivel: true });
+      expect(res.body.filtro).toMatchObject({
+        departamentoId: null,
+        visivel: true,
+      });
       const porque = res.body.perguntas.find(
         (p: { perguntaId: string }) => p.perguntaId === "porque",
       );
@@ -1092,34 +1196,186 @@ describe("T216 — Pesquisas (e2e)", () => {
 
   // -----------------------------------------------------------------------
   describe("anônima", () => {
-    it("sem identificação: quem tem o link responde; nada liga a pessoa", async () => {
+    it("sem participantes, com separação por grupo; nada liga a pessoa", async () => {
+      const lot = await lotacaoMinima(appUrl, empresaA);
       const a = await admitir(rhA, empresaA);
-      const { id, token } = await publicada({
+      const rascunho = await criarPesquisa({
         identificacao: "anonima",
+        separarPor: ["departamento", "unidade"],
+        // Ignorados na anônima.
         participantes: { todos: false, colaboradorIds: [a.id] },
       });
+      expect(rascunho).toMatchObject({ participantes: null });
+      const det0 = await get(`/v1/pesquisas/${rascunho.id}`, rhA).expect(200);
+      expect(det0.body).toMatchObject({
+        participantes: null,
+        participantesLista: [],
+        naoIdentificaveis: 0,
+        separarPor: ["departamento", "unidade"],
+      });
+      // Publica sem participante nenhum.
+      const pub = await post(`/v1/pesquisas/${rascunho.id}/publicar`, rhA)
+        .send()
+        .expect(200);
+      const id = rascunho.id;
+      const token = (pub.body.link as string).replace("#/p/", "");
+      expect(
+        await prisma.pesquisaParticipante.count({ where: { pesquisaId: id } }),
+      ).toBe(0);
+
+      const abertura = await agent().get(publico(token)).expect(200);
+      expect(
+        abertura.body.grupos.map((g: { campo: string; rotulo: string }) => [
+          g.campo,
+          g.rotulo,
+        ]),
+      ).toEqual([
+        ["departamento", "Departamento"],
+        ["unidade", "Unidade"],
+      ]);
+      expect(abertura.body.grupos[0].opcoes).toContainEqual({
+        id: lot.departamentoId,
+        nome: "Departamento T179 Sintetico",
+      });
       await identificar(token, a).expect(404);
-      for (let i = 0; i < 2; i += 1) {
+
+      // Grupo fora da pesquisa ou inexistente: 422; "não informar", ok.
+      for (const grupos of [
+        { centroCusto: randomUUID() },
+        { departamento: randomUUID() },
+        { qualquer: null },
+      ]) {
+        const r = await agent()
+          .post(publico(token, "/respostas"))
+          .send({ grupos, respostas: RESPOSTAS_BOAS })
+          .expect(422);
+        expect(r.body.erros).toEqual([{ campo: "grupos", motivo: "invalido" }]);
+      }
+      for (const grupos of [
+        { departamento: lot.departamentoId, unidade: null },
+        { departamento: lot.departamentoId },
+        undefined,
+      ]) {
         await agent()
           .post(publico(token, "/respostas"))
-          .send({ respostas: RESPOSTAS_BOAS })
+          .send({ grupos, respostas: RESPOSTAS_BOAS })
           .expect(201);
       }
       const respostas = await prisma.pesquisaResposta.findMany({
         where: { pesquisaId: id },
       });
-      expect(respostas).toHaveLength(2);
+      expect(respostas).toHaveLength(3);
       expect(respostas.every((r) => r.colaboradorId === null)).toBe(true);
-      expect(respostas.every((r) => r.departamentoId === null)).toBe(true);
-      const det = await get(`/v1/pesquisas/${id}`, rhA).expect(200);
-      expect(det.body.participantesLista[0].respondeu).toBeNull();
-      expect(det.body).toMatchObject({ participantes: 1, respostas: 2 });
-      // Sem vínculo pessoa↔resposta: a visão geral aparece mesmo abaixo do
-      // mínimo por grupo.
+      expect(
+        respostas.filter((r) => r.departamentoId === lot.departamentoId),
+      ).toHaveLength(2);
+      expect(respostas.every((r) => r.unidadeId === null)).toBe(true);
+
+      // Resultados: sem participantes; recortes = os da separação, com o
+      // mínimo por grupo (3).
       const res = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(200);
-      expect(res.body.filtro).toEqual({ departamentoId: null, visivel: true });
+      expect(res.body).toMatchObject({
+        participantes: null,
+        respostas: 3,
+        recortes: ["departamento", "unidade"],
+        filtro: { departamentoId: null, visivel: true },
+      });
       expect(res.body.perguntas).toHaveLength(5);
-      await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(404);
+      expect(res.body.grupos.departamento).toEqual([
+        {
+          id: lot.departamentoId,
+          nome: "Departamento T179 Sintetico",
+          respostas: 2,
+          visivel: false,
+        },
+      ]);
+      const recorte = await get(
+        `/v1/pesquisas/${id}/resultados?campo=departamento&grupoId=${lot.departamentoId}`,
+        rhA,
+      ).expect(200);
+      expect(recorte.body.filtro).toEqual({
+        campo: "departamento",
+        grupoId: lot.departamentoId,
+        departamentoId: lot.departamentoId,
+        visivel: false,
+      });
+      expect(recorte.body.perguntas).toEqual([]);
+      await get(`/v1/pesquisas/${id}/analises?campo=centroCusto`, rhA).expect(
+        422,
+      );
+      const analises = await get(
+        `/v1/pesquisas/${id}/analises?campo=departamento`,
+        rhA,
+      ).expect(200);
+      expect(analises.body.linhas[1]).toMatchObject({
+        grupoId: lot.departamentoId,
+        visivel: false,
+        media: null,
+      });
+
+      // Respostas individuais numeradas, sem pessoa.
+      const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
+      expect(lista.body.map((x: { numero: number }) => x.numero)).toEqual([
+        1, 2, 3,
+      ]);
+      expect(
+        lista.body.every(
+          (x: {
+            nome: unknown;
+            colaboradorId: unknown;
+            departamento: unknown;
+          }) =>
+            x.nome === null &&
+            x.colaboradorId === null &&
+            x.departamento === null,
+        ),
+      ).toBe(true);
+      const meio = await get(
+        `/v1/pesquisas/${id}/respostas/${lista.body[1].id}`,
+        rhA,
+      ).expect(200);
+      expect(meio.body).toMatchObject({
+        numero: 2,
+        posicao: 2,
+        total: 3,
+        anteriorId: lista.body[0].id,
+        proximaId: lista.body[2].id,
+        nome: null,
+      });
+    });
+
+    it("separar por: só na anônima, até 2 campos, sem repetir", async () => {
+      const r = await post("/v1/pesquisas", rhA)
+        .send(corpo({ separarPor: ["departamento"] }))
+        .expect(422);
+      expect(r.body.erros).toEqual([
+        { campo: "separarPor", motivo: "nao_se_aplica" },
+      ]);
+      const tres = await post("/v1/pesquisas", rhA)
+        .send(
+          corpo({
+            identificacao: "anonima",
+            separarPor: ["departamento", "centroCusto", "unidade"],
+          }),
+        )
+        .expect(422);
+      expect(tres.body.erros).toEqual([
+        { campo: "separarPor", motivo: "limite" },
+      ]);
+      const repetido = await post("/v1/pesquisas", rhA)
+        .send(
+          corpo({
+            identificacao: "anonima",
+            separarPor: ["unidade", "unidade"],
+          }),
+        )
+        .expect(422);
+      expect(repetido.body.erros).toEqual([
+        { campo: "separarPor", motivo: "invalido" },
+      ]);
+      await post("/v1/pesquisas", rhA)
+        .send(corpo({ identificacao: "anonima", separarPor: ["cargo"] }))
+        .expect(400);
     });
   });
 
@@ -1172,14 +1428,22 @@ describe("T216 — Pesquisas (e2e)", () => {
           nome: "Departamento T216 Sintetico",
         },
       });
+      const centro = await prisma.centroCusto.create({
+        data: {
+          empresaId: empresaA,
+          codigo: "T216_CC",
+          nome: "Centro T216 Sintetico",
+        },
+      });
       const grandes = [
-        await admitir(rhA, empresaA),
-        await admitir(rhA, empresaA),
-        await admitir(rhA, empresaA),
+        await admitir(rhA, empresaA, undefined, centro.id),
+        await admitir(rhA, empresaA, undefined, centro.id),
+        await admitir(rhA, empresaA, undefined, centro.id),
       ];
       const pequeno = await admitir(rhA, empresaA, outroDep.id);
       const todos = [...grandes, pequeno];
       const { id, token } = await publicada({
+        modelo: "pulso",
         participantes: { todos: false, colaboradorIds: todos.map((p) => p.id) },
       });
       for (const p of todos) await responderComo(token, p);
@@ -1206,6 +1470,8 @@ describe("T216 — Pesquisas (e2e)", () => {
         rhA,
       ).expect(200);
       expect(abaixo.body.filtro).toEqual({
+        campo: "departamento",
+        grupoId: outroDep.id,
         departamentoId: outroDep.id,
         visivel: false,
       });
@@ -1219,6 +1485,102 @@ describe("T216 — Pesquisas (e2e)", () => {
         perguntaId: "clima",
         respondidas: 3,
       });
+
+      // Centro de custo, pela lotação vigente (identificada).
+      expect(geral.body.grupos.centroCusto).toEqual([
+        {
+          id: centro.id,
+          nome: "Centro T216 Sintetico",
+          respostas: 3,
+          visivel: true,
+        },
+      ]);
+      const porCentro = await get(
+        `/v1/pesquisas/${id}/resultados?campo=centroCusto&grupoId=${centro.id}`,
+        rhA,
+      ).expect(200);
+      expect(porCentro.body.filtro).toEqual({
+        campo: "centroCusto",
+        grupoId: centro.id,
+        departamentoId: null,
+        visivel: true,
+      });
+      expect(porCentro.body.indicadores.mediaGeral).toBe(8);
+
+      // Análises: o mapa (clima 4 de 5 → 8 de 10) e a evolução do modelo.
+      const mapa = await get(
+        `/v1/pesquisas/${id}/analises?campo=departamento`,
+        rhA,
+      ).expect(200);
+      expect(mapa.body).toEqual({
+        campo: "departamento",
+        colunas: [{ perguntaId: "clima", rotulo: "Respeito" }],
+        linhas: [
+          {
+            grupoId: null,
+            nome: "Toda a empresa",
+            respostas: 4,
+            visivel: true,
+            media: 8,
+            medias: [8],
+          },
+          {
+            grupoId: lot.departamentoId,
+            nome: "Departamento T179 Sintetico",
+            respostas: 3,
+            visivel: true,
+            media: 8,
+            medias: [8],
+          },
+          {
+            grupoId: outroDep.id,
+            nome: "Departamento T216 Sintetico",
+            respostas: 1,
+            visivel: false,
+            media: null,
+            medias: [null],
+          },
+        ],
+        evolucao: [
+          {
+            pesquisaId: id,
+            nome: "Pesquisa de clima sintética",
+            publicadaEm: expect.any(String),
+            mediaGeral: 8,
+          },
+        ],
+      });
+      await get(`/v1/pesquisas/${id}/analises`, rhA).expect(400);
+      // Segundo pulso: a evolução traz os dois, o mais antigo primeiro.
+      const segundo = await publicada({
+        modelo: "pulso",
+        nome: "Pulso seguinte",
+        participantes: {
+          todos: false,
+          colaboradorIds: grandes.map((p) => p.id),
+        },
+      });
+      for (const p of grandes) {
+        await responderComo(segundo.token, p, [
+          { perguntaId: "gosta", valor: "sim" },
+          { perguntaId: "clima", valor: 2 },
+        ]);
+      }
+      const evolucao = await get(
+        `/v1/pesquisas/${segundo.id}/analises?campo=unidade`,
+        rhA,
+      ).expect(200);
+      expect(
+        evolucao.body.evolucao.map(
+          (e: { pesquisaId: string; mediaGeral: number }) => [
+            e.pesquisaId,
+            e.mediaGeral,
+          ],
+        ),
+      ).toEqual([
+        [id, 8],
+        [segundo.id, 4],
+      ]);
     });
   });
 
