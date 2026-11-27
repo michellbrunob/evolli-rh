@@ -17,7 +17,6 @@ import type {
   CampoGrupo,
   Pergunta,
   PesquisaDetalhe,
-  RespostaDetalhe,
   RespostaResumo,
   ResultadoPergunta,
   ResultadosPesquisa,
@@ -68,11 +67,9 @@ import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
-import {
-  nomeDaExportacao,
-  pdfDosResultados,
-  planilhaDosResultados,
-} from "./exportarResultados";
+import { carregarRelatorio, respostasCompletas } from "./carregarRelatorio";
+import { nomeDaExportacao, planilhaDosResultados } from "./exportarResultados";
+import { enderecoDaRota } from "./rotasDePesquisas";
 import {
   BarraEmpilhada,
   BarrasPorNota,
@@ -240,23 +237,27 @@ function ResultadosInterno({
     if (!detalhe || !geral) return;
     try {
       if (formato === "pdf") {
-        baixarArquivo(
-          pdfDosResultados(detalhe, geral, indicadoresDe(detalhe, geral)),
-          nomeDaExportacao(detalhe.nome, "pdf"),
-          "application/pdf",
+        // O relatório em PDF: página A4 imprimível, em outra aba.
+        window.open(
+          enderecoDaRota({ tela: "relatorio", id: pesquisaId }),
+          "_blank",
+          "noopener",
         );
         return;
       }
-      let completas: RespostaDetalhe[] | null = null;
-      if (individuais) {
-        const lista =
-          respostas ?? (await servico.respostasDaPesquisa(pesquisaId)) ?? [];
-        completas = await Promise.all(
-          lista.map((r) => servico.respostaDaPesquisa(pesquisaId, r.id)),
-        );
-      }
+      const carregado = await carregarRelatorio(servico, pesquisaId, hoje);
+      const completas = await respostasCompletas(
+        servico,
+        pesquisaId,
+        carregado.lista,
+      );
       baixarArquivo(
-        planilhaDosResultados(detalhe, geral, completas),
+        planilhaDosResultados(
+          carregado.rel,
+          carregado.detalhe,
+          carregado.geral,
+          completas,
+        ),
         nomeDaExportacao(detalhe.nome, "xlsx"),
         TIPO_MIME_XLSX,
       );

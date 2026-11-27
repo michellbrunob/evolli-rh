@@ -144,6 +144,7 @@ describe("Resultado individual", () => {
         secoes={DETALHE.secoes}
         respostaId="r-1"
         carregar={() => Promise.resolve(RESPOSTA_DETALHE)}
+        pesquisaIdDoPdf="p-1"
         rotuloVoltar="Voltar"
         onVoltar={vi.fn()}
       />,
@@ -155,7 +156,14 @@ describe("Resultado individual", () => {
     expect(
       screen.queryByRole("navigation", { name: "Outras respostas" }),
     ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Exportar/ }));
-    expect(vi.mocked(baixarArquivo).mock.calls[0]![2]).toBe("application/pdf");
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
+    fireEvent.click(screen.getByRole("button", { name: "Exportar PDF" }));
+    expect(abrir).toHaveBeenCalledWith(
+      expect.stringMatching(/#\/pesquisas\/p-1\/respostas\/r-1\/relatorio$/),
+      "_blank",
+      "noopener",
+    );
+    abrir.mockRestore();
+    expect(baixarArquivo).not.toHaveBeenCalled();
   });
 });

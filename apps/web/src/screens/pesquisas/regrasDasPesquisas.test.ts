@@ -15,9 +15,9 @@ import {
   validarEtapa,
   validarPerguntas,
 } from "./estadoDaPesquisa";
+import { montarRelatorio } from "./dadosDoRelatorio";
 import {
   linhasDoResumo,
-  pdfDosResultados,
   planilhaDosResultados,
   textoDoValor,
 } from "./exportarResultados";
@@ -158,27 +158,26 @@ describe("Exportação e texto das respostas", () => {
 
   it("planilha: respostas individuais nunca na confidencial", async () => {
     const respostas = [RESPOSTA_DETALHE];
-    const conf = await lerAbasXlsx(
-      planilhaDosResultados(DETALHE, RESULTADOS, respostas),
-    );
-    expect(Object.keys(conf)).toEqual(["Resultados"]);
-    const anon = await lerAbasXlsx(
-      planilhaDosResultados(
-        { ...DETALHE, identificacao: "anonima" },
-        RESULTADOS,
-        respostas,
-      ),
-    );
-    expect(anon["Respostas"]![1]![0]).toBe("Resposta #1");
-    expect(anon["Respostas"]![1]![1]).toBe("");
-    const ident = await lerAbasXlsx(
-      planilhaDosResultados(
-        { ...DETALHE, identificacao: "identificada" },
-        RESULTADOS,
-        respostas,
-      ),
-    );
-    expect(ident["Respostas"]![1]!.slice(0, 2)).toEqual([
+    const planilha = (d: typeof DETALHE) =>
+      lerAbasXlsx(
+        planilhaDosResultados(
+          montarRelatorio({
+            detalhe: d,
+            geral: RESULTADOS,
+            empresa: "Empresa Alfa",
+            hoje: "2026-11-27",
+          }),
+          d,
+          RESULTADOS,
+          respostas,
+        ),
+      );
+    const conf = await planilha(DETALHE);
+    expect(Object.keys(conf)).not.toContain("Participantes");
+    const anon = await planilha({ ...DETALHE, identificacao: "anonima" });
+    expect(anon["Participantes"]![4]![0]).toBe("Participante 1");
+    const ident = await planilha({ ...DETALHE, identificacao: "identificada" });
+    expect(ident["Participantes"]![4]!.slice(0, 2)).toEqual([
       "Ana Exemplo",
       "Operações",
     ]);
@@ -191,10 +190,14 @@ describe("Exportação e texto das respostas", () => {
       perguntas: [],
     };
     expect(linhasDoResumo(DETALHE, vazio)).toEqual([]);
-    const pdf = new TextDecoder().decode(
-      pdfDosResultados(DETALHE, vazio, { mediaGeral: null, enps: null }),
-    );
-    expect(pdf).toContain("Poucas respostas para mostrar");
+    const rel = montarRelatorio({
+      detalhe: DETALHE,
+      geral: vazio,
+      empresa: "",
+      hoje: "2026-11-27",
+    });
+    expect(rel.mediaGeral).toBeNull();
+    expect(rel.perguntas.every((p) => p.media === null)).toBe(true);
   });
 
   it("texto das respostas por tipo", () => {

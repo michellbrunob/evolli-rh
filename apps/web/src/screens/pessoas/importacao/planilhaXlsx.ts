@@ -32,11 +32,27 @@ export const NOME_DO_MODELO_XLSX = "modelo-importacao-colaboradores.xlsx";
 export const TIPO_MIME_XLSX =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-/** Uma célula: texto, número ou fórmula (esta só para testes de recusa). */
+/** T216 — formato de exibição de um número (o valor continua número). */
+export type FormatoDeNumeroXlsx =
+  "data" | "dataHora" | "percentual" | "decimal";
+
+/**
+ * Uma célula: texto, número, número com formato (T216) ou fórmula (esta só
+ * para testes de recusa).
+ */
 export type CelulaXlsx =
   | string
   | number
+  | { readonly numero: number; readonly formato: FormatoDeNumeroXlsx }
   | { readonly formula: string; readonly valor?: string | number };
+
+/** Estilo de cada formato de número (ver `ESTILOS`). */
+const ESTILO_DO_FORMATO: Readonly<Record<FormatoDeNumeroXlsx, number>> = {
+  data: 5,
+  dataHora: 6,
+  percentual: 7,
+  decimal: 8,
+};
 
 export interface AbaXlsx {
   readonly nome: string;
@@ -57,6 +73,10 @@ export interface AbaXlsx {
    * número (ordena e filtra como data); só o formato de exibição muda.
    */
   readonly formatos?: Readonly<Record<number, "data" | "dataHora">>;
+  /** T216 — a primeira linha é um título (negrito). */
+  readonly titulo?: boolean;
+  /** T216 — linhas (índice a partir de 0) com o estilo de cabeçalho. */
+  readonly linhasDeCabecalho?: readonly number[];
 }
 
 export interface OpcoesDoXlsx {
@@ -369,10 +389,12 @@ function indiceDaColuna(referencia: string): number {
 
 // Estilos: 0 normal; 1 texto (@); 2 cabeçalho (negrito, fundo, texto);
 // 3 texto quebrado (Instruções); 4 título das instruções (negrito);
-// 5 data (formato embutido 14); 6 data e hora (formato embutido 22).
+// 5 data (formato embutido 14); 6 data e hora (formato embutido 22);
+// 7 percentual (formato embutido 9, "0%"); 8 decimal com uma casa ("0.0").
 const ESTILOS =
   CABECALHO_XML +
   `<styleSheet xmlns="${NS_MAIN}">` +
+  '<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0"/></numFmts>' +
   '<fonts count="2"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font>' +
   '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts>' +
   '<fills count="3"><fill><patternFill patternType="none"/></fill>' +
@@ -380,7 +402,7 @@ const ESTILOS =
   '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FB"/><bgColor indexed="64"/></patternFill></fill></fills>' +
   '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="7">' +
+  '<cellXfs count="9">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   '<xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
   '<xf numFmtId="49" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>' +
@@ -388,6 +410,8 @@ const ESTILOS =
   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
   '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
   '<xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+  '<xf numFmtId="9" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+  '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
   "</cellXfs>" +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   "</styleSheet>";
@@ -420,9 +444,9 @@ function folhaXml(
     .map((linha, i) => {
       const numero = i + 1;
       const destaque =
-        aba.cabecalho && i === 0
+        (aba.cabecalho && i === 0) || aba.linhasDeCabecalho?.includes(i)
           ? 2
-          : aba.quebrarTexto && i === 0
+          : (aba.quebrarTexto || aba.titulo) && i === 0
             ? 4
             : estiloPadrao;
       const celulas = linha
@@ -434,6 +458,9 @@ function folhaXml(
               i > 0 || !aba.cabecalho ? aba.formatos?.[j] : undefined;
             const sNumero = formato ? ` s="${formato === "data" ? 5 : 6}"` : s;
             return `<c r="${ref}"${sNumero}><v>${celula}</v></c>`;
+          }
+          if (typeof celula === "object" && "numero" in celula) {
+            return `<c r="${ref}" s="${ESTILO_DO_FORMATO[celula.formato]}"><v>${celula.numero}</v></c>`;
           }
           if (typeof celula === "object") {
             const valor = celula.valor ?? "";

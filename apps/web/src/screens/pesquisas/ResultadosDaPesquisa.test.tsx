@@ -479,78 +479,64 @@ describe("Resultados — Análises e Respostas", () => {
 });
 
 describe("Resultados — Exportar", () => {
-  it("Excel na confidencial: só os resultados, sem autor nem respostas individuais", async () => {
-    const { servico } = montar();
+  async function exportarExcel() {
     await screen.findByRole("region", { name: "Indicadores" });
     abrirMenu("Exportar");
     fireEvent.click(await screen.findByRole("menuitem", { name: /Excel/ }));
     await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
     const [bytes, nome] = vi.mocked(baixarArquivo).mock.calls[0]!;
+    return { abas: await lerAbasXlsx(bytes as Uint8Array), nome };
+  }
+
+  it("Excel na confidencial: as abas do relatório, sem autor nem respostas individuais", async () => {
+    const { servico } = montar();
+    const { abas, nome } = await exportarExcel();
     expect(nome).toBe("clima-de-novembro-resultados.xlsx");
-    const abas = await lerAbasXlsx(bytes as Uint8Array);
-    expect(Object.keys(abas)).toEqual(["Resultados"]);
+    expect(Object.keys(abas)).toEqual([
+      "Resumo",
+      "Perguntas",
+      "eNPS",
+      "Comentários",
+      "Alertas",
+      "Metodologia",
+    ]);
     expect(JSON.stringify(abas)).toContain("Mais retorno, por favor.");
     expect(JSON.stringify(abas)).not.toContain("Pessoa Exemplo");
     expect(servico.respostaDaPesquisa).not.toHaveBeenCalled();
+    expect(servico.respostasDaPesquisa).not.toHaveBeenCalled();
   });
 
-  it("Excel na identificada leva as respostas com o nome", async () => {
+  it("Excel na identificada leva os participantes com o nome e a data como data", async () => {
     montar(comIdentificacao("identificada"));
-    await screen.findByRole("region", { name: "Indicadores" });
-    abrirMenu("Exportar");
-    fireEvent.click(await screen.findByRole("menuitem", { name: /Excel/ }));
-    await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
-    const abas = await lerAbasXlsx(
-      vi.mocked(baixarArquivo).mock.calls[0]![0] as Uint8Array,
-    );
-    expect(abas["Respostas"]![1]![0]).toBe("Ana Exemplo");
-  });
-
-  it("Excel na anônima numera as respostas, sem nome", async () => {
-    montar(comIdentificacao("anonima"));
-    await screen.findByRole("region", { name: "Indicadores" });
-    abrirMenu("Exportar");
-    fireEvent.click(await screen.findByRole("menuitem", { name: /Excel/ }));
-    await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
-    const abas = await lerAbasXlsx(
-      vi.mocked(baixarArquivo).mock.calls[0]![0] as Uint8Array,
-    );
-    expect(abas["Respostas"]![1]![0]).toBe("Resposta #1");
-    expect(JSON.stringify(abas["Respostas"])).not.toContain("Ana Exemplo");
-  });
-
-  it("Excel: data da resposta e notas saem como número, não texto", async () => {
-    montar(comIdentificacao("identificada"));
-    await screen.findByRole("region", { name: "Indicadores" });
-    abrirMenu("Exportar");
-    fireEvent.click(await screen.findByRole("menuitem", { name: /Excel/ }));
-    await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
-    const abas = await lerAbasXlsx(
-      vi.mocked(baixarArquivo).mock.calls[0]![0] as Uint8Array,
-    );
-    const [cabecalho, ana] = abas["Respostas"]!;
+    const { abas } = await exportarExcel();
+    const [cabecalho, ana] = abas["Participantes"]!.slice(3);
     expect(cabecalho![2]).toBe("Respondida em");
+    expect(ana![0]).toBe("Ana Exemplo");
     // 20/11/2026 11:23 (Brasília) como data serial do Excel.
     expect(Number(ana![2])).toBeCloseTo(46346 + (11 * 60 + 23) / 1440, 5);
     const nota = cabecalho!.findIndex((c) => c.startsWith("1."));
     expect(ana![nota]).toBe("10");
   });
 
-  it("PDF do relatório", async () => {
+  it("Excel na anônima numera os participantes, sem nome", async () => {
+    montar(comIdentificacao("anonima"));
+    const { abas } = await exportarExcel();
+    expect(abas["Participantes"]![4]![0]).toBe("Participante 1");
+    expect(JSON.stringify(abas["Participantes"])).not.toContain("Ana Exemplo");
+  });
+
+  it("PDF: abre o relatório imprimível em outra aba", async () => {
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
     montar();
     await screen.findByRole("region", { name: "Indicadores" });
     abrirMenu("Exportar");
     fireEvent.click(await screen.findByRole("menuitem", { name: /PDF/ }));
-    await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
-    const [bytes, nome, tipo] = vi.mocked(baixarArquivo).mock.calls[0]!;
-    expect(nome).toBe("clima-de-novembro-resultados.pdf");
-    expect(tipo).toBe("application/pdf");
-    const texto = new TextDecoder("latin1").decode(bytes as Uint8Array);
-    expect(texto.startsWith("%PDF")).toBe(true);
-    // Indicadores (média, maior e menor média, eNPS com a zona) e barras.
-    expect(texto).toContain("eNPS");
-    expect(texto).toContain("Zona de qualidade");
-    expect(texto).toContain("8,5 /10");
-    expect(texto.match(/ re f/g)?.length ?? 0).toBeGreaterThan(4);
+    expect(abrir).toHaveBeenCalledWith(
+      expect.stringMatching(/#\/pesquisas\/p-1\/relatorio$/),
+      "_blank",
+      "noopener",
+    );
+    expect(baixarArquivo).not.toHaveBeenCalled();
+    abrir.mockRestore();
   });
 });

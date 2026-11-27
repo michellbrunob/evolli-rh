@@ -16,6 +16,8 @@
  *   #/pesquisas/<id>/editar                       editar (publicada)
  *   #/pesquisas/<id>/respostas/<respostaId>       resultado individual
  *   #/pesquisas/<id>/previa                       pré-visualização
+ *   #/pesquisas/<id>/relatorio                    relatório em PDF
+ *   #/pesquisas/<id>/respostas/<rid>/relatorio    PDF de uma resposta
  */
 
 export type AbaDosResultados = "geral" | "analises" | "respostas";
@@ -40,7 +42,13 @@ export type RotaDePesquisas =
       readonly id: string;
       readonly respostaId: string;
     }
-  | { readonly tela: "previa"; readonly id: string };
+  | { readonly tela: "previa"; readonly id: string }
+  | { readonly tela: "relatorio"; readonly id: string }
+  | {
+      readonly tela: "relatorioDaResposta";
+      readonly id: string;
+      readonly respostaId: string;
+    };
 
 export const ROTA_DA_LISTA: RotaDePesquisas = { tela: "lista" };
 
@@ -100,8 +108,11 @@ export function rotaDePesquisasDoFragmento(
   if (p.length === 2 && p[1] === "rascunho") return { tela: "rascunho", id };
   if (p.length === 2 && p[1] === "editar") return { tela: "editar", id };
   if (p.length === 2 && p[1] === "previa") return { tela: "previa", id };
+  if (p.length === 2 && p[1] === "relatorio") return { tela: "relatorio", id };
   if (p.length === 3 && p[1] === "respostas")
     return { tela: "resposta", id, respostaId: p[2]! };
+  if (p.length === 4 && p[1] === "respostas" && p[3] === "relatorio")
+    return { tela: "relatorioDaResposta", id, respostaId: p[2]! };
   return null;
 }
 
@@ -136,13 +147,22 @@ export function fragmentoDaRotaDePesquisas(rota: RotaDePesquisas): string {
       return `${PREFIXO}/${enc(rota.id)}/respostas/${enc(rota.respostaId)}`;
     case "previa":
       return `${PREFIXO}/${enc(rota.id)}/previa`;
+    case "relatorio":
+      return `${PREFIXO}/${enc(rota.id)}/relatorio`;
+    case "relatorioDaResposta":
+      return `${PREFIXO}/${enc(rota.id)}/respostas/${enc(rota.respostaId)}/relatorio`;
   }
+}
+
+/** O endereço completo de uma tela (para abrir em outra aba). */
+export function enderecoDaRota(rota: RotaDePesquisas): string {
+  const { origin, pathname } = window.location;
+  return `${origin}${pathname}${fragmentoDaRotaDePesquisas(rota)}`;
 }
 
 /** O endereço completo da prévia (abre em outra aba). */
 export function enderecoDaPrevia(id: string): string {
-  const { origin, pathname } = window.location;
-  return `${origin}${pathname}${fragmentoDaRotaDePesquisas({ tela: "previa", id })}`;
+  return enderecoDaRota({ tela: "previa", id });
 }
 
 /** O último nível da trilha de cada tela. */
@@ -169,5 +189,8 @@ export function rotuloDaTrilha(rota: RotaDePesquisas): string | null {
       return "Resultado individual";
     case "previa":
       return "Pré-visualização";
+    case "relatorio":
+    case "relatorioDaResposta":
+      return "Relatório em PDF";
   }
 }

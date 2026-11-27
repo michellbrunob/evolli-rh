@@ -29,11 +29,10 @@ import {
   IconeVoltar,
 } from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
-import { baixarArquivo } from "../dashboard/exportacao";
 import { Avatar, iniciaisDe } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
-import { nomeDaExportacao, pdfDaResposta } from "./exportarResultados";
 import { Regua } from "./graficos";
+import { enderecoDaRota } from "./rotasDePesquisas";
 import {
   ROTULO_DA_FAIXA_DA_MEDIA,
   ehDeEscala,
@@ -99,6 +98,7 @@ export function ResultadoIndividual({
       respostaId={respostaId}
       carregar={(id) => servico.respostaDaPesquisa(pesquisaId, id)}
       listar={() => servico.respostasDaPesquisa(pesquisaId)}
+      pesquisaIdDoPdf={pesquisaId}
       rotuloVoltar="Voltar para os resultados"
       onVoltar={onVoltar}
       onIr={onIr}
@@ -113,6 +113,7 @@ export function PaginaDaResposta({
   respostaId,
   carregar,
   listar,
+  pesquisaIdDoPdf,
   rotuloVoltar,
   onVoltar,
   onIr,
@@ -124,6 +125,8 @@ export function PaginaDaResposta({
   readonly carregar: (respostaId: string) => Promise<RespostaDetalhe>;
   /** Todas as respostas (o seletor "N de M"); sem ele, só anterior/próxima. */
   readonly listar?: () => Promise<readonly RespostaResumo[]>;
+  /** A pesquisa da resposta: com ele, "Exportar PDF" abre o relatório. */
+  readonly pesquisaIdDoPdf?: string;
   readonly rotuloVoltar: string;
   readonly onVoltar: () => void;
   /** Sem `onIr`, não há paginação (ex.: ficha). */
@@ -230,19 +233,26 @@ export function PaginaDaResposta({
           </p>
         </div>
         <div className="pesquisas__acoes-topo">
-          <Button
-            variant="secondary"
-            onClick={() =>
-              baixarArquivo(
-                pdfDaResposta(nomeDaPesquisa, titulo, r, secoes),
-                nomeDaExportacao(`${nomeDaPesquisa} ${titulo}`, "pdf"),
-                "application/pdf",
-              )
-            }
-          >
-            <IconeBaixarArquivo tamanho={16} />
-            Exportar
-          </Button>
+          {pesquisaIdDoPdf ? (
+            <Button
+              variant="secondary"
+              onClick={() =>
+                // O PDF da resposta: página A4 imprimível, em outra aba.
+                window.open(
+                  enderecoDaRota({
+                    tela: "relatorioDaResposta",
+                    id: pesquisaIdDoPdf,
+                    respostaId: r.id,
+                  }),
+                  "_blank",
+                  "noopener",
+                )
+              }
+            >
+              <IconeBaixarArquivo tamanho={16} />
+              Exportar PDF
+            </Button>
+          ) : null}
           {onIr ? (
             <nav className="pesquisas__paginacao" aria-label="Outras respostas">
               <IconButton

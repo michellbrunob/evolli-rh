@@ -93,6 +93,7 @@ export function AbaPesquisas({
         secoes={aberta.secoes}
         respostaId={aberta.respostaId}
         carregar={(id) => carregarResposta(aberta.pesquisaId, id)}
+        pesquisaIdDoPdf={aberta.pesquisaId}
         rotuloVoltar="Voltar para as pesquisas respondidas"
         onVoltar={voltar}
       />

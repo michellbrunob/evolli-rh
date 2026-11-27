@@ -65,6 +65,10 @@ import { estadoDaCopia } from "./estadoDaPesquisa";
 import { GaleriaDeModelos, semAcento } from "./GaleriaDeModelos";
 import { ehModeloPronto, modeloDaGaleria } from "./modelosDePesquisa";
 import { PreviaDaPesquisa } from "./PreviaDaPesquisa";
+import {
+  RelatorioDaPesquisa,
+  RelatorioDaResposta,
+} from "./RelatorioImprimivel";
 import { esquecerRascunho } from "./rascunhosLocais";
 import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
@@ -470,6 +474,16 @@ function Modulo({
       );
     case "previa":
       return <PreviaDaPesquisa servico={servico} pesquisaId={atual.id} />;
+    case "relatorio":
+      return <RelatorioDaPesquisa servico={servico} pesquisaId={atual.id} />;
+    case "relatorioDaResposta":
+      return (
+        <RelatorioDaResposta
+          servico={servico}
+          pesquisaId={atual.id}
+          respostaId={atual.respostaId}
+        />
+      );
     case "nova":
       return (
         <div className="pesquisas">

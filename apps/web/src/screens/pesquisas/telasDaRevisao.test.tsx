@@ -185,6 +185,11 @@ describe("Rotas do módulo Pesquisas", () => {
       { tela: "resposta", id: "p-1", respostaId: "r-2" },
     ],
     ["#/pesquisas/p-1/previa", { tela: "previa", id: "p-1" }],
+    ["#/pesquisas/p-1/relatorio", { tela: "relatorio", id: "p-1" }],
+    [
+      "#/pesquisas/p-1/respostas/r-2/relatorio",
+      { tela: "relatorioDaResposta", id: "p-1", respostaId: "r-2" },
+    ],
   ];
 
   it.each(casos)("%s ida e volta", (fragmento, rota) => {

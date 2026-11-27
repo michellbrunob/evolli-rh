@@ -1,6 +1,6 @@
 /**
- * T216 — o texto de cada resposta e a exportação dos resultados (Excel e
- * PDF), gerados no navegador.
+ * T216 — o texto de cada resposta e a planilha (.xlsx) dos resultados,
+ * gerada no navegador. O PDF é a página imprimível do relatório.
  *
  * Privacidade (LGPD): a exportação segue a identificação da pesquisa. O
  * resumo por pergunta nunca leva autor fora da identificada, mesmo que o
@@ -9,31 +9,31 @@
  */
 import type {
   Identificacao,
-  IndicadoresDosResultados,
   Pergunta,
   PesquisaDetalhe,
   RespostaDetalhe,
   ResultadoPergunta,
   ResultadosPesquisa,
 } from "../../api/pesquisasClient";
-import {
-  type Cor,
-  DocumentoPdf,
-  cortarTexto,
-  larguraDoTexto,
-} from "../../arquivos/pdfSimples";
 import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import { plural } from "../../format/plural";
 import { nomeDoArquivo } from "../dashboard/exportacao";
-import { type AbaXlsx, montarXlsx } from "../pessoas/importacao/planilhaXlsx";
+import {
+  type AbaXlsx,
+  type CelulaXlsx,
+  montarXlsx,
+} from "../pessoas/importacao/planilhaXlsx";
+import {
+  INTERVALO_DA_ZONA,
+  textoDaFaixa,
+  type RelatorioDeResultados,
+} from "./dadosDoRelatorio";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
-import { ROTULO_DA_ZONA, ehDeEscala, escalaDe, mediaNa10 } from "./indicadores";
+import { ehDeEscala } from "./indicadores";
 import {
   ROTULO_DA_IDENTIFICACAO,
-  ROTULO_DO_MODELO,
   ROTULO_DO_TIPO,
   ROTULOS_DA_CONCORDANCIA,
-  dataDoInstante,
   percentual,
   umaCasa,
 } from "./textosDasPesquisas";
@@ -224,384 +224,372 @@ export function linhasDoResumo(
   return linhas;
 }
 
+/** Percentual (0–100) como célula de porcentagem do Excel. */
+const porcento = (v: number | null): CelulaXlsx =>
+  v === null ? "—" : { numero: v / 100, formato: "percentual" };
+/** Média com uma casa, como número. */
+const decimal = (v: number | null): CelulaXlsx =>
+  v === null ? "—" : { numero: Math.round(v * 10) / 10, formato: "decimal" };
+
+const ROTULO_DA_ESCALA = (e: { minimo: number; maximo: number }) =>
+  `${e.minimo} a ${e.maximo}`;
+
+/** Título na linha 1 e "<Empresa> · <pesquisa>" na linha 2. */
+function cabecalhoDaAba(
+  titulo: string,
+  rel: RelatorioDeResultados,
+): CelulaXlsx[][] {
+  return [[titulo], [`${rel.empresa || "Empresa"} · ${rel.nome}`], []];
+}
+
+const DEPOIS_DO_CABECALHO = 3;
+
 /**
- * A planilha (.xlsx): "Resultados" (resumo por pergunta) e, quando a
- * identificação permite, "Respostas" (uma linha por resposta: com o nome na
- * identificada; numerada, sem pessoa, na anônima). A confidencial nunca
- * leva respostas individuais.
+ * A planilha (.xlsx) do relatório: Resumo, Perguntas, eNPS, Participantes
+ * (só identificada e anônima), Comentários, Alertas e Metodologia. Números
+ * saem como número (médias com uma casa, percentuais em %, datas como data).
+ * O gerador não embute imagens: os gráficos ficam no relatório em PDF.
  */
 export function planilhaDosResultados(
+  rel: RelatorioDeResultados,
   detalhe: PesquisaDetalhe,
-  resultados: ResultadosPesquisa,
+  geral: ResultadosPesquisa,
   respostas: readonly RespostaDetalhe[] | null,
 ): Uint8Array {
-  const resumo = linhasDoResumo(detalhe, resultados);
-  const abas: AbaXlsx[] = [
-    {
-      nome: "Resultados",
-      cabecalho: true,
-      larguras: [22, 6, 60, 18, 10, 12, 70],
-      linhas: [
-        [
-          "Seção",
-          "Nº",
-          "Pergunta",
-          "Tipo",
-          "Viram",
-          "Responderam",
-          "Resultado",
-        ],
-        ...(resumo.length === 0
-          ? [["", "", "Poucas respostas para mostrar", "", "", "", ""]]
-          : resumo.map((l) => [
-              l.secao,
-              l.numero,
-              l.pergunta,
-              l.tipo,
-              l.viram,
-              l.responderam,
-              l.resultado,
-            ])),
-      ],
-    },
+  const abas: AbaXlsx[] = [];
+  const titulo = (linhas: CelulaXlsx[][], cabecalhos: number[]) => ({
+    titulo: true,
+    linhasDeCabecalho: cabecalhos,
+    linhas,
+  });
+
+  // 1. Resumo.
+  const resumo: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Resumo", rel),
+    ["Participação", ""],
+    ["Convidados", rel.convidados === null ? "Link aberto" : rel.convidados],
+    ["Respostas", rel.respostas],
+    ...(rel.participacao !== null
+      ? [["Taxa de participação", porcento(rel.participacao)]]
+      : []),
+    ["Período das respostas", rel.periodo],
+    ["Identificação", ROTULO_DA_IDENTIFICACAO[rel.identificacao]],
+    [],
+    ["Resultado", "", ""],
   ];
+  const linhaDoResultado = resumo.length - 1;
+  resumo.push(
+    [
+      "Média geral (de 0 a 10)",
+      decimal(rel.mediaGeral),
+      rel.faixaGeral ? textoDaFaixa(rel.faixaGeral) : "Sem perguntas de escala",
+    ],
+    [
+      "Favorável",
+      porcento(rel.favoravelGeral),
+      "Notas 8 a 10 na escala de 10 (ou o terço de cima das outras escalas)",
+    ],
+    rel.enps
+      ? [
+          "eNPS",
+          rel.enps.indice,
+          `${rel.enps.rotuloDaZona} · ${percentual(rel.enps.promotores, rel.enps.total)}% promotores · ${percentual(rel.enps.neutros, rel.enps.total)}% neutros · ${percentual(rel.enps.detratores, rel.enps.total)}% detratores`,
+        ]
+      : ["eNPS", "—", "Sem a pergunta de recomendação"],
+    [
+      "Maior média",
+      decimal(rel.maior?.media10 ?? null),
+      rel.maior?.texto ?? "—",
+    ],
+    [
+      "Menor média",
+      decimal(rel.menor?.media10 ?? null),
+      rel.menor?.texto ?? "—",
+    ],
+    [
+      "Comentários livres",
+      rel.comentarios.reduce((n, c) => n + c.textos.length, 0),
+    ],
+  );
+  abas.push({
+    nome: "Resumo",
+    larguras: [28, 16, 70],
+    ...titulo(resumo, [DEPOIS_DO_CABECALHO, linhaDoResultado]),
+  });
+
+  // 2. Perguntas (as de escala; o eNPS tem a aba dele).
+  const NOTAS = Array.from({ length: 11 }, (_, i) => i);
+  const perguntas: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Perguntas", rel),
+    [
+      "#",
+      "Pergunta",
+      "Tema",
+      "Escala",
+      "Respostas",
+      "Média",
+      "Média (0 a 10)",
+      "Faixa",
+      "Favorável",
+      "Neutro",
+      "Desfavorável",
+      ...NOTAS.map((n) => `Nota ${n}`),
+    ],
+    ...[...rel.perguntas]
+      .sort((a, b) => a.numero - b.numero)
+      .map((p): CelulaXlsx[] => [
+        p.numero,
+        p.texto,
+        p.rotulo,
+        ROTULO_DA_ESCALA(p.escala),
+        p.respostas,
+        decimal(p.media),
+        decimal(p.media10),
+        p.faixa ? textoDaFaixa(p.faixa) : "—",
+        porcento(p.favoravel),
+        porcento(p.neutro),
+        porcento(p.desfavoravel),
+        ...NOTAS.map(
+          (n) => p.porNota.find((x) => x.nota === n)?.quantidade ?? "",
+        ),
+      ]),
+    [
+      "",
+      "Média geral (média das perguntas)",
+      "",
+      "",
+      "",
+      "",
+      decimal(rel.mediaGeral),
+    ],
+  ];
+  abas.push({
+    nome: "Perguntas",
+    larguras: [5, 60, 26, 10, 11, 9, 13, 20, 11, 10, 13, ...NOTAS.map(() => 8)],
+    ...titulo(perguntas, [DEPOIS_DO_CABECALHO]),
+  });
+
+  // 3. eNPS.
+  const enps: CelulaXlsx[][] = [...cabecalhoDaAba("eNPS", rel)];
+  const cabecalhosDoEnps = [DEPOIS_DO_CABECALHO];
+  if (rel.enps) {
+    const e = rel.enps;
+    enps.push(
+      ["Indicador", "Valor", "Detalhe"],
+      ["eNPS", e.indice, `${e.rotuloDaZona} (${INTERVALO_DA_ZONA[e.zona]})`],
+      ["Respostas", e.total, ""],
+      [
+        "Promotores (9 e 10)",
+        e.promotores,
+        porcento(percentual(e.promotores, e.total)),
+      ],
+      ["Neutros (7 e 8)", e.neutros, porcento(percentual(e.neutros, e.total))],
+      [
+        "Detratores (0 a 6)",
+        e.detratores,
+        porcento(percentual(e.detratores, e.total)),
+      ],
+      [],
+      ["Nota", "Pessoas", "Do total"],
+    );
+    cabecalhosDoEnps.push(enps.length - 1);
+    for (const n of e.porNota)
+      enps.push([
+        n.nota,
+        n.quantidade,
+        porcento(percentual(n.quantidade, e.total)),
+      ]);
+  } else {
+    enps.push(["Esta pesquisa não tem a pergunta de recomendação (eNPS)."]);
+  }
+  abas.push({
+    nome: "eNPS",
+    larguras: [24, 12, 40],
+    ...titulo(enps, cabecalhosDoEnps),
+  });
+
+  // 4. Participantes: nunca na confidencial.
   const individuais =
     detalhe.identificacao === "confidencial" ? null : respostas;
   if (individuais) {
-    const perguntas = perguntasEmOrdem(detalhe.secoes);
+    const todas = perguntasEmOrdem(detalhe.secoes);
     const identificada = detalhe.identificacao === "identificada";
-    const formatos: Record<number, "data" | "dataHora"> = { 2: "dataHora" };
-    perguntas.forEach((p, i) => {
-      if (p.tipo === "data") formatos[3 + i] = "data";
+    const ocultos = new Set(
+      geral.departamentos.filter((d) => !d.visivel).map((d) => d.nome),
+    );
+    const departamentoDe = (r: RespostaDetalhe) =>
+      r.departamento === null
+        ? "—"
+        : !identificada && ocultos.has(r.departamento)
+          ? "Oculto"
+          : r.departamento;
+    const comentarioDe = (r: RespostaDetalhe) => {
+      const textos = todas
+        .filter((p) => p.tipo === "paragrafo" || p.tipo === "texto_curto")
+        .map((p) => r.valores.find((v) => v.perguntaId === p.id)?.valor)
+        .filter((v): v is string => typeof v === "string" && v.trim() !== "");
+      return textos.at(-1) ?? "";
+    };
+    const formatos: Record<number, "data" | "dataHora"> = {};
+    const fixas = identificada ? 3 : 2;
+    if (identificada) formatos[2] = "dataHora";
+    todas.forEach((p, i) => {
+      if (p.tipo === "data") formatos[fixas + i] = "data";
     });
-    abas.push({
-      nome: "Respostas",
-      cabecalho: true,
-      formatos,
-      larguras: [26, 20, 20, ...perguntas.map(() => 30)],
-      linhas: [
-        [
-          identificada ? "Nome" : "Resposta",
-          "Departamento",
-          "Respondida em",
-          ...perguntas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
-        ],
-        ...individuais.map((r) => {
-          const valores = new Map(
-            r.valores.map((v) => [v.perguntaId, v.valor]),
-          );
-          return [
-            identificada ? (r.nome ?? "") : `Resposta #${r.numero}`,
-            identificada ? (r.departamento ?? "") : "",
-            serialDoInstante(r.respondidaEm) ??
-              formatarInstante(r.respondidaEm),
-            ...perguntas.map((p) =>
-              valores.has(p.id)
-                ? celulaDaResposta(p, valores.get(p.id))
-                : SEM_RESPOSTA,
-            ),
-          ];
-        }),
+    const participantes: CelulaXlsx[][] = [
+      ...cabecalhoDaAba("Participantes", rel),
+      [
+        identificada ? "Nome" : "Participante",
+        "Departamento",
+        ...(identificada ? ["Respondida em"] : []),
+        ...todas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
+        "Média",
+        "Comentário",
       ],
+      ...individuais.map((r): CelulaXlsx[] => {
+        const valores = new Map(r.valores.map((v) => [v.perguntaId, v.valor]));
+        return [
+          identificada ? (r.nome ?? "") : `Participante ${r.numero}`,
+          departamentoDe(r),
+          ...(identificada
+            ? [
+                serialDoInstante(r.respondidaEm) ??
+                  formatarInstante(r.respondidaEm),
+              ]
+            : []),
+          ...todas.map((p) =>
+            valores.has(p.id)
+              ? celulaDaResposta(p, valores.get(p.id))
+              : SEM_RESPOSTA,
+          ),
+          decimal(r.media),
+          comentarioDe(r),
+        ];
+      }),
+    ];
+    abas.push({
+      nome: "Participantes",
+      larguras: [
+        26,
+        20,
+        ...(identificada ? [18] : []),
+        ...todas.map(() => 24),
+        9,
+        40,
+      ],
+      formatos,
+      ...titulo(participantes, [DEPOIS_DO_CABECALHO]),
     });
   }
+
+  // 5. Comentários (em ordem alfabética fora da identificada).
+  const comAutor = rel.identificacao === "identificada";
+  const comentarios: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Comentários", rel),
+    ["Pergunta", "Comentário", ...(comAutor ? ["Autor"] : [])],
+  ];
+  for (const c of rel.comentarios)
+    for (const t of c.textos)
+      comentarios.push([
+        c.pergunta,
+        t.texto,
+        ...(comAutor ? [t.autor ?? ""] : []),
+      ]);
+  if (comentarios.length === DEPOIS_DO_CABECALHO + 1)
+    comentarios.push(["", "Nenhum comentário livre."]);
+  abas.push({
+    nome: "Comentários",
+    larguras: [40, 80, ...(comAutor ? [26] : [])],
+    ...titulo(comentarios, [DEPOIS_DO_CABECALHO]),
+  });
+
+  // 6. Alertas.
+  const alertas: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Alertas", rel),
+    [
+      "Severidade",
+      "Onde",
+      "O quê",
+      "Departamento",
+      "Média (0 a 10)",
+      "Favorável",
+      "Respostas",
+      "Motivo",
+    ],
+    ...rel.alertas.map((a): CelulaXlsx[] => [
+      a.severidade,
+      a.onde,
+      a.oQue,
+      a.departamento,
+      decimal(a.media),
+      porcento(a.favoravel),
+      a.respostas,
+      a.motivo,
+    ]),
+  ];
+  if (rel.alertas.length === 0)
+    alertas.push(["—", "", "Nenhum ponto de atenção pelas regras abaixo."]);
+  abas.push({
+    nome: "Alertas",
+    larguras: [11, 13, 40, 22, 14, 11, 11, 44],
+    ...titulo(alertas, [DEPOIS_DO_CABECALHO]),
+  });
+
+  // 7. Metodologia.
+  const metodologia: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Metodologia", rel),
+    ["Tema", "Como é calculado"],
+    ...METODOLOGIA.map(([tema, texto]) => [tema, texto]),
+    [
+      "Grupos pequenos",
+      `Grupos com menos de ${rel.minimoPorGrupo} respostas não mostram números, para ninguém ser reconhecido.`,
+    ],
+  ];
+  abas.push({
+    nome: "Metodologia",
+    larguras: [26, 100],
+    quebrarTexto: false,
+    ...titulo(metodologia, [DEPOIS_DO_CABECALHO]),
+  });
+
   return montarXlsx(abas);
 }
 
-const MARGEM = 40;
-const TINTA: Cor = [29, 29, 31];
-const SUAVE: Cor = [71, 84, 103];
-const LINHA: Cor = [210, 210, 215];
-
-/** Quebra o texto em linhas que cabem na largura (palavra a palavra). */
-function quebrar(texto: string, largura: number, tamanho: number): string[] {
-  const linhas: string[] = [];
-  let atual = "";
-  for (const palavra of texto.split(" ")) {
-    const tentativa = atual ? `${atual} ${palavra}` : palavra;
-    if (larguraDoTexto(tentativa, tamanho) > largura && atual) {
-      linhas.push(atual);
-      atual = palavra;
-    } else atual = tentativa;
-  }
-  if (atual) linhas.push(atual);
-  return linhas.slice(0, 8);
-}
-
-/** O relatório em PDF: cabeçalho, indicadores e o resumo de cada pergunta. */
-export function pdfDosResultados(
-  detalhe: PesquisaDetalhe,
-  resultados: ResultadosPesquisa,
-  indicadores: Pick<IndicadoresDosResultados, "mediaGeral" | "enps"> &
-    Partial<Pick<IndicadoresDosResultados, "maiorMedia" | "menorMedia">>,
-): Uint8Array {
-  const doc = new DocumentoPdf(detalhe.nome);
-  let pg = doc.novaPagina();
-  let y = 50;
-  pg.texto(MARGEM, y, cortarTexto(detalhe.nome, pg.largura - MARGEM * 2, 16), {
-    tamanho: 16,
-    negrito: true,
-    cor: TINTA,
-  });
-  y += 18;
-  pg.texto(
-    MARGEM,
-    y,
-    `${ROTULO_DO_MODELO[detalhe.modelo]} · ${ROTULO_DA_IDENTIFICACAO[detalhe.identificacao]} · ${plural(resultados.respostas, "resposta", "respostas")} · criada em ${dataDoInstante(detalhe.criadaEm)}`,
-    { tamanho: 9, cor: SUAVE },
-  );
-  y += 20;
-  y = quadrosDeIndicadores(pg, y, detalhe, indicadores);
-  pg.linha(MARGEM, y, pg.largura - MARGEM, y, LINHA);
-  y += 18;
-  const resumo = linhasDoResumo(detalhe, resultados);
-  if (resumo.length === 0) {
-    pg.texto(MARGEM, y, "Poucas respostas para mostrar.", {
-      tamanho: 10,
-      cor: SUAVE,
-    });
-  }
-  const largura = pg.largura - MARGEM * 2;
-  const perguntas = perguntasEmOrdem(detalhe.secoes);
-  const porId = new Map(resultados.perguntas.map((r) => [r.perguntaId, r]));
-  for (const l of resumo) {
-    const titulo = quebrar(`${l.numero}. ${l.pergunta}`, largura, 10);
-    const corpo = quebrar(l.resultado || "Sem respostas", largura, 8);
-    const p = perguntas[l.numero - 1];
-    const r = p ? porId.get(p.id) : undefined;
-    const barras = p && r ? barrasDaPergunta(p, r) : [];
-    const altura =
-      titulo.length * 13 + corpo.length * 11 + barras.length * 14 + 12;
-    if (y + altura > pg.altura - MARGEM) {
-      pg = doc.novaPagina();
-      y = 50;
-    }
-    for (const t of titulo) {
-      pg.texto(MARGEM, y, t, { tamanho: 10, negrito: true, cor: TINTA });
-      y += 13;
-    }
-    for (const t of corpo) {
-      pg.texto(MARGEM, y, t, { tamanho: 8, cor: SUAVE });
-      y += 11;
-    }
-    y = desenharBarras(pg, y, barras);
-    y += 12;
-  }
-  return doc.bytes();
-}
-
-type PaginaPdf = ReturnType<DocumentoPdf["novaPagina"]>;
-
-const VERMELHO: Cor = [196, 50, 50];
-const AMARELO: Cor = [214, 160, 30];
-const VERDE: Cor = [38, 140, 80];
-const AZUL: Cor = [40, 100, 200];
-const TRILHO: Cor = [236, 236, 240];
-
-/** Do vermelho (nota baixa) ao verde (nota alta), passando pelo amarelo. */
-function corDaNotaNoPdf(fracao: number): Cor {
-  const f = Math.max(0, Math.min(1, fracao));
-  const [a, b, t] =
-    f <= 0.5 ? [VERMELHO, AMARELO, f / 0.5] : [AMARELO, VERDE, (f - 0.5) / 0.5];
-  return [0, 1, 2].map((i) =>
-    Math.round(a[i]! + (b[i]! - a[i]!) * t),
-  ) as unknown as Cor;
-}
-
-interface BarraDoPdf {
-  readonly rotulo: string;
-  readonly quantidade: number;
-  readonly total: number;
-  readonly cor: Cor;
-}
-
-/** As barras de uma pergunta: distribuição das notas ou das opções. */
-function barrasDaPergunta(p: Pergunta, r: ResultadoPergunta): BarraDoPdf[] {
-  if ("media" in r && r.distribuicao && r.distribuicao.length > 0) {
-    const e = ehDeEscala(p) ? escalaDe(p) : null;
-    const total = r.distribuicao.reduce((s, d) => s + d.quantidade, 0);
-    return r.distribuicao.map((d) => ({
-      rotulo: String(d.valor),
-      quantidade: d.quantidade,
-      total,
-      cor: e
-        ? corDaNotaNoPdf(
-            (d.valor - e.minimo) / Math.max(1, e.maximo - e.minimo),
-          )
-        : AZUL,
-    }));
-  }
-  if ("opcoes" in r) {
-    return r.opcoes.map((o) => ({
-      rotulo:
-        p.config.opcoes?.find((x) => x.id === o.opcaoId)?.texto ??
-        "Opção removida",
-      quantidade: o.quantidade,
-      total: r.respondidas,
-      cor: AZUL,
-    }));
-  }
-  if ("sim" in r) {
-    const total = r.sim + r.nao;
-    return [
-      { rotulo: "Sim", quantidade: r.sim, total, cor: VERDE },
-      { rotulo: "Não", quantidade: r.nao, total, cor: VERMELHO },
-    ];
-  }
-  return [];
-}
-
-/** Desenha as barras horizontais (rótulo, trilho, barra e percentual). */
-function desenharBarras(
-  pg: PaginaPdf,
-  y0: number,
-  barras: readonly BarraDoPdf[],
-): number {
-  let y = y0 + (barras.length > 0 ? 4 : 0);
-  const xTrilho = MARGEM + 110;
-  const largura = pg.largura - MARGEM - 60 - xTrilho;
-  for (const b of barras) {
-    pg.texto(MARGEM, y + 7, cortarTexto(b.rotulo, 104, 8), {
-      tamanho: 8,
-      cor: SUAVE,
-    });
-    pg.retangulo(xTrilho, y, largura, 8, { preenchimento: TRILHO });
-    const fracao = b.total > 0 ? b.quantidade / b.total : 0;
-    if (fracao > 0)
-      pg.retangulo(xTrilho, y, largura * fracao, 8, { preenchimento: b.cor });
-    pg.texto(
-      xTrilho + largura + 8,
-      y + 7,
-      `${b.quantidade} · ${percentual(b.quantidade, b.total)}%`,
-      {
-        tamanho: 8,
-        cor: TINTA,
-      },
-    );
-    y += 14;
-  }
-  return y;
-}
-
-/** Quatro quadros: média geral, maior e menor média e eNPS (com a zona). */
-function quadrosDeIndicadores(
-  pg: PaginaPdf,
-  y: number,
-  detalhe: PesquisaDetalhe,
-  ind: Pick<IndicadoresDosResultados, "mediaGeral" | "enps"> &
-    Partial<Pick<IndicadoresDosResultados, "maiorMedia" | "menorMedia">>,
-): number {
-  const perguntas = perguntasEmOrdem(detalhe.secoes);
-  const textoDa = (id: string | undefined) => {
-    const p = perguntas.find((x) => x.id === id);
-    return p ? p.rotulo || p.texto : "";
-  };
-  const na10 = (
-    x: { perguntaId: string; media: number } | null | undefined,
-  ) => {
-    if (!x) return null;
-    const p = perguntas.find((q) => q.id === x.perguntaId);
-    return p && ehDeEscala(p) ? mediaNa10(x.media, escalaDe(p)) : x.media;
-  };
-  const quadros: { titulo: string; valor: string; nota: string }[] = [
-    {
-      titulo: "Média geral",
-      valor: ind.mediaGeral === null ? "—" : `${umaCasa(ind.mediaGeral)} /10`,
-      nota: "Perguntas de escala, de 0 a 10",
-    },
-    {
-      titulo: "Maior média",
-      valor: ind.maiorMedia ? umaCasa(na10(ind.maiorMedia) ?? 0) : "—",
-      nota: textoDa(ind.maiorMedia?.perguntaId),
-    },
-    {
-      titulo: "Menor média",
-      valor: ind.menorMedia ? umaCasa(na10(ind.menorMedia) ?? 0) : "—",
-      nota: textoDa(ind.menorMedia?.perguntaId),
-    },
-    {
-      titulo: "eNPS",
-      valor: ind.enps ? String(ind.enps.indice) : "—",
-      nota: ind.enps
-        ? ROTULO_DA_ZONA[ind.enps.zona]
-        : "Sem a pergunta de recomendação",
-    },
-  ];
-  const vao = 8;
-  const largura = (pg.largura - MARGEM * 2 - vao * 3) / 4;
-  const altura = 52;
-  quadros.forEach((q, i) => {
-    const x = MARGEM + i * (largura + vao);
-    pg.retangulo(x, y, largura, altura, { contorno: LINHA, espessura: 0.6 });
-    pg.texto(x + 8, y + 14, q.titulo, { tamanho: 8, cor: SUAVE });
-    pg.texto(x + 8, y + 31, q.valor, {
-      tamanho: 14,
-      negrito: true,
-      cor: TINTA,
-    });
-    pg.texto(x + 8, y + 45, cortarTexto(q.nota, largura - 16, 7), {
-      tamanho: 7,
-      cor: SUAVE,
-    });
-  });
-  return y + altura + 14;
-}
-
-/** O PDF de uma resposta: cada pergunta e o que foi respondido. */
-export function pdfDaResposta(
-  nomeDaPesquisa: string,
-  titulo: string,
-  resposta: Pick<RespostaDetalhe, "respondidaEm" | "valores">,
-  secoes: readonly PesquisaDetalhe["secoes"][number][],
-): Uint8Array {
-  const doc = new DocumentoPdf(`${nomeDaPesquisa} — ${titulo}`);
-  let pg = doc.novaPagina();
-  let y = 50;
-  pg.texto(MARGEM, y, cortarTexto(titulo, pg.largura - MARGEM * 2, 16), {
-    tamanho: 16,
-    negrito: true,
-    cor: TINTA,
-  });
-  y += 18;
-  pg.texto(
-    MARGEM,
-    y,
-    cortarTexto(
-      `${nomeDaPesquisa} · respondeu em ${formatarInstante(resposta.respondidaEm)}`,
-      pg.largura - MARGEM * 2,
-      9,
-    ),
-    { tamanho: 9, cor: SUAVE },
-  );
-  y += 16;
-  pg.linha(MARGEM, y, pg.largura - MARGEM, y, LINHA);
-  y += 18;
-  const valores = new Map(resposta.valores.map((v) => [v.perguntaId, v.valor]));
-  const largura = pg.largura - MARGEM * 2;
-  perguntasEmOrdem(secoes).forEach((p, i) => {
-    const titulo = quebrar(`${i + 1}. ${p.texto}`, largura, 10);
-    const corpo = quebrar(
-      valores.has(p.id) ? textoDoValor(p, valores.get(p.id)) : SEM_RESPOSTA,
-      largura,
-      9,
-    );
-    const altura = titulo.length * 13 + corpo.length * 12 + 10;
-    if (y + altura > pg.altura - MARGEM) {
-      pg = doc.novaPagina();
-      y = 50;
-    }
-    for (const t of titulo) {
-      pg.texto(MARGEM, y, t, { tamanho: 10, negrito: true, cor: TINTA });
-      y += 13;
-    }
-    for (const t of corpo) {
-      pg.texto(MARGEM, y, t, { tamanho: 9, cor: SUAVE });
-      y += 12;
-    }
-    y += 10;
-  });
-  return doc.bytes();
-}
+/** O que cada número quer dizer (planilha e relatório em PDF). */
+export const METODOLOGIA: readonly (readonly [string, string])[] = [
+  [
+    "Escala",
+    "As perguntas de nota usam a escala do modelo (de 1 a 10, de 1 a 5 ou de 0 a 10). Para comparar, toda média é levada à escala de 0 a 10.",
+  ],
+  [
+    "Média da pergunta",
+    "Soma das notas dividida pelo número de pessoas que responderam a pergunta.",
+  ],
+  [
+    "Média geral",
+    "Média simples das médias das perguntas de nota (a de recomendação fica de fora).",
+  ],
+  [
+    "Favorável, neutro e desfavorável",
+    "Na escala de 10: notas 8 a 10 (favorável), 5 a 7 (neutro) e 1 a 4 (desfavorável). Nas outras escalas, o terço de cima, o do meio e o de baixo.",
+  ],
+  [
+    "Faixas da média",
+    "Abaixo de 6,5: crítica. De 6,5 a 7,9: atenção. 8 ou mais: saudável.",
+  ],
+  [
+    "eNPS",
+    "Percentual de promotores (notas 9 e 10) menos o de detratores (0 a 6). Vai de −100 a 100.",
+  ],
+  [
+    "Identificação",
+    "Identificada: as respostas mostram quem respondeu. Confidencial: o RH vê só os resultados agregados, sem respostas individuais. Anônima: ninguém é identificado; as respostas são numeradas.",
+  ],
+  [
+    "Preenchimento",
+    "Perguntas opcionais em branco não entram nas médias; cada pergunta conta só quem a respondeu.",
+  ],
+];
 
 export function nomeDaExportacao(
   nome: string,
