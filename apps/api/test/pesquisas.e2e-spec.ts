@@ -1031,6 +1031,66 @@ describe("T216 — Pesquisas (e2e)", () => {
   });
 
   // -----------------------------------------------------------------------
+  describe("participantes identificáveis pelo link", () => {
+    it("avisa quem não tem CPF ou nascimento no perfil, sem expor os dados", async () => {
+      const completo = await admitir(rhA, empresaA);
+      const semCpf = await admitir(rhA, empresaA);
+      const semNascimento = await admitir(rhA, empresaA);
+      await prisma.perfilPessoalColaborador.updateMany({
+        where: { colaboradorId: semCpf.id, empresaId: empresaA },
+        data: { cpf: null },
+      });
+      await prisma.perfilPessoalColaborador.updateMany({
+        where: { colaboradorId: semNascimento.id, empresaId: empresaA },
+        data: { dataNascimento: null },
+      });
+      const ids = [completo.id, semCpf.id, semNascimento.id];
+      const marcas = (
+        lista: { colaboradorId: string; identificavel: boolean }[],
+      ) =>
+        Object.fromEntries(
+          lista.map((x) => [x.colaboradorId, x.identificavel]),
+        );
+
+      for (const identificacao of ["identificada", "confidencial"] as const) {
+        const p = await criarPesquisa({
+          identificacao,
+          participantes: { todos: false, colaboradorIds: ids },
+        });
+        const r = await get(`/v1/pesquisas/${p.id}`, rhA).expect(200);
+        expect(r.body.naoIdentificaveis).toBe(2);
+        expect(marcas(r.body.participantesLista)).toEqual({
+          [completo.id]: true,
+          [semCpf.id]: false,
+          [semNascimento.id]: false,
+        });
+        const texto = JSON.stringify(r.body);
+        expect(texto).not.toContain(completo.cpf);
+        expect(texto).not.toContain(NASCIMENTO);
+        expect(r.body.participantesLista[0]).not.toHaveProperty("cpf");
+      }
+      // Quem não é identificável de fato não entra pelo link.
+      const { token } = await publicada({
+        participantes: { todos: false, colaboradorIds: ids },
+      });
+      await identificar(token, semNascimento).expect(401);
+      await identificar(token, completo).expect(200);
+
+      const anonima = await criarPesquisa({
+        identificacao: "anonima",
+        participantes: { todos: false, colaboradorIds: ids },
+      });
+      const r = await get(`/v1/pesquisas/${anonima.id}`, rhA).expect(200);
+      expect(r.body.naoIdentificaveis).toBe(0);
+      expect(
+        r.body.participantesLista.every(
+          (x: { identificavel: boolean }) => x.identificavel,
+        ),
+      ).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   describe("anônima", () => {
     it("sem identificação: quem tem o link responde; nada liga a pessoa", async () => {
       const a = await admitir(rhA, empresaA);

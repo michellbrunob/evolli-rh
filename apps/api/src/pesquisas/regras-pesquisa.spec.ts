@@ -1,5 +1,6 @@
 import {
   cpfNormalizado,
+  identificavelPeloLink,
   minutosEstimados,
   motivoIndisponivel,
   podeEditar,
@@ -73,5 +74,34 @@ describe("T216 — página pública", () => {
     expect(cpfNormalizado("123.456.789-09")).toBe("12345678909");
     expect(cpfNormalizado("1234567890")).toBeNull();
     expect(cpfNormalizado("abc")).toBeNull();
+  });
+});
+
+describe("T216 — identificavelPeloLink", () => {
+  const nascimento = new Date("1990-01-15T00:00:00Z");
+
+  it("identificada e confidencial: precisa de CPF e nascimento no perfil", () => {
+    for (const i of ["identificada", "confidencial"] as const) {
+      expect(
+        identificavelPeloLink(i, {
+          cpf: "12345678909",
+          dataNascimento: nascimento,
+        }),
+      ).toBe(true);
+      expect(
+        identificavelPeloLink(i, { cpf: null, dataNascimento: nascimento }),
+      ).toBe(false);
+      expect(
+        identificavelPeloLink(i, { cpf: "12345678909", dataNascimento: null }),
+      ).toBe(false);
+      expect(identificavelPeloLink(i, null)).toBe(false);
+    }
+  });
+
+  it("anônima: sempre (não há identificação)", () => {
+    expect(identificavelPeloLink("anonima", null)).toBe(true);
+    expect(
+      identificavelPeloLink("anonima", { cpf: null, dataNascimento: null }),
+    ).toBe(true);
   });
 });

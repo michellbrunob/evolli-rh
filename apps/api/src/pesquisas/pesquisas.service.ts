@@ -41,7 +41,12 @@ import type {
   ValorRespondido,
 } from "./pesquisas.types";
 import { STATUS_PESQUISA } from "./pesquisas.types";
-import { podeEditar, statusEfetivo, transicaoValida } from "./regras-pesquisa";
+import {
+  identificavelPeloLink,
+  podeEditar,
+  statusEfetivo,
+  transicaoValida,
+} from "./regras-pesquisa";
 
 /**
  * T216 — Pesquisas da empresa ativa: lista com contagens por status, criar
@@ -283,20 +288,33 @@ export class PesquisasService {
       }));
     }
     const ids = lista.map((l) => l.colaboradorId);
-    const [nomes, deps] = await Promise.all([
+    const [nomes, deps, perfis] = await Promise.all([
       db.colaborador.findMany({
         where: { id: { in: ids } },
         select: { id: true, nome: true },
       }),
       departamentosVigentes(db, p.empresaId, ids),
+      // Só para saber se o link consegue identificar a pessoa: CPF e
+      // nascimento nunca saem na resposta.
+      anonima
+        ? Promise.resolve([])
+        : db.perfilPessoalColaborador.findMany({
+            where: { empresaId: p.empresaId, colaboradorId: { in: ids } },
+            select: { colaboradorId: true, cpf: true, dataNascimento: true },
+          }),
     ]);
     const nomeDe = new Map(nomes.map((c) => [c.id, c.nome]));
+    const perfilDe = new Map(perfis.map((x) => [x.colaboradorId, x]));
     const participantesLista: ParticipanteDaLista[] = lista
       .map((l) => ({
         colaboradorId: l.colaboradorId,
         nome: nomeDe.get(l.colaboradorId) ?? "",
         departamento: deps.get(l.colaboradorId)?.nome ?? null,
         respondeu: l.respondeu,
+        identificavel: identificavelPeloLink(
+          p.identificacao,
+          perfilDe.get(l.colaboradorId) ?? null,
+        ),
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     return {
@@ -306,6 +324,8 @@ export class PesquisasService {
       minimoPorGrupo: p.minimoPorGrupo,
       todos: p.todos,
       participantesLista,
+      naoIdentificaveis: participantesLista.filter((x) => !x.identificavel)
+        .length,
       temRespostas: respostas > 0,
     };
   }

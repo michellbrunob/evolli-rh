@@ -110,6 +110,8 @@ export interface ParticipanteDaLista {
   nome: string;
   departamento: string | null;
   respondeu: boolean | null;
+  /** Tem CPF e nascimento no perfil (o link exige); anônima: sempre. */
+  identificavel: boolean;
 }
 
 export interface PesquisaDetalhe extends PesquisaResumo {
@@ -118,6 +120,8 @@ export interface PesquisaDetalhe extends PesquisaResumo {
   minimoPorGrupo: number;
   todos: boolean;
   participantesLista: ParticipanteDaLista[];
+  /** Participantes que não conseguem se identificar pelo link (0 na anônima). */
+  naoIdentificaveis: number;
   temRespostas: boolean;
 }
 

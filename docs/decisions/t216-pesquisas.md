@@ -243,8 +243,10 @@ interface PesquisaDetalhe extends PesquisaResumo {
     nome: string;
     departamento: string | null;
     respondeu: boolean | null;
+    identificavel: boolean; // tem CPF e nascimento na ficha (o link exige); anônima: sempre true
   }[];
   // respondeu: null na anônima; na confidencial só true/false
+  naoIdentificaveis: number; // participantes com identificavel=false (0 na anônima); CPF e data nunca saem
   temRespostas: boolean;
 }
 // GET /pesquisas → ResultadoPaginado<PesquisaResumo> & { contagens: Record<"todas"|StatusPesquisa, number> }

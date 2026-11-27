@@ -88,3 +88,16 @@ export function cpfNormalizado(cpf: string): string | null {
   const d = cpf.replace(/[.\-\s]/g, "");
   return /^\d{11}$/.test(d) ? d : null;
 }
+
+/**
+ * O participante consegue se identificar pelo link? O `identificar` exige
+ * CPF e data de nascimento no perfil pessoal (na empresa). Na anônima não há
+ * identificação: sempre.
+ */
+export function identificavelPeloLink(
+  identificacao: Identificacao,
+  perfil: { cpf: string | null; dataNascimento: Date | null } | null,
+): boolean {
+  if (!exigeIdentificacao(identificacao)) return true;
+  return !!perfil && !!perfil.cpf && perfil.dataNascimento !== null;
+}
