@@ -1,6 +1,7 @@
 import {
   calcularEnps,
   calcularIndicadores,
+  suprimirGrupos,
   faixaDoValor,
   mediaDaResposta,
   montarResultados,
@@ -250,14 +251,28 @@ describe("T216 — montarResultados (recorte e mínimo por grupo)", () => {
     const res = montarResultados(base);
     expect(res.respostas).toBe(5);
     expect(res.participantes).toBe(8);
+    // d2 abaixo do mínimo; a resposta sem grupo impede deduzi-lo pelo total.
     expect(res.departamentos).toEqual([
-      { id: "d2", nome: "Comercial", respostas: 1, visivel: false },
-      { id: "d1", nome: "Operações", respostas: 3, visivel: true },
+      {
+        id: "d2",
+        nome: "Comercial",
+        respostas: 1,
+        visivel: false,
+        oculto: "minimo",
+      },
+      {
+        id: "d1",
+        nome: "Operações",
+        respostas: 3,
+        visivel: true,
+        oculto: null,
+      },
     ]);
     expect(res.filtro).toEqual({
       campo: null,
       grupoId: null,
       departamentoId: null,
+      respostas: 5,
       visivel: true,
     });
     expect(res.grupos.departamento).toEqual(res.departamentos);
@@ -275,6 +290,7 @@ describe("T216 — montarResultados (recorte e mínimo por grupo)", () => {
       campo: "departamento",
       grupoId: "d1",
       departamentoId: "d1",
+      respostas: 3,
       visivel: true,
     });
     expect(res.perguntas[0]).toMatchObject({ respondidas: 3, media: 3 });
@@ -455,15 +471,36 @@ describe("T216 — recortes por centro de custo e unidade", () => {
     expect(res.participantes).toBeNull();
     expect(res.departamentos).toEqual([]);
     expect(res.grupos.unidade).toEqual([
-      { id: "u1", nome: "Unidade Norte", respostas: 3, visivel: true },
+      {
+        id: "u1",
+        nome: "Unidade Norte",
+        respostas: 3,
+        visivel: true,
+        oculto: null,
+      },
     ]);
+    // Só dois centros e nenhuma resposta sem centro: o total menos Centro A
+    // daria Centro B. Centro A fica oculto para proteger o menor.
     expect(res.grupos.centroCusto).toEqual([
-      { id: "cc1", nome: "Centro A", respostas: 3, visivel: true },
-      { id: "cc2", nome: "Centro B", respostas: 1, visivel: false },
+      {
+        id: "cc1",
+        nome: "Centro A",
+        respostas: 3,
+        visivel: false,
+        oculto: "protege_grupo_menor",
+      },
+      {
+        id: "cc2",
+        nome: "Centro B",
+        respostas: 1,
+        visivel: false,
+        oculto: "minimo",
+      },
     ]);
   });
 
   it("filtro por centro de custo e por unidade", () => {
+    // Centro A protege o B: o recorte não mostra números.
     const cc = montarResultados({
       ...base,
       filtro: { campo: "centroCusto", grupoId: "cc1" },
@@ -472,9 +509,21 @@ describe("T216 — recortes por centro de custo e unidade", () => {
       campo: "centroCusto",
       grupoId: "cc1",
       departamentoId: null,
-      visivel: true,
+      respostas: 3,
+      visivel: false,
     });
-    expect(cc.perguntas[0]).toMatchObject({ respondidas: 3, media: 3 });
+    expect(cc.perguntas).toEqual([]);
+    // Com uma resposta a mais sem centro, o B já não pode ser deduzido.
+    const comSemGrupo = montarResultados({
+      ...base,
+      respostas: [...respostas, com(4, { centroCusto: null, unidade: "u1" })],
+      filtro: { campo: "centroCusto", grupoId: "cc1" },
+    });
+    expect(comSemGrupo.filtro.visivel).toBe(true);
+    expect(comSemGrupo.perguntas[0]).toMatchObject({
+      respondidas: 3,
+      media: 3,
+    });
     const u = montarResultados({
       ...base,
       filtro: { campo: "unidade", grupoId: "u1" },
@@ -644,5 +693,50 @@ describe("T216 — indicadores", () => {
       ),
     ).toBe(8);
     expect(mediaDaResposta(sec, new Map([["t", "oi"]]))).toBeNull();
+  });
+});
+
+describe("T216 — suprimirGrupos (supressão secundária)", () => {
+  const g = (id: string, respostas: number) => ({ id, nome: id, respostas });
+
+  it("sem grupo abaixo do mínimo: nada oculto", () => {
+    expect(suprimirGrupos([g("a", 3), g("b", 5)], 0, 3)).toEqual(
+      new Map([
+        ["a", null],
+        ["b", null],
+      ]),
+    );
+  });
+
+  it("um oculto e um visível, sem resposta sem grupo: o visível protege o oculto", () => {
+    expect(suprimirGrupos([g("a", 5), g("b", 1)], 0, 3)).toEqual(
+      new Map([
+        ["a", "protege_grupo_menor"],
+        ["b", "minimo"],
+      ]),
+    );
+  });
+
+  it("o oculto isolado pela diferença: esconde o MENOR visível seguinte", () => {
+    expect(suprimirGrupos([g("a", 9), g("b", 4), g("c", 1)], 0, 3)).toEqual(
+      new Map([
+        ["a", null],
+        ["b", "protege_grupo_menor"],
+        ["c", "minimo"],
+      ]),
+    );
+  });
+
+  it("dois ocultos (ou um oculto e respostas sem grupo): nenhum pode ser deduzido sozinho", () => {
+    expect(
+      suprimirGrupos([g("a", 9), g("b", 2), g("c", 1)], 0, 3).get("a"),
+    ).toBeNull();
+    expect(suprimirGrupos([g("a", 9), g("c", 1)], 2, 3).get("a")).toBeNull();
+  });
+
+  it("só grupos ocultos: nada a proteger", () => {
+    expect(suprimirGrupos([g("a", 1)], 0, 3)).toEqual(
+      new Map([["a", "minimo"]]),
+    );
   });
 });

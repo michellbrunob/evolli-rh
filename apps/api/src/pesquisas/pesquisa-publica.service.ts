@@ -97,14 +97,14 @@ export class PesquisaPublicaService {
     if (motivo) return { indisponivel: motivo };
     const secoes = p.secoes as unknown as Secao[];
     const total = totalDePerguntas(secoes);
-    const grupos = [];
-    for (const campo of this.separarPor(p)) {
-      grupos.push({
+    // Os catálogos dos campos em paralelo (uma ida ao banco por campo).
+    const grupos = await Promise.all(
+      this.separarPor(p).map(async (campo) => ({
         campo,
         rotulo: ROTULOS_DOS_CAMPOS[campo],
         opcoes: await catalogoAtivo(this.prisma, p.empresaId, campo),
-      });
-    }
+      })),
+    );
     return {
       empresa: p.empresa.nome,
       nome: p.nome,

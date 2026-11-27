@@ -193,11 +193,18 @@ export type ResultadoPergunta = {
   | { datas: { valor: string; quantidade: number }[] }
 );
 
+/**
+ * Por que um grupo não mostra números: abaixo do mínimo, ou escondido para
+ * que o grupo menor não possa ser deduzido pelo total.
+ */
+export type MotivoOculto = "minimo" | "protege_grupo_menor";
+
 export interface DepartamentoDoResultado {
   id: string;
   nome: string;
   respostas: number;
   visivel: boolean;
+  oculto: MotivoOculto | null;
 }
 
 export interface IndicadoresPesquisa {
@@ -227,6 +234,8 @@ export interface ResultadosPesquisa {
     campo: CampoGrupo | null;
     grupoId: string | null;
     departamentoId: string | null;
+    /** Respostas do recorte (sem filtro, o total). */
+    respostas: number;
     visivel: boolean;
   };
   indicadores: IndicadoresPesquisa;
@@ -242,6 +251,7 @@ export interface AnalisesPesquisa {
     nome: string;
     respostas: number;
     visivel: boolean;
+    oculto: MotivoOculto | null;
     media: number | null;
     medias: (number | null)[];
   }[];
@@ -262,6 +272,16 @@ export interface RespostaResumo {
   respondidaEm: string;
   /** Média da resposta nas perguntas de escala (0–10). */
   media: number | null;
+  /**
+   * Anônima com separação: o grupo escolhido em cada campo — o nome, ou
+   * `null` com o motivo quando o grupo está oculto (ou `null` sem motivo
+   * quando a pessoa não informou). Vazio nas demais.
+   */
+  grupos: {
+    campo: CampoGrupo;
+    grupo: string | null;
+    oculto: MotivoOculto | null;
+  }[];
 }
 
 export interface RespostaDetalhe extends RespostaResumo {
@@ -294,6 +314,17 @@ export interface CandidatoPesquisa {
   departamento: string | null;
   centroCusto: string | null;
   unidade: string | null;
+}
+
+/** `GET /pesquisas/candidatos/contagem`: o "Todo o time". */
+export interface ContagemDoTime {
+  total: number;
+  /** Por departamento da lotação vigente; `null` = sem departamento. */
+  departamentos: {
+    departamentoId: string | null;
+    departamento: string | null;
+    quantidade: number;
+  }[];
 }
 
 export interface PesquisaDaFicha {

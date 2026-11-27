@@ -431,6 +431,11 @@ interface RespostaResumo {
   departamento: string | null;
   respondidaEm: string;
   media: number | null;
+  grupos: {
+    campo: CampoGrupo;
+    grupo: string | null;
+    oculto: "minimo" | "protege_grupo_menor" | null;
+  }[]; // só na anônima com separar por (senão []); grupo oculto → grupo null + motivo
 }
 // GET /pesquisas/:id/respostas/:respostaId
 interface RespostaDetalhe extends RespostaResumo {
@@ -505,3 +510,23 @@ type ListaDeCandidatos = ResultadoPaginado<{
   unidade: string | null;
 }>;
 ```
+
+Segunda revisão (27/11/2026):
+
+- **Supressão secundária (privacidade):** além do grupo abaixo do mínimo (`oculto: "minimo"`), o que
+  não aparece — grupos ocultos e as respostas sem grupo — precisa ter ao menos duas partes; senão o
+  total menos os grupos visíveis daria o grupo oculto. Enquanto houver uma parte só, o MENOR grupo
+  visível também fica oculto (`oculto: "protege_grupo_menor"`). Vale por campo em
+  `ResultadosPesquisa.grupos`/`departamentos` (`DepartamentoDoResultado.oculto`), no recorte filtrado
+  (`filtro.visivel`), nas linhas das análises (`linhas[].oculto`) e no grupo de cada resposta da
+  anônima (`RespostaResumo.grupos`). A contagem de respostas de cada grupo continua visível.
+- **`filtro.respostas`:** as respostas do recorte (sem filtro, o total).
+- **Publicar sem ninguém identificável:** na identificada e na confidencial, se nenhum participante
+  tem CPF e nascimento no perfil, `POST /pesquisas/:id/publicar` responde 422
+  `{ campo: "participantes", motivo: "ninguem_identificavel" }`; reenviar com
+  `{ confirmarSemIdentificaveis: true }` publica mesmo assim.
+- **Evolução** (análises): só as pesquisas que têm respostas.
+- **`GET /pesquisas/candidatos/contagem`** (leitura de pesquisa), para "Todo o time" sem baixar a
+  lista: `{ total: number; departamentos: { departamentoId: string | null; departamento: string |
+null; quantidade: number }[] }` (por departamento da lotação vigente; `null` = sem departamento; a
+  soma é o total).

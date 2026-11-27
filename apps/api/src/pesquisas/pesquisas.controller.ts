@@ -24,6 +24,7 @@ import { CurrentUser } from "../auth/session/current-user.decorator";
 import { extractRequestMetadata } from "../auth/request-metadata.util";
 import {
   AnalisesQueryDto,
+  PublicarDto,
   CandidatosQueryDto,
   DuplicarDto,
   IdentificarDto,
@@ -77,7 +78,18 @@ export class PesquisasController {
     return this.service.criar(dto, ctx(actor, req));
   }
 
-  // Rota fixa ANTES de ":pesquisaId" (senão "candidatos" seria um id).
+  // Rotas fixas ANTES de ":pesquisaId" (senão seriam lidas como id).
+  @Get("candidatos/contagem")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Todo o time: ativos da empresa e quantos por departamento",
+  })
+  contagemDoTime(@CurrentUser() actor: AccessUser, @Req() req: Request) {
+    return this.service.contagemDoTime(ctx(actor, req));
+  }
+
   @Get("candidatos")
   @UseGuards(AuthorizationGuard)
   @RequirePermission("pesquisa", "read")
@@ -129,10 +141,15 @@ export class PesquisasController {
   @ApiOperation({ summary: "Publica o rascunho (a pesquisa fica ativa)" })
   publicar(
     @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Body() dto: PublicarDto,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
   ) {
-    return this.service.publicar(id, ctx(actor, req));
+    return this.service.publicar(
+      id,
+      ctx(actor, req),
+      dto?.confirmarSemIdentificaveis === true,
+    );
   }
 
   @Post(":pesquisaId/status")

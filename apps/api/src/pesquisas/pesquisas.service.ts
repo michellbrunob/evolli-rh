@@ -19,6 +19,7 @@ import type {
 } from "../pessoas/pessoas.types";
 import { empresaEstaAutorizada } from "../auth/session/contexto-empresarial";
 import {
+  gruposDoCampo,
   mediaDaResposta,
   montarResultados,
   type RespostaParaCalculo,
@@ -40,6 +41,7 @@ import { semDesativacaoVigente } from "../pessoas/colaborador/desativacao";
 import {
   type AnalisesPesquisa,
   type CandidatoPesquisa,
+  type ContagemDoTime,
   CAMPOS_GRUPO,
   type CampoGrupo,
   type ContagensPorStatus,
@@ -372,6 +374,61 @@ export class PesquisasService {
     };
   }
 
+  /**
+   * "Todo o time": quantos colaboradores ativos a empresa tem e quantos por
+   * departamento (lotação vigente), em duas consultas agregadas — sem
+   * baixar a lista inteira.
+   */
+  async contagemDoTime(ctx: PessoasAuditContext): Promise<ContagemDoTime> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const ativos: Prisma.VinculoFuncionalWhereInput = {
+      empresaId,
+      situacao: "ativo",
+      colaborador: semDesativacaoVigente(empresaId),
+    };
+    const [total, porDepartamento] = await Promise.all([
+      this.prisma.vinculoFuncional.count({ where: ativos }),
+      this.prisma.alocacaoOrganizacional.groupBy({
+        by: ["departamentoId"],
+        where: { empresaId, vigenteAte: null, vinculo: ativos },
+        _count: { _all: true },
+      }),
+    ]);
+    const ids = porDepartamento
+      .map((g) => g.departamentoId)
+      .filter((x): x is string => x !== null);
+    const nomes = new Map(
+      (
+        await this.prisma.departamento.findMany({
+          where: { empresaId, id: { in: ids } },
+          select: { id: true, nome: true },
+        })
+      ).map((d) => [d.id, d.nome]),
+    );
+    const comDepartamento = porDepartamento.reduce(
+      (a, g) => a + (g.departamentoId ? g._count._all : 0),
+      0,
+    );
+    const departamentos = porDepartamento
+      .filter((g) => g.departamentoId !== null)
+      .map((g) => ({
+        departamentoId: g.departamentoId,
+        departamento: nomes.get(g.departamentoId!) ?? null,
+        quantidade: g._count._all,
+      }))
+      .sort((a, b) =>
+        (a.departamento ?? "").localeCompare(b.departamento ?? "", "pt-BR"),
+      );
+    if (total > comDepartamento) {
+      departamentos.push({
+        departamentoId: null,
+        departamento: null,
+        quantidade: total - comDepartamento,
+      });
+    }
+    return { total, departamentos };
+  }
+
   async obter(id: string, ctx: PessoasAuditContext): Promise<PesquisaDetalhe> {
     const empresaId = this.empresaDaSessao(ctx, "leitura");
     const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
@@ -684,6 +741,7 @@ export class PesquisasService {
   async publicar(
     id: string,
     ctx: PessoasAuditContext,
+    confirmarSemIdentificaveis = false,
   ): Promise<PesquisaDetalhe> {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     return this.prisma.$transaction(async (tx) => {
@@ -716,6 +774,25 @@ export class PesquisasService {
         });
         if (participantes === 0) {
           erros.push({ campo: "participantes", motivo: "obrigatorio" });
+        } else if (!confirmarSemIdentificaveis) {
+          // Ninguém tem CPF e nascimento no perfil: ninguém consegue se
+          // identificar pelo link. Publicar só com confirmação explícita.
+          const identificaveis = await tx.perfilPessoalColaborador.count({
+            where: {
+              empresaId,
+              cpf: { not: null },
+              dataNascimento: { not: null },
+              colaborador: {
+                participacoesPesquisa: { some: { pesquisaId: id } },
+              },
+            },
+          });
+          if (identificaveis === 0) {
+            erros.push({
+              campo: "participantes",
+              motivo: "ninguem_identificavel",
+            });
+          }
         }
       }
       if (erros.length) throw new CamposRecusadosException(erros);
@@ -1024,22 +1101,25 @@ export class PesquisasService {
       where: { pesquisaId: { in: mesmas.map((m) => m.id) } },
       select: { pesquisaId: true, valores: true },
     });
-    const evolucao = mesmas.map((m) => ({
-      pesquisaId: m.id,
-      nome: m.nome,
-      publicadaEm: m.publicadaEm!.toISOString(),
-      mediaGeral: mediaGeralVisivel(
-        m.secoes as unknown as Secao[],
-        valoresDe
-          .filter((v) => v.pesquisaId === m.id)
-          .map((v) => ({
-            valores: v.valores as unknown as ValorRespondido[],
-            grupos: {},
-          })),
-        m.minimoPorGrupo,
-        m.identificacao === "confidencial",
-      ),
-    }));
+    const comRespostas = new Set(valoresDe.map((v) => v.pesquisaId));
+    const evolucao = mesmas
+      .filter((m) => comRespostas.has(m.id))
+      .map((m) => ({
+        pesquisaId: m.id,
+        nome: m.nome,
+        publicadaEm: m.publicadaEm!.toISOString(),
+        mediaGeral: mediaGeralVisivel(
+          m.secoes as unknown as Secao[],
+          valoresDe
+            .filter((v) => v.pesquisaId === m.id)
+            .map((v) => ({
+              valores: v.valores as unknown as ValorRespondido[],
+              grupos: {},
+            })),
+          m.minimoPorGrupo,
+          m.identificacao === "confidencial",
+        ),
+      }));
 
     return montarAnalises({
       campo,
@@ -1066,6 +1146,33 @@ export class PesquisasService {
     if (p.identificacao === "confidencial") throw new NotFoundException();
     const secoes = p.secoes as unknown as Secao[];
     const respostas = await this.carregarRespostas(p, true);
+    // Anônima com separação: o grupo de cada resposta, com a mesma regra
+    // de ocultação dos resultados (mínimo e proteção do grupo menor).
+    const campos =
+      p.identificacao === "anonima" ? (p.separarPor as CampoGrupo[]) : [];
+    const nomes = campos.length
+      ? await this.nomesDosGruposDe(empresaId, respostas)
+      : new Map<string, string>();
+    const situacao = new Map(
+      campos.map((campo) => [
+        campo,
+        new Map(
+          gruposDoCampo(campo, respostas, nomes, p.minimoPorGrupo).map((g) => [
+            g.id,
+            g,
+          ]),
+        ),
+      ]),
+    );
+    const gruposDe = (r: RespostaCarregada): RespostaResumo["grupos"] =>
+      campos.map((campo) => {
+        const id = r.grupos[campo];
+        const g = id ? situacao.get(campo)!.get(id) : undefined;
+        if (!g) return { campo, grupo: null, oculto: null };
+        return g.oculto
+          ? { campo, grupo: null, oculto: g.oculto }
+          : { campo, grupo: g.nome, oculto: null };
+      });
     const lista = respostas.map((r, i) => ({
       ...r,
       resumo: {
@@ -1079,6 +1186,7 @@ export class PesquisasService {
           secoes,
           new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
         ),
+        grupos: gruposDe(r),
       },
     }));
     // Exibição: da mais recente para a mais antiga; o número continua sendo

@@ -12,6 +12,7 @@ import type {
   AnalisesPesquisa,
   CampoGrupo,
   GruposDaResposta,
+  MotivoOculto,
   RespostaDetalhe,
   Secao,
   ValorRespondido,
@@ -106,14 +107,15 @@ export function montarAnalises(e: EntradaDasAnalises): AnalisesPesquisa {
     grupoId: string | null,
     nome: string,
     respostas: readonly RespostaDaAnalise[],
-    visivel: boolean,
+    oculto: MotivoOculto | null,
   ): AnalisesPesquisa["linhas"][number] => {
-    if (!visivel) {
+    if (oculto !== null) {
       return {
         grupoId,
         nome,
         respostas: respostas.length,
-        visivel,
+        visivel: false,
+        oculto,
         media: null,
         medias: colunas.map(() => null),
       };
@@ -127,7 +129,8 @@ export function montarAnalises(e: EntradaDasAnalises): AnalisesPesquisa {
       grupoId,
       nome,
       respostas: respostas.length,
-      visivel,
+      visivel: true,
+      oculto: null,
       media: calcularIndicadores(e.secoes, resultado).mediaGeral,
       medias: deEscala.map((p) => {
         const media = (porId.get(p.id) as { media?: number | null })?.media;
@@ -143,7 +146,9 @@ export function montarAnalises(e: EntradaDasAnalises): AnalisesPesquisa {
       null,
       "Toda a empresa",
       e.respostas,
-      !e.minimoNaVisaoGeral || e.respostas.length >= e.minimoPorGrupo,
+      !e.minimoNaVisaoGeral || e.respostas.length >= e.minimoPorGrupo
+        ? null
+        : "minimo",
     ),
   ];
   for (const g of gruposDoCampo(
@@ -157,7 +162,7 @@ export function montarAnalises(e: EntradaDasAnalises): AnalisesPesquisa {
         g.id,
         g.nome,
         e.respostas.filter((r) => r.grupos[e.campo] === g.id),
-        g.visivel,
+        g.oculto,
       ),
     );
   }

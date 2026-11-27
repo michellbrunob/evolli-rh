@@ -5,6 +5,7 @@ import type {
   Faixas,
   GruposDaResposta,
   IndicadoresPesquisa,
+  MotivoOculto,
   Pergunta,
   ResultadoPergunta,
   ResultadosPesquisa,
@@ -332,6 +333,40 @@ export function mediaDaResposta(
     : null;
 }
 
+/**
+ * Supressão por grupo. Primária: grupo com menos respostas que o mínimo.
+ * Secundária: o conjunto do que não aparece (grupos ocultos e as respostas
+ * sem grupo) precisa ter ao menos duas partes — senão o total menos os
+ * grupos visíveis daria exatamente o grupo oculto. Enquanto houver uma
+ * parte só, o MENOR grupo visível também é escondido.
+ */
+export function suprimirGrupos(
+  grupos: readonly { id: string; nome: string; respostas: number }[],
+  semGrupo: number,
+  minimoPorGrupo: number,
+): Map<string, MotivoOculto | null> {
+  const motivo = new Map<string, MotivoOculto | null>(
+    grupos.map((g) => [
+      g.id,
+      g.respostas < minimoPorGrupo ? ("minimo" as const) : null,
+    ]),
+  );
+  const ocultos = grupos.filter((g) => motivo.get(g.id) !== null);
+  if (ocultos.length === 0) return motivo;
+  const visiveis = grupos
+    .filter((g) => motivo.get(g.id) === null)
+    .sort(
+      (a, b) =>
+        a.respostas - b.respostas || a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+  let partes = ocultos.length + (semGrupo > 0 ? 1 : 0);
+  while (partes < 2 && visiveis.length) {
+    motivo.set(visiveis.shift()!.id, "protege_grupo_menor");
+    partes += 1;
+  }
+  return motivo;
+}
+
 /** Os grupos de um campo com respostas, com a visibilidade de cada um. */
 export function gruposDoCampo(
   campo: CampoGrupo,
@@ -340,17 +375,23 @@ export function gruposDoCampo(
   minimoPorGrupo: number,
 ): DepartamentoDoResultado[] {
   const contagem = new Map<string, number>();
+  let semGrupo = 0;
   for (const r of respostas) {
     const id = r.grupos[campo];
     if (id) contagem.set(id, (contagem.get(id) ?? 0) + 1);
+    else semGrupo += 1;
   }
-  return [...contagem]
-    .map(([id, quantidade]) => ({
-      id,
-      nome: nomes.get(id) ?? "Grupo",
-      respostas: quantidade,
-      visivel: quantidade >= minimoPorGrupo,
-    }))
+  const grupos = [...contagem].map(([id, quantidade]) => ({
+    id,
+    nome: nomes.get(id) ?? "Grupo",
+    respostas: quantidade,
+  }));
+  const motivo = suprimirGrupos(grupos, semGrupo, minimoPorGrupo);
+  return grupos
+    .map((g) => {
+      const oculto = motivo.get(g.id) ?? null;
+      return { ...g, visivel: oculto === null, oculto };
+    })
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
@@ -420,11 +461,17 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
   const filtradas = f
     ? respostas.filter((r) => r.grupos[f.campo] === f.grupoId)
     : respostas;
-  const visivel =
-    recorteValido &&
-    (f === null && !e.minimoNaVisaoGeral
-      ? true
-      : filtradas.length >= e.minimoPorGrupo);
+  // Com recorte, o grupo precisa estar visível depois da supressão (o
+  // mínimo e a proteção do grupo menor); sem recorte, a confidencial
+  // respeita o mínimo também na visão geral.
+  let visivel: boolean;
+  if (f === null) {
+    visivel = !e.minimoNaVisaoGeral || filtradas.length >= e.minimoPorGrupo;
+  } else {
+    visivel =
+      recorteValido &&
+      (grupos[f.campo] ?? []).some((g) => g.id === f.grupoId && g.visivel);
+  }
   const calculadas = visivel ? resultadoDasPerguntas(e.secoes, filtradas) : [];
   // Sem autor (confidencial, anônima e o master), os textos saem em ordem
   // alfabética: a ordem de chegada ajudaria a ligar o texto a quem
@@ -443,6 +490,7 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
       campo: f?.campo ?? null,
       grupoId: f?.grupoId ?? null,
       departamentoId: f?.campo === "departamento" ? f.grupoId : null,
+      respostas: recorteValido ? filtradas.length : 0,
       visivel,
     },
     indicadores: calcularIndicadores(e.secoes, perguntas),

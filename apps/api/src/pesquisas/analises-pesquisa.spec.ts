@@ -84,15 +84,20 @@ describe("T216 — montarAnalises", () => {
   });
 
   it("'Toda a empresa' primeiro; grupo abaixo do mínimo oculto", () => {
-    const { linhas } = montarAnalises(base);
-    // clima 3,25 → 6,5; carga 6,5 → média 6,5
+    // Uma resposta sem departamento: Comercial não pode ser deduzido.
+    const { linhas } = montarAnalises({
+      ...base,
+      respostas: [...respostas, r(2, 2, null)],
+    });
+    // clima 3 → 6; carga 5,6 → média 5,8
     expect(linhas[0]).toEqual({
       grupoId: null,
       nome: "Toda a empresa",
-      respostas: 4,
+      respostas: 5,
       visivel: true,
-      media: 6.5,
-      medias: [6.5, 6.5],
+      oculto: null,
+      media: 5.8,
+      medias: [6, 5.6],
     });
     expect(linhas.slice(1)).toEqual([
       {
@@ -100,6 +105,7 @@ describe("T216 — montarAnalises", () => {
         nome: "Comercial",
         respostas: 1,
         visivel: false,
+        oculto: "minimo",
         media: null,
         medias: [null, null],
       },
@@ -108,9 +114,21 @@ describe("T216 — montarAnalises", () => {
         nome: "Operações",
         respostas: 3,
         visivel: true,
+        oculto: null,
         media: 8,
         medias: [8, 8],
       },
+    ]);
+  });
+
+  it("sem resposta sem grupo, o único visível protege o oculto (supressão secundária)", () => {
+    const { linhas } = montarAnalises(base);
+    expect(linhas[0]).toMatchObject({ visivel: true, media: 6.5 });
+    expect(
+      linhas.slice(1).map((l) => [l.grupoId, l.visivel, l.oculto, l.media]),
+    ).toEqual([
+      ["d2", false, "minimo", null],
+      ["d1", false, "protege_grupo_menor", null],
     ]);
   });
 
@@ -120,7 +138,11 @@ describe("T216 — montarAnalises", () => {
       respostas: respostas.slice(0, 2),
       minimoNaVisaoGeral: true,
     });
-    expect(linhas[0]).toMatchObject({ visivel: false, media: null });
+    expect(linhas[0]).toMatchObject({
+      visivel: false,
+      oculto: "minimo",
+      media: null,
+    });
   });
 
   it("evolução: média geral com a mesma regra do mínimo", () => {

@@ -67,7 +67,10 @@ export type MotivoDoCampo =
   // T216 — Pesquisas: a identificação não muda depois de publicar; perguntas
   // e participantes que já têm resposta não saem.
   | "nao_editavel"
-  | "com_respostas";
+  | "com_respostas"
+  // T216 — publicar sem nenhum participante identificável pelo link (sem
+  // CPF e nascimento): só com confirmação explícita.
+  | "ninguem_identificavel";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o

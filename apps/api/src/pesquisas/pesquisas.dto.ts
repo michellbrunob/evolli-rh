@@ -99,6 +99,13 @@ export class PesquisaDto {
   minimoPorGrupo!: number;
 }
 
+export class PublicarDto {
+  /** Publica mesmo sem ninguém identificável (a tela pede confirmação). */
+  @IsOptional()
+  @IsBoolean()
+  confirmarSemIdentificaveis?: boolean;
+}
+
 export class DuplicarDto {
   /** Empresa de destino; sem ela, a empresa ativa. */
   @IsOptional()

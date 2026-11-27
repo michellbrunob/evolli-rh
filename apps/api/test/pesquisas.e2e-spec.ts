@@ -686,6 +686,8 @@ describe("T216 — Pesquisas (e2e)", () => {
 
   // -----------------------------------------------------------------------
   describe("candidatos (Escolher pessoas)", () => {
+    const gestorDoTime = () => outrosPapeis.find(([p]) => p === "gestor")![1];
+
     it("ativos da empresa com cargo, departamento, centro de custo e unidade; filtros e busca", async () => {
       const lot = await lotacaoMinima(appUrl, empresaA);
       const centro = await prisma.centroCusto.create({
@@ -740,13 +742,36 @@ describe("T216 — Pesquisas (e2e)", () => {
           where: { empresaId: empresaA, situacao: "ativo" },
         }),
       );
+      // "Todo o time": o total e por departamento, sem baixar a lista.
+      const time = await get("/v1/pesquisas/candidatos/contagem", rhA).expect(
+        200,
+      );
+      expect(time.headers["cache-control"]).toBe("no-store");
+      expect(time.body.total).toBe(todos.body.total);
+      expect(
+        time.body.departamentos.reduce(
+          (a: number, d: { quantidade: number }) => a + d.quantidade,
+          0,
+        ),
+      ).toBe(time.body.total);
+      expect(time.body.departamentos).toContainEqual({
+        departamentoId: lot.departamentoId,
+        departamento: "Departamento T179 Sintetico",
+        quantidade: todos.body.itens.filter(
+          (x: { departamento: string }) =>
+            x.departamento === "Departamento T179 Sintetico",
+        ).length,
+      });
+      await get("/v1/pesquisas/candidatos/contagem", gestorDoTime()).expect(
+        403,
+      );
       const deB = await get("/v1/pesquisas/candidatos", rhB).expect(200);
       expect(
         deB.body.itens.map((x: { colaboradorId: string }) => x.colaboradorId),
       ).not.toContain(comCentro.id);
       // Permissão de leitura da pesquisa: master lê; gestor não.
       await get("/v1/pesquisas/candidatos", masterA).expect(200);
-      const gestor = outrosPapeis.find(([p]) => p === "gestor")![1];
+      const gestor = gestorDoTime();
       await get("/v1/pesquisas/candidatos", gestor).expect(403);
       await get("/v1/pesquisas/candidatos?centroCustoId=x", rhA).expect(400);
     });
@@ -980,6 +1005,7 @@ describe("T216 — Pesquisas (e2e)", () => {
           departamento: "Departamento T179 Sintetico",
           respondidaEm: expect.any(String),
           media: 4,
+          grupos: [],
         },
         {
           id: expect.any(String),
@@ -989,6 +1015,7 @@ describe("T216 — Pesquisas (e2e)", () => {
           departamento: "Departamento T179 Sintetico",
           respondidaEm: expect.any(String),
           media: 8,
+          grupos: [],
         },
       ]);
       const [segunda, primeira] = r.body as { id: string }[];
@@ -1322,6 +1349,27 @@ describe("T216 — Pesquisas (e2e)", () => {
       await identificar(token, semNascimento).expect(401);
       await identificar(token, completo).expect(200);
 
+      // Publicar com NINGUÉM identificável: 422 até a confirmação.
+      const ninguem = await criarPesquisa({
+        participantes: {
+          todos: false,
+          colaboradorIds: [semCpf.id, semNascimento.id],
+        },
+      });
+      const recusa = await post(`/v1/pesquisas/${ninguem.id}/publicar`, rhA)
+        .send()
+        .expect(422);
+      expect(recusa.body.erros).toEqual([
+        { campo: "participantes", motivo: "ninguem_identificavel" },
+      ]);
+      await post(`/v1/pesquisas/${ninguem.id}/publicar`, rhA)
+        .send({ confirmarSemIdentificaveis: false })
+        .expect(422);
+      const confirmada = await post(`/v1/pesquisas/${ninguem.id}/publicar`, rhA)
+        .send({ confirmarSemIdentificaveis: true })
+        .expect(200);
+      expect(confirmada.body.status).toBe("ativa");
+
       const anonima = await criarPesquisa({
         identificacao: "anonima",
         participantes: { todos: false, colaboradorIds: ids },
@@ -1429,6 +1477,7 @@ describe("T216 — Pesquisas (e2e)", () => {
           nome: "Departamento T179 Sintetico",
           respostas: 2,
           visivel: false,
+          oculto: "minimo",
         },
       ]);
       const recorte = await get(
@@ -1439,6 +1488,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         campo: "departamento",
         grupoId: lot.departamentoId,
         departamentoId: lot.departamentoId,
+        respostas: 2,
         visivel: false,
       });
       expect(recorte.body.perguntas).toEqual([]);
@@ -1484,9 +1534,113 @@ describe("T216 — Pesquisas (e2e)", () => {
         anteriorId: lista.body[0].id,
         proximaId: lista.body[2].id,
         nome: null,
+        // O grupo escolhido, com a mesma regra de ocultação.
+        grupos: [
+          { campo: "departamento", grupo: null, oculto: "minimo" },
+          { campo: "unidade", grupo: null, oculto: null },
+        ],
         // Na anônima não há como ligar a pessoa às pesquisas anteriores.
         indicadores: { mediaUltimosPulsos: null },
       });
+    });
+
+    it("lista de respostas: o grupo escolhido ou 'oculto' (mínimo e proteção do menor)", async () => {
+      const lot = await lotacaoMinima(appUrl, empresaA);
+      const outro = await prisma.departamento.create({
+        data: {
+          empresaId: empresaA,
+          codigo: "T216_ANON_DEP",
+          nome: "Departamento Anonimo Sintetico",
+        },
+      });
+      const { id, token } = await publicada({
+        identificacao: "anonima",
+        separarPor: ["departamento"],
+      });
+      const enviar = (departamento: string | null) =>
+        agent()
+          .post(publico(token, "/respostas"))
+          .send({ grupos: { departamento }, respostas: RESPOSTAS_BOAS })
+          .expect(201);
+      for (let i = 0; i < 3; i += 1) await enviar(lot.departamentoId);
+      await enviar(outro.id);
+      const grupoDe = async () =>
+        (await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200)).body.map(
+          (x: { numero: number; grupos: unknown[] }) => [x.numero, x.grupos],
+        );
+      // 3 e 1, ninguém sem grupo: o de 3 protege o de 1.
+      expect(await grupoDe()).toEqual([
+        [4, [{ campo: "departamento", grupo: null, oculto: "minimo" }]],
+        [
+          3,
+          [
+            {
+              campo: "departamento",
+              grupo: null,
+              oculto: "protege_grupo_menor",
+            },
+          ],
+        ],
+        [
+          2,
+          [
+            {
+              campo: "departamento",
+              grupo: null,
+              oculto: "protege_grupo_menor",
+            },
+          ],
+        ],
+        [
+          1,
+          [
+            {
+              campo: "departamento",
+              grupo: null,
+              oculto: "protege_grupo_menor",
+            },
+          ],
+        ],
+      ]);
+      const filtrado = await get(
+        `/v1/pesquisas/${id}/resultados?campo=departamento&grupoId=${lot.departamentoId}`,
+        rhA,
+      ).expect(200);
+      expect(filtrado.body.filtro).toMatchObject({
+        respostas: 3,
+        visivel: false,
+      });
+      // Uma resposta sem grupo: o de 1 já não pode ser deduzido; o de 3
+      // aparece (na lista e nos resultados), o de 1 continua oculto.
+      await enviar(null);
+      const depois = await grupoDe();
+      expect(depois[0]).toEqual([
+        5,
+        [{ campo: "departamento", grupo: null, oculto: null }],
+      ]);
+      expect(depois[1]).toEqual([
+        4,
+        [{ campo: "departamento", grupo: null, oculto: "minimo" }],
+      ]);
+      expect(depois[2]).toEqual([
+        3,
+        [
+          {
+            campo: "departamento",
+            grupo: "Departamento T179 Sintetico",
+            oculto: null,
+          },
+        ],
+      ]);
+      const visivel = await get(
+        `/v1/pesquisas/${id}/resultados?campo=departamento&grupoId=${lot.departamentoId}`,
+        rhA,
+      ).expect(200);
+      expect(visivel.body.filtro).toMatchObject({
+        respostas: 3,
+        visivel: true,
+      });
+      expect(visivel.body.perguntas).toHaveLength(5);
     });
 
     it("separar por: só na anônima, até 2 campos, sem repetir", async () => {
@@ -1596,18 +1750,22 @@ describe("T216 — Pesquisas (e2e)", () => {
       const geral = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(
         200,
       );
+      // Só dois departamentos e ninguém sem departamento: o total menos o
+      // maior daria o menor. O maior fica oculto para protegê-lo.
       expect(geral.body.departamentos).toEqual([
         {
           id: lot.departamentoId,
           nome: "Departamento T179 Sintetico",
           respostas: 3,
-          visivel: true,
+          visivel: false,
+          oculto: "protege_grupo_menor",
         },
         {
           id: outroDep.id,
           nome: "Departamento T216 Sintetico",
           respostas: 1,
           visivel: false,
+          oculto: "minimo",
         },
       ]);
       const abaixo = await get(
@@ -1618,6 +1776,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         campo: "departamento",
         grupoId: outroDep.id,
         departamentoId: outroDep.id,
+        respostas: 1,
         visivel: false,
       });
       expect(abaixo.body.perguntas).toEqual([]);
@@ -1625,19 +1784,19 @@ describe("T216 — Pesquisas (e2e)", () => {
         `/v1/pesquisas/${id}/resultados?departamentoId=${lot.departamentoId}`,
         rhA,
       ).expect(200);
-      expect(acima.body.filtro.visivel).toBe(true);
-      expect(acima.body.perguntas[2]).toMatchObject({
-        perguntaId: "clima",
-        respondidas: 3,
-      });
+      // Acima do mínimo, mas protegendo o menor: sem números.
+      expect(acima.body.filtro).toMatchObject({ respostas: 3, visivel: false });
+      expect(acima.body.perguntas).toEqual([]);
 
       // Centro de custo, pela lotação vigente (identificada).
+      // Um centro só, e uma pessoa sem centro: nada a proteger.
       expect(geral.body.grupos.centroCusto).toEqual([
         {
           id: centro.id,
           nome: "Centro T216 Sintetico",
           respostas: 3,
           visivel: true,
+          oculto: null,
         },
       ]);
       const porCentro = await get(
@@ -1648,6 +1807,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         campo: "centroCusto",
         grupoId: centro.id,
         departamentoId: null,
+        respostas: 3,
         visivel: true,
       });
       expect(porCentro.body.indicadores.mediaGeral).toBe(8);
@@ -1666,6 +1826,7 @@ describe("T216 — Pesquisas (e2e)", () => {
             nome: "Toda a empresa",
             respostas: 4,
             visivel: true,
+            oculto: null,
             media: 8,
             medias: [8],
           },
@@ -1673,15 +1834,17 @@ describe("T216 — Pesquisas (e2e)", () => {
             grupoId: lot.departamentoId,
             nome: "Departamento T179 Sintetico",
             respostas: 3,
-            visivel: true,
-            media: 8,
-            medias: [8],
+            visivel: false,
+            oculto: "protege_grupo_menor",
+            media: null,
+            medias: [null],
           },
           {
             grupoId: outroDep.id,
             nome: "Departamento T216 Sintetico",
             respostas: 1,
             visivel: false,
+            oculto: "minimo",
             media: null,
             medias: [null],
           },
@@ -1696,6 +1859,15 @@ describe("T216 — Pesquisas (e2e)", () => {
         ],
       });
       await get(`/v1/pesquisas/${id}/analises`, rhA).expect(400);
+      // Um pulso publicado sem resposta não entra na evolução.
+      await publicada({
+        modelo: "pulso",
+        nome: "Pulso sem respostas",
+        participantes: {
+          todos: false,
+          colaboradorIds: grandes.map((p) => p.id),
+        },
+      });
       // Segundo pulso: a evolução traz os dois, o mais antigo primeiro.
       const segundo = await publicada({
         modelo: "pulso",
