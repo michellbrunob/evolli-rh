@@ -3459,3 +3459,184 @@ textarea.pesquisas__campo {
     transition: none;
   }
 }
+
+/* ---- T216 — "Editar pesquisa" em duas colunas ---- */
+.pesquisas__edicao-cabeca {
+  align-items: center;
+}
+
+/* O conteúdo da edição numa largura de leitura, no centro. */
+.pesquisas__edicao-cabeca,
+.pesquisas__edicao-grade {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+}
+
+.pesquisas__edicao-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.pesquisas__edicao-coluna {
+  display: grid;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.pesquisas__edicao-formato {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.pesquisas__edicao-vazio {
+  margin: 0;
+  padding: 40px 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-ui);
+  text-align: center;
+}
+
+/* Contadores do painel: pílulas com o rótulo e o número lado a lado. */
+.pesquisas__contadores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.pesquisas__contadores > div {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 6px var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pearl);
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: var(--weight-medium);
+}
+
+.pesquisas__contadores dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pesquisas__contadores > [data-tom="sucesso"] {
+  border-color: var(--status-success-border);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+.pesquisas__contadores > [data-tom="sucesso"] dd {
+  color: var(--status-success-ink);
+}
+
+.pesquisas__contadores > [data-tom="destaque"] {
+  border-color: color-mix(in srgb, var(--color-action) 30%, transparent);
+  background: color-mix(in srgb, var(--color-action) 8%, var(--surface-canvas));
+  color: var(--color-action);
+}
+
+.pesquisas__contadores > [data-tom="destaque"] dd {
+  color: var(--color-action);
+}
+
+.pesquisas__participantes-filtros {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
+.pesquisas__participantes-filtros--quatro {
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
+}
+
+.pesquisas__participantes-filtros .pesquisas__filtro-lista {
+  min-width: 0;
+}
+
+.pesquisas__participantes-filtros .pesquisas__busca {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.pesquisas__participantes-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-ui);
+}
+
+.pesquisas__participantes-todos {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.pesquisas__participantes-lista {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pesquisas__participantes-lista > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 3.25rem;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.pesquisas__participantes-lista .pesquisas__pessoa-textos {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pesquisas__participantes-sem-acao {
+  flex: 0 0 auto;
+  width: var(--botao-icone);
+}
+
+.pesquisas__participantes-escolha {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* Com o rodapé fixo na tela, o aviso flutuante sobe acima dele (não cobre
+   "Salvar alterações" nem a ação principal). */
+body:has(.pesquisas__rodape) .aviso-flutuante {
+  bottom: calc(var(--altura-rodape-pagina) + var(--space-sm));
+}
+
+@media (max-width: 48rem) {
+  .pesquisas__edicao-grade,
+  .pesquisas__participantes-filtros,
+  .pesquisas__participantes-filtros--quatro {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,29 +1,29 @@
 /**
  * T216 — "Editar pesquisa" (publicada, até ser finalizada): página própria,
- * sem mexer nas perguntas. Cartões: Dados da pesquisa (nome, descrição e o
- * selo da identificação), Encerramento, "Separar por" (travado quando já há
- * respostas) e Participantes (Total, Responderam e Pendentes; abas Atuais e
- * Adicionar, com busca e filtro). Rodapé fixo com o estado das alterações,
- * Cancelar e Salvar alterações.
+ * sem mexer nas perguntas, em duas colunas. À esquerda: Dados da pesquisa
+ * (nome, descrição e o formato), Encerramento e, na anônima, "Separar por"
+ * (travado quando já há respostas). À direita: o painel de participantes
+ * (Total, Responderam, Pendentes e "A adicionar"; abas Atuais e Adicionar,
+ * com busca e filtros). Rodapé fixo com o estado das alterações, Cancelar e
+ * Salvar alterações; o aviso flutuante sobe acima dele.
  */
-import { useEffect, useMemo, useState } from "react";
-import type { ColaboradorListadoApi } from "../../api/colaboradoresClient";
-import type { PesquisaDetalhe } from "../../api/pesquisasClient";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type {
+  CandidatoPesquisa,
+  PesquisaDetalhe,
+} from "../../api/pesquisasClient";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
-import { Button } from "../../components";
+import { Button, StatusBadge } from "../../components";
 import { plural } from "../../format/plural";
-import { IconButton } from "../../ui";
-import { IconeRemover, IconeVoltar } from "../../ui/icones";
+import { IconButton, ListaDeEscolha } from "../../ui";
+import { IconeFechar, IconeVoltar } from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
 import { useAvisar } from "./avisos";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import {
-  Avatar,
   CampoDeBusca,
   CartaoDeSecao,
   ICONE_DA_IDENTIFICACAO,
-  IconeDoModelo,
-  iniciaisDe,
   Pilulas,
 } from "./componentes";
 import {
@@ -34,10 +34,13 @@ import {
   type EstadoDaPesquisa,
   type PessoaEscolhida,
 } from "./estadoDaPesquisa";
-import { departamentoDe } from "./EtapaColaboradores";
 import { semAcento } from "./GaleriaDeModelos";
 import { SepararRespostasPor } from "./SepararRespostasPor";
-import type { ServicoDePesquisas } from "./servicoDePesquisas";
+import {
+  todosOsCandidatos,
+  type GruposDaEmpresa,
+  type ServicoDePesquisas,
+} from "./servicoDePesquisas";
 import { LIMITES, ROTULO_DA_IDENTIFICACAO } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 
@@ -162,89 +165,96 @@ function FormularioDeEdicao({
   }
 
   return (
-    <div className="pesquisas pesquisas--com-rodape">
-      <header className="pesquisas__cabecalho">
+    <div className="pesquisas pesquisas--com-rodape pesquisas__edicao">
+      <header className="pesquisas__cabecalho pesquisas__edicao-cabeca">
         <IconButton
           label="Voltar para os resultados"
           icon={<IconeVoltar tamanho={18} />}
           className="pesquisas__voltar"
           onClick={onVoltar}
         />
-        <IconeDoModelo id={detalhe.modelo} tamanho="lg" />
-        <div className="pesquisas__titulos">
-          <h1
-            id={PESQUISAS_TITULO_ID}
-            className="pesquisas__titulo"
-            tabIndex={-1}
-          >
-            Editar pesquisa
-          </h1>
-          <p className="pesquisas__subtitulo">
-            As perguntas não mudam depois de publicar. Nome, descrição, prazo e
-            participantes ainda podem mudar.
-          </p>
-        </div>
+        <h1
+          id={PESQUISAS_TITULO_ID}
+          className="pesquisas__titulo"
+          tabIndex={-1}
+        >
+          Editar pesquisa
+        </h1>
       </header>
 
-      <CartaoDeSecao
-        titulo="Dados da pesquisa"
-        acao={
-          <span className="pesquisas__selo pesquisas__com-icone">
-            <IconeId tamanho={12} />
-            {ROTULO_DA_IDENTIFICACAO[estado.identificacao]}
-          </span>
-        }
-      >
-        <div className="pesquisas__campos">
-          <label htmlFor="editar-nome" className="pesquisas__rotulo">
-            Nome da pesquisa
-          </label>
-          <input
-            id="editar-nome"
-            className="pesquisas__campo"
-            value={estado.nome}
-            maxLength={LIMITES.nome + 10}
-            aria-invalid={erros?.nome ? true : undefined}
-            onChange={(e) => mudar({ nome: e.target.value })}
+      <div className="pesquisas__edicao-grade">
+        <div className="pesquisas__edicao-coluna">
+          <CartaoDeSecao titulo="Dados da pesquisa">
+            <div className="pesquisas__campos">
+              <label htmlFor="editar-nome" className="pesquisas__rotulo">
+                Nome da pesquisa
+              </label>
+              <input
+                id="editar-nome"
+                className="pesquisas__campo"
+                value={estado.nome}
+                maxLength={LIMITES.nome + 10}
+                aria-invalid={erros?.nome ? true : undefined}
+                onChange={(e) => mudar({ nome: e.target.value })}
+              />
+              {erros?.nome ? (
+                <p className="pesquisas__erro">{erros.nome}</p>
+              ) : null}
+              <label htmlFor="editar-descricao" className="pesquisas__rotulo">
+                Descrição <span className="pesquisas__suave">(opcional)</span>
+              </label>
+              <textarea
+                id="editar-descricao"
+                className="pesquisas__campo"
+                value={estado.boasVindas}
+                onChange={(e) => mudar({ boasVindas: e.target.value })}
+              />
+            </div>
+            <p className="pesquisas__edicao-formato">
+              <span className="pesquisas__suave">Formato:</span>
+              <span className="pesquisas__selo pesquisas__selo--destaque pesquisas__com-icone">
+                <IconeId tamanho={12} />
+                {ROTULO_DA_IDENTIFICACAO[estado.identificacao]}
+              </span>
+            </p>
+          </CartaoDeSecao>
+
+          <CartaoDeEncerramento
+            compacto
+            data={estado.encerraEm}
+            hora={estado.encerraHora}
+            hoje={hoje}
+            erro={erros?.encerraEm}
+            onMudar={mudar}
           />
-          {erros?.nome ? <p className="pesquisas__erro">{erros.nome}</p> : null}
-          <label htmlFor="editar-descricao" className="pesquisas__rotulo">
-            Descrição <span className="pesquisas__suave">opcional</span>
-          </label>
-          <textarea
-            id="editar-descricao"
-            className="pesquisas__campo"
-            value={estado.boasVindas}
-            onChange={(e) => mudar({ boasVindas: e.target.value })}
-          />
+
+          {anonima ? (
+            <SepararRespostasPor
+              servico={servico}
+              separarPor={estado.separarPor}
+              travado={detalhe.temRespostas}
+              motivoDoTravamento="Esta pesquisa já tem respostas: os campos não mudam mais."
+              onMudar={(separarPor) => mudar({ separarPor })}
+            />
+          ) : null}
         </div>
-      </CartaoDeSecao>
 
-      <CartaoDeEncerramento
-        compacto
-        data={estado.encerraEm}
-        hora={estado.encerraHora}
-        hoje={hoje}
-        erro={erros?.encerraEm}
-        onMudar={mudar}
-      />
-
-      {anonima ? (
-        <SepararRespostasPor
-          servico={servico}
-          separarPor={estado.separarPor}
-          travado={detalhe.temRespostas}
-          motivoDoTravamento="A pesquisa já tem respostas: a separação por grupo não muda mais."
-          onMudar={(separarPor) => mudar({ separarPor })}
-        />
-      ) : (
-        <PainelDeParticipantes
-          servico={servico}
-          detalhe={detalhe}
-          estado={estado}
-          onMudar={mudar}
-        />
-      )}
+        {anonima ? (
+          <CartaoDeSecao titulo="Participantes">
+            <p className="pesquisas__edicao-vazio">
+              Pesquisa anônima: quem tiver o link responde, sem lista de
+              participantes.
+            </p>
+          </CartaoDeSecao>
+        ) : (
+          <PainelDeParticipantes
+            servico={servico}
+            detalhe={detalhe}
+            estado={estado}
+            onMudar={mudar}
+          />
+        )}
+      </div>
 
       {falha ? (
         <p className="pesquisas__erro" role="alert">
@@ -272,6 +282,29 @@ function FormularioDeEdicao({
   );
 }
 
+type FiltroDeStatus = "" | "responderam" | "pendentes";
+
+const OPCOES_DE_STATUS: readonly { valor: FiltroDeStatus; rotulo: string }[] = [
+  { valor: "", rotulo: "Todos os status" },
+  { valor: "responderam", rotulo: "Responderam" },
+  { valor: "pendentes", rotulo: "Pendentes" },
+];
+
+/** "Cargo · Departamento · Centro de custo · Unidade" (o que houver). */
+const lotacaoDe = (c: CandidatoPesquisa) =>
+  [c.cargo, c.departamento, c.centroCusto, c.unidade]
+    .filter(Boolean)
+    .join(" · ");
+
+type CampoDoFiltro = "departamento" | "centroCusto" | "unidade";
+
+/**
+ * O painel da direita: pílulas Total, Responderam, Pendentes (e "A
+ * adicionar" quando há inclusões), abas Atuais e Adicionar. Atuais: busca e
+ * filtros por status e departamento; quem já respondeu não sai. Adicionar:
+ * os ativos da empresa que ainda não estão na pesquisa (candidatos da API,
+ * com busca e filtros no servidor), marcados um a um ou todos de uma vez.
+ */
 function PainelDeParticipantes({
   servico,
   detalhe,
@@ -283,12 +316,24 @@ function PainelDeParticipantes({
   readonly estado: EstadoDaPesquisa;
   readonly onMudar: (m: Partial<EstadoDaPesquisa>) => void;
 }) {
+  const ids = useId();
   const [aba, setAba] = useState<"atuais" | "adicionar">("atuais");
   const [busca, setBusca] = useState("");
-  const [time, setTime] = useState<readonly ColaboradorListadoApi[] | null>(
+  const [status, setStatus] = useState<FiltroDeStatus>("");
+  const [departamento, setDepartamento] = useState("");
+  const [buscaNova, setBuscaNova] = useState("");
+  const [filtroNovo, setFiltroNovo] = useState<Record<CampoDoFiltro, string>>({
+    departamento: "",
+    centroCusto: "",
+    unidade: "",
+  });
+  const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
+  const [candidatos, setCandidatos] = useState<CandidatoPesquisa[] | null>(
     null,
   );
+  const geralRef = useRef<HTMLInputElement>(null);
   const lista = detalhe.participantesLista ?? [];
+  const naPesquisa = new Set(lista.map((p) => p.colaboradorId));
   const respondeu = new Set(
     lista.filter((p) => p.respondeu).map((p) => p.colaboradorId),
   );
@@ -301,32 +346,87 @@ function PainelDeParticipantes({
         ]),
       )
     : { ...estado.escolhidos };
+  const aAdicionar =
+    lista.length === 0
+      ? 0
+      : Object.keys(atuais).filter((id) => !naPesquisa.has(id)).length;
   // Sem mudança na lista, vale o total do servidor (todo o time inteiro).
   const total =
     estado.todos && lista.length === 0
       ? (detalhe.participantesTotal ?? detalhe.participantes ?? 0)
       : Object.keys(atuais).length;
   const responderam = detalhe.responderam ?? respondeu.size;
-  const pendentes = detalhe.pendentes ?? Math.max(0, total - responderam);
+  // Incluir alguém aumenta os pendentes (e a frase do painel).
+  const pendentes = Math.max(0, total - responderam);
 
   useEffect(() => {
-    if (aba !== "adicionar" || time) return;
     let vivo = true;
-    Promise.resolve(servico.listarTodosAtivos())
-      .then((t) => {
-        if (vivo) setTime(t ?? []);
+    Promise.resolve(servico.listarGrupos())
+      .then((g) => {
+        if (vivo && g) setGrupos(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [servico]);
+
+  const consulta = useMemo(
+    () => ({
+      ...(buscaNova.trim() ? { busca: buscaNova.trim() } : {}),
+      ...(filtroNovo.departamento
+        ? { departamentoId: filtroNovo.departamento }
+        : {}),
+      ...(filtroNovo.centroCusto
+        ? { centroCustoId: filtroNovo.centroCusto }
+        : {}),
+      ...(filtroNovo.unidade ? { unidadeId: filtroNovo.unidade } : {}),
+    }),
+    [buscaNova, filtroNovo],
+  );
+
+  // Os candidatos do filtro, página a página no servidor (só nesta aba).
+  useEffect(() => {
+    if (aba !== "adicionar") return;
+    let vivo = true;
+    todosOsCandidatos(
+      (q) => Promise.resolve(servico.listarCandidatos(q)),
+      consulta,
+    )
+      .then((l) => {
+        if (vivo) setCandidatos(l);
       })
       .catch(() => {
-        if (vivo) setTime([]);
+        if (vivo) setCandidatos([]);
       });
     return () => {
       vivo = false;
     };
-  }, [aba, time, servico]);
+  }, [aba, servico, consulta]);
 
   const termo = semAcento(busca.trim());
-  const casa = (nome: string, dep: string | null) =>
-    !termo || semAcento(`${nome} ${dep ?? ""}`).includes(termo);
+  const nomeDoDepartamento =
+    grupos?.departamento.find((d) => d.id === departamento)?.nome ?? null;
+  const visiveis = Object.entries(atuais).filter(
+    ([id, p]) =>
+      (!termo ||
+        semAcento(`${p.nome} ${p.departamento ?? ""}`).includes(termo)) &&
+      (status === "" ||
+        (status === "responderam" ? respondeu.has(id) : !respondeu.has(id))) &&
+      (!departamento || p.departamento === nomeDoDepartamento),
+  );
+  // Para adicionar: quem não estava na pesquisa (os marcados agora ficam).
+  const paraAdicionar = (candidatos ?? []).filter(
+    (c) => !naPesquisa.has(c.colaboradorId),
+  );
+  const marcados = paraAdicionar.filter((c) => c.colaboradorId in atuais);
+  const todosMarcados =
+    paraAdicionar.length > 0 && marcados.length === paraAdicionar.length;
+
+  useEffect(() => {
+    if (geralRef.current)
+      geralRef.current.indeterminate = marcados.length > 0 && !todosMarcados;
+  }, [marcados.length, todosMarcados]);
 
   function remover(id: string) {
     const novo = { ...atuais };
@@ -334,24 +434,65 @@ function PainelDeParticipantes({
     onMudar({ todos: false, escolhidos: novo });
   }
 
-  function adicionar(c: ColaboradorListadoApi) {
-    onMudar({
-      todos: false,
-      escolhidos: {
-        ...atuais,
-        [c.id]: { nome: c.nome, departamento: departamentoDe(c) },
-      },
-    });
+  function marcar(pessoas: readonly CandidatoPesquisa[], marcado: boolean) {
+    const novo = { ...atuais };
+    for (const c of pessoas) {
+      if (marcado)
+        novo[c.colaboradorId] = { nome: c.nome, departamento: c.departamento };
+      else delete novo[c.colaboradorId];
+    }
+    onMudar({ todos: false, escolhidos: novo });
   }
 
+  const filtro = (
+    id: string,
+    rotulo: string,
+    opcoes: readonly { valor: string; rotulo: string }[],
+    valor: string,
+    onMudarValor: (v: string) => void,
+  ) => (
+    <div className="pesquisas__filtro-lista">
+      <label htmlFor={id} className="pesquisas__so-leitor">
+        {rotulo}
+      </label>
+      <ListaDeEscolha
+        id={id}
+        opcoes={opcoes}
+        valor={valor}
+        onMudar={onMudarValor}
+      />
+    </div>
+  );
+
+  const opcoesDoGrupo = (campo: CampoDoFiltro, todos: string) => [
+    { valor: "", rotulo: todos },
+    ...(grupos?.[campo] ?? []).map((g) => ({ valor: g.id, rotulo: g.nome })),
+  ];
+
+  const filtroDoNovo = (campo: CampoDoFiltro, rotulo: string, todos: string) =>
+    filtro(
+      `${ids}-novo-${campo}`,
+      rotulo,
+      opcoesDoGrupo(campo, todos),
+      filtroNovo[campo],
+      (v) => setFiltroNovo((f) => ({ ...f, [campo]: v })),
+    );
+
   return (
-    <CartaoDeSecao titulo="Participantes">
-      <dl className="pesquisas__faixa" aria-label="Totais de participantes">
+    <section
+      className="pesquisas__cartao-secao pesquisas__participantes"
+      aria-label="Participantes"
+    >
+      <h2 className="pesquisas__cartao-secao-titulo">{`Participantes (${total})`}</h2>
+      <dl
+        className="pesquisas__contadores"
+        aria-label="Totais de participantes"
+      >
         <div>
           <dt>Total</dt>
           <dd>{total}</dd>
         </div>
-        <div>
+        <div data-tom="sucesso">
           <dt>Responderam</dt>
           <dd>{responderam}</dd>
         </div>
@@ -359,79 +500,163 @@ function PainelDeParticipantes({
           <dt>Pendentes</dt>
           <dd>{pendentes}</dd>
         </div>
+        {aAdicionar > 0 ? (
+          <div data-tom="destaque">
+            <dt>A adicionar</dt>
+            <dd>{aAdicionar}</dd>
+          </div>
+        ) : null}
       </dl>
-      <div className="pesquisas__filtros">
-        <Pilulas
-          rotulo="Participantes"
-          valor={aba}
-          onMudar={setAba}
-          opcoes={[
-            { valor: "atuais", rotulo: "Atuais", contagem: total },
-            { valor: "adicionar", rotulo: "Adicionar" },
-          ]}
-        />
-        <CampoDeBusca rotulo="Buscar pessoa" valor={busca} onMudar={setBusca} />
-      </div>
+      <Pilulas
+        rotulo="Participantes"
+        valor={aba}
+        onMudar={setAba}
+        opcoes={[
+          { valor: "atuais", rotulo: "Atuais", contagem: total - aAdicionar },
+          {
+            valor: "adicionar",
+            rotulo: "Adicionar",
+            ...(aAdicionar > 0 ? { contagem: aAdicionar } : {}),
+          },
+        ]}
+      />
       {aba === "atuais" ? (
-        <ul
-          className="pesquisas__lista-pessoas"
-          aria-label="Participantes atuais"
-        >
-          {Object.entries(atuais)
-            .filter(([, p]) => casa(p.nome, p.departamento))
-            .map(([id, p]) => (
+        <>
+          <div className="pesquisas__participantes-filtros">
+            <CampoDeBusca
+              rotulo="Buscar por nome ou departamento"
+              valor={busca}
+              onMudar={setBusca}
+            />
+            {filtro(`${ids}-status`, "Status", OPCOES_DE_STATUS, status, (v) =>
+              setStatus(v as FiltroDeStatus),
+            )}
+            {filtro(
+              `${ids}-departamento`,
+              "Departamento",
+              opcoesDoGrupo("departamento", "Todos os departamentos"),
+              departamento,
+              setDepartamento,
+            )}
+          </div>
+          <ul
+            className="pesquisas__participantes-lista"
+            aria-label="Participantes atuais"
+          >
+            {visiveis.map(([id, p]) => (
               <li key={id}>
-                <Avatar texto={iniciaisDe(p.nome)} />
                 <span className="pesquisas__pessoa-textos">
-                  <span>{p.nome}</span>
+                  <span className="pesquisas__forte">{p.nome}</span>
                   <span className="pesquisas__suave">
-                    {[
-                      p.departamento,
-                      respondeu.has(id) ? "já respondeu" : "pendente",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {p.departamento ?? "Sem departamento"}
                   </span>
                 </span>
-                {respondeu.has(id) ? null : (
+                {respondeu.has(id) ? (
+                  <StatusBadge variant="success">Respondeu</StatusBadge>
+                ) : (
+                  <StatusBadge variant="warning">Pendente</StatusBadge>
+                )}
+                {respondeu.has(id) ? (
+                  <span
+                    className="pesquisas__participantes-sem-acao"
+                    aria-hidden="true"
+                  />
+                ) : (
                   <IconButton
                     label={`Tirar ${p.nome}`}
-                    icon={<IconeRemover tamanho={14} />}
+                    icon={<IconeFechar tamanho={14} />}
                     variant="subtle"
                     onClick={() => remover(id)}
                   />
                 )}
               </li>
             ))}
-        </ul>
-      ) : time === null ? (
-        <p className="pesquisas__suave">Carregando pessoas…</p>
+          </ul>
+          {visiveis.length === 0 ? (
+            <p className="pesquisas__edicao-vazio">
+              Nenhum participante encontrado com esses filtros.
+            </p>
+          ) : null}
+        </>
       ) : (
-        <ul
-          className="pesquisas__lista-pessoas"
-          aria-label="Pessoas para adicionar"
-        >
-          {time
-            .filter((c) => !(c.id in atuais) && casa(c.nome, departamentoDe(c)))
-            .map((c) => (
-              <li key={c.id}>
-                <Avatar texto={iniciaisDe(c.nome)} />
-                <span className="pesquisas__pessoa-textos">
-                  <span>{c.nome}</span>
-                  <span className="pesquisas__suave">
-                    {departamentoDe(c) ?? "Sem departamento"}
-                  </span>
-                </span>
-                <Button variant="secondary" onClick={() => adicionar(c)}>
-                  Adicionar
-                </Button>
-              </li>
-            ))}
-        </ul>
+        <>
+          <div className="pesquisas__participantes-topo">
+            <strong>Selecionar colaboradores</strong>
+            <span className="pesquisas__suave">
+              {plural(marcados.length, "selecionado", "selecionados")}
+            </span>
+          </div>
+          <div className="pesquisas__participantes-filtros pesquisas__participantes-filtros--quatro">
+            <CampoDeBusca
+              rotulo="Buscar colaborador"
+              valor={buscaNova}
+              onMudar={setBuscaNova}
+            />
+            {filtroDoNovo(
+              "departamento",
+              "Departamento dos colaboradores",
+              "Todos os departamentos",
+            )}
+            {filtroDoNovo(
+              "centroCusto",
+              "Centro de custo dos colaboradores",
+              "Todos os centros de custo",
+            )}
+            {filtroDoNovo(
+              "unidade",
+              "Unidade dos colaboradores",
+              "Todas as unidades",
+            )}
+          </div>
+          {candidatos === null ? (
+            <p className="pesquisas__suave">Carregando pessoas…</p>
+          ) : paraAdicionar.length === 0 ? (
+            <p className="pesquisas__edicao-vazio">
+              Ninguém para adicionar com esses filtros.
+            </p>
+          ) : (
+            <>
+              <label className="pesquisas__participantes-todos">
+                <input
+                  ref={geralRef}
+                  type="checkbox"
+                  checked={todosMarcados}
+                  onChange={(e) => marcar(paraAdicionar, e.target.checked)}
+                />
+                {`Selecionar todos (${paraAdicionar.length})`}
+              </label>
+              <ul
+                className="pesquisas__participantes-lista"
+                aria-label="Pessoas para adicionar"
+              >
+                {paraAdicionar.map((c) => (
+                  <li key={c.colaboradorId}>
+                    <label className="pesquisas__participantes-escolha">
+                      <input
+                        type="checkbox"
+                        aria-label={c.nome}
+                        checked={c.colaboradorId in atuais}
+                        onChange={(e) => marcar([c], e.target.checked)}
+                      />
+                      <span className="pesquisas__pessoa-textos">
+                        <span className="pesquisas__forte">{c.nome}</span>
+                        {lotacaoDe(c) ? (
+                          <span className="pesquisas__suave">
+                            {lotacaoDe(c)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       )}
       <p className="pesquisas__suave">
         {`Quem já respondeu não sai da pesquisa. ${plural(pendentes, "pessoa ainda não respondeu", "pessoas ainda não responderam")}.`}
       </p>
-    </CartaoDeSecao>
+    </section>
   );
 }

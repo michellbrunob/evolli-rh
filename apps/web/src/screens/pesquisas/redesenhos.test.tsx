@@ -6,10 +6,30 @@
  * pergunta embaixo do título) e rodapés dos cartões. Servidor simulado;
  * dados sintéticos.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { CampoGrupo } from "../../api/pesquisasClient";
-import { DETALHE, GRUPOS, RESULTADOS, servicoFalso } from "./dadosDeTeste";
+import type {
+  CampoGrupo,
+  CandidatoPesquisa,
+  PesquisaDetalhe,
+} from "../../api/pesquisasClient";
+import {
+  CANDIDATOS,
+  DETALHE,
+  GRUPOS,
+  RESULTADOS,
+  listarCandidatosFalso,
+  servicoFalso,
+} from "./dadosDeTeste";
+import { EditarPesquisa } from "./EditarPesquisa";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { SepararRespostasPor } from "./SepararRespostasPor";
@@ -398,5 +418,159 @@ describe("B12 — etapa Enviar", () => {
       "Descrição",
     ]);
     expect(celulas.at(-1)).toHaveClass("pesquisas__resumo-largo");
+  });
+});
+
+describe("B13 — Editar pesquisa em duas colunas", () => {
+  const PUBLICADA = {
+    ...DETALHE,
+    identificacao: "identificada",
+    todos: false,
+    participantesTotal: 3,
+    responderam: 1,
+    pendentes: 2,
+    participantesLista: [
+      {
+        colaboradorId: "c-1",
+        nome: "Ana Exemplo",
+        departamento: "Operações",
+        respondeu: true,
+      },
+      {
+        colaboradorId: "c-2",
+        nome: "Bruno Exemplo",
+        departamento: "Financeiro",
+        respondeu: false,
+      },
+      {
+        colaboradorId: "c-9",
+        nome: "Caio Exemplo",
+        departamento: null,
+        respondeu: false,
+      },
+    ],
+  } as PesquisaDetalhe;
+  const DORA: CandidatoPesquisa = {
+    colaboradorId: "c-3",
+    nome: "Dora Exemplo",
+    cargo: "Analista",
+    departamento: "Operações",
+    centroCusto: "Administrativo",
+    unidade: "Matriz",
+  };
+
+  function montarEdicao(detalhe: PesquisaDetalhe = PUBLICADA) {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() => Promise.resolve(detalhe)),
+      listarCandidatos: vi.fn(listarCandidatosFalso([...CANDIDATOS, DORA])),
+    });
+    const onSalvo = vi.fn();
+    render(
+      <EditarPesquisa
+        servico={servico}
+        pesquisaId="p-1"
+        hoje="2026-11-27"
+        onVoltar={vi.fn()}
+        onSalvo={onSalvo}
+      />,
+    );
+    return { servico, onSalvo };
+  }
+
+  it("à esquerda os dados, o encerramento e o formato; à direita o painel de participantes", async () => {
+    montarEdicao();
+    const painel = await screen.findByRole("region", {
+      name: "Participantes",
+    });
+    const grade = painel.parentElement!;
+    expect(grade).toHaveClass("pesquisas__edicao-grade");
+    const [esquerda, direita] = Array.from(grade.children);
+    expect(direita).toBe(painel);
+    expect(esquerda).toHaveTextContent("Dados da pesquisa");
+    expect(esquerda).toHaveTextContent("Encerramento");
+    expect(esquerda).toHaveTextContent("Formato:Identificada");
+    expect(
+      within(painel).getByRole("heading", { name: "Participantes (3)" }),
+    ).toBeInTheDocument();
+  });
+
+  it("atuais: busca e filtros de status e departamento; cada pessoa com o status", async () => {
+    montarEdicao();
+    const painel = await screen.findByRole("region", {
+      name: "Participantes",
+    });
+    const lista = within(painel).getByRole("list", {
+      name: "Participantes atuais",
+    });
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(lista).getAllByRole("listitem")[0]).toHaveTextContent(
+      "Respondeu",
+    );
+    expect(within(lista).getAllByRole("listitem")[1]).toHaveTextContent(
+      "Pendente",
+    );
+    fireEvent.click(within(painel).getByRole("combobox", { name: "Status" }));
+    fireEvent.click(screen.getByRole("option", { name: "Pendentes" }));
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(2);
+    fireEvent.click(
+      within(painel).getByRole("combobox", { name: "Departamento" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "Financeiro" }));
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(1);
+    expect(lista).toHaveTextContent("Bruno Exemplo");
+    fireEvent.change(
+      within(painel).getByRole("searchbox", {
+        name: "Buscar por nome ou departamento",
+      }),
+      { target: { value: "caio" } },
+    );
+    expect(within(lista).queryAllByRole("listitem")).toHaveLength(0);
+    expect(painel).toHaveTextContent(
+      "Nenhum participante encontrado com esses filtros.",
+    );
+  });
+
+  it("adicionar: candidatos da API; incluir atualiza totais, pendentes e a frase", async () => {
+    const { servico, onSalvo } = montarEdicao();
+    const painel = await screen.findByRole("region", {
+      name: "Participantes",
+    });
+    fireEvent.click(within(painel).getByRole("button", { name: /Adicionar/ }));
+    const candidatos = await within(painel).findByRole("list", {
+      name: "Pessoas para adicionar",
+    });
+    expect(servico.listarCandidatos).toHaveBeenCalled();
+    // Quem já está na pesquisa não aparece para adicionar.
+    expect(within(candidatos).getAllByRole("listitem")).toHaveLength(1);
+    expect(candidatos).toHaveTextContent(
+      "Dora ExemploAnalista · Operações · Administrativo · Matriz",
+    );
+    expect(painel).toHaveTextContent("0 selecionados");
+    fireEvent.click(
+      within(candidatos).getByRole("checkbox", { name: "Dora Exemplo" }),
+    );
+    const totais = within(painel).getByLabelText("Totais de participantes");
+    expect(totais).toHaveTextContent("Total4");
+    expect(totais).toHaveTextContent("Pendentes3");
+    expect(totais).toHaveTextContent("A adicionar1");
+    expect(painel).toHaveTextContent("1 selecionado");
+    expect(
+      within(painel).getByRole("heading", { name: "Participantes (4)" }),
+    ).toBeInTheDocument();
+    expect(painel).toHaveTextContent("3 pessoas ainda não responderam");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(onSalvo).toHaveBeenCalled());
+    const [, entrada] = servico.alterarPesquisa.mock.calls.at(-1)!;
+    expect(entrada.participantes).toEqual({
+      todos: false,
+      colaboradorIds: ["c-1", "c-2", "c-9", "c-3"],
+    });
+  });
+
+  it("o aviso flutuante sobe acima do rodapé fixo (não cobre 'Salvar alterações')", () => {
+    const css = readFileSync(resolve(__dirname, "Pesquisas.css"), "utf8");
+    expect(css).toMatch(
+      /:has\(\.pesquisas__rodape\)\s+\.aviso-flutuante\s*\{[^}]*bottom:\s*calc\(var\(--altura-rodape-pagina\)/,
+    );
   });
 });
