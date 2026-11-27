@@ -94,6 +94,10 @@ import {
   Link1,
   Teacher,
   Timer1,
+  Chart2,
+  TrendUp,
+  TrendDown,
+  Category,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -250,3 +254,10 @@ export const IconeMostrarSenha = decorativo(Eye, "Linear");
 export const IconeOcultarSenha = decorativo(EyeSlash, "Linear");
 export const IconeEntrar = decorativo(ArrowRight, "Linear");
 export const IconeCadeado = decorativo(Lock, "Linear");
+/** T216 — os indicadores dos resultados de uma pesquisa. */
+export const IconeMediaGeral = decorativo(Chart2, "Bulk");
+export const IconeRecomendacao = decorativo(ShieldTick, "Bulk");
+export const IconeEmAlta = decorativo(TrendUp, "Linear");
+export const IconeEmBaixa = decorativo(TrendDown, "Linear");
+/** T216 — as seções de uma pesquisa personalizada. */
+export const IconeSecoes = decorativo(Category, "Bulk");

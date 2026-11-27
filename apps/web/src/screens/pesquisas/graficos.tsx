@@ -32,7 +32,10 @@ export function Rosca({
           cy="50"
           r={raio}
           fill="none"
-          stroke="var(--surface-neutral)"
+          // O trilho é a cor do valor, bem clara.
+          style={{
+            stroke: `color-mix(in srgb, ${cor} 16%, var(--surface-canvas))`,
+          }}
           strokeWidth="10"
         />
         <circle
@@ -62,15 +65,20 @@ export interface ParteDaBarra {
   readonly cor: string;
 }
 
-/** Barra empilhada (faixas, eNPS) com a legenda em texto. */
+/**
+ * Barra empilhada (faixas, eNPS) com a legenda em texto: "63% promotores"
+ * ou, com `legendaSoRotulo`, só o rótulo de cada parte ("8 a 10").
+ */
 export function BarraEmpilhada({
   partes,
   rotulo,
   legenda = true,
+  legendaSoRotulo = false,
 }: {
   readonly partes: readonly ParteDaBarra[];
   readonly rotulo: string;
   readonly legenda?: boolean;
+  readonly legendaSoRotulo?: boolean;
 }) {
   const total = partes.reduce((t, p) => t + p.valor, 0);
   const pct = (v: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
@@ -101,7 +109,7 @@ export function BarraEmpilhada({
                 className="pesquisas__ponto"
                 style={{ background: p.cor }}
               />
-              {`${pct(p.valor)}% ${p.rotulo}`}
+              {legendaSoRotulo ? p.rotulo : `${pct(p.valor)}% ${p.rotulo}`}
             </li>
           ))}
         </ul>
@@ -175,19 +183,22 @@ export function BarrasPorNota({
 
 /**
  * Régua de 0 a 10 em três faixas (abaixo de 6,5 · 6,5 a 7,9 · 8 ou mais),
- * com o marcador do valor e, se houver, o traço da média do time.
+ * com o marcador do valor e, se houver, o traço da média do time. Com
+ * `pontas`, os extremos da escala embaixo ("1" e "10").
  */
 export function Regua({
   valor,
   referencia,
   rotulo,
+  pontas,
 }: {
   readonly valor: number | null;
   readonly referencia?: number | null;
   readonly rotulo: string;
+  readonly pontas?: readonly [string, string];
 }) {
   const pos = (v: number) => `${Math.max(0, Math.min(10, v)) * 10}%`;
-  return (
+  const regua = (
     <div
       className="pesquisas__regua"
       role="img"
@@ -197,7 +208,11 @@ export function Regua({
           : ""
       }`}
     >
-      <span className="pesquisas__regua-faixas" aria-hidden="true" />
+      <span className="pesquisas__regua-faixas" aria-hidden="true">
+        <span data-faixa="baixa" />
+        <span data-faixa="media" />
+        <span data-faixa="alta" />
+      </span>
       {referencia !== undefined && referencia !== null ? (
         <span
           className="pesquisas__regua-time"
@@ -212,6 +227,16 @@ export function Regua({
           aria-hidden="true"
         />
       ) : null}
+    </div>
+  );
+  if (!pontas) return regua;
+  return (
+    <div className="pesquisas__regua-com-pontas">
+      {regua}
+      <div className="pesquisas__regua-pontas" aria-hidden="true">
+        <span>{pontas[0]}</span>
+        <span>{pontas[1]}</span>
+      </div>
     </div>
   );
 }

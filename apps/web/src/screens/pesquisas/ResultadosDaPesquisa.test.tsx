@@ -275,8 +275,7 @@ describe("Resultados — Visão geral", () => {
     });
     const enps = within(cartao).getByRole("region", { name: "eNPS" });
     expect(enps).toHaveTextContent("Zona de qualidade");
-    expect(enps).toHaveTextContent("Promotores (9–10)5 · 63%");
-    expect(enps).toHaveTextContent("Detratores (0–6)1 · 13%");
+    expect(enps).toHaveTextContent("63% promotores · 13% detratores");
     expect(cartao).toHaveTextContent(
       "eNPS = % de promotores − % de detratores",
     );

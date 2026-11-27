@@ -48,9 +48,13 @@ import {
   IconeCopiar,
   IconeDocumento,
   IconeEditar,
+  IconeEmAlta,
+  IconeEmBaixa,
   IconeInformacao,
   IconeMaisAcoes,
+  IconeMediaGeral,
   IconePlanilha,
+  IconeRecomendacao,
   IconeRemover,
   IconeStatus,
   IconeVoltar,
@@ -760,39 +764,53 @@ function VisaoGeral({
     <>
       {geral.filtro.visivel && geral.respostas > 0 ? (
         <section className="pesquisas__indicadores" aria-label="Indicadores">
-          <div className="pesquisas__indicador">
-            <h3>Média geral</h3>
+          <CartaoDeIndicador
+            titulo="Média geral"
+            icone={<IconeMediaGeral tamanho={16} />}
+            tom="roxo"
+          >
             <p className="pesquisas__indicador-valor">
-              {indicadores.mediaGeral === null
-                ? "—"
-                : umaCasa(indicadores.mediaGeral)}
-              <span className="pesquisas__suave"> /10</span>
-            </p>
-            {indicadores.mediaGeral !== null ? (
-              <span
-                className="pesquisas__nota-colorida"
-                data-faixa={faixaDaMedia10(indicadores.mediaGeral)}
-              >
-                {
-                  ROTULO_DA_FAIXA_DA_MEDIA[
-                    faixaDaMedia10(indicadores.mediaGeral)
-                  ]
-                }
+              <span className="pesquisas__indicador-numero">
+                {indicadores.mediaGeral === null
+                  ? "—"
+                  : umaCasa(indicadores.mediaGeral)}
               </span>
-            ) : null}
+              <span className="pesquisas__indicador-sufixo"> /10</span>
+              {indicadores.mediaGeral !== null ? (
+                <span
+                  className="pesquisas__nota-colorida pesquisas__indicador-selo"
+                  data-faixa={faixaDaMedia10(indicadores.mediaGeral)}
+                >
+                  {
+                    ROTULO_DA_FAIXA_DA_MEDIA[
+                      faixaDaMedia10(indicadores.mediaGeral)
+                    ]
+                  }
+                </span>
+              ) : null}
+            </p>
             <p className="pesquisas__suave">
               {`${indicadores.perguntasDeEscala === 1 ? "Média da única pergunta de escala" : `Média das ${indicadores.perguntasDeEscala} perguntas de escala`}, com ${plural(geral.respostas, "resposta", "respostas")}`}
             </p>
-            <Regua valor={indicadores.mediaGeral} rotulo="Média geral" />
-          </div>
-          <div className="pesquisas__indicador">
-            <h3>eNPS</h3>
+            <Regua
+              valor={indicadores.mediaGeral}
+              rotulo="Média geral"
+              pontas={PONTAS_DA_REGUA}
+            />
+          </CartaoDeIndicador>
+          <CartaoDeIndicador
+            titulo="eNPS"
+            icone={<IconeRecomendacao tamanho={16} />}
+            tom="verde-agua"
+          >
             {enps ? (
               <>
                 <p className="pesquisas__indicador-valor">
-                  {enps.indice}
+                  <span className="pesquisas__indicador-numero">
+                    {enps.indice}
+                  </span>
                   <span
-                    className={`pesquisas__selo pesquisas__zona--${enps.zona}`}
+                    className={`pesquisas__selo pesquisas__indicador-selo pesquisas__zona--${enps.zona}`}
                   >
                     {ROTULO_DA_ZONA[enps.zona]}
                   </span>
@@ -824,47 +842,44 @@ function VisaoGeral({
                 Esta pesquisa não tem a pergunta de recomendação.
               </p>
             )}
-          </div>
-          <div className="pesquisas__indicador">
-            <h3>Maior média</h3>
-            {indicadores.maiorMedia ? (
-              <>
-                <p className="pesquisas__indicador-valor">
-                  {umaCasa(indicadores.maiorMedia.media)}
-                  <span className="pesquisas__suave"> /10</span>
-                </p>
-                <p className="pesquisas__suave">
-                  {textoDaPergunta(indicadores.maiorMedia.perguntaId)}
-                </p>
-                <Regua
-                  valor={indicadores.maiorMedia.media}
-                  rotulo="Maior média"
-                />
-              </>
-            ) : (
-              <p className="pesquisas__suave">—</p>
-            )}
-          </div>
-          <div className="pesquisas__indicador">
-            <h3>Menor média</h3>
-            {indicadores.menorMedia ? (
-              <>
-                <p className="pesquisas__indicador-valor">
-                  {umaCasa(indicadores.menorMedia.media)}
-                  <span className="pesquisas__suave"> /10</span>
-                </p>
-                <p className="pesquisas__suave">
-                  {textoDaPergunta(indicadores.menorMedia.perguntaId)}
-                </p>
-                <Regua
-                  valor={indicadores.menorMedia.media}
-                  rotulo="Menor média"
-                />
-              </>
-            ) : (
-              <p className="pesquisas__suave">—</p>
-            )}
-          </div>
+          </CartaoDeIndicador>
+          {(
+            [
+              ["Maior média", indicadores.maiorMedia, "verde", IconeEmAlta],
+              ["Menor média", indicadores.menorMedia, "vermelho", IconeEmBaixa],
+            ] as const
+          ).map(([titulo, extremo, tom, Icone]) => (
+            <CartaoDeIndicador
+              key={titulo}
+              titulo={titulo}
+              icone={<Icone tamanho={16} />}
+              tom={tom}
+            >
+              {extremo ? (
+                <>
+                  <p className="pesquisas__indicador-valor">
+                    <span
+                      className="pesquisas__indicador-numero"
+                      data-faixa={faixaDaMedia10(extremo.media)}
+                    >
+                      {umaCasa(extremo.media)}
+                    </span>
+                    <span className="pesquisas__indicador-sufixo"> /10</span>
+                  </p>
+                  <p className="pesquisas__suave">
+                    {textoDaPergunta(extremo.perguntaId)}
+                  </p>
+                  <Regua
+                    valor={extremo.media}
+                    rotulo={titulo}
+                    pontas={PONTAS_DA_REGUA}
+                  />
+                </>
+              ) : (
+                <p className="pesquisas__suave">—</p>
+              )}
+            </CartaoDeIndicador>
+          ))}
         </section>
       ) : null}
 
@@ -946,6 +961,38 @@ function VisaoGeral({
   );
 }
 
+/** Os extremos da régua dos indicadores (as médias vão de 1 a 10). */
+const PONTAS_DA_REGUA = ["1", "10"] as const;
+
+/** Um cartão de indicador: ícone colorido e título; o conteúdo embaixo. */
+function CartaoDeIndicador({
+  titulo,
+  icone,
+  tom,
+  children,
+}: {
+  readonly titulo: string;
+  readonly icone: ReactNode;
+  readonly tom: "roxo" | "verde-agua" | "verde" | "vermelho";
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="pesquisas__indicador">
+      <div className="pesquisas__indicador-cabeca">
+        <span
+          className="pesquisas__indicador-icone"
+          data-tom={tom}
+          aria-hidden="true"
+        >
+          {icone}
+        </span>
+        <h3>{titulo}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function CabecaDoCartao({
   numero,
   pergunta: p,
@@ -1017,18 +1064,20 @@ function CartaoDaPergunta({
     const textos = r && "textos" in r ? r.textos : [];
     return (
       <section className="pesquisas__cartao-pergunta" aria-label={nome}>
-        <header className="pesquisas__cartao-pergunta-cabeca">
+        <header className="pesquisas__cartao-pergunta-cabeca pesquisas__cartao-pergunta-cabeca--comentarios">
           <span
             className="pesquisas__icone-modelo pesquisas__icone-modelo--sm"
             aria-hidden="true"
           >
             <IconeComentario tamanho={14} />
           </span>
-          <h3>Comentários livres</h3>
-          <span className="pesquisas__suave">
-            {`“${p.texto}”${p.obrigatoria ? "" : " · opcional"}`}
-          </span>
-          <span className="pesquisas__contagem">
+          <div className="pesquisas__cartao-pergunta-titulos">
+            <h3>Comentários livres</h3>
+            <p className="pesquisas__suave">
+              {`“${p.texto}”${p.obrigatoria ? "" : " · opcional"}`}
+            </p>
+          </div>
+          <span className="pesquisas__suave pesquisas__cartao-pergunta-contagem">
             {plural(textos.length, "comentário", "comentários")}
           </span>
         </header>
@@ -1091,26 +1140,34 @@ function CartaoDaPergunta({
               rotulo={`eNPS ${indice ?? "sem dado"}`}
             />
             {zona ? (
-              <span className={`pesquisas__selo pesquisas__zona--${zona}`}>
+              <p className="pesquisas__zona-texto" data-zona={zona}>
                 {ROTULO_DA_ZONA[zona]}
-              </span>
+              </p>
             ) : null}
-            <ul className="pesquisas__linhas">
-              {(
-                [
-                  ["Promotores (9–10)", promotores],
-                  ["Neutros (7–8)", neutros],
-                  ["Detratores (0–6)", detratores],
-                ] as const
-              ).map(([rotulo, q]) => (
-                <LinhaComBarra
-                  key={rotulo}
-                  rotulo={rotulo}
-                  quantidade={q}
-                  total={total}
-                />
-              ))}
-            </ul>
+            <span className="pesquisas__pilula-cinza">
+              {`${percentual(promotores, total)}% promotores · ${percentual(detratores, total)}% detratores`}
+            </span>
+            <BarraEmpilhada
+              rotulo="Grupos do eNPS"
+              legendaSoRotulo
+              partes={[
+                {
+                  rotulo: "Detratores 0–6",
+                  valor: detratores,
+                  cor: "var(--status-danger-ink)",
+                },
+                {
+                  rotulo: "Neutros 7–8",
+                  valor: neutros,
+                  cor: "var(--turno-mostarda)",
+                },
+                {
+                  rotulo: "Promotores 9–10",
+                  valor: promotores,
+                  cor: "var(--turno-verde)",
+                },
+              ]}
+            />
           </div>
           <BarrasPorNota
             valores={valores}
@@ -1126,9 +1183,9 @@ function CartaoDaPergunta({
             rotulo={`Notas de ${p.texto}`}
           />
         </section>
-        <p className="pesquisas__suave pesquisas__cartao-pergunta-rodape">
+        <footer className="pesquisas__cartao-pergunta-rodape">
           eNPS = % de promotores − % de detratores
-        </p>
+        </footer>
       </section>
     );
   }
@@ -1169,6 +1226,7 @@ function CartaoDaPergunta({
             ) : null}
             <BarraEmpilhada
               rotulo="Faixas"
+              legendaSoRotulo
               partes={[
                 {
                   rotulo: intervalo(e.minimo, baixaAte),
@@ -1200,9 +1258,9 @@ function CartaoDaPergunta({
             rotulo={`Notas de ${p.texto}`}
           />
         </div>
-        <p className="pesquisas__suave pesquisas__cartao-pergunta-rodape">
+        <footer className="pesquisas__cartao-pergunta-rodape">
           {`Favorável = notas ${textoDoFavoravel(e)}`}
-        </p>
+        </footer>
       </section>
     );
   }
