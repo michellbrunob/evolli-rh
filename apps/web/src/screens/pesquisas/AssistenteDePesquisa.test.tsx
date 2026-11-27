@@ -319,7 +319,9 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     fireEvent.click(
       await screen.findByRole("checkbox", { name: /Ana Exemplo/ }),
     );
-    expect(screen.getByText("Vão receber: 1 pessoa")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 selecionado de 2 colaboradores"),
+    ).toBeInTheDocument();
     avancar();
     await screen.findByRole("heading", { name: /Etapa 4 de 5/ });
     expect(ultimaEntrada(servico.alterarPesquisa).participantes).toEqual({
@@ -344,7 +346,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     fireEvent.click(await screen.findByRole("option", { name: "Financeiro" }));
     await waitFor(() =>
       expect(servico.listarAtivos).toHaveBeenLastCalledWith(
-        expect.objectContaining({ departamentoId: "d-2" }),
+        expect.objectContaining({ departamentos: ["d-2"] }),
       ),
     );
   });
@@ -394,7 +396,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     expect(resumo).toHaveTextContent("eNPS");
     expect(resumo).toHaveTextContent("3 perguntas");
     expect(resumo).toHaveTextContent("15/12/2026");
-    expect(resumo).toHaveTextContent("Confidencial");
+    expect(resumo).toHaveTextContent("Identificada");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Pré-visualizar como quem responde" }),
@@ -408,11 +410,11 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
 
     fireEvent.click(screen.getByRole("button", { name: "Publicar pesquisa" }));
     const final = await screen.findByRole("region", {
-      name: "Pesquisa publicada e ativa",
+      name: "Pesquisa criada e ativa",
     });
     expect(
       within(final).getByRole("heading", {
-        name: "Pesquisa publicada e ativa",
+        name: "Pesquisa criada e ativa",
       }),
     ).toBeInTheDocument();
     expect(within(final).getByRole("link", { name: /^Abrir/ })).toHaveAttribute(
@@ -420,10 +422,10 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       "_blank",
     );
     expect(
-      within(final).getByRole("button", { name: "Ver resultados" }),
+      within(final).getByRole("button", { name: /Acompanhar respostas/ }),
     ).toBeInTheDocument();
     expect(
-      within(final).getByRole("button", { name: "Voltar para Pesquisas" }),
+      within(final).getByRole("button", { name: "Concluir" }),
     ).toBeInTheDocument();
     // Sem `naoIdentificaveis` na resposta: nenhum aviso.
     expect(
@@ -452,7 +454,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
       "Não foi possível publicar",
     );
     expect(
-      screen.queryByRole("heading", { name: "Pesquisa publicada e ativa" }),
+      screen.queryByRole("heading", { name: "Pesquisa criada e ativa" }),
     ).toBeNull();
   });
 });
@@ -531,7 +533,7 @@ describe("Assistente de pesquisa — quem não consegue se identificar", () => {
     ).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Publicar pesquisa" }));
     const final = await screen.findByRole("region", {
-      name: "Pesquisa publicada e ativa",
+      name: "Pesquisa criada e ativa",
     });
     expect(
       within(final).getByRole("region", {

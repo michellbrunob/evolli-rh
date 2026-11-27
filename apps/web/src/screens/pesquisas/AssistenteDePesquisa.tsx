@@ -15,10 +15,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import type {
-  ModeloPesquisa,
-  PesquisaDetalhe,
-} from "../../api/pesquisasClient";
+import type { PesquisaDetalhe } from "../../api/pesquisasClient";
 import { Button, FormActions } from "../../components";
 import {
   CadastroEmEtapas,
@@ -29,10 +26,13 @@ import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { formatarDiaCivil } from "../../format/data";
 import { plural } from "../../format/plural";
 import { Dialog } from "../../ui";
-import { IconeNovaAba, IconeSucesso } from "../../ui/icones";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
+import { SepararRespostasPor } from "./AssistenteDoModelo";
 import { EditorDePerguntas } from "./EditorDePerguntas";
-import { EtapaParticipantes } from "./EtapaParticipantes";
+import { EtapaColaboradores } from "./EtapaColaboradores";
+import { lembrarRascunho } from "./rascunhosLocais";
+import type { GruposDaEmpresa } from "./servicoDePesquisas";
+import { CampoDoLink, TelaDeGerada } from "./TelaDeGerada";
 import { PreVisualizacao } from "./PreVisualizacao";
 import {
   entradaDoEstado,
@@ -49,8 +49,6 @@ import {
   LIMITES,
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
-  copiarLink,
-  enderecoDoLink,
 } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import "./Pesquisas.css";
@@ -89,14 +87,22 @@ const idTituloDaEtapa = (i: number) => `pesquisa-etapa-${i}`;
 export function AssistenteDePesquisa({
   servico,
   modelo,
+  inicial,
   base,
   hoje,
   onSair,
   onVerResultados,
+  onConcluir,
+  onEditarGerada,
 }: {
   readonly servico: ServicoDePesquisas;
-  /** Nova pesquisa a partir do modelo. */
-  readonly modelo?: ModeloPesquisa;
+  /** Nova pesquisa a partir de um modelo (id da galeria ou roteiro). */
+  readonly modelo?: string;
+  /** Ponto de partida pronto (cópia de outra pesquisa). */
+  readonly inicial?: EstadoDaPesquisa;
+  /** Depois de gerada: voltar à lista. */
+  readonly onConcluir?: () => void;
+  readonly onEditarGerada?: (pesquisa: PesquisaDetalhe) => void;
   /** Edição de uma pesquisa existente. */
   readonly base?: PesquisaDetalhe;
   /** Dia civil de hoje (`AAAA-MM-DD`). */
@@ -106,8 +112,11 @@ export function AssistenteDePesquisa({
 }) {
   const ids = useId();
   const [estado, setEstado] = useState<EstadoDaPesquisa>(() =>
-    base ? estadoDoDetalhe(base) : estadoDoModelo(modelo ?? "personalizada"),
+    base
+      ? estadoDoDetalhe(base)
+      : (inicial ?? estadoDoModelo(modelo ?? "personalizada", hoje)),
   );
+  const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
   const [referencia, setReferencia] = useState(() =>
     JSON.stringify(entradaDoEstado(estado)),
   );
@@ -147,6 +156,19 @@ export function AssistenteDePesquisa({
     setAvisoRascunho(null);
   };
 
+  useEffect(() => {
+    if (estado.identificacao !== "anonima" || grupos) return;
+    let vivo = true;
+    Promise.resolve(servico.listarGrupos())
+      .then((g) => {
+        if (vivo && g) setGrupos(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [estado.identificacao, grupos, servico]);
+
   function irPara(indice: number) {
     setAtual(indice);
     setAlcancada((a) => Math.max(a, indice));
@@ -171,6 +193,11 @@ export function AssistenteDePesquisa({
       if (alterada) setGravada(alterada);
     }
     setReferencia(JSON.stringify(entrada));
+    lembrarRascunho(id, {
+      etapa: Math.min(atual + 2, 5),
+      totalDeEtapas: 5,
+      salvoEm: new Date().toISOString(),
+    });
     return id;
   }
 
@@ -242,11 +269,16 @@ export function AssistenteDePesquisa({
 
   if (publicada) {
     return (
-      <TelaFinal
-        pesquisa={publicada}
-        onSair={onSair}
-        onVerResultados={onVerResultados}
-      />
+      <div className="pesquisas">
+        <TelaDeGerada
+          pesquisa={publicada}
+          onVerResultados={(id) => onVerResultados(id)}
+          onEditar={(p) => (onEditarGerada ? onEditarGerada(p) : onSair())}
+          onConcluir={() =>
+            onConcluir ? onConcluir() : onSair("Pesquisa publicada.")
+          }
+        />
+      </div>
     );
   }
 
@@ -331,6 +363,14 @@ export function AssistenteDePesquisa({
           ))}
         </div>
       </SecaoDoCadastro>
+      {estado.identificacao === "anonima" ? (
+        <SepararRespostasPor
+          separarPor={estado.separarPor}
+          grupos={grupos}
+          travado={!rascunho}
+          onMudar={(separarPor) => mudar({ separarPor })}
+        />
+      ) : null}
     </>
   );
 
@@ -357,17 +397,23 @@ export function AssistenteDePesquisa({
   );
 
   // ---- etapa 3 --------------------------------------------------------------
-  const etapa3 = (
-    <EtapaParticipantes
-      servico={servico}
-      todos={estado.todos}
-      escolhidos={estado.escolhidos}
-      responderam={estado.responderam}
-      publicada={!rascunho}
-      erro={atual === 2 ? erros?.participantes : undefined}
-      onMudar={(m) => mudar(m)}
-    />
-  );
+  const etapa3 =
+    estado.identificacao === "anonima" ? (
+      <p className="pesquisas__nota">
+        Na pesquisa anônima não há lista de participantes: quem tiver o link
+        responde, sem ligação com a pessoa.
+      </p>
+    ) : (
+      <EtapaColaboradores
+        servico={servico}
+        todos={estado.todos}
+        escolhidos={estado.escolhidos}
+        responderam={estado.responderam}
+        publicada={!rascunho}
+        erro={atual === 2 ? erros?.participantes : undefined}
+        onMudar={(m) => mudar(m)}
+      />
+    );
 
   // ---- etapa 4 --------------------------------------------------------------
   const idData = `${ids}-data`;
@@ -670,114 +716,6 @@ function LinhaDoResumo({
           </Button>
         ) : null}
       </dd>
-    </div>
-  );
-}
-
-/** O endereço completo do link, só leitura, com "Copiar link". */
-export function CampoDoLink({ link }: { readonly link: string }) {
-  const [aviso, setAviso] = useState<string | null>(null);
-  const endereco = enderecoDoLink(link);
-  return (
-    <div className="pesquisas__etapa">
-      <div className="pesquisas__link">
-        <input
-          className="pesquisas__campo"
-          readOnly
-          aria-label="Link da pesquisa"
-          value={endereco}
-          onFocus={(e) => e.target.select()}
-        />
-        <Button
-          variant="secondary"
-          onClick={async () =>
-            setAviso(
-              (await copiarLink(link))
-                ? "Link copiado."
-                : "Não foi possível copiar. Selecione o endereço e copie.",
-            )
-          }
-        >
-          Copiar link
-        </Button>
-        {/* Sempre em outra aba: a página pública não divide a aba com o painel. */}
-        <a
-          className="evolli-button evolli-button--secondary"
-          href={endereco}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconeNovaAba tamanho={16} />
-          Abrir
-          <span className="pesquisas__so-leitor"> (em outra aba)</span>
-        </a>
-      </div>
-      {aviso ? (
-        <p className="pesquisas__aviso" role="status">
-          {aviso}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function TelaFinal({
-  pesquisa,
-  onSair,
-  onVerResultados,
-}: {
-  readonly pesquisa: PesquisaDetalhe;
-  readonly onSair: (mensagem?: string) => void;
-  readonly onVerResultados: (id: string, mensagem?: string) => void;
-}) {
-  useEffect(() => {
-    document.getElementById(PESQUISAS_TITULO_ID)?.focus();
-  }, []);
-  return (
-    <div className="pesquisas pesquisas__final">
-      <section
-        className="pesquisas__final-cartao"
-        aria-labelledby={PESQUISAS_TITULO_ID}
-      >
-        <span className="pesquisas__final-icone" aria-hidden="true">
-          <IconeSucesso tamanho={32} />
-        </span>
-        <h1
-          id={PESQUISAS_TITULO_ID}
-          className="pesquisas__final-titulo"
-          tabIndex={-1}
-        >
-          Pesquisa publicada e ativa
-        </h1>
-        <p className="pesquisas__suave">
-          {`${pesquisa.nome} já aceita respostas. Envie o link para quem vai responder.`}
-        </p>
-        {pesquisa.link ? (
-          <div className="pesquisas__final-link">
-            <CampoDoLink link={pesquisa.link} />
-          </div>
-        ) : (
-          <p className="pesquisas__suave">
-            O link ainda não chegou. Abra a pesquisa na lista para copiá-lo.
-          </p>
-        )}
-        <AvisoNaoIdentificaveis
-          identificacao={pesquisa.identificacao}
-          naoIdentificaveis={pesquisa.naoIdentificaveis}
-          participantes={pesquisa.participantesLista ?? []}
-        />
-        <div className="pesquisas__final-acoes">
-          <Button
-            variant="secondary"
-            onClick={() => onSair("Pesquisa publicada.")}
-          >
-            Voltar para Pesquisas
-          </Button>
-          <Button onClick={() => onVerResultados(pesquisa.id)}>
-            Ver resultados
-          </Button>
-        </div>
-      </section>
     </div>
   );
 }

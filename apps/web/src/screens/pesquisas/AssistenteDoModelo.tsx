@@ -1,0 +1,1070 @@
+/**
+ * T216 — assistente dos modelos prontos, com a barra de etapas na
+ * horizontal: Configurar (perguntas e identificação) → Colaboradores (quem
+ * responde) → Enviar (revisão, prazo e gerar). Na anônima não há lista de
+ * pessoas: quem tiver o link responde, e são 2 etapas.
+ *
+ * O rascunho é gravado sozinho no servidor (ao abrir e a cada mudança, com
+ * uma pequena espera) e o cabeçalho mostra a hora da última gravação.
+ * "Cancelar" guarda o rascunho e volta à galeria. Depois de publicada, as
+ * mudanças só valem no "Salvar alterações".
+ */
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type {
+  CampoGrupo,
+  Pergunta,
+  PesquisaDetalhe,
+} from "../../api/pesquisasClient";
+import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
+import { Button } from "../../components";
+import { formatarDiaCivil } from "../../format/data";
+import { plural } from "../../format/plural";
+import { Dialog, IconButton } from "../../ui";
+import {
+  IconeArrastar,
+  IconeComentario,
+  IconeEditar,
+  IconeMais,
+  IconeRemover,
+  IconeVoltar,
+} from "../../ui/icones";
+import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
+import {
+  BarraDeEtapas,
+  CartaoDeSecao,
+  ICONE_DA_IDENTIFICACAO,
+  IconeDoModelo,
+} from "./componentes";
+import {
+  entradaDoEstado,
+  estadoDoDetalhe,
+  estadoDoModelo,
+  excluirPergunta,
+  levarPerguntaPara,
+  perguntasEmOrdem,
+  validarEnvio,
+  validarPerguntas,
+  validarSobre,
+  type Erros,
+  type EstadoDaPesquisa,
+} from "./estadoDaPesquisa";
+import { EtapaColaboradores } from "./EtapaColaboradores";
+import { modeloDaGaleria, type ModeloDaGaleria } from "./modelosDePesquisa";
+import { PreVisualizacao } from "./PreVisualizacao";
+import { lembrarRascunho } from "./rascunhosLocais";
+import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
+import { TelaDeGerada } from "./TelaDeGerada";
+import {
+  IDENTIFICACOES,
+  LIMITES,
+  ROTULO_DA_IDENTIFICACAO,
+  novoId,
+} from "./textosDasPesquisas";
+import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
+
+const ETAPAS_COMPLETAS = [
+  { titulo: "Configurar", subtitulo: "Perguntas e identificação" },
+  { titulo: "Colaboradores", subtitulo: "Quem vai responder" },
+  { titulo: "Enviar", subtitulo: "Link e prazo" },
+] as const;
+
+export const CAMPOS_DE_GRUPO: readonly { campo: CampoGrupo; rotulo: string }[] =
+  [
+    { campo: "departamento", rotulo: "Departamento" },
+    { campo: "centroCusto", rotulo: "Centro de custo" },
+    { campo: "unidade", rotulo: "Unidade" },
+  ];
+
+/** Selo curto do tipo da pergunta ("Escala 1–10", "eNPS 0–10"). */
+export function seloDoTipo(p: Pergunta): string {
+  switch (p.tipo) {
+    case "escala":
+      return `Escala ${p.config.minimo ?? 1}–${p.config.maximo ?? 5}`;
+    case "nota_0_10":
+      return p.config.enps ? "eNPS 0–10" : "Nota 0–10";
+    case "concordancia":
+      return "Concordância 1–5";
+    case "estrelas":
+      return "Estrelas 1–5";
+    case "escolha_unica":
+      return "Escolha única";
+    case "multipla_escolha":
+      return "Múltipla escolha";
+    case "sim_nao":
+      return "Sim ou não";
+    case "paragrafo":
+      return "Texto livre";
+    case "texto_curto":
+      return "Texto curto";
+    case "data":
+      return "Data";
+    default:
+      return "Número";
+  }
+}
+
+/** A faixa que explica a escala das perguntas que o modelo adiciona. */
+function explicacaoDaEscala(m: ModeloDaGaleria): {
+  titulo: string;
+  texto: string;
+  valores: number[];
+} | null {
+  const { tipo, config } = m.perguntaPadrao;
+  if (tipo === "escala") {
+    const min = config.minimo ?? 1;
+    const max = config.maximo ?? 10;
+    return {
+      titulo: `Escala de ${min} a ${max}`,
+      texto: `${min} = ${config.rotuloMinimo ?? "mínimo"} · ${max} = ${config.rotuloMaximo ?? "máximo"}`,
+      valores: Array.from({ length: max - min + 1 }, (_, i) => min + i),
+    };
+  }
+  if (tipo === "concordancia")
+    return {
+      titulo: "Concordância de 1 a 5",
+      texto: "1 = Discordo totalmente · 5 = Concordo totalmente",
+      valores: [1, 2, 3, 4, 5],
+    };
+  if (tipo === "estrelas")
+    return {
+      titulo: "Estrelas de 1 a 5",
+      texto: "1 = muito ruim · 5 = excelente",
+      valores: [1, 2, 3, 4, 5],
+    };
+  return null;
+}
+
+const horaDe = (d: Date) =>
+  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+export function AssistenteDoModelo({
+  servico,
+  modeloId,
+  base,
+  hoje,
+  agora = () => new Date(),
+  atrasoDoRascunho = 1200,
+  onCancelar,
+  onConcluir,
+  onVerResultados,
+  onEditarGerada,
+}: {
+  readonly servico: ServicoDePesquisas;
+  /** Nova pesquisa a partir do modelo pronto. */
+  readonly modeloId?: string;
+  /** Rascunho retomado ou pesquisa publicada em edição. */
+  readonly base?: PesquisaDetalhe;
+  readonly hoje: string;
+  readonly agora?: () => Date;
+  /** Espera (ms) antes de gravar o rascunho depois de uma mudança. */
+  readonly atrasoDoRascunho?: number;
+  /** Sair: rascunho guardado (ou edição descartada). */
+  readonly onCancelar: (mensagem?: string) => void;
+  readonly onConcluir: () => void;
+  readonly onVerResultados: (id: string, mensagem?: string) => void;
+  readonly onEditarGerada: (pesquisa: PesquisaDetalhe) => void;
+}) {
+  const ids = useId();
+  const [estado, setEstado] = useState<EstadoDaPesquisa>(() =>
+    base ? estadoDoDetalhe(base) : estadoDoModelo(modeloId ?? "pulso", hoje),
+  );
+  const m = modeloDaGaleria(base ? base.modelo : (modeloId ?? "pulso"));
+  const publicadaAntes = estado.status !== "rascunho";
+  const anonima = estado.identificacao === "anonima";
+  const etapas = anonima
+    ? [ETAPAS_COMPLETAS[0], ETAPAS_COMPLETAS[2]]
+    : [...ETAPAS_COMPLETAS];
+  const [etapa, setEtapa] = useState(0);
+  const [mostrarErros, setMostrarErros] = useState(false);
+  const [salvoAs, setSalvoAs] = useState<string | null>(null);
+  const [gravando, setGravando] = useState(false);
+  const [falha, setFalha] = useState<string | null>(null);
+  const [gravada, setGravada] = useState<PesquisaDetalhe | null>(base ?? null);
+  const [gerada, setGerada] = useState<PesquisaDetalhe | null>(null);
+  const [previa, setPrevia] = useState(false);
+  const [totalDoTime, setTotalDoTime] = useState<number | null>(null);
+  const [grupos, setGrupos] = useState<GruposDaEmpresa | null>(null);
+  const [referencia, setReferencia] = useState(() =>
+    base ? JSON.stringify(entradaDoEstado(estadoDoDetalhe(base))) : "",
+  );
+
+  const idRef = useRef<string | null>(estado.id);
+  const filaRef = useRef<Promise<unknown>>(Promise.resolve());
+  const entrada = useMemo(() => entradaDoEstado(estado), [estado]);
+  const serial = JSON.stringify(entrada);
+  const pendente = serial !== referencia;
+  const etapaDaApi = anonima && etapa === 1 ? 2 : etapa;
+
+  useEdicaoEmAndamento(
+    publicadaAntes ? `Editar ${estado.nome}` : `Nova ${m.nome}`,
+    {
+      pendente: pendente && gerada === null,
+      salvando: gravando,
+    },
+  );
+
+  useEffect(() => {
+    if (!anonima) return;
+    let vivo = true;
+    Promise.resolve(servico.listarGrupos())
+      .then((g) => {
+        if (vivo && g) setGrupos(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [anonima, servico]);
+
+  /** Grava o rascunho (cria na primeira vez), em fila. */
+  const gravar = useCallback(
+    (e: EstadoDaPesquisa): Promise<string | null> => {
+      const corpo = entradaDoEstado(e);
+      const texto = JSON.stringify(corpo);
+      const passo = filaRef.current.then(async () => {
+        if (!corpo.nome) return idRef.current;
+        setGravando(true);
+        try {
+          let d: PesquisaDetalhe;
+          if (idRef.current === null) {
+            d = await servico.criarPesquisa(corpo);
+            idRef.current = d.id;
+            setEstado((s) => ({ ...s, id: d.id, link: d.link }));
+          } else {
+            d = await servico.alterarPesquisa(idRef.current, corpo);
+          }
+          if (d) setGravada(d);
+          setReferencia(texto);
+          const quando = agora();
+          setSalvoAs(horaDe(quando));
+          setFalha(null);
+          return idRef.current;
+        } finally {
+          setGravando(false);
+        }
+      });
+      filaRef.current = passo.catch(() => undefined);
+      return passo;
+    },
+    [servico, agora],
+  );
+
+  // Rascunho gravado ao abrir (modelo novo) e a cada mudança, com espera.
+  useEffect(() => {
+    if (publicadaAntes || gerada || serial === referencia) return;
+    const t = window.setTimeout(
+      () => {
+        gravar(estado).catch(() =>
+          setFalha(
+            "Não foi possível salvar o rascunho. Vamos tentar de novo na próxima mudança.",
+          ),
+        );
+      },
+      idRef.current === null ? 0 : atrasoDoRascunho,
+    );
+    return () => window.clearTimeout(t);
+    // `estado` acompanha `serial`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serial, referencia, publicadaAntes, gerada, atrasoDoRascunho, gravar]);
+
+  // O navegador lembra onde a pessoa parou.
+  useEffect(() => {
+    if (estado.id && !publicadaAntes && salvoAs)
+      lembrarRascunho(estado.id, {
+        etapa: etapaDaApi + 1,
+        totalDeEtapas: 3,
+        salvoEm: agora().toISOString(),
+      });
+    // `agora` é estável na prática.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.id, etapaDaApi, salvoAs, publicadaAntes]);
+
+  const mudar = (mudanca: Partial<EstadoDaPesquisa>) =>
+    setEstado((e) => ({ ...e, ...mudanca }));
+
+  const errosDaEtapa = (): Erros => {
+    if (etapaDaApi === 0)
+      return { ...validarSobre(estado), ...validarPerguntas(estado) };
+    if (etapaDaApi === 1)
+      return !estado.todos && Object.keys(estado.escolhidos).length === 0
+        ? { participantes: "Escolha pelo menos uma pessoa." }
+        : {};
+    return validarEnvio(estado, hoje);
+  };
+  const erros = mostrarErros ? errosDaEtapa() : null;
+
+  function irPara(i: number) {
+    setEtapa(i);
+    setMostrarErros(false);
+    requestAnimationFrame?.(() =>
+      document
+        .getElementById(PESQUISAS_TITULO_ID)
+        ?.scrollIntoView?.({ block: "start" }),
+    );
+  }
+
+  async function avancar() {
+    if (Object.keys(errosDaEtapa()).length > 0) {
+      setMostrarErros(true);
+      return;
+    }
+    const ultima = etapa === etapas.length - 1;
+    if (!ultima) {
+      irPara(etapa + 1);
+      return;
+    }
+    try {
+      if (publicadaAntes) {
+        const id = await gravar(estado);
+        if (id) onVerResultados(id, "Alterações salvas.");
+        return;
+      }
+      const id = await gravar(estado);
+      if (!id) return;
+      setGerada(await servico.publicarPesquisa(id));
+    } catch (erro) {
+      const status = (erro as { status?: unknown } | null)?.status;
+      setFalha(
+        status === 422
+          ? "Não foi possível gerar: o servidor recusou algum campo. Revise as etapas."
+          : publicadaAntes
+            ? "Não foi possível salvar as alterações. Tente de novo."
+            : "Não foi possível gerar a pesquisa. Verifique a conexão e tente de novo.",
+      );
+    }
+  }
+
+  async function cancelar() {
+    if (publicadaAntes) {
+      onCancelar();
+      return;
+    }
+    try {
+      if (pendente) await gravar(estado);
+    } catch {
+      /* o que já estava gravado fica */
+    }
+    onCancelar("Rascunho guardado. Você pode continuar depois.");
+  }
+
+  const principais = perguntasEmOrdem(estado.secoes).filter(
+    (p) => p.id !== estado.comentarioId,
+  );
+  const comentario = perguntasEmOrdem(estado.secoes).find(
+    (p) => p.id === estado.comentarioId,
+  );
+  const vaoReceber = estado.todos
+    ? totalDoTime
+    : Object.keys(estado.escolhidos).length;
+
+  if (gerada) {
+    return (
+      <div className="pesquisas">
+        <BarraDeEtapas etapas={etapas} atual={etapas.length} />
+        <TelaDeGerada
+          pesquisa={gerada}
+          onVerResultados={(id) => onVerResultados(id)}
+          onEditar={onEditarGerada}
+          onConcluir={onConcluir}
+        />
+      </div>
+    );
+  }
+
+  const ultima = etapa === etapas.length - 1;
+  const proxima = etapas[etapa + 1];
+
+  return (
+    <div className="pesquisas pesquisas--com-rodape">
+      <header className="pesquisas__cabecalho">
+        <IconButton
+          label="Voltar"
+          icon={<IconeVoltar tamanho={18} />}
+          className="pesquisas__voltar"
+          onClick={() => void cancelar()}
+        />
+        <IconeDoModelo id={m.id} tamanho="lg" />
+        <div className="pesquisas__titulos">
+          <h1
+            id={PESQUISAS_TITULO_ID}
+            className="pesquisas__titulo"
+            tabIndex={-1}
+          >
+            {publicadaAntes
+              ? `Editar ${estado.nome}`
+              : `Nova pesquisa ${m.nome}`}
+          </h1>
+          <p className="pesquisas__subtitulo">{m.descricao}</p>
+        </div>
+        {publicadaAntes ? null : (
+          <p className="pesquisas__salvo" role="status">
+            {gravando && !salvoAs ? (
+              "Salvando rascunho…"
+            ) : salvoAs ? (
+              <>
+                <span
+                  className="pesquisas__ponto pesquisas__ponto--sucesso"
+                  aria-hidden="true"
+                />
+                {`Rascunho salvo às ${salvoAs}`}
+              </>
+            ) : null}
+          </p>
+        )}
+      </header>
+
+      <BarraDeEtapas etapas={etapas} atual={etapa} />
+
+      {etapaDaApi === 0 ? (
+        <EtapaConfigurar
+          ids={ids}
+          estado={estado}
+          modelo={m}
+          principais={principais}
+          comentario={comentario ?? null}
+          travado={publicadaAntes && estado.temRespostas}
+          grupos={grupos}
+          erros={erros}
+          onMudar={mudar}
+        />
+      ) : etapaDaApi === 1 ? (
+        <CartaoDeSecao
+          titulo="Quem vai responder"
+          descricao="Escolha o time todo ou só algumas pessoas. Cada uma recebe o mesmo link."
+        >
+          <EtapaColaboradores
+            servico={servico}
+            todos={estado.todos}
+            escolhidos={estado.escolhidos}
+            responderam={estado.responderam}
+            publicada={publicadaAntes}
+            erro={erros?.participantes}
+            onMudar={(x) => mudar(x)}
+            onTotalDoTime={setTotalDoTime}
+          />
+        </CartaoDeSecao>
+      ) : (
+        <EtapaEnviar
+          ids={ids}
+          estado={estado}
+          principais={principais}
+          vaoReceber={vaoReceber}
+          hoje={hoje}
+          erros={erros}
+          gravada={gravada}
+          onMudar={mudar}
+          onPrevia={() => setPrevia(true)}
+        />
+      )}
+
+      {falha ? (
+        <p className="pesquisas__erro" role="alert">
+          {falha}
+        </p>
+      ) : null}
+
+      <footer className="pesquisas__rodape">
+        <Button variant="subtle" onClick={() => void cancelar()}>
+          Cancelar
+        </Button>
+        <div className="pesquisas__rodape-direita">
+          {etapa > 0 ? (
+            <>
+              {!anonima && vaoReceber !== null ? (
+                <span className="pesquisas__suave">
+                  {`${plural(vaoReceber, "pessoa vai", "pessoas vão")} receber`}
+                </span>
+              ) : null}
+              <Button variant="secondary" onClick={() => irPara(etapa - 1)}>
+                ‹ Voltar
+              </Button>
+            </>
+          ) : null}
+          <Button disabled={gravando && ultima} onClick={() => void avancar()}>
+            {ultima
+              ? publicadaAntes
+                ? "Salvar alterações"
+                : "✓ Gerar pesquisa"
+              : `Próximo: ${proxima?.titulo ?? ""} →`}
+          </Button>
+        </div>
+      </footer>
+
+      <Dialog
+        aberto={previa}
+        titulo="Pré-visualização"
+        subtitulo="Como quem responde vê a pesquisa"
+        onFechar={() => setPrevia(false)}
+        className="pesquisas__janela-previa"
+      >
+        <PreVisualizacao
+          nome={estado.nome}
+          boasVindas={estado.boasVindas}
+          secoes={estado.secoes}
+        />
+      </Dialog>
+    </div>
+  );
+}
+
+function EtapaConfigurar({
+  ids,
+  estado,
+  modelo: m,
+  principais,
+  comentario,
+  travado,
+  grupos,
+  erros,
+  onMudar,
+}: {
+  readonly ids: string;
+  readonly estado: EstadoDaPesquisa;
+  readonly modelo: ModeloDaGaleria;
+  readonly principais: readonly Pergunta[];
+  readonly comentario: Pergunta | null;
+  readonly travado: boolean;
+  readonly grupos: GruposDaEmpresa | null;
+  readonly erros: Erros | null;
+  readonly onMudar: (m: Partial<EstadoDaPesquisa>) => void;
+}) {
+  const [adicionando, setAdicionando] = useState(false);
+  const [rascunhoDaPergunta, setRascunhoDaPergunta] = useState("");
+  const [editando, setEditando] = useState<{
+    id: string;
+    texto: string;
+  } | null>(null);
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const publicada = estado.status !== "rascunho";
+  const escala = explicacaoDaEscala(m);
+  const temEnps = principais.some(
+    (p) => p.tipo === "nota_0_10" && p.config.enps,
+  );
+  const noLimite = principais.length >= m.limite;
+  const idNome = `${ids}-nome`;
+  const idDescricao = `${ids}-descricao`;
+
+  function adicionar() {
+    const texto = rascunhoDaPergunta.trim();
+    if (!texto) return;
+    const nova: Pergunta = {
+      id: novoId(),
+      tipo: m.perguntaPadrao.tipo,
+      texto,
+      descricao: null,
+      obrigatoria: true,
+      config: { ...m.perguntaPadrao.config },
+      condicao: null,
+      rotulo: null,
+    };
+    // Entra antes do comentário final (que fica sempre por último).
+    const secoes = estado.secoes.map((s, i) => {
+      if (i !== estado.secoes.length - 1) return s;
+      const fim = s.perguntas.findIndex((p) => p.id === estado.comentarioId);
+      const perguntas = [...s.perguntas];
+      perguntas.splice(fim >= 0 ? fim : perguntas.length, 0, nova);
+      return { ...s, perguntas };
+    });
+    onMudar({ secoes });
+    setRascunhoDaPergunta("");
+    setAdicionando(false);
+  }
+
+  function salvarEdicao() {
+    if (!editando || !editando.texto.trim()) return;
+    onMudar({
+      secoes: estado.secoes.map((s) => ({
+        ...s,
+        perguntas: s.perguntas.map((p) =>
+          p.id === editando.id ? { ...p, texto: editando.texto } : p,
+        ),
+      })),
+    });
+    setEditando(null);
+  }
+
+  const tituloDaSecao = new Map(
+    estado.secoes.length > 1
+      ? estado.secoes
+          .filter((s) => s.perguntas.length > 0 && s.titulo)
+          .map((s) => [s.perguntas[0]!.id, s.titulo!])
+      : [],
+  );
+
+  return (
+    <>
+      <CartaoDeSecao
+        titulo="Sobre a pesquisa"
+        descricao="Só o RH vê o nome. A descrição aparece para quem responde."
+      >
+        <div className="pesquisas__campos">
+          <label htmlFor={idNome} className="pesquisas__rotulo">
+            Nome da pesquisa
+          </label>
+          <input
+            id={idNome}
+            className="pesquisas__campo"
+            value={estado.nome}
+            aria-invalid={erros?.nome ? true : undefined}
+            {...(erros?.nome ? { "aria-describedby": `${idNome}-erro` } : {})}
+            onChange={(e) => onMudar({ nome: e.target.value })}
+          />
+          {erros?.nome ? (
+            <p id={`${idNome}-erro`} className="pesquisas__erro">
+              {erros.nome}
+            </p>
+          ) : null}
+          <label htmlFor={idDescricao} className="pesquisas__rotulo">
+            Descrição <span className="pesquisas__suave">opcional</span>
+          </label>
+          <textarea
+            id={idDescricao}
+            className="pesquisas__campo"
+            value={estado.boasVindas}
+            aria-describedby={`${idDescricao}-ajuda`}
+            onChange={(e) => onMudar({ boasVindas: e.target.value })}
+          />
+          <p id={`${idDescricao}-ajuda`} className="pesquisas__suave">
+            Enter quebra o texto em parágrafos.
+          </p>
+          {erros?.boasVindas ? (
+            <p className="pesquisas__erro">{erros.boasVindas}</p>
+          ) : null}
+        </div>
+      </CartaoDeSecao>
+
+      <CartaoDeSecao
+        titulo="Como as respostas são identificadas"
+        descricao="Define o que o RH vê nos resultados. Não muda depois do envio."
+      >
+        <div
+          className="pesquisas__escolhas pesquisas__escolhas--tres"
+          role="radiogroup"
+          aria-label="Identificação"
+        >
+          {IDENTIFICACOES.map((i) => {
+            const Icone = ICONE_DA_IDENTIFICACAO[i.valor];
+            return (
+              <label
+                key={i.valor}
+                className="pesquisas__escolha pesquisas__escolha--vertical"
+              >
+                <span className="pesquisas__escolha-topo">
+                  <span className="pesquisas__escolha-icone" aria-hidden="true">
+                    <Icone tamanho={16} />
+                  </span>
+                  <strong>{i.rotulo}</strong>
+                  <input
+                    type="radio"
+                    name={`${ids}-identificacao`}
+                    checked={estado.identificacao === i.valor}
+                    disabled={publicada}
+                    onChange={() => onMudar({ identificacao: i.valor })}
+                  />
+                </span>
+                <span className="pesquisas__suave">{i.texto}</span>
+              </label>
+            );
+          })}
+        </div>
+      </CartaoDeSecao>
+
+      {estado.identificacao === "anonima" ? (
+        <SepararRespostasPor
+          separarPor={estado.separarPor}
+          grupos={grupos}
+          travado={publicada}
+          onMudar={(separarPor) => onMudar({ separarPor })}
+        />
+      ) : null}
+
+      <CartaoDeSecao
+        titulo="Perguntas"
+        contador={`${principais.length} de ${m.limite}${comentario ? " · + comentário" : ""}`}
+        acao={
+          travado ? null : (
+            <Button
+              variant="secondary"
+              disabled={noLimite}
+              aria-expanded={adicionando}
+              onClick={() => setAdicionando(true)}
+            >
+              <IconeMais tamanho={16} />
+              Adicionar pergunta
+            </Button>
+          )
+        }
+      >
+        {travado ? (
+          <p className="pesquisas__nota">
+            Esta pesquisa já tem respostas: as perguntas não mudam mais.
+          </p>
+        ) : null}
+        {escala ? (
+          <div className="pesquisas__faixa-escala">
+            <div>
+              <strong>{escala.titulo}</strong>
+              <span className="pesquisas__suave">{escala.texto}</span>
+            </div>
+            <span
+              className="pesquisas__previa-escala pesquisas__previa-escala--mini"
+              aria-hidden="true"
+            >
+              {escala.valores.map((v) => (
+                <span key={v}>{v}</span>
+              ))}
+            </span>
+          </div>
+        ) : null}
+        {erros?.perguntas ? (
+          <p className="pesquisas__erro" role="alert">
+            {erros.perguntas}
+          </p>
+        ) : null}
+        <ol
+          className="pesquisas__linhas-perguntas"
+          aria-label="Perguntas da pesquisa"
+        >
+          {principais.map((p, i) => {
+            const n = String(i + 1).padStart(2, "0");
+            const erro = erros?.[`pergunta:${p.id}`];
+            const secao = tituloDaSecao.get(p.id);
+            return (
+              <li
+                key={p.id}
+                className="pesquisas__linha-pergunta"
+                aria-label={`Pergunta ${i + 1}`}
+                draggable={!travado}
+                {...(arrastando === p.id ? { "data-arrastando": "" } : {})}
+                {...(erro ? { "data-invalida": "" } : {})}
+                onDragStart={() => setArrastando(p.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (arrastando)
+                    onMudar({
+                      secoes: levarPerguntaPara(
+                        estado.secoes,
+                        arrastando,
+                        p.id,
+                      ),
+                    });
+                  setArrastando(null);
+                }}
+                onDragEnd={() => setArrastando(null)}
+              >
+                {secao ? (
+                  <p className="pesquisas__linha-secao">{secao}</p>
+                ) : null}
+                <div className="pesquisas__linha-corpo">
+                  <span className="pesquisas__pegador" aria-hidden="true">
+                    <IconeArrastar tamanho={14} />
+                  </span>
+                  <span
+                    className="pesquisas__numero-pergunta"
+                    aria-hidden="true"
+                  >
+                    {n}
+                  </span>
+                  {editando?.id === p.id ? (
+                    <div className="pesquisas__caixa-inline">
+                      <textarea
+                        className="pesquisas__campo"
+                        aria-label={`Texto da pergunta ${i + 1}`}
+                        maxLength={LIMITES.textoPergunta}
+                        value={editando.texto}
+                        onChange={(e) =>
+                          setEditando({ id: p.id, texto: e.target.value })
+                        }
+                      />
+                      <div className="pesquisas__caixa-inline-rodape">
+                        <span className="pesquisas__suave">{`${editando.texto.length}/${LIMITES.textoPergunta}`}</span>
+                        <Button
+                          variant="subtle"
+                          onClick={() => setEditando(null)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          disabled={!editando.texto.trim()}
+                          onClick={salvarEdicao}
+                        >
+                          Salvar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="pesquisas__linha-texto">
+                      {p.texto || "Pergunta sem texto"}
+                    </span>
+                  )}
+                  <span
+                    className={`pesquisas__selo${p.tipo === "nota_0_10" && p.config.enps ? " pesquisas__selo--destaque" : ""}`}
+                  >
+                    {seloDoTipo(p)}
+                  </span>
+                  {travado || editando?.id === p.id ? null : (
+                    <span className="pesquisas__linha-acoes">
+                      <IconButton
+                        label={`Editar pergunta ${i + 1}`}
+                        icon={<IconeEditar tamanho={14} />}
+                        variant="subtle"
+                        onClick={() =>
+                          setEditando({ id: p.id, texto: p.texto })
+                        }
+                      />
+                      <IconButton
+                        label={`Excluir pergunta ${i + 1}`}
+                        icon={<IconeRemover tamanho={14} />}
+                        variant="subtle"
+                        onClick={() =>
+                          onMudar({
+                            secoes: excluirPergunta(estado.secoes, p.id),
+                          })
+                        }
+                      />
+                    </span>
+                  )}
+                </div>
+                {erro ? <p className="pesquisas__erro">{erro}</p> : null}
+              </li>
+            );
+          })}
+        </ol>
+        {adicionando ? (
+          <div className="pesquisas__caixa-inline pesquisas__caixa-inline--nova">
+            <textarea
+              className="pesquisas__campo"
+              aria-label="Nova pergunta"
+              placeholder="Escreva a pergunta como quem responde vai ler"
+              maxLength={LIMITES.textoPergunta}
+              value={rascunhoDaPergunta}
+              onChange={(e) => setRascunhoDaPergunta(e.target.value)}
+            />
+            <div className="pesquisas__caixa-inline-rodape">
+              <span className="pesquisas__suave">{`${rascunhoDaPergunta.length}/${LIMITES.textoPergunta}`}</span>
+              <Button
+                variant="subtle"
+                onClick={() => {
+                  setAdicionando(false);
+                  setRascunhoDaPergunta("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button disabled={!rascunhoDaPergunta.trim()} onClick={adicionar}>
+                Adicionar
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {comentario ? (
+          <div className="pesquisas__linha-comentario">
+            <IconeComentario tamanho={16} />
+            <span>{comentario.texto}</span>
+            <span className="pesquisas__selo">Sempre opcional · fixa</span>
+          </div>
+        ) : null}
+        {temEnps ? (
+          <p className="pesquisas__nota">
+            A pergunta de eNPS pode sair. Se ficar, os resultados mostram
+            promotores, neutros e detratores.
+          </p>
+        ) : null}
+        {comentario ? (
+          <p className="pesquisas__suave">
+            O comentário livre fica sempre por último e não entra nas médias.
+          </p>
+        ) : null}
+      </CartaoDeSecao>
+    </>
+  );
+}
+
+function EtapaEnviar({
+  ids,
+  estado,
+  principais,
+  vaoReceber,
+  hoje,
+  erros,
+  gravada,
+  onMudar,
+  onPrevia,
+}: {
+  readonly ids: string;
+  readonly estado: EstadoDaPesquisa;
+  readonly principais: readonly Pergunta[];
+  readonly vaoReceber: number | null;
+  readonly hoje: string;
+  readonly erros: Erros | null;
+  readonly gravada: PesquisaDetalhe | null;
+  readonly onMudar: (m: Partial<EstadoDaPesquisa>) => void;
+  readonly onPrevia: () => void;
+}) {
+  const idData = `${ids}-data`;
+  const tipos = [
+    ...new Set(principais.map((p) => seloDoTipo(p).toLowerCase())),
+  ];
+  const encerra = estado.encerraEm !== null;
+  return (
+    <>
+      <CartaoDeSecao
+        titulo="Revise antes de gerar"
+        descricao="Ao gerar, a pesquisa fica ativa e o link já funciona."
+        acao={
+          <Button variant="secondary" onClick={onPrevia}>
+            Pré-visualizar
+          </Button>
+        }
+      >
+        <dl className="pesquisas__resumo-grade" aria-label="Resumo da pesquisa">
+          <div>
+            <dt>Nome</dt>
+            <dd>{estado.nome.trim() || "—"}</dd>
+          </div>
+          <div>
+            <dt>Identificação</dt>
+            <dd>{ROTULO_DA_IDENTIFICACAO[estado.identificacao]}</dd>
+          </div>
+          <div>
+            <dt>Perguntas</dt>
+            <dd>{`${principais.length} · ${tipos.join(" + ")}`}</dd>
+          </div>
+          <div>
+            <dt>Participantes</dt>
+            <dd>
+              {estado.identificacao === "anonima"
+                ? "Quem tiver o link (anônima)"
+                : vaoReceber === null
+                  ? "Todo o time"
+                  : plural(vaoReceber, "colaborador", "colaboradores")}
+            </dd>
+          </div>
+          <div className="pesquisas__resumo-largo">
+            <dt>Descrição</dt>
+            <dd>{estado.boasVindas.trim() || "Sem descrição"}</dd>
+          </div>
+        </dl>
+      </CartaoDeSecao>
+
+      <CartaoDeSecao
+        titulo="Encerrar automaticamente"
+        descricao="Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada."
+        acao={
+          <button
+            type="button"
+            role="switch"
+            aria-checked={encerra}
+            aria-label="Encerrar automaticamente"
+            className="pesquisas__interruptor"
+            onClick={() => onMudar({ encerraEm: encerra ? null : "" })}
+          >
+            <span
+              className="pesquisas__interruptor-trilho"
+              aria-hidden="true"
+            />
+          </button>
+        }
+      >
+        {encerra ? (
+          <div className="pesquisas__campos">
+            <label htmlFor={idData} className="pesquisas__rotulo">
+              Data de encerramento
+            </label>
+            <input
+              id={idData}
+              type="date"
+              min={hoje}
+              className="pesquisas__campo pesquisas__campo--curto"
+              value={estado.encerraEm ?? ""}
+              aria-invalid={erros?.encerraEm ? true : undefined}
+              onChange={(e) => onMudar({ encerraEm: e.target.value })}
+            />
+            <p className="pesquisas__suave">
+              {estado.encerraEm
+                ? `Depois de ${formatarDiaCivil(estado.encerraEm)}, o link para de aceitar respostas.`
+                : "O link para de aceitar respostas depois do dia escolhido."}
+            </p>
+            {erros?.encerraEm ? (
+              <p className="pesquisas__erro">{erros.encerraEm}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </CartaoDeSecao>
+
+      {gravada ? (
+        <AvisoNaoIdentificaveis
+          identificacao={estado.identificacao}
+          naoIdentificaveis={gravada.naoIdentificaveis}
+          participantes={gravada.participantesLista ?? []}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Só na anônima: os campos que quem responde escolhe antes (até 2). */
+export function SepararRespostasPor({
+  separarPor,
+  grupos,
+  travado,
+  onMudar,
+}: {
+  readonly separarPor: readonly CampoGrupo[];
+  readonly grupos: GruposDaEmpresa | null;
+  readonly travado: boolean;
+  readonly onMudar: (separarPor: CampoGrupo[]) => void;
+}) {
+  return (
+    <CartaoDeSecao
+      titulo="Separar respostas por (opcional)"
+      descricao="Quem responde escolhe antes das perguntas, ou prefere não informar. Até 2 campos; grupos pequenos continuam protegidos pelo mínimo."
+    >
+      <ul className="pesquisas__separar" aria-label="Separar respostas por">
+        {CAMPOS_DE_GRUPO.map(({ campo, rotulo }) => {
+          const marcado = separarPor.includes(campo);
+          const opcoes = grupos?.[campo] ?? [];
+          return (
+            <li key={campo}>
+              <label className="pesquisas__escolha">
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  disabled={travado || (!marcado && separarPor.length >= 2)}
+                  onChange={(e) =>
+                    onMudar(
+                      e.target.checked
+                        ? [...separarPor, campo]
+                        : separarPor.filter((c) => c !== campo),
+                    )
+                  }
+                />
+                <span className="pesquisas__escolha-textos">
+                  <strong>{rotulo}</strong>
+                  <span className="pesquisas__suave">
+                    {grupos === null
+                      ? "Carregando opções…"
+                      : opcoes.length === 0
+                        ? "Nenhuma opção cadastrada"
+                        : `${plural(opcoes.length, "opção", "opções")}: ${opcoes
+                            .slice(0, 3)
+                            .map((o) => o.nome)
+                            .join(", ")}${opcoes.length > 3 ? "…" : ""}`}
+                  </span>
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </CartaoDeSecao>
+  );
+}

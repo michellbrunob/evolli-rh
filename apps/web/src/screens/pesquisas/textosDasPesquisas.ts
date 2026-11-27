@@ -144,6 +144,7 @@ export const LIMITES = {
   nome: 120,
   boasVindas: 1000,
   textoPergunta: 300,
+  rotulo: 40,
   descricaoPergunta: 500,
   textoOpcao: 200,
   opcoesMinimo: 2,

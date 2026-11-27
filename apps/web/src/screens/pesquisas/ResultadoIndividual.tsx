@@ -1,0 +1,410 @@
+/**
+ * T216 — o resultado de uma resposta (identificada: com o nome; anônima:
+ * numerada, sem pessoa). Paginação entre as respostas, exportar em PDF e
+ * duas abas: Visão geral (média, recomendação, nota mais alta e mais baixa,
+ * cada pergunta comparada com a média do time) e Respostas (tudo o que foi
+ * respondido). Também abre pela aba Pesquisas da ficha.
+ */
+import { useEffect, useState } from "react";
+import type {
+  Identificacao,
+  PesquisaDetalhe,
+  RespostaDetalhe,
+  Secao,
+} from "../../api/pesquisasClient";
+import { Button } from "../../components";
+import { formatarInstante } from "../../format/data";
+import { IconButton } from "../../ui";
+import { IconeAvancar, IconeBaixarArquivo, IconeVoltar } from "../../ui/icones";
+import { Esqueleto } from "../../ui/movimento";
+import { baixarArquivo } from "../dashboard/exportacao";
+import { Avatar, iniciaisDe } from "./componentes";
+import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import { nomeDaExportacao, pdfDaResposta } from "./exportarResultados";
+import { Regua } from "./graficos";
+import { ehDeEscala, escalaDe, faixaDaMedia10, mediaNa10 } from "./indicadores";
+import { RespostasDaPessoa } from "./RespostasDaPessoa";
+import type { ServicoDePesquisas } from "./servicoDePesquisas";
+import { umaCasa } from "./textosDasPesquisas";
+import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
+
+const diferenca = (v: number, time: number) => {
+  const d = v - time;
+  return `${d > 0 ? "+" : d < 0 ? "−" : ""}${umaCasa(Math.abs(d))}`;
+};
+
+function grupoDoEnps(v: number): string {
+  return v >= 9 ? "Promotor" : v >= 7 ? "Neutro" : "Detrator";
+}
+
+/** A página na tela do módulo: carrega a pesquisa e a resposta. */
+export function ResultadoIndividual({
+  servico,
+  pesquisaId,
+  respostaId,
+  onVoltar,
+  onIr,
+}: {
+  readonly servico: ServicoDePesquisas;
+  readonly pesquisaId: string;
+  readonly respostaId: string;
+  readonly onVoltar: () => void;
+  readonly onIr: (respostaId: string) => void;
+}) {
+  const [pesquisa, setPesquisa] = useState<PesquisaDetalhe | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    Promise.resolve(servico.obterPesquisa(pesquisaId))
+      .then((d) => {
+        if (vivo) setPesquisa(d);
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [servico, pesquisaId]);
+  if (falhou)
+    return (
+      <p className="pesquisas__erro" role="alert">
+        Não foi possível carregar a pesquisa.
+      </p>
+    );
+  if (!pesquisa) return <Esqueleto rotulo="Carregando resposta…" linhas={5} />;
+  return (
+    <PaginaDaResposta
+      nomeDaPesquisa={pesquisa.nome}
+      identificacao={pesquisa.identificacao}
+      secoes={pesquisa.secoes}
+      respostaId={respostaId}
+      carregar={(id) => servico.respostaDaPesquisa(pesquisaId, id)}
+      rotuloVoltar="Voltar para os resultados"
+      onVoltar={onVoltar}
+      onIr={onIr}
+    />
+  );
+}
+
+export function PaginaDaResposta({
+  nomeDaPesquisa,
+  identificacao,
+  secoes,
+  respostaId,
+  carregar,
+  rotuloVoltar,
+  onVoltar,
+  onIr,
+}: {
+  readonly nomeDaPesquisa: string;
+  readonly identificacao: Identificacao;
+  readonly secoes: readonly Secao[];
+  readonly respostaId: string;
+  readonly carregar: (respostaId: string) => Promise<RespostaDetalhe>;
+  readonly rotuloVoltar: string;
+  readonly onVoltar: () => void;
+  /** Sem `onIr`, não há paginação (ex.: ficha). */
+  readonly onIr?: (respostaId: string) => void;
+}) {
+  const [r, setR] = useState<RespostaDetalhe | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  const [aba, setAba] = useState<"geral" | "respostas">("geral");
+
+  useEffect(() => {
+    let vivo = true;
+    setFalhou(false);
+    Promise.resolve(carregar(respostaId))
+      .then((d) => {
+        if (vivo) setR(d);
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
+    return () => {
+      vivo = false;
+    };
+    // `carregar` muda a cada render do pai; a resposta é o que importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [respostaId]);
+
+  if (falhou)
+    return (
+      <div className="pesquisas">
+        <p className="pesquisas__erro" role="alert">
+          Não foi possível carregar a resposta.
+        </p>
+        <Button variant="secondary" onClick={onVoltar}>
+          {rotuloVoltar}
+        </Button>
+      </div>
+    );
+  if (!r) return <Esqueleto rotulo="Carregando resposta…" linhas={5} />;
+
+  const identificada = identificacao === "identificada" && r.nome;
+  const titulo = identificada ? r.nome! : `Resposta anônima #${r.numero}`;
+  const todas = perguntasEmOrdem(secoes);
+  const porId = new Map(r.valores.map((v) => [v.perguntaId, v]));
+  const textoDe = (id: string | undefined) =>
+    todas.find((p) => p.id === id)?.texto ?? "";
+  const ind = r.indicadores;
+  const escalas = todas.filter(
+    (p) =>
+      ehDeEscala(p) &&
+      !(p.tipo === "nota_0_10" && p.config.enps) &&
+      porId.has(p.id),
+  );
+
+  return (
+    <div className="pesquisas">
+      <header className="pesquisas__cabecalho">
+        <IconButton
+          label={rotuloVoltar}
+          icon={<IconeVoltar tamanho={18} />}
+          className="pesquisas__voltar"
+          onClick={onVoltar}
+        />
+        <Avatar texto={identificada ? iniciaisDe(r.nome!) : `R${r.numero}`} />
+        <div className="pesquisas__titulos">
+          <h1
+            id={PESQUISAS_TITULO_ID}
+            className="pesquisas__titulo"
+            tabIndex={-1}
+          >
+            {titulo}
+          </h1>
+          <p className="pesquisas__subtitulo">
+            {`${identificada ? (r.departamento ?? nomeDaPesquisa) : "Identidade oculta"} · respondeu em ${formatarInstante(r.respondidaEm)}`}
+          </p>
+        </div>
+        <div className="pesquisas__acoes-topo">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              baixarArquivo(
+                pdfDaResposta(nomeDaPesquisa, titulo, r, secoes),
+                nomeDaExportacao(`${nomeDaPesquisa} ${titulo}`, "pdf"),
+                "application/pdf",
+              )
+            }
+          >
+            <IconeBaixarArquivo tamanho={16} />
+            Exportar
+          </Button>
+          {onIr ? (
+            <nav className="pesquisas__paginacao" aria-label="Outras respostas">
+              <IconButton
+                label="Resposta anterior"
+                icon={<IconeVoltar tamanho={16} />}
+                disabled={!r.anteriorId}
+                onClick={() => r.anteriorId && onIr(r.anteriorId)}
+              />
+              <span>{`${r.posicao} de ${r.total}`}</span>
+              <IconButton
+                label="Próxima resposta"
+                icon={<IconeAvancar tamanho={16} />}
+                disabled={!r.proximaId}
+                onClick={() => r.proximaId && onIr(r.proximaId)}
+              />
+            </nav>
+          ) : null}
+        </div>
+      </header>
+
+      <div
+        role="tablist"
+        aria-label="Resultado individual"
+        className="pesquisas__abas"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === "geral"}
+          onClick={() => setAba("geral")}
+        >
+          Visão geral
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === "respostas"}
+          onClick={() => setAba("respostas")}
+        >
+          Respostas{" "}
+          <span className="pesquisas__contagem">{r.valores.length}</span>
+        </button>
+      </div>
+
+      {aba === "respostas" ? (
+        <RespostasDaPessoa
+          rotulo={`Respostas de ${titulo}`}
+          secoes={secoes}
+          valores={r.valores}
+        />
+      ) : (
+        <>
+          <section
+            className="pesquisas__indicadores"
+            aria-label="Indicadores da resposta"
+          >
+            <div className="pesquisas__indicador">
+              <h3>Média geral</h3>
+              <p className="pesquisas__indicador-valor">
+                {ind.media === null ? "—" : umaCasa(ind.media)}
+                <span className="pesquisas__suave"> /10</span>
+              </p>
+              {ind.media !== null && ind.mediaTime !== null ? (
+                <p className="pesquisas__suave">
+                  {`${diferenca(ind.media, ind.mediaTime)} ${ind.media >= ind.mediaTime ? "acima" : "abaixo"} do time (${umaCasa(ind.mediaTime)})`}
+                </p>
+              ) : null}
+              <Regua
+                valor={ind.media}
+                referencia={ind.mediaTime}
+                rotulo="Média geral da resposta"
+              />
+            </div>
+            <div className="pesquisas__indicador">
+              <h3>Recomendação</h3>
+              {ind.recomendacao === null ? (
+                <p className="pesquisas__suave">
+                  Sem a pergunta de recomendação.
+                </p>
+              ) : (
+                <>
+                  <p className="pesquisas__indicador-valor">
+                    {ind.recomendacao}
+                    <span className="pesquisas__suave"> /10</span>
+                  </p>
+                  <p className="pesquisas__suave">
+                    {`${grupoDoEnps(ind.recomendacao)}${ind.enpsTime !== null ? ` · eNPS do time ${ind.enpsTime}` : ""}`}
+                  </p>
+                </>
+              )}
+            </div>
+            {(
+              [
+                ["Nota mais alta", ind.maior],
+                ["Nota mais baixa", ind.menor],
+              ] as const
+            ).map(([rotulo, x]) => {
+              const time = x
+                ? (porId.get(x.perguntaId)?.mediaTime ?? null)
+                : null;
+              return (
+                <div key={rotulo} className="pesquisas__indicador">
+                  <h3>{rotulo}</h3>
+                  {x ? (
+                    <>
+                      <p className="pesquisas__indicador-valor">
+                        {umaCasa(x.valor)}
+                      </p>
+                      <p className="pesquisas__suave">
+                        {textoDe(x.perguntaId)}
+                      </p>
+                      {time !== null ? (
+                        <p className="pesquisas__suave">{`${diferenca(x.valor, time)} em relação ao time (${umaCasa(time)})`}</p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="pesquisas__suave">—</p>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+
+          <section
+            className="pesquisas__cartao-secao"
+            aria-label="Respostas por pergunta"
+          >
+            <header className="pesquisas__cartao-secao-cabeca">
+              <h2 className="pesquisas__cartao-secao-titulo">
+                Respostas por pergunta
+              </h2>
+            </header>
+            {escalas.length === 0 ? (
+              <p className="pesquisas__suave">
+                Esta pesquisa não tem perguntas de escala para comparar.
+              </p>
+            ) : (
+              <div className="pesquisas__tabela-caixa">
+                <table
+                  className="pesquisas__tabela"
+                  aria-label="Comparação com o time"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col">Pergunta</th>
+                      <th scope="col">Nota</th>
+                      <th scope="col">Comparação com o time</th>
+                      <th scope="col">Diferença</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {escalas.map((p) => {
+                      const v = porId.get(p.id)!;
+                      const e = escalaDe(p);
+                      const nota =
+                        typeof v.valor === "number" ? v.valor : Number(v.valor);
+                      const nota10 = Number.isFinite(nota)
+                        ? mediaNa10(nota, e)
+                        : null;
+                      const time10 =
+                        v.mediaTime === null ? null : mediaNa10(v.mediaTime, e);
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <span className="pesquisas__pessoa-textos">
+                              {p.rotulo ? (
+                                <span className="pesquisas__rotulo-curto">
+                                  {p.rotulo}
+                                </span>
+                              ) : null}
+                              <span>{p.texto}</span>
+                            </span>
+                          </td>
+                          <td>
+                            {nota10 === null ? (
+                              "—"
+                            ) : (
+                              <span
+                                className="pesquisas__nota-colorida"
+                                data-faixa={faixaDaMedia10(nota10)}
+                              >
+                                {`${umaCasa(nota)} /${e.maximo}`}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <Regua
+                              valor={nota10}
+                              referencia={time10}
+                              rotulo={p.rotulo || p.texto}
+                            />
+                          </td>
+                          <td className="pesquisas__numero">
+                            {nota10 !== null && v.mediaTime !== null ? (
+                              <span className="pesquisas__pessoa-textos">
+                                <span className="pesquisas__forte">
+                                  {diferenca(nota, v.mediaTime)}
+                                </span>
+                                <span className="pesquisas__suave">{`time ${umaCasa(v.mediaTime)}`}</span>
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}

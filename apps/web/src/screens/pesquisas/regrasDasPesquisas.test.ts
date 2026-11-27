@@ -1,11 +1,10 @@
 /**
  * T216 — regras puras de Pesquisas: modelos (contagem única, 11 tipos,
- * condições válidas, textos neutros), operações sobre perguntas e o CSV que
- * respeita a identificação.
+ * condições válidas), operações sobre perguntas, a exportação que respeita a
+ * identificação e as contas dos indicadores.
  */
 import { describe, expect, it } from "vitest";
-import type { PesquisaDetalhe } from "../../api/pesquisasClient";
-import { DETALHE, RESULTADOS } from "./dadosDeTeste";
+import { DETALHE, RESPOSTA_DETALHE, RESULTADOS } from "./dadosDeTeste";
 import {
   duplicarSecao,
   entradaDoEstado,
@@ -17,10 +16,21 @@ import {
   validarPerguntas,
 } from "./estadoDaPesquisa";
 import {
-  csvDasRespostas,
-  csvDoResumo,
+  linhasDoResumo,
+  pdfDosResultados,
+  planilhaDosResultados,
   textoDoValor,
 } from "./exportarResultados";
+import { lerAbasXlsx } from "../pessoas/importacao/planilhaXlsx";
+import {
+  faixaDaMedia10,
+  faixasDe,
+  favoravelDe,
+  indicadoresDe,
+  limitesDasFaixas,
+  mediaNa10,
+  zonaDoEnps,
+} from "./indicadores";
 import {
   MODELOS_DE_PESQUISA,
   secoesDoModelo,
@@ -129,49 +139,62 @@ describe("operações e validação", () => {
   });
 });
 
-describe("CSV e texto das respostas", () => {
+describe("Exportação e texto das respostas", () => {
   it("o resumo nunca leva autor fora da identificada", () => {
-    const csv = csvDoResumo(DETALHE, RESULTADOS);
-    expect(csv).toContain("Mais retorno, por favor.");
-    expect(csv).not.toContain("Pessoa Exemplo");
-    expect(csv).toContain("eNPS 50");
-    const ident = csvDoResumo(
+    const resumo = linhasDoResumo(DETALHE, RESULTADOS)
+      .map((l) => l.resultado)
+      .join(" ");
+    expect(resumo).toContain("Mais retorno, por favor.");
+    expect(resumo).not.toContain("Pessoa Exemplo");
+    expect(resumo).toContain("eNPS 50");
+    const ident = linhasDoResumo(
       { ...DETALHE, identificacao: "identificada" },
       RESULTADOS,
-    );
+    )
+      .map((l) => l.resultado)
+      .join(" ");
     expect(ident).toContain("Pessoa Exemplo: Mais retorno, por favor.");
   });
 
-  it("CSV por pessoa só existe na identificada", () => {
-    const resposta = {
-      colaboradorId: "c-1",
-      nome: "Ana Exemplo",
-      departamento: null,
-      respondidaEm: "2026-11-20T12:00:00Z",
-      valores: [],
-    };
-    for (const identificacao of ["confidencial", "anonima"] as const) {
-      expect(
-        csvDasRespostas({ ...DETALHE, identificacao } as PesquisaDetalhe, [
-          resposta,
-        ]),
-      ).toBeNull();
-    }
-    expect(
-      csvDasRespostas({ ...DETALHE, identificacao: "identificada" }, [
-        resposta,
-      ]),
-    ).toContain("Ana Exemplo");
+  it("planilha: respostas individuais nunca na confidencial", async () => {
+    const respostas = [RESPOSTA_DETALHE];
+    const conf = await lerAbasXlsx(
+      planilhaDosResultados(DETALHE, RESULTADOS, respostas),
+    );
+    expect(Object.keys(conf)).toEqual(["Resultados"]);
+    const anon = await lerAbasXlsx(
+      planilhaDosResultados(
+        { ...DETALHE, identificacao: "anonima" },
+        RESULTADOS,
+        respostas,
+      ),
+    );
+    expect(anon["Respostas"]![1]![0]).toBe("Resposta #1");
+    expect(anon["Respostas"]![1]![1]).toBe("");
+    const ident = await lerAbasXlsx(
+      planilhaDosResultados(
+        { ...DETALHE, identificacao: "identificada" },
+        RESULTADOS,
+        respostas,
+      ),
+    );
+    expect(ident["Respostas"]![1]!.slice(0, 2)).toEqual([
+      "Ana Exemplo",
+      "Operações",
+    ]);
   });
 
   it("abaixo do mínimo, o resumo não traz números", () => {
-    const csv = csvDoResumo(DETALHE, {
+    const vazio = {
       ...RESULTADOS,
       filtro: { departamentoId: "d-2", visivel: false },
       perguntas: [],
-    });
-    expect(csv).toContain("Poucas respostas para mostrar");
-    expect(csv).not.toContain("eNPS");
+    };
+    expect(linhasDoResumo(DETALHE, vazio)).toEqual([]);
+    const pdf = new TextDecoder().decode(
+      pdfDosResultados(DETALHE, vazio, { mediaGeral: null, enps: null }),
+    );
+    expect(pdf).toContain("Poucas respostas para mostrar");
   });
 
   it("texto das respostas por tipo", () => {
@@ -181,5 +204,62 @@ describe("CSV e texto das respostas", () => {
     expect(textoDoValor(sim!, "nao")).toBe("Não");
     expect(textoDoValor(esc!, { opcao: "o-2" })).toBe("Mensagem");
     expect(textoDoValor(esc!, undefined)).toBe("Sem resposta");
+  });
+});
+
+describe("indicadores e faixas", () => {
+  it("faixas e favorável por escala", () => {
+    expect(limitesDasFaixas({ minimo: 1, maximo: 10 })).toEqual({
+      baixaAte: 4,
+      altaDesde: 8,
+    });
+    expect(limitesDasFaixas({ minimo: 0, maximo: 10 })).toEqual({
+      baixaAte: 4,
+      altaDesde: 8,
+    });
+    expect(limitesDasFaixas({ minimo: 1, maximo: 5 })).toEqual({
+      baixaAte: 2,
+      altaDesde: 4,
+    });
+    const f = faixasDe(
+      [
+        { valor: 2, quantidade: 1 },
+        { valor: 6, quantidade: 1 },
+        { valor: 9, quantidade: 2 },
+      ],
+      { minimo: 1, maximo: 10 },
+    );
+    expect(f).toEqual({ baixa: 1, media: 1, alta: 2 });
+    expect(favoravelDe(f)).toBe(50);
+  });
+
+  it("zonas do eNPS", () => {
+    expect([-1, 0, 49, 50, 74, 75, 100].map(zonaDoEnps)).toEqual([
+      "critica",
+      "aperfeicoamento",
+      "aperfeicoamento",
+      "qualidade",
+      "qualidade",
+      "excelencia",
+      "excelencia",
+    ]);
+  });
+
+  it("média na escala de 0 a 10 e a faixa do mapa", () => {
+    expect(mediaNa10(4, { minimo: 1, maximo: 5 })).toBe(8);
+    expect(mediaNa10(7, { minimo: 1, maximo: 10 })).toBe(7);
+    expect([6.4, 6.5, 7.9, 8].map(faixaDaMedia10)).toEqual([
+      "baixa",
+      "media",
+      "media",
+      "alta",
+    ]);
+  });
+
+  it("indicadores pelo cálculo local deixam o eNPS fora da média", () => {
+    const ind = indicadoresDe(DETALHE, RESULTADOS);
+    expect(ind.mediaGeral).toBe(8.5);
+    expect(ind.perguntasDeEscala).toBe(1);
+    expect(ind.enps).toMatchObject({ indice: 50, zona: "qualidade" });
   });
 });

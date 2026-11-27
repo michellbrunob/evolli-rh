@@ -27,6 +27,9 @@ export type ModeloPesquisa =
   | "beneficios"
   | "treinamento"
   | "personalizada";
+/** Campos que a anônima pode pedir para separar as respostas. */
+export type CampoGrupo = "departamento" | "centroCusto" | "unidade";
+
 export type TipoPergunta =
   | "texto_curto"
   | "paragrafo"
@@ -74,6 +77,8 @@ export interface Pergunta {
   obrigatoria: boolean;
   config: ConfigPergunta;
   condicao: CondicaoPergunta | null;
+  /** Rótulo curto (até 40) para as tabelas de análise. */
+  rotulo?: string | null;
 }
 
 export interface Secao {
@@ -96,6 +101,8 @@ export interface PesquisaEntrada {
   participantes: ParticipantesEntrada;
   encerraEm: string | null;
   minimoPorGrupo: number;
+  /** Só na anônima: até 2 campos que quem responde escolhe antes. */
+  separarPor?: CampoGrupo[];
 }
 
 export interface PesquisaResumo {
@@ -105,7 +112,8 @@ export interface PesquisaResumo {
   identificacao: Identificacao;
   /** Já considera `encerraEm` vencido (finalizada). */
   status: StatusPesquisa;
-  participantes: number;
+  /** `null` na anônima (quem tiver o link responde). */
+  participantes: number | null;
   respostas: number;
   criadaEm: string;
   publicadaEm: string | null;
@@ -139,6 +147,7 @@ export interface PesquisaDetalhe extends PesquisaResumo {
    * sem data de nascimento). Ausente = sem aviso.
    */
   naoIdentificaveis?: number;
+  separarPor?: CampoGrupo[];
 }
 
 export type ContagensDePesquisas = Record<"todas" | StatusPesquisa, number>;
@@ -166,9 +175,22 @@ interface ResultadoBase {
 }
 
 /** Escalas, estrelas, nota e número. */
+/** Quantas respostas caem em cada terço da escala. */
+export interface FaixasDaEscala {
+  baixa: number;
+  media: number;
+  alta: number;
+}
+
+export type ZonaEnps =
+  "critica" | "aperfeicoamento" | "qualidade" | "excelencia";
+
 export interface ResultadoNumerico extends ResultadoBase {
   media: number | null;
   distribuicao: { valor: number; quantidade: number }[];
+  /** % de respostas favoráveis (0–100). */
+  favoravel?: number | null;
+  faixas?: FaixasDaEscala;
 }
 
 /** Nota 0–10 marcada como eNPS (com média e distribuição). */
@@ -178,6 +200,7 @@ export interface ResultadoEnps extends ResultadoBase {
     neutros: number;
     detratores: number;
     indice: number | null;
+    zona?: ZonaEnps;
   };
   media?: number | null;
   distribuicao?: { valor: number; quantidade: number }[];
@@ -219,6 +242,73 @@ export interface ResultadosPesquisa {
   filtro: { departamentoId: string | null; visivel: boolean };
   /** Vazio quando `filtro.visivel` é `false`. */
   perguntas: ResultadoPergunta[];
+  indicadores?: IndicadoresDosResultados;
+  /** Recortes disponíveis (anônima: os de `separarPor`). */
+  recortes?: CampoGrupo[];
+}
+
+export interface IndicadoresDosResultados {
+  /** Média das perguntas de escala, na escala 0–10. */
+  mediaGeral: number | null;
+  perguntasDeEscala: number;
+  maiorMedia: { perguntaId: string; media: number } | null;
+  menorMedia: { perguntaId: string; media: number } | null;
+  enps: {
+    indice: number;
+    zona: ZonaEnps;
+    promotores: number;
+    neutros: number;
+    detratores: number;
+  } | null;
+}
+
+/** `GET /pesquisas/:id/analises?campo=`. */
+export interface AnalisesPesquisa {
+  campo: CampoGrupo;
+  colunas: { perguntaId: string; rotulo: string }[];
+  /** 1ª linha: "Toda a empresa" (`grupoId` nulo). */
+  linhas: {
+    grupoId: string | null;
+    nome: string;
+    respostas: number;
+    visivel: boolean;
+    media: number | null;
+    medias: (number | null)[];
+  }[];
+  evolucao: {
+    pesquisaId: string;
+    nome: string;
+    publicadaEm: string;
+    mediaGeral: number | null;
+  }[];
+}
+
+/** Item de `GET /pesquisas/:id/respostas` (identificada e anônima). */
+export interface RespostaResumo {
+  id: string;
+  numero: number;
+  colaboradorId: string | null;
+  nome: string | null;
+  departamento: string | null;
+  respondidaEm: string;
+  media: number | null;
+}
+
+/** `GET /pesquisas/:id/respostas/:respostaId`. */
+export interface RespostaDetalhe extends RespostaResumo {
+  anteriorId: string | null;
+  proximaId: string | null;
+  posicao: number;
+  total: number;
+  valores: { perguntaId: string; valor: unknown; mediaTime: number | null }[];
+  indicadores: {
+    media: number | null;
+    mediaTime: number | null;
+    recomendacao: number | null;
+    enpsTime: number | null;
+    maior: { perguntaId: string; valor: number } | null;
+    menor: { perguntaId: string; valor: number } | null;
+  };
 }
 
 export interface ValorRespondido {
@@ -243,6 +333,8 @@ export interface PesquisaDaFicha {
   respondidaEm: string;
   secoes: Secao[];
   valores: ValorRespondido[];
+  /** Abre o resultado individual da pessoa (API ampliada). */
+  respostaId?: string;
 }
 
 type Metodo = "GET" | "POST" | "PUT" | "DELETE";
@@ -323,12 +415,37 @@ export const duplicarPesquisa = (pesquisaId: string) =>
 export const excluirPesquisa = (pesquisaId: string) =>
   pedir<void>(`/pesquisas/${id(pesquisaId)}`, "DELETE");
 
+/** Recorte: `campo` + `grupoId` (o `departamentoId` antigo segue aceito). */
+export interface RecorteDosResultados {
+  campo: CampoGrupo;
+  grupoId: string;
+}
+
 export const resultadosDaPesquisa = (
   pesquisaId: string,
-  departamentoId?: string | null,
-) =>
-  pedir<ResultadosPesquisa>(
-    `/pesquisas/${id(pesquisaId)}/resultados${departamentoId ? `?departamentoId=${id(departamentoId)}` : ""}`,
+  recorte?: RecorteDosResultados | string | null,
+) => {
+  const q =
+    typeof recorte === "string"
+      ? `?departamentoId=${id(recorte)}`
+      : recorte
+        ? `?campo=${id(recorte.campo)}&grupoId=${id(recorte.grupoId)}`
+        : "";
+  return pedir<ResultadosPesquisa>(
+    `/pesquisas/${id(pesquisaId)}/resultados${q}`,
+    "GET",
+  );
+};
+
+export const analisesDaPesquisa = (pesquisaId: string, campo: CampoGrupo) =>
+  pedir<AnalisesPesquisa>(
+    `/pesquisas/${id(pesquisaId)}/analises?campo=${id(campo)}`,
+    "GET",
+  );
+
+export const respostaDaPesquisa = (pesquisaId: string, respostaId: string) =>
+  pedir<RespostaDetalhe>(
+    `/pesquisas/${id(pesquisaId)}/respostas/${id(respostaId)}`,
     "GET",
   );
 
@@ -348,7 +465,7 @@ function comoLista<T>(corpo: unknown): T[] {
 }
 
 export const respostasDaPesquisa = async (pesquisaId: string) =>
-  comoLista<RespostaIndividual>(
+  comoLista<RespostaResumo>(
     await pedir<unknown>(`/pesquisas/${id(pesquisaId)}/respostas`, "GET"),
   );
 

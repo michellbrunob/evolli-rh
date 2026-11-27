@@ -5,13 +5,16 @@
 import { vi, type Mock } from "vitest";
 import type { ListagemColaboradoresApi } from "../../api/colaboradoresClient";
 import type {
+  AnalisesPesquisa,
+  RespostaDetalhe,
+  RespostaResumo,
   ListaDePesquisasApi,
   PesquisaDetalhe,
   PesquisaResumo,
   ResultadosPesquisa,
   Secao,
 } from "../../api/pesquisasClient";
-import type { ServicoDePesquisas } from "./servicoDePesquisas";
+import type { GruposDaEmpresa, ServicoDePesquisas } from "./servicoDePesquisas";
 
 export const RESUMO: PesquisaResumo = {
   id: "p-1",
@@ -216,6 +219,94 @@ export const ATIVOS: ListagemColaboradoresApi = {
   contadores: {} as ListagemColaboradoresApi["contadores"],
 };
 
+export const GRUPOS: GruposDaEmpresa = {
+  departamento: [
+    { id: "d-1", nome: "Operações" },
+    { id: "d-2", nome: "Financeiro" },
+  ],
+  centroCusto: [{ id: "cc-1", nome: "Administrativo" }],
+  unidade: [
+    { id: "u-1", nome: "Matriz" },
+    { id: "u-2", nome: "Filial Sul" },
+  ],
+  area: [{ id: "a-1", nome: "Atendimento" }],
+};
+
+export const RESPOSTAS: RespostaResumo[] = [
+  {
+    id: "r-1",
+    numero: 1,
+    colaboradorId: "c-1",
+    nome: "Ana Exemplo",
+    departamento: "Operações",
+    respondidaEm: "2026-11-20T14:23:00Z",
+    media: 9,
+  },
+  {
+    id: "r-2",
+    numero: 2,
+    colaboradorId: "c-2",
+    nome: "Bruno Exemplo",
+    departamento: "Financeiro",
+    respondidaEm: "2026-11-21T12:00:00Z",
+    media: 5.5,
+  },
+];
+
+export const RESPOSTA_DETALHE: RespostaDetalhe = {
+  ...RESPOSTAS[0]!,
+  anteriorId: null,
+  proximaId: "r-2",
+  posicao: 1,
+  total: 2,
+  valores: [
+    { perguntaId: "q-nota", valor: 10, mediaTime: 8.4 },
+    { perguntaId: "q-conc", valor: 5, mediaTime: 4.25 },
+    { perguntaId: "q-sim", valor: "sim", mediaTime: null },
+    { perguntaId: "q-esc", valor: { outro: "Mural" }, mediaTime: null },
+  ],
+  indicadores: {
+    media: 10,
+    mediaTime: 8.5,
+    recomendacao: 10,
+    enpsTime: 50,
+    maior: { perguntaId: "q-conc", valor: 5 },
+    menor: { perguntaId: "q-conc", valor: 5 },
+  },
+};
+
+export const ANALISES: AnalisesPesquisa = {
+  campo: "departamento",
+  colunas: [{ perguntaId: "q-conc", rotulo: "Prioridades" }],
+  linhas: [
+    {
+      grupoId: null,
+      nome: "Toda a empresa",
+      respostas: 8,
+      visivel: true,
+      media: 8.5,
+      medias: [8.5],
+    },
+    {
+      grupoId: "d-1",
+      nome: "Operações",
+      respostas: 6,
+      visivel: true,
+      media: 6.1,
+      medias: [6.1],
+    },
+    {
+      grupoId: "d-2",
+      nome: "Financeiro",
+      respostas: 2,
+      visivel: false,
+      media: null,
+      medias: [null],
+    },
+  ],
+  evolucao: [],
+};
+
 /** Serviço falso: tudo resolve (nunca `undefined` em efeito). */
 export type ServicoFalso = {
   [K in keyof ServicoDePesquisas]: Mock<ServicoDePesquisas[K]>;
@@ -274,8 +365,14 @@ export function servicoFalso(
     ),
     excluirPesquisa: vi.fn(() => Promise.resolve(undefined)),
     resultadosDaPesquisa: vi.fn(() => Promise.resolve(RESULTADOS)),
-    respostasDaPesquisa: vi.fn(() => Promise.resolve([])),
+    respostasDaPesquisa: vi.fn(() => Promise.resolve(RESPOSTAS)),
+    respostaDaPesquisa: vi.fn((_p: string, id: string) =>
+      Promise.resolve({ ...RESPOSTA_DETALHE, id }),
+    ),
+    analisesDaPesquisa: vi.fn(() => Promise.resolve(ANALISES)),
     listarAtivos: vi.fn(() => Promise.resolve(ATIVOS)),
+    listarTodosAtivos: vi.fn(() => Promise.resolve(ATIVOS.itens)),
+    listarGrupos: vi.fn(() => Promise.resolve(GRUPOS)),
     listarDepartamentos: vi.fn(() =>
       Promise.resolve([
         { id: "d-1", codigo: "OP", nome: "Operações" },

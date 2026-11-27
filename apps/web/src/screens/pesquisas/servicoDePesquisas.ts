@@ -1,18 +1,34 @@
 /**
  * T216 — as chamadas do módulo Pesquisas (o shell liga o cliente real; os
- * testes, um falso). Participantes usam os clientes de colaboradores e de
- * departamentos que já existem.
+ * testes, um falso). Participantes e recortes usam os clientes de
+ * colaboradores e da estrutura organizacional que já existem.
  */
 import {
   listarColaboradores,
+  type ColaboradorListadoApi,
   type ListagemColaboradoresApi,
   type ListarColaboradoresQuery,
 } from "../../api/colaboradoresClient";
 import {
+  listarAreas,
+  listarCentrosCusto,
   listarDepartamentos,
+  listarUnidades,
   type DepartamentoApi,
 } from "../../api/organizacaoClient";
 import * as cliente from "../../api/pesquisasClient";
+import type { CampoGrupo } from "../../api/pesquisasClient";
+
+/** Uma opção de recorte (departamento, centro de custo, unidade ou área). */
+export interface OpcaoDeGrupo {
+  readonly id: string;
+  readonly nome: string;
+}
+
+/** As opções de cada campo da estrutura (a área entra só no filtro de pessoas). */
+export type GruposDaEmpresa = Readonly<
+  Record<CampoGrupo | "area", readonly OpcaoDeGrupo[]>
+>;
 
 export type ServicoDePesquisas = Pick<
   typeof cliente,
@@ -26,17 +42,37 @@ export type ServicoDePesquisas = Pick<
   | "excluirPesquisa"
   | "resultadosDaPesquisa"
   | "respostasDaPesquisa"
+  | "analisesDaPesquisa"
+  | "respostaDaPesquisa"
 > & {
-  /** Colaboradores ativos da empresa (busca, departamento, página). */
+  /** Colaboradores ativos da empresa (busca, filtros e página). */
   readonly listarAtivos: (
     query: Pick<
       ListarColaboradoresQuery,
-      "busca" | "departamentoId" | "pagina" | "tamanhoPagina"
+      | "busca"
+      | "departamentoId"
+      | "departamentos"
+      | "centrosCusto"
+      | "areas"
+      | "pagina"
+      | "tamanhoPagina"
     >,
   ) => Promise<ListagemColaboradoresApi>;
-  /** Departamentos ativos da empresa (filtro dos participantes). */
+  /** Todos os colaboradores ativos (para "Todo o time": contagem e grupos). */
+  readonly listarTodosAtivos: () => Promise<readonly ColaboradorListadoApi[]>;
+  /** Departamentos ativos da empresa. */
   readonly listarDepartamentos: () => Promise<readonly DepartamentoApi[]>;
+  /** Departamentos, centros de custo, unidades e áreas ativos. */
+  readonly listarGrupos: () => Promise<GruposDaEmpresa>;
 };
+
+const TETO_DE_PESSOAS = 1000;
+
+const ativos = (query: Parameters<ServicoDePesquisas["listarAtivos"]>[0]) =>
+  listarColaboradores({ ...query, grupo: "ativos" });
+
+const opcoes = (itens: readonly { id: string; nome: string }[]) =>
+  itens.map(({ id, nome }) => ({ id, nome }));
 
 export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   listarPesquisas: cliente.listarPesquisas,
@@ -49,7 +85,32 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   excluirPesquisa: cliente.excluirPesquisa,
   resultadosDaPesquisa: cliente.resultadosDaPesquisa,
   respostasDaPesquisa: cliente.respostasDaPesquisa,
-  listarAtivos: (query) => listarColaboradores({ ...query, grupo: "ativos" }),
+  analisesDaPesquisa: cliente.analisesDaPesquisa,
+  respostaDaPesquisa: cliente.respostaDaPesquisa,
+  listarAtivos: ativos,
+  listarTodosAtivos: async () => {
+    const todos: ColaboradorListadoApi[] = [];
+    for (let pagina = 1; todos.length < TETO_DE_PESSOAS; pagina += 1) {
+      const r = await ativos({ pagina, tamanhoPagina: 100 });
+      todos.push(...r.itens);
+      if (r.itens.length === 0 || todos.length >= r.total) break;
+    }
+    return todos;
+  },
   listarDepartamentos: async () =>
     (await listarDepartamentos({ status: "ativo", tamanhoPagina: 100 })).itens,
+  listarGrupos: async () => {
+    const [dep, cc, un, ar] = await Promise.all([
+      listarDepartamentos({ status: "ativo", tamanhoPagina: 100 }),
+      listarCentrosCusto({ status: "ativo", tamanhoPagina: 100 }),
+      listarUnidades({ status: "ativo", tamanhoPagina: 100 }),
+      listarAreas({ status: "ativo", tamanhoPagina: 100 }),
+    ]);
+    return {
+      departamento: opcoes(dep.itens),
+      centroCusto: opcoes(cc.itens),
+      unidade: opcoes(un.itens),
+      area: opcoes(ar.itens),
+    };
+  },
 };

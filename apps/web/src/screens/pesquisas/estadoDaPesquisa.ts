@@ -4,6 +4,7 @@
  * excluir, sem deixar condição órfã) e a validação de cada etapa.
  */
 import type {
+  CampoGrupo,
   Identificacao,
   ModeloPesquisa,
   Pergunta,
@@ -12,6 +13,10 @@ import type {
   Secao,
   StatusPesquisa,
 } from "../../api/pesquisasClient";
+import {
+  diaCivilDeHoje,
+  formatarCompetenciaPorExtenso,
+} from "../../format/data";
 import { modeloDaGaleria, secoesDoModelo } from "./modelosDePesquisa";
 import {
   LIMITES,
@@ -38,6 +43,10 @@ export interface EstadoDaPesquisa {
   readonly escolhidos: Readonly<Record<string, PessoaEscolhida>>;
   readonly encerraEm: string | null;
   readonly minimoPorGrupo: number;
+  /** Só na anônima: o que quem responde escolhe antes (até 2). */
+  readonly separarPor: readonly CampoGrupo[];
+  /** O comentário final fixo do modelo (sempre por último), se houver. */
+  readonly comentarioId: string | null;
   /** Já há respostas: perguntas travadas. */
   readonly temRespostas: boolean;
   /** Participantes que já responderam (não saem da lista). */
@@ -45,27 +54,71 @@ export interface EstadoDaPesquisa {
   readonly link: string | null;
 }
 
-export function estadoDoModelo(modelo: ModeloPesquisa): EstadoDaPesquisa {
-  const m = modeloDaGaleria(modelo);
+/** "Pulso – novembro de 2026". */
+export function nomeSugerido(nomeBase: string, hoje: string): string {
+  return `${nomeBase} – ${formatarCompetenciaPorExtenso(hoje.slice(0, 7))}`;
+}
+
+/** A última pergunta, quando é o comentário final (paragrafo opcional). */
+function comentarioDe(secoes: readonly Secao[]): string | null {
+  const ultima = perguntasEmOrdem(secoes).at(-1);
+  return ultima &&
+    ultima.tipo === "paragrafo" &&
+    !ultima.obrigatoria &&
+    !ultima.condicao
+    ? ultima.id
+    : null;
+}
+
+export function estadoDoModelo(
+  id: string,
+  hoje: string = diaCivilDeHoje(),
+): EstadoDaPesquisa {
+  const m = modeloDaGaleria(id);
+  const secoes = secoesDoModelo(m);
   return {
     id: null,
     status: "rascunho",
-    nome: m.nomeSugerido,
+    nome: m.id === "personalizada" ? "" : nomeSugerido(m.nomeBase, hoje),
     boasVindas: m.boasVindas ?? "",
-    modelo,
-    identificacao: "confidencial",
-    secoes: secoesDoModelo(m),
+    modelo: m.modelo,
+    identificacao: "identificada",
+    secoes,
     todos: true,
     escolhidos: {},
     encerraEm: null,
     minimoPorGrupo: 3,
+    separarPor: [],
+    comentarioId: m.comentarioFinal ? comentarioDe(secoes) : null,
     temRespostas: false,
     responderam: [],
     link: null,
   };
 }
 
+/** Uma pesquisa existente como ponto de partida (copiar), sem participantes. */
+export function estadoDaCopia(
+  d: PesquisaDetalhe,
+  hoje: string = diaCivilDeHoje(),
+): EstadoDaPesquisa {
+  const base = estadoDoModelo("personalizada", hoje);
+  const copia = estadoDoDetalhe(d);
+  return {
+    ...base,
+    nome: `${d.nome} (cópia)`,
+    boasVindas: copia.boasVindas,
+    identificacao: d.identificacao,
+    secoes: copia.secoes,
+    minimoPorGrupo: d.minimoPorGrupo,
+    separarPor: copia.separarPor,
+  };
+}
+
 export function estadoDoDetalhe(d: PesquisaDetalhe): EstadoDaPesquisa {
+  const secoes =
+    d.secoes.length > 0
+      ? d.secoes
+      : [{ id: novoId(), titulo: null, descricao: null, perguntas: [] }];
   return {
     id: d.id,
     status: d.status,
@@ -73,21 +126,20 @@ export function estadoDoDetalhe(d: PesquisaDetalhe): EstadoDaPesquisa {
     boasVindas: d.boasVindas ?? "",
     modelo: d.modelo,
     identificacao: d.identificacao,
-    secoes:
-      d.secoes.length > 0
-        ? d.secoes
-        : [{ id: novoId(), titulo: null, descricao: null, perguntas: [] }],
+    secoes,
     todos: d.todos,
     escolhidos: Object.fromEntries(
-      d.participantesLista.map((p) => [
+      (d.participantesLista ?? []).map((p) => [
         p.colaboradorId,
         { nome: p.nome, departamento: p.departamento },
       ]),
     ),
     encerraEm: d.encerraEm,
     minimoPorGrupo: d.minimoPorGrupo,
+    separarPor: d.separarPor ?? [],
+    comentarioId: d.modelo !== "personalizada" ? comentarioDe(secoes) : null,
     temRespostas: d.temRespostas,
-    responderam: d.participantesLista
+    responderam: (d.participantesLista ?? [])
       .filter((p) => p.respondeu === true)
       .map((p) => p.colaboradorId),
     link: d.link,
@@ -95,7 +147,9 @@ export function estadoDoDetalhe(d: PesquisaDetalhe): EstadoDaPesquisa {
 }
 
 export function entradaDoEstado(e: EstadoDaPesquisa): PesquisaEntrada {
-  const vazio = (t: string | null) => (t && t.trim() ? t.trim() : null);
+  const vazio = (t: string | null | undefined) =>
+    t && t.trim() ? t.trim() : null;
+  const anonima = e.identificacao === "anonima";
   return {
     nome: e.nome.trim(),
     boasVindas: vazio(e.boasVindas),
@@ -109,13 +163,17 @@ export function entradaDoEstado(e: EstadoDaPesquisa): PesquisaEntrada {
         ...p,
         texto: p.texto.trim(),
         descricao: vazio(p.descricao),
+        rotulo: vazio(p.rotulo),
       })),
     })),
-    participantes: e.todos
-      ? { todos: true }
-      : { todos: false, colaboradorIds: Object.keys(e.escolhidos) },
+    // Na anônima quem tiver o link responde: a lista não vale.
+    participantes:
+      e.todos || anonima
+        ? { todos: true }
+        : { todos: false, colaboradorIds: Object.keys(e.escolhidos) },
     encerraEm: e.encerraEm,
     minimoPorGrupo: e.minimoPorGrupo,
+    ...(anonima ? { separarPor: [...e.separarPor] } : {}),
   };
 }
 
@@ -349,6 +407,8 @@ export function errosDaPergunta(
   if (!texto) erros.push("Escreva a pergunta.");
   else if (texto.length > LIMITES.textoPergunta)
     erros.push(`A pergunta passa de ${LIMITES.textoPergunta} caracteres.`);
+  if ((p.rotulo ?? "").length > LIMITES.rotulo)
+    erros.push(`O rótulo curto pode ter até ${LIMITES.rotulo} caracteres.`);
   if ((p.descricao ?? "").length > LIMITES.descricaoPergunta)
     erros.push(`A descrição passa de ${LIMITES.descricaoPergunta} caracteres.`);
   if (temOpcoes(p.tipo)) {
@@ -422,6 +482,7 @@ export function validarPerguntas(e: EstadoDaPesquisa): Erros {
 }
 
 export function validarParticipantes(e: EstadoDaPesquisa): Erros {
+  if (e.identificacao === "anonima") return {};
   if (!e.todos && Object.keys(e.escolhidos).length === 0)
     return { participantes: "Escolha pelo menos uma pessoa." };
   return {};
