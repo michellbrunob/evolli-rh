@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "constitutionVersion": "1.4.0",
-  "lastConvergedAt": "2026-11-18",
-  "lastIntegratedTask": 212,
-  "lastRecordedTask": 215,
+  "lastConvergedAt": "2026-11-27",
+  "lastIntegratedTask": 215,
+  "lastRecordedTask": 216,
   "platformDecision": {
     "adr": "docs/adr/0014-evolli-plataforma-base-e-encerramento-do-frappe.md",
     "decidedAt": "2026-10-01",
@@ -11,25 +11,15 @@
     "frappe": "encerrado_como_candidato_referencia_apenas"
   },
   "nextTask": {
-    "id": "T213",
-    "status": "documentos_colaborador_correcoes_pos_revisao_aguardando_validacao",
-    "reason": "T212 integrada em main pela PR #205 (squash 9caf216c7f0912efa145781f35a59cad6a55c49a), com a CI de push 3/3 verde (run 44527419288); convergida no primeiro commit da T213. T213 com validacao visual aprovada em 2026-11-23 e PR #206 aberta em Draft; correcoes pos-revisao (antivirus antes de gravar, DELETE revogado no banco, foco e download) aguardando validacao da proprietaria antes do Ready. Arquivos reais bloqueados ate o ClamAV estar configurado e a revisao de seguranca concluida. Sem Ready nem merge."
+    "id": "T216",
+    "status": "pesquisas_em_andamento",
+    "reason": "T213, T214 e T215 integradas em main pela PR #207 (squash 7ff3a2a65d), com a CI de push 3/3 verde (run 45995281985); convergidas no primeiro commit da T216. T216 (Pesquisas: modulo do menu e aba da ficha) em andamento na branch codex/t216-pesquisas, conforme docs/decisions/t216-pesquisas.md. Sem PR."
   },
   "openDeliveries": [
     {
-      "id": "T213",
-      "pullRequest": 206,
-      "status": "documentos_colaborador_correcoes_pos_revisao_aguardando_validacao"
-    },
-    {
-      "id": "T214",
+      "id": "T216",
       "pullRequest": null,
-      "status": "dashboard_login_implementada_localmente_aguarda_separacao"
-    },
-    {
-      "id": "T215",
-      "pullRequest": null,
-      "status": "colaboradores_em_andamento_local_aba_ferias_aguarda_validacao_visual"
+      "status": "pesquisas_em_andamento"
     }
   ],
   "requiredArtifacts": [

@@ -3595,10 +3595,9 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         das 8 do modelo; dependência nova; Documentos.
 
 110.  **T213 - Documentos do colaborador**
-      - **Estado:** **primeira fatia implementada localmente** (API e tela), com a **validação
-        visual aprovada pela proprietária em 23/11/2026**; aguarda a autorização para publicar
-        a PR. Branch `codex/t213-documentos-colaborador`, a partir do squash da T212 em `main`
-        (`9caf216`, PR #205). Sem push, PR, Ready ou merge.
+      - **Estado:** **integrada** em `main` junto com a T214 e a T215 pela PR #207, squash
+        `7ff3a2a`, com a CI de push 3/3 verde (run 45995281985). A PR #206 (rascunho) ficou
+        redundante.
       - **Arquivos reais:** continuam bloqueados até o ClamAV estar configurado e a revisão de
         segurança estar concluída; até lá, só arquivos sintéticos.
       - **Correções pós-revisão (23/11/2026, PR #206 em Draft):** antivírus antes de gravar (sem
@@ -3617,18 +3616,18 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         vencimentos e envio de documentos pela importação.
 
 111.  **T214 - Card principal do Dashboard e login novo**
-      - **Estado:** implementada localmente (commit `515b7e0`, só tela), empilhada na branch da
-        T215. Sem push próprio, PR, Ready ou merge; a separação em entrega própria aguarda
-        autorização.
+      - **Estado:** **integrada** em `main` junto com a T213 e a T215 pela PR #207, squash
+        `7ff3a2a`, com a CI de push 3/3 verde (run 45995281985).
       - **Feito:** card único do Dashboard com o resumo do time, período por anos com admissão
         efetivada, exportação (CSV e impressão), "Como calculamos" com o botão "i", e a tela de
         login com o formulário à esquerda e o painel à direita.
 
 112.  **T215 - Colaboradores: lista, edição, ficha e abas**
-      - **Estado:** em andamento localmente na branch `codex/t215-colaboradores-lista`; a branch
-        foi enviada ao GitHub em 24/11/2026 até `204633a`, e os commits seguintes ficaram só
-        locais. Sem PR, Ready ou merge. A separação em entregas revisáveis (T213, T214 e a
-        T215 em partes) aguarda autorização.
+      - **Estado:** **integrada** em `main` pela PR #207 (com a T213 e a T214), squash
+        `7ff3a2a`, com a CI de push 3/3 verde (run 45995281985); branches
+        `codex/t215-colaboradores-lista` (histórico completo) e `codex/t215-integracao`
+        preservadas. Abrange também Escala de trabalho, Benefícios, desligamento e a revisão com
+        cenários reais de 27/11/2026.
       - **Feito (comprovado por testes):** lista com filtros e ações; Segurança e Editar
         colaborador; desativar e reativar; página inicial com busca, CPF, contatos, salário e
         indicadores; auditoria da lista com um evento por consulta; Férias e ausências na API
@@ -3642,6 +3641,15 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
       - **Fora de escopo nesta fatia:** Portal do colaborador, fluxo do gestor, férias
         coletivas, políticas de férias, mudança automática de status e feriados móveis,
         estaduais e municipais no cálculo de dias úteis.
+
+113.  **T216 - Pesquisas (módulo do menu e aba da ficha)**
+      - **Estado:** em andamento na branch `codex/t216-pesquisas`, a partir do squash da T215 em
+        `main` (`7ff3a2a`, PR #207). Sem PR.
+      - **Objetivo:** lista, galeria de modelos próprios, assistente em 5 etapas, resultados,
+        resposta pelo link público e aba Pesquisas da ficha, conforme o
+        [documento de decisão](../docs/decisions/t216-pesquisas.md).
+      - **Fora de escopo:** avaliações pelo gestor (90° e 180°), e-mail e lembretes, instrumentos
+        de terceiros com licença, IA, evolução entre pesquisas e banco de perguntas.
 
 ## Regra obrigatória para as próximas tarefas
 
