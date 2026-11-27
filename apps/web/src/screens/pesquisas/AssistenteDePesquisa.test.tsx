@@ -470,7 +470,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     ).toBeNull();
     expect(servico.publicarPesquisa).toHaveBeenCalledWith("p-novo");
     expect(ultimaEntrada(servico.alterarPesquisa).encerraEm).toBe(
-      "2026-12-15T23:59:00-03:00",
+      "2026-12-15T23:59",
     );
     expect(
       (screen.getByLabelText("Link da pesquisa") as HTMLInputElement).value,

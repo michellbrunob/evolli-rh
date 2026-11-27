@@ -207,7 +207,7 @@ describe("Encerramento automático", () => {
   it("padrão de 14 dias às 23:59, com o fuso de Brasília para a API", () => {
     expect(diasDepois("2026-11-27", 14)).toBe("2026-12-11");
     expect(encerraEmParaApi({ data: "2026-12-11", hora: "23:59" })).toBe(
-      "2026-12-11T23:59:00-03:00",
+      "2026-12-11T23:59",
     );
     expect(partesDoEncerramento("2026-12-11")).toEqual({
       data: "2026-12-11",

@@ -26,7 +26,7 @@ export function diasDepois(dia: string, dias: number): string {
 
 /** O que vai para a API. */
 export function encerraEmParaApi(partes: PartesDoEncerramento): string {
-  return `${partes.data}T${partes.hora}:00-03:00`;
+  return `${partes.data}T${partes.hora}`;
 }
 
 /** Data e hora (de Brasília) do valor da API; `null` sem prazo. */
