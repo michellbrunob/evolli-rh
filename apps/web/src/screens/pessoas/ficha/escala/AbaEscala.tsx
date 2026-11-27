@@ -661,9 +661,11 @@ function Resumo({
     if (!diasDeTrabalho) return;
     let vivo = true;
     setDias(null);
-    diasDeTrabalho(colaboradorId, mes).then(
+    // Promise.resolve: um cliente que não responde (ou simulado) não quebra
+    // a aba; sem o número, o resumo só não mostra os dias.
+    Promise.resolve(diasDeTrabalho(colaboradorId, mes)).then(
       (r) => {
-        if (vivo) setDias(r);
+        if (vivo && r) setDias(r);
       },
       () => undefined,
     );
