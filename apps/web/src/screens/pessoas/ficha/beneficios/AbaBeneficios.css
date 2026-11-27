@@ -333,3 +333,7 @@
     display: none;
   }
 }
+
+.aba-beneficios__categoria-linha strong + .aba-beneficios__suave {
+  margin-left: var(--space-xxs);
+}

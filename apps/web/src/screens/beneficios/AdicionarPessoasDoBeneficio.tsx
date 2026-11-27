@@ -4,6 +4,7 @@
  * departamento, contrato e desligados; "Entram a partir de" (este mês ou os
  * dois seguintes).
  */
+import { Esqueleto } from "../../ui/movimento";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PessoaDoBeneficioApi } from "../../api/beneficiosClient";
 import { Button, FormActions } from "../../components";
@@ -258,9 +259,7 @@ export function AdicionarPessoasDoBeneficio({
           </Button>
         </div>
       ) : !lista ? (
-        <p role="status" className="beneficios__suave">
-          Carregando…
-        </p>
+        <Esqueleto rotulo="Carregando as pessoas…" linhas={5} />
       ) : lista.length === 0 ? (
         <p className="beneficios__suave beneficios__sem-linhas">
           Todas as pessoas ativas já recebem este benefício.

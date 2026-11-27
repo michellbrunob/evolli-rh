@@ -7,6 +7,7 @@
  * As subtelas vivem dentro do módulo (a rota é `#/beneficios`); abrir a
  * ficha de alguém usa a rota da ficha.
  */
+import { Esqueleto } from "../../ui/movimento";
 import { useCallback, useEffect, useState } from "react";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import type {
@@ -343,9 +344,7 @@ function ListaDeBeneficios({
           </Button>
         </div>
       ) : !dados ? (
-        <p role="status" className="beneficios__suave">
-          Carregando benefícios…
-        </p>
+        <Esqueleto rotulo="Carregando benefícios…" linhas={5} />
       ) : vazio ? (
         <div className="beneficios__vazio">
           <div className="beneficios__vazio-cartao">

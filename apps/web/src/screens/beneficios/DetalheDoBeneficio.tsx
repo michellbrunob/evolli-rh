@@ -5,6 +5,7 @@
  * "Adicionar pessoas", dependentes no plano, remover) e a aba Histórico.
  * Sem Folha no Evolli, toda competência é "valores previstos".
  */
+import { Esqueleto } from "../../ui/movimento";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import type {
@@ -252,11 +253,7 @@ export function DetalheDoBeneficio({
     );
   }
   if (!dados || !b || !r) {
-    return (
-      <p role="status" className="beneficios__suave">
-        Carregando o benefício…
-      </p>
-    );
+    return <Esqueleto rotulo="Carregando o benefício…" linhas={6} />;
   }
 
   const info = CATEGORIAS[b.categoria];

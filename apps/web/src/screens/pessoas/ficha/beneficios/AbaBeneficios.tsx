@@ -8,6 +8,7 @@
  *
  * Vincular ou mudar valores é no módulo Benefícios.
  */
+import { Esqueleto } from "../../../../ui/movimento";
 import { useEffect, useState } from "react";
 import type { FichaDeBeneficiosApi } from "../../../../api/beneficiosClient";
 import { beneficiosDaFicha } from "../../../../api/beneficiosClient";
@@ -67,11 +68,7 @@ export function AbaBeneficios({
     );
   }
   if (!dados) {
-    return (
-      <p className="aba-beneficios__suave" role="status">
-        Carregando benefícios…
-      </p>
-    );
+    return <Esqueleto rotulo="Carregando benefícios…" linhas={4} />;
   }
 
   const lista = dados.beneficios;
