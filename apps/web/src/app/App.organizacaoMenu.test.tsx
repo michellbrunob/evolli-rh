@@ -283,6 +283,8 @@ describe("T211 — árvore do menu", () => {
     expect(gruposNoMenu).toEqual([
       "Dashboard",
       "Gestão de Pessoas",
+      // T216 — Pesquisas (Pessoas › Pesquisas).
+      "Pesquisas",
       "Liderança",
       // T215 — Benefícios (Remuneração).
       "Benefícios",

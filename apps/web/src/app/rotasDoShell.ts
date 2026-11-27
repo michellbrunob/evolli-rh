@@ -52,6 +52,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "politicas-ferias": "#/pessoas/politicas-ferias",
   // T215 — o módulo Benefícios (as subtelas vivem dentro dele).
   beneficios: "#/beneficios",
+  // T216 — o módulo Pesquisas (as subtelas vivem dentro dele).
+  pesquisas: "#/pesquisas",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
   // sub-página dele.

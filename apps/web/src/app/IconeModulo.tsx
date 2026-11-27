@@ -23,6 +23,7 @@ import {
   IconeJornada,
   IconeLideranca,
   IconePainel,
+  IconePesquisas,
   IconePessoas,
   IconeSeguranca,
   type IconeDoEcossistema,
@@ -36,6 +37,7 @@ export type IconeModuloId =
   | "jornada"
   | "lideranca"
   | "beneficios"
+  | "pesquisas"
   | "administracao"
   | "seguranca"
   | "configuracoes"
@@ -52,6 +54,7 @@ const ICONES: Readonly<Record<IconeModuloId, IconeDoEcossistema>> = {
   jornada: IconeJornada,
   lideranca: IconeLideranca,
   beneficios: IconeBeneficios,
+  pesquisas: IconePesquisas,
   administracao: IconeAdministracao,
   seguranca: IconeSeguranca,
   configuracoes: IconeConfiguracoes,

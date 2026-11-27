@@ -138,6 +138,8 @@ describe("T215 — Segurança no menu", () => {
     expect(gruposNoMenu).toEqual([
       "Dashboard",
       "Gestão de Pessoas",
+      // T216 — Pesquisas (Pessoas › Pesquisas).
+      "Pesquisas",
       "Liderança",
       // T215 — Benefícios (Remuneração).
       "Benefícios",

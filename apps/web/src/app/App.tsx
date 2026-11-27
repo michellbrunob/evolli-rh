@@ -152,6 +152,11 @@ import {
   BeneficiosModulo,
 } from "../screens/beneficios/BeneficiosModulo";
 import { servicoDeBeneficiosDoServidor } from "../screens/beneficios/servicoDeBeneficios";
+import {
+  PESQUISAS_TITULO_ID,
+  PesquisasModulo,
+} from "../screens/pesquisas/PesquisasModulo";
+import { servicoDePesquisasDoServidor } from "../screens/pesquisas/servicoDePesquisas";
 import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
@@ -323,6 +328,7 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
   "politicas-ferias": POLITICAS_FERIAS_TITULO_ID,
   beneficios: BENEFICIOS_TITULO_ID,
+  pesquisas: PESQUISAS_TITULO_ID,
   // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
   "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
   "turnos-escala": TURNOS_TITULO_ID,
@@ -734,6 +740,15 @@ function conteudoDoDestino(
             aba: "beneficios",
           });
         }}
+      />
+    );
+  }
+  if (destinoId === "pesquisas") {
+    return (
+      <PesquisasModulo
+        servico={servicoDePesquisasDoServidor}
+        // T216 — RH e DP operam; o master técnico só lê.
+        podeEditar={podeEditarFicha(admissao.papelDoAtor)}
       />
     );
   }

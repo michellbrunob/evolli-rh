@@ -414,6 +414,22 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
     ],
   },
   {
+    // T216 — Pesquisas (Pessoas › Pesquisas): lista por status, galeria de
+    // modelos, assistente em 5 etapas e resultados. RH e DP operam; o master
+    // técnico só lê. O servidor decide cada requisição.
+    titulo: "Pesquisas",
+    icone: "pesquisas",
+    destinos: [
+      {
+        id: "pesquisas",
+        label: "Pesquisas",
+        subRotulo: "Clima, engajamento e experiência",
+        estado: "funcional",
+        papeis: ["rh", "dp", "master_tecnico"],
+      },
+    ],
+  },
+  {
     titulo: "Liderança",
     icone: "lideranca",
     destinos: [
@@ -748,6 +764,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "importar-colaboradores",
     "politicas-ferias",
     "beneficios",
+    "pesquisas",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
@@ -771,6 +788,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "importar-colaboradores",
     "politicas-ferias",
     "beneficios",
+    "pesquisas",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
@@ -788,6 +806,7 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "dashboard",
     "pessoas",
     "beneficios",
+    "pesquisas",
     "cadastros",
     "jornadas-trabalho",
     "turnos-escala",
