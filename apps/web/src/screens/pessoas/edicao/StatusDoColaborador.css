@@ -1,6 +1,6 @@
 /*
- * T215 — Status do colaborador: rótulo cinza à esquerda, botão claro com
- * contorno (bolinha, nome e seta), lista em cartão com sombra leve, item
+ * T215 — Status do colaborador: rótulo cinza à esquerda, botão cuja face é
+ * a pílula padrão de status (T216: classes do StatusBadge, com a seta), lista em cartão com sombra leve, item
  * atual destacado com o visto à direita e "Desligado" em vermelho. Só tokens.
  */
 .status-colaborador {
@@ -14,24 +14,22 @@
   color: var(--color-ink-subtle);
 }
 
+/* O botão só dá a área de toque e o foco; a face é a pílula de status. */
 .status-colaborador__botao {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
   min-height: var(--touch-target);
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-botao);
-  background: var(--surface-canvas);
-  color: var(--color-ink);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
   font: inherit;
-  font-weight: var(--weight-strong);
   cursor: pointer;
 }
 
-.status-colaborador__botao:hover:not(:disabled),
-.status-colaborador__botao[data-state="open"] {
-  border-color: var(--color-action);
+.status-colaborador__botao:hover:not(:disabled) .status-colaborador__pilula,
+.status-colaborador__botao[data-state="open"] .status-colaborador__pilula {
+  box-shadow: inset 0 0 0 1px currentColor;
 }
 
 .status-colaborador__botao:focus-visible {
@@ -45,7 +43,7 @@
 }
 
 .status-colaborador__seta {
-  color: var(--color-ink-subtle);
+  flex: none;
   transition: transform 150ms ease;
 }
 

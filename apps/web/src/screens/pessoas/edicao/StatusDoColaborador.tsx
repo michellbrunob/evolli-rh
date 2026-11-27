@@ -1,13 +1,18 @@
 /**
- * T215 — o Status no cabeçalho de "Editar colaborador", no desenho da
- * referência: "Status" ao lado de um botão com a bolinha da cor do status, o
- * nome e a seta; a lista com as cinco opções (Ativo, Férias, Afastado,
+ * T215 — o Status no cabeçalho de "Editar colaborador": "Status" ao lado
+ * de um botão cuja face é a pílula padrão de status (T216: mesmas classes do
+ * `StatusBadge` — fundo suave, ponto, rótulo e seta); a lista com as cinco opções (Ativo, Férias, Afastado,
  * Inativo, Desligado), cada uma com a sua bolinha, o visto na atual e
  * "Desligado" em vermelho. Escolha única (`menuitemradio`): quem usa decide
  * o que cada escolha faz.
  */
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { useId } from "react";
+import {
+  PontoDoStatus,
+  classesDoStatus,
+  type StatusVariant,
+} from "../../../components/StatusBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +29,15 @@ export const OPCOES_STATUS = [
   { valor: "desligado", rotulo: "Desligado" },
 ] as const;
 export type StatusDoColaboradorValor = (typeof OPCOES_STATUS)[number]["valor"];
+
+/** A variante do status padrão de cada situação (mesma semântica do sistema). */
+const VARIANTE_DO_STATUS: Record<StatusDoColaboradorValor, StatusVariant> = {
+  ativo: "success",
+  ferias: "warning",
+  afastado: "neutral",
+  inativo: "neutral",
+  desligado: "danger",
+};
 
 function Ponto({ valor }: { readonly valor: StatusDoColaboradorValor }) {
   return (
@@ -79,9 +93,13 @@ export function StatusDoColaborador({
           aria-label={`Status: ${atual.rotulo}`}
           disabled={desabilitado}
         >
-          <Ponto valor={atual.valor} />
-          <span className="status-colaborador__nome">{atual.rotulo}</span>
-          <IconeAbrir className="status-colaborador__seta" tamanho={14} />
+          <span
+            className={`${classesDoStatus(VARIANTE_DO_STATUS[atual.valor])} status-colaborador__pilula`}
+          >
+            <PontoDoStatus />
+            <span className="evolli-badge__label">{atual.rotulo}</span>
+            <IconeAbrir className="status-colaborador__seta" tamanho={14} />
+          </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="status-colaborador__lista">
           <RadixMenu.RadioGroup

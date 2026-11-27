@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { StatusBadge, type StatusVariant } from "./StatusBadge";
+import {
+  PontoDoStatus,
+  StatusBadge,
+  classesDoStatus,
+  type StatusVariant,
+} from "./StatusBadge";
 
 describe("StatusBadge (UI-F02)", () => {
   it("exibe o rótulo textual visível (não depende só da cor)", () => {
@@ -42,5 +47,31 @@ describe("StatusBadge (UI-F02)", () => {
       );
       unmount();
     }
+  });
+
+  it("aceita uma classe extra só de posição, sem perder a da variante", () => {
+    const { container } = render(
+      <StatusBadge variant="info" className="tela__posicao">
+        Programada
+      </StatusBadge>,
+    );
+    const selo = container.querySelector(".evolli-badge");
+    expect(selo).toHaveClass("evolli-badge--info", "tela__posicao");
+  });
+
+  it("expõe as classes e o ponto para quando o elemento precisa ser outro (ex.: botão de menu)", () => {
+    expect(classesDoStatus("danger")).toBe("evolli-badge evolli-badge--danger");
+    expect(classesDoStatus()).toBe("evolli-badge evolli-badge--neutral");
+    const { container } = render(
+      <button type="button" className={classesDoStatus("success")}>
+        <PontoDoStatus />
+        Ativo
+      </button>,
+    );
+    const ponto = container.querySelector(".evolli-badge__ponto");
+    expect(ponto).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "Ativo" })).toHaveClass(
+      "evolli-badge--success",
+    );
   });
 });

@@ -18,15 +18,41 @@ export interface StatusBadgeProps {
   variant?: StatusVariant;
   /** Rótulo textual visível do estado (obrigatório — parte do sinal). */
   children: ReactNode;
+  /**
+   * Classe extra só de posição (margem, alinhamento na grade). O visual —
+   * fundo, cor, ponto, peso e altura — é sempre o do componente.
+   */
+  className?: string;
+}
+
+/**
+ * As classes do visual de status, para quando o elemento precisa ser outro
+ * (por exemplo o gatilho de um menu de status): o mesmo desenho do
+ * `StatusBadge`, sem CSS próprio na tela.
+ */
+export function classesDoStatus(variant: StatusVariant = "neutral"): string {
+  return `evolli-badge evolli-badge--${variant}`;
+}
+
+/** O ponto decorativo do status, para uso junto de `classesDoStatus`. */
+export function PontoDoStatus() {
+  return <span className="evolli-badge__ponto" aria-hidden="true" />;
 }
 
 export function StatusBadge({
   variant = "neutral",
   children,
+  className,
 }: StatusBadgeProps) {
   return (
-    <span className={`evolli-badge evolli-badge--${variant}`}>
-      <span className="evolli-badge__ponto" aria-hidden="true" />
+    <span
+      className={
+        className
+          ? `${classesDoStatus(variant)} ${className}`
+          : classesDoStatus(variant)
+      }
+    >
+      <PontoDoStatus />
       <span className="evolli-badge__label">{children}</span>
     </span>
   );

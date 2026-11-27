@@ -17,7 +17,7 @@ export type { SurfaceProps, SurfacePadding } from "./Surface";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 
-export { StatusBadge } from "./StatusBadge";
+export { PontoDoStatus, StatusBadge, classesDoStatus } from "./StatusBadge";
 export type { StatusBadgeProps, StatusVariant } from "./StatusBadge";
 
 export { DataTable } from "./DataTable";

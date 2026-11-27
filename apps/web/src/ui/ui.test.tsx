@@ -102,11 +102,15 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
     expect(select.className).toMatch(/ev:min-h-\[var\(--touch-target\)\]/);
   });
 
-  it("Badge diz o estado em texto, com os tokens semânticos", () => {
+  it("Badge diz o estado em texto, no mesmo visual do status padrão (T216)", () => {
     render(<Badge variant="success">Ativo</Badge>);
-    const badge = screen.getByText("Ativo");
+    const badge = screen.getByText("Ativo").closest("[data-variant]");
     expect(badge).toHaveAttribute("data-variant", "success");
-    expect(badge.className).toMatch(/status-success-ink/);
+    expect(badge).toHaveClass("evolli-badge", "evolli-badge--success");
+    expect(badge?.querySelector(".evolli-badge__ponto")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 });
 

@@ -14,14 +14,34 @@ function abrir() {
 }
 
 describe("T215 — Status do colaborador", () => {
-  it("o botão diz o status atual, com a bolinha da cor dele", () => {
+  it("o botão diz o status atual na pílula padrão de status, com o ponto da cor dele", () => {
     render(<StatusDoColaborador valor="ativo" onEscolher={vi.fn()} />);
     const botao = screen.getByRole("button", { name: "Status: Ativo" });
     expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(
-      botao.querySelector(".status-colaborador__ponto--ativo"),
-    ).not.toBeNull();
+    const pilula = botao.querySelector(".evolli-badge");
+    expect(pilula).toHaveClass("evolli-badge--success");
+    expect(pilula?.querySelector(".evolli-badge__ponto")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
+
+  it.each([
+    ["ativo", "success"],
+    ["ferias", "warning"],
+    ["afastado", "neutral"],
+    ["inativo", "neutral"],
+    ["desligado", "danger"],
+  ] as const)(
+    "%s: a pílula do botão usa a variante %s do status padrão",
+    (valor, variante) => {
+      render(<StatusDoColaborador valor={valor} onEscolher={vi.fn()} />);
+      const botao = screen.getByRole("button", { name: /^Status:/ });
+      expect(botao.querySelector(".evolli-badge")).toHaveClass(
+        `evolli-badge--${variante}`,
+      );
+    },
+  );
 
   it("a lista: cinco opções na ordem, bolinhas, visto só na atual, Desligado em vermelho", async () => {
     render(<StatusDoColaborador valor="ativo" onEscolher={vi.fn()} />);
