@@ -988,7 +988,11 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
       }
     });
 
-    it("evolli_app nao tem DELETE em tabela_horario nem UPDATE em periodo_horario", async () => {
+    // T215 — os horários do turno passaram a ser editáveis (decisão da
+    // proprietária de 2026-11-25): a aplicação troca os períodos numa
+    // transação. A tabela continua sem DELETE e a sobreposição continua
+    // barrada pelo banco.
+    it("evolli_app nao tem DELETE em tabela_horario; periodo_horario edita sem sobrepor", async () => {
       const { id: tabelaId } = await criarTabela(rhA, "Privilegio");
       const appClient = new PrismaClient({
         datasources: { db: { url: appUrl } },
@@ -1005,7 +1009,7 @@ describe("Cadastros: Horarios e vinculo ao colaborador (e2e)", () => {
             `UPDATE app.periodo_horario SET fim_minuto = 999 WHERE tabela_horario_id = $1`,
             tabelaId,
           ),
-        ).rejects.toThrow(/permission denied/i);
+        ).rejects.toThrow(/periodo_horario_sem_sobreposicao/);
       } finally {
         await appClient.$disconnect();
       }

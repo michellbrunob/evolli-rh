@@ -499,7 +499,7 @@ const MATRICULA_FORA_DA_EQUIPE = "DEMO-A-0202";
 /**
  * T177 — o que a admissão exige além do nome: data de nascimento e os três
  * contatos. Valores SINTÉTICOS; o domínio é reservado (`example.test`).
- * Endereço é opcional e fica de fora.
+ * Endereço é opcional e fica de fora. T215 — e o primeiro salário.
  *
  * T179 — o e-mail pessoal é único na mesma empresa: cada pessoa da
  * demonstração ganha o seu, derivado da matrícula. Os telefones já estão na
@@ -511,6 +511,8 @@ function camposObrigatoriosDaAdmissao(matricula: unknown) {
     .replace(/[^a-z0-9]+/g, ".");
   return {
     perfilPessoal: { dataNascimento: "1990-01-15" },
+    // T215 — a admissão exige o primeiro salário (abre a linha do tempo).
+    contrato: { salarioBruto: "1621.00" },
     contatos: {
       emailPessoal: `pessoa.demo.${sufixo}@example.test`,
       celular: "+5511900000000",

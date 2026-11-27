@@ -21,6 +21,8 @@ import {
 
 /** T215 — Políticas de férias: as entradas (as mesmas listas da tela). */
 const DIA_CIVIL = /^\d{4}-\d{2}-\d{2}$/;
+// Recusa caracteres de controle (exceto a quebra de linha) no texto livre.
+// eslint-disable-next-line no-control-regex
 const SEM_CONTROLE_COM_LINHA = /^[^\u0000-\u0009\u000B-\u001F\u007F]*$/;
 const TIPOS: readonly TipoVinculo[] = [
   "clt",
