@@ -351,7 +351,7 @@ describe("T215 — aba Salários", () => {
   it("desligado: só leitura — nada de Nova alteração, ⋯ ou Registrar reajuste", async () => {
     const encerrado = {
       ...COM_REAJUSTES,
-      vinculo: { ...COM_REAJUSTES.vinculo, situacao: "encerrado" },
+      vinculo: { ...COM_REAJUSTES.vinculo, situacao: "encerrado" as const },
     };
     montar(servico(encerrado));
     await screen.findByRole("region", { name: "Salário atual" });
@@ -371,7 +371,7 @@ describe("T215 — aba Salários", () => {
     montar(
       servico({
         ...historico([]),
-        vinculo: { ...historico([]).vinculo, situacao: "encerrado" },
+        vinculo: { ...historico([]).vinculo, situacao: "encerrado" as const },
       }),
     );
     expect(await screen.findByText("Nenhum salário registrado")).toBeTruthy();

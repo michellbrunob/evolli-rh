@@ -8,8 +8,11 @@
  *   nível e gestor direto são do contrato e se editam aqui.
  * - **Contrato:** tipo, admissão e desligamento são do vínculo (só leitura);
  *   jornada semanal, escala e matrícula se editam.
- * - **Remuneração** e **Informações adicionais:** salário bruto (o líquido é
- *   estimado na tela), conselho e registro, dependentes para IRRF e pensão.
+ * - **Remuneração:** o salário bruto é SÓ LEITURA (o período vigente da aba
+ *   Salários); mudar é registrar uma alteração com data lá, com o atalho
+ *   ao lado. O líquido é estimado na tela.
+ * - **Informações adicionais:** conselho e registro, dependentes para IRRF e
+ *   pensão.
  *
  * Os valores editáveis moram na página (um formulário só); esta seção só os
  * desenha e lê, sozinha, o que é só de leitura (lotação e gestores).
@@ -29,13 +32,13 @@ import {
   LinhaDoCadastro,
   SecaoDoCadastro,
 } from "../../../components/cadastro/CadastroEmEtapas";
+import { rotaDaFicha } from "../../../app/rotasDoShell";
 import { formatarDiaCivil } from "../../../format/data";
 import { ListaDeEscolha } from "../../../ui";
 import {
   OPCOES_CONSELHO,
   OPCOES_ESCALA,
   OPCOES_NIVEL,
-  mascararReais,
 } from "../NovaAdmissaoScreen";
 import {
   calcularSalarioLiquido,
@@ -45,6 +48,7 @@ import {
 import {
   type CampoProfissional,
   type ValoresProfissionais,
+  MATRICULA_MAXIMO,
   ROTULO_DO_TIPO_DE_VINCULO,
 } from "./dadosProfissionais";
 
@@ -367,7 +371,7 @@ export function SecaoDadosProfissionais({
         >
           <input
             type="text"
-            maxLength={30}
+            maxLength={MATRICULA_MAXIMO}
             autoComplete="off"
             placeholder="Ex.: 000123"
             value={valores.matricula}
@@ -386,22 +390,27 @@ export function SecaoDadosProfissionais({
       >
         <LinhaDoCadastro
           rotulo="Salário bruto"
+          ajuda="O salário vigente, da aba Salários."
           paraId={propsDoCampo("salarioBruto").id}
         >
           <div className="cadastro-etapas__com-prefixo">
             <span aria-hidden="true">R$</span>
             <input
               type="text"
-              inputMode="numeric"
-              placeholder="0,00"
+              readOnly
+              placeholder="—"
               value={valores.salarioBruto}
-              onChange={(e) =>
-                onAlterar("salarioBruto", mascararReais(e.target.value))
-              }
               {...propsDoCampo("salarioBruto")}
             />
           </div>
           {erroDe("salarioBruto")}
+          <p className="cadastro-etapas__linha-ajuda editar-colaborador__nota">
+            Para mudar o salário, registre uma alteração com data na{" "}
+            <a href={rotaDaFicha({ colaboradorId, aba: "salarios" })}>
+              aba Salários
+            </a>
+            . O valor anterior fica no histórico.
+          </p>
         </LinhaDoCadastro>
         <LinhaDoCadastro
           rotulo="Salário líquido"

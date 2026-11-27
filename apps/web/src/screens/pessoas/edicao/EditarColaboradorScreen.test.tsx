@@ -910,11 +910,54 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
     expect(campo("Dependentes (IRRF)")).toHaveValue("1");
   });
 
-  it("salvar grava o bloco inteiro do contrato, com a matrícula", async () => {
+  it("salário bruto é só leitura, com o atalho para a aba Salários", async () => {
     montar("dados-profissionais");
     await screen.findByDisplayValue("5.000,00");
-    fireEvent.change(campo("Salário bruto"), { target: { value: "600000" } });
-    expect(campo("Salário bruto")).toHaveValue("6.000,00");
+    expect(campo("Salário bruto")).toHaveAttribute("readonly");
+    expect(screen.getByRole("link", { name: "aba Salários" })).toHaveAttribute(
+      "href",
+      `#/pessoas/colaboradores/${ID}/salarios`,
+    );
+  });
+
+  it("salário recusado pelo servidor: a mensagem fica embaixo do campo", async () => {
+    vi.mocked(registrarContratoDoColaborador).mockRejectedValueOnce(
+      new ApiError(422, "Erro na requisição.", {
+        erros: [{ campo: "salarioBruto", motivo: "nao_se_aplica" }],
+      }),
+    );
+    montar("dados-profissionais");
+    await screen.findByDisplayValue("5.000,00");
+    escolher("Nível", "Sênior");
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    expect(
+      await screen.findByText(
+        "O salário mudou na aba Salários depois que esta página abriu. Recarregue para ver o valor atual.",
+      ),
+    ).toBeInTheDocument();
+    expect(campo("Salário bruto")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("matrícula fora da regra da API é recusada antes de enviar", async () => {
+    montar("dados-profissionais");
+    await screen.findByDisplayValue("0042");
+    fireEvent.change(campo("Matrícula"), { target: { value: "MAT 42" } });
+    fireEvent.click(
+      within(rodape()).getByRole("button", { name: "Salvar alterações" }),
+    );
+    expect(
+      await screen.findByText(
+        "Use de 2 a 32 caracteres: letras sem acento, números, hífen ou sublinhado.",
+      ),
+    ).toBeInTheDocument();
+    expect(registrarContratoDoColaborador).not.toHaveBeenCalled();
+  });
+
+  it("salvar grava o bloco inteiro do contrato, com a matrícula (sem o salário)", async () => {
+    montar("dados-profissionais");
+    await screen.findByDisplayValue("5.000,00");
     escolher("Nível", "Sênior");
     fireEvent.change(campo("Pensão alimentícia"), {
       target: { value: "12,5" },
@@ -928,7 +971,6 @@ describe("T215 — Editar colaborador: Dados profissionais", () => {
         gestorDiretoId: GESTORA,
         jornadaSemanalHoras: 44,
         escala: "5x2",
-        salarioBruto: "6000.00",
         conselhoProfissional: "crc",
         registroProfissional: "123456/SP",
         dependentesIrrf: 1,

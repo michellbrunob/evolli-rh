@@ -2,14 +2,27 @@
  * T215 — Dados profissionais da página "Editar colaborador": o contrato do
  * vínculo principal (`GET/PUT /v1/colaboradores/:id/contrato`) como a tela o
  * edita, e de volta como o servidor o grava. O `PUT` substitui o bloco
- * inteiro: o corpo leva sempre os nove campos e a matrícula.
+ * inteiro: o corpo leva sempre os campos editáveis e a matrícula.
+ *
+ * O salário NÃO vai no corpo: aqui ele é só leitura (o espelho do período
+ * vigente). Mudar o salário é registrar uma alteração com data na aba
+ * Salários — assim um aumento não vira retroativo, o valor anterior fica no
+ * histórico e um formulário aberto há tempo não apaga um reajuste.
  */
 import type { TipoVinculo } from "../../../api/colaboradoresClient";
 import type {
   ContratoDoColaboradorApi,
   RegistrarContratoDto,
 } from "../../../api/edicaoColaboradorClient";
-import { formatarReais, lerValorEmReais } from "../salarioLiquido";
+import { formatarReais } from "../salarioLiquido";
+
+/**
+ * A regra da matrícula na API (`MATRICULA_PATTERN`): 2 a 32 caracteres,
+ * letras maiúsculas sem acento, dígitos, hífen e sublinhado. A tela grava em
+ * maiúsculas.
+ */
+export const MATRICULA_PADRAO = /^[A-Z0-9_-]{2,32}$/;
+export const MATRICULA_MAXIMO = 32;
 
 export interface ValoresProfissionais {
   readonly nivel: string;
@@ -73,7 +86,6 @@ function inteiroOuNulo(valor: string): number | null {
 export function dtoDoContrato(v: ValoresProfissionais): RegistrarContratoDto {
   const semConselho =
     v.conselhoProfissional === "" || v.conselhoProfissional === "nenhum";
-  const salario = lerValorEmReais(v.salarioBruto);
   const pensao = v.pensaoAlimenticiaPercentual.trim().replace(",", ".");
   const registro = v.registroProfissional.trim();
   const matricula = v.matricula.trim().toUpperCase();
@@ -82,7 +94,6 @@ export function dtoDoContrato(v: ValoresProfissionais): RegistrarContratoDto {
     gestorDiretoId: v.gestorDiretoId === "" ? null : v.gestorDiretoId,
     jornadaSemanalHoras: inteiroOuNulo(v.jornadaSemanalHoras),
     escala: v.escala === "" || v.escala === "nao_informada" ? null : v.escala,
-    salarioBruto: salario === null ? null : salario.toFixed(2),
     conselhoProfissional: semConselho ? null : v.conselhoProfissional,
     registroProfissional: semConselho || registro === "" ? null : registro,
     dependentesIrrf: inteiroOuNulo(v.dependentesIrrf),
@@ -116,19 +127,15 @@ export function validarProfissionais(
   ) {
     erros.pensaoAlimenticiaPercentual = "Informe um percentual de 0 a 100.";
   }
-  if (
-    v.salarioBruto.trim() !== "" &&
-    lerValorEmReais(v.salarioBruto) === null
-  ) {
-    erros.salarioBruto = "Informe o salário em reais, como 5.000,00.";
-  }
   const semConselho =
     v.conselhoProfissional === "" || v.conselhoProfissional === "nenhum";
   if (!semConselho && v.registroProfissional.trim() === "") {
     erros.registroProfissional = "Informe o número do registro.";
   }
-  if (v.matricula.trim().length > 30) {
-    erros.matricula = "A matrícula tem no máximo 30 caracteres.";
+  const matricula = v.matricula.trim().toUpperCase();
+  if (matricula !== "" && !MATRICULA_PADRAO.test(matricula)) {
+    erros.matricula =
+      "Use de 2 a 32 caracteres: letras sem acento, números, hífen ou sublinhado.";
   }
   return erros;
 }
@@ -146,6 +153,13 @@ export function errosDaRecusaDoContrato(
           : "Confira a matrícula.";
     } else if (campo === "gestorDiretoId") {
       saida.gestorDiretoId = "Escolha outra pessoa como gestor direto.";
+    } else if (campo === "salarioBruto") {
+      saida.salarioBruto =
+        motivo === "nao_se_aplica"
+          ? "O salário mudou na aba Salários depois que esta página abriu. Recarregue para ver o valor atual."
+          : motivo === "obrigatorio"
+            ? "O salário não pode ficar vazio. Para mudar, registre uma alteração na aba Salários."
+            : "Confira o salário na aba Salários.";
     }
   }
   return saida;
