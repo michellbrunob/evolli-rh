@@ -576,17 +576,19 @@ describe("T216 — uma pergunta por tela", () => {
       { key: "Enter" },
     );
     expect(idAtual()).toBe("q-conc");
+    expect(screen.getByRole("button", { name: "Próximo" })).toBeDisabled();
     expect(emAlerta("Escolha uma opção para continuar.")).not.toBeNull();
     expect(radios(/Tenho clareza/)).toHaveAttribute("aria-invalid", "true");
   });
 
   it("Enter no parágrafo não avança (é quebra de linha)", async () => {
-    await comecar();
+    const cliente = await comecar();
     irAoFim();
     const campo = screen.getByLabelText(/comentário/);
     fireEvent.change(campo, { target: { value: "Linha" } });
     fireEvent.keyDown(campo, { key: "Enter" });
     expect(idAtual()).toBe("q-par");
+    expect(cliente.enviarRespostas).not.toHaveBeenCalled();
   });
 
   it("a última pergunta envia", async () => {
