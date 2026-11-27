@@ -315,6 +315,7 @@ export function PaginaDaResposta({
         <button
           type="button"
           role="tab"
+          className="evolli-aba"
           aria-selected={aba === "geral"}
           onClick={() => setAba("geral")}
         >
@@ -323,6 +324,7 @@ export function PaginaDaResposta({
         <button
           type="button"
           role="tab"
+          className="evolli-aba"
           aria-selected={aba === "respostas"}
           onClick={() => setAba("respostas")}
         >

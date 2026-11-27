@@ -513,6 +513,7 @@ function ResultadosInterno({
             key={a.valor}
             type="button"
             role="tab"
+            className="evolli-aba"
             aria-selected={aba === a.valor}
             onClick={() => setAba(a.valor)}
           >

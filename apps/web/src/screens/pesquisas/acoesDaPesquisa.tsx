@@ -11,7 +11,13 @@ import type {
   PesquisaResumo,
   StatusPesquisa,
 } from "../../api/pesquisasClient";
-import { Button, FormActions, StatusBadge } from "../../components";
+import {
+  Button,
+  FormActions,
+  PontoDoStatus,
+  StatusBadge,
+  classesDoStatus,
+} from "../../components";
 import { plural } from "../../format/plural";
 import {
   Dialog,
@@ -115,11 +121,11 @@ export function MenuDeStatus({
       <DropdownMenu>
         {/* O gatilho é um botão com as classes da pílula do sistema. */}
         <DropdownMenuTrigger
-          className={`evolli-badge evolli-badge--${tom} pesquisas__status-gatilho`}
+          className={`${classesDoStatus(tom)} pesquisas__status-gatilho`}
           aria-label={`Mudar status, hoje ${ROTULO_DO_STATUS[pesquisa.status]}`}
           disabled={mudando}
         >
-          <span className="evolli-badge__ponto" aria-hidden="true" />
+          <PontoDoStatus />
           <span className="evolli-badge__label">
             {ROTULO_DO_STATUS[pesquisa.status]}
           </span>
