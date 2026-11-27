@@ -13,7 +13,11 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { LotacaoMinima, lotacaoMinima } from "./admissao-obrigatoria";
+import {
+  LotacaoMinima,
+  contratoDaAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T177 — Cadastro de colaborador, Módulo 1: dados pessoais, endereço e
@@ -258,6 +262,7 @@ describe("Cadastro de colaborador — Módulo 1 (e2e)", () => {
       endereco: ENDERECO,
       contatos: { ...CONTATOS, emailPessoal: emailDaAdmissao(matricula) },
       ...extra,
+      contrato: contratoDaAdmissao(extra["contrato"]),
     };
   }
 

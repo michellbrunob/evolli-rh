@@ -1,3 +1,4 @@
+import { campoPeloRotulo } from "../test/campoPeloRotulo";
 import {
   act,
   fireEvent,
@@ -32,6 +33,7 @@ import { listarCargos } from "../api/cargoClient";
 import {
   buscarColaborador,
   listarColaboradores,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
 } from "../api/colaboradoresClient";
 import { listarMovimentacoes } from "../api/movimentacaoClient";
@@ -184,6 +186,8 @@ vi.mock("../api/colaboradoresClient", async () => {
     ...actual,
     buscarColaborador: vi.fn(),
     listarVinculosDoColaborador: vi.fn(),
+    // T215 — a aba Documentos da ficha lê os arquivos do colaborador.
+    listarDocumentosDoColaborador: vi.fn(),
     // T207 — as leituras do Dashboard passam pela implementação real (como
     // antes: fetch sem servidor, ou o fetch falso do teste); os testes da
     // vista do quadro as resolvem e devolvem depois.
@@ -1102,7 +1106,9 @@ async function abrirNovaAdmissaoPorRota() {
   window.history.replaceState(null, "", "#/pessoas/nova-admissao");
   vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
   render(<AutenticacaoApp />);
-  return screen.findByLabelText(/^Nome completo/);
+  // Espera pelo localizador rápido: o findByLabelText refaz a busca cara a
+  // cada 50 ms (veja test/campoPeloRotulo.ts).
+  return waitFor(() => campoPeloRotulo(/^Nome completo/));
 }
 
 describe("T163/T189 — contexto empresarial ativo", () => {
@@ -1135,7 +1141,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
 
     // Busca antiga digitada na empresa Alfa.
     const busca = (await screen.findByLabelText(
-      /Buscar por nome ou matrícula/,
+      /Buscar por nome, CPF, e-mail ou ID/,
     )) as HTMLInputElement;
     fireEvent.change(busca, { target: { value: "busca da empresa anterior" } });
 
@@ -1154,7 +1160,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(window.location.hash).toBe("#/pessoas/colaboradores");
     // Recriado: a busca da empresa anterior não sobrou.
     const buscaNova = (await screen.findByLabelText(
-      /Buscar por nome ou matrícula/,
+      /Buscar por nome, CPF, e-mail ou ID/,
     )) as HTMLInputElement;
     expect(buscaNova.value).toBe("");
     // Foco no título da tela de destino; anúncio da troca.
@@ -1187,12 +1193,12 @@ describe("T163/T189 — contexto empresarial ativo", () => {
   it("T198 — ficha aberta pela rota: a troca volta à listagem da empresa nova, sem a ficha anterior", async () => {
     trocarParaBetaNoServidor();
     const rotaDaFicha =
-      "#/pessoas/colaboradores/11111111-1111-4111-8111-111111111111/contratuais";
+      "#/pessoas/colaboradores/11111111-1111-4111-8111-111111111111/dados";
     window.history.replaceState(null, "", rotaDaFicha);
     vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
     render(<AutenticacaoApp />);
     await waitFor(() =>
-      expect(document.querySelector(".ficha-colaborador")).not.toBeNull(),
+      expect(document.querySelector(".ficha-ref")).not.toBeNull(),
     );
     expect(window.location.hash).toBe(rotaDaFicha);
 
@@ -1205,7 +1211,7 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       expect(window.location.hash).toBe("#/pessoas/colaboradores"),
     );
     // A ficha da empresa anterior não é reaberta na empresa nova.
-    expect(document.querySelector(".ficha-colaborador")).toBeNull();
+    expect(document.querySelector(".ficha-ref")).toBeNull();
     await waitFor(() =>
       expect(document.activeElement?.id).toBe("colaboradores-titulo"),
     );
@@ -1280,16 +1286,6 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       criadoEm: "2026-01-01T00:00:00.000Z",
       atualizadoEm: "2026-01-01T00:00:00.000Z",
     };
-    const DOC = {
-      id: "d-1",
-      empresaId: EMPRESA_ALFA.id,
-      colaboradorId: ANA_ID,
-      tipoDocumentoId: TIPO.id,
-      estado: "upload_desabilitado" as const,
-      substituiDocumentoId: null,
-      criadoEm: "2026-03-10T12:00:00.000Z",
-      atualizadoEm: "2026-03-10T12:00:00.000Z",
-    };
     const paginado = <T,>(itens: T[]) => ({
       itens,
       pagina: 1,
@@ -1326,80 +1322,18 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     it("troca de empresa com a leitura em curso: volta à listagem da empresa nova, e a resposta atrasada não aparece", async () => {
       trocarParaBetaNoServidor();
       anaNaEmpresaAlfa();
-      let entregar!: (v: ReturnType<typeof paginado<typeof DOC>>) => void;
-      vi.mocked(listarDocumentos).mockReturnValue(
+      let entregar!: (v: unknown) => void;
+      vi.mocked(listarDocumentosDoColaborador).mockReturnValue(
         new Promise((ok) => {
           entregar = ok;
-        }),
+        }) as never,
       );
       window.history.replaceState(null, "", ROTA);
       vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
       render(<AutenticacaoApp />);
       await screen.findByRole("tab", { name: "Documentos", selected: true });
-      await waitFor(() => expect(listarDocumentos).toHaveBeenCalledTimes(1));
-
-      await trocarPeloMenuPara("Empresa Beta");
       await waitFor(() =>
-        expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
-      );
-      await waitFor(() =>
-        expect(window.location.hash).toBe("#/pessoas/colaboradores"),
-      );
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-
-      await act(async () => {
-        entregar(paginado([DOC]));
-      });
-      const main = document.getElementById("conteudo-principal")!;
-      expect(main.textContent).not.toMatch(
-        /Identidade \(teste\)|Documentos registrados/,
-      );
-      expect(listarDocumentos).toHaveBeenCalledTimes(1);
-    });
-
-    it("tipo escolhido e não salvo: a troca de empresa pergunta antes, e continuar mantém a escolha", async () => {
-      trocarParaBetaNoServidor();
-      anaNaEmpresaAlfa();
-      vi.mocked(listarDocumentos).mockResolvedValue(paginado([DOC]));
-      window.history.replaceState(null, "", ROTA);
-      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-      render(<AutenticacaoApp />);
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Registrar documento" }),
-      );
-      fireEvent.change(screen.getByLabelText(/^Tipo do documento/), {
-        target: { value: TIPO.id },
-      });
-
-      await trocarPeloMenuPara("Empresa Beta");
-      expect(
-        await screen.findByText(
-          /Há edição em andamento em: Ficha do colaborador\./,
-        ),
-      ).toBeInTheDocument();
-      fireEvent.click(
-        screen.getByRole("button", { name: "Continuar editando" }),
-      );
-      expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
-      expect(screen.getByLabelText(/^Tipo do documento/)).toHaveValue(TIPO.id);
-    });
-
-    it("T203 — aba Solicitações com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {
-      trocarParaBetaNoServidor();
-      anaNaEmpresaAlfa();
-      let entregar!: (v: unknown) => void;
-      vi.mocked(listarSolicitacoesPessoas).mockReturnValue(
-        new Promise((ok) => {
-          entregar = ok;
-        }) as never,
-      );
-      const rotaSolicitacoes = `#/pessoas/colaboradores/${ANA_ID}/solicitacoes`;
-      window.history.replaceState(null, "", rotaSolicitacoes);
-      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-      render(<AutenticacaoApp />);
-      await screen.findByRole("tab", { name: "Solicitações", selected: true });
-      await waitFor(() =>
-        expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1),
+        expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(1),
       );
 
       await trocarPeloMenuPara("Empresa Beta");
@@ -1409,137 +1343,14 @@ describe("T163/T189 — contexto empresarial ativo", () => {
       await waitFor(() =>
         expect(window.location.hash).toBe("#/pessoas/colaboradores"),
       );
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-      // Só leitura: a troca não pergunta nada.
-      expect(screen.queryByText(/Há edição em andamento/)).toBeNull();
+      expect(document.querySelector(".ficha-ref")).toBeNull();
 
       await act(async () => {
-        entregar({
-          itens: [
-            {
-              id: "s-1",
-              empresaId: EMPRESA_ALFA.id,
-              vinculoId: "33333333-3333-4333-8333-333333333333",
-              tipo: "atestado",
-              motivo: "atestado_apresentado",
-              situacao: "enviada",
-              periodoReferencia: "2026-10-05",
-              registradoPorUserId: "u-1",
-              enviadaEm: null,
-              primeiraRevisaoEm: null,
-              criadoEm: "2026-10-05T12:00:00.000Z",
-              atualizadoEm: "2026-10-05T12:00:00.000Z",
-            },
-          ],
-          pagina: 1,
-          tamanhoPagina: 100,
-          total: 1,
-        });
+        entregar([]);
       });
       const main = document.getElementById("conteudo-principal")!;
-      expect(main.textContent).not.toMatch(/Atestado|Solicitações de /);
-      expect(listarSolicitacoesPessoas).toHaveBeenCalledTimes(1);
-    });
-
-    it("T204 — 'Nova solicitação' com o tipo escolhido: a troca de empresa pergunta antes, e continuar mantém a escolha", async () => {
-      trocarParaBetaNoServidor();
-      anaNaEmpresaAlfa();
-      vi.mocked(listarSolicitacoesPessoas).mockResolvedValue({
-        itens: [],
-        pagina: 1,
-        tamanhoPagina: 100,
-        total: 0,
-      });
-      const rotaSolicitacoes = `#/pessoas/colaboradores/${ANA_ID}/solicitacoes`;
-      window.history.replaceState(null, "", rotaSolicitacoes);
-      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-      render(<AutenticacaoApp />);
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Nova solicitação" }),
-      );
-      const janela = screen.getByRole("dialog", { name: "Nova solicitação" });
-      fireEvent.change(within(janela).getByLabelText(/^Tipo/), {
-        target: { value: "ferias" },
-      });
-
-      await trocarPeloMenuPara("Empresa Beta");
-      expect(
-        await screen.findByText(
-          /Há edição em andamento em: Nova solicitação\./,
-        ),
-      ).toBeInTheDocument();
-      fireEvent.click(
-        screen.getByRole("button", { name: "Continuar editando" }),
-      );
-      expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
-      expect(
-        within(
-          screen.getByRole("dialog", { name: "Nova solicitação" }),
-        ).getByLabelText(/^Tipo/),
-      ).toHaveValue("ferias");
-    });
-
-    it("T202 — aba Registros de ponto com a leitura em curso: a troca volta à listagem da empresa nova e a resposta atrasada não aparece", async () => {
-      trocarParaBetaNoServidor();
-      anaNaEmpresaAlfa();
-      const momento = "2026-10-05T11:00:00.000Z";
-      let entregar!: (v: unknown) => void;
-      vi.mocked(listarPontosDoVinculo).mockReturnValue(
-        new Promise((ok) => {
-          entregar = ok;
-        }) as never,
-      );
-      const rotaPonto = `#/pessoas/colaboradores/${ANA_ID}/ponto/2026-10`;
-      window.history.replaceState(null, "", rotaPonto);
-      vi.mocked(refreshCsrfToken).mockResolvedValueOnce("token");
-      render(<AutenticacaoApp />);
-      await screen.findByRole("tab", {
-        name: "Registros de ponto",
-        selected: true,
-      });
-      await waitFor(() =>
-        expect(listarPontosDoVinculo).toHaveBeenCalledTimes(1),
-      );
-
-      await trocarPeloMenuPara("Empresa Beta");
-      await waitFor(() =>
-        expect(seletorDoMenu()).toHaveTextContent("Empresa Beta"),
-      );
-      await waitFor(() =>
-        expect(window.location.hash).toBe("#/pessoas/colaboradores"),
-      );
-      expect(document.querySelector(".ficha-colaborador")).toBeNull();
-      // Sem edição pendente: a aba de ponto só lê, a troca não pergunta.
-      expect(screen.queryByText(/Há edição em andamento/)).toBeNull();
-
-      await act(async () => {
-        entregar({
-          itens: [
-            {
-              id: "e-1",
-              vinculoId: "33333333-3333-4333-8333-333333333333",
-              empresaId: EMPRESA_ALFA.id,
-              tipo: "entrada",
-              momento,
-              competencia: "2026-10",
-              registradoPorUserId: "u-1",
-              registradoEm: momento,
-              efetivo: {
-                tipo: "entrada",
-                momento,
-                anulado: false,
-                totalAjustes: 0,
-              },
-            },
-          ],
-          pagina: 1,
-          tamanhoPagina: 100,
-          total: 1,
-        });
-      });
-      const main = document.getElementById("conteudo-principal")!;
-      expect(main.textContent).not.toMatch(/05\/10\/2026|Registros de ponto/);
-      expect(listarPontosDoVinculo).toHaveBeenCalledTimes(1);
+      expect(main.textContent).not.toMatch(/Documentos obrigatórios/);
+      expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1573,9 +1384,11 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(
       await screen.findByRole("tab", { name: /^Ativos/, selected: true }),
     ).toBeInTheDocument();
+    // T215 — sem filtros: nenhum chip e o botão "Filtrar" sem contagem.
+    expect(screen.queryByRole("group", { name: "Filtros ativos" })).toBeNull();
     expect(
-      (screen.getByLabelText("Tipo de vínculo") as HTMLSelectElement).value,
-    ).toBe("");
+      screen.getByRole("button", { name: /^Filtrar/ }),
+    ).toHaveAccessibleName("Filtrar");
     await waitFor(() =>
       expect(document.activeElement?.id).toBe("colaboradores-titulo"),
     );
@@ -1594,9 +1407,9 @@ describe("T163/T189 — contexto empresarial ativo", () => {
 
     expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
-    expect(
-      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
-    ).toBe("Pessoa Sintetica Rascunho");
+    expect((campoPeloRotulo(/^Nome completo/) as HTMLInputElement).value).toBe(
+      "Pessoa Sintetica Rascunho",
+    );
   });
 
   it("T195 — edição pendente numa etapa adiantada: continuar editando mantém a etapa e os dados", async () => {
@@ -1604,11 +1417,14 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     const nome = await abrirNovaAdmissaoPorRota();
     const etapas = within(conteudoDoCadastro());
     fireEvent.change(nome, { target: { value: "Pessoa Sintetica Rascunho" } });
-    fireEvent.change(etapas.getByLabelText(/^Data de nascimento/), {
-      target: { value: "1990-05-20" },
-    });
+    fireEvent.change(
+      campoPeloRotulo(/^Data de nascimento/, conteudoDoCadastro()),
+      {
+        target: { value: "1990-05-20" },
+      },
+    );
     // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
-    fireEvent.change(etapas.getByLabelText(/^CPF$/), {
+    fireEvent.change(campoPeloRotulo(/^CPF$/, conteudoDoCadastro()), {
       target: { value: "529.982.247-25" },
     });
     fireEvent.click(
@@ -1627,7 +1443,12 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     expect(trocarEmpresaDoContexto).not.toHaveBeenCalled();
     expect(titulo).toBeVisible();
     expect(
-      (etapas.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
+      (
+        campoPeloRotulo(
+          /^Nome completo/,
+          conteudoDoCadastro(),
+        ) as HTMLInputElement
+      ).value,
     ).toBe("Pessoa Sintetica Rascunho");
   });
 
@@ -1727,9 +1548,9 @@ describe("T163/T189 — contexto empresarial ativo", () => {
     await waitFor(() =>
       expect(vi.mocked(obterUsuarioAtual).mock.calls.length).toBe(leituras + 1),
     );
-    expect(
-      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
-    ).toBe("Pessoa Sintetica Foco");
+    expect((campoPeloRotulo(/^Nome completo/) as HTMLInputElement).value).toBe(
+      "Pessoa Sintetica Foco",
+    );
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
@@ -1824,9 +1645,9 @@ describe("T163/T189 — contexto empresarial ativo", () => {
 
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     expect(trocarEmpresaDoContexto).toHaveBeenCalledWith(EMPRESA_ALFA.id);
-    expect(
-      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
-    ).toBe("Pessoa Sintetica Volta");
+    expect((campoPeloRotulo(/^Nome completo/) as HTMLInputElement).value).toBe(
+      "Pessoa Sintetica Volta",
+    );
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
     expect(
       document.querySelector(".autenticacao-app__arvore"),
@@ -1942,23 +1763,33 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
   async function abrirReferenciaRapida() {
     await abrirNovaAdmissaoPorRota();
     const etapas = within(conteudoDoCadastro());
-    fireEvent.change(etapas.getByLabelText(/Nome completo/), {
+    fireEvent.change(campoPeloRotulo(/Nome completo/, conteudoDoCadastro()), {
       target: { value: "Pessoa Sintetica Referencia" },
     });
-    fireEvent.change(etapas.getByLabelText(/^Data de nascimento/), {
-      target: { value: "1990-05-20" },
-    });
+    fireEvent.change(
+      campoPeloRotulo(/^Data de nascimento/, conteudoDoCadastro()),
+      {
+        target: { value: "1990-05-20" },
+      },
+    );
     // T209 — CPF obrigatório na etapa 1 (sintético, dígitos válidos).
-    fireEvent.change(etapas.getByLabelText(/^CPF$/), {
+    fireEvent.change(campoPeloRotulo(/^CPF$/, conteudoDoCadastro()), {
       target: { value: "529.982.247-25" },
     });
     fireEvent.click(
       within(rodapeDoCadastro()).getByRole("button", { name: "Próxima etapa" }),
     );
-    await etapas.findByRole("heading", {
-      level: 2,
-      name: /Dados profissionais$/,
-    });
+    // A etapa 2 visível (as quatro ficam montadas; só a atual sem `hidden`),
+    // sem o findByRole sobre o documento inteiro.
+    await waitFor(() =>
+      expect(
+        [
+          ...conteudoDoCadastro().querySelectorAll<HTMLElement>(
+            "section.cadastro-etapas__etapa:not([hidden]) h2",
+          ),
+        ].map((h) => h.textContent),
+      ).toEqual([expect.stringMatching(/Dados profissionais$/)]),
+    );
     const mais = await etapas.findByRole("button", {
       name: "Cadastrar novo departamento",
     });
@@ -2033,8 +1864,9 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     // A admissão por trás do modal também ficou, na mesma etapa.
     expect(
       (
-        within(conteudoDoCadastro()).getByLabelText(
+        campoPeloRotulo(
           /Nome completo/,
+          conteudoDoCadastro(),
         ) as HTMLInputElement
       ).value,
     ).toBe("Pessoa Sintetica Referencia");
@@ -2104,8 +1936,9 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
     expect(campoDaReferencia(/^Código/).value).toBe("");
     expect(
       (
-        within(conteudoDoCadastro()).getByLabelText(
+        campoPeloRotulo(
           /Nome completo/,
+          conteudoDoCadastro(),
         ) as HTMLInputElement
       ).value,
     ).toBe("Pessoa Sintetica Referencia");
@@ -2217,9 +2050,9 @@ describe("T189 (B1/N1) — referência rápida pendente e conferência antes de 
       }),
     );
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(
-      (screen.getByLabelText(/^Nome completo/) as HTMLInputElement).value,
-    ).toBe("Pessoa Sintetica Volta");
+    expect((campoPeloRotulo(/^Nome completo/) as HTMLInputElement).value).toBe(
+      "Pessoa Sintetica Volta",
+    );
     expect(seletorDoMenu()).toHaveTextContent("Empresa Alfa");
     expect(
       document.querySelector(".autenticacao-app__arvore"),

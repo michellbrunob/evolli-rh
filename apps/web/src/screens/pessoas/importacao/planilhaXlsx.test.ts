@@ -11,6 +11,7 @@ import {
   TIPOS_ACEITOS,
   conferirPlanilha,
   lerPlanilha,
+  lerSalarioDaPlanilha,
   type Referencias,
 } from "./planilhaColaboradores";
 import {
@@ -32,6 +33,7 @@ const CABECALHO: readonly string[] = [
   "data_nascimento",
   "departamento_codigo",
   "cargo_codigo",
+  "salario",
   "matricula",
   "unidade_codigo",
 ];
@@ -49,6 +51,7 @@ const LINHA_VALIDA: readonly string[] = [
   "15/05/1990",
   "ADM",
   "ANALISTA",
+  "1.621,00",
   "",
   "SEDE",
 ];
@@ -89,8 +92,8 @@ describe("T212 — modelo .xlsx", () => {
     expect(linhas[0]).toEqual(CABECALHO);
     expect(linhas[1]![0]).toBe(NOME_DA_LINHA_DE_EXEMPLO);
     expect(linhas).toHaveLength(2);
-    // Nada fora das 8 colunas.
-    for (const linha of linhas) expect(linha.length).toBeLessThanOrEqual(8);
+    // Nada fora das 9 colunas.
+    for (const linha of linhas) expect(linha.length).toBeLessThanOrEqual(9);
   });
 
   it("a linha sintética é lida e recusada pela conferência (apagar antes de enviar)", async () => {
@@ -104,15 +107,16 @@ describe("T212 — modelo .xlsx", () => {
     });
   });
 
-  it("Exemplos: cabeçalho igual e só linhas fictícias nos 8 campos, com tipos aceitos", async () => {
+  it("Exemplos: cabeçalho igual e só linhas fictícias nos 9 campos, com tipos aceitos e salário", async () => {
     const linhas = (await lerAbasXlsx(gerarModeloXlsx()))[ABA_EXEMPLOS]!;
     expect(linhas[0]).toEqual(CABECALHO);
     expect(linhas.length).toBeGreaterThanOrEqual(3);
     const tipos = new Set(TIPOS_ACEITOS.map(([codigo]) => codigo));
     for (const linha of linhas.slice(1)) {
-      expect(linha.length).toBeLessThanOrEqual(8);
+      expect(linha.length).toBeLessThanOrEqual(9);
       expect(linha[0]).toMatch(/Fictíci[oa]/);
       expect(tipos.has(linha[1] as never)).toBe(true);
+      expect(lerSalarioDaPlanilha(String(linha[6]))).not.toBeNull();
     }
   });
 
@@ -129,13 +133,14 @@ describe("T212 — modelo .xlsx", () => {
       /Google Planilhas/,
       /CSV/,
       /apague/i,
+      /sal[aá]rio/i,
     ]) {
       expect(texto).toMatch(trecho);
     }
     for (const [, rotulo] of TIPOS_ACEITOS) expect(texto).toContain(rotulo);
   });
 
-  it("nenhum dado proibido: sem CPF, salário, RG, contatos, endereço ou foto", async () => {
+  it("nenhum dado proibido: sem CPF, RG, contatos, endereço ou foto (o salário da admissão é obrigatório desde a T215)", async () => {
     const abas = await lerAbasXlsx(gerarModeloXlsx());
     const cabecalhos = [
       abas[ABA_COLABORADORES]![0]!,
@@ -143,7 +148,6 @@ describe("T212 — modelo .xlsx", () => {
     ].flat();
     for (const proibido of [
       /cpf/i,
-      /sal[aá]rio/i,
       /\brg\b/i,
       /telefone|e-?mail|contato/i,
       /endere[cç]o|cep/i,
@@ -208,6 +212,7 @@ describe("T212 — leitura: a mesma conferência do CSV", () => {
           "15/05/1991",
           "NAO-EXISTE",
           "ANALISTA",
+          "1.621,00",
         ],
       ]),
     );
@@ -252,10 +257,40 @@ describe("T212 — leitura: a mesma conferência do CSV", () => {
 
   it("matrícula digitada como número vira texto sem casas decimais", async () => {
     const linha: CelulaXlsx[] = [...LINHA_VALIDA];
-    linha[6] = 1234;
+    linha[7] = 1234;
     const lida = await lerPlanilhaXlsx(pasta([CABECALHO, linha]));
     if ("erro" in lida) throw new Error(lida.erro);
     expect(lida.linhas[0]!.valores.matricula).toBe("1234");
+  });
+
+  it.each([
+    [2045.0000000000002, "2045.00"], // ruído de ponto flutuante do Excel
+    [1621.555, "1621.56"], // meio para cima
+    [1621.554, "1621.55"],
+    [3000.1, "3000.10"],
+    [1621, "1621.00"],
+    [0.005, "0.01"],
+  ])(
+    "salário em célula numérica (%p) arredonda a 2 casas na leitura: %s",
+    async (numero, texto) => {
+      const linha: CelulaXlsx[] = [...LINHA_VALIDA];
+      linha[6] = numero;
+      const lida = await lerPlanilhaXlsx(pasta([CABECALHO, linha]));
+      if ("erro" in lida) throw new Error(lida.erro);
+      expect(lida.linhas[0]!.valores.salario).toBe(texto);
+      const [conferida] = conferirPlanilha(lida, REFERENCIAS, "2026-11-18");
+      expect(conferida!.erros).toEqual([]);
+      expect(lerSalarioDaPlanilha(texto)).toBe(texto);
+    },
+  );
+
+  it("salário em TEXTO com casas extras continua recusado (foi digitado assim)", async () => {
+    const linha: CelulaXlsx[] = [...LINHA_VALIDA];
+    linha[6] = "1621,555";
+    const lida = await lerPlanilhaXlsx(pasta([CABECALHO, linha]));
+    if ("erro" in lida) throw new Error(lida.erro);
+    const [conferida] = conferirPlanilha(lida, REFERENCIAS, "2026-11-18");
+    expect(conferida!.erros.map((e) => e.campo)).toContain("Salário");
   });
 
   it("textos compartilhados (como o Excel grava) também são lidos", async () => {
@@ -410,7 +445,7 @@ describe("T212 — recusas do arquivo inteiro", () => {
     ).toMatch(/cabeçalho/i);
   });
 
-  it("coluna extra no cabeçalho ou conteúdo fora das 8 colunas", async () => {
+  it("coluna extra no cabeçalho ou conteúdo fora das 9 colunas", async () => {
     expect(
       await erroDe(
         pasta([
@@ -421,7 +456,7 @@ describe("T212 — recusas do arquivo inteiro", () => {
     ).toMatch(/fora do modelo|cabeçalho/i);
     expect(
       await erroDe(pasta([CABECALHO, [...LINHA_VALIDA, "valor a mais"]])),
-    ).toMatch(/fora das 8 colunas/i);
+    ).toMatch(/fora das 9 colunas/i);
   });
 
   it("fórmula em qualquer célula", async () => {

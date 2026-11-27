@@ -4,6 +4,10 @@
  * dos tokens: altura de 44 px, borda fina, raio pequeno. O rótulo e as
  * mensagens continuam a cargo do `FormField` existente, que liga `id`,
  * `aria-describedby` e `aria-invalid`.
+ *
+ * T215 (2026-11-26) — telas novas escolhem com `ListaDeEscolha` (lista
+ * própria, como a referência); este `Select` fica para as telas antigas até
+ * serem revisitadas.
  */
 import { forwardRef } from "react";
 import type { InputHTMLAttributes, SelectHTMLAttributes } from "react";

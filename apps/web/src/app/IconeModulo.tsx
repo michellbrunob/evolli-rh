@@ -16,6 +16,7 @@
 
 import {
   IconeAdministracao,
+  IconeBeneficios,
   IconeConfiguracoes,
   IconeDemonstracao,
   IconeEstrutura,
@@ -23,6 +24,7 @@ import {
   IconeLideranca,
   IconePainel,
   IconePessoas,
+  IconeSeguranca,
   type IconeDoEcossistema,
 } from "../ui/icones";
 
@@ -33,7 +35,9 @@ export type IconeModuloId =
   | "estrutura"
   | "jornada"
   | "lideranca"
+  | "beneficios"
   | "administracao"
+  | "seguranca"
   | "configuracoes"
   | "demonstracao";
 
@@ -47,7 +51,9 @@ const ICONES: Readonly<Record<IconeModuloId, IconeDoEcossistema>> = {
   estrutura: IconeEstrutura,
   jornada: IconeJornada,
   lideranca: IconeLideranca,
+  beneficios: IconeBeneficios,
   administracao: IconeAdministracao,
+  seguranca: IconeSeguranca,
   configuracoes: IconeConfiguracoes,
   demonstracao: IconeDemonstracao,
 };

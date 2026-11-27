@@ -137,7 +137,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
   it("T212 — rh: no painel, 'Iniciar importação' espera o arquivo do passo 3 (nada abre antes)", async () => {
     render(<App papelDoAtor="rh" destinoInicial="pessoas" />);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Adicionar colaborador" }),
+      await screen.findByRole("button", { name: "Novo colaborador" }),
     );
     const painel = screen.getByRole("dialog", {
       name: "Adicionar colaborador",
@@ -185,7 +185,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
     );
     render(<App papelDoAtor="rh" destinoInicial="pessoas" />);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Adicionar colaborador" }),
+      await screen.findByRole("button", { name: "Novo colaborador" }),
     );
     const painel = screen.getByRole("dialog", {
       name: "Adicionar colaborador",
@@ -199,7 +199,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
       {
         nome: ABA_COLABORADORES,
         linhas: [
-          "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;matricula;unidade_codigo".split(
+          "nome;tipo_vinculo;data_admissao;data_nascimento;departamento_codigo;cargo_codigo;salario;matricula;unidade_codigo".split(
             ";",
           ),
           [
@@ -209,6 +209,7 @@ describe("T209 (Bloco C) — rota da importação", () => {
             "15/05/1990",
             "ADM",
             "ANALISTA",
+            "1.621,00",
           ],
         ],
       },

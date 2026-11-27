@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter
 import { requestIdMiddleware } from "../src/common/request-id";
 import {
   camposObrigatoriosAdmissao,
+  contratoDaAdmissao,
   lotacaoMinima,
 } from "./admissao-obrigatoria";
 
@@ -508,7 +509,14 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       expect(Object.keys(r.itens[0]!).sort()).toEqual(
         [
           "atualizadoEm",
+          // T215 — página inicial no desenho da referência: contatos, CPF e
+          // salário bruto, só para quem os lê na ficha (aqui, o RH).
+          "contatos",
+          "cpf",
+          "salarioBruto",
           "criadoEm",
+          // T215 — desativado na empresa (lixeira do Editar colaborador).
+          "desativado",
           // T209 — a foto anunciada (só a versão, ou `null`).
           "foto",
           "id",
@@ -865,11 +873,17 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       ]);
       // T199 — os contadores do dashboard, ao lado dos de sempre.
       expect(Object.keys(r.body.contadores).sort()).toEqual([
+        // T215 — indicadores do cartão da página inicial.
+        "admitidosNoMes",
         "ativos",
         "ativosPorTipo",
+        // T215 — desativados na empresa.
+        "desativados",
         "desligados",
+        "desligadosNoAno",
         "emAdmissao",
         "inativos",
+        "serieAtivos",
         "total",
       ]);
       for (const cred of [gestorA, colaboradorA]) {
@@ -1362,6 +1376,8 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       desligados: number;
       total: number;
       ativosPorTipo: Record<string, number>;
+      /** T215 — a série de ativos do cartão (6 meses). */
+      serieAtivos: number[];
     }
 
     async function listarD(
@@ -1561,12 +1577,17 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
 
     it("contadores do escopo: grupos exclusivos que somam o total, e ativos por tipo pelo principal", async () => {
       const r = await listarD(rhD);
-      expect(r.contadores).toEqual({
+      // T215 — os indicadores do cartão (que dependem do dia de hoje) têm
+      // suíte própria; aqui, só a forma da série.
+      expect(r.contadores.serieAtivos).toHaveLength(6);
+      expect(r.contadores).toMatchObject({
         ativos: 4,
         inativos: 4,
         emAdmissao: 2,
         desligados: 2,
         total: 8,
+        // T215 — nenhum desativado.
+        desativados: 0,
         ativosPorTipo: {
           clt: 1,
           estagio: 1,
@@ -1655,12 +1676,14 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
         r.itens[0]!.vinculos.map((v) => [v.matricula, v.situacao, v.tipo]),
       ).toEqual([["MAT-D-NIN", "ativo", "temporario"]]);
       const texto = JSON.stringify(r);
+      // T215 — CPF, e-mail, celular e salário passaram a ser da linha (a
+      // página inicial no desenho da referência); o resto segue fora.
       for (const proibido of [
-        "cpf",
-        "salario",
-        "email",
-        "celular",
         "telefone",
+        '"rg"',
+        "logradouro",
+        "nascimento",
+        "genero",
       ]) {
         expect(texto.toLowerCase()).not.toContain(proibido);
       }
@@ -1760,6 +1783,206 @@ describe("Colaboradores — listagem da porta principal (T178, e2e)", () => {
       const v = await listarD(rhD, { situacaoVinculo: "encerrado" });
       // Quem tem algum vínculo encerrado: Iara, Lia, Marcos e Carla.
       expect(v.total).toBe(4);
+    });
+  });
+  // -------------------------------------------------------------------------
+  // T215 — gaveta "Filtrar": vários valores por grupo (qualquer um deles),
+  // grupos combinados (todos). Lotação e nível no MESMO vínculo ativo, na
+  // alocação aberta; gênero no perfil pessoal da empresa. PostgreSQL real.
+  // -------------------------------------------------------------------------
+  describe("T215 — filtros da gaveta", () => {
+    let empresaF: string;
+    let rhF: Credencial;
+    let dep1: string;
+    let dep2: string;
+    let area1: string;
+    let centro1: string;
+    let centro2: string;
+    let unidade: string;
+
+    async function admitirF(dados: {
+      nome: string;
+      matricula: string;
+      tipo: string;
+      departamentoId: string;
+      areaId?: string;
+      centroCustoId?: string;
+      nivel: string;
+      genero: string;
+      efetivar: boolean;
+    }) {
+      const obrigatorios = camposObrigatoriosAdmissao();
+      const lotacao = await lotacaoMinima(appUrl, empresaF);
+      const r = await post("/v1/colaboradores", rhF)
+        .send({
+          ...obrigatorios,
+          perfilPessoal: {
+            ...obrigatorios.perfilPessoal,
+            genero: dados.genero,
+          },
+          ...lotacao,
+          nome: dados.nome,
+          empresaId: empresaF,
+          matricula: dados.matricula,
+          tipo: dados.tipo,
+          dataAdmissao: ADMISSAO,
+          motivoCodigo: "admissao_inicial",
+          departamentoId: dados.departamentoId,
+          ...(dados.areaId ? { areaId: dados.areaId } : {}),
+          ...(dados.centroCustoId
+            ? { centroCustoId: dados.centroCustoId }
+            : {}),
+          contrato: contratoDaAdmissao({ nivel: dados.nivel }),
+        })
+        .expect(201);
+      if (dados.efetivar) {
+        await post(`/v1/movimentacoes/${r.body.movimentacao.id}/efetivar`, rhF)
+          .send()
+          .expect(201);
+      }
+    }
+
+    const nomesF = async (query: Record<string, string>) => {
+      const qs = new URLSearchParams(query).toString();
+      const r = await get(`/v1/colaboradores?${qs}`, rhF).expect(200);
+      return (r.body.itens as ItemListado[]).map((i) => i.nome).sort();
+    };
+
+    beforeAll(async () => {
+      empresaF = (
+        await post("/v1/empresas", master)
+          .send({ codigo: "LISTF", nome: "Empresa Listagem Gaveta" })
+          .expect(201)
+      ).body.id;
+      const departamento = async (codigo: string) =>
+        (
+          await post("/v1/departamentos", master)
+            .send({ empresaId: empresaF, codigo, nome: `Depto ${codigo}` })
+            .expect(201)
+        ).body.id as string;
+      dep1 = await departamento("DEPF1");
+      dep2 = await departamento("DEPF2");
+      area1 = (
+        await prisma.area.create({
+          data: { departamentoId: dep1, codigo: "AREAF1", nome: "Área F1" },
+        })
+      ).id;
+      centro1 = (
+        await prisma.centroCusto.create({
+          data: { empresaId: empresaF, codigo: "CCF1", nome: "Centro F1" },
+        })
+      ).id;
+      centro2 = (
+        await prisma.centroCusto.create({
+          data: { empresaId: empresaF, codigo: "CCF2", nome: "Centro F2" },
+        })
+      ).id;
+      unidade = (await lotacaoMinima(appUrl, empresaF)).unidadeOrganizacionalId;
+      rhF = await criarUsuario("rh.lf@example.test", "rh", empresaF);
+
+      await admitirF({
+        nome: "Ana Gaveta",
+        matricula: "F-1",
+        tipo: "clt",
+        departamentoId: dep1,
+        areaId: area1,
+        centroCustoId: centro1,
+        nivel: "pleno",
+        genero: "feminino",
+        efetivar: true,
+      });
+      await admitirF({
+        nome: "Bruno Gaveta",
+        matricula: "F-2",
+        tipo: "pj",
+        departamentoId: dep2,
+        centroCustoId: centro2,
+        nivel: "senior",
+        genero: "masculino",
+        efetivar: true,
+      });
+      // Em admissão (não efetivada): sem lotação vigente ativa.
+      await admitirF({
+        nome: "Caio Gaveta",
+        matricula: "F-3",
+        tipo: "clt",
+        departamentoId: dep1,
+        nivel: "pleno",
+        genero: "masculino",
+        efetivar: false,
+      });
+    });
+
+    it("departamentos: qualquer um dos marcados; quem está em admissão não tem lotação vigente", async () => {
+      expect(await nomesF({ departamentos: `${dep1},${dep2}` })).toEqual([
+        "Ana Gaveta",
+        "Bruno Gaveta",
+      ]);
+      expect(await nomesF({ departamentos: dep2 })).toEqual(["Bruno Gaveta"]);
+    });
+
+    it("área, centro de custo e unidade, na alocação aberta", async () => {
+      expect(await nomesF({ areas: area1 })).toEqual(["Ana Gaveta"]);
+      expect(await nomesF({ centrosCusto: centro2 })).toEqual(["Bruno Gaveta"]);
+      expect(await nomesF({ unidades: unidade })).toEqual([
+        "Ana Gaveta",
+        "Bruno Gaveta",
+      ]);
+    });
+
+    it("nível do contrato do vínculo ativo, e grupos combinados (todos)", async () => {
+      expect(await nomesF({ niveis: "pleno" })).toEqual(["Ana Gaveta"]);
+      expect(await nomesF({ niveis: "pleno,senior" })).toEqual([
+        "Ana Gaveta",
+        "Bruno Gaveta",
+      ]);
+      expect(
+        await nomesF({ departamentos: `${dep1},${dep2}`, niveis: "senior" }),
+      ).toEqual(["Bruno Gaveta"]);
+    });
+
+    it("gênero no perfil pessoal (vale também para quem está em admissão)", async () => {
+      expect(await nomesF({ generos: "masculino" })).toEqual([
+        "Bruno Gaveta",
+        "Caio Gaveta",
+      ]);
+      expect(
+        await nomesF({ generos: "masculino", departamentos: dep2 }),
+      ).toEqual(["Bruno Gaveta"]);
+      expect(await nomesF({ generos: "outro" })).toEqual([]);
+    });
+
+    it("vários tipos de contrato, no vínculo do grupo da aba", async () => {
+      expect(await nomesF({ grupo: "ativos", tipos: "clt,pj" })).toEqual([
+        "Ana Gaveta",
+        "Bruno Gaveta",
+      ]);
+      expect(await nomesF({ tipos: "clt" })).toEqual([
+        "Ana Gaveta",
+        "Caio Gaveta",
+      ]);
+    });
+
+    it("os contadores das abas não mudam com os filtros", async () => {
+      const qs = new URLSearchParams({ departamentos: dep2 }).toString();
+      const filtrado = await get(`/v1/colaboradores?${qs}`, rhF).expect(200);
+      const tudo = await get("/v1/colaboradores", rhF).expect(200);
+      expect(filtrado.body.total).toBe(1);
+      expect(filtrado.body.contadores).toEqual(tudo.body.contadores);
+    });
+
+    it("filtro, nunca concessão: departamento de outra empresa não traz ninguém", async () => {
+      const qs = new URLSearchParams({ departamentos: dep1 }).toString();
+      const r = await get(`/v1/colaboradores?${qs}`, rhA).expect(200);
+      expect(r.body.itens).toEqual([]);
+      expect(r.body.total).toBe(0);
+    });
+
+    it("valor fora da forma é recusado (400)", async () => {
+      await get("/v1/colaboradores?departamentos=abc", rhF).expect(400);
+      await get("/v1/colaboradores?niveis=estagiario", rhF).expect(400);
+      await get("/v1/colaboradores?generos=nenhum", rhF).expect(400);
+      await get("/v1/colaboradores?tipos=folguista", rhF).expect(400);
     });
   });
 });

@@ -90,7 +90,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(rotulo).toHaveTextContent("Colaboradores");
   });
 
-  it("renderiza Estrutura > Jornadas de trabalho dentro do <main> (T182)", () => {
+  it("renderiza Escala de trabalho (o quadro) dentro do <main>; o botão Turnos abre os turnos, com voltar (T215)", () => {
     render(<App papelDoAtor="rh" />);
     fireEvent.click(
       screen.getByRole("button", { name: /^Escala de trabalho/ }),
@@ -98,12 +98,30 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     const main = screen.getByRole("main");
     expect(main).toContainElement(
-      screen.getByRole("heading", { level: 1, name: "Jornadas de trabalho" }),
+      screen.getByRole("heading", { level: 1, name: "Escala de trabalho" }),
     );
-    expect(main).toContainElement(screen.getByText("Operação do RH"));
     expect(
       document.getElementById(main.getAttribute("aria-labelledby")!),
-    ).toHaveTextContent("Jornadas de trabalho");
+    ).toHaveTextContent("Escala de trabalho");
+
+    fireEvent.click(within(main).getByRole("button", { name: "Turnos" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Turnos" }),
+    ).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/pessoas/escala/turnos");
+    // Sub-página: a barra continua marcando "Escala de trabalho".
+    expect(
+      within(
+        screen.getByRole("navigation", { name: "Navegação do painel" }),
+      ).getByRole("button", { name: /^Escala de trabalho/ }),
+    ).toHaveAttribute("aria-current", "page");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para a escala de trabalho" }),
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Escala de trabalho" }),
+    ).toBeInTheDocument();
   });
 
   it("Estrutura não tem mais a aba Horários: ela virou Jornadas de trabalho (T182)", () => {
@@ -198,9 +216,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   it("não referencia autenticação, sessão real ou dado sensível no shell", () => {
     render(<App papelDoAtor="rh" />);
 
+    // T215 — "CPF" agora é coluna da lista de Colaboradores (desenho da
+    // referência); o dado só vem do servidor, com a permissão de quem lê.
     const texto = document.body.innerHTML.toLowerCase();
     for (const termoProibido of [
-      "cpf",
       "reserva fiscal",
       "secullum",
       "rwtech",
@@ -222,7 +241,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     });
     for (const nome of [
       "Colaboradores Consulta, ficha e vida funcional",
-      "Escala de trabalho Turnos da empresa",
+      "Escala de trabalho Quadro da semana e do mês",
       "Organograma Unidades, cargos e centros de custo",
       "Liderança Consulta do gestor",
     ]) {
@@ -407,7 +426,10 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("RH e DP")).toBeInTheDocument();
+    // T215 — o aviso "RH e DP" saiu da página (desenho da referência).
+    expect(
+      screen.getByText("Gerencie contratos, dados e documentos do time."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
@@ -417,7 +439,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     );
   });
 
-  it("Pessoas > aba local 'Horário de trabalho' continua acessível, sem regressão (T112)", () => {
+  it("Pessoas > o horário de trabalho continua acessível, pela aba Escala de trabalho (T112/T215)", async () => {
     render(<App papelDoAtor="rh" />);
 
     fireEvent.click(
@@ -425,19 +447,17 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Colaboradores Consulta, ficha e vida funcional",
       }),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
+    // T215 — sem a faixa de seções na página: a visão de horários é a aba
+    // Escala de trabalho da lista.
+    fireEvent.click(screen.getByRole("tab", { name: /^Escala de trabalho/ }));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Jornada de trabalho",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    const main = screen.getByRole("main");
-    const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
-      "Horário de trabalho",
-    );
   });
 
   it("Pessoas volta para 'Colaboradores' ao sair e voltar ao destino (T072)", () => {
@@ -448,11 +468,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
         name: "Colaboradores Consulta, ficha e vida funcional",
       }),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
-    ).toBeInTheDocument();
-
+    // T215 — sem a faixa de seções: sai direto do destino.
     fireEvent.click(screen.getByRole("button", { name: /^Organograma/ }));
     fireEvent.click(
       screen.getByRole("button", {
@@ -545,21 +561,23 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
   });
 
   it("renderiza Contas de acesso com h1 próprio (T121) — sem 'Módulo em preparação'", async () => {
-    // T211 — Equipe e permissões, pela URL de Configurações.
+    // T215 — as Contas de acesso são Segurança › Permissões de acesso: o h1
+    // é o do módulo, e a tela vira o painel com h2.
     render(<App papelDoAtor="rh" destinoInicial="contas-acesso" />);
-    expect(window.location.hash).toBe("#/configuracoes/equipe-e-permissoes");
+    expect(window.location.hash).toBe("#/seguranca/permissoes-de-acesso");
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Contas de acesso" }),
+      screen.getByRole("heading", { level: 1, name: "Segurança" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Permissões de acesso" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Módulo em preparação")).not.toBeInTheDocument();
 
     const main = screen.getByRole("main");
     const rotuloId = main.getAttribute("aria-labelledby");
-    expect(document.getElementById(rotuloId!)).toHaveTextContent(
-      "Contas de acesso",
-    );
+    expect(document.getElementById(rotuloId!)).toHaveTextContent("Segurança");
 
     // Este arquivo testa só o shell, sem mockar rede: GET /v1/users/me real
     // falha (sem servidor), e a tela cai no próprio estado de erro — nunca
@@ -621,7 +639,7 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("com onLogout informado, abre o painel 'Sessões ativas' pelo menu da conta, e fecha ao clicar em Fechar (T117/T209)", async () => {
+  it("com onLogout informado, 'Sessões ativas' no menu da conta leva a Segurança › Sessões ativas (T117/T209/T215)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} />);
 
     expect(
@@ -630,15 +648,15 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
 
     fireEvent.click(await itemDaConta("Sessões ativas"));
 
+    // T215 — é a página do módulo Segurança, não um painel com "Fechar".
+    expect(window.location.hash).toBe("#/seguranca/sessoes-ativas");
     expect(
-      screen.getByRole("heading", { name: "Sessões ativas" }),
+      within(screen.getByRole("main")).getByRole("heading", {
+        level: 2,
+        name: "Sessões ativas",
+      }),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-
-    expect(
-      screen.queryByRole("heading", { name: "Sessões ativas" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fechar" })).toBeNull();
   });
 
   it("sem onLogout: não mostra o botão 'Segurança' (T126)", () => {
@@ -671,21 +689,20 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("abrir 'Segurança' fecha 'Sessões ativas' e vice-versa (painéis exclusivos, T126/T131)", async () => {
+  it("'Sessões ativas' fecha o painel 'Segurança da conta' e leva à página (T126/T131/T215)", async () => {
     render(<App papelDoAtor="rh" onLogout={vi.fn()} mfaDisponivel />);
-
-    fireEvent.click(await itemDaConta("Sessões ativas"));
-    expect(
-      screen.getByRole("heading", { name: "Sessões ativas" }),
-    ).toBeInTheDocument();
 
     fireEvent.click(await itemDaConta("Segurança"));
     expect(
       screen.getByRole("heading", { name: "Segurança da conta" }),
     ).toBeInTheDocument();
+
+    // T215 — Sessões ativas virou página: abri-la fecha o painel do MFA.
+    fireEvent.click(await itemDaConta("Sessões ativas"));
     expect(
-      screen.queryByRole("heading", { name: "Sessões ativas" }),
+      screen.queryByRole("heading", { name: "Segurança da conta" }),
     ).not.toBeInTheDocument();
+    expect(window.location.hash).toBe("#/seguranca/sessoes-ativas");
   });
 
   it("cada botão de navegação é um <button> nativo, operável por teclado", () => {
@@ -710,7 +727,8 @@ describe("App — shell administrativo + navegação visual (T044)", () => {
     // (cabeçalho + 2), Dashboard, Portal, Pesquisas, Calendário, Liderança,
     // Folha, Benefícios, Hub, Suporte, Roadmap e Configurações: 19. Sem
     // Operação, Estrutura, Jornada, Administração e Demonstração.
-    expect(botoes).toHaveLength(19);
+    // T215 — + Segurança (item único, no rodapé): 20.
+    expect(botoes).toHaveLength(20);
     expect(
       botoes
         .filter((b) => b.hasAttribute("aria-expanded"))
@@ -1300,14 +1318,14 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     );
   });
 
-  it("T182 — dp entra em Jornadas de trabalho, só para consultar", () => {
-    render(<App papelDoAtor="dp" destinoInicial="jornadas-trabalho" />);
+  it("T182/T215 — dp entra em Turnos, só para consultar", () => {
+    render(<App papelDoAtor="dp" destinoInicial="turnos-escala" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Jornadas de trabalho",
+      "Turnos",
     );
     expect(screen.getByText("Somente consulta")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Nova jornada" }),
+      screen.queryByRole("button", { name: "Novo turno" }),
     ).not.toBeInTheDocument();
   });
 
@@ -1346,7 +1364,7 @@ describe("T162 — entrada vinda do Hub é validada no shell", () => {
     // `master_tecnico`). Montar ali seria 403.
     render(<App papelDoAtor="financeiro" destinoInicial="jornadas-trabalho" />);
     expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
-      "Jornadas de trabalho",
+      "Turnos",
     );
   });
 

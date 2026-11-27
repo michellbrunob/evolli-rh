@@ -30,7 +30,10 @@ Esta aprovação é **visual**. Não autoriza merge, produção nem migração. 
 expansão é liberada, não concluída: cada tela recebe identificador próprio e
 validação própria.
 
-> **Por que este arquivo existe, e não uma edição em `DESIGN-apple.md`.**
+> Nota (2026-11-25): o arquivo de referência externa citado abaixo foi removido;
+> a fonte oficial de design é [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md).
+>
+> **Por que este arquivo existe, e não uma edição no arquivo de referência visual da T032.**
 > Aquele arquivo é a referência visual externa, mantida **intacta byte a byte**
 > por decisão do próprio projeto (T032; está em `.prettierignore` exatamente
 > por isso). Editá-lo misturaria referência com decisão nossa. As decisões de

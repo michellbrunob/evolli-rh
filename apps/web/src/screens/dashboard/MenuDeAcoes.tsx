@@ -12,7 +12,14 @@
  * cima de cabeçalho fixo, modal, guarda ou gaveta. Ao abrir, ele é rolado
  * para dentro da área visível, abaixo do cabeçalho fixo.
  */
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 export interface AcaoDoMenu {
   readonly id: string;
@@ -59,11 +66,21 @@ function mostrarAbaixoDoCabecalho(
 export function MenuDeAcoes({
   assunto,
   acoes,
+  nome,
+  icone,
+  classe,
 }: {
   /** "Quadro de colaboradores" → botão "Ações: Quadro de colaboradores". */
   readonly assunto: string;
   readonly acoes: readonly AcaoDoMenu[];
+  /** T214 — o nome do botão e do menu, no lugar de "Ações: {assunto}". */
+  readonly nome?: string;
+  /** T214 — o ícone do botão, no lugar das reticências. */
+  readonly icone?: ReactNode;
+  /** T214 — classe a mais na raiz (posição do botão na barra). */
+  readonly classe?: string;
 }) {
+  const nomeDoMenu = nome ?? `Ações: ${assunto}`;
   const prefixo = useId();
   const idDoMenu = `${prefixo}-menu`;
   const [aberto, setAberto] = useState(false);
@@ -152,7 +169,9 @@ export function MenuDeAcoes({
   return (
     <div
       ref={raizRef}
-      className="dashboard__acoes-do-bloco dashboard__sem-impressao"
+      className={["dashboard__acoes-do-bloco dashboard__sem-impressao", classe]
+        .filter(Boolean)
+        .join(" ")}
       onBlur={(evento) => {
         const destino = evento.relatedTarget;
         if (destino instanceof Node && raizRef.current?.contains(destino)) {
@@ -171,24 +190,26 @@ export function MenuDeAcoes({
         onClick={() => (aberto ? setAberto(false) : abrir("primeira"))}
         onKeyDown={aoTeclarNoBotao}
       >
-        <svg
-          aria-hidden="true"
-          focusable="false"
-          width="18"
-          height="18"
-          viewBox="0 0 18 18"
-        >
-          <circle cx="3.5" cy="9" r="1.6" />
-          <circle cx="9" cy="9" r="1.6" />
-          <circle cx="14.5" cy="9" r="1.6" />
-        </svg>
-        <span className="dashboard__so-leitor">Ações: {assunto}</span>
+        {icone ?? (
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+          >
+            <circle cx="3.5" cy="9" r="1.6" />
+            <circle cx="9" cy="9" r="1.6" />
+            <circle cx="14.5" cy="9" r="1.6" />
+          </svg>
+        )}
+        <span className="dashboard__so-leitor">{nomeDoMenu}</span>
       </button>
       {aberto ? (
         <div
           id={idDoMenu}
           role="menu"
-          aria-label={`Ações: ${assunto}`}
+          aria-label={nomeDoMenu}
           className="dashboard__menu"
           onKeyDown={aoTeclarNoMenu}
         >

@@ -16,23 +16,33 @@ import {
   Add,
   ArrowDown2,
   ArrowLeft2,
+  ArrowRight,
   ArrowRight2,
   Building,
   Calendar,
   Clock,
+  Copy,
+  Danger,
   ColorSwatch,
   Cup,
   DocumentDownload,
   DocumentText,
   DocumentUpload,
+  Devices,
   Edit2,
   Element3,
+  Element4,
   Eye,
+  Filter,
+  EyeSlash,
   Gift,
   Hierarchy,
   InfoCircle,
+  KeySquare,
+  Lock,
   MessageQuestion,
   Messages1,
+  More,
   People,
   Personalcard,
   Profile,
@@ -40,13 +50,45 @@ import {
   ProfileCircle,
   Rank,
   Receipt,
+  Refresh2,
+  Repeat,
   Routing2,
+  SearchNormal1,
+  Star1,
+  Send2,
   SecurityUser,
+  ShieldCross,
+  ShieldSearch,
   Setting,
   ShieldTick,
   TickCircle,
+  Trash,
   UserAdd,
+  Warning2,
   type Icon,
+  Briefcase,
+  Airplane,
+  Bank,
+  Cake,
+  ClipboardClose,
+  ClipboardText,
+  Health,
+  Hospital,
+  Lovely,
+  WalletMoney,
+  CalendarAdd,
+  Call,
+  Forbidden2,
+  Setting4,
+  Status,
+  UserRemove,
+  Home2,
+  Location,
+  MessageText1,
+  Money2,
+  Sms,
+  Teacher,
+  Timer1,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -102,15 +144,63 @@ export const IconeRoadmap = decorativo(Routing2, "Bulk");
 export const IconePerfil = decorativo(Profile, "Bulk");
 export const IconeConta = decorativo(ProfileCircle, "Bulk");
 export const IconeSeguranca = decorativo(ShieldTick, "Bulk");
+/** T215 — Segurança › Sessões ativas e › Permissões de acesso. */
+export const IconeSessoes = decorativo(Devices, "Bulk");
+export const IconePermissoes = decorativo(KeySquare, "Bulk");
+/** T215 — busca e Filtrar da lista de Colaboradores. */
+export const IconeBuscar = decorativo(SearchNormal1, "Linear");
+export const IconeFiltrar = decorativo(Filter, "Bulk");
+/** T215 — ficha do colaborador (abas, cartões e faixa de resumo). */
+export const IconeMaleta = decorativo(Briefcase, "Bulk");
+export const IconeTelefone = decorativo(Call, "Bulk");
+export const IconeCasa = decorativo(Home2, "Bulk");
+export const IconeLocal = decorativo(Location, "Bulk");
+export const IconeComentario = decorativo(MessageText1, "Bulk");
+export const IconeDinheiro = decorativo(Money2, "Bulk");
+/** T215 — carteira com dinheiro (aba Salários da ficha). */
+export const IconeCarteira = decorativo(WalletMoney, "Bulk");
+export const IconeEmail = decorativo(Sms, "Bulk");
+export const IconeFormacao = decorativo(Teacher, "Bulk");
+export const IconeTempo = decorativo(Timer1, "Bulk");
+export const IconeRelogio = decorativo(Clock, "Bulk");
+/** T215 — copiar (ex.: "Copiar semana anterior"). */
+export const IconeCopiar = decorativo(Copy, "Bulk");
+/** T215 — repetir (ex.: "Repetir esta semana até…"). */
+export const IconeRepetir = decorativo(Repeat, "Linear");
+/** T215 — visão salva (estrela). */
+export const IconeEstrela = decorativo(Star1, "Linear");
+/** T215 — documento (ex.: acordos e convenção). */
+export const IconeDocumento = decorativo(DocumentText, "Bulk");
+/** T215 — enviar ou publicar. */
+export const IconeEnviar = decorativo(Send2, "Bulk");
+/** T215 — aplicar um modelo (escala do catálogo). */
+export const IconeModelo = decorativo(Element4, "Bulk");
+/** T215 — aviso de atenção (avisos da escala). */
+export const IconeAviso = decorativo(Danger, "Bulk");
+export const IconePresente = decorativo(Gift, "Bulk");
 export const IconeEmpresa = decorativo(Building, "Bulk");
 export const IconeEquipe = decorativo(Profile2User, "Bulk");
 export const IconeAparencia = decorativo(ColorSwatch, "Bulk");
+/** T215 — ficha: menu ⋯ e seções da edição do colaborador. */
+export const IconeRegistrarAusencia = decorativo(CalendarAdd, "Bulk");
+export const IconeStatus = decorativo(Status, "Bulk");
+export const IconeDesligar = decorativo(UserRemove, "Bulk");
+export const IconeDesativar = decorativo(Forbidden2, "Bulk");
+export const IconeBanco = decorativo(Bank, "Bulk");
+export const IconeCamposExtras = decorativo(Setting4, "Bulk");
+/** T215 — os tipos de ausência (histórico, próxima ausência e registro). */
+export const IconeAviao = decorativo(Airplane, "Bulk");
+export const IconeSaude = decorativo(Health, "Bulk");
+export const IconeFamilia = decorativo(Lovely, "Bulk");
+export const IconeHospital = decorativo(Hospital, "Bulk");
+export const IconeFaltaJustificada = decorativo(ClipboardText, "Bulk");
+export const IconeFaltaSemJustificativa = decorativo(ClipboardClose, "Bulk");
+export const IconeBolo = decorativo(Cake, "Bulk");
 
 // ---- Ações (Bulk) --------------------------------------------------------
 export const IconeEditar = decorativo(Edit2, "Bulk");
 export const IconeAdicionarPessoa = decorativo(UserAdd, "Bulk");
 export const IconePlanilha = decorativo(DocumentText, "Bulk");
-export const IconeRelogio = decorativo(Clock, "Bulk");
 export const IconeSucesso = decorativo(TickCircle, "Bulk");
 /** T212 — baixar um modelo de arquivo. */
 export const IconeBaixarArquivo = decorativo(DocumentDownload, "Bulk");
@@ -119,6 +209,19 @@ export const IconeEnviarArquivo = decorativo(DocumentUpload, "Bulk");
 /** T212 — aviso curto, informativo. */
 export const IconeInformacao = decorativo(InfoCircle, "Bulk");
 
+// ---- T213 — documentos do colaborador (Bulk) ------------------------------
+/** Arquivo em análise pelo antivírus. */
+export const IconeEmVerificacao = decorativo(ShieldSearch, "Bulk");
+/** Arquivo recusado pelo antivírus. */
+export const IconeReprovado = decorativo(ShieldCross, "Bulk");
+/** Envio que não chegou ao servidor. */
+export const IconeNaoEnviado = decorativo(Warning2, "Bulk");
+export const IconeVer = decorativo(Eye, "Bulk");
+export const IconeRemover = decorativo(Trash, "Bulk");
+export const IconeTentarDeNovo = decorativo(Refresh2, "Linear");
+/** Os três pontos de "mais ações". */
+export const IconeMaisAcoes = decorativo(More, "Linear");
+
 // ---- Glifos de interface (Linear) ----------------------------------------
 export const IconeVoltar = decorativo(ArrowLeft2, "Linear");
 export const IconeAvancar = decorativo(ArrowRight2, "Linear");
@@ -126,3 +229,8 @@ export const IconeAbrir = decorativo(ArrowDown2, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");
+/** Login: mostrar e esconder a senha, entrar e o aviso de acesso restrito. */
+export const IconeMostrarSenha = decorativo(Eye, "Linear");
+export const IconeOcultarSenha = decorativo(EyeSlash, "Linear");
+export const IconeEntrar = decorativo(ArrowRight, "Linear");
+export const IconeCadeado = decorativo(Lock, "Linear");

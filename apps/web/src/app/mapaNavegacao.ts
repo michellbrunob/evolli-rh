@@ -168,11 +168,17 @@ export function podeLerSolicitacoesPessoas(papel: string | null): boolean {
  * "Solicitações" pedida por quem não a lê (o DP) vira "Dados do colaborador".
  * O shell escreve a URL corrigida no lugar, sem consulta nenhuma.
  */
-export function fichaParaOPapel<T extends { readonly aba: string } | null>(
-  ficha: T,
-  papel: string | null,
-): T {
+export function fichaParaOPapel<
+  T extends { readonly aba: string; readonly edicao?: string } | null,
+>(ficha: T, papel: string | null): T {
   if (ficha === null) return ficha;
+  // T215 — a página "Editar colaborador" é de quem edita a ficha (RH e DP);
+  // os demais caem na ficha, em Dados.
+  if (ficha.edicao !== undefined && !podeEditarFicha(papel)) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { edicao: _edicao, ...semEdicao } = ficha;
+    return { ...semEdicao, aba: "dados" } as T;
+  }
   if (ficha.aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papel)) {
     return { ...ficha, aba: "dados" };
   }
@@ -200,6 +206,18 @@ export const PAPEIS_OPERACAO_JORNADAS: readonly string[] = ["rh"];
 
 export function podeOperarJornadas(papel: string | null): boolean {
   return papel !== null && PAPEIS_OPERACAO_JORNADAS.includes(papel);
+}
+
+/**
+ * T215 — papéis que definem, alteram e encerram a ESCALA do colaborador
+ * (aba Escala da ficha): `rh` e `dp`, na empresa ativa. Espelha a matriz de
+ * `escala_colaborador` no avaliador. Os turnos (Jornadas de trabalho) seguem
+ * com `PAPEIS_OPERACAO_JORNADAS`. Só ORIENTA a tela: quem recusa é o servidor.
+ */
+export const PAPEIS_OPERACAO_ESCALA: readonly string[] = ["rh", "dp"];
+
+export function podeOperarEscala(papel: string | null): boolean {
+  return papel !== null && PAPEIS_OPERACAO_ESCALA.includes(papel);
 }
 
 /**
@@ -274,13 +292,50 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
       {
         // T182 — tela própria do catálogo de jornadas (antes a aba Horários
         // de Cadastros), sobre o mesmo contrato de `/v1/horarios`.
-        // T211 — no submenu de Colaboradores, como "Escala de trabalho"
-        // (rótulo de navegação; a tela mantém o título dela).
+        // T211 — no submenu de Colaboradores, como "Escala de trabalho".
+        // T215 — abre o quadro da escala (semana e mês); o id fica, para os
+        // endereços salvos. Os turnos viram sub-página dele.
         id: "jornadas-trabalho",
         label: "Escala de trabalho",
-        subRotulo: "Turnos da empresa",
+        subRotulo: "Quadro da semana e do mês",
         estado: "funcional",
         papeis: PAPEIS_CONSULTA_JORNADAS,
+      },
+      {
+        // T215 — Turnos: sub-página do quadro (botão "Turnos"), com voltar.
+        id: "turnos-escala",
+        label: "Turnos",
+        subRotulo: "Horários do quadro",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
+        // T215 — Regras da escala: sub-página do quadro (menu ⋯).
+        id: "regras-escala",
+        label: "Regras da escala",
+        subRotulo: "Jornada, convenção, feriados locais e avisos",
+        estado: "funcional",
+        papeis: PAPEIS_CONSULTA_JORNADAS,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
+        // T215 — Planejar a transição da EC 141/2026 (quem opera a escala).
+        id: "transicao-escala",
+        label: "Planejar a transição",
+        subRotulo: "EC 141/2026: 6x1 para 2 descansos por semana",
+        estado: "funcional",
+        papeis: PAPEIS_OPERACAO_ESCALA,
+        agrupadoEm: "jornadas-trabalho",
+      },
+      {
+        // T215 — Aplicar modelo: uma escala do catálogo para várias pessoas.
+        id: "modelo-escala",
+        label: "Aplicar modelo",
+        subRotulo: "Uma escala para várias pessoas, no rascunho",
+        estado: "funcional",
+        papeis: PAPEIS_OPERACAO_ESCALA,
+        agrupadoEm: "jornadas-trabalho",
       },
       {
         // T182 — sem a aba Horários, o contêiner abre na Estrutura
@@ -315,6 +370,16 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         papeis: PAPEIS_NOVA_ADMISSAO,
         agrupadoEm: "pessoas",
       },
+      {
+        // T215 — Políticas de férias: sub-página de Colaboradores (abre pela
+        // engrenagem da aba Férias e ausências); RH e DP, como a ficha.
+        id: "politicas-ferias",
+        label: "Políticas de férias",
+        subRotulo: "Regras dos pedidos de férias",
+        estado: "funcional",
+        papeis: PAPEIS_EDICAO_FICHA,
+        agrupadoEm: "pessoas",
+      },
     ],
   },
   {
@@ -328,6 +393,23 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         label: "Jornada",
         subRotulo: "Visão do período",
         estado: "funcional",
+      },
+    ],
+  },
+  {
+    // T215 — Benefícios (Remuneração › Benefícios): o módulo da empresa
+    // (lista por competência, assistente, detalhe com o valor de cada pessoa).
+    // RH e DP operam; o servidor decide cada requisição.
+    titulo: "Benefícios",
+    icone: "beneficios",
+    destinos: [
+      {
+        id: "beneficios",
+        label: "Benefícios",
+        subRotulo: "Quem recebe e quanto entra na folha",
+        estado: "funcional",
+        // RH e DP operam; o master técnico só lê (o servidor decide).
+        papeis: ["rh", "dp", "master_tecnico"],
       },
     ],
   },
@@ -350,6 +432,31 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         papeis: PAPEIS_ADMINISTRACAO_LIDERANCA,
         // T211 — fora do menu; abre por `#/lideranca/administracao`.
         foraDoMenu: true,
+      },
+    ],
+  },
+  {
+    // T215 — Segurança: módulo próprio, no rodapé do menu, no desenho de
+    // Configurações. Abre em Sessões ativas (de toda conta: `GET
+    // /v1/auth/sessions` só devolve as da própria conta); as Contas de acesso
+    // saem de Configurações e viram "Permissões de acesso", com a capacidade
+    // de sempre. Auditoria continua sem item: a API existe, mas não há tela.
+    titulo: "Segurança",
+    icone: "seguranca",
+    daConta: true,
+    destinos: [
+      {
+        id: "seguranca",
+        label: "Segurança",
+        subRotulo: "Sessões ativas",
+        estado: "funcional",
+      },
+      {
+        id: "contas-acesso",
+        label: "Permissões de acesso",
+        subRotulo: "Contas de acesso e papéis",
+        estado: "funcional",
+        agrupadoEm: "seguranca",
       },
     ],
   },
@@ -384,17 +491,6 @@ export const GRUPOS: readonly GrupoNavegacao[] = [
         subRotulo: "Empresas da conta",
         estado: "funcional",
         papeis: PAPEIS_EMPRESAS_DA_CONTA,
-        agrupadoEm: "configuracoes",
-      },
-      {
-        // T211 — Contas de acesso, como "Equipe e permissões" na navegação
-        // interna de Configurações (grupo Empresa), com URL própria. A tela é
-        // a mesma; quem a vê segue a capacidade de sempre (`contas-acesso`).
-        // Auditoria continua sem item: a API existe, mas não há tela.
-        id: "contas-acesso",
-        label: "Equipe e permissões",
-        subRotulo: "Contas de acesso e papéis",
-        estado: "funcional",
         agrupadoEm: "configuracoes",
       },
       {
@@ -600,13 +696,18 @@ export function destinoPosLoginPara(papel: string | null): string | null {
  * | `pessoas`                 | `colaborador` read      | `rh`, `dp`, `master_tecnico`     |
  * | `nova-admissao`           | `colaborador` create    | `rh`, `dp`                       |
  * | `cadastros`               | `unidade_organizacional`| `rh`, `dp`, `master_tecnico`     |
- * | `jornadas-trabalho`       | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
+ * | `jornadas-trabalho` (T215)| `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
+ * | `turnos-escala` (T215)    | `tabela_horario` read   | `rh`, `dp`, `master_tecnico`     |
+ * | `regras-escala` (T215)    | `escala_colaborador` read | `rh`, `dp`, `master_tecnico`   |
+ * | `transicao-escala` (T215) | `escala_colaborador` alter | `rh`, `dp`                     |
+ * | `modelo-escala` (T215)    | `escala_colaborador` alter | `rh`, `dp`                     |
  * | `ponto`                   | `evento_ponto` read     | `rh`, `dp`, `master_tecnico`     |
  * | `equipe`                  | `gestor_equipe` read    | `gestor`, `rh`                   |
  * | `administracao-lideranca` | `gestor_atribuicao`     | `rh`                             |
  * | `contas-acesso`           | `other_account` read    | `rh`, `dp`, `master_tecnico`     |
  * | `configuracoes` (T208)    | `own_account` read      | todos os papéis                  |
  * | `configuracoes-aparencia` | `own_account` manage    | todos os papéis (T210)           |
+ * | `seguranca` (T215)        | sessões da própria conta| todos os papéis                  |
  *
  * Os dois casos que surpreendem, e por isso valem dito:
  *
@@ -645,14 +746,21 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "nova-admissao",
     "importar-colaboradores",
+    "politicas-ferias",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
+    "regras-escala",
+    "transicao-escala",
+    "modelo-escala",
     "ponto",
     "equipe",
     "administracao-lideranca",
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
     "nova-empresa",
   ],
@@ -661,32 +769,43 @@ const CAPACIDADE_FUNCIONAL_POR_PAPEL: Readonly<
     "pessoas",
     "nova-admissao",
     "importar-colaboradores",
+    "politicas-ferias",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
+    "regras-escala",
+    "transicao-escala",
+    "modelo-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
   ],
   master_tecnico: [
     "dashboard",
     "pessoas",
+    "beneficios",
     "cadastros",
     "jornadas-trabalho",
+    "turnos-escala",
+    "regras-escala",
     "ponto",
     "contas-acesso",
     "configuracoes",
     "configuracoes-aparencia",
+    "seguranca",
     "configuracoes-empresas",
     "nova-empresa",
   ],
-  gestor: ["equipe", "configuracoes", "configuracoes-aparencia"],
-  financeiro: ["configuracoes", "configuracoes-aparencia"],
-  colaborador: ["configuracoes", "configuracoes-aparencia"],
-  auditor: ["configuracoes", "configuracoes-aparencia"],
-  dpo: ["configuracoes", "configuracoes-aparencia"],
-  admin_tecnico: ["configuracoes", "configuracoes-aparencia"],
+  gestor: ["equipe", "configuracoes", "configuracoes-aparencia", "seguranca"],
+  financeiro: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  colaborador: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  auditor: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  dpo: ["configuracoes", "configuracoes-aparencia", "seguranca"],
+  admin_tecnico: ["configuracoes", "configuracoes-aparencia", "seguranca"],
 };
 
 /**

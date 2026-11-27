@@ -346,8 +346,9 @@ describe("T196 — SeletorDeReferencia: contrato de CSS (375 px e 44 px)", () =>
         /min-height: var\(--touch-target\)/,
       );
     }
+    // T215 — o botão quadrado segue o padrão do sistema.
     expect(css).toMatch(
-      /width: var\(--touch-target\);\s*height: var\(--touch-target\);/,
+      /width: var\(--botao-icone\);\s*height: var\(--botao-icone\);/,
     );
   });
 

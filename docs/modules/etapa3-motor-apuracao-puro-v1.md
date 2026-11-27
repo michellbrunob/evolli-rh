@@ -336,5 +336,5 @@ fechamento, espelho, assinatura, parser, lote, associação por CPF, persistênc
 endpoint, API, UI ou dado real** é produzido. **Não declara** conformidade com a
 **Portaria MTP 671** nem faz interpretação jurídica/trabalhista; a semântica do
 motor é **candidata à homologação** (QH-01), não validade legal. **Não altera**
-`apps/web`, schema, migrations, dependências, MFA ou `DESIGN-apple.md`, e **não
+`apps/web`, schema, migrations, dependências, MFA ou o guia visual, e **não
 relaxa** nenhum gate de dado real.

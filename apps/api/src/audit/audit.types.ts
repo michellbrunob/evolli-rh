@@ -82,6 +82,69 @@ export const AUDIT_ACTIONS = [
   "pessoas_foto_colaborador_enviada",
   "pessoas_foto_colaborador_substituida",
   "pessoas_foto_colaborador_removida",
+  // T215 — desativacao e reativacao do colaborador na empresa (lixeira do
+  // Editar colaborador), sem conteudo.
+  "pessoas_colaborador_desativado",
+  "pessoas_colaborador_reativado",
+  // T215 — Férias e ausências: registro e decisões, sem conteúdo.
+  "pessoas_ausencia_registrada",
+  "pessoas_ausencia_aprovada",
+  "pessoas_ausencia_recusada",
+  "pessoas_ausencia_cancelada",
+  "pessoas_ausencia_alterada",
+  "pessoas_ausencia_excluida",
+  "pessoas_ausencia_ajuste_sugerido",
+  // T215 — Políticas de férias: o `resourceId` é o id da POLÍTICA.
+  "pessoas_politica_ferias_criada",
+  "pessoas_politica_ferias_alterada",
+  "pessoas_politica_ferias_desativada",
+  "pessoas_politica_ferias_reativada",
+  // T215 — Benefícios: o `resourceId` é o id do BENEFÍCIO; dependentes, o
+  // do DEPENDENTE. Nunca nome, valores, pessoas ou datas.
+  "pessoas_beneficio_criado",
+  "pessoas_beneficio_alterado",
+  "pessoas_beneficio_pausado",
+  "pessoas_beneficio_encerrado",
+  "pessoas_beneficio_reativado",
+  "pessoas_beneficio_excluido",
+  "pessoas_beneficio_pessoas_alteradas",
+  "pessoas_beneficio_valores_alterados",
+  "pessoas_dependente_criado",
+  "pessoas_dependente_alterado",
+  "pessoas_dependente_removido",
+  // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
+  "pessoas_periodo_reiniciado",
+  "pessoas_periodo_reinicio_removido",
+  // T215 — ficha: leitura (dados de saúde) e anexo, sem conteúdo.
+  "pessoas_ausencia_consultada",
+  "pessoas_ausencia_anexo_enviado",
+  "pessoas_ausencia_anexo_baixado",
+  "pessoas_ausencia_anexo_removido",
+
+  // T215 — Salários (linha do tempo salarial): sem valor, cargo ou contrato.
+  "pessoas_salario_registrado",
+  "pessoas_salario_atualizado",
+  "pessoas_salario_removido",
+  // T215 — escala do colaborador: só o id da escala e a empresa.
+  "pessoas_escala_definida",
+  "pessoas_escala_encerrada",
+  // T215 — quadro da escala: o dia gravado ou limpo no rascunho.
+  "pessoas_escala_dia_gravado",
+  "pessoas_escala_dia_limpo",
+  "pessoas_escala_publicada",
+  "pessoas_escala_regras_salvas",
+  "pessoas_escala_feriado_criado",
+  "pessoas_escala_feriado_removido",
+  "pessoas_escala_feriado_alterado",
+  "pessoas_escala_feriado_arquivado",
+  // T213 — documentos do colaborador (ADR 0021).
+  "pessoas_documento_colaborador_enviado",
+  "pessoas_documento_colaborador_substituido",
+  "pessoas_documento_colaborador_removido",
+  "pessoas_documento_colaborador_aprovado",
+  "pessoas_documento_colaborador_reprovado",
+  "pessoas_documento_colaborador_nao_verificado",
+  "pessoas_documento_colaborador_baixado",
   "pessoas_vinculo_criado",
   "pessoas_vinculo_ativado",
   "pessoas_vinculo_encerrado",
@@ -282,7 +345,35 @@ export type AuditResource =
   // Nunca nome, data ou qualquer valor do formulario.
   | "rascunho_admissao"
   // T209 — foto do colaborador: o `resourceId` e o id do COLABORADOR.
-  | "foto_colaborador";
+  | "foto_colaborador"
+  // T213 — documento do colaborador com arquivo: o `resourceId` e o id do
+  // DOCUMENTO. Nunca nome, categoria, tamanho, hash ou chave do objeto.
+  | "documento_colaborador"
+  // T215 — contrato do vinculo (edicao do colaborador): o `resourceId` e o
+  // id do VINCULO. Nunca salario, nivel, registro ou qualquer valor.
+  | "contrato_vinculo"
+  // T215 — Férias e ausências: o `resourceId` é o id da AUSÊNCIA (no
+  // registro e nas decisões) ou do COLABORADOR (consultas negadas). Nunca
+  // tipo, datas, motivo ou observação.
+  | "ausencia"
+  // T215 — Salários: o `resourceId` é o id da ALTERAÇÃO salarial. Nunca
+  // valor, cargo ou modelo de contrato.
+  | "alteracao_salarial"
+  // T215 — o arquivo anexado à ausência (negações do guard). O `resourceId` é
+  // o id da ausência.
+  | "anexo_ausencia"
+  // T215 — escala do colaborador: o `resourceId` é o id da ESCALA (ou do
+  // COLABORADOR nas negações). Nunca modelo, turno ou datas.
+  | "escala_colaborador"
+  // T215 — reinício do período aquisitivo: o `resourceId` é o id do
+  // REINÍCIO (ou do COLABORADOR nas negações). Nunca data, motivo ou dias.
+  | "reinicio_periodo"
+  // T215 — política de férias: o `resourceId` é o id da POLÍTICA. Nunca
+  // nome, regras ou pessoas.
+  | "politica_ferias"
+  // T215 — benefício e dependente: o `resourceId` é o id do registro.
+  | "beneficio"
+  | "dependente_colaborador";
 
 export type RecordAuditEventInput =
   | {

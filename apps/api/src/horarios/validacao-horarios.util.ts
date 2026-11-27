@@ -110,6 +110,28 @@ export function normalizarPeriodos(
 }
 
 /**
+ * T215 — regras do turno: até 3 períodos por dia; no modo "mesmo_horario",
+ * só os períodos de segunda (valem para todo dia de trabalho da escala).
+ */
+export function conferirPeriodosDoTurno(
+  periodos: PeriodoNormalizado[],
+  modo: string,
+): void {
+  const porDia = new Map<number, number>();
+  for (const p of periodos) {
+    porDia.set(p.diaSemana, (porDia.get(p.diaSemana) ?? 0) + 1);
+  }
+  if ([...porDia.values()].some((n) => n > 3)) {
+    throw new UnprocessableEntityException("Cada dia pode ter ate 3 periodos.");
+  }
+  if (modo === "mesmo_horario" && [...porDia.keys()].some((d) => d !== 1)) {
+    throw new UnprocessableEntityException(
+      "No mesmo horario todo dia, os periodos sao os de segunda.",
+    );
+  }
+}
+
+/**
  * Traduz falha de restrição do banco em erro HTTP estável, sem vazar nome de
  * tabela, coluna, constraint ou SQL. Mesmo critério de `traduzirErroPonto`.
  */

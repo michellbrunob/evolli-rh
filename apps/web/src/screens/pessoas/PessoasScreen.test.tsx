@@ -1,7 +1,12 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PessoasScreen } from "./PessoasScreen";
 
+/**
+ * T215 — na página de Colaboradores (desenho da referência) a faixa de
+ * seções de Pessoas não aparece; o atalho da ficha para o Histórico funcional
+ * saiu com a aba Vida funcional (decisão de 2026-11-23).
+ */
 /**
  * PessoasScreen — contêiner de abas (T072…T094, separado por modo na T159).
  *
@@ -23,31 +28,11 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     ).toBeInTheDocument();
   });
 
-  it("expõe as seis abas funcionais, com aria-selected correto por padrão", () => {
+  it("T215 — na página de Colaboradores, sem a faixa de seções", () => {
     render(<PessoasScreen />);
-
-    const tablist = screen.getByRole("tablist", { name: "Seções de Pessoas" });
-    expect(tablist).toBeInTheDocument();
-
-    const esperadas = [
-      "Colaboradores",
-      "Horário de trabalho",
-      "Histórico funcional",
-      "Dados contratuais",
-      "Documentos",
-      "Solicitações",
-    ];
-    // T199 — o dashboard de Colaboradores tem abas próprias; aqui só as de Pessoas.
-    const abas = within(tablist).getAllByRole("tab");
-    expect(abas.map((a) => a.textContent)).toEqual(esperadas);
-
-    for (const aba of abas) {
-      expect(aba.tagName).toBe("BUTTON");
-      expect(aba).toHaveAttribute(
-        "aria-selected",
-        aba.textContent === "Colaboradores" ? "true" : "false",
-      );
-    }
+    expect(
+      screen.queryByRole("tablist", { name: "Seções de Pessoas" }),
+    ).toBeNull();
   });
 
   it("NÃO oferece nenhuma aba demonstrativa — nem desabilitada, nem oculta", () => {
@@ -57,129 +42,6 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     }
     // E o conteúdo delas também não é montado: nenhuma tabela de exemplo.
     expect(screen.queryByText(/\(exemplo\)/)).toBeNull();
-  });
-
-  it("troca para 'Horário de trabalho' ao clicar na aba — preservado sem regressão (T112)", () => {
-    const onTituloIdChange = vi.fn();
-    render(
-      <PessoasScreen onTituloIdChange={onTituloIdChange} podeOperarJornada />,
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Horário de trabalho" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-horario-titulo");
-  });
-
-  it("troca para 'Histórico funcional' ao clicar na aba — preservado sem regressão (T115)", () => {
-    const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Histórico funcional" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH e DP")).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Histórico funcional" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("historico-funcional-titulo");
-  });
-
-  it("troca para 'Dados contratuais' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Dados contratuais" }));
-
-    // T134 — a aba Dados contratuais passou a ser funcional (carrega dados
-    // reais). Aqui (sem mocks de rede) validamos só o contrato de NAVEGAÇÃO: h1
-    // único e titleId reportado. O comportamento funcional é coberto por
-    // DadosContratuaisScreen.test.tsx.
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Dados contratuais" }),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole("tab", { name: "Dados contratuais" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("dados-contratuais-titulo");
-  });
-
-  it("troca para 'Documentos' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
-
-    // T133 — a aba Documentos passou a ser funcional (carrega dados reais). Aqui
-    // (sem mocks de rede) só validamos o contrato de NAVEGAÇÃO: h1 único e o
-    // titleId reportado. O comportamento funcional é coberto por
-    // PessoasDocumentosScreen.test.tsx.
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Documentos" }),
-    ).toBeInTheDocument();
-
-    expect(screen.getByRole("tab", { name: "Documentos" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-documentos-titulo");
-  });
-
-  it("troca para 'Solicitações' ao clicar na aba, com h1 único e informa o titleId", () => {
-    const onTituloIdChange = vi.fn();
-    render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Solicitações" }));
-
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Solicitações" }),
-    ).toBeInTheDocument();
-    // T140: a aba deixou de ser demonstrativa. O que a identifica agora é o
-    // aviso de escopo da Central funcional, renderizado de forma síncrona —
-    // a listagem em si depende da API e é coberta em SolicitacoesScreen.test.
-    expect(screen.getByText(/Encaminhar é um repasse/)).toBeInTheDocument();
-
-    expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Colaboradores" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-    expect(onTituloIdChange).toHaveBeenCalledWith("solicitacoes-titulo");
   });
 
   it("troca para 'Benefícios' ao clicar na aba, com h1 único e informa o titleId", () => {
@@ -272,75 +134,13 @@ describe("PessoasScreen — modo funcional (T072/T088/T089/T090/T091)", () => {
     expect(onTituloIdChange).toHaveBeenCalledWith("afastamentos-titulo");
   });
 
-  it("volta para 'Colaboradores' ao clicar de novo na aba", () => {
-    render(<PessoasScreen />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
-
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
-    ).toBeInTheDocument();
-  });
-
-  it("passa por 'Histórico funcional' e volta para 'Colaboradores', preservando 'Horário de trabalho' sem regressão", () => {
-    render(<PessoasScreen podeOperarJornada />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Histórico funcional" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Histórico funcional" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Horário de trabalho" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Somente RH")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Colaboradores" }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Colaboradores" }),
-    ).toBeInTheDocument();
-  });
-
-  it("informa o titleId do h1 visível via onTituloIdChange, inclusive ao trocar de aba", () => {
+  it("informa o titleId do h1 visível via onTituloIdChange", () => {
     const onTituloIdChange = vi.fn();
     render(<PessoasScreen onTituloIdChange={onTituloIdChange} />);
 
     expect(onTituloIdChange).toHaveBeenCalledWith("colaboradores-titulo");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Horário de trabalho" }));
-    expect(onTituloIdChange).toHaveBeenCalledWith("pessoas-horario-titulo");
-
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.id).toBe("pessoas-horario-titulo");
-  });
-
-  it("não referencia autenticação, sessão, CPF, dinheiro ou dado real", () => {
-    render(<PessoasScreen />);
-    for (const aba of [
-      "Horário de trabalho",
-      "Histórico funcional",
-      "Dados contratuais",
-      "Documentos",
-      "Solicitações",
-      "Colaboradores",
-    ]) {
-      fireEvent.click(screen.getByRole("tab", { name: aba }));
-    }
-
-    const texto = document.body.innerHTML.toLowerCase();
-    for (const termoProibido of [
-      "reserva fiscal",
-      "secullum",
-      "rwtech",
-      "bioprox",
-      "login",
-      "senha",
-      "sessão",
-    ]) {
-      expect(texto).not.toContain(termoProibido);
-    }
+    expect(h1.id).toBe("colaboradores-titulo");
   });
 });
 

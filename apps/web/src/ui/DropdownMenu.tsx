@@ -133,7 +133,8 @@ export function DropdownMenuContent({
           itens[itens.length - 1]?.focus();
         }}
         className={cn(
-          "ev:z-20 ev:grid ev:min-w-[13rem] ev:max-w-[calc(100vw-2*var(--space-md))] ev:rounded-[var(--radius-md)] ev:border-[length:var(--borda-espessura)] ev:border-[var(--divisor-cor-forte)] ev:bg-[var(--surface-canvas)] ev:p-1",
+          // T215 — "ev-menu": cresce a partir do gatilho (ui/movimento.css).
+          "ev-menu ev:z-20 ev:grid ev:min-w-[13rem] ev:max-w-[calc(100vw-2*var(--space-md))] ev:rounded-[var(--radius-md)] ev:border-[length:var(--borda-espessura)] ev:border-[var(--divisor-cor-forte)] ev:bg-[var(--surface-canvas)] ev:p-1",
           className,
         )}
         {...props}
@@ -162,5 +163,12 @@ export function DropdownMenuItem({
       }}
       {...props}
     />
+  );
+}
+
+/** T215 — linha entre grupos de itens (ex.: antes de uma ação destrutiva). */
+export function DropdownMenuSeparator() {
+  return (
+    <RadixMenu.Separator className="ev:my-1 ev:h-px ev:bg-[var(--divisor-cor)]" />
   );
 }

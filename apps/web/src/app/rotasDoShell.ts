@@ -47,8 +47,19 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "nova-admissao": "#/pessoas/nova-admissao",
   // T209 (Bloco C) — importação por planilha, sub-página de Colaboradores.
   "importar-colaboradores": "#/pessoas/importar",
+  // T215 — Políticas de férias, sub-página de Colaboradores (engrenagem da
+  // aba Férias e ausências).
+  "politicas-ferias": "#/pessoas/politicas-ferias",
+  // T215 — o módulo Benefícios (as subtelas vivem dentro dele).
+  beneficios: "#/beneficios",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
-  "jornadas-trabalho": "#/estrutura/jornadas-trabalho",
+  // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
+  // sub-página dele.
+  "jornadas-trabalho": "#/pessoas/escala",
+  "turnos-escala": "#/pessoas/escala/turnos",
+  "regras-escala": "#/pessoas/escala/regras",
+  "transicao-escala": "#/pessoas/escala/transicao",
+  "modelo-escala": "#/pessoas/escala/modelo",
   // T208 — Configurações abre no único submódulo com tela: Meu perfil.
   configuracoes: "#/configuracoes/meu-perfil",
   // T210 — Configurações › Aparência (o tema da própria conta).
@@ -56,8 +67,10 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T209 — Configurações › Empresas e a Nova empresa.
   "configuracoes-empresas": "#/configuracoes/empresas",
   "nova-empresa": "#/configuracoes/empresas/nova",
-  // T211 — Contas de acesso como Configurações › Equipe e permissões.
-  "contas-acesso": "#/configuracoes/equipe-e-permissoes",
+  // T215 — o módulo Segurança: Sessões ativas e Permissões de acesso (as
+  // Contas de acesso, que até a T215 moravam em Configurações).
+  seguranca: "#/seguranca/sessoes-ativas",
+  "contas-acesso": "#/seguranca/permissoes-de-acesso",
   // T211 — fora do menu lateral: abrem pela URL própria.
   ponto: "#/jornada/ponto",
   "administracao-lideranca": "#/lideranca/administracao",
@@ -69,6 +82,19 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
  * caminho (`#/configuracoes/seguranca`) não é rota: não há tela atrás dele.
  */
 const ROTA_DO_MODULO_CONFIGURACOES = "#/configuracoes";
+
+/**
+ * T215 — endereços que levam a um destino sem serem a forma canônica dele:
+ * `#/seguranca` sozinho (o módulo abre em Sessões ativas) e o endereço
+ * salvo das permissões quando moravam em Configurações. A primeira exibição
+ * escreve a forma canônica no lugar.
+ */
+const ROTAS_ALTERNATIVAS: Readonly<Record<string, string>> = {
+  "#/seguranca": "seguranca",
+  "#/configuracoes/equipe-e-permissoes": "contas-acesso",
+  // T215 — endereço antigo de "Escala de trabalho" (catálogo de jornadas).
+  "#/estrutura/jornadas-trabalho": "jornadas-trabalho",
+};
 
 /** O fragmento da URL do destino, ou `null` se ele não tem rota própria. */
 export function rotaDoDestino(destinoId: string): string | null {
@@ -91,14 +117,30 @@ export function rotaDoDestino(destinoId: string): string | null {
  */
 export const ABAS_DA_FICHA = [
   "dados",
-  "vida-funcional",
-  "contratuais",
-  "jornada",
+  "salarios",
+  "ferias",
+  "escala",
+  "beneficios",
+  "pesquisas",
   "documentos",
-  "ponto",
-  "solicitacoes",
+  "desenvolvimento",
+  "comentarios",
 ] as const;
 export type AbaDaFicha = (typeof ABAS_DA_FICHA)[number];
+
+/**
+ * T215 — a ficha no desenho da referência (decisão de 2026-11-23): as abas
+ * acima. As que saíram da ficha (Vida funcional, Dados contratuais,
+ * Registros de ponto e Solicitações) levam a Dados; "jornada" virou Escala.
+ * Endereços salvos não quebram: a primeira exibição corrige a URL.
+ */
+const ABA_DA_FICHA_ANTIGA: Readonly<Record<string, AbaDaFicha>> = {
+  "vida-funcional": "dados",
+  contratuais: "dados",
+  ponto: "dados",
+  solicitacoes: "dados",
+  jornada: "escala",
+};
 
 /**
  * T198 — a ficha pedida pela URL: o colaborador e a aba.
@@ -110,6 +152,66 @@ export interface RotaDaFicha {
   readonly colaboradorId: string;
   readonly aba: AbaDaFicha;
   readonly competencia?: string;
+  /**
+   * T215 — a página "Editar colaborador", na seção pedida
+   * (`…/:id/editar/:secao`). Presente, ela ocupa o lugar da ficha.
+   */
+  readonly edicao?: SecaoDaEdicao;
+  /**
+   * T215 — a edição foi aberta pela ficha desta pessoa, nesta aba: voltar
+   * reabre a ficha nela. Não vai à URL (recarregar volta para a lista).
+   */
+  readonly voltarParaFicha?: AbaDaFicha;
+}
+
+/**
+ * T215 — a edição pedida a partir do que está aberto: se é a ficha da mesma
+ * pessoa (e não a própria edição), guarda a aba para a volta.
+ */
+export function edicaoAPartirDe(
+  atual: RotaDaFicha | null,
+  colaboradorId: string,
+  secao: SecaoDaEdicao,
+): RotaDaFicha {
+  const daFicha =
+    atual !== null &&
+    atual.colaboradorId === colaboradorId &&
+    atual.edicao === undefined;
+  return {
+    colaboradorId,
+    aba: "dados",
+    edicao: secao,
+    ...(daFicha
+      ? { voltarParaFicha: atual.aba }
+      : atual?.colaboradorId === colaboradorId && atual.voltarParaFicha
+        ? { voltarParaFicha: atual.voltarParaFicha }
+        : {}),
+  };
+}
+
+/** T215 — para onde a edição volta: a ficha de origem, ou a lista (`null`). */
+export function voltarDaEdicao(edicao: RotaDaFicha | null): RotaDaFicha | null {
+  if (!edicao?.voltarParaFicha) return null;
+  return { colaboradorId: edicao.colaboradorId, aba: edicao.voltarParaFicha };
+}
+
+/**
+ * T215 — as seções da página "Editar colaborador", na ordem do menu lateral.
+ */
+export const SECOES_DA_EDICAO = [
+  "dados-basicos",
+  "dados-profissionais",
+  "endereco",
+  "dependentes",
+  "documentos",
+  "dados-bancarios",
+  "formacao-academica",
+  "campos-extras",
+] as const;
+export type SecaoDaEdicao = (typeof SECOES_DA_EDICAO)[number];
+
+function ehSecaoDaEdicao(valor: string): valor is SecaoDaEdicao {
+  return (SECOES_DA_EDICAO as readonly string[]).includes(valor);
 }
 
 /**
@@ -156,22 +258,23 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
   if (partes.length > 3) return null;
   const [colaboradorId = "", aba = "dados", competencia] = partes;
   if (!UUID.test(colaboradorId)) return null;
-  if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
-  // T202 — o terceiro segmento é só da aba "ponto", e só no formato do
-  // servidor. Sem ele, vale o mês corrente (P-4): a URL é corrigida no lugar.
-  if (aba !== "ponto") {
-    return competencia === undefined
-      ? { colaboradorId, aba: aba as AbaDaFicha }
+  // T215 — `…/:id/editar` e `…/:id/editar/:secao`: a página de edição.
+  if (aba === "editar") {
+    const secao = competencia ?? "dados-basicos";
+    return ehSecaoDaEdicao(secao)
+      ? { colaboradorId, aba: "dados", edicao: secao }
       : null;
   }
-  if (competencia !== undefined && !competenciaValida(competencia)) {
-    return null;
+  const antiga = ABA_DA_FICHA_ANTIGA[aba];
+  if (antiga) {
+    // O antigo "…/ponto/AAAA-MM" também abre Dados.
+    if (competencia !== undefined && aba !== "ponto") return null;
+    return { colaboradorId, aba: antiga };
   }
-  return {
-    colaboradorId,
-    aba: "ponto",
-    competencia: competencia ?? competenciaDoMesAtual(),
-  };
+  if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
+  return competencia === undefined
+    ? { colaboradorId, aba: aba as AbaDaFicha }
+    : null;
 }
 
 /**
@@ -179,23 +282,36 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
  * "ponto", sempre com a competência (a do mês corrente, se não houver).
  */
 export function rotaDaFicha(ficha: RotaDaFicha): string {
-  const base = `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
-  if (ficha.aba !== "ponto") return base;
-  return `${base}/${ficha.competencia ?? competenciaDoMesAtual()}`;
+  if (ficha.edicao !== undefined) {
+    return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/editar/${ficha.edicao}`;
+  }
+  return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
 }
 
 /**
  * T199 — as abas do dashboard de Colaboradores. Ativos é a inicial (N-6);
  * "jornada" mostra a visão de jornadas que já existia (N-4).
+ * T215 — na ordem da tela: Ativos, Em admissão, Férias e ausências
+ * ("ferias"), Escala de trabalho (o id "jornada" fica, para endereços
+ * salvos), Desligados e Todos. O Organograma é atalho, não aba com estado.
  */
 export const ABAS_DA_LISTAGEM = [
   "ativos",
   "em-admissao",
+  "ferias",
+  "jornada",
   "desligados",
   "todos",
-  "jornada",
 ] as const;
 export type AbaDaListagem = (typeof ABAS_DA_LISTAGEM)[number];
+
+/**
+ * T215 — abas com a tabela de colaboradores. Escala de trabalho e Férias e
+ * ausências são outras visões, com conteúdo e filtros próprios.
+ */
+export function abaTemTabela(aba: AbaDaListagem): boolean {
+  return aba !== "jornada" && aba !== "ferias";
+}
 
 /**
  * T199 — os tipos de vínculo controlados. Aqui, e não importados do cliente da
@@ -224,18 +340,94 @@ export const TAMANHOS_DE_PAGINA = [20, 50, 100] as const;
 export type TamanhoDaPagina = (typeof TAMANHOS_DE_PAGINA)[number];
 
 /**
- * T199 — o que o dashboard guarda na URL (D-3): aba, página e os ids dos
- * filtros. **Nunca o texto da busca**, que pode ser nome ou matrícula — dado
- * pessoal não vai para a URL, o histórico ou o servidor de log.
+ * T215 — os níveis de carreira do contrato: a mesma lista fechada da API
+ * (`NIVEIS`). Aqui, e não importados de outra tela, pela mesma razão dos
+ * tipos de vínculo.
+ */
+export const NIVEIS_DE_CARREIRA = [
+  "primeiro_emprego",
+  "junior",
+  "pleno",
+  "senior",
+  "lider_tecnico",
+  "coordenador",
+  "gerente",
+  "head",
+  "diretor",
+  "vp",
+  "c_level",
+] as const;
+export type NivelDeCarreira = (typeof NIVEIS_DE_CARREIRA)[number];
+
+/** T215 — os gêneros do perfil pessoal: a lista fechada da API (`GENEROS`). */
+export const GENEROS_DO_PERFIL = [
+  "feminino",
+  "masculino",
+  "outro",
+  "prefiro_nao_informar",
+] as const;
+export type GeneroDoPerfil = (typeof GENEROS_DO_PERFIL)[number];
+
+/** T215 — o teto de valores por grupo da gaveta (o mesmo da API). */
+export const FILTRO_VALORES_MAXIMOS = 50;
+
+/**
+ * T215 — os grupos da gaveta "Filtrar". Os de lotação (departamentos,
+ * áreas, centros de custo, unidades, cargos) são ids; nível, tipo e gênero,
+ * valores das listas fechadas. Lista vazia: sem filtro naquele grupo.
+ */
+export interface FiltrosDaListagem {
+  readonly departamentos: readonly string[];
+  readonly areas: readonly string[];
+  readonly centrosCusto: readonly string[];
+  readonly unidades: readonly string[];
+  readonly cargos: readonly string[];
+  readonly niveis: readonly NivelDeCarreira[];
+  readonly tipos: readonly TipoDeVinculo[];
+  readonly generos: readonly GeneroDoPerfil[];
+}
+
+export const FILTROS_VAZIOS: FiltrosDaListagem = {
+  departamentos: [],
+  areas: [],
+  centrosCusto: [],
+  unidades: [],
+  cargos: [],
+  niveis: [],
+  tipos: [],
+  generos: [],
+};
+
+/** T215 — os grupos que dependem da lotação vigente (vínculo ativo). */
+export const GRUPOS_DE_LOTACAO = [
+  "departamentos",
+  "areas",
+  "centrosCusto",
+  "unidades",
+  "cargos",
+  "niveis",
+] as const satisfies readonly (keyof FiltrosDaListagem)[];
+
+/** T215 — quantos valores estão marcados, somando os grupos. */
+export function quantidadeDeFiltros(filtros: FiltrosDaListagem): number {
+  return Object.values(filtros).reduce(
+    (soma: number, lista: readonly string[]) => soma + lista.length,
+    0,
+  );
+}
+
+/**
+ * T199 — o que o dashboard guarda na URL (D-3): aba, página e os filtros.
+ * **Nunca o texto da busca**, que pode ser nome ou matrícula — dado pessoal
+ * não vai para a URL, o histórico ou o servidor de log.
  * T209 — e o tamanho da página (C-2), no parâmetro canônico `tamanho`.
+ * T215 — os filtros são os grupos da gaveta "Filtrar", em listas.
  */
 export interface EstadoDaListagem {
   readonly aba: AbaDaListagem;
   readonly pagina: number;
   readonly tamanho: TamanhoDaPagina;
-  readonly departamentoId: string | null;
-  readonly cargoId: string | null;
-  readonly tipo: TipoDeVinculo | null;
+  readonly filtros: FiltrosDaListagem;
 }
 
 /**
@@ -252,9 +444,7 @@ export const ESTADO_INICIAL_DA_LISTAGEM: EstadoDaListagem = {
   aba: "ativos",
   pagina: 1,
   tamanho: 20,
-  departamentoId: null,
-  cargoId: null,
-  tipo: null,
+  filtros: FILTROS_VAZIOS,
 };
 
 const ROTA_DA_LISTAGEM = "#/pessoas/colaboradores";
@@ -263,34 +453,87 @@ const PAGINA_MAXIMA = 100_000;
 /**
  * T199 — abas com filtro de lotação: a lotação vigente só existe em vínculo
  * ATIVO (T184, T190), então Departamento e Cargo nunca casariam em "Em
- * admissão" nem em "Desligados".
+ * admissão" nem em "Desligados". T215 — o mesmo vale para Área, Centro de
+ * custo, Unidade e Nível.
  */
 export function abaTemLotacao(aba: AbaDaListagem): boolean {
   return aba === "ativos" || aba === "todos";
 }
 
 /**
- * T199 — o estado coerente com a aba: lotação só onde ela existe; a aba de
- * jornada (outra visão, com paginação e filtros próprios) não leva página,
- * lotação nem tipo. T209 — nem tamanho de página: ela tem paginação própria.
+ * T199 — o estado coerente com a aba: lotação só onde ela existe; as abas
+ * sem tabela (jornada e, T215, férias) não levam página, filtros nem
+ * tamanho — têm conteúdo próprio.
  */
 export function normalizarEstadoDaListagem(
   estado: EstadoDaListagem,
 ): EstadoDaListagem {
-  if (estado.aba === "jornada") {
-    return { ...ESTADO_INICIAL_DA_LISTAGEM, aba: "jornada" };
+  if (!abaTemTabela(estado.aba)) {
+    return { ...ESTADO_INICIAL_DA_LISTAGEM, aba: estado.aba };
   }
-  return abaTemLotacao(estado.aba)
-    ? estado
-    : { ...estado, departamentoId: null, cargoId: null };
+  if (abaTemLotacao(estado.aba)) return estado;
+  const lotacaoVazia = GRUPOS_DE_LOTACAO.every(
+    (g) => estado.filtros[g].length === 0,
+  );
+  if (lotacaoVazia) return estado;
+  return {
+    ...estado,
+    filtros: {
+      ...FILTROS_VAZIOS,
+      tipos: estado.filtros.tipos,
+      generos: estado.filtros.generos,
+    },
+  };
 }
+
+/**
+ * T215 — uma lista da URL: valores separados por vírgula (ou o parâmetro
+ * repetido); cada um conferido; inválidos saem, repetidos entram uma vez, e
+ * no máximo `FILTRO_VALORES_MAXIMOS`.
+ */
+function listaDaUrl<T extends string>(
+  params: URLSearchParams,
+  nome: string,
+  aceitar: (valor: string) => T | null,
+): T[] {
+  const lidos: T[] = [];
+  for (const bruto of params.getAll(nome)) {
+    for (const parte of bruto.split(",")) {
+      const valor = aceitar(parte.trim());
+      if (valor !== null && !lidos.includes(valor)) lidos.push(valor);
+    }
+  }
+  return lidos.slice(0, FILTRO_VALORES_MAXIMOS);
+}
+
+const idValido = (valor: string): string | null =>
+  UUID.test(valor) ? valor.toLowerCase() : null;
+const daLista =
+  <T extends string>(lista: readonly T[]) =>
+  (valor: string): T | null =>
+    (lista as readonly string[]).includes(valor) ? (valor as T) : null;
+
+/** T215 — o parâmetro da URL de cada grupo, na ordem em que é escrito. */
+const PARAMETRO_DO_GRUPO: readonly (readonly [
+  keyof FiltrosDaListagem,
+  string,
+])[] = [
+  ["departamentos", "departamento"],
+  ["areas", "area"],
+  ["centrosCusto", "centro"],
+  ["unidades", "unidade"],
+  ["cargos", "cargo"],
+  ["niveis", "nivel"],
+  ["tipos", "tipo"],
+  ["generos", "genero"],
+];
 
 /**
  * T199 — o estado do dashboard pedido pelo fragmento, ou `null` se ele não é a
  * rota da listagem. Valor inválido (aba desconhecida, página que não é inteiro
- * positivo, id que não é UUID, tipo fora dos controlados) cai no padrão seguro
- * — nunca vira consulta. Qualquer outro parâmetro é ignorado, inclusive uma
- * busca colada na URL.
+ * positivo, id que não é UUID, valor fora das listas fechadas) cai no padrão
+ * seguro — nunca vira consulta. Qualquer outro parâmetro é ignorado,
+ * inclusive uma busca colada na URL.
  */
 export function listagemDaRota(fragmento: string): EstadoDaListagem | null {
   if (fragmento === ROTA_DA_LISTAGEM) return ESTADO_INICIAL_DA_LISTAGEM;
@@ -301,9 +544,6 @@ export function listagemDaRota(fragmento: string): EstadoDaListagem | null {
   const aba = params.get("aba") ?? "";
   const pagina = params.get("pagina") ?? "";
   const numero = /^[1-9][0-9]{0,5}$/.test(pagina) ? Number(pagina) : 1;
-  const uuid = (valor: string | null) =>
-    valor !== null && UUID.test(valor) ? valor.toLowerCase() : null;
-  const tipo = params.get("tipo") ?? "";
   const tamanho = params.get("tamanho") ?? "";
   return normalizarEstadoDaListagem({
     aba: (ABAS_DA_LISTAGEM as readonly string[]).includes(aba)
@@ -313,30 +553,41 @@ export function listagemDaRota(fragmento: string): EstadoDaListagem | null {
     tamanho:
       TAMANHOS_DE_PAGINA.find((n) => String(n) === tamanho) ??
       ESTADO_INICIAL_DA_LISTAGEM.tamanho,
-    departamentoId: uuid(params.get("departamento")),
-    cargoId: uuid(params.get("cargo")),
-    tipo: (TIPOS_DE_VINCULO as readonly string[]).includes(tipo)
-      ? (tipo as TipoDeVinculo)
-      : null,
+    filtros: {
+      departamentos: listaDaUrl(params, "departamento", idValido),
+      areas: listaDaUrl(params, "area", idValido),
+      centrosCusto: listaDaUrl(params, "centro", idValido),
+      unidades: listaDaUrl(params, "unidade", idValido),
+      cargos: listaDaUrl(params, "cargo", idValido),
+      niveis: listaDaUrl(params, "nivel", daLista(NIVEIS_DE_CARREIRA)),
+      tipos: listaDaUrl(params, "tipo", daLista(TIPOS_DE_VINCULO)),
+      generos: listaDaUrl(params, "genero", daLista(GENEROS_DO_PERFIL)),
+    },
   });
 }
 
 /**
  * T199 — o endereço do dashboard: só o que difere do padrão, sempre na mesma
- * ordem (o mesmo estado dá sempre a mesma URL).
+ * ordem (o mesmo estado dá sempre a mesma URL). T215 — cada grupo da gaveta
+ * em um parâmetro, valores separados por vírgula.
  */
 export function rotaDaListagem(estado: EstadoDaListagem): string {
   const e = normalizarEstadoDaListagem(estado);
-  const params = new URLSearchParams();
-  if (e.aba !== ESTADO_INICIAL_DA_LISTAGEM.aba) params.set("aba", e.aba);
-  if (e.pagina > 1) params.set("pagina", String(e.pagina));
+  const partes: string[] = [];
+  if (e.aba !== ESTADO_INICIAL_DA_LISTAGEM.aba) partes.push(`aba=${e.aba}`);
+  if (e.pagina > 1) partes.push(`pagina=${e.pagina}`);
   if (e.tamanho !== ESTADO_INICIAL_DA_LISTAGEM.tamanho)
-    params.set("tamanho", String(e.tamanho));
-  if (e.departamentoId) params.set("departamento", e.departamentoId);
-  if (e.cargoId) params.set("cargo", e.cargoId);
-  if (e.tipo) params.set("tipo", e.tipo);
-  const qs = params.toString();
-  return qs ? `${ROTA_DA_LISTAGEM}?${qs}` : ROTA_DA_LISTAGEM;
+    partes.push(`tamanho=${e.tamanho}`);
+  // Os valores já são conferidos (UUID ou listas fechadas): a vírgula fica
+  // legível, sem escape.
+  for (const [grupo, nome] of PARAMETRO_DO_GRUPO) {
+    const lista = e.filtros[grupo];
+    if (lista.length > 0)
+      partes.push(`${nome}=${lista.map(encodeURIComponent).join(",")}`);
+  }
+  return partes.length > 0
+    ? `${ROTA_DA_LISTAGEM}?${partes.join("&")}`
+    : ROTA_DA_LISTAGEM;
 }
 
 /**
@@ -457,6 +708,8 @@ export function rotaDoDashboard(
 export function destinoDaRota(fragmento: string): string | null {
   if (dashboardDaRota(fragmento) !== null) return "dashboard";
   if (fragmento === ROTA_DO_MODULO_CONFIGURACOES) return "configuracoes";
+  const alternativa = ROTAS_ALTERNATIVAS[fragmento];
+  if (alternativa) return alternativa;
   if (fichaDaRota(fragmento) !== null) return "pessoas";
   if (listagemDaRota(fragmento) !== null) return "pessoas";
   const entrada = Object.entries(ROTA_POR_DESTINO).find(
@@ -497,6 +750,8 @@ const DESTINO_SEGURO_APOS_TROCA: Readonly<Record<string, string>> = {
   "nova-admissao": "pessoas",
   // T209 (Bloco C) — a planilha conferida é da empresa anterior: descartada.
   "importar-colaboradores": "pessoas",
+  // T215 — a política em edição é da empresa anterior: volta à lista.
+  "politicas-ferias": "pessoas",
   // T209 — um CNPJ pela metade não segue para a empresa nova: volta à lista.
   "nova-empresa": "configuracoes-empresas",
 };

@@ -1,0 +1,247 @@
+/*
+ * T215 — movimento da interface do Evolli: animações sutis e corporativas.
+ *
+ * - Tempos e curva vêm dos tokens (`--movimento-*`, tokens.css): abrir em
+ *   250 ms, fechar em 150 ms, desacelerando no fim; deslocamentos pequenos.
+ * - Só `opacity`, `transform`/`scale`/`translate` e `filter` são animados:
+ *   nada que obrigue o navegador a recalcular o layout.
+ * - Quem pede movimento reduzido não vê animação nem transição (fim do
+ *   arquivo).
+ */
+
+/* ---- Menus (⋯ e listas suspensas): crescem a partir do gatilho. ---- */
+@keyframes ev-menu-entra {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes ev-menu-sai {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+.ev-menu {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
+
+.ev-menu[data-state="open"] {
+  animation: ev-menu-entra var(--movimento-abrir) var(--movimento-curva-suave);
+}
+
+.ev-menu[data-state="closed"] {
+  animation: ev-menu-sai var(--movimento-fechar) var(--movimento-curva-suave);
+}
+
+/* ---- Dicas (o "i" e afins): aparecem rápido, somem mais rápido. ---- */
+@keyframes ev-dica-entra {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+.ev-dica {
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+
+.ev-dica[data-state="delayed-open"],
+.ev-dica[data-state="instant-open"] {
+  animation: ev-dica-entra var(--movimento-dica) ease-out;
+}
+
+/* ---- Janela de confirmação (Dialog central): surge do centro. ---- */
+@keyframes ev-janela-entra {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes ev-janela-sai {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+.ev-janela--centro[data-state="open"] {
+  animation: ev-janela-entra var(--movimento-abrir) var(--movimento-curva-suave);
+}
+
+.ev-janela--centro[data-state="closed"] {
+  animation: ev-janela-sai var(--movimento-fechar) var(--movimento-curva-suave);
+}
+
+/* ---- Abas (todas): o sublinhado desliza até a aba escolhida.
+   `movimentoDasAbas.ts` mede a aba selecionada de cada `[role="tablist"]`
+   e publica `--aba-x`, `--aba-largura` e `--aba-espessura`; a cor sai de
+   `--aba-cor` (padrão, a cor de ação). A primeira medida não anima. ---- */
+[role="tablist"][data-abas-animadas] {
+  position: relative;
+}
+
+[role="tablist"][data-abas-animadas]::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: var(--aba-largura, 0px);
+  height: var(--aba-espessura, 2px);
+  background: var(--aba-cor, var(--color-action));
+  pointer-events: none;
+  translate: var(--aba-x, 0px) 0;
+}
+
+[role="tablist"][data-abas-animadas="pronto"]::after {
+  transition:
+    translate var(--movimento-abrir) var(--movimento-curva-suave),
+    width var(--movimento-abrir) var(--movimento-curva-suave);
+}
+
+/* O sublinhado fixo de cada tela dá lugar ao que desliza. */
+[role="tablist"][data-abas-animadas] [role="tab"][aria-selected="true"] {
+  border-bottom-color: transparent;
+}
+
+/* ---- Números: o valor novo entra deslizando de leve. ---- */
+@keyframes ev-numero-sobe {
+  from {
+    opacity: 0;
+    translate: 0 0.35em;
+    filter: blur(2px);
+  }
+}
+
+@keyframes ev-numero-desce {
+  from {
+    opacity: 0;
+    translate: 0 -0.35em;
+    filter: blur(2px);
+  }
+}
+
+.ev-numero {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-numero--mudou[data-direcao="sobe"] {
+  animation: ev-numero-sobe var(--movimento-numero) var(--movimento-curva-suave);
+}
+
+.ev-numero--mudou[data-direcao="desce"] {
+  animation: ev-numero-desce var(--movimento-numero)
+    var(--movimento-curva-suave);
+}
+
+/* ---- Esqueleto de carregamento e revelação do conteúdo. ---- */
+@keyframes ev-pulso {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.ev-esqueleto {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+}
+
+.ev-esqueleto__linha {
+  height: 0.875rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  animation: ev-pulso var(--movimento-pulso) ease-in-out infinite;
+}
+
+.ev-esqueleto__linha:nth-child(1) {
+  width: 40%;
+  height: 1.5rem;
+}
+
+.ev-esqueleto__linha:nth-child(2n) {
+  width: 85%;
+}
+
+.ev-esqueleto__linha:nth-child(2n + 3) {
+  width: 65%;
+}
+
+/* A entrada do conteúdo que chega (painel de aba, seção, etapa, formulário,
+   página) é global: `movimentoDaInterface.ts`, no padrão da aba Dados.
+   `.ev-revelar` só marca o bloco revelado. */
+
+/* ---- Avisos de resultado: sobem de leve; o ✓ se desenha. ---- */
+@keyframes ev-aviso-entra {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+    scale: 0.98;
+  }
+}
+
+@keyframes ev-check-desenha {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+.ev-aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  animation: ev-aviso-entra var(--movimento-aviso) var(--movimento-curva-suave);
+}
+
+.ev-aviso__check {
+  flex: none;
+  color: var(--status-success-ink);
+}
+
+.ev-aviso__check path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: ev-check-desenha var(--movimento-revelar)
+    var(--movimento-curva-suave) 80ms both;
+}
+
+/* ---- Campo inválido: uma tremida curta, quando o erro aparece. ---- */
+@keyframes ev-tremer {
+  28.57% {
+    translate: -4px 0;
+  }
+  57.14% {
+    translate: 3px 0;
+  }
+  78.57% {
+    translate: -2px 0;
+  }
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  animation: ev-tremer 280ms var(--movimento-curva-suave);
+}
+
+/* ---- Quem pede movimento reduzido: nada se move. ---- */
+@media (prefers-reduced-motion: reduce) {
+  .ev-menu,
+  .ev-dica,
+  .ev-janela--centro,
+  [role="tablist"][data-abas-animadas]::after,
+  .ev-numero,
+  .ev-esqueleto__linha,
+  .ev-aviso,
+  .ev-aviso__check path,
+  input[aria-invalid="true"],
+  textarea[aria-invalid="true"],
+  select[aria-invalid="true"] {
+    animation: none !important;
+    transition: none !important;
+  }
+}

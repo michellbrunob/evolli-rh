@@ -18,9 +18,26 @@ import { PrismaClient } from "@prisma/client";
  */
 let sequenciaDeEmail = 0;
 
+/**
+ * T215 — o primeiro salário é obrigatório na admissão (abre a linha do tempo
+ * salarial, com a tag Admissão).
+ */
+export const SALARIO_DA_ADMISSAO = "1621.00";
+
+/** O bloco `contrato` com o salário da admissão, mesclado ao do teste. */
+export function contratoDaAdmissao(
+  extra: unknown = undefined,
+): Record<string, unknown> {
+  return {
+    salarioBruto: SALARIO_DA_ADMISSAO,
+    ...((extra as Record<string, unknown> | undefined) ?? {}),
+  };
+}
+
 export function camposObrigatoriosAdmissao() {
   sequenciaDeEmail += 1;
   return {
+    contrato: contratoDaAdmissao(),
     perfilPessoal: { dataNascimento: "1990-01-15" },
     contatos: {
       emailPessoal: `pessoa.sintetica.${sequenciaDeEmail}@example.test`,

@@ -58,6 +58,8 @@ const MOVIMENTACOES = [
   mov("admissao", "2025-05-10"),
   mov("admissao", "2025-06-10"),
   mov("desligamento", "2024-03-10"),
+  // T214 — a admissão mais antiga: o filtro de anos começa em 2023.
+  mov("admissao", "2023-01-15"),
 ];
 
 beforeEach(() => {
@@ -87,13 +89,20 @@ beforeEach(() => {
       },
     },
   });
-  vi.mocked(listarMovimentacoes).mockImplementation(async (q = {}) =>
-    paginado(
-      MOVIMENTACOES.filter((m) => m.tipo === q.tipo).sort((a, b) =>
-        a.vigenciaInicio < b.vigenciaInicio ? 1 : -1,
-      ),
-    ),
-  );
+  // Como o servidor: da vigência mais nova para a mais antiga, por página.
+  vi.mocked(listarMovimentacoes).mockImplementation(async (q = {}) => {
+    const todas = MOVIMENTACOES.filter((m) => m.tipo === q.tipo).sort((a, b) =>
+      a.vigenciaInicio < b.vigenciaInicio ? 1 : -1,
+    );
+    const tamanho = q.tamanhoPagina ?? 100;
+    const pagina = q.pagina ?? 1;
+    return {
+      itens: todas.slice((pagina - 1) * tamanho, pagina * tamanho),
+      pagina,
+      tamanhoPagina: tamanho,
+      total: todas.length,
+    };
+  });
   vi.mocked(listarCargos).mockResolvedValue(paginado([]) as never);
   vi.mocked(listarDepartamentos).mockResolvedValue(paginado([]) as never);
   vi.mocked(listarEquipe).mockResolvedValue({
@@ -145,6 +154,20 @@ async function esperarLeitura(ano: number) {
   );
 }
 
+/** T214 — o ano mostrado no botão do período. */
+const anoNaTela = () =>
+  screen
+    .getByRole("button", { name: /^Período consultado/ })
+    .querySelector(".dashboard__periodo-ano")?.textContent;
+
+/** T214 — abre a janela do período e escolhe o ano (os anos chegam ao abrir). */
+async function escolherAno(ano: number) {
+  fireEvent.click(screen.getByRole("button", { name: /^Período consultado/ }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: new RegExp(`^${ano}`) }),
+  );
+}
+
 describe("T205 — rota do Dashboard no shell", () => {
   it("sem ano: abre no ano corrente e corrige a URL no lugar, sem entrada nova", async () => {
     window.history.replaceState(null, "", "/#/dashboard");
@@ -179,7 +202,7 @@ describe("T205 — rota do Dashboard no shell", () => {
   it("recarga mantém o ano da URL", async () => {
     const { unmount } = montar("#/dashboard?ano=2024");
     await esperarLeitura(2024);
-    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2024");
+    expect(anoNaTela()).toBe("2024");
     unmount();
     montar("#/dashboard?ano=2024");
     await esperarLeitura(2024);
@@ -190,7 +213,7 @@ describe("T205 — rota do Dashboard no shell", () => {
     montar("#/dashboard?ano=2026");
     await esperarLeitura(2026);
     const entradas = window.history.length;
-    fireEvent.click(screen.getByRole("button", { name: "Ano anterior" }));
+    await escolherAno(2025);
     await waitFor(() =>
       expect(window.location.hash).toBe("#/dashboard?ano=2025"),
     );
@@ -200,10 +223,10 @@ describe("T205 — rota do Dashboard no shell", () => {
 
     navegadorVaiPara("#/dashboard?ano=2026");
     await esperarLeitura(2026);
-    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2026");
+    expect(anoNaTela()).toBe("2026");
     navegadorVaiPara("#/dashboard?ano=2025");
     await esperarLeitura(2025);
-    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2025");
+    expect(anoNaTela()).toBe("2025");
   });
 
   it("voltar para um ano inválido: o corrente, com a URL corrigida no lugar", async () => {
@@ -286,9 +309,8 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     montar("#/dashboard?ano=2025");
     await esperarLeitura(2025);
     const entradas = window.history.length;
-    const link = screen.getByRole("link", {
-      name: "Abrir na listagem de Colaboradores: pessoas ativas",
-    });
+    // T214 — o atalho fica em "Pessoas hoje" (o card principal não tem link).
+    const link = screen.getByRole("link", { name: /^Ativas/ });
     link.focus();
     fireEvent.click(link);
     await screen.findByRole("heading", { level: 1, name: "Colaboradores" });
@@ -303,7 +325,7 @@ describe("T205 — atalhos para a listagem (D-5)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Dashboard" }),
     ).toHaveFocus();
-    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2025");
+    expect(anoNaTela()).toBe("2025");
   });
 
   it("'Pessoas em admissão hoje' e cada tipo abrem a listagem com a aba e o tipo que ela aceita", async () => {
@@ -344,7 +366,7 @@ describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
     );
     expect(window.location.hash).toBe(rota);
     expect(window.history.length).toBe(entradas);
-    expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2024");
+    expect(anoNaTela()).toBe("2024");
   });
 
   it.each([
@@ -373,15 +395,13 @@ describe("T207 — abas do Dashboard no shell (V-3, V-4)", () => {
     expect(window.history.length).toBe(entradas + 1);
     expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
     // O ano é compartilhado: trocar de ano na aba mantém a aba.
-    fireEvent.click(screen.getByRole("button", { name: "Ano anterior" }));
+    await escolherAno(2024);
     await waitFor(() =>
       expect(window.location.hash).toBe("#/dashboard/movimentacao?ano=2024"),
     );
 
     navegadorVaiPara("#/dashboard/movimentacao?ano=2025");
-    await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Ano" })).toHaveValue("2025"),
-    );
+    await waitFor(() => expect(anoNaTela()).toBe("2025"));
     expect(aba("Movimentação")).toHaveAttribute("aria-selected", "true");
     navegadorVaiPara("#/dashboard?ano=2025");
     await waitFor(() =>

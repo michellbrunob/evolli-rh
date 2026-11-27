@@ -16,7 +16,11 @@ import { GenericContainer, StartedTestContainer, Wait } from "testcontainers";
 import { AppModule } from "../src/app.module";
 import { AllExceptionsFilter } from "../src/common/filters/http-exception.filter";
 import { requestIdMiddleware } from "../src/common/request-id";
-import { LotacaoMinima, lotacaoMinima } from "./admissao-obrigatoria";
+import {
+  LotacaoMinima,
+  contratoDaAdmissao,
+  lotacaoMinima,
+} from "./admissao-obrigatoria";
 
 /**
  * T179 — confirmação segura da Nova admissão (decisões da proprietária de
@@ -241,6 +245,7 @@ describe("Confirmação da Nova admissão (T179, e2e)", () => {
         telefone: "(11) 3333-4444",
       },
       ...extra,
+      contrato: contratoDaAdmissao(extra["contrato"]),
     };
     lembrar(corpo);
     return corpo;

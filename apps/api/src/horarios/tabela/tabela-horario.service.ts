@@ -14,7 +14,11 @@ import {
   resolverEscopoHorarios,
   resolverEscopoLeituraTabelas,
 } from "../escopo-horarios.util";
-import { ConflitoDeCamposException } from "../../common/erros/recusa-por-campo";
+import {
+  CamposRecusadosException,
+  ConflitoDeCamposException,
+} from "../../common/erros/recusa-por-campo";
+import { conferirPeriodosDoTurno } from "../validacao-horarios.util";
 import { escaparCuringas } from "../../pessoas/colaborador/colaborador.service";
 import {
   formatarHora,
@@ -47,6 +51,42 @@ interface TabelaProjetada {
   criadoEm: Date;
   atualizadoEm: Date;
   periodos: PeriodoProjetado[];
+  /** T215 — turno da escala. */
+  cor: string;
+  sigla: string | null;
+  unidadeOrganizacionalId: string | null;
+  modo: string;
+  intervaloMinutos: number;
+  toleranciaMinutos: number | null;
+  minimoPorDia: number | null;
+  /** Pessoas com escala vigente ou futura neste turno (dia ou noite). */
+  emUso: number;
+}
+
+/** T215 — sigla padrão: as iniciais das duas primeiras palavras do nome. */
+function siglaDoNome(nome: string): string {
+  const palavras = nome
+    .trim()
+    .split(/\s+/)
+    .map((p) => p.replace(/[^A-Za-zÀ-ÿ0-9]/g, ""))
+    .filter(Boolean);
+  const sigla =
+    palavras.length > 1
+      ? `${palavras[0]![0]}${palavras[1]![0]}`
+      : (palavras[0]?.slice(0, 1) ?? "T");
+  return sigla.toUpperCase();
+}
+
+/** T215 — código gerado do nome: MAIÚSCULAS, dígitos e _ (2 a 28). */
+function codigoDoNome(nome: string): string {
+  const base = nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 28);
+  return base.length >= 2 ? base : `TURNO_${base}`.slice(0, 28);
 }
 
 /**
@@ -108,16 +148,29 @@ export class TabelaHorarioService {
     const periodos = normalizarPeriodos(
       dto.periodos.map((p) => ({ dia: p.dia, inicio: p.inicio, fim: p.fim })),
     );
+    const modo = dto.modo ?? "por_dia";
+    conferirPeriodosDoTurno(periodos, modo);
+    await this.conferirUnidade(escopo.empresaId, dto.unidadeOrganizacionalId);
 
     try {
       const criada = await this.prisma.$transaction(async (tx) => {
-        await this.recusarCodigoEmUso(tx, escopo.empresaId, dto.codigo, null);
+        const codigo =
+          dto.codigo ??
+          (await this.codigoLivre(tx, escopo.empresaId, dto.nome));
+        await this.recusarCodigoEmUso(tx, escopo.empresaId, codigo, null);
         const tabela = await tx.tabelaHorario.create({
           data: {
             empresaId: escopo.empresaId,
-            codigo: dto.codigo,
+            codigo,
             nome: dto.nome,
             criadoPorUserId: ctx.actor.id,
+            cor: dto.cor ?? "azul",
+            sigla: dto.sigla ?? siglaDoNome(dto.nome),
+            unidadeOrganizacionalId: dto.unidadeOrganizacionalId ?? null,
+            modo,
+            intervaloMinutos: dto.intervaloMinutos ?? 0,
+            toleranciaMinutos: dto.toleranciaMinutos ?? null,
+            minimoPorDia: dto.minimoPorDia ?? null,
             periodos: {
               create: periodos.map((p) => ({
                 diaSemana: p.diaSemana,
@@ -161,10 +214,23 @@ export class TabelaHorarioService {
     dto: EditarTabelaHorarioDto,
     ctx: HorariosAuditContext,
   ): Promise<TabelaProjetada> {
-    if (dto.codigo === undefined && dto.nome === undefined) {
+    const campos = [
+      "codigo",
+      "nome",
+      "cor",
+      "sigla",
+      "unidadeOrganizacionalId",
+      "toleranciaMinutos",
+      "minimoPorDia",
+      "periodos",
+      "modo",
+      "intervaloMinutos",
+    ] as const;
+    if (campos.every((c) => dto[c] === undefined)) {
       throw new BadRequestException();
     }
     const escopo = resolverEscopoHorarios(ctx.actor);
+    await this.conferirUnidade(escopo.empresaId, dto.unidadeOrganizacionalId);
 
     // Busca já escopada: tabela de outra empresa não é encontrada aqui.
     const tabela = await this.prisma.tabelaHorario.findFirst({
@@ -180,14 +246,81 @@ export class TabelaHorarioService {
       );
     }
 
-    const mudancas: { codigo?: string; nome?: string } = {};
+    const mudancas: Prisma.TabelaHorarioUncheckedUpdateInput & {
+      codigo?: string;
+    } = {};
     if (dto.codigo !== undefined && dto.codigo !== tabela.codigo) {
       mudancas.codigo = dto.codigo;
     }
     if (dto.nome !== undefined && dto.nome !== tabela.nome) {
       mudancas.nome = dto.nome;
     }
-    if (Object.keys(mudancas).length === 0) {
+    if (dto.cor !== undefined && dto.cor !== tabela.cor) mudancas.cor = dto.cor;
+    if (dto.sigla !== undefined && dto.sigla !== tabela.sigla) {
+      mudancas.sigla = dto.sigla;
+    }
+    if (
+      dto.unidadeOrganizacionalId !== undefined &&
+      dto.unidadeOrganizacionalId !== tabela.unidadeOrganizacionalId
+    ) {
+      mudancas.unidadeOrganizacionalId = dto.unidadeOrganizacionalId;
+    }
+    if (
+      dto.toleranciaMinutos !== undefined &&
+      dto.toleranciaMinutos !== tabela.toleranciaMinutos
+    ) {
+      mudancas.toleranciaMinutos = dto.toleranciaMinutos;
+    }
+    if (
+      dto.minimoPorDia !== undefined &&
+      dto.minimoPorDia !== tabela.minimoPorDia
+    ) {
+      mudancas.minimoPorDia = dto.minimoPorDia;
+    }
+    if (dto.modo !== undefined && dto.modo !== tabela.modo) {
+      mudancas.modo = dto.modo;
+    }
+    if (
+      dto.intervaloMinutos !== undefined &&
+      dto.intervaloMinutos !== tabela.intervaloMinutos
+    ) {
+      mudancas.intervaloMinutos = dto.intervaloMinutos;
+    }
+    // T215 — horários novos: validados como na criação, no modo final.
+    const novosPeriodos =
+      dto.periodos !== undefined
+        ? normalizarPeriodos(
+            dto.periodos.map((p) => ({
+              dia: p.dia,
+              inicio: p.inicio,
+              fim: p.fim,
+            })),
+          )
+        : null;
+    if (novosPeriodos !== null || mudancas.modo !== undefined) {
+      conferirPeriodosDoTurno(
+        novosPeriodos ??
+          tabela.periodos.map((p) => ({
+            diaSemana: p.diaSemana,
+            inicioMinuto: p.inicioMinuto,
+            fimMinuto: p.fimMinuto,
+          })),
+        dto.modo ?? tabela.modo,
+      );
+    }
+    const periodosMudaram =
+      novosPeriodos !== null &&
+      JSON.stringify(
+        novosPeriodos
+          .map((p) => [p.diaSemana, p.inicioMinuto, p.fimMinuto])
+          .sort(),
+      ) !==
+        JSON.stringify(
+          tabela.periodos
+            .map((p) => [p.diaSemana, p.inicioMinuto, p.fimMinuto])
+            .sort(),
+        );
+    if (Object.keys(mudancas).length === 0 && !periodosMudaram) {
       return this.projetar(tabela, tabela.periodos);
     }
 
@@ -200,6 +333,19 @@ export class TabelaHorarioService {
             mudancas.codigo,
             tabela.id,
           );
+        }
+        if (periodosMudaram && novosPeriodos !== null) {
+          await tx.periodoHorario.deleteMany({
+            where: { tabelaHorarioId: tabela.id },
+          });
+          await tx.periodoHorario.createMany({
+            data: novosPeriodos.map((p) => ({
+              tabelaHorarioId: tabela.id,
+              diaSemana: p.diaSemana,
+              inicioMinuto: p.inicioMinuto,
+              fimMinuto: p.fimMinuto,
+            })),
+          });
         }
         const tabelaAtualizada = await tx.tabelaHorario.update({
           where: { id: tabela.id },
@@ -236,6 +382,9 @@ export class TabelaHorarioService {
     const where: Prisma.TabelaHorarioWhereInput = {
       ...filtroEmpresaLeituraHorarios(escopo),
       ...(query.ativo !== undefined && { ativo: query.ativo }),
+      ...(query.unidadeOrganizacionalId !== undefined && {
+        unidadeOrganizacionalId: { in: [query.unidadeOrganizacionalId] },
+      }),
       ...(termo !== null && {
         OR: [
           { nome: { contains: termo, mode: "insensitive" } },
@@ -265,8 +414,11 @@ export class TabelaHorarioService {
       escopo.global ? null : escopo.empresaId,
     );
 
+    const usos = await this.contarEmUso(tabelas.map((t) => t.id));
     return {
-      itens: tabelas.map((tabela) => this.projetar(tabela, tabela.periodos)),
+      itens: tabelas.map((tabela) =>
+        this.projetar(tabela, tabela.periodos, usos.get(tabela.id) ?? 0),
+      ),
       pagina,
       tamanhoPagina,
       total,
@@ -309,7 +461,8 @@ export class TabelaHorarioService {
       escopo.global ? null : escopo.empresaId,
     );
 
-    return this.projetar(tabela, tabela.periodos);
+    const usos = await this.contarEmUso([tabela.id]);
+    return this.projetar(tabela, tabela.periodos, usos.get(tabela.id) ?? 0);
   }
 
   async desativar(
@@ -384,6 +537,75 @@ export class TabelaHorarioService {
   }
 
   /**
+   * T215 — pessoas com escala vigente ou futura em cada turno (como turno do
+   * dia ou da noite), contadas uma vez por turno.
+   */
+  private async contarEmUso(ids: string[]): Promise<Map<string, number>> {
+    const usos = new Map<string, number>();
+    if (ids.length === 0) return usos;
+    const hoje = new Date(
+      `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
+    );
+    const escalas = await this.prisma.escalaColaborador.findMany({
+      where: {
+        OR: [{ tabelaHorarioId: { in: ids } }, { turnoNoiteId: { in: ids } }],
+        AND: [{ OR: [{ vigenciaFim: null }, { vigenciaFim: { gt: hoje } }] }],
+      },
+      select: {
+        colaboradorId: true,
+        tabelaHorarioId: true,
+        turnoNoiteId: true,
+      },
+    });
+    const pessoas = new Map<string, Set<string>>();
+    for (const e of escalas) {
+      for (const id of [e.tabelaHorarioId, e.turnoNoiteId]) {
+        if (id === null || !ids.includes(id)) continue;
+        const conjunto = pessoas.get(id) ?? new Set<string>();
+        conjunto.add(e.colaboradorId);
+        pessoas.set(id, conjunto);
+      }
+    }
+    for (const [id, conjunto] of pessoas) usos.set(id, conjunto.size);
+    return usos;
+  }
+
+  /** T215 — a unidade precisa ser da empresa (sem revelar outra). */
+  private async conferirUnidade(
+    empresaId: string,
+    unidadeId: string | null | undefined,
+  ): Promise<void> {
+    if (unidadeId === undefined || unidadeId === null) return;
+    const unidade = await this.prisma.unidadeOrganizacional.findFirst({
+      where: { id: unidadeId, empresaId },
+      select: { id: true },
+    });
+    if (unidade === null) {
+      throw new CamposRecusadosException([
+        { campo: "unidadeOrganizacionalId", motivo: "indisponivel" },
+      ]);
+    }
+  }
+
+  /** T215 — um código livre na empresa a partir do nome. */
+  private async codigoLivre(
+    tx: Prisma.TransactionClient,
+    empresaId: string,
+    nome: string,
+  ): Promise<string> {
+    const base = codigoDoNome(nome);
+    for (let n = 1; n < 100; n += 1) {
+      const codigo = n === 1 ? base : `${base.slice(0, 25)}_${n}`;
+      const existe = await tx.tabelaHorario.findFirst({
+        where: { empresaId, codigo },
+        select: { id: true },
+      });
+      if (existe === null) return codigo;
+    }
+    return `${base.slice(0, 20)}_${Date.now() % 1000000}`;
+  }
+
+  /**
    * T182 — o código já é de outra tabela da mesma empresa? Só a empresa da
    * sessão é consultada: "em uso" nunca revela outra empresa. A unicidade do
    * banco cobre a corrida entre a consulta e a gravação.
@@ -410,6 +632,7 @@ export class TabelaHorarioService {
   private projetar(
     tabela: TabelaHorario,
     periodos: PeriodoHorario[],
+    emUso = 0,
   ): TabelaProjetada {
     return {
       id: tabela.id,
@@ -425,6 +648,14 @@ export class TabelaHorarioService {
         inicio: formatarHora(p.inicioMinuto),
         fim: formatarHora(p.fimMinuto),
       })),
+      cor: tabela.cor,
+      sigla: tabela.sigla,
+      unidadeOrganizacionalId: tabela.unidadeOrganizacionalId,
+      modo: tabela.modo,
+      intervaloMinutos: tabela.intervaloMinutos,
+      toleranciaMinutos: tabela.toleranciaMinutos,
+      minimoPorDia: tabela.minimoPorDia,
+      emUso,
     };
   }
 }

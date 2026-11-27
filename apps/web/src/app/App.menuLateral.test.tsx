@@ -651,9 +651,12 @@ describe("T206 — celular: a gaveta continua a mesma", () => {
 });
 
 describe("T206 — contrato de CSS do shell", () => {
-  const shellCss = readFileSync("src/app/app-shell.css", "utf8");
-  const navCss = readFileSync("src/app/PainelNavigation.css", "utf8");
-  const seletorCss = readFileSync("src/app/SeletorEmpresaAtiva.css", "utf8");
+  // O worktree pode ter CRLF: o contrato compara com quebra de linha LF.
+  const lerCss = (caminho: string) =>
+    readFileSync(caminho, "utf8").replace(/\r\n/g, "\n");
+  const shellCss = lerCss("src/app/app-shell.css");
+  const navCss = lerCss("src/app/PainelNavigation.css");
+  const seletorCss = lerCss("src/app/SeletorEmpresaAtiva.css");
 
   /** Conteúdo exato de um bloco delimitado por chaves a partir de `inicio`. */
   function bloco(css: string, cabecalho: RegExp): string {
@@ -751,10 +754,11 @@ describe("T206 — contrato de CSS do shell", () => {
     );
   });
 
-  it("botão de recolher com alvo de 44px e a dica fixa, sem deslocamento horizontal", () => {
+  // T215 — o botão quadrado segue o padrão do sistema (--botao-icone).
+  it("botão de recolher no tamanho do botão de ícone e a dica fixa, sem deslocamento horizontal", () => {
     const botao = regra(shellCss, ".app-shell__recolher");
-    expect(botao).toMatch(/width:\s*var\(--touch-target\)/);
-    expect(botao).toMatch(/height:\s*var\(--touch-target\)/);
+    expect(botao).toMatch(/width:\s*var\(--botao-icone\)/);
+    expect(botao).toMatch(/height:\s*var\(--botao-icone\)/);
     expect(regra(shellCss, ".dica-trilho")).toMatch(/position:\s*fixed/);
     expect(shellCss).not.toMatch(/translateX|translate3d/);
   });

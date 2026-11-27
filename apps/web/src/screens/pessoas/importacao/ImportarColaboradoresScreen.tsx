@@ -76,6 +76,7 @@ const FORMATO_DA_COLUNA: Readonly<Record<Coluna, string>> = {
   data_nascimento: "DD/MM/AAAA, até hoje",
   departamento_codigo: "Código de um departamento ativo da empresa",
   cargo_codigo: "Código de um cargo ativo da empresa",
+  salario: "Salário bruto da admissão, em reais (ex.: 1.621,00)",
   matricula: "De 2 a 32 letras, números, hífen ou sublinhado",
   unidade_codigo: "Código de uma unidade ativa da empresa",
 };

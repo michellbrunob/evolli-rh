@@ -149,6 +149,7 @@ import {
   formatarReais,
   lerValorEmReais,
 } from "./salarioLiquido";
+import { completarReais, mascararReais } from "../../format/moeda";
 import {
   type TabelaHorarioApi,
   listarTabelasHorario,
@@ -201,9 +202,23 @@ import {
   SeletorDeReferencia,
   TAMANHO_DA_PAGINA_DE_REFERENCIAS,
 } from "./SeletorDeReferencia";
+import { MENSAGEM_CPF_EM_USO, useCpfEmUso } from "./useCpfEmUso";
+import {
+  EtapaDocumentos,
+  documentosIniciais,
+  type DocumentoDaEtapa,
+} from "./documentos/EtapaDocumentos";
+import {
+  EnvioDosDocumentos,
+  algumEnviando,
+  enviarDocumentoDaEtapa,
+  type EnvioDeDocumento,
+} from "./documentos/EnvioDosDocumentos";
+import { novaChaveDeEnvio } from "./documentos/documentosDoColaborador";
 import "./NovaAdmissaoScreen.css";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
 import { useGuardaDeSaida } from "../../app/guardaDeSaida";
+import { plural } from "../../format/plural";
 
 export const NOVA_ADMISSAO_TITULO_ID = "nova-admissao-titulo";
 
@@ -326,28 +341,27 @@ type Erros = Partial<Record<CampoErro, string>>;
  */
 const ETAPAS = [
   // T209 — etapa 1 do Novo colaborador (2026-11-17): títulos, subtítulos e
-  // descrições do novo cadastro. A etapa 4 segue como revisão até a fatia
-  // dos documentos.
+  // descrições do novo cadastro. T213 — a etapa 4 é "Documentos" (opcional).
   "Dados básicos",
   "Dados profissionais",
   "Endereço",
-  "Revisão e conclusão",
+  "Documentos",
 ] as const;
 
 /** T209 — o subtítulo de cada etapa, na coluna das etapas. */
 const SUBTITULOS_DAS_ETAPAS = [
-  "Identificação e contatos",
-  "Lotação e contrato",
-  "CEP e endereço",
-  "Resumo final",
+  "Informações pessoais",
+  "Cargo e contrato",
+  "Residência",
+  "Envio de arquivos",
 ] as const;
 
 /** T209 — a descrição de cada etapa, no cabeçalho dela. */
 const DESCRICOES_DAS_ETAPAS = [
-  "Quem é a pessoa e como falar com ela.",
-  "Lotação, contrato e remuneração.",
-  "Onde a pessoa mora.",
-  "Revise tudo antes de concluir.",
+  "Informações pessoais e de contato do novo colaborador.",
+  "Cargo, contrato e remuneração do novo colaborador.",
+  "Residência usada em correspondências e no eSocial.",
+  "Opcional. Os arquivos são enviados ao concluir o cadastro.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;
@@ -589,7 +603,7 @@ const CAMPO_DO_CONFLITO: Readonly<
   // T209 — CPF único na empresa.
   "perfilPessoal.cpf": {
     campo: "cpf",
-    mensagem: "Este CPF já está cadastrado nesta empresa.",
+    mensagem: MENSAGEM_CPF_EM_USO,
   },
   // T209 — gestor direto sem vínculo na empresa.
   "contrato.gestorDiretoId": {
@@ -948,7 +962,7 @@ const TIPOS_DE_CONTRATACAO: readonly TipoVinculo[] = [
   "trainee",
 ];
 
-const OPCOES_NIVEL = [
+export const OPCOES_NIVEL = [
   { codigo: "sem_nivel", rotulo: "Sem nível" },
   { codigo: "primeiro_emprego", rotulo: "Primeiro emprego" },
   { codigo: "junior", rotulo: "Júnior" },
@@ -964,7 +978,7 @@ const OPCOES_NIVEL = [
 ] as const;
 
 /** Escalas: nome e descrição (dias de trabalho no mês). */
-const OPCOES_ESCALA = [
+export const OPCOES_ESCALA = [
   { codigo: "nao_informada", nome: "Não informada", descricao: "" },
   {
     codigo: "5x2",
@@ -1115,7 +1129,7 @@ const OPCOES_ESCALA = [
   },
 ] as const;
 
-const OPCOES_CONSELHO = [
+export const OPCOES_CONSELHO = [
   { codigo: "nenhum", rotulo: "Nenhum" },
   ...(
     [
@@ -1141,15 +1155,6 @@ const OPCOES_CONSELHO = [
 /** Dica da matrícula (ícone de ajuda ao lado do rótulo). */
 const DICA_DA_MATRICULA =
   "Código da pessoa na folha ou na contabilidade (matrícula, registro ou chapa). Serve para achar a pessoa quando um documento não traz o CPF.";
-
-/** "500000" → "5.000,00", conforme se digita (centavos à direita). */
-function mascararReais(texto: string): string {
-  const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, 12);
-  if (digitos === "") return "";
-  const completo = digitos.padStart(3, "0");
-  const inteiros = completo.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${inteiros},${completo.slice(-2)}`;
-}
 
 /** T209 — o cargo digitado não pôde virar cargo do cadastro. */
 class CargoIndisponivel extends Error {}
@@ -1185,7 +1190,7 @@ const CHAVES_IDENTIFICACAO = Object.keys(
 ) as ChaveIdentificacao[];
 
 /** Gênero em lista fechada (o código vai ao servidor). */
-const OPCOES_GENERO = [
+export const OPCOES_GENERO = [
   { codigo: "feminino", rotulo: "Feminino" },
   { codigo: "masculino", rotulo: "Masculino" },
   { codigo: "outro", rotulo: "Outro" },
@@ -1193,7 +1198,7 @@ const OPCOES_GENERO = [
 ] as const;
 
 /** Estado civil: o texto da opção é o que fica gravado. */
-const OPCOES_ESTADO_CIVIL = [
+export const OPCOES_ESTADO_CIVIL = [
   "Solteiro(a)",
   "Casado(a)",
   "Divorciado(a)",
@@ -1207,7 +1212,7 @@ function rotuloDoGenero(codigo: string | null | undefined): string | null {
 }
 
 /** `00000000000` → `000.000.000-00`, conforme se digita. */
-function mascararCpf(valor: string): string {
+export function mascararCpf(valor: string): string {
   const d = valor.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
@@ -1221,7 +1226,7 @@ function exibirCpf(cpf: string | null | undefined): string | null {
 }
 
 /** Dígitos verificadores do CPF (a mesma regra do servidor). */
-function cpfValido(digitos: string): boolean {
+export function cpfValido(digitos: string): boolean {
   if (!/^\d{11}$/.test(digitos) || /^(\d)\1{10}$/.test(digitos)) return false;
   const n = [...digitos].map(Number);
   const dv = (quantos: number) => {
@@ -1279,6 +1284,16 @@ export function NovaAdmissaoScreen({
   const [identificacao, setIdentificacao] =
     useState<ValoresIdentificacao>(IDENTIFICACAO_VAZIA);
   const [erros, setErros] = useState<Erros>({});
+  // T215 — o CPF repetido aparece enquanto se digita, não só ao gravar.
+  const cpfEmUso = useCpfEmUso(identificacao.cpf, cpfValido);
+  useEffect(() => {
+    if (!cpfEmUso) return;
+    setErros((prev) =>
+      prev.cpf === MENSAGEM_CPF_EM_USO
+        ? prev
+        : { ...prev, cpf: MENSAGEM_CPF_EM_USO },
+    );
+  }, [cpfEmUso]);
   /** T179 — o resumo "Revise N campos" só aparece depois de uma tentativa. */
   /** T179 — o modal "Confirmar cadastro de colaborador?" está aberto. */
   const [confirmando, setConfirmando] = useState(false);
@@ -1287,6 +1302,13 @@ export function NovaAdmissaoScreen({
   /** T209 — a foto escolhida (prévia local) e o seu envio, pós-admissão. */
   const [foto, setFoto] = useState<FotoEscolhida | null>(null);
   const [recusaDaFoto, setRecusaDaFoto] = useState<string | null>(null);
+  // T213 — documentos da etapa 4: só na memória desta aba (nunca no
+  // rascunho); sobem depois de o colaborador ser criado.
+  const [documentos, setDocumentos] =
+    useState<DocumentoDaEtapa[]>(documentosIniciais);
+  const [enviosDosDocumentos, setEnviosDosDocumentos] = useState<
+    Record<string, EnvioDeDocumento>
+  >({});
   const [envioDaFoto, setEnvioDaFoto] = useState<EnvioDaFoto>({
     estado: "nenhum",
   });
@@ -1620,13 +1642,21 @@ export function NovaAdmissaoScreen({
 
   // Com o rascunho salvo e nada mudado desde então, sair não perde nada.
   // T209 — a foto nunca vai para o rascunho: escolhida, sair a perde.
+  // T213 — os documentos escolhidos também (só na memória desta aba).
+  const comDocumentoEscolhido = documentos.some((d) => d.arquivo !== null);
   const pendenteSemRascunho =
     admissao === null &&
-    ((alterado && assinaturaAtual !== assinaturaSalva) || foto !== null);
+    ((alterado && assinaturaAtual !== assinaturaSalva) ||
+      foto !== null ||
+      comDocumentoEscolhido);
+  // T213 — enquanto os documentos sobem, a página não pode ser trocada.
+  const enviandoDocumentos =
+    admissao !== null && algumEnviando(documentos, enviosDosDocumentos);
 
   useEdicaoEmAndamento("Nova admissão", {
     pendente: pendenteSemRascunho,
-    salvando: salvando || envioDaFoto.estado === "enviando",
+    salvando:
+      salvando || envioDaFoto.estado === "enviando" || enviandoDocumentos,
     aviso: envioIncerto ? AVISO_ENVIO_INCERTO : AVISO_NADA_SALVO,
   });
 
@@ -1925,7 +1955,9 @@ export function NovaAdmissaoScreen({
     if (cpf === "") {
       novos.cpf = "Informe o CPF.";
     } else if (!cpfValido(cpf)) {
-      novos.cpf = "Informe um CPF válido.";
+      novos.cpf = "CPF inválido. Confira os números digitados.";
+    } else if (cpfEmUso) {
+      novos.cpf = MENSAGEM_CPF_EM_USO;
     }
     if (identificacao.rg.trim().length > 20) {
       novos.rg = "O RG deve ter no máximo 20 caracteres.";
@@ -1975,7 +2007,8 @@ export function NovaAdmissaoScreen({
     }
     const bruto = lerValorEmReais(campos.salarioBruto);
     if (bruto === null || bruto <= 0) {
-      novos.salarioBruto = "Informe o salário bruto.";
+      novos.salarioBruto =
+        "Informe o salário bruto. Ele é usado na folha de pagamento.";
     }
     if (campos.registroProfissional.trim().length > 40) {
       novos.registroProfissional =
@@ -2246,6 +2279,9 @@ export function NovaAdmissaoScreen({
       // T209 — a foto vai só agora, para o colaborador já criado; a falha
       // dela nunca desfaz a admissão.
       if (foto) void enviarFoto(resposta.id, foto.arquivo);
+      // T213 — os documentos também: um por vez, e a falha de um nunca
+      // desfaz a admissão.
+      void enviarDocumentos(resposta.id);
       // T209 — concluída a admissão, o rascunho deixa de existir.
       setRascunho(null);
       setAssinaturaSalva(null);
@@ -2442,7 +2478,30 @@ export function NovaAdmissaoScreen({
     void enviarFoto(colaboradorId, arquivo);
   }
 
+  /** T213 — envia os documentos escolhidos (todos, ou só os indicados). */
+  async function enviarDocumentos(
+    colaboradorId: string,
+    somente?: readonly string[],
+  ) {
+    const alvo = documentos.filter(
+      (d) => d.arquivo && (!somente || somente.includes(d.id)),
+    );
+    for (const documento of alvo) {
+      setEnviosDosDocumentos((atual) => ({
+        ...atual,
+        [documento.id]: { estado: "enviando" },
+      }));
+      const resultado = await enviarDocumentoDaEtapa(colaboradorId, documento);
+      setEnviosDosDocumentos((atual) => ({
+        ...atual,
+        [documento.id]: resultado,
+      }));
+    }
+  }
+
   function recomecar() {
+    setDocumentos(documentosIniciais());
+    setEnviosDosDocumentos({});
     setFoto(null);
     setRecusaDaFoto(null);
     setEnvioDaFoto({ estado: "nenhum" });
@@ -2606,6 +2665,7 @@ export function NovaAdmissaoScreen({
     return (
       <ConfirmacaoDaAdmissao
         admissao={admissao}
+        cargoDigitado={campos.cargoNome.trim().replace(/\s+/g, " ")}
         opcoes={opcoes}
         areas={areas}
         tituloRef={sucessoTituloRef}
@@ -2618,6 +2678,11 @@ export function NovaAdmissaoScreen({
           if (foto) void enviarFoto(admissao.id, foto.arquivo);
         }}
         onEscolherOutraFoto={(arquivo) => enviarOutraFoto(admissao.id, arquivo)}
+        documentos={documentos}
+        enviosDosDocumentos={enviosDosDocumentos}
+        onTentarDocumentoDeNovo={(id) =>
+          void enviarDocumentos(admissao.id, [id])
+        }
       />
     );
   }
@@ -2655,91 +2720,6 @@ export function NovaAdmissaoScreen({
     ) : null;
   }
 
-  // T195 — o resumo da revisão: o que foi digitado, sem opcional em branco.
-  const linhasBasicas = linhasPreenchidas([
-    ["Nome completo", campos.nome],
-    ["CPF", identificacao.cpf],
-    ["RG", identificacao.rg],
-    [
-      ROTULO_DATA_NASCIMENTO,
-      perfil.dataNascimento ? formatarDiaCivil(perfil.dataNascimento) : null,
-    ],
-    ["Gênero", rotuloDoGenero(identificacao.genero)],
-    ["Estado civil", perfil.estadoCivil],
-    ["E-mail pessoal", contatos.emailPessoal],
-    ["Telefone pessoal", contatos.celular],
-    ["Nome do contato", identificacao.contatoEmergenciaNome],
-    ["Telefone do contato", identificacao.contatoEmergenciaTelefone],
-  ]);
-  const linhasProfissionais = linhasPreenchidas([
-    [
-      "Cargo",
-      campos.cargoNome.trim() || escolhida(opcoes.cargos, campos.cargoId),
-    ],
-    [
-      "Nível",
-      OPCOES_NIVEL.find((o) => o.codigo === campos.nivel)?.rotulo ?? null,
-    ],
-    ["Departamento", escolhida(opcoes.departamentos, campos.departamentoId)],
-    ["Área", escolhida(areas, campos.areaId)],
-    ["Centro de custo", escolhida(opcoes.centrosCusto, campos.centroCustoId)],
-    ["Unidade", escolhida(opcoes.unidades, campos.unidadeId)],
-    [
-      "Gestor direto",
-      campos.gestorDiretoId === "sem_gestor"
-        ? "Sem gestor"
-        : (gestores.find((g) => g.id === campos.gestorDiretoId)?.nome ?? null),
-    ],
-    [
-      "Tipo de contratação",
-      campos.tipo ? ROTULO_TIPO_VINCULO[campos.tipo] : null,
-    ],
-    [
-      "Data de admissão",
-      campos.dataAdmissao ? formatarDiaCivil(campos.dataAdmissao) : null,
-    ],
-    [
-      "Jornada de trabalho",
-      campos.jornadaSemanalHoras
-        ? `${campos.jornadaSemanalHoras} horas por semana`
-        : null,
-    ],
-    [
-      "Escala de trabalho",
-      OPCOES_ESCALA.find((o) => o.codigo === campos.escala)?.nome ?? null,
-    ],
-    ["Matrícula", campos.matricula.toUpperCase()],
-    ["Salário bruto", campos.salarioBruto ? `R$ ${campos.salarioBruto}` : null],
-    [
-      "Salário líquido",
-      salarioLiquidoExibido ? `R$ ${salarioLiquidoExibido}` : null,
-    ],
-    [
-      "Conselho e registro",
-      campos.conselhoProfissional && campos.conselhoProfissional !== "nenhum"
-        ? [
-            campos.conselhoProfissional.toUpperCase(),
-            campos.registroProfissional.trim(),
-          ]
-            .filter(Boolean)
-            .join(" ")
-        : null,
-    ],
-    ["Dependentes (IRRF)", campos.dependentesIrrf || null],
-    [
-      "Pensão alimentícia",
-      campos.pensaoAlimenticiaPercentual
-        ? `${campos.pensaoAlimenticiaPercentual}%`
-        : null,
-    ],
-  ]);
-  // T209 — sem campo País na etapa 3: o país não entra no resumo.
-  const linhasDoEndereco = linhasPreenchidas(
-    CAMPOS_ENDERECO.filter((c) => c.chave !== "pais").map(
-      (c) => [c.rotulo, endereco[c.chave]] as const,
-    ),
-  );
-
   return (
     <>
       {/* T209 — o padrão compartilhado de cadastro em etapas: cabeçalho com
@@ -2752,7 +2732,7 @@ export function NovaAdmissaoScreen({
         className="nova-admissao"
         tituloId={NOVA_ADMISSAO_TITULO_ID}
         titulo="Novo colaborador"
-        descricao="Quatro etapas. Salve o rascunho a qualquer momento e termine depois."
+        descricao="Preencha os dados em 4 etapas. Você pode salvar e continuar depois."
         rotuloVoltar="Voltar para Colaboradores"
         onVoltarDaPagina={pedirCancelamento}
         acaoDoCabecalho={
@@ -2843,7 +2823,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-identificacao"
               titulo="Identificação"
-              descricao="Dados que identificam a pessoa no Evolli."
+              descricao="Aparecem no perfil, nos documentos e no eSocial."
             >
               <BlocoDaFoto
                 foto={foto}
@@ -2853,7 +2833,7 @@ export function NovaAdmissaoScreen({
               />
               <LinhaDoCadastro
                 rotulo="Nome completo"
-                ajuda="Igual ao documento de identidade."
+                ajuda="Como está nos documentos oficiais."
                 paraId={ID_DO_CAMPO.nome}
               >
                 <input
@@ -2870,7 +2850,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="CPF e RG"
-                ajuda="Documentos de identificação da pessoa."
+                ajuda="Usados na folha e no eSocial."
               >
                 <div className="nova-admissao__linha-par">
                   <div className="nova-admissao__linha-celula">
@@ -2978,11 +2958,11 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-contato"
               titulo="Contato"
-              descricao="Como a empresa fala com a pessoa."
+              descricao="Canais pessoais para falar com o colaborador."
             >
               <LinhaDoCadastro
                 rotulo="E-mail pessoal"
-                ajuda="O e-mail particular, não o da empresa."
+                ajuda="Diferente do e-mail corporativo."
                 paraId={ID_DO_CAMPO.emailPessoal}
               >
                 <input
@@ -3017,7 +2997,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-emergencia"
               titulo="Contato de emergência"
-              descricao="Quem avisar se algo acontecer."
+              descricao="Acionado apenas em situações de urgência."
             >
               <LinhaDoCadastro
                 rotulo="Nome do contato"
@@ -3061,7 +3041,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-cargo"
               titulo="Cargo e estrutura"
-              descricao="Posição da pessoa na estrutura da empresa."
+              descricao="Onde o colaborador está na organização."
             >
               <LinhaDoCadastro rotulo="Cargo e nível">
                 <div className="nova-admissao__linha-par">
@@ -3183,7 +3163,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Unidade"
-                ajuda="Onde a pessoa trabalha."
+                ajuda="Filial, loja ou local de trabalho."
                 grupo={false}
               >
                 <SeletorDeReferencia
@@ -3217,7 +3197,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Gestor direto"
-                ajuda="Quem aprova os pedidos da pessoa."
+                ajuda="Recebe as solicitações do colaborador."
                 paraId={ID_DO_CAMPO.gestorDireto}
               >
                 <select
@@ -3251,7 +3231,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-contrato"
               titulo="Contrato"
-              descricao="Como e desde quando a pessoa trabalha."
+              descricao="Tipo de vínculo, admissão, jornada, escala e matrícula."
             >
               <LinhaDoCadastro
                 rotulo="Tipo de contratação"
@@ -3298,7 +3278,7 @@ export function NovaAdmissaoScreen({
                     type="text"
                     inputMode="numeric"
                     maxLength={2}
-                    placeholder="44"
+                    placeholder="Ex.: 44"
                     value={campos.jornadaSemanalHoras}
                     onChange={(e) =>
                       atualizar(
@@ -3315,7 +3295,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Escala de trabalho"
-                ajuda="Sem escala, contam os dias úteis do mês."
+                ajuda="Sem escala, os benefícios usam os dias úteis do mês."
                 paraId={ID_DO_CAMPO.escala}
               >
                 <select
@@ -3381,7 +3361,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-remuneracao"
               titulo="Remuneração"
-              descricao="Salário mensal da pessoa."
+              descricao="Valores mensais usados na folha."
             >
               <LinhaDoCadastro
                 rotulo="Salário bruto"
@@ -3391,7 +3371,7 @@ export function NovaAdmissaoScreen({
                   <span aria-hidden="true">R$</span>
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     placeholder="0,00"
                     aria-required="true"
                     value={campos.salarioBruto}
@@ -3402,6 +3382,11 @@ export function NovaAdmissaoScreen({
                         "salarioBruto",
                       )
                     }
+                    onBlur={(e) => {
+                      const completo = completarReais(e.target.value);
+                      if (completo !== campos.salarioBruto)
+                        atualizar("salarioBruto", completo, "salarioBruto");
+                    }}
                     {...propsDoCampo("salarioBruto")}
                   />
                 </div>
@@ -3409,7 +3394,7 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
               <LinhaDoCadastro
                 rotulo="Salário líquido"
-                ajuda="Estimativa a partir do salário bruto."
+                ajuda="Calculado a partir do bruto."
                 paraId="nova-admissao-salario-liquido"
               >
                 <div className="nova-admissao__com-prefixo">
@@ -3427,11 +3412,11 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-adicionais"
               titulo="Informações adicionais"
-              descricao="Conselho de classe e descontos."
+              descricao="Registro profissional e deduções."
             >
               <LinhaDoCadastro
                 rotulo="Conselho e registro"
-                ajuda="Exigido em profissões regulamentadas."
+                ajuda="Obrigatório para algumas profissões."
               >
                 <div className="nova-admissao__linha-par">
                   <div className="nova-admissao__linha-celula">
@@ -3465,7 +3450,7 @@ export function NovaAdmissaoScreen({
                       type="text"
                       maxLength={40}
                       autoComplete="off"
-                      placeholder="Ex.: 123456/SP"
+                      placeholder="Número do registro"
                       aria-label="Número do registro"
                       disabled={
                         !campos.conselhoProfissional ||
@@ -3536,7 +3521,7 @@ export function NovaAdmissaoScreen({
             <SecaoDoCadastro
               id="nova-admissao-secao-endereco"
               titulo="Endereço residencial"
-              descricao="Digite o CEP e o Evolli completa o endereço."
+              descricao="Preenchemos o restante automaticamente a partir do CEP."
             >
               <LinhaDoCadastro rotulo="CEP" paraId={ID_DO_CAMPO.cep}>
                 <div className="nova-admissao__campo-cep">
@@ -3572,7 +3557,7 @@ export function NovaAdmissaoScreen({
                   ) : cep.tipo === "sugerido" && cep.encontrado ? (
                     <>
                       <IconeSucesso tamanho={14} />
-                      Endereço localizado pelo CEP
+                      Endereço encontrado
                     </>
                   ) : cep.tipo === "aviso" || cep.tipo === "sugerido" ? (
                     cep.mensagem
@@ -3704,33 +3689,41 @@ export function NovaAdmissaoScreen({
               </LinhaDoCadastro>
             </SecaoDoCadastro>
           </>,
-          <>
-            <p className="nova-admissao__texto">
-              Confira os dados antes de concluir. Para corrigir algo, use
-              Editar: o que você já digitou continua aqui.
-            </p>
-            <BlocoDaRevisao
-              titulo={ETAPAS[0]}
-              id="nova-admissao-revisao-basicos"
-              linhas={linhasBasicas}
-              onEditar={() => irParaEtapa(0)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[1]}
-              id="nova-admissao-revisao-profissionais"
-              linhas={linhasProfissionais}
-              onEditar={() => irParaEtapa(1)}
-            />
-            <BlocoDaRevisao
-              titulo={ETAPAS[2]}
-              id="nova-admissao-revisao-endereco"
-              linhas={linhasDoEndereco}
-              onEditar={() => irParaEtapa(2)}
-            />
-            <p className="nova-admissao__texto nova-admissao__ajuda">
-              Campos opcionais em branco não aparecem neste resumo.
-            </p>
-          </>,
+          <EtapaDocumentos
+            key="documentos"
+            documentos={documentos}
+            onEscolherArquivo={(id, arquivo) =>
+              setDocumentos((atual) =>
+                atual.map((d) =>
+                  d.id === id
+                    ? { ...d, arquivo, chaveDeEnvio: novaChaveDeEnvio() }
+                    : d,
+                ),
+              )
+            }
+            onTirarArquivo={(id) =>
+              setDocumentos((atual) =>
+                atual.map((d) =>
+                  d.id === id ? { ...d, arquivo: null, chaveDeEnvio: null } : d,
+                ),
+              )
+            }
+            onAdicionarOutro={(nome) =>
+              setDocumentos((atual) => [
+                ...atual,
+                {
+                  id: `outro-${novaChaveDeEnvio()}`,
+                  categoria: "outros",
+                  nome,
+                  arquivo: null,
+                  chaveDeEnvio: null,
+                },
+              ])
+            }
+            onRemoverOutro={(id) =>
+              setDocumentos((atual) => atual.filter((d) => d.id !== id))
+            }
+          />,
         ]}
         mensagem={
           <>
@@ -3835,7 +3828,9 @@ export function NovaAdmissaoScreen({
                     ],
                     [
                       "Cargo",
-                      escolhida(opcoes.cargos, campos.cargoId),
+                      campos.cargoNome.trim()
+                        ? campos.cargoNome.trim().replace(/\s+/g, " ")
+                        : escolhida(opcoes.cargos, campos.cargoId),
                       "Não informado",
                     ],
                     [
@@ -3862,9 +3857,15 @@ export function NovaAdmissaoScreen({
                 ))}
               </ul>
             </dd>
+            <dt>Jornada semanal</dt>
+            <dd>
+              {campos.jornadaSemanalHoras
+                ? `${plural(Number(campos.jornadaSemanalHoras), "hora", "horas")} por semana`
+                : "Não informada"}
+            </dd>
             {papelDoAtor === "rh" ? (
               <>
-                <dt>Jornada de trabalho</dt>
+                <dt>Horário de trabalho</dt>
                 <dd>
                   {campos.tabelaHorarioId
                     ? `${jornadaEscolhida ? rotuloDaJornada(jornadaEscolhida) : "Jornada escolhida"}, a partir de ${formatarDiaCivil(campos.dataAdmissao)}`
@@ -3918,63 +3919,9 @@ export function NovaAdmissaoScreen({
  * acontece ao voltar é o chamador (com ou sem confirmação de descarte).
  */
 /** T195 — rótulo e valor, só os preenchidos, sem espaços nas pontas. */
-function linhasPreenchidas(
-  pares: readonly (readonly [string, string | null])[],
-): (readonly [string, string])[] {
-  return pares.flatMap(([rotulo, valor]) =>
-    valor !== null && valor.trim() !== ""
-      ? [[rotulo, valor.trim()] as const]
-      : [],
-  );
-}
-
-/**
- * T195 — um bloco da revisão: o que foi digitado em uma etapa e "Editar",
- * que volta a ela sem perder nada.
- */
-function BlocoDaRevisao({
-  titulo,
-  id,
-  linhas,
-  onEditar,
-}: {
-  readonly titulo: string;
-  readonly id: string;
-  readonly linhas: readonly (readonly [string, string])[];
-  readonly onEditar: () => void;
-}) {
-  return (
-    <section className="nova-admissao__revisao-bloco" aria-labelledby={id}>
-      <div className="nova-admissao__revisao-cabecalho">
-        <h3 id={id} className="nova-admissao__subtitulo">
-          {titulo}
-        </h3>
-        <Button
-          type="button"
-          variant="subtle"
-          aria-label={`Editar ${titulo}`}
-          onClick={onEditar}
-        >
-          Editar
-        </Button>
-      </div>
-      {linhas.length > 0 ? (
-        <dl className="nova-admissao__resumo">
-          {linhas.map(([rotulo, valor]) => (
-            <div key={rotulo} className="nova-admissao__resumo-linha">
-              <dt>{rotulo}</dt>
-              <dd>{valor}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="nova-admissao__texto">Nada informado nesta etapa.</p>
-      )}
-    </section>
-  );
-}
-
 interface ConfirmacaoProps {
+  /** O cargo digitado na admissão (criado agora, fora da lista carregada). */
+  readonly cargoDigitado?: string;
   admissao: AdmissaoRegistradaApi;
   opcoes: Opcoes;
   areas: AreaApi[];
@@ -3987,6 +3934,10 @@ interface ConfirmacaoProps {
   envioDaFoto: EnvioDaFoto;
   onTentarFotoDeNovo: () => void;
   onEscolherOutraFoto: (arquivo: File | undefined) => void;
+  /** T213 — os documentos da etapa 4 e o envio de cada um. */
+  documentos: readonly DocumentoDaEtapa[];
+  enviosDosDocumentos: Readonly<Record<string, EnvioDeDocumento>>;
+  onTentarDocumentoDeNovo: (id: string) => void;
 }
 
 /**
@@ -3998,6 +3949,8 @@ function lotacaoGravada(
   destino: AdmissaoRegistradaApi["movimentacao"]["destino"],
   opcoes: Opcoes,
   areas: AreaApi[],
+  /** O cargo digitado (criado na admissão, ainda fora da lista carregada). */
+  cargoDigitado = "",
 ): string[] {
   const nomear = (
     lista: readonly Referencia[],
@@ -4016,7 +3969,12 @@ function lotacaoGravada(
       "Departamento",
       "Departamento registrado",
     ),
-    ...nomear(opcoes.cargos, destino.cargoId, "Cargo", "Cargo registrado"),
+    ...nomear(
+      opcoes.cargos,
+      destino.cargoId,
+      "Cargo",
+      cargoDigitado ? `Cargo: ${cargoDigitado}` : "Cargo registrado",
+    ),
     // T179 — a Unidade é opcional: sem ela, a confirmação diz isso.
     ...(destino.unidadeOrganizacionalId
       ? nomear(
@@ -4046,6 +4004,7 @@ function jornadaGravada(tabelaHorarioId: string, opcoes: Opcoes): string {
 
 function ConfirmacaoDaAdmissao({
   admissao,
+  cargoDigitado = "",
   opcoes,
   areas,
   tituloRef,
@@ -4056,6 +4015,9 @@ function ConfirmacaoDaAdmissao({
   envioDaFoto,
   onTentarFotoDeNovo,
   onEscolherOutraFoto,
+  documentos,
+  enviosDosDocumentos,
+  onTentarDocumentoDeNovo,
 }: ConfirmacaoProps) {
   const colaborador: ColaboradorApi = {
     id: admissao.id,
@@ -4127,11 +4089,14 @@ function ConfirmacaoDaAdmissao({
           <dt>Lotação inicial</dt>
           <dd>
             <ul className="nova-admissao__lista-lotacao">
-              {lotacaoGravada(admissao.movimentacao.destino, opcoes, areas).map(
-                (linha) => (
-                  <li key={linha}>{linha}</li>
-                ),
-              )}
+              {lotacaoGravada(
+                admissao.movimentacao.destino,
+                opcoes,
+                areas,
+                cargoDigitado,
+              ).map((linha) => (
+                <li key={linha}>{linha}</li>
+              ))}
             </ul>
           </dd>
           {/* T183 — a jornada que o SERVIDOR gravou com a admissão. */}
@@ -4190,7 +4155,7 @@ function ConfirmacaoDaAdmissao({
               [
                 "Jornada de trabalho",
                 admissao.contrato.jornadaSemanalHoras
-                  ? `${admissao.contrato.jornadaSemanalHoras} horas por semana`
+                  ? `${plural(admissao.contrato.jornadaSemanalHoras, "hora", "horas")} por semana`
                   : null,
               ],
               [
@@ -4289,6 +4254,11 @@ function ConfirmacaoDaAdmissao({
             onEscolherOutra={onEscolherOutraFoto}
           />
         ) : null}
+        <EnvioDosDocumentos
+          documentos={documentos}
+          envios={enviosDosDocumentos}
+          onTentarDeNovo={onTentarDocumentoDeNovo}
+        />
         <FormActions>
           <Button
             type="button"
@@ -4302,9 +4272,20 @@ function ConfirmacaoDaAdmissao({
             variant="secondary"
             onClick={() => onAbrirAdmitido(colaborador, "contatos")}
           >
-            Revisar contatos na ficha
+            Revisar contatos
           </Button>
-          <Button type="button" variant="secondary" onClick={onRecomecar}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRecomecar}
+            // T213 — com documento subindo, recomeçar perderia o envio.
+            disabled={algumEnviando(documentos, enviosDosDocumentos)}
+            aria-describedby={
+              algumEnviando(documentos, enviosDosDocumentos)
+                ? "nova-admissao-documentos-aguarde"
+                : undefined
+            }
+          >
             Registrar outra admissão
           </Button>
           <Button type="button" variant="secondary" onClick={onSair}>
@@ -4371,7 +4352,10 @@ function BlocoDaFoto({
 }) {
   const campoRef = useRef<HTMLInputElement | null>(null);
   return (
-    <LinhaDoCadastro rotulo="Foto" ajuda="Mostrada na lista e na ficha.">
+    <LinhaDoCadastro
+      rotulo="Foto"
+      ajuda="Aparece na lista de colaboradores e no perfil."
+    >
       <div
         className="nova-admissao__foto"
         aria-describedby={`nova-admissao-foto-ajuda${recusa ? " nova-admissao-foto-recusa" : ""}`}

@@ -10,8 +10,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   AUSENTE,
+  diaDaSemanaEDiaMes,
+  diaMesCurto,
+  numeroDoDia,
+  umAnoDepois,
+  diaPorExtensoComSemana,
+  intervaloCurtoDeDias,
   FUSO_DE_NEGOCIO,
   formatarDiaCivil,
+  formatarIntervaloDeDias,
   formatarInstante,
   formatarMesReferencia,
 } from "./data";
@@ -647,5 +654,64 @@ describe("contrato do módulo", () => {
 
   it("T154.20 o traço é o mesmo caractere usado no produto", () => {
     expect(AUSENTE).toBe("—");
+  });
+});
+
+describe("T215 — diaDaSemanaEDiaMes", () => {
+  it("dia da semana, dia e mês sem zero à esquerda; recusa vira ausente", () => {
+    expect(diaDaSemanaEDiaMes("2026-11-24")).toBe("terça 24/11");
+    expect(diaDaSemanaEDiaMes("2026-03-01")).toBe("domingo 1/3");
+    expect(diaDaSemanaEDiaMes("2026-02-30")).toBe(diaDaSemanaEDiaMes(null));
+  });
+});
+
+describe("T215 — painel do dia do quadro", () => {
+  it("dia por extenso com a semana e intervalo curto de dias", () => {
+    expect(diaPorExtensoComSemana("2027-03-03")).toBe("Quarta, 3 de março");
+    expect(diaPorExtensoComSemana("2026-11-29")).toBe(
+      "Domingo, 29 de novembro",
+    );
+    expect(diaPorExtensoComSemana("2026-13-01")).toBe(
+      diaPorExtensoComSemana(null),
+    );
+    expect(intervaloCurtoDeDias("2027-03-01", "2027-03-07")).toBe("1 a 7/3");
+    expect(intervaloCurtoDeDias("2026-11-30", "2026-12-06")).toBe(
+      "30/11 a 6/12",
+    );
+    expect(intervaloCurtoDeDias("x", "2026-12-06")).toBe(
+      diaPorExtensoComSemana(null),
+    );
+  });
+});
+
+describe("T215 — diaMesCurto", () => {
+  it("dia e mês sem zero à esquerda", () => {
+    expect(diaMesCurto("2027-03-02")).toBe("2/3");
+    expect(diaMesCurto("2026-11-24")).toBe("24/11");
+    expect(diaMesCurto("")).toBe(diaMesCurto(null));
+  });
+});
+
+describe("T215 — numeroDoDia e umAnoDepois", () => {
+  it("dia do mês e a mesma data no ano seguinte", () => {
+    expect(numeroDoDia("2026-11-05")).toBe(5);
+    expect(umAnoDepois("2026-12-16")).toBe("2027-12-16");
+  });
+});
+
+describe("T215 — formatarIntervaloDeDias (como a referência)", () => {
+  it("um dia, mesmo ano, anos diferentes e sem fim", () => {
+    expect(formatarIntervaloDeDias("2026-11-30", "2026-11-30")).toBe(
+      "30/11/2026",
+    );
+    expect(formatarIntervaloDeDias("2026-11-02", "2026-11-07")).toBe(
+      "02/11 – 07/11/2026",
+    );
+    expect(formatarIntervaloDeDias("2026-12-31", "2027-01-04")).toBe(
+      "31/12/2026 – 04/01/2027",
+    );
+    expect(formatarIntervaloDeDias("2026-11-02", null)).toBe(
+      "Desde 02/11/2026",
+    );
   });
 });

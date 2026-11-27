@@ -39,7 +39,8 @@ lastIntegratedTask` e a presença literal dos identificadores citados na mudanç
 O planejamento detalhado permanece em `tasks.md`, e a evidência técnica está no histórico Git e nos
 ADRs/documentos indicados por cada tarefa. T020–T023 estão canceladas porque “Reserva Fiscal” é o nome
 da empresa/projeto, não um módulo. T032 alinhou repositório, Spec Kit e PRD ao estado real, e é a
-tarefa que mantém `DESIGN-apple.md` intacto byte a byte como referência externa. T049 encerra o
+tarefa que manteve o arquivo de referência visual externa intacto (removido em 2026-11-25; fonte
+oficial atual: `docs/DESIGN-SYSTEM-EVOLLI.md`). T049 encerra o
 primeiro caderno de homologação de jornada e Banco de Horas.
 
 > **Por que esta seção nomeia tarefas que uma faixa já cobre.** `pnpm spec:check` procura cada
@@ -156,8 +157,9 @@ primeiro caderno de homologação de jornada e Banco de Horas.
 | T142   | **Integrada** (PR #134, squash `8c3d8c3`); padrão visual B + modais aprovado; expansão **liberada de forma gradual** | Direção visual aprovada: alternativa B com modais. Piloto de `Pessoas › Colaboradores` **integrado em `main`**; a validação do proprietário segue tela a tela. A condição arquitetural caiu em 01/10/2026 (T143, ADR 0014): a expansão é agora **tela por tela, com validação visual antes de ampliar**. **Nada foi expandido até aqui**, e a correção compartilhada do `DataTable` segue fora de escopo. |
 
 **Apoio externo:** skill `ui-ux-pro-max` (MIT, 2.13.0, commit `09170eec`), instalada localmente e
-fora do versionamento, usada como **checklist consultivo**. A fonte de verdade de design continua
-sendo `DESIGN-apple.md` + `tokens.css` + `src/components/`; nenhuma regra divergente foi criada.
+fora do versionamento, usada como **checklist consultivo**. A fonte de verdade de design é
+`docs/DESIGN-SYSTEM-EVOLLI.md` + `tokens.css` + `src/components/` (desde 2026-11-25; antes, um arquivo
+de referência externa, já removido); nenhuma regra divergente foi criada.
 
 **Limites explícitos:** concluir o piloto **não** significa que o ecossistema foi revisado ou
 corrigido. O diagnóstico cobriu as telas funcionais; as demonstrativas não foram avaliadas como
@@ -3376,11 +3378,16 @@ item direto de Pessoas; sem Operação e sem Demonstração no menu
 **Fora de escopo:** módulos, permissões, dados, migrations, API e dependências novos; mudança
 funcional nas telas; Documentos.
 
-## Importação por `.xlsx` — T212 (aprovada visualmente; aguarda publicação)
+## Importação por `.xlsx` — T212 (integrada)
 
-| Tarefa | Estado                                                     | Resultado principal                                                                      |
-| ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| T212   | **Aprovada visualmente em 18/11/2026; aguarda publicação** | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+| Tarefa | Estado                                    | Resultado principal                                                                      |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| T212   | **Integrada** (PR #205, squash `9caf216`) | Importação de colaboradores por `.xlsx`, mantendo o CSV, com modelo gerado no navegador. |
+
+**Observação de relatório:** a integração funcional da T212 está concluída (PR #205, squash
+`9caf216c7f0912efa145781f35a59cad6a55c49a`, CI de push 3/3 verde, run 44527419288; branch
+remota preservada); a única pendência administrativa era a sua convergência no Spec Kit,
+resolvida no primeiro commit da tarefa seguinte.
 
 **Escopo:** modelo `.xlsx` (abas Colaboradores, Exemplos e Instruções) gerado da mesma definição
 de colunas do importador; leitura só no navegador, pela mesma conferência, idempotência e envio
@@ -3399,3 +3406,53 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
+
+## Documentos do colaborador — T213 (validação visual aprovada; aguarda publicação)
+
+| Tarefa | Estado                                                          | Resultado principal                                                        |
+| ------ | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| T213   | **Validação visual aprovada em 23/11/2026; aguarda publicação** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
+
+**Arquivos reais:** bloqueados até o ClamAV estar configurado e a revisão de segurança estar
+concluída; até lá, só arquivos sintéticos. Tecnicamente, o envio depende de verificador
+configurado e operante (sem ele, 503 antes de gravar).
+
+**Correções pós-revisão (23/11/2026, PR #206 em Draft):** antivírus antes de gravar, `DELETE`
+revogado no banco, foco depois de cada ação e download pelo padrão do Dashboard; aguardam
+validação antes do Ready.
+
+**Escopo:** primeira fatia da [ADR 0021](../docs/adr/0021-documentos-do-colaborador-no-r2-privado.md)
+— API (migration, rotas, RBAC, auditoria, ClamAV com quarentena fail-closed, limpeza pendente) e
+tela (etapa 4 "Documentos" do Novo colaborador, envio depois do cadastro, proteção de saída e
+seção da ficha) ([documento de decisão](../docs/decisions/t213-documentos-colaborador.md)).
+
+**Fora de escopo:** MFA para baixar, retenção e descarte, obrigatoriedade, categorias
+configuráveis, OCR, assinatura, leitura automática, compartilhamento externo, vencimentos e
+envio pela importação.
+
+## Dashboard e login — T214 (implementada localmente; aguarda separação)
+
+| Tarefa | Estado                                             | Resultado principal                                  |
+| ------ | -------------------------------------------------- | ---------------------------------------------------- |
+| T214   | **Implementada localmente (`515b7e0`), só a tela** | Card principal do Dashboard, "i" do cálculo e login. |
+
+**Situação:** empilhada na branch da T215; sem PR. A separação em entrega própria aguarda
+autorização.
+
+## Colaboradores — T215 (em andamento local; sem PR)
+
+| Tarefa | Estado                     | Resultado principal                                                       |
+| ------ | -------------------------- | ------------------------------------------------------------------------- |
+| T215   | **Em andamento, só local** | Lista, edição, ficha nova e as abas Dados, Salários e Férias e ausências. |
+
+**Aba Férias e ausências da ficha (24/11/2026):** regra de férias por vínculo (CLT e Estágio
+com saldo; PJ e Freelancer sem férias; Aprendiz e os tipos não decididos sem cálculo
+automático), leitura da ficha auditada sem valores, anexo (atestado ou documento) com
+antivírus antes de gravar e remoção só lógica, e o aviso de que feriados móveis, estaduais e
+municipais ainda não entram nos dias úteis
+([documento de decisão](../docs/decisions/t215-colaboradores.md)).
+
+**Dependência:** o anexo usa o armazenamento privado e o antivírus da T213 (PR #206 em Draft).
+
+**Fora de escopo:** Portal do colaborador, fluxo do gestor, férias coletivas, políticas de
+férias e mudança automática de status.

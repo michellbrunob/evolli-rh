@@ -26,6 +26,7 @@ import {
 } from "../src/cep/cep.types";
 import {
   camposObrigatoriosAdmissao,
+  contratoDaAdmissao,
   lotacaoMinima,
 } from "./admissao-obrigatoria";
 
@@ -307,6 +308,8 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
       dataAdmissao: "2026-02-02",
       motivoCodigo: "admissao_inicial",
       departamentoId,
+      // T215 — o primeiro salário é obrigatório na admissão.
+      contrato: contratoDaAdmissao(),
     };
     colaboradorId = (
       await post("/v1/colaboradores", rh)
@@ -415,13 +418,16 @@ describe("Log geral de requisições sem valores (T178, e2e)", () => {
         rh,
       ).expect(200);
       expect(r.body.itens.map((c: { nome: string }) => c.nome)).toEqual([NOME]);
-      expect(r.body.contadores).toEqual({
+      // T215 — os indicadores do cartão têm suíte própria.
+      expect(r.body.contadores).toMatchObject({
         ativos: 0,
         inativos: 1,
         // T199 — o admitido ainda está previsto: Em admissão.
         emAdmissao: 1,
         desligados: 0,
         total: 1,
+        // T215 — nenhum desativado.
+        desativados: 0,
         ativosPorTipo: {
           clt: 0,
           estagio: 0,

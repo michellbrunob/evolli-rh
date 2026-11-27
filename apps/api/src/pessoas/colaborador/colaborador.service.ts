@@ -50,6 +50,7 @@ import {
   ListarColaboradoresQueryDto,
   RetificarColaboradorDto,
 } from "../dto/pessoas.dto";
+import { ConsultarCpfEmUsoDto } from "../dados-pessoais/dados-pessoais.dto";
 import {
   DadosPessoaisColaboradorService,
   ValoresEndereco,
@@ -64,6 +65,14 @@ import {
   contatosInformados,
 } from "../contatos/contato-colaborador.service";
 import { escaparCuringas } from "../../common/busca.util";
+import { dataLocalDe } from "../../ponto/competencia.util";
+import { clausulasDeBusca, indicadoresDoEscopo } from "./listagem-pagina";
+import {
+  comDesativacaoVigente,
+  grupoExcluiDesativados,
+  selecaoDaDesativacaoVigente,
+  semDesativacaoVigente,
+} from "./desativacao";
 import {
   type ContratoDaAdmissao,
   contratoConfere,
@@ -220,6 +229,36 @@ export interface ColaboradorListado {
   vinculos: VinculoListado[];
   /** T209 — se há foto do colaborador NA EMPRESA ATIVA (ver `FotoAnunciada`). */
   foto: FotoAnunciada | null;
+  /**
+   * T215 — desativado na empresa (global: em alguma). A `situacao` vem
+   * "inativo"; a linha só aparece em Todos.
+   */
+  desativado: boolean;
+  /**
+   * T215 — o CPF (11 dígitos) do perfil pessoal na empresa ativa. AUSENTE
+   * para quem não lê dados pessoais e sem empresa ativa; `null` sem CPF ou
+   * com o dado bloqueado (desligado: só a ficha diz que existe).
+   */
+  cpf?: string | null;
+  /**
+   * T215 — e-mail pessoal e celular do contato ATIVO na empresa. AUSENTE
+   * para quem não lê contatos e sem empresa ativa; `null` sem contato ou
+   * bloqueado.
+   */
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  /**
+   * T215 — salário bruto do contrato do vínculo PRINCIPAL ("5000.00").
+   * AUSENTE para quem não lê `contrato_vinculo` e sem empresa ativa; `null`
+   * sem contrato ou sem salário.
+   */
+  salarioBruto?: string | null;
+}
+
+/** T215 — o que a página lê de cada linha, além da projeção de sempre. */
+interface DadosDaLinha {
+  cpf?: string | null;
+  contatos?: { emailPessoal: string | null; celular: string | null } | null;
+  salarioBruto?: string | null;
 }
 
 /**
@@ -303,9 +342,18 @@ export function filtroDeLotacaoVigente(
 export function filtroDeGrupo(
   noEscopo: Prisma.VinculoFuncionalWhereInput,
   grupo: GrupoColaborador | undefined,
-  tipo?: TipoVinculo,
+  /** T215 — um tipo, ou vários (qualquer um deles). */
+  tipo?: TipoVinculo | readonly TipoVinculo[],
 ): Prisma.ColaboradorWhereInput | null {
-  const doTipo = tipo ? { tipo } : {};
+  const doTipo: Prisma.VinculoFuncionalWhereInput =
+    tipo === undefined
+      ? {}
+      : typeof tipo === "string"
+        ? { tipo }
+        : tipo.length > 0
+          ? { tipo: { in: [...tipo] } }
+          : {};
+  const temTipo = Object.keys(doTipo).length > 0;
   const com = (situacao: SituacaoVinculo): Prisma.ColaboradorWhereInput => ({
     vinculos: { some: { ...noEscopo, situacao, ...doTipo } },
   });
@@ -320,8 +368,78 @@ export function filtroDeGrupo(
     case "desligados":
       return { AND: [sem("ativo"), sem("previsto"), com("encerrado")] };
     default:
-      return tipo ? { vinculos: { some: { ...noEscopo, tipo } } } : null;
+      return temTipo
+        ? { vinculos: { some: { ...noEscopo, ...doTipo } } }
+        : null;
   }
+}
+
+/** T215 — o que a gaveta "Filtrar" manda (cada grupo, uma lista). */
+export interface FiltrosDaGaveta {
+  readonly departamentos?: readonly string[] | undefined;
+  readonly areas?: readonly string[] | undefined;
+  readonly centrosCusto?: readonly string[] | undefined;
+  readonly unidades?: readonly string[] | undefined;
+  readonly cargos?: readonly string[] | undefined;
+  readonly niveis?: readonly string[] | undefined;
+  readonly generos?: readonly string[] | undefined;
+}
+
+/**
+ * T215 — a gaveta "Filtrar" no `where`. Dentro de um grupo, qualquer um dos
+ * valores; entre os grupos, todos. Lotação e nível valem no MESMO vínculo
+ * ATIVO do escopo, na alocação ABERTA (a regra da T190); o gênero, no perfil
+ * pessoal do escopo. Nada marcado: lista vazia (nenhum filtro na consulta).
+ */
+export function filtrosDaGaveta(
+  noEscopo: Prisma.VinculoFuncionalWhereInput,
+  filtros: FiltrosDaGaveta,
+): Prisma.ColaboradorWhereInput[] {
+  const em = (lista: readonly string[] | undefined) =>
+    lista && lista.length > 0 ? { in: [...lista] } : undefined;
+  const alocacao: Prisma.AlocacaoOrganizacionalWhereInput = {};
+  const departamentos = em(filtros.departamentos);
+  const areas = em(filtros.areas);
+  const centros = em(filtros.centrosCusto);
+  const unidades = em(filtros.unidades);
+  const cargos = em(filtros.cargos);
+  if (departamentos) alocacao.departamentoId = departamentos;
+  if (areas) alocacao.areaId = areas;
+  if (centros) alocacao.centroCustoId = centros;
+  if (unidades) alocacao.unidadeOrganizacionalId = unidades;
+  if (cargos) alocacao.cargoId = cargos;
+  const niveis = em(filtros.niveis);
+  const temLotacao = Object.keys(alocacao).length > 0;
+
+  const resultado: Prisma.ColaboradorWhereInput[] = [];
+  if (temLotacao || niveis) {
+    resultado.push({
+      vinculos: {
+        some: {
+          ...noEscopo,
+          situacao: "ativo",
+          ...(temLotacao
+            ? { alocacoes: { some: { vigenteAte: null, ...alocacao } } }
+            : {}),
+          ...(niveis ? { contrato: { is: { nivel: niveis } } } : {}),
+        },
+      },
+    });
+  }
+  const generos = em(filtros.generos);
+  if (generos) {
+    resultado.push({
+      perfisPessoais: {
+        some: {
+          ...(typeof noEscopo.empresaId === "string"
+            ? { empresaId: noEscopo.empresaId }
+            : {}),
+          genero: generos,
+        },
+      },
+    });
+  }
+  return resultado;
 }
 
 /** Um vínculo ativo, só com o que decide o principal e o tipo. */
@@ -375,7 +493,11 @@ export function contadoresVazios(): ContadoresColaboradores {
     emAdmissao: 0,
     desligados: 0,
     total: 0,
+    desativados: 0,
     ativosPorTipo: distribuirAtivosPorTipo([]),
+    admitidosNoMes: 0,
+    desligadosNoAno: 0,
+    serieAtivos: [0, 0, 0, 0, 0, 0],
   };
 }
 
@@ -663,6 +785,39 @@ export class ColaboradorService {
    * O vínculo nasce `previsto`, nunca `ativo`: ativar exige efetivar a
    * movimentação, que é ato explícito e auditado (spec §8).
    */
+  /**
+   * T215 — o CPF já está cadastrado na empresa ativa? Responde enquanto o RH
+   * digita, antes de qualquer gravação; quem pode admitir é quem pode
+   * perguntar. Só `emUso` volta — nunca quem é a pessoa.
+   */
+  async cpfEmUso(
+    dto: ConsultarCpfEmUsoDto,
+    ctx: PessoasAuditContext,
+  ): Promise<{ emUso: boolean }> {
+    const escopo = resolverEscopoPessoas(ctx.actor);
+    if (
+      !podeAcessarPessoas(ctx.actor, "colaborador", "create", escopo.empresaId)
+    ) {
+      return this.auditoria.negarAcesso(
+        ctx,
+        "colaborador",
+        null,
+        escopo.empresaId,
+      );
+    }
+    const achado = await this.prisma.perfilPessoalColaborador.findFirst({
+      where: {
+        empresaId: escopo.empresaId,
+        cpf: dto.cpf,
+        ...(dto.ignorarColaboradorId
+          ? { colaboradorId: { not: dto.ignorarColaboradorId } }
+          : {}),
+      },
+      select: { id: true },
+    });
+    return { emUso: achado !== null };
+  }
+
   async admitir(
     dto: AdmitirColaboradorDto,
     ctx: PessoasAuditContext,
@@ -768,6 +923,14 @@ export class ColaboradorService {
 
     const destino = extrairDestino(dto);
     assertDestinoCoerente("admissao", destino);
+
+    // T215 — ninguém é admitido sem o primeiro salário: ele abre a linha do
+    // tempo salarial (aba Salários da ficha), com a tag Admissão.
+    if (!dto.contrato?.salarioBruto) {
+      throw new CamposRecusadosException([
+        { campo: "contrato.salarioBruto", motivo: "obrigatorio" },
+      ]);
+    }
 
     const dataAdmissao = dataUtc(new Date(dto.dataAdmissao));
     const status: StatusMovimentacao =
@@ -890,7 +1053,13 @@ export class ColaboradorService {
         // T209 — contrato da admissão (etapa 2), na MESMA transação.
         const contrato = await gravarContratoNaAdmissao(
           tx,
-          { vinculoId: vinculo.id, empresaId: escopo.empresaId },
+          {
+            vinculoId: vinculo.id,
+            empresaId: escopo.empresaId,
+            dataAdmissao: vinculo.dataAdmissao,
+            registradaPorUserId: ctx.actor.id,
+            cargoId: destino.cargoId,
+          },
           dto.contrato,
         );
 
@@ -1266,14 +1435,24 @@ export class ColaboradorService {
     const base: Prisma.ColaboradorWhereInput =
       empresaId !== undefined ? { vinculos: { some: { empresaId } } } : {};
 
-    const ativoNoEscopo: Prisma.ColaboradorWhereInput =
-      empresaId !== undefined
-        ? { vinculos: { some: { empresaId, situacao: "ativo" } } }
-        : { situacao: "ativo" };
-    const inativoNoEscopo: Prisma.ColaboradorWhereInput =
-      empresaId !== undefined
-        ? { vinculos: { none: { empresaId, situacao: "ativo" } } }
-        : { situacao: "inativo" };
+    // T215 — o desativado na empresa não é ativo: sai do "ativo" e entra no
+    // "inativo", pela mesma regra dos grupos.
+    const ativoNoEscopo: Prisma.ColaboradorWhereInput = {
+      AND: [
+        empresaId !== undefined
+          ? { vinculos: { some: { empresaId, situacao: "ativo" } } }
+          : { situacao: "ativo" },
+        semDesativacaoVigente(empresaId),
+      ],
+    };
+    const inativoNoEscopo: Prisma.ColaboradorWhereInput = {
+      OR: [
+        empresaId !== undefined
+          ? { vinculos: { none: { empresaId, situacao: "ativo" } } }
+          : { situacao: "inativo" },
+        comDesativacaoVigente(empresaId),
+      ],
+    };
 
     const filtros: Prisma.ColaboradorWhereInput[] = [base];
     if (query.situacaoVinculo) {
@@ -1287,19 +1466,21 @@ export class ColaboradorService {
       );
     }
     if (query.busca) {
-      const termo = escaparCuringas(query.busca);
+      // T215 — nome, matrícula, CPF, e-mail pessoal e id (ver
+      // `clausulasDeBusca`); CPF e e-mail só para quem os lê na ficha.
+      const pode = (
+        recurso: "dados_pessoais_colaborador" | "contato_colaborador",
+      ) =>
+        empresaId !== undefined
+          ? podeAcessarPessoas(ctx.actor, recurso, "read", empresaId)
+          : podeConsultarPessoas(ctx.actor, recurso, "read", escopo);
       filtros.push({
-        OR: [
-          { nome: { contains: termo, mode: "insensitive" } },
-          {
-            vinculos: {
-              some: {
-                ...noEscopo,
-                matricula: { contains: termo, mode: "insensitive" },
-              },
-            },
-          },
-        ],
+        OR: clausulasDeBusca(query.busca, {
+          noEscopo,
+          empresaId,
+          podeCpf: pode("dados_pessoais_colaborador"),
+          podeEmail: pode("contato_colaborador"),
+        }),
       });
     }
     const porLotacao = filtroDeLotacaoVigente(
@@ -1308,16 +1489,47 @@ export class ColaboradorService {
       query.cargoId,
     );
     if (porLotacao) filtros.push(porLotacao);
+    // T215 — a gaveta "Filtrar" (listas; grupos combinados).
+    filtros.push(
+      ...filtrosDaGaveta(noEscopo, {
+        departamentos: query.departamentos,
+        areas: query.areas,
+        centrosCusto: query.centrosCusto,
+        unidades: query.unidades,
+        cargos: query.cargos,
+        niveis: query.niveis,
+        generos: query.generos,
+      }),
+    );
     // T199 — grupo da aba e tipo de vínculo, no banco e antes da paginação.
-    const porGrupo = filtroDeGrupo(noEscopo, query.grupo, query.tipoVinculo);
+    // T215 — o tipo único (antigo) e a lista da gaveta valem juntos.
+    const tipos = [
+      ...(query.tipoVinculo ? [query.tipoVinculo] : []),
+      ...(query.tipos ?? []),
+    ];
+    const porGrupo = filtroDeGrupo(
+      noEscopo,
+      query.grupo,
+      tipos.length === 1 ? tipos[0] : tipos.length > 1 ? tipos : undefined,
+    );
     if (porGrupo) filtros.push(porGrupo);
+    // T215 — o desativado fica só em Todos.
+    if (grupoExcluiDesativados(query.grupo)) {
+      filtros.push(semDesativacaoVigente(empresaId));
+    }
     const where: Prisma.ColaboradorWhereInput = { AND: filtros };
 
     // T199 — contadores do escopo inteiro, sem busca, filtros nem aba; os
     // três grupos pela MESMA regra do filtro, para que somem o total.
     const contarGrupo = (grupo: GrupoColaborador) =>
       this.prisma.colaborador.count({
-        where: { AND: [base, filtroDeGrupo(noEscopo, grupo)!] },
+        where: {
+          AND: [
+            base,
+            filtroDeGrupo(noEscopo, grupo)!,
+            semDesativacaoVigente(empresaId),
+          ],
+        },
       });
 
     const [
@@ -1328,6 +1540,8 @@ export class ColaboradorService {
       emAdmissao,
       desligados,
       vinculosAtivos,
+      desativados,
+      vinculosDoEscopo,
     ] = await Promise.all([
       this.prisma.colaborador.findMany({
         where,
@@ -1341,6 +1555,8 @@ export class ColaboradorService {
           situacao: true,
           criadoEm: true,
           atualizadoEm: true,
+          // T215 — a desativação vigente na empresa, se houver.
+          desativacoes: selecaoDaDesativacaoVigente(empresaId),
           vinculos: {
             where: noEscopo,
             select: {
@@ -1375,12 +1591,35 @@ export class ColaboradorService {
       contarGrupo("em_admissao"),
       contarGrupo("desligados"),
       this.prisma.vinculoFuncional.findMany({
-        where: { ...noEscopo, situacao: "ativo" },
+        // T215 — o desativado não conta entre os ativos por tipo.
+        where: {
+          ...noEscopo,
+          situacao: "ativo",
+          colaborador: semDesativacaoVigente(empresaId),
+        },
         select: {
           colaboradorId: true,
           tipo: true,
           dataAdmissao: true,
           matricula: true,
+        },
+      }),
+      this.prisma.colaborador.count({
+        where: { AND: [base, comDesativacaoVigente(empresaId)] },
+      }),
+      // T215 — indicadores do cartão: admitidos no mês, desligados no ano e
+      // a série de 6 meses, sem quem está desativado na empresa.
+      this.prisma.vinculoFuncional.findMany({
+        where: {
+          ...noEscopo,
+          situacao: { in: ["ativo", "encerrado"] },
+          colaborador: semDesativacaoVigente(empresaId),
+        },
+        select: {
+          colaboradorId: true,
+          situacao: true,
+          dataAdmissao: true,
+          dataDesligamento: true,
         },
       }),
     ]);
@@ -1408,15 +1647,20 @@ export class ColaboradorService {
       linhas.map((c) => c.id),
     );
 
+    // T215 — CPF, contatos e salário da página, em lote e com a trilha.
+    const dadosDasLinhas = await this.dadosDasLinhas(ctx, empresaId, linhas);
+
     const itens: ColaboradorListado[] = linhas.map((c) => ({
       id: c.id,
       nome: c.nome,
       situacao:
-        empresaId !== undefined
-          ? c.vinculos.some((v) => v.situacao === "ativo")
-            ? "ativo"
-            : "inativo"
-          : c.situacao,
+        c.desativacoes.length > 0
+          ? "inativo"
+          : empresaId !== undefined
+            ? c.vinculos.some((v) => v.situacao === "ativo")
+              ? "ativo"
+              : "inativo"
+            : c.situacao,
       criadoEm: c.criadoEm,
       atualizadoEm: c.atualizadoEm,
       vinculos: ordenarVinculosListados(
@@ -1435,6 +1679,8 @@ export class ColaboradorService {
         })),
       ),
       foto: fotos.get(c.id) ?? null,
+      desativado: c.desativacoes.length > 0,
+      ...(dadosDasLinhas.get(c.id) ?? {}),
     }));
 
     return {
@@ -1447,10 +1693,200 @@ export class ColaboradorService {
         inativos: totalNoEscopo - ativos,
         emAdmissao,
         desligados,
+        desativados,
         total: totalNoEscopo,
         ativosPorTipo: distribuirAtivosPorTipo(vinculosAtivos),
+        ...indicadoresDoEscopo(vinculosDoEscopo, dataLocalDe(new Date())),
       },
     };
+  }
+
+  /**
+   * T215 — CPF, contatos e salário bruto das linhas da página, em três
+   * consultas (nunca uma por linha).
+   *
+   * - Só com empresa ativa (o `master_tecnico` global não recebe nenhum dos
+   *   três: os dados são por empresa, como a foto).
+   * - Cada campo só para quem o lê na ficha: `dados_pessoais_colaborador`
+   *   (CPF), `contato_colaborador` (contatos) e `contrato_vinculo` (salário).
+   *   Sem a permissão, o campo nem vai — a tela distingue "sem permissão" de
+   *   "vazio".
+   * - CPF e contatos de quem não está em uso operacional na empresa
+   *   (desligado) vêm `null`: o dado é bloqueado, como na ficha.
+   * - Toda leitura que devolve valor deixa trilha, na mesma transação
+   *   (fail-safe), sem nenhum valor:
+   *   - na categoria, UMA linha por pessoa (leitura, valores devolvidos, só
+   *     os NOMES dos campos), num `createMany` só — é o que responde "quem
+   *     viu os meus dados" ao titular (LGPD art. 18);
+   *   - no `audit_event`, UM evento por categoria por consulta (o acesso em
+   *     lote é um ato só), sem `resourceId`, ligado às linhas da categoria
+   *     pelo `request_id`. Nunca um evento por pessoa: a página de 100
+   *     viraria 200 escritas por abertura de tela.
+   */
+  private async dadosDasLinhas(
+    ctx: PessoasAuditContext,
+    empresaId: string | undefined,
+    linhas: readonly {
+      id: string;
+      vinculos: readonly {
+        id: string;
+        situacao: SituacaoVinculo;
+        dataAdmissao: Date;
+        matricula: string | null;
+      }[];
+    }[],
+  ): Promise<Map<string, DadosDaLinha>> {
+    const resultado = new Map<string, DadosDaLinha>();
+    if (empresaId === undefined || linhas.length === 0) return resultado;
+    const lerCpf = podeAcessarPessoas(
+      ctx.actor,
+      "dados_pessoais_colaborador",
+      "read",
+      empresaId,
+    );
+    const lerContatos = podeAcessarPessoas(
+      ctx.actor,
+      "contato_colaborador",
+      "read",
+      empresaId,
+    );
+    const lerSalario = podeAcessarPessoas(
+      ctx.actor,
+      "contrato_vinculo",
+      "read",
+      empresaId,
+    );
+    if (!lerCpf && !lerContatos && !lerSalario) return resultado;
+
+    const operacionais = linhas
+      .filter((c) => c.vinculos.some((v) => v.situacao !== "encerrado"))
+      .map((c) => c.id);
+    // O vínculo principal: a mesma ordem da linha, da ficha e do contrato.
+    const principais = new Map<string, string>();
+    for (const c of linhas) {
+      const [principal] = [...c.vinculos].sort(
+        (a, b) =>
+          ORDEM_SITUACAO_VINCULO[a.situacao] -
+            ORDEM_SITUACAO_VINCULO[b.situacao] ||
+          b.dataAdmissao.getTime() - a.dataAdmissao.getTime() ||
+          compararMatriculas(a.matricula, b.matricula),
+      );
+      if (principal) principais.set(c.id, principal.id);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const perfis =
+        lerCpf && operacionais.length > 0
+          ? await tx.perfilPessoalColaborador.findMany({
+              where: { empresaId, colaboradorId: { in: operacionais } },
+              select: { id: true, colaboradorId: true, cpf: true },
+            })
+          : [];
+      const contatos =
+        lerContatos && operacionais.length > 0
+          ? await tx.contatoColaborador.findMany({
+              where: {
+                empresaId,
+                colaboradorId: { in: operacionais },
+                ativo: true,
+              },
+              select: {
+                id: true,
+                colaboradorId: true,
+                emailPessoal: true,
+                celular: true,
+              },
+            })
+          : [];
+      const contratos = lerSalario
+        ? await tx.contratoVinculo.findMany({
+            where: { empresaId, vinculoId: { in: [...principais.values()] } },
+            select: { vinculoId: true, salarioBruto: true },
+          })
+        : [];
+
+      const cpfPor = new Map(perfis.map((p) => [p.colaboradorId, p]));
+      const contatoPor = new Map(contatos.map((c) => [c.colaboradorId, c]));
+      const salarioPor = new Map(
+        contratos.map((c) => [
+          c.vinculoId,
+          c.salarioBruto === null ? null : c.salarioBruto.toFixed(2),
+        ]),
+      );
+
+      for (const c of linhas) {
+        const dados: DadosDaLinha = {};
+        if (lerCpf) dados.cpf = cpfPor.get(c.id)?.cpf ?? null;
+        if (lerContatos) {
+          const contato = contatoPor.get(c.id);
+          dados.contatos = contato
+            ? { emailPessoal: contato.emailPessoal, celular: contato.celular }
+            : null;
+        }
+        if (lerSalario) {
+          const vinculoId = principais.get(c.id);
+          dados.salarioBruto = vinculoId
+            ? (salarioPor.get(vinculoId) ?? null)
+            : null;
+        }
+        resultado.set(c.id, dados);
+      }
+
+      // A trilha de cada valor devolvido (só os NOMES dos campos).
+      const cpfsLidos = perfis.filter((p) => p.cpf !== null);
+      if (cpfsLidos.length > 0) {
+        await tx.dadosPessoaisColaboradorEvento.createMany({
+          data: cpfsLidos.map((p) => ({
+            colaboradorId: p.colaboradorId,
+            empresaId,
+            categoria: "perfil_pessoal" as const,
+            perfilId: p.id,
+            enderecoId: null,
+            acao: "leitura" as const,
+            resultado: "valores_devolvidos" as const,
+            campos: ["cpf" as const],
+            atorUserId: ctx.actor.id,
+            requestId: ctx.metadata.requestId,
+          })),
+        });
+        await this.auditoria.registrarNaTransacao(tx, ctx, {
+          action: "pessoas_dados_pessoais_consultados",
+          resource: "dados_pessoais_colaborador",
+          resourceId: null,
+          empresaId,
+          result: "success",
+        });
+      }
+      // A leitura alcança o registro de contato inteiro (a regra do banco
+      // para a leitura com valores: os três campos), como na ficha — mesmo
+      // que a linha mostre só e-mail e celular.
+      const contatosLidos = contatos.map((c) => ({
+        contato: c,
+        campos: ["email_pessoal", "celular", "telefone"] as const,
+      }));
+      if (contatosLidos.length > 0) {
+        await tx.contatoColaboradorEvento.createMany({
+          data: contatosLidos.map(({ contato, campos }) => ({
+            colaboradorId: contato.colaboradorId,
+            empresaId,
+            contatoId: contato.id,
+            acao: "leitura" as const,
+            resultado: "valores_devolvidos" as const,
+            campos: [...campos],
+            atorUserId: ctx.actor.id,
+            requestId: ctx.metadata.requestId,
+          })),
+        });
+        await this.auditoria.registrarNaTransacao(tx, ctx, {
+          action: "pessoas_contato_consultado",
+          resource: "contato_colaborador",
+          resourceId: null,
+          empresaId,
+          result: "success",
+        });
+      }
+    });
+    return resultado;
   }
 
   async detalhar(

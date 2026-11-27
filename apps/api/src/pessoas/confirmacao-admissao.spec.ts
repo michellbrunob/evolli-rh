@@ -895,6 +895,8 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
     cargoId: CARGO,
     unidadeOrganizacionalId: UNIDADE,
     perfilPessoal: { dataNascimento: "1990-05-20" },
+    // T215 — o primeiro salário é obrigatório na admissão.
+    contrato: { salarioBruto: "1621.00" },
     contatos: {
       emailPessoal: "pessoa.t179@example.test",
       celular: "(11) 98765-4321",
@@ -993,8 +995,21 @@ describe("T179 — admitirIdempotente (serviço, sem banco)", () => {
       contatoColaborador: { findUnique: jest.fn(async () => gravada.contato) },
       // T183 — admissão sem jornada: nenhuma vigência nasceu com ela.
       vinculoHorario: { findFirst: jest.fn(async () => null) },
-      // T209 — sem contrato gravado (etapa 2).
-      contratoVinculo: { findUnique: jest.fn(async () => null) },
+      // T215 — o contrato gravado na admissão: só o salário obrigatório.
+      contratoVinculo: {
+        findUnique: jest.fn(async () => ({
+          nivel: null,
+          gestorDiretoColaboradorId: null,
+          jornadaSemanalHoras: null,
+          escala: null,
+          salarioBruto: { toFixed: () => "1621.00" },
+          conselhoProfissional: null,
+          registroProfissional: null,
+          dependentesIrrf: null,
+          pensaoAlimenticiaPercentual: null,
+          atualizadoEm: AGORA,
+        })),
+      },
     };
     const gravacao = jest.fn(async () => {
       throw opcoes.falhaNaGravacao ?? new Error("não devia gravar");

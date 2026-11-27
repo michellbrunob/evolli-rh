@@ -1,0 +1,86 @@
+/* T215 — aviso flutuante de sucesso (canto inferior direito). */
+.aviso-flutuante {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: var(--space-lg);
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  width: min(26rem, calc(100vw - 2 * var(--space-md)));
+  padding: var(--space-md);
+  border: 1px solid var(--status-success-border);
+  border-radius: var(--radius-md);
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+  box-shadow: var(--sombra-flutuante);
+  animation: ev-aviso-entra var(--movimento-aviso) var(--movimento-curva-suave);
+}
+
+.aviso-flutuante__icone {
+  flex: none;
+  margin-top: 0.125rem;
+}
+
+.aviso-flutuante__textos {
+  flex: 1;
+  min-width: 0;
+}
+
+.aviso-flutuante__titulo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.aviso-flutuante__texto {
+  margin: 2px 0 0;
+  font-size: var(--text-caption);
+}
+
+.aviso-flutuante__fechar {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.aviso-flutuante__acao {
+  flex: none;
+  padding: var(--space-xxs) var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.aviso-flutuante__acao:focus-visible {
+  outline: var(--focus-width) solid currentColor;
+  outline-offset: var(--focus-offset);
+}
+
+.aviso-flutuante__fechar:hover,
+.aviso-flutuante__fechar:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 480px) {
+  .aviso-flutuante {
+    right: var(--space-md);
+    bottom: var(--space-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-flutuante {
+    animation: none;
+  }
+}

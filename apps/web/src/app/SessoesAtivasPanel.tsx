@@ -37,7 +37,11 @@ import "./SessoesAtivasPanel.css";
 
 export interface SessoesAtivasPanelProps {
   aberto: boolean;
-  onFechar: () => void;
+  /**
+   * T215 — sem `onFechar`, o painel é a página Segurança › Sessões ativas:
+   * fica sempre à vista, sem o botão "Fechar".
+   */
+  onFechar?: () => void;
   /** Chamado quando a própria sessão desta aba deixou de ser válida (foi a
    * sessão revogada, ou já havia expirado). Nunca chamado por revogar a
    * sessão de outra aba/dispositivo da mesma conta. */
@@ -159,9 +163,11 @@ export function SessoesAtivasPanel({
         <h2 id={tituloId} className="sessoes-ativas-painel__titulo">
           Sessões ativas
         </h2>
-        <Button variant="subtle" onClick={onFechar}>
-          Fechar
-        </Button>
+        {onFechar ? (
+          <Button variant="subtle" onClick={onFechar}>
+            Fechar
+          </Button>
+        ) : null}
       </div>
       <p className="sessoes-ativas-painel__aviso">
         Sessões ativas da sua própria conta, nesta e em outros dispositivos.

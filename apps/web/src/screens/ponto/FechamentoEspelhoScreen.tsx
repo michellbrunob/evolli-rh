@@ -32,6 +32,7 @@ import {
   type SituacaoFechamento,
 } from "./fechamentoEspelho.fixtures";
 import "./FechamentoEspelhoScreen.css";
+import { plural } from "../../format/plural";
 
 export const FECHAMENTO_ESPELHO_TITULO_ID = "fechamento-espelho-titulo";
 
@@ -163,13 +164,13 @@ export function FechamentoEspelhoScreen() {
       key: "pendencias",
       header: "Pendências bloqueadoras",
       cell: (linha) =>
-        `${linha.pendenciasBloqueadoras.length} pendência(s) (exemplo)`,
+        `${plural(linha.pendenciasBloqueadoras.length, "pendência", "pendências")} (exemplo)`,
     },
     {
       key: "alertas",
       header: "Alertas informativos",
       cell: (linha) =>
-        `${linha.alertasInformativos.length} alerta(s) (exemplo)`,
+        `${plural(linha.alertasInformativos.length, "alerta", "alertas")} (exemplo)`,
     },
     {
       key: "responsavel",
@@ -330,7 +331,12 @@ export function FechamentoEspelhoScreen() {
                 Pendências bloqueadoras
               </StatusBadge>
               <p className="fechamento-espelho-screen__resumo-item-texto">
-                {resumo.totalPendencias} pendência(s) bloqueadora(s) (exemplo)
+                {plural(
+                  resumo.totalPendencias,
+                  "pendência bloqueadora",
+                  "pendências bloqueadoras",
+                )}{" "}
+                (exemplo)
               </p>
             </Surface>
           </li>
@@ -342,7 +348,12 @@ export function FechamentoEspelhoScreen() {
             >
               <StatusBadge variant="info">Alertas informativos</StatusBadge>
               <p className="fechamento-espelho-screen__resumo-item-texto">
-                {resumo.totalAlertas} alerta(s) informativo(s) (exemplo)
+                {plural(
+                  resumo.totalAlertas,
+                  "alerta informativo",
+                  "alertas informativos",
+                )}{" "}
+                (exemplo)
               </p>
             </Surface>
           </li>
@@ -356,8 +367,12 @@ export function FechamentoEspelhoScreen() {
                 Ajustes manuais em revisão
               </StatusBadge>
               <p className="fechamento-espelho-screen__resumo-item-texto">
-                {resumo.totalAjustesEmRevisao} ajuste(s) manual(is) em revisão
-                (exemplo)
+                {plural(
+                  resumo.totalAjustesEmRevisao,
+                  "ajuste manual",
+                  "ajustes manuais",
+                )}{" "}
+                em revisão (exemplo)
               </p>
             </Surface>
           </li>
@@ -369,7 +384,11 @@ export function FechamentoEspelhoScreen() {
             >
               <StatusBadge variant="success">Validação do gestor</StatusBadge>
               <p className="fechamento-espelho-screen__resumo-item-texto">
-                {resumo.totalValidacoesGestor} validação(ões)/recomendação(ões)
+                {plural(
+                  resumo.totalValidacoesGestor,
+                  "validação ou recomendação",
+                  "validações ou recomendações",
+                )}{" "}
                 de gestor (exemplo)
               </p>
             </Surface>
@@ -382,8 +401,12 @@ export function FechamentoEspelhoScreen() {
             >
               <StatusBadge variant="neutral">Situação do espelho</StatusBadge>
               <p className="fechamento-espelho-screen__resumo-item-texto">
-                {resumo.totalEspelhoDisponibilizado} espelho(s)
-                disponibilizado(s) (exemplo)
+                {plural(
+                  resumo.totalEspelhoDisponibilizado,
+                  "espelho disponibilizado",
+                  "espelhos disponibilizados",
+                )}{" "}
+                (exemplo)
               </p>
             </Surface>
           </li>

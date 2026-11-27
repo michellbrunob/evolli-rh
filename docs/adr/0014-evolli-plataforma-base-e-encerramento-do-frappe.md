@@ -100,8 +100,8 @@ A aprovação do **padrão visual B + modais**, registrada em
 
 A expansão deixa de estar “aguardando decisão sobre o Frappe” e passa a ser
 **liberada de forma gradual, tela por tela, com validação visual antes de ampliar**.
-Cada tela recebe identificador próprio. `DESIGN-apple.md` continua intocado, como
-referência externa (T032).
+Cada tela recebe identificador próprio. Na época, o arquivo de referência externa
+da T032 continuava intocado (removido em 2026-11-25; a fonte oficial passou a ser [`docs/DESIGN-SYSTEM-EVOLLI.md`](../DESIGN-SYSTEM-EVOLLI.md)).
 
 ## Consequências
 

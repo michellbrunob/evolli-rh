@@ -1,0 +1,460 @@
+/*
+ * T215 — aba Férias e ausências da ficha. Só tokens; os cartões reaproveitam
+ * `.ficha-ref__cartao` (FichaDoColaborador.css).
+ */
+
+.ferias-ficha {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.ferias-ficha__aviso {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-ink-subtle);
+}
+
+.ferias-ficha__topo {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 52rem) {
+  .ferias-ficha__topo {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  }
+}
+
+.ferias-ficha__corpo {
+  display: grid;
+  align-content: start;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+}
+
+.ferias-ficha__forte {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.ferias-ficha__suave {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+/* Saldo */
+
+.ferias-ficha__saldo-valor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.ferias-ficha__saldo-numero {
+  color: var(--color-ink);
+  font-size: 2.5rem;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* Saldo como a referência: o número e o prazo à esquerda; Direito,
+   Solicitados e Disponíveis à direita. */
+.ferias-ficha__saldo-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.ferias-ficha__saldo-principal {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ferias-ficha__saldo-rotulo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body);
+}
+
+.ferias-ficha__prazo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.ferias-ficha__detalhes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: 0;
+}
+
+.ferias-ficha__detalhes > div {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.ferias-ficha__detalhes dt {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.ferias-ficha__detalhes dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.ferias-ficha__detalhes .ferias-ficha__destaque {
+  color: var(--color-action);
+}
+
+/* Um quadradinho por dia do direito; os solicitados preenchidos. */
+.ferias-ficha__dias {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0.5rem, 1fr));
+  gap: 3px;
+  margin: var(--space-sm) 0 0;
+}
+
+.ferias-ficha__dia,
+.ferias-ficha__amostra {
+  display: block;
+  height: 1.5rem;
+  border: 1px solid var(--divisor-cor);
+  border-radius: 4px;
+  background: var(--surface-neutral);
+}
+
+.ferias-ficha__dia--solicitado,
+.ferias-ficha__amostra--solicitado {
+  border-color: var(--color-action);
+  background: var(--color-action);
+}
+
+.ferias-ficha__legenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  margin-top: var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.ferias-ficha__legenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.ferias-ficha__amostra {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+}
+
+.ferias-ficha__agendar {
+  margin-left: auto;
+}
+
+.ferias-ficha__periodos {
+  display: grid;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm) 0 0;
+  border-top: var(--divisor);
+  list-style: none;
+}
+
+.ferias-ficha__periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Próxima ausência */
+
+.ferias-ficha__proxima-corpo {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.ferias-ficha__calendario {
+  display: grid;
+  justify-items: center;
+  width: 3.5rem;
+  overflow: hidden;
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.ferias-ficha__calendario-mes {
+  width: 100%;
+  padding: var(--space-xxs) 0;
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.ferias-ficha__calendario-dia {
+  padding: var(--space-xs) 0;
+  color: var(--color-ink);
+  font-size: 1.375rem;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.ferias-ficha__proxima-textos {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+/* Histórico */
+
+.ferias-ficha__anos {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
+}
+
+/* O ano, a linha e a contagem do ano à direita. */
+.ferias-ficha__ano-cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.ferias-ficha__ano-titulo {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.ferias-ficha__ano-linha {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--divider-soft);
+}
+
+.ferias-ficha__ano-total {
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+/* O ponto com a cor do tipo, antes do nome. */
+.ferias-ficha__com-ponto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ferias-ficha__ponto {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.ferias-ficha__lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ferias-ficha__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.ferias-ficha__item + .ferias-ficha__item {
+  border-top: var(--divisor);
+}
+
+.ferias-ficha__item-icone {
+  display: inline-grid;
+  place-items: center;
+  grid-row: span 3;
+  align-self: start;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: var(--divisor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink-subtle);
+}
+
+/* A próxima ausência: o ícone em destaque. */
+.ferias-ficha__item-icone--proxima {
+  border-color: color-mix(in srgb, var(--color-action) 35%, transparent);
+  background: color-mix(in srgb, var(--color-action) 8%, transparent);
+  color: var(--color-action);
+}
+
+.ferias-ficha__item-textos {
+  display: grid;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.ferias-ficha__item-dias {
+  display: grid;
+  gap: var(--space-xxs);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ferias-ficha__item-fim {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+@container (min-width: 48rem) {
+  .ferias-ficha__item {
+    /* O nome com largura fixa: as datas começam no mesmo ponto em todas as
+       linhas. */
+    grid-template-columns: auto minmax(0, 17rem) minmax(0, 1fr) auto;
+  }
+
+  .ferias-ficha__item-icone {
+    grid-row: auto;
+    align-self: center;
+  }
+
+  .ferias-ficha__item-fim {
+    justify-content: flex-end;
+  }
+}
+
+.ferias-ficha__anexo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-sm);
+  border: var(--divisor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.ferias-ficha__anexo:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+.ferias-ficha__nota {
+  margin: 0;
+  padding-top: var(--space-sm);
+  border-top: var(--divisor);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.ferias-ficha__vazio {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.ferias-ficha__centro {
+  justify-items: center;
+  text-align: center;
+}
+
+.ferias-ficha__status:empty {
+  display: none;
+}
+
+.ferias-ficha__status {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.ferias-ficha__campo {
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.ferias-ficha__campo textarea {
+  min-height: 5rem;
+  padding: var(--space-sm);
+  border: var(--divisor-forte);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: normal;
+}
+
+.ferias-ficha__campo textarea:focus-visible {
+  outline: var(--focus-width) solid var(--color-action);
+  outline-offset: var(--focus-offset);
+}
+
+/* Como a referência: a nota do período encurtado por um reinício. */
+.ferias-ficha__nota {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.ferias-ficha__nota svg {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.ferias-ficha__nota strong {
+  color: var(--color-ink);
+}
+
+.ferias-ficha__ajustar {
+  margin-left: auto;
+}

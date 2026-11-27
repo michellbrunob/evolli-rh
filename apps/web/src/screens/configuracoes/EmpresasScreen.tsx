@@ -43,8 +43,6 @@ export interface EmpresasScreenProps {
   readonly onAdicionar: () => void;
   /** Mensagem de retorno (ex.: a empresa recém-criada). */
   readonly aviso?: string | undefined;
-  /** T211 — a conta alcança Equipe e permissões (item na navegação). */
-  readonly mostrarEquipe?: boolean;
 }
 
 export function EmpresasScreen({
@@ -52,7 +50,6 @@ export function EmpresasScreen({
   podeEditar,
   onAdicionar,
   aviso,
-  mostrarEquipe = false,
 }: EmpresasScreenProps) {
   const [estado, setEstado] = useState<Estado>({ tipo: "carregando" });
   const [tentativa, setTentativa] = useState(0);
@@ -88,11 +85,7 @@ export function EmpresasScreen({
       />
 
       <div className="configuracoes__corpo">
-        <NavegacaoConfiguracoes
-          atual="empresas"
-          mostrarEmpresas
-          mostrarEquipe={mostrarEquipe}
-        />
+        <NavegacaoConfiguracoes atual="empresas" mostrarEmpresas />
 
         <section
           className="configuracoes__painel"

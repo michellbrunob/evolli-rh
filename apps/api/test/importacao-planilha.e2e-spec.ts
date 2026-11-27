@@ -149,6 +149,8 @@ interface LinhaDaPlanilha {
   dataNascimento: string;
   departamentoId: string;
   cargoId: string;
+  /** T215 — o primeiro salário, obrigatório na admissão: "1621.00". */
+  salarioBruto: string;
   unidadeId?: string;
   matricula?: string;
 }
@@ -207,6 +209,8 @@ function montarAdmissao(linha: LinhaDaPlanilha, empresaId: string) {
       nomePai: null,
       nomeMae: null,
     },
+    // T215 — o primeiro salário abre a linha do tempo salarial.
+    contrato: { salarioBruto: linha.salarioBruto },
   };
 }
 
@@ -290,6 +294,8 @@ describe("Importação de colaboradores por planilha (T212, e2e)", () => {
       dataNascimento: "1990-05-15",
       departamentoId: lotacao.departamentoId,
       cargoId: lotacao.cargoId,
+      // T215 — o primeiro salário é obrigatório na admissão.
+      salarioBruto: "1621.00",
       ...extra,
     };
   }

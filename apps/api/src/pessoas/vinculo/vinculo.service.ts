@@ -24,6 +24,8 @@ import {
 } from "../validacao-pessoas.util";
 import { extrairDestino, traduzirErroPessoas } from "../pessoas-comum.util";
 import { CriarVinculoDto } from "../dto/pessoas.dto";
+import { CamposRecusadosException } from "../../common/erros/recusa-por-campo";
+import { gravarContratoNaAdmissao } from "../colaborador/contrato-admissao";
 
 /**
  * Vínculo funcional — a relação entre um Colaborador e uma Empresa. É ele que
@@ -98,6 +100,14 @@ export class VinculoService {
     const destino = extrairDestino(dto);
     assertDestinoCoerente("admissao", destino);
 
+    // T215 — como na Nova admissão: ninguém é admitido sem o primeiro
+    // salário, que abre a linha do tempo salarial do vínculo NOVO.
+    if (!dto.contrato?.salarioBruto) {
+      throw new CamposRecusadosException([
+        { campo: "contrato.salarioBruto", motivo: "obrigatorio" },
+      ]);
+    }
+
     const dataAdmissao = dataUtc(new Date(dto.dataAdmissao));
     const status: StatusMovimentacao =
       dataAdmissao > dataUtc(new Date()) ? "programada" : "solicitada";
@@ -152,6 +162,20 @@ export class VinculoService {
           "movimentacao_funcional",
           movimentacao.id,
           escopo.empresaId,
+        );
+
+        // T215 — o contrato da readmissão e a linha da admissão (tag
+        // Admissão, cargo da contratação), na MESMA transação.
+        await gravarContratoNaAdmissao(
+          tx,
+          {
+            vinculoId: vinculo.id,
+            empresaId: escopo.empresaId,
+            dataAdmissao: vinculo.dataAdmissao,
+            registradaPorUserId: ctx.actor.id,
+            cargoId: destino.cargoId,
+          },
+          dto.contrato,
         );
 
         return vinculo;

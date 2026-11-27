@@ -50,7 +50,7 @@
   min-height: var(--touch-target);
   padding: 0 var(--space-lg);
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--color-ink);
   font: inherit;

@@ -523,7 +523,23 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     const auditorias: Record<string, unknown>[] = [];
     const tx = {
       departamento: { count: jest.fn().mockResolvedValue(1) },
-      cargo: { count: jest.fn().mockResolvedValue(1) },
+      // T215 — o salário obrigatório da admissão: contrato e linha salarial.
+      cargo: {
+        count: jest.fn().mockResolvedValue(1),
+        findFirst: jest.fn().mockResolvedValue({ nome: "Cargo Sintetico" }),
+      },
+      contratoVinculo: {
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) => ({
+          ...data,
+          salarioBruto: { toFixed: () => "1621.00" },
+          pensaoAlimenticiaPercentual: null,
+          atualizadoEm: AGORA,
+          colunaFutura: "NAO_PODE_VAZAR",
+        })),
+      },
+      alteracaoSalarial: {
+        create: jest.fn().mockResolvedValue({ id: "alt-1" }),
+      },
       unidadeOrganizacional: { count: jest.fn().mockResolvedValue(1) },
       colaborador: {
         create: jest.fn().mockResolvedValue({
@@ -638,6 +654,8 @@ describe("Módulo 1 — admissão com perfil, endereço e contatos", () => {
     departamentoId: DEPARTAMENTO,
     cargoId: CARGO,
     unidadeOrganizacionalId: UNIDADE,
+    // T215 — o primeiro salário é obrigatório na admissão.
+    contrato: { salarioBruto: "1621.00" },
     perfilPessoal: {
       dataNascimento: "1990-05-20",
       sexo: "Feminino",

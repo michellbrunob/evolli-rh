@@ -107,8 +107,6 @@ export interface MeuPerfilScreenProps {
   readonly onContaAtualizada?: ((ator: SafeAccessUserApi) => void) | undefined;
   /** T209 — a conta alcança Configurações › Empresas (item na navegação). */
   readonly mostrarEmpresas?: boolean;
-  /** T211 — a conta alcança Equipe e permissões (item na navegação). */
-  readonly mostrarEquipe?: boolean;
 }
 
 /** A data (sem a hora) do instante de criação, no fuso de negócio. */
@@ -148,7 +146,6 @@ export function MeuPerfilScreen({
   conta,
   onContaAtualizada,
   mostrarEmpresas = false,
-  mostrarEquipe = false,
 }: MeuPerfilScreenProps) {
   const papel =
     conta === null ? AUSENTE : (ROTULO_PAPEL[conta.role] ?? conta.role);
@@ -474,7 +471,6 @@ export function MeuPerfilScreen({
         <NavegacaoConfiguracoes
           atual="meu-perfil"
           mostrarEmpresas={mostrarEmpresas}
-          mostrarEquipe={mostrarEquipe}
         />
 
         <section

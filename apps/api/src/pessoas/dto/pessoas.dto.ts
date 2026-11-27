@@ -5,6 +5,8 @@ import {
 } from "../dados-pessoais/dados-pessoais.dto";
 import { RegistrarContatosColaboradorDto } from "../contatos/contato-colaborador.dto";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDateString,
   IsDefined,
   IsIn,
@@ -30,14 +32,35 @@ import {
   TipoVinculo,
 } from "@prisma/client";
 import { TAMANHO_PAGINA_MAXIMO, TAMANHO_PAGINA_PADRAO } from "../pessoas.types";
-import { ContratoAdmissaoDto } from "../colaborador/contrato-admissao";
+import { ContratoAdmissaoDto, NIVEIS } from "../colaborador/contrato-admissao";
+import {
+  GENEROS,
+  type Genero,
+} from "../dados-pessoais/normalizacao-dados-pessoais.util";
+
+/** T215 — quantos valores um grupo da gaveta "Filtrar" aceita. */
+export const FILTRO_VALORES_MAXIMOS = 50;
+
+/**
+ * T215 — um grupo da gaveta "Filtrar" vem como lista: valores separados por
+ * vírgula ou o parâmetro repetido. Vazio vale como ausente.
+ */
+export function emLista(valor: unknown): unknown {
+  if (valor === undefined || valor === null || valor === "") return undefined;
+  const brutos = Array.isArray(valor) ? valor : [valor];
+  const lista = brutos
+    .flatMap((v) => (typeof v === "string" ? v.split(",") : [v]))
+    .map((v) => (typeof v === "string" ? v.trim() : v))
+    .filter((v) => v !== "");
+  return lista.length === 0 ? undefined : lista;
+}
 
 /**
  * Matrícula: identificador **funcional**, único dentro da empresa
  * (Baseline V1, item 2). Restrita a maiúsculas, dígitos, `-` e `_` — nunca
  * é, nem deriva de, documento pessoal (RI-C1).
  */
-const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
+export const MATRICULA_PATTERN = /^[A-Z0-9_-]{2,32}$/;
 
 /**
  * T209 — nome completo: até 150 caracteres e pelo menos 3 letras (qualquer
@@ -316,6 +339,18 @@ export class CriarVinculoDto extends DestinoOrganizacionalDto {
 
   @IsIn(MOTIVOS)
   motivoCodigo!: MotivoMovimentacao;
+
+  /**
+   * T215 — o contrato da readmissão, com as mesmas validações da admissão.
+   * Opcional na forma; o serviço exige o salário (422
+   * `contrato.salarioBruto` `obrigatorio`): ninguém é admitido sem o
+   * primeiro salário, que abre a linha do tempo do vínculo novo.
+   */
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ContratoAdmissaoDto)
+  contrato?: ContratoAdmissaoDto;
 }
 
 /**
@@ -448,6 +483,67 @@ export class ListarColaboradoresQueryDto extends ListarPaginadoQueryDto {
   @IsOptional()
   @IsIn(TIPOS_VINCULO)
   tipoVinculo?: TipoVinculo;
+
+  // T215 — gaveta "Filtrar": vários valores por grupo (qualquer um deles),
+  // grupos combinados (todos). Lotação e nível pela regra da T190: o MESMO
+  // vínculo ativo, na alocação aberta. Filtro, nunca concessão de escopo.
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsUUID("all", { each: true })
+  departamentos?: string[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsUUID("all", { each: true })
+  areas?: string[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsUUID("all", { each: true })
+  centrosCusto?: string[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsUUID("all", { each: true })
+  unidades?: string[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsUUID("all", { each: true })
+  cargos?: string[];
+
+  /** Nível do contrato, só os da lista fechada do cadastro (`NIVEIS`). */
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsIn(NIVEIS, { each: true })
+  niveis?: string[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsIn(TIPOS_VINCULO, { each: true })
+  tipos?: TipoVinculo[];
+
+  @Transform(({ value }) => emLista(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(FILTRO_VALORES_MAXIMOS)
+  @IsIn(GENEROS, { each: true })
+  generos?: Genero[];
 }
 
 export class ListarMovimentacoesQueryDto extends ListarPaginadoQueryDto {

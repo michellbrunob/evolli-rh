@@ -159,7 +159,7 @@
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-botao);
   background: transparent;
   color: var(--color-ink-muted);
   font-family: inherit;
@@ -239,8 +239,8 @@
   flex: 0 0 auto;
   display: inline-grid;
   place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--botao-icone);
+  height: var(--botao-icone);
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -291,11 +291,14 @@
    própria vaze a rolagem para a página inteira. Sem `max-width` (T206): o
    conteúdo ocupa a largura da coluna, e a largura que o trilho libera. */
 .app-shell__main {
+  /* T215 — o recuo do conteúdo, para quem precisa encostar na barra lateral
+     (o menu de seções e o rodapé fixo de PaginaComSecoes). */
+  --main-recuo-x: clamp(var(--space-md), 3vw, var(--space-xl));
+  --main-recuo-y: clamp(var(--space-lg), 4vw, var(--space-2xl));
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  padding: clamp(var(--space-lg), 4vw, var(--space-2xl))
-    clamp(var(--space-md), 3vw, var(--space-xl));
+  padding: var(--main-recuo-y) var(--main-recuo-x);
   outline: none; /* alvo do skip-link; foco não desenha contorno na região */
 }
 

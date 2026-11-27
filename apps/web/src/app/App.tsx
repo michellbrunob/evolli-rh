@@ -44,6 +44,10 @@
  * aba deixou de ser válida; o `AutenticacaoApp` reage limpando o estado em
  * memória e voltando ao login — mesmo caminho do logout explícito.
  *
+ * T215 — "Sessões ativas", no menu da conta, leva à página Segurança ›
+ * Sessões ativas (o mesmo `SessoesAtivasPanel`, sem "Fechar"), em vez de
+ * abrir o painel sobre a tela.
+ *
  * "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
  * "Relatórios" são os destinos cujo `h1` pode mudar sem trocar de destino
  * (cada um troca de aba local entre telas com `h1` próprio).
@@ -73,11 +77,14 @@ import { MarcaEvolli } from "./marca/MarcaEvolli";
 import { iconeDaTrilha, trilhaDoDestino } from "./trilhaDoShell";
 import { ProvedorDeTrilhaComplementar } from "./trilhaComplementar";
 import { SessoesAtivasPanel } from "./SessoesAtivasPanel";
+import {
+  PaginaDeSeguranca,
+  SEGURANCA_TITULO_ID,
+} from "../screens/seguranca/PaginaDeSeguranca";
 import { SegurancaMfaPanel } from "./SegurancaMfaPanel";
 import {
   ADMINISTRACAO_LIDERANCA_TITULO_ID,
   AdministracaoLiderancaScreen,
-  CONTAS_ACESSO_TITULO_ID,
   ContasAcessoScreen,
 } from "../screens/administracao";
 import {
@@ -88,8 +95,16 @@ import { EQUIPE_TITULO_ID, EquipeScreen } from "../screens/equipe";
 import {
   CadastrosScreen,
   ESTRUTURA_ORGANIZACIONAL_TITULO_ID,
-  JORNADAS_TRABALHO_TITULO_ID,
-  JornadasTrabalhoScreen,
+  AplicarModeloScreen,
+  MODELO_ESCALA_TITULO_ID,
+  PlanejarTransicaoScreen,
+  QUADRO_ESCALA_TITULO_ID,
+  QuadroDaEscalaScreen,
+  REGRAS_ESCALA_TITULO_ID,
+  RegrasDaEscalaScreen,
+  TRANSICAO_TITULO_ID,
+  TURNOS_TITULO_ID,
+  TurnosScreen,
 } from "../screens/horarios";
 import {
   CONFIGURACOES_TITULO_ID,
@@ -127,6 +142,16 @@ import {
   NovaAdmissaoScreen,
   PessoasScreen,
 } from "../screens/pessoas";
+import {
+  POLITICAS_FERIAS_TITULO_ID,
+  PoliticasFeriasScreen,
+} from "../screens/pessoas/ferias/politicas/PoliticasFeriasScreen";
+import { servicoDePoliticasDoServidor } from "../screens/pessoas/ferias/politicas/servicoDePoliticas";
+import {
+  BENEFICIOS_TITULO_ID,
+  BeneficiosModulo,
+} from "../screens/beneficios/BeneficiosModulo";
+import { servicoDeBeneficiosDoServidor } from "../screens/beneficios/servicoDeBeneficios";
 import type { ColaboradorApi } from "../api/colaboradoresClient";
 import { PontoScreen } from "../screens/ponto/PontoScreen";
 import { VISAO_PERIODO_TITULO_ID } from "../screens/ponto/VisaoPeriodoScreen";
@@ -158,17 +183,19 @@ import {
   podeLerSolicitacoesPessoas,
   podeOperarEstrutura,
   podeOperarJornadas,
+  podeOperarEscala,
 } from "./mapaNavegacao";
 import {
   type AbaDaFicha,
   type EstadoDaListagem,
   type OpcoesDaMudancaDaListagem,
   type RotaDaFicha,
+  type SecaoDaEdicao,
   ESTADO_INICIAL_DA_LISTAGEM,
+  edicaoAPartirDe,
+  voltarDaEdicao,
   destinoDaRota,
   ehFragmentoDeRota,
-  competenciaDoMesAtual,
-  competenciaValida,
   fichaDaRota,
   listagemDaRota,
   rotaDaFicha,
@@ -287,12 +314,21 @@ const TITULO_ID_POR_DESTINO: Record<string, string> = {
   dashboard: DASHBOARD_TITULO_ID,
   inicio: "inicio-visao-geral-titulo",
   "solicitacoes-rh": "central-solicitacoes-rh-titulo",
-  "contas-acesso": CONTAS_ACESSO_TITULO_ID,
+  // T215 — Segurança: o `h1` é o do módulo, nas duas telas.
+  seguranca: SEGURANCA_TITULO_ID,
+  "contas-acesso": SEGURANCA_TITULO_ID,
   equipe: EQUIPE_TITULO_ID,
   "administracao-lideranca": ADMINISTRACAO_LIDERANCA_TITULO_ID,
   "nova-admissao": NOVA_ADMISSAO_TITULO_ID,
   "importar-colaboradores": IMPORTAR_COLABORADORES_TITULO_ID,
-  "jornadas-trabalho": JORNADAS_TRABALHO_TITULO_ID,
+  "politicas-ferias": POLITICAS_FERIAS_TITULO_ID,
+  beneficios: BENEFICIOS_TITULO_ID,
+  // T215 — "Escala de trabalho" abre o quadro; Turnos é sub-página dele.
+  "jornadas-trabalho": QUADRO_ESCALA_TITULO_ID,
+  "turnos-escala": TURNOS_TITULO_ID,
+  "regras-escala": REGRAS_ESCALA_TITULO_ID,
+  "transicao-escala": TRANSICAO_TITULO_ID,
+  "modelo-escala": MODELO_ESCALA_TITULO_ID,
   configuracoes: CONFIGURACOES_TITULO_ID,
   "configuracoes-aparencia": APARENCIA_TITULO_ID,
   "configuracoes-empresas": EMPRESAS_TITULO_ID,
@@ -469,6 +505,14 @@ function conteudoDoDestino(
     /** T202 — outra competência da aba de ponto: o shell troca a rota. */
     readonly onTrocarCompetencia: (competencia: string) => void;
     readonly onFechar: () => void;
+    /** T215 — a página "Editar colaborador" e a troca de seção dela. */
+    readonly onAbrirEdicao: (
+      colaboradorId: string,
+      secao?: SecaoDaEdicao,
+    ) => void;
+    readonly onTrocarSecaoDaEdicao: (secao: SecaoDaEdicao) => void;
+    /** T215 — voltar da edição: à ficha de origem ou à lista. */
+    readonly onVoltarDaEdicao: () => void;
     /** T199 — o estado do dashboard de Colaboradores, guardado na URL. */
     readonly listagem: EstadoDaListagem;
     readonly onListagemChange: (
@@ -497,7 +541,7 @@ function conteudoDoDestino(
   empresas: {
     readonly podeVer: boolean;
     readonly podeAdicionar: boolean;
-    /** T211 — Configurações › Equipe e permissões (Contas de acesso). */
+    /** T215 — Segurança › Permissões de acesso (Contas de acesso). */
     readonly podeVerEquipe: boolean;
     readonly aviso: string | undefined;
     readonly onCriadaSemAbrir: (nome: string) => void;
@@ -506,6 +550,12 @@ function conteudoDoDestino(
       destino: DestinoDepoisDaEmpresa,
     ) => void;
   },
+  // T215 — o quadro da escala: a pessoa da ficha que pediu "Abrir no
+  // quadro" (uma vez) e como abri-lo a partir da ficha.
+  escala: {
+    readonly colaboradorEmFoco: string | null;
+    readonly onAbrirQuadro: () => void;
+  },
 ) {
   if (destinoId === "configuracoes") {
     return (
@@ -513,7 +563,6 @@ function conteudoDoDestino(
         conta={contaDoAtor}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -523,7 +572,6 @@ function conteudoDoDestino(
         temaAtual={contaDoAtor?.temaAparencia}
         onContaAtualizada={onContaAtualizada}
         mostrarEmpresas={empresas.podeVer}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -534,7 +582,6 @@ function conteudoDoDestino(
         podeEditar={empresas.podeAdicionar}
         onAdicionar={() => onNavegar("nova-empresa")}
         aviso={empresas.aviso}
-        mostrarEquipe={empresas.podeVerEquipe}
       />
     );
   }
@@ -574,10 +621,56 @@ function conteudoDoDestino(
     );
   }
   if (destinoId === "jornadas-trabalho") {
+    // T215 — o quadro da escala (semana e mês).
+    return (
+      <QuadroDaEscalaScreen
+        onVoltar={() => onNavegar("pessoas")}
+        onAbrirTurnos={() => onNavegar("turnos-escala")}
+        onAbrirRegras={() => onNavegar("regras-escala")}
+        {...(podeOperarEscala(admissao.papelDoAtor)
+          ? {
+              onAbrirTransicao: () => onNavegar("transicao-escala"),
+              onAbrirModelo: () => onNavegar("modelo-escala"),
+            }
+          : {})}
+        colaboradorEmFoco={escala.colaboradorEmFoco}
+        // T215 — gravar no rascunho do quadro é de RH e DP.
+        podeOperar={podeOperarEscala(admissao.papelDoAtor)}
+        nomeDaEmpresa={empresaAtiva?.nome ?? null}
+        // T215 — os avisos da CLT no arquivo exportado são só do RH.
+        podeExportarAvisos={admissao.papelDoAtor === "rh"}
+      />
+    );
+  }
+  if (destinoId === "regras-escala") {
+    return (
+      <RegrasDaEscalaScreen
+        podeOperar={podeOperarEscala(admissao.papelDoAtor)}
+        onVoltar={() => onNavegar("jornadas-trabalho")}
+        {...(podeOperarEscala(admissao.papelDoAtor)
+          ? { onAbrirTransicao: () => onNavegar("transicao-escala") }
+          : {})}
+      />
+    );
+  }
+  if (destinoId === "modelo-escala") {
+    return (
+      <AplicarModeloScreen onVoltar={() => onNavegar("jornadas-trabalho")} />
+    );
+  }
+  if (destinoId === "transicao-escala") {
+    return (
+      <PlanejarTransicaoScreen
+        onVoltar={() => onNavegar("jornadas-trabalho")}
+      />
+    );
+  }
+  if (destinoId === "turnos-escala") {
     // T182 — só o RH opera; DP e `master_tecnico` consultam.
     return (
-      <JornadasTrabalhoScreen
+      <TurnosScreen
         podeOperar={podeOperarJornadas(admissao.papelDoAtor)}
+        onVoltar={() => onNavegar("jornadas-trabalho")}
       />
     );
   }
@@ -600,6 +693,9 @@ function conteudoDoDestino(
         onTrocarAbaDaFicha={fichaDoColaborador.onTrocarAba}
         onTrocarCompetenciaDaFicha={fichaDoColaborador.onTrocarCompetencia}
         onFecharFicha={fichaDoColaborador.onFechar}
+        onAbrirEdicao={fichaDoColaborador.onAbrirEdicao}
+        onTrocarSecaoDaEdicao={fichaDoColaborador.onTrocarSecaoDaEdicao}
+        onVoltarDaEdicao={fichaDoColaborador.onVoltarDaEdicao}
         listagem={fichaDoColaborador.listagem}
         onListagemChange={fichaDoColaborador.onListagemChange}
         {...(admissao.podeAdmitir
@@ -613,8 +709,46 @@ function conteudoDoDestino(
         podeEditarFicha={podeEditarFicha(admissao.papelDoAtor)}
         // T183 — atribuir, trocar e encerrar jornada é só do RH.
         podeOperarJornada={podeOperarJornadas(admissao.papelDoAtor)}
+        // T215 — a escala (aba da ficha) é de RH e DP.
+        podeOperarEscala={podeOperarEscala(admissao.papelDoAtor)}
+        onAbrirJornadas={escala.onAbrirQuadro}
         // T203 — a aba Solicitações só existe para quem a lê (não o DP).
         podeVerSolicitacoes={podeLerSolicitacoesPessoas(admissao.papelDoAtor)}
+        // T215 — a aba Organograma da listagem abre a estrutura.
+        onAbrirOrganograma={() => onNavegar("cadastros")}
+        // T215 — a engrenagem de Férias e ausências abre as políticas.
+        {...(podeEditarFicha(admissao.papelDoAtor)
+          ? { onAbrirPoliticasDeFerias: () => onNavegar("politicas-ferias") }
+          : {})}
+      />
+    );
+  }
+  if (destinoId === "beneficios") {
+    return (
+      <BeneficiosModulo
+        servico={servicoDeBeneficiosDoServidor}
+        podeEditar={podeEditarFicha(admissao.papelDoAtor)}
+        onAbrirFicha={(colaboradorId) => {
+          window.location.hash = rotaDaFicha({
+            colaboradorId,
+            aba: "beneficios",
+          });
+        }}
+      />
+    );
+  }
+  if (destinoId === "politicas-ferias") {
+    return (
+      <PoliticasFeriasScreen
+        servico={servicoDePoliticasDoServidor}
+        podeEditar={podeEditarFicha(admissao.papelDoAtor)}
+        // Volta à aba de onde a engrenagem abriu: Férias e ausências.
+        onVoltar={() =>
+          dashboard.onAbrirListagem({
+            ...ESTADO_INICIAL_DA_LISTAGEM,
+            aba: "ferias",
+          })
+        }
       />
     );
   }
@@ -674,9 +808,30 @@ function conteudoDoDestino(
   if (destinoId === "relatorios") {
     return <RelatoriosScreen onTituloIdChange={onRelatoriosTituloIdChange} />;
   }
-  if (destinoId === "contas-acesso") {
+  if (destinoId === "seguranca") {
+    // T215 — Segurança › Sessões ativas: as sessões da própria conta.
     return (
-      <ContasAcessoScreen onSessaoAtualEncerrada={onSessaoAtualEncerrada} />
+      <PaginaDeSeguranca
+        atual="sessoes-ativas"
+        mostrarPermissoes={empresas.podeVerEquipe}
+      >
+        <SessoesAtivasPanel
+          aberto
+          onSessaoAtualEncerrada={onSessaoAtualEncerrada}
+        />
+      </PaginaDeSeguranca>
+    );
+  }
+  if (destinoId === "contas-acesso") {
+    // T215 — Segurança › Permissões de acesso (as Contas de acesso).
+    return (
+      <PaginaDeSeguranca atual="permissoes-de-acesso" mostrarPermissoes>
+        <ContasAcessoScreen
+          onSessaoAtualEncerrada={onSessaoAtualEncerrada}
+          nivelDoTitulo={2}
+          titulo="Permissões de acesso"
+        />
+      </PaginaDeSeguranca>
     );
   }
   if (destinoId === "equipe") {
@@ -943,6 +1098,9 @@ export function App({
    */
   const [ficha, setFicha] = useState<RotaDaFicha | null>(entradaDaUrl.ficha);
   // T212 — o arquivo escolhido no painel, até a página de importação o ler.
+  // T215 — quem pediu "Abrir no quadro" na ficha (o quadro mostra o
+  // departamento dessa pessoa); some ao abrir o quadro por outro caminho.
+  const [quadroEmFoco, setQuadroEmFoco] = useState<string | null>(null);
   const [arquivoParaImportar, setArquivoParaImportar] = useState<File | null>(
     null,
   );
@@ -1048,7 +1206,6 @@ export function App({
       ? destinoAtivoId
       : destinoInicialPara(papelDoAtor),
   );
-  const [sessoesAtivasAberto, setSessoesAtivasAberto] = useState(false);
   const [segurancaAberto, setSegurancaAberto] = useState(false);
   // "Cadastros", "Pessoas", "Ponto", "Documentos", "Portal do Colaborador" e
   // "Relatórios" sempre voltam à aba padrão ao serem selecionados (o wrapper
@@ -1200,13 +1357,28 @@ export function App({
     [irParaDireto],
   );
 
-  // T176/T198 — "Abrir ficha" e "Completar contatos" da Nova admissão abrem a
-  // ficha do admitido, na aba de dados.
-  const abrirAdmitido = useCallback((abertura: AberturaDoAdmitido) => {
-    setFicha({ colaboradorId: abertura.colaborador.id, aba: "dados" });
-    setFocarContatosNaFicha(abertura.foco === "contatos");
-    setDestinoAtivoId("pessoas");
-  }, []);
+  // T176/T198 — "Abrir ficha" da Nova admissão abre a ficha do admitido, na
+  // aba de dados. T215 — "Revisar contatos" abre a página Editar
+  // colaborador em Dados básicos (os contatos moram lá), voltando à ficha.
+  const abrirAdmitido = useCallback(
+    (abertura: AberturaDoAdmitido) => {
+      const ficha: RotaDaFicha = {
+        colaboradorId: abertura.colaborador.id,
+        aba: "dados",
+      };
+      setFicha(
+        abertura.foco === "contatos"
+          ? fichaParaOPapel(
+              edicaoAPartirDe(ficha, ficha.colaboradorId, "dados-basicos"),
+              papelDoAtor,
+            )
+          : ficha,
+      );
+      setFocarContatosNaFicha(false);
+      setDestinoAtivoId("pessoas");
+    },
+    [papelDoAtor],
+  );
   // T205 — trocar de ano no Dashboard é navegação: empilha uma entrada
   // (voltar e avançar percorrem os anos). Ano fora do intervalo não vira rota.
   const trocarAnoDoDashboard = useCallback((ano: number) => {
@@ -1241,50 +1413,45 @@ export function App({
   const abrirFicha = useCallback(
     (colaboradorId: string, aba: AbaDaFicha = "dados") => {
       setFocarContatosNaFicha(false);
-      setFicha(
+      setFicha(fichaParaOPapel({ colaboradorId, aba }, papelDoAtor));
+    },
+    [papelDoAtor],
+  );
+  // T215 — as abas da ficha da referência (sem ponto nem solicitações).
+  const trocarAbaDaFicha = useCallback((aba: AbaDaFicha) => {
+    setFicha((atual) => (atual ? { ...atual, aba } : atual));
+  }, []);
+  // T215 — sem a aba de ponto, não há competência na ficha.
+  const trocarCompetenciaDaFicha = useCallback((_competencia: string) => {
+    return undefined;
+  }, []);
+  const fecharFicha = useCallback(() => {
+    setFocarContatosNaFicha(false);
+    setFicha(null);
+  }, []);
+  // T215 — a página "Editar colaborador" (empilha a rota), começando em
+  // Dados básicos; quem não edita cai na ficha (`fichaParaOPapel`).
+  const abrirEdicao = useCallback(
+    (colaboradorId: string, secao: SecaoDaEdicao = "dados-basicos") => {
+      setFocarContatosNaFicha(false);
+      // T215 — aberta pela ficha, a edição volta para ela.
+      setFicha((atual) =>
         fichaParaOPapel(
-          aba === "ponto"
-            ? { colaboradorId, aba, competencia: competenciaDoMesAtual() }
-            : { colaboradorId, aba },
+          edicaoAPartirDe(atual, colaboradorId, secao),
           papelDoAtor,
         ),
       );
     },
     [papelDoAtor],
   );
-  const trocarAbaDaFicha = useCallback(
-    (aba: AbaDaFicha) => {
-      // T203 — aba que o papel não lê não é oferecida; se pedida, é ignorada.
-      if (aba === "solicitacoes" && !podeLerSolicitacoesPessoas(papelDoAtor)) {
-        return;
-      }
-      // T202 — a aba de ponto abre na última competência vista nesta ficha ou,
-      // na primeira vez, no mês corrente (P-4).
-      setFicha((atual) =>
-        atual
-          ? {
-              ...atual,
-              aba,
-              ...(aba === "ponto"
-                ? { competencia: atual.competencia ?? competenciaDoMesAtual() }
-                : {}),
-            }
-          : atual,
-      );
-    },
-    [papelDoAtor],
-  );
-  // T202 — trocar de mês é navegação: empilha uma entrada (voltar e avançar
-  // percorrem os meses). Competência fora do formato não vira rota.
-  const trocarCompetenciaDaFicha = useCallback((competencia: string) => {
-    if (!competenciaValida(competencia)) return;
-    setFicha((atual) =>
-      atual && atual.aba === "ponto" ? { ...atual, competencia } : atual,
-    );
-  }, []);
-  const fecharFicha = useCallback(() => {
+  const voltarDaPaginaDeEdicao = useCallback(() => {
     setFocarContatosNaFicha(false);
-    setFicha(null);
+    setFicha((atual) => voltarDaEdicao(atual));
+  }, []);
+  const trocarSecaoDaEdicao = useCallback((secao: SecaoDaEdicao) => {
+    setFicha((atual) =>
+      atual && atual.edicao !== undefined ? { ...atual, edicao: secao } : atual,
+    );
   }, []);
   // T177 — "Nova admissão" (T178; era "Novo colaborador"), na listagem, leva
   // à página de Nova admissão e só aparece para
@@ -1298,7 +1465,7 @@ export function App({
     "configuracoes-empresas";
   const podeAdicionarEmpresa =
     resolverEntrada("nova-empresa", papelDoAtor) === "nova-empresa";
-  // T211 — Configurações › Equipe e permissões, pela mesma regra.
+  // T215 — Segurança › Permissões de acesso, pela mesma regra.
   const podeVerEquipe =
     resolverEntrada("contas-acesso", papelDoAtor) === "contas-acesso";
   /** T209 — "Empresa X criada." ao voltar da Nova empresa sem abri-la. */
@@ -1309,6 +1476,8 @@ export function App({
     if (destinoAtivoId !== "configuracoes-empresas") {
       setAvisoDeEmpresas(undefined);
     }
+    // T215 — fora do quadro, o pedido da ficha não vale mais.
+    if (destinoAtivoId !== "jornadas-trabalho") setQuadroEmFoco(null);
   }, [destinoAtivoId]);
 
   /** O destino exibido agora — lido pelo manipulador de URL, fora do React. */
@@ -1922,11 +2091,11 @@ export function App({
               onMeuPerfil={() => irPara("configuracoes")}
               onSeguranca={() => {
                 setSegurancaAberto(true);
-                setSessoesAtivasAberto(false);
               }}
               onSessoesAtivas={() => {
-                setSessoesAtivasAberto(true);
+                // T215 — leva à página Segurança › Sessões ativas.
                 setSegurancaAberto(false);
+                irPara("seguranca");
               }}
               onSair={() => {
                 if (onLogout) {
@@ -1943,19 +2112,6 @@ export function App({
                 <SegurancaMfaPanel
                   aberto={segurancaAberto}
                   onFechar={() => setSegurancaAberto(false)}
-                  onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
-                />
-              </div>
-            ) : null}
-
-            {onLogout && sessoesAtivasAberto ? (
-              <div
-                className="app-shell__sessoes-ativas-wrapper"
-                {...(gavetaModal ? FUNDO_INERTE : {})}
-              >
-                <SessoesAtivasPanel
-                  aberto={sessoesAtivasAberto}
-                  onFechar={() => setSessoesAtivasAberto(false)}
                   onSessaoAtualEncerrada={() => onSessaoAtualEncerrada?.()}
                 />
               </div>
@@ -1998,6 +2154,9 @@ export function App({
                   onTrocarAba: trocarAbaDaFicha,
                   onTrocarCompetencia: trocarCompetenciaDaFicha,
                   onFechar: fecharFicha,
+                  onAbrirEdicao: abrirEdicao,
+                  onVoltarDaEdicao: voltarDaPaginaDeEdicao,
+                  onTrocarSecaoDaEdicao: trocarSecaoDaEdicao,
                   listagem,
                   onListagemChange: mudarListagem,
                 },
@@ -2023,6 +2182,13 @@ export function App({
                   },
                   onEmpresaAberta: (empresa, destino) =>
                     onEmpresaTrocada?.(empresa, destino),
+                },
+                {
+                  colaboradorEmFoco: quadroEmFoco,
+                  onAbrirQuadro: () => {
+                    setQuadroEmFoco(ficha?.colaboradorId ?? null);
+                    irPara("jornadas-trabalho");
+                  },
                 },
               )}
             </main>

@@ -1,7 +1,20 @@
+export { TURNOS_TITULO_ID, TurnosScreen } from "./turnos/TurnosScreen";
 export {
-  JORNADAS_TRABALHO_TITULO_ID,
-  JornadasTrabalhoScreen,
-} from "./JornadasTrabalhoScreen";
+  QUADRO_ESCALA_TITULO_ID,
+  QuadroDaEscalaScreen,
+} from "./quadro/QuadroDaEscalaScreen";
+export {
+  REGRAS_ESCALA_TITULO_ID,
+  RegrasDaEscalaScreen,
+} from "./quadro/RegrasDaEscalaScreen";
+export {
+  TRANSICAO_TITULO_ID,
+  PlanejarTransicaoScreen,
+} from "./quadro/PlanejarTransicaoScreen";
+export {
+  AplicarModeloScreen,
+  MODELO_ESCALA_TITULO_ID,
+} from "./quadro/AplicarModeloScreen";
 export {
   CALENDARIO_FERIADOS_TITULO_ID,
   CalendarioFeriadosScreen,

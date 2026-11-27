@@ -145,6 +145,71 @@ export const DADOS_PESSOAIS_RESOURCES = ["dados_pessoais_colaborador"] as const;
 export type DadosPessoaisResource = (typeof DADOS_PESSOAIS_RESOURCES)[number];
 
 /**
+ * T215 — contrato do vínculo na edição do colaborador (nível, gestor direto,
+ * jornada semanal, escala, salário bruto, conselho e registro, dependentes
+ * para IRRF, pensão e a matrícula). Recurso próprio porque a matriz é outra:
+ * o salário é dado sensível, e nem o ramo de pessoas (que o gestor alcança
+ * pela equipe) nem o de dados pessoais devem estendê-lo por herança. `rh` e
+ * `dp` leem e editam na empresa ativa; o `master_tecnico` só lê; os demais
+ * papéis são negados.
+ */
+export const CONTRATO_RESOURCES = ["contrato_vinculo"] as const;
+
+export type ContratoResource = (typeof CONTRATO_RESOURCES)[number];
+
+/**
+ * T215 — Férias e ausências: a lista, o saldo e a simulação (`read`), o
+ * registro (`create`) e as decisões (`alter`: aprovar, recusar,
+ * cancelar). `rh` e `dp` fazem tudo na empresa ativa; o `master_tecnico`
+ * só lê, com empresa ativa; os demais papéis são negados (gestor e portal
+ * entram numa fatia futura).
+ */
+// T215 — `anexo_ausencia`: o arquivo (atestado ou documento) da ausência,
+// com a proteção reforçada dos documentos sensíveis (só RH e DP).
+export const AUSENCIA_RESOURCES = ["ausencia", "anexo_ausencia"] as const;
+
+export type AusenciaResource = (typeof AUSENCIA_RESOURCES)[number];
+
+/**
+ * T215 — escala do colaborador (aba Escala da ficha): o padrão de escala com
+ * vigência. Mesma matriz das ausências: `rh` e `dp` leem (`read`), definem
+ * (`create`) e encerram (`alter`) na empresa ativa; o `master_tecnico` só
+ * lê, com empresa ativa; os demais papéis são negados.
+ */
+export const ESCALA_RESOURCES = ["escala_colaborador"] as const;
+
+export type EscalaResource = (typeof ESCALA_RESOURCES)[number];
+
+/**
+ * T215 — Benefícios (módulo e aba da ficha) e dependentes do colaborador.
+ * Mesma matriz das ausências: `rh` e `dp` leem e operam na empresa ativa;
+ * o `master_tecnico` só lê; os demais papéis são negados.
+ */
+export const BENEFICIO_RESOURCES = ["beneficio", "dependente"] as const;
+
+export type BeneficioResource = (typeof BENEFICIO_RESOURCES)[number];
+
+/**
+ * T213 — documentos do colaborador com ARQUIVO real (ADR 0021), separados dos
+ * metadados da Etapa 2 (`documento_metadado`):
+ *
+ * - `documento_colaborador`: a lista e o estado (`read`), enviar (`create`) e
+ *   trocar, remover ou verificar de novo (`alter`);
+ * - `conteudo_documento_colaborador`: baixar o arquivo (`read`) — decisão
+ *   distinta da lista (DP-2E-13, conteúdo).
+ *
+ * `rh` e `dp` fazem tudo na empresa ativa; o `master_tecnico` só vê a lista
+ * e o estado, nunca o conteúdo; os demais papéis são negados.
+ */
+export const DOCUMENTOS_COLABORADOR_RESOURCES = [
+  "documento_colaborador",
+  "conteudo_documento_colaborador",
+] as const;
+
+export type DocumentosColaboradorResource =
+  (typeof DOCUMENTOS_COLABORADOR_RESOURCES)[number];
+
+/**
  * Recursos/ações desta fatia (matriz §3 da spec). Módulos futuros (Etapa 1+)
  * estendem este union — nunca reduzem o que já está aqui.
  */
@@ -166,7 +231,12 @@ export type AuthorizationResource =
   | SolicitacoesPessoasResource
   | GestorResource
   | ContatosResource
-  | DadosPessoaisResource;
+  | DadosPessoaisResource
+  | DocumentosColaboradorResource
+  | ContratoResource
+  | AusenciaResource
+  | EscalaResource
+  | BeneficioResource;
 
 export type AuthorizationAction =
   | "read"
@@ -245,6 +315,38 @@ export function isContatosResource(
   resource: AuthorizationResource,
 ): resource is ContatosResource {
   return (CONTATOS_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isDocumentosColaboradorResource(
+  resource: AuthorizationResource,
+): resource is DocumentosColaboradorResource {
+  return (DOCUMENTOS_COLABORADOR_RESOURCES as readonly string[]).includes(
+    resource,
+  );
+}
+
+export function isEscalaResource(
+  resource: AuthorizationResource,
+): resource is EscalaResource {
+  return (ESCALA_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isBeneficioResource(
+  resource: AuthorizationResource,
+): resource is BeneficioResource {
+  return (BENEFICIO_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isAusenciaResource(
+  resource: AuthorizationResource,
+): resource is AusenciaResource {
+  return (AUSENCIA_RESOURCES as readonly string[]).includes(resource);
+}
+
+export function isContratoResource(
+  resource: AuthorizationResource,
+): resource is ContratoResource {
+  return (CONTRATO_RESOURCES as readonly string[]).includes(resource);
 }
 
 export function isDadosPessoaisResource(
