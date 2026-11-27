@@ -15,6 +15,7 @@ import {
   type PlanoDoLote,
   trocarTurno,
 } from "./acoesEmMassa";
+import { LoteDoRascunhoError, mensagemDoLote } from "./loteDoRascunho";
 
 const LETRAS = [
   { n: 1, letra: "S", nome: "Segunda" },
@@ -69,6 +70,11 @@ function Rodape({
 }
 
 const FALHA = "Não foi possível gravar no rascunho. Tente de novo.";
+
+/** T215 — a falha do lote diz se o rascunho ficou como antes ou não. */
+function falhaDoLote(e: unknown): string {
+  return e instanceof LoteDoRascunhoError ? mensagemDoLote(e) : FALHA;
+}
 
 /** "Trocar turno de N pessoa(s)". */
 export function DialogoTrocarTurno({
@@ -164,8 +170,8 @@ export function DialogoTrocarTurno({
     setErro(null);
     try {
       await onAplicar(resultado.plano, doIntervalo, turno);
-    } catch {
-      setErro(FALHA);
+    } catch (e) {
+      setErro(falhaDoLote(e));
       setEnviando(false);
     }
   };
@@ -334,8 +340,8 @@ export function DialogoDarFolga({
     setErro(null);
     try {
       await onAplicar(dia, tipo);
-    } catch {
-      setErro(FALHA);
+    } catch (e) {
+      setErro(falhaDoLote(e));
       setEnviando(false);
     }
   };
@@ -417,8 +423,8 @@ export function DialogoRepetir({
     setErro(null);
     try {
       await onAplicar(ate);
-    } catch {
-      setErro(FALHA);
+    } catch (e) {
+      setErro(falhaDoLote(e));
       setEnviando(false);
     }
   };

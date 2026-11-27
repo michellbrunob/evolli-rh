@@ -9,11 +9,14 @@ import {
   type GravarDiaDto,
   type PessoaDoQuadroApi,
   consultarQuadro,
-  gravarDias,
-  limparDias,
 } from "../../../api/escalaClient";
 import { somarDias } from "../../pessoas/ficha/escala/calendarioDaEscala";
-import { type PlanoDoLote, valorDaCelula } from "./acoesEmMassa";
+import {
+  type PlanoDoLote,
+  rascunhosPorChave,
+  valorDaCelula,
+} from "./acoesEmMassa";
+import { aplicarLoteNoRascunho } from "./loteDoRascunho";
 import { ausenciaDoDia } from "./ausenciasDoQuadro";
 import { celulaDoDia, diaGravado, diasDoPeriodo } from "./quadroDaEscala";
 
@@ -60,7 +63,7 @@ export async function refazerRascunhoDoQuadro(
   const p = quadro.pessoas.find((x) => x.colaboradorId === colaboradorId);
   if (!p) return 0;
   const plano = planoDeRefazer(p, diasDoPeriodo(inicio, fim));
-  if (plano.gravar.length > 0) await gravarDias(plano.gravar);
-  if (plano.limpar.length > 0) await limparDias(plano.limpar);
+  // T215 — tudo ou nada no rascunho (envios de cem dias, com volta).
+  await aplicarLoteNoRascunho(plano, rascunhosPorChave([p]));
   return plano.gravar.length + plano.limpar.length;
 }

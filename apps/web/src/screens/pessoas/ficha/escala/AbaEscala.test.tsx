@@ -224,8 +224,29 @@ describe("T215 — aba Escala (desenho da referência)", () => {
     // T215 — sem jornada no contrato, vale o limite legal da data (44 h).
     expect(atual).toHaveTextContent("44 h");
     expect(atual).toHaveTextContent("por semana");
-    expect(atual).toHaveTextContent("19 dias");
-    expect(atual).toHaveTextContent("de benefício em nov.");
+    // Sem o número do servidor, a aba não inventa os dias do mês.
+    expect(atual).not.toHaveTextContent("de benefício");
+    expect(atual).not.toHaveTextContent("de trabalho em");
+  });
+
+  it("dias de trabalho do mês: o número do servidor (a conta dos benefícios), não um cálculo da tela", async () => {
+    const servico = {
+      ...servicoCom([escala("e1", "5x2", "2026-02-02", null)]),
+      diasDeTrabalho: vi.fn().mockResolvedValue({
+        colaboradorId: COLAB,
+        mes: "2026-11",
+        dias: 16,
+        origem: "escala",
+      }),
+    };
+    montar(servico);
+    const atual = await screen.findByRole("region", { name: "Escala atual" });
+    await waitFor(() => expect(atual).toHaveTextContent("16 dias"));
+    expect(atual).toHaveTextContent("de trabalho em nov.");
+    // O 5x2 pela tela daria 19 (dias úteis): não aparece.
+    expect(atual).not.toHaveTextContent("19 dias");
+    expect(atual).not.toHaveTextContent("de benefício");
+    expect(servico.diasDeTrabalho).toHaveBeenCalledWith(COLAB, "2026-11");
   });
 
   it("Próximos 7 dias: hoje, amanhã, os dias da semana, folga e DSR, não publicado", async () => {
@@ -431,8 +452,8 @@ describe("T215 — aba Escala (desenho da referência)", () => {
       expect(m).toHaveTextContent("Escala");
       expect(m).toHaveTextContent("Horas por semana");
       expect(m).toHaveTextContent("40 h");
-      expect(m).toHaveTextContent("Benefício em nov.");
-      expect(m).toHaveTextContent("19 dias");
+      // Os dias de benefício são do servidor: a gaveta não os promete.
+      expect(m).not.toHaveTextContent("Benefício");
     });
 
     it("com a escala do cadastro: ela vem escolhida e sai do O que muda", async () => {
@@ -443,7 +464,7 @@ describe("T215 — aba Escala (desenho da referência)", () => {
         within(muda(g))
           .getAllByRole("term")
           .map((t) => t.textContent),
-      ).toEqual(["Turno", "Horas por semana", "Benefício em nov."]);
+      ).toEqual(["Turno", "Horas por semana"]);
     });
 
     it("lista de escalas agrupada, com descrição e ✓ na escolhida", async () => {
@@ -486,7 +507,12 @@ describe("T215 — aba Escala (desenho da referência)", () => {
       expect(gatilho(g, "Turno da noite")).toHaveTextContent(
         "Mesmo turno em todos os plantões",
       );
-      expect(g).toHaveTextContent("Um mês de dia, o seguinte de noite");
+      // T215 — a jornada não aceita turno que passa da meia-noite: a ajuda
+      // não promete plantão noturno pelo turno.
+      expect(g).toHaveTextContent(
+        "Os turnos terminam no mesmo dia (até 23:59): plantão que passa da meia-noite vai no quadro, dia a dia.",
+      );
+      expect(g).not.toHaveTextContent("o seguinte de noite");
       expect(muda(g)).toHaveTextContent("28 h");
       await escolher(g, "Turno da noite", /^Estágio/);
       expect(muda(g)).toHaveTextContent("22 h 23");
@@ -692,17 +718,24 @@ describe("T215 — Escala atual e gaveta como na referência (regras e explicaç
     expect(indicador("44 h")).toHaveAccessibleDescription(
       "Jornada por semana Pela jornada do contrato e pela data (EC 141/2026): vale o menor limite.",
     );
-    expect(indicador("26 dias")).toHaveAccessibleDescription(
-      "26 dias de benefício em novembro Pelo catálogo (6x1).",
-    );
+    expect(screen.queryByText("26 dias")).toBeNull();
     expect(indicador("Matriz Sintética")).toHaveTextContent("local");
   });
 
-  it("5x2: benefício pelos dias úteis; sem contrato vale o limite legal da data", async () => {
-    montar(servicoCom([escala("e1", "5x2", "2026-02-02", null)]));
+  it("dias de trabalho com a explicação do servidor; sem contrato vale o limite legal da data", async () => {
+    montar({
+      ...servicoCom([escala("e1", "5x2", "2026-02-02", null)]),
+      diasDeTrabalho: vi.fn().mockResolvedValue({
+        colaboradorId: COLAB,
+        mes: "2026-11",
+        dias: 1,
+        origem: "catalogo",
+      }),
+    });
     await screen.findByRole("region", { name: "Escala atual" });
-    expect(indicador("19 dias")).toHaveAccessibleDescription(
-      "19 dias de benefício em novembro Pelos dias úteis do mês (sem escala no catálogo).",
+    expect(await screen.findByText("1 dia", { selector: "dd" })).toBeTruthy();
+    expect(indicador("1 dia")).toHaveAccessibleDescription(
+      "1 dia de trabalho em novembro Sem padrão nem dias publicados no mês: pela escala do cadastro. É a base dos benefícios pagos pela escala; os pagos por dia útil seguem o calendário.",
     );
     // O card não soma o turno (5 × 8 h): sem contrato, vale o limite da data.
     expect(indicador("44 h")).toHaveTextContent("por semana");
@@ -783,7 +816,7 @@ describe("T215 — refazer o rascunho do quadro", () => {
     });
     expect(opcao).toBeChecked();
     expect(opcao).toHaveAccessibleDescription(
-      "Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam quando a escala for publicada.",
+      "Dias com férias ou ausência aprovada não mudam. Nos benefícios, valem os dias publicados e, nos ainda não publicados, o padrão; o rascunho só conta depois de publicado.",
     );
     expect(muda(g)).toHaveTextContent(
       "Rascunho do quadro—› passa a 28 dias refeitos",

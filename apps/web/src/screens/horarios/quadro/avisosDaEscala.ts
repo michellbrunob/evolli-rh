@@ -125,7 +125,8 @@ function turnoDeNoite(trechos: readonly [number, number][]): boolean {
 
 /**
  * O feriado do dia para a pessoa: nacional, estadual (do estado da empresa)
- * ou local da unidade dela.
+ * ou municipal da unidade dela. T215 — ponto facultativo não é feriado (não
+ * gera aviso de trabalho no feriado nem tira o dia útil dos benefícios).
  */
 export function feriadoDaPessoa(
   p: PessoaDoQuadroApi,
@@ -137,6 +138,7 @@ export function feriadoDaPessoa(
   const local = regras?.feriados.find(
     (f) =>
       f.data === dia &&
+      f.tipo !== "ponto_facultativo" &&
       (f.unidadeIds.length === 0 ||
         (p.unidade !== null && f.unidadeIds.includes(p.unidade.id))),
   );

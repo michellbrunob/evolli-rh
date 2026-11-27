@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DiaGravadoApi } from "../../../api/escalaClient";
-import { pessoa } from "./fixturasDoQuadro";
-import { periodosDaPublicacao, resumoDaPublicacao } from "./publicacaoDaEscala";
+import { escala, pessoa } from "./fixturasDoQuadro";
+import {
+  padraoParaPublicar,
+  periodosDaPublicacao,
+  resumoDaPublicacao,
+} from "./publicacaoDaEscala";
+import { diasDoPeriodo } from "./quadroDaEscala";
 
 function dia(
   d: string,
@@ -63,6 +68,33 @@ describe("T215 — publicar: resumo e períodos", () => {
       removidas: 0,
       pessoas: 1,
     });
+  });
+
+  it("dias do padrão ainda não publicados entram como novos (a mesma regra do servidor)", () => {
+    const comPadrao = pessoa("Caio", {
+      colaboradorId: "c",
+      dataAdmissao: "2026-11-24",
+      escalas: [escala()],
+      dias: [dia("2026-11-25", "publicado", "trabalho")],
+    });
+    // 23: antes da admissão; 25: já publicado; 24, 26–29: do padrão.
+    expect(padraoParaPublicar(comPadrao, "2026-11-23")).toBe(false);
+    expect(padraoParaPublicar(comPadrao, "2026-11-25")).toBe(false);
+    expect(padraoParaPublicar(comPadrao, "2026-11-28")).toBe(true); // sábado: folga
+    const semana = new Set(diasDoPeriodo("2026-11-23", "2026-11-29"));
+    expect(resumoDaPublicacao([comPadrao], semana)).toEqual({
+      novas: 5,
+      alteradas: 0,
+      removidas: 0,
+      pessoas: 1,
+    });
+    // Trabalho sem turno fixo não tem forma de dia gravado: fica no padrão.
+    const semTurno = pessoa("Dora", {
+      colaboradorId: "d",
+      escalas: [escala({ turno: null })],
+    });
+    expect(padraoParaPublicar(semTurno, "2026-11-23")).toBe(false);
+    expect(padraoParaPublicar(semTurno, "2026-11-29")).toBe(true);
   });
 
   it("semana: a semana, o mês e 4 semanas; mês: o mês e 4 semanas", () => {

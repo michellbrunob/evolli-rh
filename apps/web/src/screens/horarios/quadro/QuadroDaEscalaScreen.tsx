@@ -99,6 +99,11 @@ import {
 } from "./MenuDaCelula";
 import { type FocoDoPainel, PainelDoDia } from "./PainelDoDia";
 import { DialogoPublicar } from "./DialogoPublicar";
+import {
+  LoteDoRascunhoError,
+  aplicarLoteNoRascunho,
+  mensagemDoLote,
+} from "./loteDoRascunho";
 import { PainelDeAvisos } from "./PainelDeAvisos";
 import { DialogoExportar } from "./DialogoExportar";
 import { lerAvisoDoQuadro, pedirModelo } from "./aplicarModelo";
@@ -157,6 +162,7 @@ import {
   diasDoPeriodo,
   faixaDosPeriodos,
   iniciais,
+  juntarPessoaDoPeriodo,
   metaDoPeriodo,
   nomeDosGrupos,
   ordenar,
@@ -217,32 +223,19 @@ export interface QuadroDaEscalaScreenProps {
 
 /**
  * As pessoas com os dias de outro período (em consultas de até 42 dias),
- * juntando padrões e dias gravados de cada uma.
+ * juntando padrões, dias gravados e ausências de cada uma.
  */
-async function pessoasDoPeriodo(
+export async function pessoasDoPeriodo(
   de: string,
   ate: string,
+  consultar: typeof consultarQuadro = consultarQuadro,
 ): Promise<Map<string, PessoaDoQuadroApi>> {
   const m = new Map<string, PessoaDoQuadroApi>();
   for (let i = de; i <= ate;) {
     const f = [ate, somarDiasLocal(i, 41)].sort()[0]!;
-    const q = await consultarQuadro(i, f);
+    const q = await consultar(i, f);
     for (const p of q.pessoas) {
-      const atual = m.get(p.colaboradorId);
-      if (!atual) {
-        m.set(p.colaboradorId, { ...p, dias: [...(p.dias ?? [])] });
-        continue;
-      }
-      const escalas = [...atual.escalas];
-      for (const e of p.escalas) {
-        if (!escalas.some((x) => x.id === e.id)) escalas.push(e);
-      }
-      escalas.sort((a, b) => b.vigenciaInicio.localeCompare(a.vigenciaInicio));
-      m.set(p.colaboradorId, {
-        ...atual,
-        escalas,
-        dias: [...(atual.dias ?? []), ...(p.dias ?? [])],
-      });
+      m.set(p.colaboradorId, juntarPessoaDoPeriodo(m.get(p.colaboradorId), p));
     }
     i = somarDiasLocal(f, 1);
   }
@@ -613,6 +606,11 @@ export function QuadroDaEscalaScreen({
   const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  // T215 — trocar o filtro ou a busca limpa a seleção: as ações em massa
+  // nunca alcançam quem saiu da tela.
+  useEffect(() => {
+    setSelecionados((atual) => (atual.size === 0 ? atual : new Set()));
+  }, [filtros, busca]);
   const [dialogo, setDialogo] = useState<
     | { tipo: "trocar"; alvo: "selecao" }
     | { tipo: "folga"; alvo: "selecao" }
@@ -727,8 +725,16 @@ export function QuadroDaEscalaScreen({
       setAviso({ id: Date.now(), titulo: semMudanca });
       return;
     }
-    if (limpar.length > 0) await limparDias(limpar);
-    if (plano.gravar.length > 0) await gravarDias(plano.gravar);
+    // T215 — tudo ou nada: se um envio falha, o que já foi gravado é
+    // desfeito; se nem isso der, o quadro recarrega para mostrar o que ficou.
+    try {
+      await aplicarLoteNoRascunho(efetivo, anteriores);
+    } catch (erro) {
+      if (erro instanceof LoteDoRascunhoError && !erro.desfeito) {
+        setTentativa((n) => n + 1);
+      }
+      throw erro;
+    }
     setTentativa((n) => n + 1);
     const volta = planoParaDesfazer(efetivo, anteriores);
     setAviso({
@@ -745,7 +751,10 @@ export function QuadroDaEscalaScreen({
               setTentativa((n) => n + 1);
               setAviso({ id: Date.now(), titulo: "Ação desfeita" });
             } catch {
-              setFalha("Não foi possível desfazer. Tente de novo.");
+              setTentativa((n) => n + 1);
+              setFalha(
+                "Não foi possível desfazer tudo. Confira o rascunho no quadro e tente de novo.",
+              );
             }
           })(),
       },
@@ -830,8 +839,12 @@ export function QuadroDaEscalaScreen({
     setFalha(null);
     try {
       await acao();
-    } catch {
-      setFalha("Não foi possível gravar o dia. Tente de novo.");
+    } catch (erro) {
+      setFalha(
+        erro instanceof LoteDoRascunhoError
+          ? mensagemDoLote(erro)
+          : "Não foi possível gravar o dia. Tente de novo.",
+      );
     }
   };
 
@@ -1071,6 +1084,11 @@ export function QuadroDaEscalaScreen({
     () => buscar(filtrar(todas, filtros, contextoDoFiltro), busca),
     [todas, filtros, contextoDoFiltro, busca],
   );
+  /** Selecionadas E visíveis: as ações em massa valem só para elas. */
+  const selecionadas = useMemo(
+    () => filtradas.filter((p) => selecionados.has(p.colaboradorId)),
+    [filtradas, selecionados],
+  );
   const aplicados = useMemo(
     () => filtrosAplicados(todas, filtros, contextoDoFiltro, ROTULOS),
     [todas, filtros, contextoDoFiltro],
@@ -1182,8 +1200,11 @@ export function QuadroDaEscalaScreen({
     (t, p) => t + (p.dias ?? []).filter((d) => d.camada === "rascunho").length,
     0,
   );
-  // O que publicar leva: dias do rascunho, novos ou sobre um publicado.
+  // O que publicar leva: dias do rascunho, novos ou sobre um publicado, e
+  // (T215) os dias do padrão ainda não publicados.
   const resumoDoQuadro = resumoDaPublicacao(todas, new Set(dias));
+  const paraPublicar =
+    resumoDoQuadro.novas + resumoDoQuadro.alteradas + resumoDoQuadro.removidas;
   const publicacao =
     carga.estado === "pronto" ? (carga.dados.publicacao ?? null) : null;
   const primeiraCelula = daPagina[0]
@@ -1205,7 +1226,7 @@ export function QuadroDaEscalaScreen({
     if (!onAbrirModelo) return;
     pedirModelo({
       doFiltro: filtrando ? filtradas.map((p) => p.colaboradorId) : null,
-      selecionadas: comSelecao ? [...selecionados] : [],
+      selecionadas: comSelecao ? selecionadas.map((p) => p.colaboradorId) : [],
     });
     onAbrirModelo();
   };
@@ -1489,12 +1510,12 @@ export function QuadroDaEscalaScreen({
                 <Button
                   type="button"
                   variant="primary"
-                  aria-disabled={mudancas === 0}
+                  aria-disabled={paraPublicar === 0}
                   aria-describedby={
-                    mudancas === 0 ? "quadro-nada-para-publicar" : undefined
+                    paraPublicar === 0 ? "quadro-nada-para-publicar" : undefined
                   }
                   onClick={() => {
-                    if (mudancas > 0) setPublicando(true);
+                    if (paraPublicar > 0) setPublicando(true);
                   }}
                 >
                   {publicacao && mudancas > 0
@@ -1502,7 +1523,7 @@ export function QuadroDaEscalaScreen({
                     : "Publicar"}
                 </Button>
               ) : null}
-              {podeOperar && mudancas === 0 ? (
+              {podeOperar && paraPublicar === 0 ? (
                 <span id="quadro-nada-para-publicar" className="sr-only">
                   Nada para publicar neste período.
                 </span>
@@ -2148,15 +2169,15 @@ export function QuadroDaEscalaScreen({
             }}
           />
         ) : null}
-        {podeOperar && selecionados.size > 0 ? (
+        {podeOperar && selecionadas.length > 0 ? (
           <div
             role="toolbar"
             aria-label="Ações para as pessoas selecionadas"
             className="quadro__barra-selecao"
           >
             <span className="quadro__selecionadas" aria-live="polite">
-              <strong>{selecionados.size}</strong>
-              {selecionados.size === 1
+              <strong>{selecionadas.length}</strong>
+              {selecionadas.length === 1
                 ? " pessoa selecionada"
                 : " pessoas selecionadas"}
             </span>
@@ -2192,11 +2213,7 @@ export function QuadroDaEscalaScreen({
                 type="button"
                 variant="secondary"
                 onClick={() =>
-                  void tentar(() =>
-                    copiarSemanaAnterior(
-                      todas.filter((p) => selecionados.has(p.colaboradorId)),
-                    ),
-                  )
+                  void tentar(() => copiarSemanaAnterior(selecionadas))
                 }
               >
                 <IconeCopiar tamanho={16} />
@@ -2264,11 +2281,7 @@ export function QuadroDaEscalaScreen({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  disabled={
-                    rascunhosDe(
-                      todas.filter((p) => selecionados.has(p.colaboradorId)),
-                    ).length === 0
-                  }
+                  disabled={rascunhosDe(selecionadas).length === 0}
                   onSelect={() =>
                     setDialogo({ tipo: "limpar", alvo: "selecao" })
                   }
@@ -2297,7 +2310,7 @@ export function QuadroDaEscalaScreen({
           </div>
         ) : null}
         {(() => {
-          const sel = todas.filter((p) => selecionados.has(p.colaboradorId));
+          const sel = selecionadas;
           if (dialogo?.tipo === "trocar") {
             return (
               <DialogoTrocarTurno
@@ -2388,7 +2401,7 @@ export function QuadroDaEscalaScreen({
                 semanaComeca={semanaComeca}
                 doFiltro={filtradas}
                 {...(dialogo.selecao
-                  ? { selecionadas: [...selecionados] }
+                  ? { selecionadas: selecionadas.map((p) => p.colaboradorId) }
                   : {})}
                 cadaUma={dialogo.cadaUma ?? false}
                 regras={regras}
@@ -2428,7 +2441,7 @@ export function QuadroDaEscalaScreen({
           <PainelDeAvisos
             titulo={
               vendoAvisos === "selecao"
-                ? `Avisos de ${plural(selecionados.size, "pessoa", "pessoas")}`
+                ? `Avisos de ${plural(selecionadas.length, "pessoa", "pessoas")}`
                 : visao === "semana"
                   ? "Avisos da semana"
                   : "Avisos do mês"

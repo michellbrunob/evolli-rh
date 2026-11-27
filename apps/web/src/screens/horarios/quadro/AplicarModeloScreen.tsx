@@ -19,7 +19,6 @@ import {
   consultarQuadro,
   consultarRegras,
   definirEscala,
-  gravarDias,
 } from "../../../api/escalaClient";
 import {
   type TabelaHorarioApi,
@@ -56,7 +55,13 @@ import {
   modeloDe,
   temCiclo,
 } from "../../pessoas/ficha/escala/modelosDeEscala";
+import { rascunhosPorChave } from "./acoesEmMassa";
 import { calcularAvisos } from "./avisosDaEscala";
+import {
+  LoteDoRascunhoError,
+  aplicarLoteNoRascunho,
+  mensagemDoLote,
+} from "./loteDoRascunho";
 import {
   DIAS_SUGERIDOS,
   type DistribuicaoDaFolga,
@@ -118,6 +123,10 @@ const TITULOS_DAS_ETAPAS = [
 
 /** O quadro aceita até 42 dias por consulta: períodos maiores vão em partes. */
 const DIAS_POR_CONSULTA = 42;
+
+/** T215 — o padrão de escala guarda um turno só: aí, o fim é obrigatório. */
+const SEM_FIM_COM_TURNO_POR_DIA =
+  "Com um turno diferente em cada dia, informe a data de fim: o padrão de escala da pessoa guarda um turno só.";
 
 async function consultarPessoas(
   inicio: string,
@@ -343,6 +352,11 @@ export function AplicarModeloScreen({
   const turnoBase = usaPorDia
     ? (turnoPorDia?.values().next().value ?? null)
     : turno;
+  // T215 — o padrão de escala da pessoa guarda UM turno: com turnos
+  // diferentes por dia, "Sem data de fim" gravaria só o do 1º dia.
+  const turnosDiferentesPorDia =
+    usaPorDia &&
+    new Set([...(turnoPorDia?.values() ?? [])].map((t) => t.id)).size > 1;
 
   const o: OpcoesDoModelo | null =
     modelo && inicio
@@ -413,6 +427,7 @@ export function AplicarModeloScreen({
     }
     if (atual === 3) {
       if (!inicio) return "Informe quando o modelo começa.";
+      if (semFim && turnosDiferentesPorDia) return SEM_FIM_COM_TURNO_POR_DIA;
       if (!semFim && (!fim || fim < inicio))
         return "O fim precisa ser no início ou depois dele.";
       if (!semFim && fim > somarDias(inicio, 365))
@@ -457,7 +472,11 @@ export function AplicarModeloScreen({
           }
         }
       }
-      await gravarDias(plano.gravar);
+      // T215 — tudo ou nada no rascunho (envios de cem dias, com volta).
+      await aplicarLoteNoRascunho(
+        { gravar: plano.gravar, limpar: [] },
+        rascunhosPorChave(comDias),
+      );
       avisarNoQuadro(
         `Modelo aplicado: ${plural(plano.gravar.length, "célula", "células")} no rascunho para ${plural(comDias.length, "pessoa", "pessoas")}` +
           (falhas.length > 0
@@ -465,9 +484,11 @@ export function AplicarModeloScreen({
             : "."),
       );
       setConcluido(true);
-    } catch {
+    } catch (erro) {
       setMensagem(
-        "Não foi possível aplicar o modelo. Nada foi publicado; tente de novo.",
+        erro instanceof LoteDoRascunhoError && !erro.desfeito
+          ? `Não foi possível aplicar o modelo. ${mensagemDoLote(erro)}`
+          : "Não foi possível aplicar o modelo. Nada mudou no rascunho e nada foi publicado; tente de novo.",
       );
       setEnviando(false);
     }
@@ -926,7 +947,11 @@ export function AplicarModeloScreen({
                   marcada={semFim}
                   onMarcar={() => setSemFim(true)}
                   titulo="Sem data de fim"
-                  texto={`Vira o padrão de cada pessoa e o quadro segue sozinho. A escala do cadastro muda para ${m.nome} a partir de ${diaMesCurto(inicio)}.`}
+                  texto={
+                    turnosDiferentesPorDia
+                      ? SEM_FIM_COM_TURNO_POR_DIA
+                      : `O padrão de escala de cada pessoa passa a ser ${m.nome} a partir de ${diaMesCurto(inicio)} e o quadro segue sozinho. A escala do contrato não muda.`
+                  }
                 />
               </div>
             </LinhaDoCadastro>

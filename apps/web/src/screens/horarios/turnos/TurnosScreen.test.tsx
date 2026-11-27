@@ -279,6 +279,32 @@ describe("T215 — Turnos (tela)", () => {
       ).toBeInTheDocument();
     });
 
+    it("turno que passa da meia-noite: recusado com o caminho (o quadro, dia a dia), sem prometer turno da noite", async () => {
+      const s = await abrir();
+      expect(
+        screen.getByRole("textbox", { name: /^Nome do turno/ }),
+      ).toHaveAttribute("placeholder", "Ex.: Manhã, Comercial");
+      fireEvent.change(
+        screen.getByRole("textbox", { name: /^Nome do turno/ }),
+        { target: { value: "Noturno" } },
+      );
+      fireEvent.change(
+        screen.getByLabelText("Todo dia de trabalho, 1º período: início"),
+        { target: { value: "19:00" } },
+      );
+      fireEvent.change(
+        screen.getByLabelText("Todo dia de trabalho, 1º período: fim"),
+        { target: { value: "07:00" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Criar turno" }));
+      expect(
+        await screen.findByText(
+          "O fim de cada período precisa ser depois do início, no mesmo dia. Horário que passa da meia-noite vai no quadro da escala, dia a dia.",
+        ),
+      ).toBeInTheDocument();
+      expect(s.criar).not.toHaveBeenCalled();
+    });
+
     it("horário por dia: liga e desliga dias, até 3 períodos, e envia cada dia", async () => {
       const s = await abrir();
       fireEvent.change(

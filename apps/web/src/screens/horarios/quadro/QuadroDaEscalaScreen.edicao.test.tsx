@@ -764,7 +764,8 @@ describe("T215 — avisos do dia (CLT)", () => {
 });
 
 describe("T215 — publicar a escala", () => {
-  it("sem rascunho no período, Publicar fica indisponível; sem permissão, não aparece", async () => {
+  it("sem rascunho e sem dia do padrão a publicar, Publicar fica indisponível", async () => {
+    pessoas = [pessoa("Sem Escala", { colaboradorId: "c-sem" })];
     await montar();
     const botao = screen.getByRole("button", { name: /^Publicar/ });
     expect(botao).toHaveAttribute("aria-disabled", "true");
@@ -773,6 +774,23 @@ describe("T215 — publicar a escala", () => {
     );
     fireEvent.click(botao);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("só o padrão (nada publicado): Publicar fica disponível e grava os dias do padrão", async () => {
+    await montar();
+    expect(screen.queryByText(/Rascunho ·/)).toBeNull();
+    const botao = screen.getByRole("button", { name: "Publicar" });
+    expect(botao).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(botao);
+    const dialogo = screen.getByRole("dialog", { name: "Publicar a escala" });
+    expect(
+      [...dialogo.querySelectorAll("dl > div")].map((d) => d.textContent),
+    ).toEqual([
+      "Alocações novas7",
+      "Alteradas0",
+      "Removidas0",
+      "Pessoas afetadas1",
+    ]);
   });
 
   it("sem permissão de operar, não há Publicar", async () => {
@@ -808,8 +826,9 @@ describe("T215 — publicar a escala", () => {
     const linhas = [...dialogo.querySelectorAll("dl > div")].map(
       (d) => d.textContent,
     );
+    // 1 rascunho novo + 5 dias do padrão (25 a 29) ainda não publicados.
     expect(linhas).toEqual([
-      "Alocações novas1",
+      "Alocações novas6",
       "Alteradas1",
       "Removidas0",
       "Pessoas afetadas1",
@@ -883,7 +902,8 @@ describe("T215 — publicar a escala", () => {
       expect(
         [...dialogo.querySelectorAll("dl > div")].map((d) => d.textContent),
       ).toEqual([
-        "Alocações novas1",
+        // O rascunho do dia 24 + os outros 29 dias do mês pelo padrão.
+        "Alocações novas30",
         "Alteradas0",
         "Removidas0",
         "Pessoas afetadas1",
@@ -988,6 +1008,43 @@ describe("T215 — ações em massa", () => {
     expect(pagina).toBeChecked();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("trocar a busca limpa a seleção: Dar folga nunca alcança quem saiu da tela", async () => {
+    pessoas = [
+      ana(),
+      pessoa("Bruno Reis", {
+        colaboradorId: "c-bruno",
+        departamento: { id: "d", nome: "TI" },
+        escalas: [escala()],
+      }),
+    ];
+    await montar();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Ana Lima" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Bruno Reis" }),
+    );
+    expect(
+      screen.getByRole("toolbar", {
+        name: "Ações para as pessoas selecionadas",
+      }),
+    ).toHaveTextContent("2 pessoas selecionadas");
+    // A busca esconde a Ana: a seleção (das duas) sai.
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Buscar colaborador" }),
+      { target: { value: "Bruno" } },
+    );
+    expect(screen.queryByRole("toolbar")).toBeNull();
+    // Seleciona o Bruno de novo e dá folga: só ele.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Selecionar Bruno Reis" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Dar folga" }));
+    expect(
+      screen.getByRole("dialog", { name: "Dar folga para 1 pessoa" }),
+    ).toBeInTheDocument();
   });
 
   it("Dar folga: dia de hoje por padrão, grava no rascunho e Desfazer limpa", async () => {

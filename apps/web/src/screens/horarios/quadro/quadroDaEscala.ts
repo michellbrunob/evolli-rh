@@ -360,6 +360,41 @@ export function celulaDoDia(p: PessoaDoQuadroApi, dia: string): CelulaDoQuadro {
   };
 }
 
+/**
+ * T215 — junta a mesma pessoa vinda de dois blocos de consulta (períodos de
+ * até 42 dias): padrões, dias gravados e ausências, sem repetir. As
+ * ausências de TODOS os blocos contam ("Repetir esta semana até…" não grava
+ * trabalho em dia de férias de um bloco depois do primeiro).
+ */
+export function juntarPessoaDoPeriodo(
+  atual: PessoaDoQuadroApi | undefined,
+  p: PessoaDoQuadroApi,
+): PessoaDoQuadroApi {
+  if (!atual) {
+    return {
+      ...p,
+      dias: [...(p.dias ?? [])],
+      ausencias: [...(p.ausencias ?? [])],
+    };
+  }
+  const escalas = [...atual.escalas];
+  for (const e of p.escalas) {
+    if (!escalas.some((x) => x.id === e.id)) escalas.push(e);
+  }
+  escalas.sort((a, b) => b.vigenciaInicio.localeCompare(a.vigenciaInicio));
+  const dias = [...(atual.dias ?? [])];
+  for (const d of p.dias ?? []) {
+    if (!dias.some((x) => x.dia === d.dia && x.camada === d.camada))
+      dias.push(d);
+  }
+  const ausencias = [...(atual.ausencias ?? [])];
+  for (const a of p.ausencias ?? []) {
+    if (!ausencias.some((x) => x.id === a.id)) ausencias.push(a);
+  }
+  ausencias.sort((a, b) => a.inicio.localeCompare(b.inicio));
+  return { ...atual, escalas, dias, ausencias };
+}
+
 /** A escala que descreve a pessoa no período: a do dia de referência ou a mais nova. */
 function escalaDaPessoa(
   p: PessoaDoQuadroApi,

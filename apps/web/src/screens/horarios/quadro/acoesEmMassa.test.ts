@@ -13,7 +13,11 @@ import {
   trocarTurno,
   valorDaCelula,
 } from "./acoesEmMassa";
-import { celulaDoDia, diasDoPeriodo } from "./quadroDaEscala";
+import {
+  celulaDoDia,
+  diasDoPeriodo,
+  juntarPessoaDoPeriodo,
+} from "./quadroDaEscala";
 import { escala, pessoa } from "./fixturasDoQuadro";
 
 const SEMANA = diasDoPeriodo("2026-11-23", "2026-11-29");
@@ -308,5 +312,96 @@ describe("T215 — ações em massa (puras)", () => {
       { colaboradorId: "a", dia: "2026-11-23", tipo: "dsr", observacao: null },
     ]);
     expect(volta.limpar).toEqual([{ colaboradorId: "a", dia: "2026-11-25" }]);
+  });
+
+  it("copiar sobre um destino já publicado diferente do padrão: o rascunho recebe o dia resolvido da origem", () => {
+    // Origem (semana anterior) só no padrão 5x2; destino com a terça e a
+    // quarta publicadas: a terça como folga (difere do padrão), a quarta
+    // igual ao padrão.
+    const origem = pessoa("Ana", {
+      colaboradorId: "c-ana",
+      escalas: [escala()],
+    });
+    const padraoDaQuarta = celulaDoDia(origem, "2026-11-25");
+    const destino = pessoa("Ana", {
+      colaboradorId: "c-ana",
+      escalas: [escala()],
+      dias: [
+        gravado("2026-11-24", { camada: "publicado", tipo: "folga" }),
+        gravado("2026-11-25", {
+          camada: "publicado",
+          tipo: "trabalho",
+          turno: padraoDaQuarta.turno as DiaGravadoApi["turno"],
+          periodos: [...padraoDaQuarta.periodos],
+          intervaloMinutos: padraoDaQuarta.intervaloMinutos,
+        }),
+      ],
+    });
+    const plano = copiarDias(
+      [destino],
+      new Map([["c-ana", origem]]),
+      ANTERIOR,
+      SEMANA,
+    );
+    // A terça reproduz a segunda-feira anterior pelo padrão (trabalho).
+    expect(plano.gravar).toEqual([
+      {
+        colaboradorId: "c-ana",
+        dia: "2026-11-24",
+        tipo: "trabalho",
+        tabelaHorarioId: "t-Comercial",
+        intervaloMinutos: 60,
+        sobreaviso: [],
+        periodos: [{ inicio: "09:00", fim: "18:00" }],
+        unidadeOrganizacionalId: null,
+        observacao: null,
+      },
+    ]);
+    // A quarta publicada igual ao padrão e os dias sem publicado: limpa.
+    expect(plano.limpar.map((d) => d.dia)).toEqual([
+      "2026-11-23",
+      "2026-11-25",
+      "2026-11-26",
+      "2026-11-27",
+      "2026-11-28",
+      "2026-11-29",
+    ]);
+  });
+
+  it("repetir por mais de 42 dias: as férias do segundo bloco de consulta continuam valendo", () => {
+    const primeiro = pessoa("Ana", {
+      colaboradorId: "c-ana",
+      escalas: [escala()],
+      ausencias: [{ ...AUSENCIA, id: "a1" }],
+    });
+    // O 2º bloco traz outra ausência (férias em janeiro).
+    const segundo = pessoa("Ana", {
+      colaboradorId: "c-ana",
+      escalas: [escala()],
+      ausencias: [
+        {
+          ...AUSENCIA,
+          id: "a2",
+          inicio: "2027-01-11",
+          fim: "2027-01-15",
+        },
+      ],
+    });
+    const junto = juntarPessoaDoPeriodo(
+      juntarPessoaDoPeriodo(undefined, primeiro),
+      segundo,
+    );
+    expect(junto.ausencias?.map((a) => a.id)).toEqual(["a1", "a2"]);
+    // Sem repetir: o mesmo bloco de novo não duplica.
+    expect(juntarPessoaDoPeriodo(junto, segundo).ausencias).toHaveLength(2);
+    // Repetir a semana até janeiro não grava trabalho nas férias do 2º bloco.
+    const plano = copiarDias(
+      [junto],
+      new Map([["c-ana", primeiro]]),
+      diasDoPeriodo("2026-11-16", "2026-11-20"),
+      diasDoPeriodo("2027-01-11", "2027-01-15"),
+    );
+    expect(plano.gravar).toEqual([]);
+    expect(plano.limpar).toEqual([]);
   });
 });

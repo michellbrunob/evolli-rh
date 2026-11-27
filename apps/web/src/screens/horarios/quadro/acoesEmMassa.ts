@@ -97,9 +97,42 @@ function noVinculo(p: PessoaDoQuadroApi, dia: string): boolean {
   );
 }
 
+/** O mesmo valor de dia (tipo, turno, horário, intervalo, local, nota)? */
+export function mesmoValor(
+  a: ValorDoDia | null,
+  b: ValorDoDia | null,
+): boolean {
+  const forma = (v: ValorDoDia | null) =>
+    v === null
+      ? null
+      : JSON.stringify([
+          v.tipo,
+          v.tabelaHorarioId ?? null,
+          v.periodos ?? [],
+          v.intervaloMinutos ?? 0,
+          v.sobreaviso ?? [],
+          v.unidadeOrganizacionalId ?? null,
+          v.observacao ?? null,
+        ]);
+  return forma(a) === forma(b);
+}
+
+/** A célula do dia só pelo padrão (sem nada gravado no dia). */
+function celulaDoPadrao(p: PessoaDoQuadroApi, dia: string): CelulaDoQuadro {
+  return celulaDoDia(
+    { ...p, dias: (p.dias ?? []).filter((d) => d.dia !== dia) },
+    dia,
+  );
+}
+
 /**
  * Copia os dias `origem` (de cada pessoa) para os dias `destino`, na mesma
  * ordem. `pessoasDaOrigem` traz os dias da origem (outro período carregado).
+ *
+ * Dia de origem que vem do padrão deixa o destino no padrão (o rascunho dele
+ * sai). T215 — mas, se o destino já está PUBLICADO com outro valor que o
+ * padrão, limpar o rascunho deixaria o publicado: aí o rascunho recebe o
+ * valor resolvido da origem, para o destino reproduzir a origem.
  */
 export function copiarDias(
   pessoas: readonly PessoaDoQuadroApi[],
@@ -117,7 +150,21 @@ export function copiarDias(
       const c = celulaDoDia(fonte, origem[i]!);
       // Ausência na origem não se copia (é de Férias e ausências).
       if (c.tipo === "ausencia") return;
-      const valor = c.origem === "padrao" ? null : valorDaCelula(c);
+      let valor = c.origem === "padrao" ? null : valorDaCelula(c);
+      if (valor === null && c.origem === "padrao") {
+        const publicado = (p.dias ?? []).find(
+          (d) => d.dia === dia && d.camada === "publicado",
+        );
+        if (
+          publicado &&
+          !mesmoValor(
+            valorDoGravado(publicado),
+            valorDaCelula(celulaDoPadrao(p, dia)),
+          )
+        ) {
+          valor = valorDaCelula(c);
+        }
+      }
       if (valor) gravar.push({ ...valor, colaboradorId: p.colaboradorId, dia });
       else limpar.push({ colaboradorId: p.colaboradorId, dia });
     });

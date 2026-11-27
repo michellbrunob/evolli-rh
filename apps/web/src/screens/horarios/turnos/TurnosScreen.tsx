@@ -617,7 +617,11 @@ function FormularioDeTurno({
       } else if (
         todos.some((l) => l.some((p) => minutos(p.fim) <= minutos(p.inicio)))
       ) {
-        e.horarios = "O fim de cada período precisa ser depois do início.";
+        // T215 — turno que passa da meia-noite ainda não é aceito na
+        // jornada (o ponto e as horas previstas leem o dia civil); o horário
+        // da noite vai no quadro da escala, dia a dia.
+        e.horarios =
+          "O fim de cada período precisa ser depois do início, no mesmo dia. Horário que passa da meia-noite vai no quadro da escala, dia a dia.";
       } else if (todos.some((l) => sobrepostos(l))) {
         e.horarios = "Os períodos de um dia não podem se sobrepor.";
       }
@@ -741,7 +745,7 @@ function FormularioDeTurno({
                 value={nome}
                 maxLength={40}
                 required
-                placeholder="Ex.: Manhã, Plantão noite"
+                placeholder="Ex.: Manhã, Comercial"
                 aria-invalid={erros.nome ? "true" : undefined}
                 aria-describedby={`${base}-nome-ajuda`}
                 disabled={enviando}

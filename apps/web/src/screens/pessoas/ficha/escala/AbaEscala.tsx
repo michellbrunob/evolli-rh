@@ -3,7 +3,8 @@
  *
  * - **Escala atual:** o padrão (5x2, 6x1, revezamentos, plantões, embarque
  *   ou "outra") com o turno, desde quando vale e os indicadores (horas por
- *   semana, dias de benefício no mês e a particularidade do modelo); "Abrir
+ *   semana, dias de trabalho no mês — contados pelo servidor, a base dos
+ *   benefícios pagos pela escala — e a particularidade do modelo); "Abrir
  *   no quadro" e "Alterar padrão".
  * - **Próximos 7 dias** e o **calendário do mês** (com os feriados).
  * - **Histórico da escala:** cada mudança de padrão, com o período, quem
@@ -19,11 +20,13 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { ApiError } from "../../../../api/colaboradoresClient";
 import {
+  consultarDiasDeTrabalho,
   consultarEscalas,
   consultarQuadro,
   definirEscala,
   encerrarEscala,
   type DefinirEscalaDto,
+  type DiasDeTrabalhoApi,
   type EscalaApi,
   type EscalasDoColaboradorApi,
   type QuadroDaEscalaApi,
@@ -66,9 +69,7 @@ import {
 import {
   type PadraoDeEscala,
   diaDaSemana,
-  diasNoMes,
   avisosDaJornada,
-  beneficioPelosDiasUteis,
   formatarHoras,
   horasPorSemana,
   jornadaPorSemana,
@@ -116,10 +117,19 @@ export interface ServicoDeEscala {
    * sem ela, os dias da aba mostram só o padrão.
    */
   quadro?(inicio: string, fim: string): Promise<QuadroDaEscalaApi>;
+  /**
+   * T215 — os dias de trabalho no mês, contados pelo servidor com a mesma
+   * conta dos benefícios; sem ela, a aba não mostra o número.
+   */
+  diasDeTrabalho?(
+    colaboradorId: string,
+    mes: string,
+  ): Promise<DiasDeTrabalhoApi>;
 }
 
 export const servicoDeEscalaDoServidor: ServicoDeEscala = {
   consultar: consultarEscalas,
+  diasDeTrabalho: consultarDiasDeTrabalho,
   turnos: async () =>
     (await listarTabelasHorario({ ativo: true, tamanhoPagina: 100 })).itens,
   definir: definirEscala,
@@ -168,6 +178,13 @@ const MESES = [
 ];
 const DIAS_CURTOS = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const CABECALHO_DO_MES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+/**
+ * T215 — o que o padrão muda nos benefícios pagos pela escala (verdadeiro
+ * com a conta do servidor: o publicado por cima do padrão, sem ausências).
+ */
+const AJUDA_DOS_BENEFICIOS =
+  "Dias com férias ou ausência aprovada não mudam. Nos benefícios, valem os dias publicados e, nos ainda não publicados, o padrão; o rascunho só conta depois de publicado.";
+
 /** Cor dos turnos enquanto o catálogo não guarda cor própria. */
 const COR_DO_TURNO = "var(--color-ink-subtle)";
 
@@ -392,6 +409,10 @@ export function AbaEscala({
               hoje={hoje}
               jornadaContratoHoras={jornadaContratoHoras}
               local={local}
+              colaboradorId={colaboradorId}
+              {...(servico.diasDeTrabalho
+                ? { diasDeTrabalho: servico.diasDeTrabalho }
+                : {})}
               acoes={
                 <>
                   {onAbrirQuadro ? (
@@ -527,6 +548,8 @@ function EscalaAtual({
   hoje,
   jornadaContratoHoras,
   local,
+  colaboradorId,
+  diasDeTrabalho,
   acoes,
 }: {
   readonly idTitulo: string;
@@ -536,6 +559,8 @@ function EscalaAtual({
   readonly hoje: string;
   readonly jornadaContratoHoras: number | null;
   readonly local: string | null;
+  readonly colaboradorId: string;
+  readonly diasDeTrabalho?: ServicoDeEscala["diasDeTrabalho"];
   readonly acoes: ReactNode;
 }) {
   const e = atual ?? programada;
@@ -561,6 +586,8 @@ function EscalaAtual({
             programada={!atual}
             jornadaContratoHoras={jornadaContratoHoras}
             local={local}
+            colaboradorId={colaboradorId}
+            {...(diasDeTrabalho ? { diasDeTrabalho } : {})}
           />
         ) : (
           <p className="escala-ficha__sem-vigente">
@@ -610,21 +637,42 @@ function Resumo({
   programada,
   jornadaContratoHoras,
   local,
+  colaboradorId,
+  diasDeTrabalho,
 }: {
   readonly e: EscalaApi;
   readonly hoje: string;
   readonly programada: boolean;
   readonly jornadaContratoHoras: number | null;
   readonly local: string | null;
+  readonly colaboradorId: string;
+  readonly diasDeTrabalho?: ServicoDeEscala["diasDeTrabalho"];
 }) {
   const idDica = useId();
   const base = e.vigenciaInicio > hoje ? e.vigenciaInicio : hoje;
   const ultimo = e.vigenciaFim ? diaAnteriorCivil(e.vigenciaFim) : null;
-  const beneficio = diasNoMes(e.modelo, mesDe(base));
-  const nomeDoModelo = modeloDe(e.modelo)?.nome ?? e.modelo;
+  const mes = mesDe(base);
+  // T215 — os dias de trabalho do mês vêm do servidor, com a mesma conta
+  // dos benefícios pagos pela escala (o publicado por cima do padrão, a troca
+  // de escala no mês, sem férias e ausências aprovadas, os feriados da
+  // empresa e da unidade). Sem resposta, o indicador não aparece.
+  const [dias, setDias] = useState<DiasDeTrabalhoApi | null>(null);
+  useEffect(() => {
+    if (!diasDeTrabalho) return;
+    let vivo = true;
+    setDias(null);
+    diasDeTrabalho(colaboradorId, mes).then(
+      (r) => {
+        if (vivo) setDias(r);
+      },
+      () => undefined,
+    );
+    return () => {
+      vivo = false;
+    };
+  }, [colaboradorId, mes, diasDeTrabalho, e]);
   // T215 — como na referência: a jornada do contrato e o limite legal da
-  // data (EC 141/2026), o menor; o benefício pelos dias úteis ou pelo
-  // catálogo da escala.
+  // data (EC 141/2026), o menor.
   const indicadores: Indicador[] = [
     [
       formatarHoras(jornadaPorSemana(jornadaContratoHoras, base)),
@@ -635,17 +683,20 @@ function Resumo({
           "Pela jornada do contrato e pela data (EC 141/2026): vale o menor limite.",
       },
     ],
-    [
-      plural(beneficio, "dia", "dias"),
-      `de benefício em ${mesCurto(base)}`,
-      {
-        titulo: `${plural(beneficio, "dia", "dias")} de benefício em ${NOMES_DOS_MESES[Number(base.slice(5, 7)) - 1]}`,
-        texto: beneficioPelosDiasUteis(e.modelo)
-          ? "Pelos dias úteis do mês (sem escala no catálogo)."
-          : `Pelo catálogo (${nomeDoModelo}).`,
-      },
-    ],
   ];
+  if (dias !== null && dias.mes === mes) {
+    indicadores.push([
+      plural(dias.dias, "dia", "dias"),
+      `de trabalho em ${mesCurto(base)}`,
+      {
+        titulo: `${plural(dias.dias, "dia", "dias")} de trabalho em ${NOMES_DOS_MESES[Number(base.slice(5, 7)) - 1]}`,
+        texto:
+          dias.origem === "escala"
+            ? "Os dias publicados e, onde ainda não há publicação, o padrão; férias e ausências aprovadas não contam. É a base dos benefícios pagos pela escala; os pagos por dia útil seguem o calendário."
+            : "Sem padrão nem dias publicados no mês: pela escala do cadastro. É a base dos benefícios pagos pela escala; os pagos por dia útil seguem o calendário.",
+      },
+    ]);
+  }
   if (e.folgaSemanal !== null) {
     indicadores.push([maiuscula(nomeDoDia(e.folgaSemanal)), "folga semanal"]);
   }
@@ -1494,11 +1545,8 @@ function GavetaDoPadrao({
       antes ? formatarHoras(horasPorSemana(padraoDe(antes), dataBase)) : VAZIO,
       formatarHoras(horasPorSemana(novo, dataBase)),
     ],
-    [
-      `Benefício em ${mesCurto(dataBase)}`,
-      plural(diasNoMes(modeloAntes, mesDe(dataBase)), "dia", "dias"),
-      plural(diasNoMes(modelo, mesDe(dataBase)), "dia", "dias"),
-    ],
+    // T215 — os dias de benefício não entram aqui: o servidor os conta dia a
+    // dia (publicado, padrão, ausências), e cada benefício tem o seu modo.
     ...(podeRefazer && refazer
       ? ([
           [
@@ -1636,8 +1684,10 @@ function GavetaDoPadrao({
               id={`${ids.turnoNoiteId}-ajuda`}
               className="escala-ficha__ajuda"
             >
-              Um mês de dia, o seguinte de noite, sempre com 36 h de descanso na
-              troca. Sem turno da noite, todo plantão usa o turno acima.
+              Um mês com o turno acima, o seguinte com este, sempre com 36 h de
+              descanso na troca. Os turnos terminam no mesmo dia (até 23:59):
+              plantão que passa da meia-noite vai no quadro, dia a dia. Sem este
+              turno, todo plantão usa o turno acima.
             </span>
           </div>
         ) : null}
@@ -1828,16 +1878,12 @@ function GavetaDoPadrao({
               <strong
                 id={`${base}-refazer`}
               >{`Refazer o rascunho do quadro a partir de ${diaMesCurto(vale)}`}</strong>
-              <small id={`${base}-refazer-ajuda`}>
-                Dias com férias ou ausência aprovada não mudam. Os benefícios só
-                mudam quando a escala for publicada.
-              </small>
+              <small id={`${base}-refazer-ajuda`}>{AJUDA_DOS_BENEFICIOS}</small>
             </span>
           </label>
         ) : null}
         <p className="escala-ficha__ajuda" hidden={podeRefazer}>
-          Dias com férias ou ausência aprovada não mudam. Os benefícios só mudam
-          quando a escala for publicada.
+          {AJUDA_DOS_BENEFICIOS}
         </p>
 
         {erros.geral ? (

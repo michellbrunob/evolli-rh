@@ -169,7 +169,7 @@ describe("T215 — Aplicar modelo de escala", () => {
     expect(
       screen.getByRole("radio", { name: /Sem data de fim/ }),
     ).toHaveTextContent(
-      "A escala do cadastro muda para 6x1 a partir de 30/11.",
+      "O padrão de escala de cada pessoa passa a ser 6x1 a partir de 30/11 e o quadro segue sozinho. A escala do contrato não muda.",
     );
     await screen.findByText(/Nenhuma célula do período está preenchida/);
     proxima();
@@ -205,10 +205,58 @@ describe("T215 — Aplicar modelo de escala", () => {
         },
       ],
     ]);
-    expect(vi.mocked(gravarDias).mock.calls[0]![0]).toHaveLength(112);
+    // Em envios de até cem dias (tudo ou nada no rascunho).
+    expect(
+      vi.mocked(gravarDias).mock.calls.map(([dias]) => dias.length),
+    ).toEqual([100, 12]);
     expect(lerAvisoDoQuadro()).toBe(
       "Modelo aplicado: 112 células no rascunho para 2 pessoas.",
     );
+  });
+
+  it("um turno diferente por dia: sem data de fim é recusado (o padrão guarda um turno só)", async () => {
+    const TARDE = tabelaHorario("Tarde", {
+      periodos: ["segunda", "terca", "quarta", "quinta", "sexta"].map(
+        (dia) => ({ dia, inicio: "13:00", fim: "22:00" }),
+      ),
+    });
+    vi.mocked(listarTabelasHorario).mockResolvedValue({
+      itens: [COMERCIAL, TARDE],
+    } as never);
+    await montar();
+    fireEvent.click(screen.getByRole("radio", { name: /Todo o time/ }));
+    proxima();
+    await screen.findByRole("heading", { name: /Qual escala/ });
+    fireEvent.click(screen.getByRole("radio", { name: /^5x2/ }));
+    proxima();
+    await screen.findByRole("heading", { name: /Turnos e folgas/ });
+    fireEvent.click(screen.getByRole("radio", { name: "Um turno por dia" }));
+    const selects = screen
+      .getAllByRole("combobox")
+      .filter((s) => s.closest(".modelo__por-dia"));
+    expect(selects).toHaveLength(5);
+    selects.forEach((s, i) =>
+      fireEvent.change(s, {
+        target: { value: i === 0 ? TARDE.id : COMERCIAL.id },
+      }),
+    );
+    proxima();
+    await screen.findByRole("heading", { name: /Período/ });
+    const semFim = screen.getByRole("radio", { name: /Sem data de fim/ });
+    expect(semFim).toHaveTextContent(
+      "Com um turno diferente em cada dia, informe a data de fim: o padrão de escala da pessoa guarda um turno só.",
+    );
+    proxima();
+    // Continua no Período, com o motivo; nada foi gravado.
+    expect(
+      screen.getByRole("heading", { name: /Período/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        /informe a data de fim: o padrão de escala da pessoa guarda um turno só/,
+      ).length,
+    ).toBeGreaterThan(1);
+    expect(definirEscala).not.toHaveBeenCalled();
   });
 
   it("até uma data, sem Substituir: só os dias vazios; tudo preenchido não aplica", async () => {

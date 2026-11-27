@@ -218,6 +218,32 @@ describe("T215 — avisos da CLT no quadro", () => {
     ).toEqual(["feriado_comercio", "feriado_comercio"]);
   });
 
+  it("ponto facultativo não é feriado: sem aviso de trabalho no feriado (como nos dias úteis dos benefícios)", () => {
+    const dez = diasDoPeriodo("2026-12-21", "2026-12-27");
+    const p = pessoa("Ana", {
+      unidade: { id: "u1", nome: "Loja" },
+      escalas: [escala({ vigenciaInicio: "2026-01-01" })],
+      dias: [dia("2026-12-24")],
+    });
+    const comPonto = regras({
+      feriados: [
+        {
+          id: "pf",
+          data: "2026-12-24",
+          nome: "Véspera de Natal",
+          tipo: "ponto_facultativo",
+          unidadeIds: [],
+        },
+      ],
+    });
+    expect(feriadoDaPessoa(p, "2026-12-24", comPonto)).toBeNull();
+    expect(
+      calcularAvisos([p], dez, comPonto)
+        .filter((a) => a.chave.startsWith("feriado"))
+        .map((a) => a.dia),
+    ).toEqual(["2026-12-25"]); // Natal (feriado de verdade), não o dia 24.
+  });
+
   it("ausência aprovada: escalado (gravado) no dia vira aviso de atenção; o padrão não; desligado nas Regras some", () => {
     const p = pessoa("Ana", {
       escalas: [escala({ vigenciaInicio: "2026-01-01" })],

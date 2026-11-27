@@ -103,6 +103,30 @@ export function consultarEscalas(
   return enviar("GET", rota(colaboradorId));
 }
 
+/**
+ * T215 — os dias de trabalho no mês (`AAAA-MM`), com a mesma conta dos
+ * benefícios pagos pela escala: o publicado por cima do padrão, sem férias e
+ * ausências aprovadas; sem padrão nem publicado, a escala do cadastro.
+ */
+export interface DiasDeTrabalhoApi {
+  colaboradorId: string;
+  mes: string;
+  dias: number;
+  /** `escala`: há padrão ou publicado no mês; `catalogo`: só o cadastro. */
+  origem: "escala" | "catalogo";
+}
+
+export function consultarDiasDeTrabalho(
+  colaboradorId: string,
+  mes: string,
+): Promise<DiasDeTrabalhoApi> {
+  const q = new URLSearchParams({ mes });
+  return enviar(
+    "GET",
+    `${rota(colaboradorId)}/dias-de-trabalho?${q.toString()}`,
+  );
+}
+
 /** Define (ou troca) o padrão; devolve a lista inteira. */
 export function definirEscala(
   colaboradorId: string,
