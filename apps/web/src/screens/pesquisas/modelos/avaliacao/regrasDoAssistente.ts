@@ -167,11 +167,6 @@ export function legendaDoPrazo(hoje: string, dia: string): string {
   return `${plural(n, "dia", "dias")} a partir de hoje`;
 }
 
-/** "DD/MM". */
-export function diaMes(dia: string): string {
-  return `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
-}
-
 export const ROTULO_DO_LEMBRETE: Readonly<Record<Lembrete, string>> = {
   "7_dias": "7 dias antes",
   "3_dias": "3 dias antes",

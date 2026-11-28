@@ -11,6 +11,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { PesquisaDetalhe } from "../../../../api/pesquisasClient";
 import { Button } from "../../../../components";
+import { diaMesComZero } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { IconButton } from "../../../../ui";
 import { IconeFechar, IconeMais, IconeVoltar } from "../../../../ui/icones";
@@ -44,7 +45,6 @@ import {
   ROTULO_DO_LEMBRETE,
   candidatosAoTime,
   contar,
-  diaMes,
   erroDoNome,
   erroDoPrazo,
   erroDoPrazoDaAutoavaliacao,
@@ -190,7 +190,7 @@ export function AssistenteDaAvaliacao({
   }, [org, times, deFora]);
 
   const hora = () =>
-    agora().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    `${String(agora().getHours()).padStart(2, "0")}:${String(agora().getMinutes()).padStart(2, "0")}`;
 
   function entradaDaPesquisa(encerraEm: string | null) {
     return {
@@ -1056,7 +1056,7 @@ function EtapaPrazo(p: {
 }) {
   const c = p.contagem;
   const regra = REGRAS_DE_COMENTARIOS.find((r) => r.valor === p.comentarios)!;
-  const prazoTexto = `${diaMes(p.prazoDia)} às ${p.prazoHora}`;
+  const prazoTexto = `${diaMesComZero(p.prazoDia)} às ${p.prazoHora}`;
   return (
     <>
       <CartaoDeSecao
@@ -1132,7 +1132,7 @@ function EtapaPrazo(p: {
                   </label>
                 </div>
                 <p className="pesquisas__suave">
-                  {`Termina antes: a pessoa responde primeiro. A pessoa tem até ${diaMes(p.autoDia)} e o gestor, até ${diaMes(p.prazoDia)}.`}
+                  {`Termina antes: a pessoa responde primeiro. A pessoa tem até ${diaMesComZero(p.autoDia)} e o gestor, até ${diaMesComZero(p.prazoDia)}.`}
                 </p>
                 {p.erros.auto ? (
                   <p className="pesquisas__erro">{p.erros.auto}</p>
@@ -1250,7 +1250,7 @@ function EtapaPrazo(p: {
             >
               <p className="pesquisas__suave">Prévia do e-mail</p>
               <p>
-                <strong>{`Avalie o seu time até ${diaMes(p.prazoDia)}`}</strong>
+                <strong>{`Avalie o seu time até ${diaMesComZero(p.prazoDia)}`}</strong>
               </p>
               <p>
                 {`Você vai avaliar as pessoas do seu time em 8 competências. Leva cerca de 4 minutos por pessoa e dá para parar e continuar depois.${p.e180 ? " Cada pessoa também faz a própria autoavaliação." : ""}`}
@@ -1295,7 +1295,7 @@ function EtapaPrazo(p: {
             <dd>
               {p.e180
                 ? p.autoAntes
-                  ? `Gestor até ${prazoTexto} · autoavaliação até ${diaMes(p.autoDia)} às ${p.autoHora}`
+                  ? `Gestor até ${prazoTexto} · autoavaliação até ${diaMesComZero(p.autoDia)} às ${p.autoHora}`
                   : `${prazoTexto} para os dois`
                 : prazoTexto}
               {` · ${textoDosLembretes(p.lembrar ? p.lembretes : [])}`}

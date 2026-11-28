@@ -20,6 +20,9 @@ import {
 } from "./dadosDeTeste";
 import { organogramaFalso as org } from "./dadosDeTeste";
 
+/** O prazo como a API recebe (dia e hora de Brasília, sem fuso no texto). */
+const prazoDaApi = (dia: string, hora: string) => `${dia}T${hora}`;
+
 const HOJE = "2026-11-27";
 const AGORA = () => new Date("2026-11-27T12:00:00-03:00");
 
@@ -210,7 +213,7 @@ describe("T216 — assistente da Avaliação 90°", () => {
     expect(servico.alterarPesquisa).toHaveBeenCalledWith(
       "pesq-1",
       expect.objectContaining({
-        encerraEm: "2026-12-27T23:59",
+        encerraEm: prazoDaApi("2026-12-27", "23:59"),
         modelo: "avaliacao90",
         identificacao: "identificada",
       }),
@@ -300,7 +303,7 @@ describe("T216 — assistente da Avaliação 180°", () => {
     await waitFor(() => expect(cliente.salvar).toHaveBeenCalled());
     expect(cliente.salvar.mock.calls[0]![1].config).toMatchObject({
       visibilidade: "so_rh",
-      prazoAutoavaliacao: "2026-12-20T23:59",
+      prazoAutoavaliacao: prazoDaApi("2026-12-20", "23:59"),
     });
   });
 });

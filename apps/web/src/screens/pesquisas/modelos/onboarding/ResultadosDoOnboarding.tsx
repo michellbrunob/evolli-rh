@@ -27,7 +27,8 @@ import type {
   SituacaoDoEnvio,
 } from "./cliente";
 import { nomeDaPlanilha, planilhaDoOnboarding } from "./exportacaoDoOnboarding";
-import { ROTULO_DA_SITUACAO, dataBr } from "./regrasDoOnboarding";
+import { formatarDiaCivil } from "../../../../format/data";
+import { ROTULO_DA_SITUACAO } from "./regrasDoOnboarding";
 import "../modelos.css";
 
 type Aba = "geral" | "envios";
@@ -215,7 +216,7 @@ function VisaoGeral({
         <h2 className="pesquisas__cartao-secao-titulo">Ainda sem respostas</h2>
         <p className="pesquisas__suave">
           {proximo
-            ? `A pesquisa está ativa. O próximo convite sai em ${dataBr(proximo.dataPrevista)}, às ${envios.horario}. Os resultados aparecem a partir de 3 respostas.`
+            ? `A pesquisa está ativa. O próximo convite sai em ${formatarDiaCivil(proximo.dataPrevista)}, às ${envios.horario}. Os resultados aparecem a partir de 3 respostas.`
             : "A pesquisa está ativa. Os resultados aparecem a partir de 3 respostas."}
         </p>
         <Button variant="secondary" onClick={onEnvios}>
@@ -584,7 +585,7 @@ function Envios({
     <section className="pesquisas__cartao-secao" aria-label="Envios">
       <p className="pesquisas__nota" role="status">
         {proximo
-          ? `Próximo envio: ${dataBr(proximo.dataPrevista)} às ${envios.horario} · ${proximo.nome}.`
+          ? `Próximo envio: ${formatarDiaCivil(proximo.dataPrevista)} às ${envios.horario} · ${proximo.nome}.`
           : "Nenhum envio agendado."}
       </p>
       <div
@@ -628,7 +629,7 @@ function Envios({
         <tbody>
           {itens.map((e) => (
             <tr key={e.id}>
-              <td>{dataBr(e.dataPrevista)}</td>
+              <td>{formatarDiaCivil(e.dataPrevista)}</td>
               <th scope="row">{e.nome}</th>
               <td>{rotuloDaRodada(e.rodada)}</td>
               <td>

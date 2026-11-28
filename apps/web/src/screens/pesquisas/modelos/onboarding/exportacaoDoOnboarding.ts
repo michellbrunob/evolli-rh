@@ -14,7 +14,8 @@ import {
 } from "../../../pessoas/importacao/planilhaXlsx";
 import { FAIXAS, rotuloDaRodada } from "./envio";
 import type { EnviosDoOnboarding, ResultadosDoOnboarding } from "./cliente";
-import { ROTULO_DA_SITUACAO, dataBr } from "./regrasDoOnboarding";
+import { formatarDiaCivil } from "../../../../format/data";
+import { ROTULO_DA_SITUACAO } from "./regrasDoOnboarding";
 
 export function nomeDaPlanilha(nome: string): string {
   return nomeDoArquivo([nome, "onboarding"], "xlsx");
@@ -166,11 +167,11 @@ export function planilhaDoOnboarding(
       linhas: [
         ["Data", "Colaborador", "Rodada", "Situação", "Prazo"],
         ...envios.itens.map((e): CelulaXlsx[] => [
-          dataBr(e.dataPrevista),
+          formatarDiaCivil(e.dataPrevista),
           e.nome,
           rotuloDaRodada(e.rodada),
           ROTULO_DA_SITUACAO[e.situacao],
-          dataBr(e.prazo),
+          formatarDiaCivil(e.prazo),
         ]),
       ],
     },

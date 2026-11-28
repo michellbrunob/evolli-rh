@@ -3,6 +3,7 @@
  * perguntas, configuração padrão e validação do assistente).
  */
 import type { Identificacao, Secao } from "../../../../api/pesquisasClient";
+import { formatarDiaCivil } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { minutosDoOnboarding } from "./envio";
 import type { ConfigOnboarding } from "./cliente";
@@ -26,11 +27,6 @@ export function somarDias(dia: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** "28/11/2026". */
-export function dataBr(dia: string): string {
-  return `${dia.slice(8, 10)}/${dia.slice(5, 7)}/${dia.slice(0, 4)}`;
-}
-
 /** O resumo vivo do rodapé. */
 export function resumoDoEnvio(c: ConfigOnboarding): string {
   if (c.modo === "automatizar") {
@@ -45,7 +41,7 @@ export function resumoDoEnvio(c: ConfigOnboarding): string {
   }
   if (c.modo === "agendar") {
     return c.agendadoPara
-      ? `Agendado · ${dataBr(c.agendadoPara)} às ${c.horario}`
+      ? `Agendado · ${formatarDiaCivil(c.agendadoPara)} às ${c.horario}`
       : "Agendado · escolha o dia";
   }
   return `Enviar agora · prazo de ${plural(c.prazoDias, "dia", "dias")}`;

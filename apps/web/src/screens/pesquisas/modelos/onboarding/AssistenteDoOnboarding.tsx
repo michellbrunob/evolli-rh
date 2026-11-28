@@ -148,7 +148,7 @@ export function AssistenteDoOnboarding({
   }, [etapa, grupos, listarGrupos]);
 
   const hora = () =>
-    agora().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    `${String(agora().getHours()).padStart(2, "0")}:${String(agora().getMinutes()).padStart(2, "0")}`;
 
   const entrada = () => ({
     nome: nome.trim(),
