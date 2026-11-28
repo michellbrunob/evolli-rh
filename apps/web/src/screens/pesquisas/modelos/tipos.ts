@@ -7,6 +7,7 @@
  */
 import type { ComponentType } from "react";
 import type {
+  CampoGrupo,
   ConfigPergunta,
   FatorDisc,
   ModeloPesquisa,
@@ -326,6 +327,10 @@ export interface ModeloDaGaleria {
   readonly minimo?: number;
   /** Metodologia fixa: o assistente mostra as perguntas sem editar. */
   readonly fixo?: boolean;
+  /** Os blocos das perguntas fixas mostram "Obrigatória" ou "Opcional". */
+  readonly obrigatoriedadeNosBlocos?: boolean;
+  /** "Separar respostas por" já ligado na anônima (padrão: nenhum). */
+  readonly separarPorPadrao?: readonly CampoGrupo[];
   /** Escala explicada no assistente (modelos fixos). */
   readonly legendaDaEscala?: readonly string[];
   /**

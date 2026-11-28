@@ -18,6 +18,9 @@ import type {
 } from "../../../../api/beneficiosClient";
 import { ApiError } from "../../../../api/colaboradoresClient";
 import { PAINEL_ISFB_DE_TESTE } from "./resultadoDeTeste";
+import { modeloDaGaleria, secoesDoModelo } from "../../modelosDePesquisa";
+import { PerguntasFixas } from "../PerguntasFixas";
+import { comAutopercepcao } from "./Autopercepcao";
 import { AnalisesIsfb, VisaoGeralIsfb } from "./VisaoGeralIsfb";
 
 const linha = (
@@ -168,5 +171,86 @@ describe("saúde financeira — benefícios da empresa × necessidades do time",
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText("Oferecido")).toBeNull();
+  });
+});
+
+describe("saúde financeira — 4ª revisão", () => {
+  const isfb = modeloDaGaleria("isfb");
+  const secoes = secoesDoModelo(isfb);
+
+  it("resumo do assistente: 15 do índice + 3 de autopercepção (ou só as 15)", () => {
+    const todas = secoes.flatMap((s) => s.perguntas);
+    expect(isfb.resumoDasPerguntas!(todas)).toBe(
+      "15 perguntas do índice + 3 de autopercepção",
+    );
+    const sem = comAutopercepcao(secoes, false).flatMap((s) => s.perguntas);
+    expect(isfb.resumoDasPerguntas!(sem)).toBe("15 perguntas do índice");
+  });
+
+  it("blocos marcados Obrigatória; a autopercepção, Opcional", () => {
+    render(<PerguntasFixas modelo={isfb} secoes={secoes} />);
+    const gatilhos = screen
+      .getAllByRole("button", { expanded: true })
+      .concat(screen.getAllByRole("button", { expanded: false }))
+      .filter((b) => b.className.includes("fixas__gatilho"));
+    expect(gatilhos).toHaveLength(secoes.length);
+    const ultimo = gatilhos.find((b) =>
+      b.textContent?.includes(secoes.at(-1)!.titulo!),
+    )!;
+    expect(ultimo).toHaveTextContent("Opcional");
+    for (const b of gatilhos.filter((x) => x !== ultimo))
+      expect(b).toHaveTextContent("Obrigatória");
+  });
+
+  it("base financeira: produtos por pessoa em inteiro, 'de 14 possíveis'", () => {
+    render(
+      <VisaoGeralIsfb
+        resultado={{
+          ...PAINEL_ISFB_DE_TESTE,
+          isfb: {
+            ...PAINEL_ISFB_DE_TESTE.isfb!,
+            base: {
+              ...PAINEL_ISFB_DE_TESTE.isfb!.base,
+              produtosPorPessoa: 2.33,
+            },
+          },
+        }}
+      />,
+    );
+    const base = screen.getByRole("region", { name: "Base financeira" });
+    expect(within(base).getByText("2 de 14 possíveis")).toBeInTheDocument();
+  });
+
+  it("por renda da casa: só as faixas que têm respostas", () => {
+    render(
+      <VisaoGeralIsfb
+        resultado={{
+          ...PAINEL_ISFB_DE_TESTE,
+          isfb: {
+            ...PAINEL_ISFB_DE_TESTE.isfb!,
+            porRenda: [
+              {
+                id: "ate_1_5",
+                respostas: 1,
+                visivel: false,
+                oculto: "minimo",
+                saude: null,
+              },
+              {
+                id: "de_1_5_a_4_2",
+                respostas: 0,
+                visivel: false,
+                oculto: null,
+                saude: null,
+              },
+            ],
+          },
+        }}
+      />,
+    );
+    const renda = screen.getByRole("region", {
+      name: "Saúde financeira por renda da casa",
+    });
+    expect(within(renda).getAllByRole("row")).toHaveLength(2);
   });
 });

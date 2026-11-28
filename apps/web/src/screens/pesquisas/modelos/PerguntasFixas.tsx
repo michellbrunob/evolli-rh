@@ -139,6 +139,13 @@ export function PerguntasFixas({
                 <span className="pesquisas__suave">
                   {` · ${plural(g.perguntas.length, "pergunta", "perguntas")}`}
                 </span>
+                {m.obrigatoriedadeNosBlocos ? (
+                  <span className="pesquisas__selo">
+                    {g.perguntas.every((p) => p.obrigatoria)
+                      ? "Obrigatória"
+                      : "Opcional"}
+                  </span>
+                ) : null}
                 <IconeAbrir
                   tamanho={16}
                   className={

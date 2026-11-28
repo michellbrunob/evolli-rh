@@ -3,6 +3,8 @@
  * perguntas (15 + 3 opcionais de autopercepção), com a chave de cada item
  * (`Q1`…, `O1`…) que a API confere. As opções valem pela posição.
  */
+import type { Pergunta } from "../../../../api/pesquisasClient";
+import { plural } from "../../../../format/plural";
 import type { ModeloDaGaleria } from "../tipos";
 import { SECOES_ISFB } from "./definicao";
 import {
@@ -13,6 +15,19 @@ import {
 } from "../../tempoEstimado";
 
 const PERGUNTAS_ISFB = perguntasParaOTempo(SECOES_ISFB);
+
+/** "15 perguntas do índice + 3 de autopercepção" (resumo do assistente). */
+export function resumoDasPerguntasDaSaudeFinanceira(
+  perguntas: readonly Pergunta[],
+): string {
+  const auto = perguntas.filter((p) => p.chave?.startsWith("O")).length;
+  const indice = plural(
+    perguntas.length - auto,
+    "pergunta do índice",
+    "perguntas do índice",
+  );
+  return auto ? `${indice} + ${auto} de autopercepção` : indice;
+}
 
 export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   id: "isfb",
@@ -40,6 +55,8 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   limite: 18,
   minimo: 15,
   fixo: true,
+  obrigatoriedadeNosBlocos: true,
+  resumoDasPerguntas: resumoDasPerguntasDaSaudeFinanceira,
   pagina: {
     titulo: "Saúde financeira · Índice de 0 a 100",
     selo: minutosCurtos(PERGUNTAS_ISFB),

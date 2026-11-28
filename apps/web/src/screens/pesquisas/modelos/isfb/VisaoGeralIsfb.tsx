@@ -512,32 +512,35 @@ export function VisaoGeralIsfb({
               </tr>
             </thead>
             <tbody>
-              {r.porRenda.map((g) => (
-                <tr key={g.id}>
-                  <td>{RENDA[g.id]}</td>
-                  <td className="modelos__num">{g.respostas}</td>
-                  <td className="modelos__celula-barra">
-                    {g.visivel && g.saude ? (
-                      <BarraDeFaixas
-                        rotulo={RENDA[g.id] ?? g.id}
-                        partes={(
-                          ["baixa", "no_limite", "saudavel"] as const
-                        ).map((s) => ({
-                          rotulo: SAUDE[s].rotulo,
-                          valor: g.saude![s],
-                          cor: SAUDE[s].cor,
-                        }))}
-                      />
-                    ) : g.respostas === 0 ? (
-                      <span className="pesquisas__suave">—</span>
-                    ) : (
-                      <span className="pesquisas__suave">
-                        {textoDoOculto(g.oculto, resultado.minimoPorGrupo)}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {/* Só as faixas de renda que têm respostas. */}
+              {r.porRenda
+                .filter((g) => g.respostas > 0)
+                .map((g) => (
+                  <tr key={g.id}>
+                    <td>{RENDA[g.id]}</td>
+                    <td className="modelos__num">{g.respostas}</td>
+                    <td className="modelos__celula-barra">
+                      {g.visivel && g.saude ? (
+                        <BarraDeFaixas
+                          rotulo={RENDA[g.id] ?? g.id}
+                          partes={(
+                            ["baixa", "no_limite", "saudavel"] as const
+                          ).map((s) => ({
+                            rotulo: SAUDE[s].rotulo,
+                            valor: g.saude![s],
+                            cor: SAUDE[s].cor,
+                          }))}
+                        />
+                      ) : g.respostas === 0 ? (
+                        <span className="pesquisas__suave">—</span>
+                      ) : (
+                        <span className="pesquisas__suave">
+                          {textoDoOculto(g.oculto, resultado.minimoPorGrupo)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -572,7 +575,7 @@ export function BaseFinanceira({ r }: { readonly r: ResultadoIsfb }) {
           valor={
             r.base.produtosPorPessoa === null
               ? "—"
-              : `${umaCasaBr(r.base.produtosPorPessoa)} de 14`
+              : `${Math.round(r.base.produtosPorPessoa)} de 14 possíveis`
           }
         />
       </div>
