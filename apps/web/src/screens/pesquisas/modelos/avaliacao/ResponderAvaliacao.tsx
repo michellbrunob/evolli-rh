@@ -26,7 +26,7 @@ import {
   type ItemPendente,
   type Pendentes,
 } from "./cliente";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 interface Rascunho {
   notas: Record<string, number>;

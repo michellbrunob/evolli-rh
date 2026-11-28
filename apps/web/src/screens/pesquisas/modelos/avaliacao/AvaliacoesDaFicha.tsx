@@ -9,7 +9,7 @@ import { formatarInstante } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { NIVEIS, nota1 } from "./catalogo";
 import { clienteDaAvaliacao, type AvaliacaoDaFicha } from "./cliente";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 export function AvaliacoesDaFicha({
   colaboradorId,

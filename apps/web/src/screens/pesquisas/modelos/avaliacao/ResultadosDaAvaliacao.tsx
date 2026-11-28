@@ -39,7 +39,7 @@ import {
   RodaDeCompetencias,
 } from "./graficosDaAvaliacao";
 import { ResultadoDaPessoa } from "./ResultadoDaPessoa";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 type Aba = "geral" | "pessoas" | "analises" | "andamento";
 

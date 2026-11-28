@@ -29,7 +29,7 @@ import type {
 import { nomeDaPlanilha, planilhaDoOnboarding } from "./exportacaoDoOnboarding";
 import { formatarDiaCivil } from "../../../../format/data";
 import { ROTULO_DA_SITUACAO } from "./regrasDoOnboarding";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 type Aba = "geral" | "envios";
 

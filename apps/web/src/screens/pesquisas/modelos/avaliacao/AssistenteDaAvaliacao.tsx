@@ -57,7 +57,7 @@ import {
   timesParaEnviar,
   type TimeNoAssistente,
 } from "./regrasDoAssistente";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 const ETAPAS: Readonly<
   Record<ModeloDeAvaliacao, readonly { titulo: string; subtitulo: string }[]>

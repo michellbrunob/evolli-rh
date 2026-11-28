@@ -57,7 +57,7 @@ import {
   textoDoBotaoFinal,
   textoDoPrazoELembrete,
 } from "./regrasDoOnboarding";
-import "../modelos.css";
+import "../AvaliacaoOnboarding.css";
 
 const ETAPAS = [
   { titulo: "Configurar", subtitulo: "Nome e envio" },
