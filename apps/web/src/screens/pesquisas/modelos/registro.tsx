@@ -53,6 +53,13 @@ export const ABAS_DO_MODELO: Partial<
   ],
 };
 
+/** O primeiro recorte (anônima: o primeiro campo de "Separar respostas por"). */
+export function primeiroRecorte(d: PesquisaDetalhe): CampoGrupo | null {
+  return d.identificacao === "anonima"
+    ? (d.separarPor?.[0] ?? null)
+    : "departamento";
+}
+
 export const temTelasProprias = (modelo: ModeloPesquisa): boolean =>
   ABAS_DO_MODELO[modelo] !== undefined;
 
@@ -95,7 +102,9 @@ function PainelNr1({
   readonly servico: ServicoDosModelos;
   readonly onTrocarAba?: (aba: AbaDoModelo) => void;
 }) {
-  const [campo, setCampo] = useState<CampoGrupo | null>(null);
+  const [campo, setCampo] = useState<CampoGrupo | null>(() =>
+    primeiroRecorte(detalhe),
+  );
   const comCampo = aba === "analises";
   const res = useResultadoDoModelo(
     servico,
@@ -103,13 +112,6 @@ function PainelNr1({
     comCampo ? campo : null,
   );
   const acompanhamento = useAcompanhamentoNr1(servico, detalhe.id);
-  // O primeiro recorte disponível, assim que o resultado chega.
-  useEffect(() => {
-    if (comCampo && campo === null && res.fase === "pronto") {
-      const primeiro = res.dados.recortes[0];
-      if (primeiro) setCampo(primeiro);
-    }
-  }, [comCampo, campo, res]);
 
   if (aba === "conformidade") {
     return (
@@ -161,19 +163,15 @@ function PainelIsfb({
   readonly aba: AbaDoModelo;
   readonly servico: ServicoDosModelos;
 }) {
-  const [campo, setCampo] = useState<CampoGrupo | null>(null);
+  const [campo, setCampo] = useState<CampoGrupo | null>(() =>
+    primeiroRecorte(detalhe),
+  );
   const comCampo = aba === "analises";
   const res = useResultadoDoModelo(
     servico,
     detalhe.id,
     comCampo ? campo : null,
   );
-  useEffect(() => {
-    if (comCampo && campo === null && res.fase === "pronto") {
-      const primeiro = res.dados.recortes[0];
-      if (primeiro) setCampo(primeiro);
-    }
-  }, [comCampo, campo, res]);
   if (res.fase !== "pronto") {
     return <EstadoDoCarregamento fase={res.fase} onTentar={res.tentarDeNovo} />;
   }

@@ -58,7 +58,9 @@ import {
 } from "./isfb/textos";
 
 const pct = (n: number | null): CelulaXlsx =>
-  n === null ? "—" : { numero: n / 100, formato: "percentual" };
+  n === null
+    ? "—"
+    : { numero: Math.round(n * 100) / 10000, formato: "percentual" };
 const dec = (n: number | null): CelulaXlsx =>
   n === null ? "—" : { numero: n, formato: "decimal" };
 

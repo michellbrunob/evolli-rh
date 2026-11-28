@@ -894,3 +894,86 @@ papéis pela `chave` do item (`q12`…`q17`) e conta no índice os tipos `concor
 por `modelos/resultados.tsx` (resultados inteiros, no lugar das abas) e pela rota
 `#/pesquisas/nova/<modelo>` (assistente próprio, `modelos/integracao.tsx`).
 ```
+
+## Modelos com metodologia própria: Riscos psicossociais (NR-1) e Saúde financeira (27/11/2026)
+
+Os dois modelos moram em `apps/api/src/pesquisas/modelos/<id>/` (definição, cálculo puro com testes e
+regras) e `apps/web/src/screens/pesquisas/modelos/<id>/` (catálogo, telas, exportação). O ponto de
+registro é `modelos/registro.ts` na API e `modelos/catalogo.ts` + `modelos/registro.tsx` na tela.
+
+**Questionário fixo** (`copsoq`, `isfb`): a estrutura é do servidor — seções, ids (`Q1`…, `O1`…), ordem,
+tipos, escalas (`config.rotulos` com o rótulo de cada ponto; `config.somenteRotulos` mostra só os
+rótulos) e ids das opções. Do corpo vêm só os textos (enunciado, `rotulo`, texto de cada opção), que a
+empresa pode trocar pela redação oficial se tiver licença. Pergunta desconhecida ou repetida → 422
+`secoes: invalido`; texto ausente → 422 por pergunta. O teto de 60 perguntas não vale para eles (NR-1
+tem 76) e o envio pelo link aceita até 100 respostas.
+
+- NR-1: 8 seções (domínios), 76 escalas de 1 a 5, todas obrigatórias. Valor gravado = posição do ponto
+  como aparece; Q53 e Q54 e a escala de saúde (exibida do melhor para o pior) pontuam `6 − posição`.
+- Saúde financeira: Q1, Q14, Q15 escolha única; Q13 múltipla (opcional: sem produto, segue); Q2–Q12
+  escalas de 0 a 4 (Q2–Q4 pontuam `4 − posição`); a seção `autopercepcao` (O1–O3, opcionais) entra só
+  se o corpo a trouxer.
+
+**Cálculo** (funções puras, ver o cabeçalho de `copsoq/calculo.ts` e `isfb/calculo.ts`): NR-1 com escore
+por dimensão, tercis (2,33 / 3,66), severidade e prevalência (regra de amostra pequena abaixo de 10),
+matriz 4 × 4, regra de proteção (sintomas depressivos e comportamentos ofensivos com severidade ≥ 3
+nunca abaixo de "alto"), ranking, domínios, saúde e comportamentos ofensivos (fora da identificada,
+contagens abaixo do mínimo por grupo viram `null` = "menos de N pessoas"). Saúde financeira com as
+tabelas de conversão (coluna da base baixa até 6 pontos), 7 faixas (globais e por dimensão), média do
+Brasil 56,7, saúde em 3 grupos, sinais de alerta, perfis (corte 50), abertura a apoio, temas, base,
+crédito × reserva e renda da casa (com supressão secundária).
+
+```ts
+// GET /pesquisas/:id/modelo/resultado?campo=<CampoGrupo>   (leitura de pesquisa; 404 em outro modelo)
+interface ResultadoDoModelo {
+  modelo: "copsoq" | "isfb";
+  respostas: number;
+  visivel: boolean; // confidencial abaixo do mínimo: false e nada mais
+  minimoPorGrupo: number;
+  recortes: CampoGrupo[]; // campo fora deles → 422
+  nr1: ResultadoNr1 | null; // + pressao/recursos (médias dos escores de exigências e de apoio)
+  isfb: ResultadoIsfb | null; // + mediaDoBrasil
+  campo: CampoGrupo | null;
+  grupos: GrupoDoModelo[] | null; // do campo pedido; mínimo e proteção do grupo menor
+  semGrupo: number;
+}
+// GET /pesquisas/:id/modelo/respostas/:respostaId  (resposta_pesquisa; mesma regra e auditoria das
+//   respostas individuais: identificada e anônima; 404 na confidencial)
+interface IndividualDoModelo {
+  modelo;
+  respostaId;
+  nr1: IndividualNr1 | null;
+  isfb: PessoaIsfb | null;
+}
+
+// GET|PUT /pesquisas/:id/modelo/acompanhamento  (só NR-1; PUT com CSRF, pesquisa.alter, auditado
+//   como pesquisas_pesquisa_alterada; gravado em pesquisa.acompanhamento, JSONB)
+interface AcompanhamentoNr1Entrada {
+  etapas: {
+    id: "comunicar" | "validar" | "treinar" | "implementar" | "revisar";
+    itens: boolean[];
+    evidencias: string | null;
+    concluida: boolean;
+  }[];
+  plano: {
+    id;
+    dimensaoId;
+    titulo;
+    descricao;
+    controle: "eliminacao" | "substituicao" | "administrativo" | "protecao";
+    responsavel;
+    prazo: "AAAA-MM-DD" | null;
+    indicador;
+    situacao: "planejada" | "em_andamento" | "concluida";
+  }[]; // até 200
+  profissionalSst: { nome: string | null; registro: string | null };
+}
+// Resposta: as 7 etapas com `concluida`/`automatica`/`concluidaEm`, `concluidas`, `proxima` e
+// `revisarEm` (AAAA-MM, 1 ano depois da publicação). "mapear" conclui sozinha (anônima: 1ª resposta;
+// demais: todos os convidados); "plano" com a 1ª medida; concluir as outras exige item ou evidência.
+```
+
+Fora desta entrega: plano de ação gerado por IA (o RH escreve o plano), análise por IA, anexos de
+evidências (a etapa guarda a descrição de onde estão), "Baixar tudo (.zip)", benefícios × necessidades
+(depende do módulo Benefícios), recortes por faixa salarial/etária/tempo de casa/sexo e o resultado
+individual imediato na página pública da saúde financeira.
