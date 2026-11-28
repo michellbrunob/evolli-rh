@@ -123,7 +123,11 @@ describe("T216 — Motivação (TAD)", () => {
       { campo: "secoes", motivo: "estrutura_do_modelo" },
     ]);
     expect(
-      resultadoIndividualDoModelo("tad", estrutura(), valores(7, 1))?.geral,
+      (
+        resultadoIndividualDoModelo("tad", estrutura(), valores(7, 1)) as {
+          geral: number | null;
+        } | null
+      )?.geral,
     ).toBe(7);
     expect(
       resultadoIndividualDoModelo("clima", estrutura(), valores(7, 1)),

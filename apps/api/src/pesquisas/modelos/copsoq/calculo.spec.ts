@@ -56,12 +56,18 @@ describe("estrutura NR-1", () => {
       Array.from({ length: 76 }, (_, i) => `Q${i + 1}`),
     );
     expect(DIMENSOES_NR1).toHaveLength(29);
-    expect(ESTRUTURA_NR1.secoes.map((s) => s.id)).toEqual(
-      DOMINIOS_NR1.map((d) => d.id),
+    expect(ESTRUTURA_NR1.itens.map((i) => i.chave)).toEqual(
+      ITENS_NR1.map((i) => i.id),
     );
-    expect(ESTRUTURA_NR1.secoes.map((s) => s.perguntas.length)).toEqual([
-      8, 12, 21, 8, 12, 2, 9, 4,
-    ]);
+    expect(ESTRUTURA_NR1.opcionais).toEqual([]);
+    const porDominio = DOMINIOS_NR1.map(
+      (d) =>
+        ITENS_NR1.filter(
+          (i) =>
+            DIMENSOES_NR1.find((x) => x.id === i.dimensao)!.dominio === d.id,
+        ).length,
+    );
+    expect(porDominio).toEqual([8, 12, 21, 8, 12, 2, 9, 4]);
   });
 
   it("usa a escala de cada bloco e inverte só Q53 e Q54", () => {
@@ -87,18 +93,25 @@ describe("estrutura NR-1", () => {
     ]);
   });
 
-  it("leva os 5 rótulos de cada ponto na escala de 1 a 5", () => {
-    const q64 = ESTRUTURA_NR1.secoes[6]!.perguntas[0]!;
-    expect(q64.id).toBe("Q64");
-    expect(q64.config.rotulos).toEqual([
+  it("confere a escala de 1 a 5 com os 5 rótulos e a obrigatoriedade", () => {
+    const q64 = ESTRUTURA_NR1.itens[63]!;
+    expect(q64.chave).toBe("Q64");
+    expect(q64.tipo).toBe("escala");
+    expect(q64.obrigatoria).toBe(true);
+    const rotulos = [...ROTULOS_DA_ESCALA.saude];
+    expect(rotulos).toEqual([
       "Excelente",
       "Muito boa",
       "Boa",
       "Regular",
       "Fraca",
     ]);
-    expect(q64.config.minimo).toBe(1);
-    expect(q64.config.maximo).toBe(5);
+    expect(q64.config!({ minimo: 1, maximo: 5, rotulos })).toBe(true);
+    expect(
+      q64.config!({ minimo: 1, maximo: 5, rotulos: rotulos.slice(1) }),
+    ).toBe(false);
+    expect(q64.config!({ minimo: 0, maximo: 4, rotulos })).toBe(false);
+    expect(q64.config!({ minimo: 1, maximo: 5 })).toBe(false);
     expect(ROTULOS_DA_ESCALA.frequencia[0]).toBe("Nunca / Quase nunca");
     expect(ROTULOS_DA_ESCALA.satisfacao[2]).toBe("Moderadamente satisfeito(a)");
   });

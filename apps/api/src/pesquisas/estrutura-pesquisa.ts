@@ -165,7 +165,15 @@ export function conferirConfig(
         return { minimo, maximo, ...pontas };
       }
       const rotulos = conferirRotulos(c.rotulos, maximo - minimo + 1);
-      return rotulos ? { minimo, maximo, ...pontas, rotulos } : null;
+      if (
+        c.somenteRotulos !== undefined &&
+        typeof c.somenteRotulos !== "boolean"
+      )
+        return null;
+      if (!rotulos) return null;
+      return c.somenteRotulos === true
+        ? { minimo, maximo, ...pontas, rotulos, somenteRotulos: true }
+        : { minimo, maximo, ...pontas, rotulos };
     }
     case "numero": {
       const minimo = c.minimo ?? null;

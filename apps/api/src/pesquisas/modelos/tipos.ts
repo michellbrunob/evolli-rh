@@ -8,6 +8,14 @@
  * `RespostaDetalhe.modelo` (a pessoa), discriminado por `modelo`.
  */
 import type { Modelo, Pergunta, Secao, TipoPergunta } from "../pesquisas.types";
+import type {
+  IndividualNr1DoModelo,
+  ResultadoNr1DoModelo,
+} from "./copsoq/calculo";
+import type {
+  IndividualIsfbDoModelo,
+  ResultadoIsfbDoModelo,
+} from "./isfb/calculo";
 
 /** Faixas do score 0–100: < 50 · 50–69 · 70–84 · ≥ 85. */
 export type FaixaDeScore = "critico" | "atencao" | "saudavel" | "forte";
@@ -136,9 +144,24 @@ export interface ResultadoIndividualTad {
 
 /** Acrescente aqui o resultado de cada modelo com cálculo próprio. */
 export type ResultadoDoModelo =
-  ResultadoPulsoClima | ResultadoClima | ResultadoTad;
+  | ResultadoPulsoClima
+  | ResultadoClima
+  | ResultadoTad
+  | ResultadoNr1DoModelo
+  | ResultadoIsfbDoModelo;
 
-export type ResultadoIndividualDoModelo = ResultadoIndividualTad;
+export type ResultadoIndividualDoModelo =
+  ResultadoIndividualTad | IndividualNr1DoModelo | IndividualIsfbDoModelo;
+
+/**
+ * O que o cálculo do modelo pode precisar além das respostas: o sigilo das
+ * contagens sensíveis (fora da identificada, contagens abaixo dele somem) e
+ * o mínimo por grupo da pesquisa.
+ */
+export interface ContextoDoModelo {
+  sigilo: number | null;
+  minimoPorGrupo: number;
+}
 
 /** Uma resposta já conferida, para o cálculo do modelo. */
 export interface RespostaDoModelo {
@@ -173,10 +196,13 @@ export interface ModeloRegistrado {
   calcular?: (
     secoes: readonly Secao[],
     respostas: readonly RespostaDoModelo[],
+    contexto?: ContextoDoModelo,
   ) => ResultadoDoModelo;
   /** O resultado de uma pessoa (resultado individual). */
   individual?: (
     secoes: readonly Secao[],
     valores: ReadonlyMap<string, unknown>,
+    /** As respostas do time (comparação), quando o modelo usa. */
+    respostas?: readonly RespostaDoModelo[],
   ) => ResultadoIndividualDoModelo | null;
 }

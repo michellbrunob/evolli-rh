@@ -1,8 +1,11 @@
-import type { EstruturaFixa, PerguntaFixa } from "../estrutura-fixa";
+import type { EstruturaFixa, ItemFixo } from "../tipos";
 
 /**
  * T216 — Saúde financeira: 15 perguntas que formam a nota (0 a 100) e 3
  * opcionais de autopercepção. Valores gravados:
+ *
+ * Cada pergunta leva a chave do item (Q1–Q15, O1–O3); as opções valem pela
+ * posição (a 1ª opção de Q14 é a menor renda etc.).
  *
  * - escalas (Q2–Q12 e O1–O3): a posição do ponto como aparece (0 a 4);
  *   os itens negativos (Q2, Q3 e Q4) valem `4 − posição`;
@@ -89,96 +92,56 @@ export const PONTOS_Q15 = [0, 0, 1, 2, 3, 4] as const;
 /** Itens negativos (pontuação espelhada). */
 export const INVERTIDOS_ISFB = new Set(["Q2", "Q3", "Q4"]);
 
-const escala = (
-  id: string,
-  rotulos: readonly string[],
-  obrigatoria = true,
-): PerguntaFixa => ({
-  id,
+const escala = (chave: string, obrigatoria = true): ItemFixo => ({
+  chave,
   tipo: "escala",
+  config: (c) => c.minimo === 0 && c.maximo === 4 && c.rotulos?.length === 5,
   obrigatoria,
-  config: {
-    minimo: 0,
-    maximo: 4,
-    rotuloMinimo: rotulos[0]!,
-    rotuloMaximo: rotulos[4]!,
-    rotulos: [...rotulos],
-    somenteRotulos: true,
-  },
 });
 
-const concordo = (id: string) => escala(id, ROTULOS_DA_CONCORDANCIA);
+const escolha = (
+  chave: string,
+  tipo: "escolha_unica" | "multipla_escolha",
+  opcoes: number,
+  obrigatoria: boolean,
+): ItemFixo => ({
+  chave,
+  tipo,
+  config: (c) => c.opcoes?.length === opcoes && c.outro !== true,
+  obrigatoria,
+});
 
+/** As 18 perguntas, conferidas ao gravar; a autopercepção (O1–O3) é opcional. */
 export const ESTRUTURA_ISFB: EstruturaFixa = {
-  secoes: [
-    {
-      id: "seguranca",
-      titulo: "Segurança Financeira",
-      perguntas: [
-        {
-          id: "Q1",
-          tipo: "escolha_unica",
-          obrigatoria: true,
-          config: { outro: false },
-          opcoes: OPCOES_Q1,
-        },
-        concordo("Q2"),
-        concordo("Q3"),
-        concordo("Q4"),
-      ],
-    },
-    {
-      id: "habilidade",
-      titulo: "Habilidade Financeira",
-      perguntas: [concordo("Q5"), concordo("Q6"), concordo("Q7")],
-    },
-    {
-      id: "comportamento",
-      titulo: "Comportamento Financeiro",
-      perguntas: [concordo("Q8"), concordo("Q9"), concordo("Q10")],
-    },
-    {
-      id: "liberdade",
-      titulo: "Liberdade Financeira",
-      perguntas: [concordo("Q11"), concordo("Q12")],
-    },
-    {
-      id: "base",
-      titulo: "Base Financeira",
-      perguntas: [
-        // Quem não tem nenhum produto segue sem marcar (vale 0).
-        {
-          id: "Q13",
-          tipo: "multipla_escolha",
-          obrigatoria: false,
-          config: { outro: false, maximo: null },
-          opcoes: PRODUTOS,
-        },
-        {
-          id: "Q14",
-          tipo: "escolha_unica",
-          obrigatoria: true,
-          config: { outro: false },
-          opcoes: OPCOES_Q14,
-        },
-        {
-          id: "Q15",
-          tipo: "escolha_unica",
-          obrigatoria: true,
-          config: { outro: false },
-          opcoes: OPCOES_Q15,
-        },
-      ],
-    },
-    {
-      id: "autopercepcao",
-      titulo: "Autopercepção Financeira",
-      opcional: true,
-      perguntas: [
-        escala("O1", ROTULOS_DA_FREQUENCIA, false),
-        escala("O2", ROTULOS_DA_FREQUENCIA, false),
-        escala("O3", ROTULOS_DA_FREQUENCIA, false),
-      ],
-    },
+  itens: [
+    escolha("Q1", "escolha_unica", OPCOES_Q1.length, true),
+    ...[
+      "Q2",
+      "Q3",
+      "Q4",
+      "Q5",
+      "Q6",
+      "Q7",
+      "Q8",
+      "Q9",
+      "Q10",
+      "Q11",
+      "Q12",
+    ].map((q) => escala(q)),
+    // Quem não tem nenhum produto segue sem marcar (vale 0).
+    escolha("Q13", "multipla_escolha", PRODUTOS.length, false),
+    escolha("Q14", "escolha_unica", OPCOES_Q14.length, true),
+    escolha("Q15", "escolha_unica", OPCOES_Q15.length, true),
   ],
+  opcionais: ["O1", "O2", "O3"].map((q) => escala(q, false)),
+};
+
+/** As chaves de cada etapa, na ordem. */
+export const CHAVES_DAS_ETAPAS: Readonly<Record<string, readonly string[]>> = {
+  seguranca: ["Q1", "Q2", "Q3", "Q4"],
+  habilidade: ["Q5", "Q6", "Q7"],
+  comportamento: ["Q8", "Q9", "Q10"],
+  liberdade: ["Q11", "Q12"],
+  base: ["Q13", "Q14", "Q15"],
+  autopercepcao: ["O1", "O2", "O3"],
 };

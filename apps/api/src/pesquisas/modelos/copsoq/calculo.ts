@@ -1,4 +1,6 @@
-import type { ValorRespondido } from "../../pesquisas.types";
+import type { Secao, ValorRespondido } from "../../pesquisas.types";
+import { respostaPorChave } from "../chaves";
+import type { ContextoDoModelo, RespostaDoModelo } from "../tipos";
 import {
   DIMENSOES_NR1,
   DOMINIOS_NR1,
@@ -553,5 +555,44 @@ export function pressaoERecursos(r: ResultadoNr1): {
   return {
     pressao: escoreDe(DIMENSOES_DE_PRESSAO),
     recursos: escoreDe(DIMENSOES_DE_RECURSOS),
+  };
+}
+
+/** O resultado do modelo no registro (`modelos/indice.ts`). */
+export type ResultadoNr1DoModelo = { modelo: "copsoq" } & ResultadoNr1 & {
+    pressao: number | null;
+    recursos: number | null;
+  };
+export type IndividualNr1DoModelo = { modelo: "copsoq" } & IndividualNr1;
+
+/** Agregado: as respostas visíveis, com o sigilo fora da identificada. */
+export function calcularNr1DoModelo(
+  secoes: readonly Secao[],
+  respostas: readonly RespostaDoModelo[],
+  contexto?: ContextoDoModelo,
+): ResultadoNr1DoModelo {
+  const r = calcularNr1(
+    respostas.map((x) => ({ valores: respostaPorChave(secoes, x.valores) })),
+    { sigilo: contexto?.sigilo ?? null },
+  );
+  return { modelo: "copsoq", ...r, ...pressaoERecursos(r) };
+}
+
+/** Uma pessoa, comparada com o time (quando as respostas vêm junto). */
+export function individualNr1DoModelo(
+  secoes: readonly Secao[],
+  valores: ReadonlyMap<string, unknown>,
+  respostas?: readonly RespostaDoModelo[],
+): IndividualNr1DoModelo {
+  const time = respostas
+    ? calcularNr1(
+        respostas.map((x) => ({
+          valores: respostaPorChave(secoes, x.valores),
+        })),
+      )
+    : null;
+  return {
+    modelo: "copsoq",
+    ...individualNr1(respostaPorChave(secoes, valores), time),
   };
 }

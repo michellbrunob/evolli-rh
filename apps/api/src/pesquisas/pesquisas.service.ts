@@ -177,7 +177,7 @@ export function recortesDa(p: {
 }
 
 /** Uma resposta gravada com os grupos e o autor (identificada). */
-export interface RespostaCarregada extends RespostaParaCalculo {
+interface RespostaCarregada extends RespostaParaCalculo {
   id: string;
   respondidaEm: Date;
   colaboradorId: string | null;
@@ -1045,7 +1045,7 @@ export class PesquisasService {
   }
 
   /**
-   * Para os modelos com cálculo próprio (`modelos/`): a pesquisa da empresa
+   * Para o acompanhamento dos modelos (`modelos/`): a pesquisa da empresa
    * ativa com a permissão do uso (leitura ou escrita).
    */
   async pesquisaDoModelo(
@@ -1058,20 +1058,6 @@ export class PesquisasService {
     return {
       pesquisa: await this.obterLinha(db, id, empresaId, ctx),
       empresaId,
-    };
-  }
-
-  /** As respostas com os grupos (sem autor) e os nomes dos grupos. */
-  async respostasDoModelo(p: LinhaPesquisa): Promise<{
-    respostas: RespostaCarregada[];
-    nomesDosGrupos: Map<string, string>;
-    recortes: CampoGrupo[];
-  }> {
-    const respostas = await this.carregarRespostas(p, false);
-    return {
-      respostas,
-      nomesDosGrupos: await this.nomesDosGruposDe(p.empresaId, respostas),
-      recortes: recortesDa(p),
     };
   }
 
@@ -1369,6 +1355,10 @@ export class PesquisasService {
         p.modelo,
         p.secoes as unknown as Secao[],
         new Map(lista[i]!.valores.map((v) => [v.perguntaId, v.valor])),
+        // O time, para comparar (NR-1 e saúde financeira).
+        lista.map((r) => ({
+          valores: new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+        })),
       ),
     };
   }

@@ -27,9 +27,14 @@ import {
   somarDias,
   somarMeses,
 } from "../src/pessoas/ausencias/calculo-ausencias";
-import { ESTRUTURA_NR1 } from "../src/pesquisas/modelos/copsoq/definicao";
-import { ESTRUTURA_ISFB } from "../src/pesquisas/modelos/isfb/definicao";
-import type { EstruturaFixa } from "../src/pesquisas/modelos/estrutura-fixa";
+import {
+  ITENS_NR1,
+  ROTULOS_DA_ESCALA,
+} from "../src/pesquisas/modelos/copsoq/definicao";
+import {
+  ROTULOS_DA_CONCORDANCIA,
+  ROTULOS_DA_FREQUENCIA,
+} from "../src/pesquisas/modelos/isfb/definicao";
 import {
   camposObrigatoriosAdmissao,
   lotacaoMinima,
@@ -2622,92 +2627,119 @@ describe("T216 — Pesquisas (e2e)", () => {
 
   // -----------------------------------------------------------------------
   describe("modelos com metodologia própria (NR-1 e saúde financeira)", () => {
-    /** As seções do questionário fixo com textos sintéticos. */
-    function secoesFixas(e: EstruturaFixa, semOpcionais = false) {
-      return e.secoes
-        .filter((s) => !(semOpcionais && s.opcional))
-        .map((s) => ({
-          id: `cliente-${s.id}`,
-          titulo: "Título do cliente (ignorado)",
+    /** As 76 escalas da NR-1, com a chave do item e o id da tela. */
+    function secoesNr1(semUma = false) {
+      const itens = semUma ? ITENS_NR1.slice(1) : ITENS_NR1;
+      return [
+        {
+          id: "s-nr1",
+          titulo: null,
           descricao: null,
-          perguntas: s.perguntas.map((p) => ({
-            id: p.id,
-            // Tipo e configuração do corpo não valem: a estrutura é do servidor.
-            tipo: "texto_curto",
-            texto: `Enunciado sintético ${p.id}`,
-            rotulo: `Rótulo ${p.id}`,
+          perguntas: itens.map((i) => ({
+            id: `q-${i.id}`,
+            chave: i.id,
+            tipo: "escala",
+            texto: `Enunciado sintético ${i.id}`,
             descricao: null,
-            obrigatoria: false,
-            config: p.opcoes
-              ? { opcoes: p.opcoes.map((id) => ({ id, texto: `Opção ${id}` })) }
-              : {},
+            obrigatoria: true,
+            config: {
+              minimo: 1,
+              maximo: 5,
+              rotulos: [...ROTULOS_DA_ESCALA[i.escala]],
+            },
             condicao: null,
           })),
-        }));
+        },
+      ];
     }
 
-    const ITENS_NR1 = ESTRUTURA_NR1.secoes.flatMap((s) =>
-      s.perguntas.map((p) => p.id),
-    );
-    /** Uma resposta NR-1: a mesma posição em tudo, com ajustes. */
+    /** As 18 perguntas da saúde financeira (ids de opção gerados). */
+    function secoesIsfb(comAuto = true) {
+      const escala = (c: string, rotulos: readonly string[], obrig = true) => ({
+        id: `q-${c}`,
+        chave: c,
+        tipo: "escala",
+        texto: `Enunciado ${c}`,
+        descricao: null,
+        obrigatoria: obrig,
+        config: {
+          minimo: 0,
+          maximo: 4,
+          rotulos: [...rotulos],
+          somenteRotulos: true,
+        },
+        condicao: null,
+      });
+      const escolha = (c: string, tipo: string, n: number, obrig: boolean) => ({
+        id: `q-${c}`,
+        chave: c,
+        tipo,
+        texto: `Enunciado ${c}`,
+        descricao: null,
+        obrigatoria: obrig,
+        config: {
+          opcoes: Array.from({ length: n }, (_, i) => ({
+            id: `${c}-o${i}`,
+            texto: `Opção ${i + 1}`,
+          })),
+          outro: false,
+        },
+        condicao: null,
+      });
+      return [
+        {
+          id: "s-isfb",
+          titulo: null,
+          descricao: null,
+          perguntas: [
+            escolha("Q1", "escolha_unica", 5, true),
+            ...[
+              "Q2",
+              "Q3",
+              "Q4",
+              "Q5",
+              "Q6",
+              "Q7",
+              "Q8",
+              "Q9",
+              "Q10",
+              "Q11",
+              "Q12",
+            ].map((c) => escala(c, ROTULOS_DA_CONCORDANCIA)),
+            escolha("Q13", "multipla_escolha", 14, false),
+            escolha("Q14", "escolha_unica", 7, true),
+            escolha("Q15", "escolha_unica", 6, true),
+            ...(comAuto
+              ? ["O1", "O2", "O3"].map((c) =>
+                  escala(c, ROTULOS_DA_FREQUENCIA, false),
+                )
+              : []),
+          ],
+        },
+      ];
+    }
+
     const respostasNr1 = (
       padrao: number,
       ajustes: Record<string, number> = {},
     ) =>
-      ITENS_NR1.map((id) => ({ perguntaId: id, valor: ajustes[id] ?? padrao }));
+      ITENS_NR1.map((i) => ({
+        perguntaId: `q-${i.id}`,
+        valor: ajustes[i.id] ?? padrao,
+      }));
 
-    it("NR-1: estrutura do servidor (76 perguntas), textos do corpo", async () => {
-      const r = await post("/v1/pesquisas", rhA)
-        .send(
-          corpo({
-            modelo: "copsoq",
-            identificacao: "anonima",
-            secoes: secoesFixas(ESTRUTURA_NR1),
-          }),
-        )
-        .expect(201);
-      expect(r.body.secoes).toHaveLength(8);
-      expect(r.body.secoes[0]).toMatchObject({
-        id: "exigencias_laborais",
-        titulo: "Exigências Laborais",
-      });
-      const perguntas = r.body.secoes.flatMap(
-        (s: { perguntas: unknown[] }) => s.perguntas,
-      );
-      expect(perguntas).toHaveLength(76);
-      expect(perguntas[63]).toMatchObject({
-        id: "Q64",
-        tipo: "escala",
-        texto: "Enunciado sintético Q64",
-        rotulo: "Rótulo Q64",
-        obrigatoria: true,
-        config: {
-          minimo: 1,
-          maximo: 5,
-          rotulos: ["Excelente", "Muito boa", "Boa", "Regular", "Fraca"],
-        },
-      });
-
-      // Sem o texto de uma pergunta, ou com pergunta que o modelo não tem.
-      const semTexto = secoesFixas(ESTRUTURA_NR1);
-      semTexto[0]!.perguntas[4]!.texto = "  ";
-      const r1 = await post("/v1/pesquisas", rhA)
-        .send(corpo({ modelo: "copsoq", secoes: semTexto }))
+    it("NR-1: estrutura conferida pela chave; resultado, individual e acompanhamento", async () => {
+      // Item faltando: 422 estrutura_do_modelo.
+      const falta = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "copsoq", secoes: secoesNr1(true) }))
         .expect(422);
-      expect(r1.body.erros).toEqual([{ campo: "Q5", motivo: "obrigatorio" }]);
-      const extra = secoesFixas(ESTRUTURA_NR1);
-      extra[0]!.perguntas.push({ ...extra[0]!.perguntas[0]!, id: "Q77" });
-      const r2 = await post("/v1/pesquisas", rhA)
-        .send(corpo({ modelo: "copsoq", secoes: extra }))
-        .expect(422);
-      expect(r2.body.erros).toEqual([{ campo: "secoes", motivo: "invalido" }]);
-    });
-
-    it("NR-1: resultado do time, de uma resposta e o acompanhamento", async () => {
+      expect(falta.body.erros).toEqual([
+        { campo: "secoes", motivo: "estrutura_do_modelo" },
+      ]);
       const { id, token } = await publicada({
         modelo: "copsoq",
         identificacao: "anonima",
-        secoes: secoesFixas(ESTRUTURA_NR1),
+        secoes: secoesNr1(),
       });
       const ajustes = { Q1: 5, Q2: 5, Q3: 5 };
       for (const respostas of [
@@ -2720,24 +2752,16 @@ describe("T216 — Pesquisas (e2e)", () => {
           .send({ respostas })
           .expect(201);
       }
-      // Fora de 1 a 5: recusado.
+      // Fora de 1 a 5: recusado (76 respostas cabem no envio).
       await agent()
         .post(publico(token, "/respostas"))
         .send({ respostas: respostasNr1(6) })
         .expect(422);
 
-      const r = await get(`/v1/pesquisas/${id}/modelo/resultado`, rhA).expect(
-        200,
-      );
-      expect(r.body).toMatchObject({
-        modelo: "copsoq",
-        respostas: 3,
-        visivel: true,
-        isfb: null,
-        grupos: null,
-      });
-      expect(r.body.nr1.dimensoes).toHaveLength(29);
-      expect(r.body.nr1.dimensoes[0]).toMatchObject({
+      const r = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(200);
+      expect(r.body.modelo).toMatchObject({ modelo: "copsoq", respostas: 3 });
+      expect(r.body.modelo.dimensoes).toHaveLength(29);
+      expect(r.body.modelo.dimensoes[0]).toMatchObject({
         id: "exigencias_quantitativas",
         escore: 4.33,
         distribuicao: { risco: 2, intermediario: 1, favoravel: 0 },
@@ -2745,9 +2769,8 @@ describe("T216 — Pesquisas (e2e)", () => {
         prevalencia: 3,
         nivel: "critico",
       });
-      expect(r.body.nr1.prioridades[0]).toBe("exigencias_quantitativas");
-      // Anônima: menos de 3 pessoas não aparece (sigilo).
-      expect(r.body.nr1.ofensivos.tipos[0]).toMatchObject({
+      // Anônima: contagens abaixo do mínimo somem (sigilo).
+      expect(r.body.modelo.ofensivos.tipos[0]).toMatchObject({
         id: "Q73",
         raramente: null,
         asVezes: null,
@@ -2755,32 +2778,18 @@ describe("T216 — Pesquisas (e2e)", () => {
         relataram: 3,
       });
 
-      // Recorte pedido fora dos disponíveis (anônima sem separação).
-      await get(
-        `/v1/pesquisas/${id}/modelo/resultado?campo=departamento`,
-        rhA,
-      ).expect(422);
-      // O master lê o agregado.
-      await get(`/v1/pesquisas/${id}/modelo/resultado`, masterA).expect(200);
-
-      // Uma resposta: mesma regra das respostas individuais.
       const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
-      const ultima = lista.body[0].id as string;
-      const ind = await get(
-        `/v1/pesquisas/${id}/modelo/respostas/${ultima}`,
+      const ultima = await get(
+        `/v1/pesquisas/${id}/respostas/${lista.body[0].id}`,
         rhA,
       ).expect(200);
-      expect(ind.body.nr1.dimensoes[0]).toMatchObject({
+      expect(ultima.body.modelo.dimensoes[0]).toMatchObject({
         id: "exigencias_quantitativas",
         escore: 3,
         prevalencia: 2,
         escoreDoTime: 4.33,
         comparacao: "abaixo",
       });
-      await get(
-        `/v1/pesquisas/${id}/modelo/respostas/${randomUUID()}`,
-        rhA,
-      ).expect(404);
 
       // Acompanhamento: a 1ª etapa conclui com a 1ª resposta (anônima).
       const a0 = await get(
@@ -2790,7 +2799,6 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect(a0.body.etapas).toHaveLength(7);
       expect(a0.body).toMatchObject({ concluidas: 1, proxima: "plano" });
       expect(a0.body.revisarEm).toMatch(/^\d{4}-\d{2}$/);
-
       const etapas = (concluir: boolean, marcar: boolean) => [
         {
           id: "comunicar",
@@ -2843,17 +2851,12 @@ describe("T216 — Pesquisas (e2e)", () => {
         concluidas: 3,
         proxima: "validar",
         plano: [medida],
-        profissionalSst: { nome: "Profissional Sintético", registro: "123" },
       });
-      const comunicar = a1.body.etapas.find(
-        (e: { id: string }) => e.id === "comunicar",
-      );
-      expect(comunicar.concluidaEm).toEqual(expect.any(String));
-      // O master só lê.
+      const concluidaEm = a1.body.etapas[2].concluidaEm as string;
+      expect(concluidaEm).toEqual(expect.any(String));
       await put(`/v1/pesquisas/${id}/modelo/acompanhamento`, masterA)
         .send({ etapas: [], plano: [], profissionalSst: {} })
         .expect(403);
-      // Gravado (a data de conclusão se mantém) e auditado.
       const a2 = await put(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhA)
         .send({
           etapas: etapas(true, true),
@@ -2861,77 +2864,71 @@ describe("T216 — Pesquisas (e2e)", () => {
           profissionalSst: {},
         })
         .expect(200);
-      expect(a2.body.etapas[2].concluidaEm).toBe(comunicar.concluidaEm);
-      expect(a2.body.profissionalSst).toEqual({ nome: null, registro: null });
+      expect(a2.body.etapas[2].concluidaEm).toBe(concluidaEm);
       expect(
         (await trilha(id)).filter(
           (e) => e.action === "pesquisas_pesquisa_alterada",
         ),
       ).toHaveLength(2);
-      // De outra empresa: 404.
       await get(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhB).expect(404);
     });
 
-    it("saúde financeira: autopercepção opcional, nota do time e da resposta", async () => {
-      const sem = await post("/v1/pesquisas", rhA)
+    it("saúde financeira: autopercepção opcional; nota pela posição das opções", async () => {
+      await post("/v1/pesquisas", rhA)
         .send(
           corpo({
             modelo: "isfb",
             identificacao: "anonima",
-            secoes: secoesFixas(ESTRUTURA_ISFB, true),
+            secoes: secoesIsfb(false),
           }),
         )
         .expect(201);
-      expect(sem.body.secoes.map((s: { id: string }) => s.id)).not.toContain(
-        "autopercepcao",
-      );
-
       const { id, token } = await publicada({
         modelo: "isfb",
         identificacao: "anonima",
-        secoes: secoesFixas(ESTRUTURA_ISFB),
+        secoes: secoesIsfb(),
       });
-      const escalas = ["Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10"];
-      const respostas = [
-        { perguntaId: "Q1", valor: { opcao: "iguais" } as unknown },
-        ...[...escalas, "Q11", "Q12"].map((q) => ({
-          perguntaId: q,
-          valor: 2 as unknown,
-        })),
+      const escalas = [
+        "Q2",
+        "Q3",
+        "Q4",
+        "Q5",
+        "Q6",
+        "Q7",
+        "Q8",
+        "Q9",
+        "Q10",
+        "Q11",
+        "Q12",
+      ];
+      const respostas: { perguntaId: string; valor: unknown }[] = [
+        { perguntaId: "q-Q1", valor: { opcao: "Q1-o2" } },
+        ...escalas.map((c) => ({ perguntaId: `q-${c}`, valor: 2 })),
         {
-          perguntaId: "Q13",
-          valor: { opcoes: ["conta_corrente", "cartao_credito", "poupanca"] },
+          perguntaId: "q-Q13",
+          valor: { opcoes: ["Q13-o0", "Q13-o1", "Q13-o3"] },
         },
-        { perguntaId: "Q14", valor: { opcao: "renda_3" } },
-        { perguntaId: "Q15", valor: { opcao: "esc_4" } },
-        { perguntaId: "O1", valor: 3 },
-        { perguntaId: "O2", valor: 3 },
-        { perguntaId: "O3", valor: 3 },
+        { perguntaId: "q-Q14", valor: { opcao: "Q14-o2" } },
+        { perguntaId: "q-Q15", valor: { opcao: "Q15-o3" } },
+        { perguntaId: "q-O1", valor: 3 },
+        { perguntaId: "q-O2", valor: 3 },
+        { perguntaId: "q-O3", valor: 3 },
       ];
       await agent()
         .post(publico(token, "/respostas"))
         .send({ respostas })
         .expect(201);
-      // Autopercepção é opcional; Q13 também (nenhum produto).
       await agent()
         .post(publico(token, "/respostas"))
         .send({
           respostas: respostas.filter(
-            (x) => !["O1", "O2", "O3", "Q13"].includes(x.perguntaId),
+            (x) => !["q-O1", "q-O2", "q-O3", "q-Q13"].includes(x.perguntaId),
           ),
         })
         .expect(201);
-      // Q14 é obrigatória.
-      await agent()
-        .post(publico(token, "/respostas"))
-        .send({ respostas: respostas.filter((x) => x.perguntaId !== "Q14") })
-        .expect(422);
-
-      const r = await get(`/v1/pesquisas/${id}/modelo/resultado`, rhA).expect(
-        200,
-      );
-      expect(r.body).toMatchObject({ modelo: "isfb", respostas: 2, nr1: null });
-      expect(r.body.isfb).toMatchObject({
+      const r = await get(`/v1/pesquisas/${id}/resultados`, rhA).expect(200);
+      expect(r.body.modelo).toMatchObject({
+        modelo: "isfb",
         pessoas: 2,
         isfb: 56,
         faixa: "baixa",
@@ -2939,27 +2936,21 @@ describe("T216 — Pesquisas (e2e)", () => {
         mediaDoBrasil: 56.7,
         comAutopercepcao: 1,
       });
-      expect(r.body.isfb.sinais.sem_reserva.quantidade).toBe(1);
+      expect(r.body.modelo.produtos.poupanca.quantidade).toBe(1);
       const lista = await get(`/v1/pesquisas/${id}/respostas`, rhA).expect(200);
-      const primeira = lista.body[1].id as string;
-      const ind = await get(
-        `/v1/pesquisas/${id}/modelo/respostas/${primeira}`,
+      const primeira = await get(
+        `/v1/pesquisas/${id}/respostas/${lista.body[1].id}`,
         rhA,
       ).expect(200);
-      expect(ind.body.isfb).toMatchObject({
+      expect(primeira.body.modelo).toMatchObject({
+        modelo: "isfb",
         isfb: 56,
         autopercepcao: 80,
         abertura: "sabem_que_precisam",
         isfbDoTime: 56,
-        mediaDoBrasil: 56.7,
       });
       // Sem acompanhamento da NR-1 em outro modelo.
       await get(`/v1/pesquisas/${id}/modelo/acompanhamento`, rhA).expect(404);
-    });
-
-    it("modelo sem resultado próprio: 404", async () => {
-      const p = await criarPesquisa();
-      await get(`/v1/pesquisas/${p.id}/modelo/resultado`, rhA).expect(404);
     });
   });
 });

@@ -1,5 +1,11 @@
 import { suprimirGrupos } from "../../calculo-resultados";
-import type { MotivoOculto, ValorRespondido } from "../../pesquisas.types";
+import type {
+  MotivoOculto,
+  Secao,
+  ValorRespondido,
+} from "../../pesquisas.types";
+import { respostaPorChave } from "../chaves";
+import type { ContextoDoModelo, RespostaDoModelo } from "../tipos";
 import {
   INVERTIDOS_ISFB,
   OPCOES_Q1,
@@ -748,4 +754,61 @@ function porRenda(
         : null,
     };
   });
+}
+
+/** As opções de cada pergunta de escolha, pela posição. */
+const OPCOES_DO_MODELO: Readonly<Record<string, readonly string[]>> = {
+  Q1: OPCOES_Q1,
+  Q13: PRODUTOS,
+  Q14: OPCOES_Q14,
+  Q15: OPCOES_Q15,
+};
+
+/** O resultado do modelo no registro (`modelos/indice.ts`). */
+export type ResultadoIsfbDoModelo = { modelo: "isfb" } & ResultadoIsfb & {
+    mediaDoBrasil: number;
+  };
+export type IndividualIsfbDoModelo = { modelo: "isfb" } & PessoaIsfb & {
+    isfbDoTime: number | null;
+    mediaDoBrasil: number;
+    dimensoesDoTime: Record<string, number | null>;
+  };
+
+export function calcularIsfbDoModelo(
+  secoes: readonly Secao[],
+  respostas: readonly RespostaDoModelo[],
+  contexto?: ContextoDoModelo,
+): ResultadoIsfbDoModelo {
+  return {
+    modelo: "isfb",
+    ...calcularIsfb(
+      respostas.map((x) => ({
+        valores: respostaPorChave(secoes, x.valores, OPCOES_DO_MODELO),
+      })),
+      contexto?.minimoPorGrupo ?? 3,
+    ),
+    mediaDoBrasil: MEDIA_DO_BRASIL,
+  };
+}
+
+/** Uma pessoa (sem as perguntas que formam a nota: `null`). */
+export function individualIsfbDoModelo(
+  secoes: readonly Secao[],
+  valores: ReadonlyMap<string, unknown>,
+  respostas?: readonly RespostaDoModelo[],
+): IndividualIsfbDoModelo | null {
+  const pessoa = calcularPessoaIsfb(
+    respostaPorChave(secoes, valores, OPCOES_DO_MODELO),
+  );
+  if (!pessoa) return null;
+  const time = respostas ? calcularIsfbDoModelo(secoes, respostas) : null;
+  return {
+    modelo: "isfb",
+    ...pessoa,
+    isfbDoTime: time?.isfb ?? null,
+    mediaDoBrasil: MEDIA_DO_BRASIL,
+    dimensoesDoTime: Object.fromEntries(
+      (time?.dimensoes ?? []).map((d) => [d.id, d.nota]),
+    ),
+  };
 }

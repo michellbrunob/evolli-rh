@@ -1,11 +1,12 @@
-import type { EstruturaFixa, PerguntaFixa } from "../estrutura-fixa";
+import type { EstruturaFixa, ItemFixo } from "../tipos";
 
 /**
  * T216 — Riscos psicossociais (NR-1): 76 perguntas em 8 domínios e 29
- * dimensões, cinco escalas de 5 pontos. O valor gravado é a posição do
- * ponto na escala como aparece (1 a 5); a pontuação de cada item sai daqui:
- * itens invertidos valem `6 − posição` e a escala de saúde, exibida do
- * melhor para o pior, também.
+ * dimensões, cinco escalas de 5 pontos. Cada pergunta leva a chave do item
+ * (`Q1` a `Q76`). O valor gravado é a posição do ponto na escala como
+ * aparece (1 a 5); itens invertidos valem `6 − posição` e a escala de
+ * saúde, exibida do melhor para o pior, também. Metodologia fixa: a API
+ * confere os itens (escala de 1 a 5 com os 5 rótulos, obrigatória).
  */
 
 export type EscalaNr1 =
@@ -290,29 +291,13 @@ export function dimensaoNr1(id: string): DimensaoNr1 {
   return dimensaoDe.get(id)!;
 }
 
-function perguntaFixa(item: ItemNr1): PerguntaFixa {
-  const rotulos = [...ROTULOS_DA_ESCALA[item.escala]];
-  return {
-    id: item.id,
-    tipo: "escala",
-    obrigatoria: true,
-    config: {
-      minimo: 1,
-      maximo: 5,
-      rotuloMinimo: rotulos[0]!,
-      rotuloMaximo: rotulos[4]!,
-      rotulos,
-    },
-  };
-}
-
-/** As 8 seções (uma por domínio) com as 76 perguntas. */
+/** Os 76 itens, conferidos ao gravar (chave, escala de 1 a 5, 5 rótulos). */
 export const ESTRUTURA_NR1: EstruturaFixa = {
-  secoes: DOMINIOS_NR1.map((dom) => ({
-    id: dom.id,
-    titulo: dom.rotulo,
-    perguntas: ITENS_NR1.filter(
-      (i) => dimensaoNr1(i.dimensao).dominio === dom.id,
-    ).map(perguntaFixa),
+  itens: ITENS_NR1.map((i): ItemFixo => ({
+    chave: i.id,
+    tipo: "escala",
+    config: (c) => c.minimo === 1 && c.maximo === 5 && c.rotulos?.length === 5,
+    obrigatoria: true,
   })),
+  opcionais: [],
 };

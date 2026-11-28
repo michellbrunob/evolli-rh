@@ -14,7 +14,12 @@ import {
   TABELAS_DAS_DIMENSOES,
   temasDa,
 } from "./calculo";
-import { ESTRUTURA_ISFB, PRODUTOS } from "./definicao";
+import {
+  ESTRUTURA_ISFB,
+  PRODUTOS,
+  ROTULOS_DA_CONCORDANCIA,
+  ROTULOS_DA_FREQUENCIA,
+} from "./definicao";
 
 /** T216 — saúde financeira: estrutura, tabelas e resultado do time. */
 
@@ -69,36 +74,33 @@ const MEIO: Pessoa = {
 };
 
 describe("estrutura da saúde financeira", () => {
-  it("tem 15 perguntas obrigatórias e 3 de autopercepção opcionais", () => {
-    const todas = ESTRUTURA_ISFB.secoes.flatMap((s) => s.perguntas);
-    expect(todas.map((p) => p.id)).toEqual([
-      ...Array.from({ length: 15 }, (_, i) => `Q${i + 1}`),
+  it("tem 15 perguntas e 3 de autopercepção opcionais", () => {
+    expect(ESTRUTURA_ISFB.itens.map((i) => i.chave)).toEqual(
+      Array.from({ length: 15 }, (_, i) => `Q${i + 1}`),
+    );
+    expect(ESTRUTURA_ISFB.opcionais.map((i) => i.chave)).toEqual([
       "O1",
       "O2",
       "O3",
     ]);
-    expect(ESTRUTURA_ISFB.secoes.map((s) => s.id)).toEqual([
-      "seguranca",
-      "habilidade",
-      "comportamento",
-      "liberdade",
-      "base",
-      "autopercepcao",
-    ]);
-    expect(ESTRUTURA_ISFB.secoes[5]!.opcional).toBe(true);
-    expect(todas.find((p) => p.id === "Q13")!.opcoes).toHaveLength(14);
-    expect(todas.find((p) => p.id === "Q14")!.opcoes).toHaveLength(7);
-    expect(todas.find((p) => p.id === "Q15")!.opcoes).toHaveLength(6);
-    const q2 = todas.find((p) => p.id === "Q2")!;
-    expect(q2.config.rotulos).toEqual([
-      "Nada",
-      "Pouco",
-      "Mais ou menos",
-      "Muito",
-      "Totalmente",
-    ]);
-    expect(q2.config.minimo).toBe(0);
-    expect(todas.find((p) => p.id === "O1")!.config.rotulos![4]).toBe("Sempre");
+    const item = (c: string) =>
+      [...ESTRUTURA_ISFB.itens, ...ESTRUTURA_ISFB.opcionais].find(
+        (i) => i.chave === c,
+      )!;
+    expect(item("Q13").tipo).toBe("multipla_escolha");
+    expect(item("Q13").obrigatoria).toBe(false);
+    expect(item("Q14").obrigatoria).toBe(true);
+    expect(item("O1").obrigatoria).toBe(false);
+    const opcoes = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ id: `o${i}`, texto: "x" }));
+    expect(item("Q13").config!({ opcoes: opcoes(14) })).toBe(true);
+    expect(item("Q13").config!({ opcoes: opcoes(13) })).toBe(false);
+    expect(item("Q14").config!({ opcoes: opcoes(7) })).toBe(true);
+    expect(item("Q15").config!({ opcoes: opcoes(6), outro: true })).toBe(false);
+    const rotulos = [...ROTULOS_DA_CONCORDANCIA];
+    expect(item("Q2").config!({ minimo: 0, maximo: 4, rotulos })).toBe(true);
+    expect(item("Q2").config!({ minimo: 1, maximo: 5, rotulos })).toBe(false);
+    expect(ROTULOS_DA_FREQUENCIA[4]).toBe("Sempre");
   });
 
   it("as tabelas cobrem cada soma possível", () => {

@@ -514,6 +514,12 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
           filtradas.map((r) => ({
             valores: new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
           })),
+          // Contagens sensíveis (ex.: comportamentos ofensivos da NR-1) só
+          // aparecem inteiras para quem vê o autor (identificada).
+          {
+            sigilo: e.identificada ? null : e.minimoPorGrupo,
+            minimoPorGrupo: e.minimoPorGrupo,
+          },
         )
       : null;
 

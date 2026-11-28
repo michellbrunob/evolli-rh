@@ -18,8 +18,13 @@ import { ESTRUTURA_DA_AVALIACAO } from "./avaliacao/definicao";
 import { calcularPulsoClima } from "./pulso_clima/calculo";
 import { ESTRUTURA_PULSO_CLIMA } from "./pulso_clima/definicao";
 import { calcularTad, individualDaTad } from "./tad/calculo";
+import { calcularNr1DoModelo, individualNr1DoModelo } from "./copsoq/calculo";
+import { ESTRUTURA_NR1 } from "./copsoq/definicao";
+import { calcularIsfbDoModelo, individualIsfbDoModelo } from "./isfb/calculo";
+import { ESTRUTURA_ISFB } from "./isfb/definicao";
 import { ESTRUTURA_TAD } from "./tad/definicao";
 import type {
+  ContextoDoModelo,
   ModeloRegistrado,
   RespostaDoModelo,
   ResultadoDoModelo,
@@ -49,6 +54,18 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
   },
   // O resultado do DISC tem rota própria (`/perfil-comportamental`).
   disc: { modelo: "disc", estrutura: ESTRUTURA_DISC },
+  copsoq: {
+    modelo: "copsoq",
+    estrutura: ESTRUTURA_NR1,
+    calcular: calcularNr1DoModelo,
+    individual: individualNr1DoModelo,
+  },
+  isfb: {
+    modelo: "isfb",
+    estrutura: ESTRUTURA_ISFB,
+    calcular: calcularIsfbDoModelo,
+    individual: individualIsfbDoModelo,
+  },
 };
 
 /** Metodologia fixa: os erros da estrutura (vazio quando confere). */
@@ -65,9 +82,10 @@ export function resultadoDoModelo(
   modelo: Modelo,
   secoes: readonly Secao[],
   respostas: readonly RespostaDoModelo[],
+  contexto?: ContextoDoModelo,
 ): ResultadoDoModelo | null {
   const calcular = MODELOS_REGISTRADOS[modelo]?.calcular;
-  return calcular ? calcular(secoes, respostas) : null;
+  return calcular ? calcular(secoes, respostas, contexto) : null;
 }
 
 /** O resultado de uma pessoa no modelo, ou `null`. */
@@ -75,7 +93,8 @@ export function resultadoIndividualDoModelo(
   modelo: Modelo,
   secoes: readonly Secao[],
   valores: ReadonlyMap<string, unknown>,
+  respostas?: readonly RespostaDoModelo[],
 ): ResultadoIndividualDoModelo | null {
   const individual = MODELOS_REGISTRADOS[modelo]?.individual;
-  return individual ? individual(secoes, valores) : null;
+  return individual ? individual(secoes, valores, respostas) : null;
 }
