@@ -33,7 +33,6 @@ import {
 import { textoDaRegua } from "../RespostasNaRegua";
 import { PaginaDoModelo } from "../PaginaDoModelo";
 import { PULSO_CLIMA } from "./catalogo";
-import { mesPorExtenso } from "./ComentariosPulsoClima";
 import { comparacaoComOTime, grupoDaNota } from "./IndividualPulsoClima";
 
 const detalhe: PesquisaDetalhe = {
@@ -231,11 +230,6 @@ describe("T216 — Pulso e Clima: aba Comentários", () => {
     expect(item).toHaveTextContent("Antigo formato");
     expect(item).not.toHaveTextContent("Anônimo");
     expect(item).toHaveTextContent("Departamento oculto");
-  });
-
-  it("mês por extenso", () => {
-    expect(mesPorExtenso("2026-03")).toBe("março de 2026");
-    expect(mesPorExtenso("lixo")).toBe("");
   });
 
   it("nas abas da pesquisa: Comentários com a contagem, antes de Respostas", async () => {

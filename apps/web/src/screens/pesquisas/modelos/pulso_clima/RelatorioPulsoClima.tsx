@@ -10,7 +10,11 @@ import type {
   ResultadoPulsoClima,
 } from "../../../../api/pesquisasClient";
 import { MarcaEvolli } from "../../../../app/marca/MarcaEvolli";
-import { formatarDiaCivil } from "../../../../format/data";
+import {
+  formatarCompetenciaPorExtenso,
+  formatarDiaCivil,
+  mesDoDia,
+} from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import type { RelatorioCarregado } from "../../carregarRelatorio";
 import { perguntasEmOrdem } from "../../estadoDaPesquisa";
@@ -23,8 +27,11 @@ import {
   comSinal,
   pct,
 } from "../resultadoComum";
-import { alertaDaAfirmacao, zonaDaMedia } from "./exportarPulsoClima";
-import { mesPorExtenso } from "./ComentariosPulsoClima";
+import {
+  alertaDaAfirmacao,
+  pontosFortesEDeAtencao,
+  zonaDaMedia,
+} from "./exportarPulsoClima";
 
 const umaCasa = (n: number | null) =>
   n === null ? "—" : n.toFixed(1).replace(".", ",");
@@ -112,14 +119,7 @@ export function DocumentoPulsoClima({
     : [];
   const critica = ordenadas[0] ?? null;
   const forte = ordenadas.at(-1) ?? null;
-  const comMedia = r ? r.afirmacoes.filter((a) => a.media !== null) : [];
-  const fortes = [...comMedia].sort((a, b) => b.media! - a.media!).slice(0, 5);
-  const atencao = [...comMedia]
-    .sort(
-      (a, b) =>
-        (b.desfavoravel ?? 0) - (a.desfavoravel ?? 0) || a.media! - b.media!,
-    )
-    .slice(0, 5);
+  const { fortes, atencao } = pontosFortesEDeAtencao(r?.afirmacoes ?? []);
   const alertas = r
     ? r.afirmacoes.flatMap((a, i) => {
         const nivel = alertaDaAfirmacao(a);
@@ -158,7 +158,7 @@ export function DocumentoPulsoClima({
             Clima organizacional
           </span>
         </div>
-        <p className="relatorio__sobretitulo">{`PULSO E CLIMA · ${(mesPorExtenso(rel.emitidoEm.slice(0, 7)) || "").toUpperCase()}`}</p>
+        <p className="relatorio__sobretitulo">{`PULSO E CLIMA · ${formatarCompetenciaPorExtenso(mesDoDia(rel.emitidoEm)).toUpperCase()}`}</p>
         <h1 className="relatorio__capa-titulo">{rel.nome}</h1>
         <p className="relatorio__capa-subtitulo">
           O clima em 8 dimensões, com a recomendação da empresa (eNPS) e da

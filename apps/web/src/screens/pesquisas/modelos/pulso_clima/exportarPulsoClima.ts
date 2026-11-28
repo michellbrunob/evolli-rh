@@ -19,6 +19,7 @@ import type {
   AbaXlsx,
   CelulaXlsx,
 } from "../../../pessoas/importacao/planilhaXlsx";
+import { formatarMesReferencia } from "../../../../format/data";
 import type { RelatorioDeResultados } from "../../dadosDoRelatorio";
 import { perguntasEmOrdem } from "../../estadoDaPesquisa";
 import { ROTULO_DA_IDENTIFICACAO } from "../../textosDasPesquisas";
@@ -64,6 +65,30 @@ export function alertaDaAfirmacao(
   if (a.desfavoravel >= 50 || a.media < 2.5) return "alto";
   if (a.desfavoravel >= 30 || a.media < 3) return "atencao";
   return null;
+}
+
+/**
+ * As 5 afirmações mais fortes (maior média) e as 5 que mais pedem atenção
+ * (mais desfavoráveis; empate pela menor média).
+ */
+export function pontosFortesEDeAtencao(
+  afirmacoes: readonly AfirmacaoDoModelo[],
+): { fortes: AfirmacaoDoModelo[]; atencao: AfirmacaoDoModelo[] } {
+  const comMedia = afirmacoes.filter((a) => a.media !== null);
+  return {
+    fortes: [...comMedia]
+      .sort(
+        (a, b) =>
+          b.media! - a.media! || (b.favoravel ?? 0) - (a.favoravel ?? 0),
+      )
+      .slice(0, 5),
+    atencao: [...comMedia]
+      .sort(
+        (a, b) =>
+          (b.desfavoravel ?? 0) - (a.desfavoravel ?? 0) || a.media! - b.media!,
+      )
+      .slice(0, 5),
+  };
 }
 
 function linhaDaRecomendacao(
@@ -357,18 +382,7 @@ export function abasDoPulsoClima(
   });
 
   // 7. Ranking.
-  const comMedia = r.afirmacoes.filter((a) => a.media !== null);
-  const fortes = [...comMedia]
-    .sort(
-      (a, b) => b.media! - a.media! || (b.favoravel ?? 0) - (a.favoravel ?? 0),
-    )
-    .slice(0, 5);
-  const criticas = [...comMedia]
-    .sort(
-      (a, b) =>
-        (b.desfavoravel ?? 0) - (a.desfavoravel ?? 0) || a.media! - b.media!,
-    )
-    .slice(0, 5);
+  const { fortes, atencao: criticas } = pontosFortesEDeAtencao(r.afirmacoes);
   abas.push({
     nome: "Ranking",
     larguras: [5, 60, 9, 13, 8],
@@ -507,7 +521,7 @@ export function abasDoPulsoClima(
       ["Dimensão", "Mês", "Departamento", "Comentário"],
       ...comentarios.map((c): CelulaXlsx[] => [
         rotuloDaDimensao(c.dimensao),
-        c.mes ? `${c.mes.slice(5, 7)}/${c.mes.slice(0, 4)}` : "—",
+        c.mes ? formatarMesReferencia(c.mes) : "—",
         c.departamento ?? "Oculto",
         c.texto,
       ]),

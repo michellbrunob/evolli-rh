@@ -12,6 +12,7 @@ import type {
   ResultadoPulsoClima,
   ResultadosPesquisa,
 } from "../../../../api/pesquisasClient";
+import { formatarCompetenciaPorExtenso } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { ListaDeEscolha } from "../../../../ui";
 import {
@@ -23,28 +24,6 @@ import {
 } from "../resultadoComum";
 import { DIMENSOES_PULSO_CLIMA, corDaDimensao } from "./catalogo";
 import "./PulsoClima.css";
-
-const MESES = [
-  "janeiro",
-  "fevereiro",
-  "março",
-  "abril",
-  "maio",
-  "junho",
-  "julho",
-  "agosto",
-  "setembro",
-  "outubro",
-  "novembro",
-  "dezembro",
-];
-
-/** "2026-11" → "novembro de 2026". */
-export function mesPorExtenso(mes: string): string {
-  const m = /^(\d{4})-(\d{2})$/.exec(mes);
-  if (!m) return "";
-  return `${MESES[Number(m[2]) - 1] ?? ""} de ${m[1]}`;
-}
 
 const ROTULO_DA_RECOMENDACAO_DO_GRUPO: Readonly<Record<string, string>> = {
   lnps: "LNPS · liderança direta",
@@ -255,7 +234,7 @@ export function ComentariosPulsoClima({
                     {[
                       anonimo ? "Anônimo" : null,
                       c.departamento ?? "Departamento oculto",
-                      c.mes ? mesPorExtenso(c.mes) : null,
+                      c.mes ? formatarCompetenciaPorExtenso(c.mes) : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
