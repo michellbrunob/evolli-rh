@@ -353,6 +353,7 @@ function AssistenteDePesquisaInterno({
             id={idNome}
             className="pesquisas__campo"
             value={estado.nome}
+            maxLength={LIMITES.nome}
             aria-invalid={erros?.nome ? true : undefined}
             {...(erros?.nome ? { "aria-describedby": `${idNome}-erro` } : {})}
             onChange={(e) => mudar({ nome: e.target.value })}
@@ -372,6 +373,7 @@ function AssistenteDePesquisaInterno({
             id={idBoas}
             className="pesquisas__campo"
             value={estado.boasVindas}
+            maxLength={LIMITES.boasVindas}
             aria-invalid={erros?.boasVindas ? true : undefined}
             onChange={(e) => mudar({ boasVindas: e.target.value })}
           />

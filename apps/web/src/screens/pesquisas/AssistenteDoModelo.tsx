@@ -665,6 +665,7 @@ function EtapaConfigurar({
             id={idNome}
             className="pesquisas__campo"
             value={estado.nome}
+            maxLength={LIMITES.nome}
             aria-invalid={erros?.nome ? true : undefined}
             {...(erros?.nome ? { "aria-describedby": `${idNome}-erro` } : {})}
             onChange={(e) => onMudar({ nome: e.target.value })}
@@ -681,6 +682,7 @@ function EtapaConfigurar({
             id={idDescricao}
             className="pesquisas__campo"
             value={estado.boasVindas}
+            maxLength={LIMITES.boasVindas}
             aria-describedby={`${idDescricao}-ajuda`}
             onChange={(e) => onMudar({ boasVindas: e.target.value })}
           />

@@ -465,6 +465,8 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
 
   const secoes = useMemo(() => pesquisa?.secoes ?? [], [pesquisa]);
   const porSecao = pesquisa?.modelo === "personalizada";
+  // Clima: a pergunta sem o nome e a descrição da dimensão (a seção).
+  const semSecao = pesquisa?.modelo === "clima";
   const gruposDaPesquisa = useMemo(
     () =>
       pesquisa?.identificacao === "anonima" ? (pesquisa.grupos ?? []) : [],
@@ -1112,7 +1114,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
           {atual.doModelo === undefined ? (
             <p className="pesquisa-contador">
               {`${rotulo} ${posicao + 1} de ${total}`}
-              {!porSecao && atual.secao.titulo ? (
+              {!porSecao && !semSecao && atual.secao.titulo ? (
                 <span className="pesquisa-contador__secao">
                   {" "}
                   · {atual.secao.titulo}
@@ -1131,6 +1133,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
             </>
           ) : primeira.primeiraDaSecao &&
             atual.secao.descricao &&
+            !semSecao &&
             atual.doModelo === undefined ? (
             <p className="pesquisa-publica__legenda">{atual.secao.descricao}</p>
           ) : null}

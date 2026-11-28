@@ -18,7 +18,7 @@ import { formatarInstante } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { IconeAvancar } from "../../../../ui/icones";
 import { Esqueleto } from "../../../../ui/movimento";
-import { Avatar, iniciaisDe } from "../../componentes";
+import { Avatar, iniciaisDe, Pilulas } from "../../componentes";
 import { Rosca } from "../../graficos";
 import { textoParaOPainel } from "../empresa";
 import { DIMENSOES_CLIMA, PREFIXO_DAS_ABERTAS } from "./catalogo";
@@ -29,9 +29,8 @@ import {
   corDaDimensao,
 } from "./pecas";
 
-/** "27/11 · 11:23". */
-const diaEHora = (iso: string) =>
-  formatarInstante(iso).replace(/^(\d{2}\/\d{2})\/\d{4} às /, "$1 · ");
+/** "28/11/2026 · 07:26" (com o ano). */
+const diaEHora = (iso: string) => formatarInstante(iso).replace(" às ", " · ");
 
 /** O departamento da resposta: identificada pela ficha; anônima pelo grupo. */
 export function departamentoDaResposta(
@@ -71,6 +70,14 @@ export function ListaDeRespostasClima({
     );
   return (
     <>
+      <Pilulas
+        rotulo="Respostas"
+        valor="todos"
+        onMudar={() => undefined}
+        opcoes={[
+          { valor: "todos", rotulo: "Todos", contagem: respostas.length },
+        ]}
+      />
       {identificada ? (
         <p className="pesquisas__suave">
           A consulta às respostas individuais fica registrada na auditoria.
@@ -85,8 +92,8 @@ export function ListaDeRespostasClima({
             <tr>
               <th scope="col">Resposta</th>
               <th scope="col">Departamento</th>
-              <th scope="col">Índice da resposta</th>
               <th scope="col">Respondeu em</th>
+              <th scope="col">Índice</th>
               <th scope="col">
                 <span className="pesquisas__so-leitor">Abrir</span>
               </th>
@@ -115,6 +122,9 @@ export function ListaDeRespostasClima({
                     </span>
                   </td>
                   <td>{departamentoDaResposta(r, identificada)}</td>
+                  <td className="pesquisas__data">
+                    {diaEHora(r.respondidaEm)}
+                  </td>
                   <td>
                     {resumo && resumo.indice !== null ? (
                       <span className="pesquisas__pessoa-linha">
@@ -124,9 +134,6 @@ export function ListaDeRespostasClima({
                     ) : (
                       "—"
                     )}
-                  </td>
-                  <td className="pesquisas__data">
-                    {diaEHora(r.respondidaEm)}
                   </td>
                   <td>
                     <button

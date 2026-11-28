@@ -561,16 +561,26 @@ describe("T216 — Clima: Respostas e resultado individual", () => {
         })}
       </>,
     );
+    expect(
+      within(screen.getByRole("group", { name: "Respostas" })).getByRole(
+        "button",
+        { name: "Todos 3" },
+      ),
+    ).toHaveAttribute("aria-pressed", "true");
     const linhas = within(
       screen.getByRole("table", { name: "Respostas" }),
     ).getAllByRole("row");
-    expect(linhas[0]).toHaveTextContent("Departamento");
-    expect(linhas[0]).toHaveTextContent("Índice da resposta");
+    expect(
+      within(linhas[0]!)
+        .getAllByRole("columnheader")
+        .map((c) => c.textContent),
+    ).toEqual(["Resposta", "Departamento", "Respondeu em", "Índice", "Abrir"]);
+    // A data com o ano.
     expect(linhas[1]).toHaveTextContent(
-      "Resposta anônima #3Operações40%Crítica",
+      "Resposta anônima #3Operações28/11/2026 · 03:2240%Crítica",
     );
-    expect(linhas[2]).toHaveTextContent("Oculto0%Crítica");
-    expect(linhas[3]).toHaveTextContent("—100%Excelente");
+    expect(linhas[2]).toHaveTextContent("Oculto28/11/2026 · 03:220%Crítica");
+    expect(linhas[3]).toHaveTextContent("—28/11/2026 · 03:22100%Excelente");
     expect(screen.queryByText(/\/10/)).toBeNull();
     fireEvent.click(linhas[1]!);
     expect(onAbrir).toHaveBeenCalledWith("r-3");

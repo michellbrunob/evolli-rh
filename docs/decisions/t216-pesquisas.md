@@ -1521,3 +1521,8 @@ Regras:
   "Mais negativo que o time" (desfavorável aqui, time a partir de 50%); neutra nunca entra; até 5 em
   cada, da maior distância; vazios explicados; "Ver todas as respostas" abre a aba Respostas do
   individual, que no Clima conta só as afirmações (`contagemIndividualDoModelo`; as abertas à parte).
+- **Clima — aba Respostas:** pílula "Todos N", colunas Resposta | Departamento | Respondeu em | Índice e
+  data com o ano ("28/11/2026 · 07:26"). **Página pública do Clima:** sem o nome nem a descrição da
+  dimensão nas perguntas. **Assistentes** (modelo e personalizada): `maxLength` 120 no nome e 1000 na
+  descrição/boas-vindas, os limites que a API já confere (`LIMITE_NOME`, `LIMITE_BOAS_VINDAS`, 422
+  `limite`).
