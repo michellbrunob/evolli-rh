@@ -814,76 +814,83 @@ PDF em `modelos/disc/`.
 // ConfigPergunta (escala): rotulos?: string[] (um por ponto, do mínimo ao máximo).
 
 // Avaliação (autenticadas; resultados e ficha pedem resposta_pesquisa e são auditados)
-// GET  /pesquisas/avaliacoes/organograma → { times: {gestor, pessoas}[], semGestor: {pessoa,
-//      motivo: "sem_gestor"|"gestor_sem_cpf"|"gestor_inativo", gestorNome}[], ativos }
-//      (pessoa: { id, nome, cargo, departamento, identificavel, temEmail }; sem CPF nem e-mail)
-// GET  /pesquisas/:id/avaliacao → { config, prazo, times, totais, lembretes, convites }
-// PUT  /pesquisas/:id/avaliacao { config?: ConfigAvaliacao, times: { gestorId, avaliadoIds[] }[] }
-//      422 times: repetida | indisponivel | gestor_nao_identificavel | invalido | sem_pessoas;
-//      prazoAutoavaliacao: fora_do_prazo | fora_de_ordem | nao_se_aplica; 409 times com_respostas
-// GET  /pesquisas/:id/avaliacao/resultados → time, pessoas, itens, calibracao, recortes, comparativo
-// GET  /pesquisas/:id/avaliacao/pessoas/:colaboradorId → gestorAvaliacao, autoavaliacao,
-//      comparativo, roteiro, desenvolver, time
-// GET  /colaboradores/:id/avaliacoes → { pesquisaId, nome, modelo, respondidaEm, gestor, geral,
-//      nivel, autoavaliacao }[]
+// GET /pesquisas/avaliacoes/organograma → { times: {gestor, pessoas}[], semGestor: {pessoa,
+// motivo: "sem_gestor"|"gestor_sem_cpf"|"gestor_inativo", gestorNome}[], ativos }
+// (pessoa: { id, nome, cargo, departamento, identificavel, temEmail }; sem CPF nem e-mail)
+// GET /pesquisas/:id/avaliacao → { config, prazo, times, totais, lembretes, convites }
+// PUT /pesquisas/:id/avaliacao { config?: ConfigAvaliacao, times: { gestorId, avaliadoIds[] }[] }
+// 422 times: repetida | indisponivel | gestor_nao_identificavel | invalido | sem_pessoas;
+// prazoAutoavaliacao: fora_do_prazo | fora_de_ordem | nao_se_aplica; 409 times com_respostas
+// GET /pesquisas/:id/avaliacao/resultados → time, pessoas, itens, calibracao, recortes, comparativo
+// GET /pesquisas/:id/avaliacao/pessoas/:colaboradorId → gestorAvaliacao, autoavaliacao,
+// comparativo, roteiro, desenvolver, time
+// GET /colaboradores/:id/avaliacoes → { pesquisaId, nome, modelo, respondidaEm, gestor, geral,
+// nivel, autoavaliacao }[]
 interface ConfigAvaliacao {
-  comentarios: "opcionais" | "extremos" | "obrigatorios"; // padrão: extremos
-  liberarNoPortal: boolean;
-  visibilidade: "depois_do_gestor" | "so_rh"; // só na 180°
-  prazoAutoavaliacao: string | null; // 180°: AAAA-MM-DDTHH:mm, ≥ 1 h e antes do prazo
-  lembretes: ("7_dias" | "3_dias" | "no_dia" | "depois")[];
-  envio: "email" | "link";
+comentarios: "opcionais" | "extremos" | "obrigatorios"; // padrão: extremos
+liberarNoPortal: boolean;
+visibilidade: "depois_do_gestor" | "so_rh"; // só na 180°
+prazoAutoavaliacao: string | null; // 180°: AAAA-MM-DDTHH:mm, ≥ 1 h e antes do prazo
+lembretes: ("7_dias" | "3_dias" | "no_dia" | "depois")[];
+envio: "email" | "link";
 }
 // Públicas (depois de POST …/identificar)
 // POST /publico/pesquisas/:token/avaliacao/pendentes { passe } → { modelo, comentarios, prazo,
-//      prazoAutoavaliacao, itens: { parId, papel, avaliado: {nome, cargo}, respondida, aberta,
-//      comparativo }[] } (comparativo: 180°, gestor que já enviou, visibilidade depois_do_gestor)
+// prazoAutoavaliacao, itens: { parId, papel, avaliado: {nome, cargo}, respondida, aberta,
+// comparativo }[] } (comparativo: 180°, gestor que já enviou, visibilidade depois_do_gestor)
 // POST /publico/pesquisas/:token/avaliacao/pares/:parId { passe, respostas (24), comentarios? }
-//      → 201 { ok, restantes }; o passe vale até a última avaliação da pessoa (2 horas).
+// → 201 { ok, restantes }; o passe vale até a última avaliação da pessoa (2 horas).
 
 // Onboarding (autenticadas)
-// GET  /pesquisas/:id/onboarding → { config, ativa, ativadaEm, publico, proximas, funil,
-//      proximoEnvio, link }
-// PUT  /pesquisas/:id/onboarding { config: ConfigOnboarding } (o modo não muda depois de ativar)
+// GET /pesquisas/:id/onboarding → { config, ativa, ativadaEm, publico, proximas, funil,
+// proximoEnvio, link }
+// PUT /pesquisas/:id/onboarding { config: ConfigOnboarding } (o modo não muda depois de ativar)
 // POST /pesquisas/onboarding/publico { publico, soDiasUteis } → { total, semEmail, proximas, pessoas }
 // POST /pesquisas/:id/onboarding/ativar → ativa sem exigir participante (no lugar de /publicar)
-// GET  /pesquisas/:id/onboarding/envios → { identificacao, horario, itens: { id, colaboradorId,
-//      nome, rodada, dataPrevista, prazo, situacao, enviadoEm, lembreteEm }[] }
+// GET /pesquisas/:id/onboarding/envios → { identificacao, horario, itens: { id, colaboradorId,
+// nome, rodada, dataPrevista, prazo, situacao, enviadoEm, lembreteEm }[] }
 // POST /pesquisas/:id/onboarding/envios/:envioId/pular → 204 (só agendado; senão 409)
-// GET  /pesquisas/:id/onboarding/resultados?campo=&grupoId= → rodadas, comparacoes, peso, fluxo,
-//      contatos, melhorar, gosta, funil, grupos
+// GET /pesquisas/:id/onboarding/resultados?campo=&grupoId= → rodadas, comparacoes, peso, fluxo,
+// contatos, melhorar, gosta, funil, grupos
 interface ConfigOnboarding {
-  modo: "agora" | "agendar" | "automatizar";
-  rodadas: (30 | 60 | 90)[];
-  horario: string; // 06:00 a 21:00, de 30 em 30 minutos
-  agendadoPara: string | null;
-  prazoDias: 3 | 5 | 7 | 10 | 15;
-  lembreteDias: 2 | 3 | 5 | null;
-  soDiasUteis: boolean;
-  incluirAtrasados: boolean;
-  publico:
-    | { tipo: "todos" }
-    | { tipo: "pessoas"; colaboradorIds: string[] }
-    | {
-        tipo: "grupo";
-        condicoes: {
-          campo: "departamento" | "cargo" | "unidade" | "centroCusto";
-          operador: "e" | "uma_destas";
-          valores: string[];
-        }[];
-      };
-  email: {
-    modelo: "padrao" | "personalizado";
-    assunto: string | null; // até 80
-    titulo: string | null; // até 60
-    mensagem: string | null; // até 600
-  };
+modo: "agora" | "agendar" | "automatizar";
+rodadas: (30 | 60 | 90)[];
+horario: string; // 06:00 a 21:00, de 30 em 30 minutos
+agendadoPara: string | null;
+prazoDias: 3 | 5 | 7 | 10 | 15;
+lembreteDias: 2 | 3 | 5 | null;
+soDiasUteis: boolean;
+incluirAtrasados: boolean;
+publico:
+| { tipo: "todos" }
+| { tipo: "pessoas"; colaboradorIds: string[] }
+| {
+tipo: "grupo";
+condicoes: {
+campo: "departamento" | "cargo" | "unidade" | "centroCusto";
+operador: "e" | "uma_destas";
+valores: string[];
+}[];
+};
+email: {
+modelo: "padrao" | "personalizado";
+assunto: string | null; // até 80
+titulo: string | null; // até 60
+mensagem: string | null; // até 600
+};
 }
 // Pública: POST /publico/pesquisas/:token/onboarding/respostas { passe?, rodada?, grupos?,
-//      respostas } → 201 { ok, rodada }; 409 rodada já respondida; 410 sem convite aberto.
+// respostas } → 201 { ok, rodada }; 409 rodada já respondida; 410 sem convite aberto.
+
 ```
 
-Telas: `apps/web/src/screens/pesquisas/modelos/{avaliacao,onboarding}/`; pontos de registro em
-`modelos/{avaliacao90,avaliacao180,onboarding}/definicao.ts` (o objeto `definicao`: card, "Sobre o
-modelo", seções, assistente e resultados). A rota `#/pesquisas/nova/<modelo>` abre o assistente
-próprio e a página da pesquisa mostra os resultados próprios (`modelos/integracao.tsx`).
+Registro: na API, a avaliação entra em `modelos/indice.ts` com a metodologia fixa (as 24
+afirmações pela `chave`, escala 1–5, obrigatórias; 422 `estrutura_do_modelo`); o onboarding acha os
+papéis pela `chave` do item (`q12`…`q17`) e conta no índice os tipos `concordancia_4` e
+`satisfacao_4` (e a escala de 1 a 4). Na tela, as 24 afirmações preenchem `secoes` dos cards em
+`modelos/avaliacao90/catalogo.ts` e `modelos/avaliacao180/catalogo.ts` (de
+`modelos/avaliacao/catalogo.ts`), o Onboarding usa o catálogo da galeria
+(`modelos/onboarding/catalogo.ts`) e as telas próprias (`modelos/{avaliacao,onboarding}/`) entram
+por `modelos/resultados.tsx` (resultados inteiros, no lugar das abas) e pela rota
+`#/pesquisas/nova/<modelo>` (assistente próprio, `modelos/integracao.tsx`).
+```
