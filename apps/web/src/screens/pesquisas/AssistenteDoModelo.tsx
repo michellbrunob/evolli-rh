@@ -76,6 +76,7 @@ import { minutosEstimados } from "./tempoEstimado";
 import { lembrarRascunho } from "./rascunhosLocais";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { TelaDeGerada } from "./TelaDeGerada";
+import { voltarAoTopo } from "./voltarAoTopo";
 import {
   IDENTIFICACOES,
   LIMITES,
@@ -323,11 +324,8 @@ function AssistenteDoModeloInterno({
   function irPara(i: number) {
     setEtapa(i);
     setMostrarErros(false);
-    requestAnimationFrame?.(() =>
-      document
-        .getElementById(PESQUISAS_TITULO_ID)
-        ?.scrollIntoView?.({ block: "start" }),
-    );
+    // A etapa nova começa do topo da página.
+    requestAnimationFrame?.(() => voltarAoTopo());
   }
 
   async function avancar() {

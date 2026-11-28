@@ -37,6 +37,7 @@ import { EditorDePerguntas } from "./EditorDePerguntas";
 import { EtapaColaboradores } from "./EtapaColaboradores";
 import { lembrarRascunho, memoriaDoRascunho } from "./rascunhosLocais";
 import { CampoDoLink, TelaDeGerada } from "./TelaDeGerada";
+import { voltarAoTopo } from "./voltarAoTopo";
 import { PreVisualizacao } from "./PreVisualizacao";
 import {
   entradaDoEstado,
@@ -197,9 +198,12 @@ function AssistenteDePesquisaInterno({
     setAlcancada((a) => Math.max(a, indice));
     setMostrarErros(false);
     setFalha(null);
-    requestAnimationFrame?.(() =>
-      document.getElementById(idTituloDaEtapa(indice))?.focus(),
-    );
+    requestAnimationFrame?.(() => {
+      voltarAoTopo();
+      document
+        .getElementById(idTituloDaEtapa(indice))
+        ?.focus({ preventScroll: true });
+    });
   }
 
   /**

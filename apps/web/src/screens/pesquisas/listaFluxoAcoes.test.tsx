@@ -720,6 +720,52 @@ describe("R3-A-25 — finalizada", () => {
   });
 });
 
+describe("R3-A-30 — assistente volta ao topo; rodapé no pé da tela", () => {
+  it("trocar de etapa e gerar levam ao topo da página", async () => {
+    const rolar = vi.fn();
+    const original = Element.prototype.scrollTo;
+    Element.prototype.scrollTo = rolar as never;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((f) => {
+      f(0);
+      return 0;
+    });
+    try {
+      render(
+        <AssistenteDoModelo
+          servico={servicoFalso()}
+          base={RASCUNHO}
+          hoje="2026-11-27"
+          onCancelar={vi.fn()}
+          onConcluir={vi.fn()}
+          onVerResultados={vi.fn()}
+          onEditarGerada={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Próximo/ }));
+      expect(rolar).toHaveBeenLastCalledWith({ top: 0 });
+      const chamadas = rolar.mock.calls.length;
+      fireEvent.click(
+        await screen.findByRole("button", { name: /Gerar pesquisa/ }),
+      );
+      await screen.findByRole("region", { name: "Pesquisa criada e ativa" });
+      expect(rolar.mock.calls.length).toBeGreaterThan(chamadas);
+      expect(rolar).toHaveBeenLastCalledWith({ top: 0 });
+    } finally {
+      Element.prototype.scrollTo = original;
+    }
+  });
+
+  it("com conteúdo curto, o rodapé fica no pé da tela", () => {
+    const regras = css("Pesquisas.css");
+    expect(regras).toMatch(
+      /\.pesquisas\.pesquisas--com-rodape \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*min-height: calc\( ?100dvh - var\(--altura-barra-superior, 60px\) - var\(--main-recuo-y, 0px\) ?\)/,
+    );
+    expect(regras).toMatch(
+      /\.pesquisas--com-rodape > \.pesquisas__rodape \{[^}]*margin-top: auto/,
+    );
+  });
+});
+
 describe("R3-A-34 — rotas inválidas", () => {
   it("pesquisa inexistente: 'Pesquisa não encontrada' com volta à lista", async () => {
     const onVoltar = vi.fn();

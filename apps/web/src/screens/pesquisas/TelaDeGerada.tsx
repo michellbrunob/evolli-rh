@@ -19,6 +19,7 @@ import {
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { copiarLink, enderecoDoLink } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
+import { voltarAoTopo } from "./voltarAoTopo";
 
 export function CampoDoLink({
   link,
@@ -91,7 +92,9 @@ export function TelaDeGerada({
     ? "pesquisa-criada-titulo"
     : PESQUISAS_TITULO_ID;
   useEffect(() => {
-    document.getElementById(idDoTitulo)?.focus();
+    // A tela final começa do topo da página; o foco vai ao título sem rolar.
+    voltarAoTopo();
+    document.getElementById(idDoTitulo)?.focus({ preventScroll: true });
   }, [idDoTitulo]);
   const Titulo = comCabecalhoDaPagina ? "h2" : "h1";
   const anonima = pesquisa.identificacao === "anonima";

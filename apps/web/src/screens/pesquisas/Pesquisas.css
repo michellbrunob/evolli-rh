@@ -3860,3 +3860,18 @@ body:has(.pesquisas__rodape) .aviso-flutuante {
 .pesquisas__secao-cabeca .pesquisas__filtro-lista .lista-escolha__opcao {
   white-space: nowrap;
 }
+
+/* Assistentes: com pouco conteúdo, o rodapé (Voltar, Gerar, Concluir) fica
+   no pé da tela, não logo abaixo do conteúdo. */
+.pesquisas.pesquisas--com-rodape {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(
+    100dvh - var(--altura-barra-superior, 60px) - var(--main-recuo-y, 0px)
+  );
+  padding-bottom: 0;
+}
+
+.pesquisas--com-rodape > .pesquisas__rodape {
+  margin-top: auto;
+}
