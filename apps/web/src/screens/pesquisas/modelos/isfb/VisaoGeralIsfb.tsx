@@ -3,7 +3,12 @@
  * pessoa. A nota (0 a 100) vem da metodologia do índice; os perfis do time,
  * os sinais e os temas são leituras do Evolli sobre as mesmas respostas.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  listarBeneficios,
+  type LinhaDeBeneficioApi,
+  type ListaDeBeneficiosApi,
+} from "../../../../api/beneficiosClient";
 import type {
   FaixaIsfb,
   PessoaIsfb,
@@ -86,7 +91,17 @@ export function ReguaIsfb({
   );
 }
 
-export function SeloDaFaixa({ faixa }: { readonly faixa: FaixaIsfb | null }) {
+export function SeloDaFaixa({
+  faixa,
+  comIntervalo = true,
+}: {
+  readonly faixa: FaixaIsfb | null;
+  /**
+   * O intervalo da régua geral ("50 a 56"). Nas dimensões, que têm cortes
+   * próprios, fica de fora: só a faixa.
+   */
+  readonly comIntervalo?: boolean;
+}) {
   if (!faixa) return <span className="pesquisas__suave">—</span>;
   const f = FAIXA_ISFB[faixa];
   return (
@@ -96,7 +111,7 @@ export function SeloDaFaixa({ faixa }: { readonly faixa: FaixaIsfb | null }) {
         style={{ ["--cor" as string]: f.cor }}
         aria-hidden="true"
       />
-      {`${f.rotulo} · ${f.de} a ${f.ate}`}
+      {comIntervalo ? `${f.rotulo} · ${f.de} a ${f.ate}` : f.rotulo}
     </span>
   );
 }
@@ -223,8 +238,11 @@ function Anel({
 
 export function VisaoGeralIsfb({
   resultado,
+  onIrPara,
 }: {
   readonly resultado: ResultadoDoPainel;
+  /** Leva a outra aba dos resultados (o atalho para as Análises). */
+  readonly onIrPara?: (aba: "analises") => void;
 }) {
   const r = resultado.isfb!;
   const [filtro, setFiltro] = useState<string>("todas");
@@ -239,6 +257,17 @@ export function VisaoGeralIsfb({
       <CartaoDeSecao
         titulo="Saúde financeira do time"
         descricao={`${plural(r.pessoas, "pessoa", "pessoas")} com nota`}
+        acao={
+          onIrPara ? (
+            <button
+              type="button"
+              className="modelos__link"
+              onClick={() => onIrPara("analises")}
+            >
+              Ver análises do time ›
+            </button>
+          ) : null
+        }
       >
         <div className="modelos__destaque">
           <span
@@ -342,7 +371,7 @@ export function VisaoGeralIsfb({
                   cor={e.cor}
                   rotulo={`${e.curto}: ${d.nota ?? 0} de 100`}
                 />
-                <SeloDaFaixa faixa={d.faixa} />
+                <SeloDaFaixa faixa={d.faixa} comIntervalo={false} />
                 <span className="pesquisas__suave">{e.texto}</span>
               </div>
             );
@@ -583,10 +612,13 @@ export function AnalisesIsfb({
   resultado,
   campo,
   onCampo,
+  carregarBeneficios = listarBeneficios,
 }: {
   readonly resultado: ResultadoDoPainel;
   readonly campo: CampoGrupo | null;
   readonly onCampo: (c: CampoGrupo) => void;
+  /** Os benefícios da empresa (módulo Benefícios); nos testes, um falso. */
+  readonly carregarBeneficios?: () => Promise<ListaDeBeneficiosApi>;
 }) {
   const r = resultado.isfb!;
   const tresOuMais = r.sinaisAcumulados[3]! + r.sinaisAcumulados[4]!;
@@ -749,6 +781,8 @@ export function AnalisesIsfb({
         </div>
       </CartaoDeSecao>
 
+      <BeneficiosXNecessidades r={r} carregar={carregarBeneficios} />
+
       <CartaoDeSecao
         titulo="Quem está aberto a receber apoio"
         descricao={`Autopercepção × nota · ${plural(r.comAutopercepcao, "pessoa respondeu", "pessoas responderam")} as perguntas opcionais.`}
@@ -789,6 +823,153 @@ export function AnalisesIsfb({
         </p>
       </CartaoDeSecao>
     </div>
+  );
+}
+
+/** Cada benefício que responde a uma necessidade financeira do time. */
+const NECESSIDADES: readonly {
+  readonly rotulo: string;
+  readonly oferece: (b: LinhaDeBeneficioApi) => boolean;
+  readonly dado: (r: ResultadoIsfb) => string;
+}[] = [
+  {
+    rotulo: "Antecipação salarial",
+    oferece: (b) => b.categoria === "antecipacao",
+    dado: (r) =>
+      `${pct(r.sinais.gasta_mais.percentual)} ${SINAL.gasta_mais.rotulo}`,
+  },
+  {
+    rotulo: "Educação financeira",
+    oferece: (b) => /financeir/i.test(b.nome),
+    dado: (r) => {
+      const t = r.temas[0];
+      return t && t.quantidade > 0
+        ? `${pct(t.percentual)} se beneficiam de “${TEMA[t.id]}”`
+        : "Nenhum tema de educação financeira se destacou.";
+    },
+  },
+  {
+    rotulo: "Previdência complementar",
+    oferece: (b) => /previd/i.test(b.nome),
+    dado: (r) =>
+      `${pct(r.base.comPrevidencia.percentual)} têm previdência privada`,
+  },
+  {
+    rotulo: "Vale-alimentação ou refeição",
+    oferece: (b) =>
+      b.categoria === "alimentacao" || b.categoria === "multibeneficios",
+    dado: (r) =>
+      `${pct(r.sinais.apertado.percentual)} ${SINAL.apertado.rotulo}`,
+  },
+  {
+    rotulo: "Plano de saúde",
+    oferece: (b) => b.categoria === "saude",
+    dado: (r) =>
+      `${pct(r.produtos.seguro_saude?.percentual ?? 0)} têm seguro saúde ou convênio (conta o plano da empresa)`,
+  },
+  {
+    rotulo: "Seguro de vida",
+    oferece: (b) => b.categoria === "seguro_vida",
+    dado: (r) =>
+      `${pct(r.base.semReserva.percentual)} ${SINAL.sem_reserva.rotulo}`,
+  },
+];
+
+type Beneficios =
+  | { readonly tipo: "carregando" }
+  | { readonly tipo: "pronto"; readonly ativos: readonly LinhaDeBeneficioApi[] }
+  | { readonly tipo: "sem-acesso" }
+  | { readonly tipo: "erro" };
+
+/** Benefícios da empresa (só os ativos) × o que o time precisa. */
+function BeneficiosXNecessidades({
+  r,
+  carregar,
+}: {
+  readonly r: ResultadoIsfb;
+  readonly carregar: () => Promise<ListaDeBeneficiosApi>;
+}) {
+  const [estado, setEstado] = useState<Beneficios>({ tipo: "carregando" });
+  useEffect(() => {
+    let vivo = true;
+    carregar().then(
+      (l) => {
+        if (vivo)
+          setEstado({
+            tipo: "pronto",
+            ativos: l.beneficios.filter((b) => b.situacao === "ativo"),
+          });
+      },
+      (e: unknown) => {
+        const status = (e as { status?: unknown } | null)?.status;
+        if (vivo) setEstado({ tipo: status === 403 ? "sem-acesso" : "erro" });
+      },
+    );
+    return () => {
+      vivo = false;
+    };
+    // Lê uma vez ao abrir a aba.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <CartaoDeSecao
+      titulo="Benefícios da empresa × necessidades do time"
+      descricao="O que a empresa oferece hoje e o dado do time que justifica cada benefício."
+      acao={<span className="pesquisas__selo">Do módulo Benefícios</span>}
+    >
+      {estado.tipo === "carregando" ? (
+        <p className="pesquisas__suave" role="status">
+          Lendo os benefícios da empresa…
+        </p>
+      ) : estado.tipo === "sem-acesso" ? (
+        <p className="pesquisas__suave">
+          Seu acesso não inclui o módulo Benefícios: não dá para cruzar com o
+          que a empresa oferece.
+        </p>
+      ) : estado.tipo === "erro" ? (
+        <p className="pesquisas__suave">
+          Não foi possível ler os benefícios da empresa agora.
+        </p>
+      ) : (
+        <div className="modelos__tabela-rolagem">
+          <table
+            className="modelos__tabela"
+            aria-label="Benefícios da empresa × necessidades do time"
+          >
+            <thead>
+              <tr>
+                <th>Benefício</th>
+                <th>Na empresa</th>
+                <th>O dado do time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {NECESSIDADES.map((n) => {
+                const oferecido = estado.ativos.some(n.oferece);
+                return (
+                  <tr key={n.rotulo}>
+                    <td>{n.rotulo}</td>
+                    <td>
+                      <span
+                        className="modelos__ponto"
+                        style={{
+                          ["--cor" as string]: oferecido
+                            ? COR_DA_RESPOSTA.favoravel
+                            : COR_DA_RESPOSTA.neutro,
+                        }}
+                        aria-hidden="true"
+                      />
+                      {oferecido ? "Oferecido" : "Não oferecido"}
+                    </td>
+                    <td>{n.dado(r)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </CartaoDeSecao>
   );
 }
 

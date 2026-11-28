@@ -632,7 +632,8 @@ describe("resultados da NR-1", () => {
 describe("resultados da saúde financeira", () => {
   it("nota do time, faixa, sinais e renda oculta", () => {
     render(<>{visaoGeralDoModelo(SAUDE_FIN, GERAL_ISFB)}</>);
-    expect(screen.getAllByText("Baixa · 50 a 56").length).toBeGreaterThan(1);
+    // Só a nota do time leva o intervalo; as dimensões mostram só a faixa.
+    expect(screen.getAllByText("Baixa · 50 a 56")).toHaveLength(1);
     expect(screen.getByText("Brasil 56,7 · −3,7")).toBeInTheDocument();
     expect(
       screen.getByText("67% dizem que dinheiro gera estresse em casa"),
