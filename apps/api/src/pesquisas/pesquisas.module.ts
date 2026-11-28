@@ -24,6 +24,14 @@ import {
 } from "./modelos/notificador-de-pesquisas";
 import { AcompanhamentoController } from "./modelos/acompanhamento.controller";
 import { AcompanhamentoService } from "./modelos/acompanhamento.service";
+import {
+  ARMAZENAMENTO_DE_DOCUMENTOS,
+  escolherArmazenamentoDeDocumentos,
+} from "../pessoas/documentos-colaborador/armazenamento-de-documentos";
+import {
+  VERIFICADOR_DE_ARQUIVOS,
+  escolherVerificadorDeArquivos,
+} from "../pessoas/documentos-colaborador/verificador-de-arquivos";
 
 /**
  * T216 — Pesquisas (módulo do menu, aba da ficha e a página pública).
@@ -52,6 +60,16 @@ import { AcompanhamentoService } from "./modelos/acompanhamento.service";
     ProcessadorDePesquisas,
     AgendadorDePesquisas,
     { provide: NOTIFICADOR_DE_PESQUISAS, useClass: NotificadorSemEmail },
+    // T216 — evidências da NR-1: o mesmo armazenamento privado (R2) e o
+    // mesmo antivírus dos documentos do colaborador (ADR 0021).
+    {
+      provide: ARMAZENAMENTO_DE_DOCUMENTOS,
+      useFactory: () => escolherArmazenamentoDeDocumentos(),
+    },
+    {
+      provide: VERIFICADOR_DE_ARQUIVOS,
+      useFactory: () => escolherVerificadorDeArquivos(),
+    },
   ],
 })
 export class PesquisasModule {}

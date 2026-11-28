@@ -1,8 +1,12 @@
 import {
   acompanhamentoVazio,
+  adicionarEvidencia,
   conferirAcompanhamento,
   detalharAcompanhamento,
+  evidenciaDa,
   lerAcompanhamento,
+  removerEvidencia,
+  type ArquivoGravado,
 } from "./acompanhamento";
 
 /** T216 — acompanhamento da NR-1: etapas e plano de ação. */
@@ -50,6 +54,7 @@ describe("conferirAcompanhamento", () => {
       itens: [false, false, false],
       evidencias: "PGR assinado na pasta do SST",
       concluidaEm: AGORA.toISOString(),
+      arquivos: [],
     });
     expect(c.valor.plano[0]!.titulo).toBe("Pausas programadas");
     expect(c.valor.atualizadoEm).toBe(AGORA.toISOString());
@@ -233,5 +238,129 @@ describe("detalharAcompanhamento", () => {
   it("lê o que estiver gravado, mesmo vazio ou antigo", () => {
     expect(lerAcompanhamento(null)).toEqual(acompanhamentoVazio());
     expect(lerAcompanhamento("x").etapas).toHaveLength(7);
+  });
+});
+
+describe("arquivos de evidência das etapas", () => {
+  const arquivo = (id: string): ArquivoGravado => ({
+    id,
+    nome: `ata-${id}.pdf`,
+    formato: "pdf",
+    tamanhoBytes: 1234,
+    hashSha256: "ab".repeat(32),
+    chave: `v1/empresas/e/pesquisas/p/evidencias/comunicar/${id}`,
+    enviadoEm: AGORA.toISOString(),
+  });
+  const contexto = {
+    anonima: true,
+    respostas: 1,
+    participantes: 0,
+    publicadaEm: null,
+  };
+
+  it("acrescenta só nas etapas que a empresa conclui, até 10 por etapa", () => {
+    let a = acompanhamentoVazio();
+    for (let i = 0; i < 10; i += 1) {
+      const r = adicionarEvidencia(a, "comunicar", arquivo(`a${i}`));
+      if (!r.ok) throw new Error(r.motivo);
+      a = r.valor;
+    }
+    expect(a.etapas[2]!.arquivos).toHaveLength(10);
+    expect(adicionarEvidencia(a, "comunicar", arquivo("x"))).toEqual({
+      ok: false,
+      motivo: "limite",
+    });
+    expect(adicionarEvidencia(a, "validar", arquivo("x")).ok).toBe(true);
+    expect(adicionarEvidencia(a, "mapear", arquivo("x"))).toEqual({
+      ok: false,
+      motivo: "nao_se_aplica",
+    });
+    expect(adicionarEvidencia(a, "plano", arquivo("x")).ok).toBe(false);
+    expect(adicionarEvidencia(a, "outra", arquivo("x")).ok).toBe(false);
+  });
+
+  it("remove e encontra pelo id; o detalhe não expõe chave nem hash", () => {
+    const r = adicionarEvidencia(
+      acompanhamentoVazio(),
+      "treinar",
+      arquivo("t1"),
+    );
+    if (!r.ok) throw new Error(r.motivo);
+    expect(evidenciaDa(r.valor, "treinar", "t1")?.chave).toContain("t1");
+    expect(evidenciaDa(r.valor, "comunicar", "t1")).toBeNull();
+    const d = detalharAcompanhamento(r.valor, contexto);
+    expect(d.etapas[4]!.arquivos).toEqual([
+      {
+        id: "t1",
+        nome: "ata-t1.pdf",
+        formato: "pdf",
+        tamanhoBytes: 1234,
+        enviadoEm: AGORA.toISOString(),
+      },
+    ]);
+    const sem = removerEvidencia(r.valor, "treinar", "t1");
+    expect(sem?.removido.id).toBe("t1");
+    expect(sem?.valor.etapas[4]!.arquivos).toEqual([]);
+    expect(removerEvidencia(r.valor, "treinar", "nao-existe")).toBeNull();
+    expect(removerEvidencia(r.valor, "validar", "t1")).toBeNull();
+  });
+
+  it("o PUT mantém os arquivos e aceita concluir só com arquivo", () => {
+    const r = adicionarEvidencia(
+      acompanhamentoVazio(),
+      "comunicar",
+      arquivo("c1"),
+    );
+    if (!r.ok) throw new Error(r.motivo);
+    const c = conferirAcompanhamento(
+      corpo({
+        etapas: [
+          {
+            id: "comunicar",
+            itens: [false, false, false],
+            concluida: true,
+            // Tentativa de trocar os arquivos pelo PUT: ignorada.
+            arquivos: [],
+          },
+        ],
+      }),
+      r.valor,
+      AGORA,
+    );
+    if (!c.ok) throw new Error("recusado");
+    expect(c.valor.etapas[2]!.arquivos.map((x) => x.id)).toEqual(["c1"]);
+    expect(c.valor.etapas[2]!.concluidaEm).toBe(AGORA.toISOString());
+    // Sem item, descrição nem arquivo: concluir é recusado.
+    const sem = conferirAcompanhamento(
+      corpo({
+        etapas: [
+          { id: "validar", itens: [false, false, false], concluida: true },
+        ],
+      }),
+      r.valor,
+      AGORA,
+    );
+    expect(sem.ok).toBe(false);
+  });
+
+  it("lê os arquivos gravados e descarta os malformados", () => {
+    const a = lerAcompanhamento({
+      etapas: [
+        {
+          id: "comunicar",
+          itens: [false, false, false],
+          evidencias: null,
+          concluidaEm: null,
+          arquivos: [
+            arquivo("ok"),
+            { ...arquivo("sem-chave"), chave: 1 },
+            { ...arquivo("formato"), formato: "exe" },
+            null,
+          ],
+        },
+      ],
+    });
+    expect(a.etapas[2]!.arquivos.map((x) => x.id)).toEqual(["ok"]);
+    expect(a.etapas[3]!.arquivos).toEqual([]);
   });
 });

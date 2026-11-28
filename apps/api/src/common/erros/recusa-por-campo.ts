@@ -271,6 +271,13 @@ export type CodigoDeRecusa =
   | "anexo_arquivo_malformado"
   | "anexo_com_macro"
   | "anexo_reprovado_antivirus"
+  // T216 — arquivos de evidência da conformidade com a NR-1.
+  | "evidencia_arquivo_vazio"
+  | "evidencia_arquivo_grande_demais"
+  | "evidencia_formato_invalido"
+  | "evidencia_arquivo_malformado"
+  | "evidencia_com_macro"
+  | "evidencia_reprovada_antivirus"
   // T215 — Publicar a escala sem mudança no rascunho do período.
   | "escala_nada_para_publicar";
 
@@ -293,7 +300,10 @@ export type CodigoDeIndisponibilidade =
   | "documento_verificacao_indisponivel"
   // T215 — anexo da ausência.
   | "anexo_verificacao_indisponivel"
-  | "anexo_armazenamento_indisponivel";
+  | "anexo_armazenamento_indisponivel"
+  // T216 — arquivos de evidência da conformidade com a NR-1.
+  | "evidencia_verificacao_indisponivel"
+  | "evidencia_armazenamento_indisponivel";
 
 export class IndisponibilidadeException extends ServiceUnavailableException {
   constructor(readonly codigo: CodigoDeIndisponibilidade) {

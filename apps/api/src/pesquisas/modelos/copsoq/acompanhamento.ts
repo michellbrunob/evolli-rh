@@ -3,6 +3,7 @@ import {
   type ErroDeCampo,
 } from "../../../common/erros/recusa-por-campo";
 import { DIMENSOES_NR1 } from "./definicao";
+import { EVIDENCIAS_POR_ETAPA, type FormatoDaEvidencia } from "./evidencias";
 
 /**
  * T216 — conformidade com a NR-1: as 7 etapas que a empresa marca e guarda
@@ -12,8 +13,9 @@ import { DIMENSOES_NR1 } from "./definicao";
  * - Etapa 1 (mapear) conclui sozinha: anônima com a 1ª resposta; as demais
  *   quando todos os convidados responderam.
  * - Etapa 2 (plano) conclui sozinha com a 1ª medida no plano.
- * - Etapas 3 a 7: a empresa marca os itens, descreve onde guardou as
- *   evidências e conclui (exige um item marcado ou a descrição).
+ * - Etapas 3 a 7: a empresa marca os itens, descreve as evidências, anexa
+ *   os arquivos (`evidencias.ts`) e conclui (exige um item marcado, a
+ *   descrição ou um arquivo). O PUT nunca mexe nos arquivos.
  * - Etapa 7 (revisar): prevista para 1 ano depois da publicação.
  */
 
@@ -68,12 +70,29 @@ export const LIMITES_DO_ACOMPANHAMENTO = {
   registro: 60,
 } as const;
 
+/** Um arquivo de evidência guardado (a chave e o hash não saem na API). */
+export interface ArquivoGravado {
+  id: string;
+  nome: string;
+  formato: FormatoDaEvidencia;
+  tamanhoBytes: number;
+  hashSha256: string;
+  chave: string;
+  /** Instante (ISO). */
+  enviadoEm: string;
+}
+
+/** O arquivo como a API devolve. */
+export type ArquivoDaEtapa = Omit<ArquivoGravado, "chave" | "hashSha256">;
+
 export interface EtapaGravada {
   id: EtapaNr1;
   itens: boolean[];
   evidencias: string | null;
   /** Instante (ISO) em que a empresa concluiu; nas automáticas, `null`. */
   concluidaEm: string | null;
+  /** Arquivos de evidência (só nas etapas que a empresa conclui). */
+  arquivos: ArquivoGravado[];
 }
 
 export interface MedidaDoPlano {
@@ -96,12 +115,16 @@ export interface AcompanhamentoNr1 {
   atualizadoEm: string | null;
 }
 
-export interface EtapaDoDetalhe extends EtapaGravada {
+export interface EtapaDoDetalhe extends Omit<EtapaGravada, "arquivos"> {
   concluida: boolean;
   automatica: boolean;
+  arquivos: ArquivoDaEtapa[];
 }
 
-export interface AcompanhamentoNr1Detalhe extends AcompanhamentoNr1 {
+export interface AcompanhamentoNr1Detalhe extends Omit<
+  AcompanhamentoNr1,
+  "etapas"
+> {
   etapas: EtapaDoDetalhe[];
   concluidas: number;
   proxima: EtapaNr1 | null;
@@ -116,11 +139,37 @@ export function acompanhamentoVazio(): AcompanhamentoNr1 {
       itens: Array.from({ length: ITENS_DA_ETAPA[id] }, () => false),
       evidencias: null,
       concluidaEm: null,
+      arquivos: [],
     })),
     plano: [],
     profissionalSst: { nome: null, registro: null },
     atualizadoEm: null,
   };
+}
+
+const FORMATOS_DA_EVIDENCIA = new Set<string>([
+  "pdf",
+  "jpg",
+  "png",
+  "webp",
+  "pptx",
+]);
+
+/** Os arquivos gravados (descarta o que não tiver a forma esperada). */
+function lerArquivos(bruto: unknown): ArquivoGravado[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto.filter(
+    (x): x is ArquivoGravado =>
+      typeof x === "object" &&
+      x !== null &&
+      typeof x.id === "string" &&
+      typeof x.nome === "string" &&
+      FORMATOS_DA_EVIDENCIA.has(x.formato) &&
+      Number.isInteger(x.tamanhoBytes) &&
+      typeof x.hashSha256 === "string" &&
+      typeof x.chave === "string" &&
+      typeof x.enviadoEm === "string",
+  );
 }
 
 /** O que está gravado (forma livre do JSON) no formato atual. */
@@ -138,6 +187,7 @@ export function lerAcompanhamento(bruto: unknown): AcompanhamentoNr1 {
             itens: e.itens.map((_, i) => g.itens?.[i] === true),
             evidencias: g.evidencias ?? null,
             concluidaEm: g.concluidaEm ?? null,
+            arquivos: lerArquivos(g.arquivos),
           }
         : e;
     }),
@@ -175,8 +225,9 @@ function diaValido(v: string): boolean {
 
 /**
  * Confere o corpo do PUT: `{ etapas, plano, profissionalSst }`. As etapas
- * automáticas não se marcam; concluir exige um item ou a descrição das
- * evidências; a data de conclusão já gravada se mantém.
+ * automáticas não se marcam; concluir exige um item, a descrição das
+ * evidências ou um arquivo; a data de conclusão já gravada se mantém; os
+ * arquivos ficam como estão (têm rotas próprias).
  */
 export function conferirAcompanhamento(
   corpo: unknown,
@@ -220,7 +271,12 @@ export function conferirAcompanhamento(
     if (evidencias === undefined) erros.push({ campo, motivo: "limite" });
     const marcados = itens.map((x) => x === true);
     const concluida = b.concluida === true;
-    if (concluida && !marcados.some(Boolean) && !evidencias) {
+    if (
+      concluida &&
+      !marcados.some(Boolean) &&
+      !evidencias &&
+      vazia.arquivos.length === 0
+    ) {
       erros.push({ campo, motivo: "obrigatorio" });
     }
     return {
@@ -230,6 +286,7 @@ export function conferirAcompanhamento(
       concluidaEm: concluida
         ? (vazia.concluidaEm ?? agora.toISOString())
         : null,
+      arquivos: vazia.arquivos,
     };
   });
 
@@ -318,6 +375,69 @@ export function conferirAcompanhamento(
   };
 }
 
+export type RecusaDaEvidencia = "nao_se_aplica" | "limite";
+
+/** Acrescenta um arquivo à etapa (só as que a empresa conclui; até 10). */
+export function adicionarEvidencia(
+  a: AcompanhamentoNr1,
+  etapa: string,
+  arquivo: ArquivoGravado,
+):
+  | { ok: true; valor: AcompanhamentoNr1 }
+  | { ok: false; motivo: RecusaDaEvidencia } {
+  const alvo = a.etapas.find((e) => e.id === etapa);
+  if (!alvo || ETAPAS_AUTOMATICAS.includes(alvo.id)) {
+    return { ok: false, motivo: "nao_se_aplica" };
+  }
+  if (alvo.arquivos.length >= EVIDENCIAS_POR_ETAPA) {
+    return { ok: false, motivo: "limite" };
+  }
+  return {
+    ok: true,
+    valor: {
+      ...a,
+      etapas: a.etapas.map((e) =>
+        e.id === alvo.id ? { ...e, arquivos: [...e.arquivos, arquivo] } : e,
+      ),
+    },
+  };
+}
+
+/** Tira um arquivo da etapa; `null` se ele não estiver lá. */
+export function removerEvidencia(
+  a: AcompanhamentoNr1,
+  etapa: string,
+  arquivoId: string,
+): { valor: AcompanhamentoNr1; removido: ArquivoGravado } | null {
+  const alvo = a.etapas.find((e) => e.id === etapa);
+  const removido = alvo?.arquivos.find((x) => x.id === arquivoId);
+  if (!alvo || !removido) return null;
+  return {
+    removido,
+    valor: {
+      ...a,
+      etapas: a.etapas.map((e) =>
+        e.id === alvo.id
+          ? { ...e, arquivos: e.arquivos.filter((x) => x.id !== arquivoId) }
+          : e,
+      ),
+    },
+  };
+}
+
+/** O arquivo guardado na etapa, ou `null`. */
+export function evidenciaDa(
+  a: AcompanhamentoNr1,
+  etapa: string,
+  arquivoId: string,
+): ArquivoGravado | null {
+  return (
+    a.etapas
+      .find((e) => e.id === etapa)
+      ?.arquivos.find((x) => x.id === arquivoId) ?? null
+  );
+}
+
 /** AAAA-MM um ano depois do instante. */
 function umAnoDepois(instante: Date): string {
   const brasilia = new Date(instante.getTime() - 3 * 3_600_000);
@@ -346,7 +466,20 @@ export function detalharAcompanhamento(
         : e.id === "plano"
           ? a.plano.length > 0
           : e.concluidaEm !== null;
-    return { ...e, concluida, automatica };
+    return {
+      ...e,
+      concluida,
+      automatica,
+      arquivos: e.arquivos.map(
+        ({ id, nome, formato, tamanhoBytes, enviadoEm }) => ({
+          id,
+          nome,
+          formato,
+          tamanhoBytes,
+          enviadoEm,
+        }),
+      ),
+    };
   });
   return {
     ...a,
