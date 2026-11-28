@@ -1,0 +1,265 @@
+/* T216 — Riscos psicossociais (NR-1): navegação da Visão geral, Por grupo
+   (ranking, mapa de calor, exigências × recursos), sugestões do plano e
+   arquivos de evidência. Só tokens do Evolli. */
+
+/* O nível "alto" é laranja (crítico vermelho, médio âmbar, baixo verde). */
+.evolli-badge.nr1__selo-alto {
+  background: var(--modelo-laranja-fundo);
+  color: color-mix(in srgb, var(--modelo-laranja) 62%, black);
+}
+
+.nr1__chip-botao {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  font-size: 0.6875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nr1__chip-botao:hover,
+.nr1__chip-botao:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.nr1__como-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+}
+
+.nr1__como-corpo p {
+  margin: 0;
+}
+
+.nr1__como-niveis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nr1__como-niveis li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.nr1__link-texto {
+  font-size: inherit;
+  color: inherit;
+}
+
+.nr1__link-texto:hover,
+.nr1__link-forte:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.nr1__link-forte {
+  display: block;
+  color: var(--color-ink);
+  font-size: inherit;
+  font-weight: var(--weight-strong);
+}
+
+.nr1__link-bloco {
+  display: block;
+  margin-top: var(--space-xxs);
+}
+
+.nr1__foco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  scroll-margin-top: var(--space-lg);
+}
+
+.nr1__linha-clicavel {
+  cursor: pointer;
+}
+
+.nr1__linha-clicavel:hover {
+  background: var(--surface-canvas);
+}
+
+.nr1__ranking-grupos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nr1__grupo {
+  display: grid;
+  grid-template-columns: 2rem minmax(8rem, 1fr) auto minmax(6rem, 12rem);
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-botao);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nr1__grupo[aria-pressed="true"] {
+  border-color: var(--color-action);
+  box-shadow: inset 3px 0 0 var(--color-action);
+}
+
+@media (max-width: 640px) {
+  .nr1__grupo {
+    grid-template-columns: 2rem 1fr;
+  }
+}
+
+.nr1__por-nivel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+}
+
+.nr1__lista-curta {
+  margin: 0;
+  padding-left: var(--space-sm);
+  font-size: var(--text-caption);
+}
+
+.nr1__calor th {
+  max-width: 7rem;
+  white-space: normal;
+}
+
+.nr1__calor-celula {
+  border-radius: var(--radius-sm);
+}
+
+.nr1__dispersao {
+  width: 100%;
+  max-width: 34rem;
+  height: auto;
+}
+
+.nr1__quadrante-alerta {
+  fill: var(--faixa-critico-fundo);
+}
+
+.nr1__eixo {
+  stroke: var(--divisor-cor);
+  stroke-width: 1;
+}
+
+.nr1__rotulo-quadrante,
+.nr1__rotulo-eixo,
+.nr1__rotulo-ponto {
+  fill: var(--color-ink);
+  font-size: 10px;
+}
+
+.nr1__rotulo-quadrante {
+  fill: var(--texto-suave, var(--color-ink));
+  font-weight: 600;
+}
+
+.nr1__ponto {
+  fill: var(--color-action);
+}
+
+.nr1__ponto-empresa {
+  fill: var(--color-ink);
+}
+
+/* Plano de ação: sugestões da biblioteca. */
+.nr1__sugestoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nr1__sugestao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-sm);
+  border: 1px solid var(--divisor-cor);
+  border-left: 3px solid var(--cor-controle, var(--color-action));
+  border-radius: var(--radius-md);
+}
+
+.nr1__sugestao p {
+  margin: 0;
+}
+
+.nr1__sugestao-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.nr1__opcoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nr1__opcoes li {
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  font-size: var(--text-caption);
+}
+
+/* Conformidade: arquivos de evidência. */
+.nr1__arquivos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nr1__arquivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-sm);
+}
+
+.nr1__envio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-sm);
+  border: 1px dashed var(--divisor-cor);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.nr1__envio[data-arrastando] {
+  border-color: var(--color-action);
+  background: var(--surface-canvas);
+}

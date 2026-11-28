@@ -399,3 +399,39 @@
 .sobre__uso p {
   margin: 0;
 }
+
+/* T216 — exemplo da NR-1: fileira de quadradinhos e mini matriz 4 × 4. */
+.sobre__quadradinhos {
+  display: grid;
+  grid-template-columns: repeat(29, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.sobre__quadradinhos > span {
+  aspect-ratio: 1;
+  border-radius: 2px;
+}
+
+.sobre__mini-matriz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.sobre__mini-matriz-grade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 12rem;
+}
+
+.sobre__mini-matriz-grade > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+}

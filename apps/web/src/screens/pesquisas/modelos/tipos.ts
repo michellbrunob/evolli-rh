@@ -160,6 +160,16 @@ export interface ExemploDoResultado {
     readonly colunas: readonly string[];
     readonly linhas: readonly (readonly string[])[];
   };
+  /** Fileira de quadradinhos (um por item), com o token de cor de cada um. */
+  readonly quadradinhos?: readonly string[];
+  /** Mini matriz com a contagem e o token de cor de cada célula. */
+  readonly matriz?: {
+    readonly titulo: string;
+    readonly celulas: readonly (readonly {
+      readonly valor: number;
+      readonly cor: string;
+    }[])[];
+  };
   readonly rodape?: string;
 }
 

@@ -5,7 +5,8 @@
  * grupo, Plano de ação, Conformidade NR-1 e Análises), os recortes (um
  * resultado por grupo visível) e o acompanhamento da NR-1.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { diaCivilDeHoje } from "../../../format/data";
 import type {
   CampoGrupo,
   ModeloPesquisa,
@@ -23,9 +24,19 @@ import type { ServicoDePesquisas } from "../servicoDePesquisas";
 import {
   ConformidadeNr1,
   PlanoDeAcaoNr1,
+  pedirDimensaoNoPlano,
+  useAcompanhamentoLembrado,
   useAcompanhamentoNr1,
 } from "./copsoq/AcompanhamentoNr1";
-import { PorGrupoNr1, VisaoGeralNr1 } from "./copsoq/VisaoGeralNr1";
+import {
+  baixarPacoteDaConformidade,
+  baixarPdfDoPlano,
+} from "./copsoq/exportarNr1";
+import {
+  PorGrupoNr1,
+  VisaoGeralNr1,
+  type DestinoDaVisaoGeral,
+} from "./copsoq/VisaoGeralNr1";
 import { AnalisesIsfb, VisaoGeralIsfb } from "./isfb/VisaoGeralIsfb";
 import { PoucasRespostasDoModelo } from "./ui";
 
@@ -48,6 +59,58 @@ export const ABAS_DO_MODELO: Partial<
 
 export const temTelasProprias = (modelo: ModeloPesquisa): boolean =>
   ABAS_DO_MODELO[modelo] !== undefined;
+
+/** O contador da aba da NR-1: medidas no plano ou "N/7" etapas. */
+function ContadorNr1({
+  pesquisaId,
+  tipo,
+}: {
+  readonly pesquisaId: string;
+  readonly tipo: "plano" | "conformidade";
+}) {
+  const a = useAcompanhamentoLembrado(pesquisaId);
+  if (!a) return null;
+  return (
+    <span className="pesquisas__contagem">
+      {tipo === "plano" ? a.plano.length : `${a.concluidas}/7`}
+    </span>
+  );
+}
+
+/**
+ * As abas próprias do modelo na pesquisa; na NR-1, com o contador de
+ * medidas no Plano de ação e o andamento da Conformidade ("1/7").
+ */
+export function abasDoModeloDaPesquisa(
+  detalhe: PesquisaDetalhe,
+): readonly { valor: AbaDoModelo; rotulo: ReactNode }[] | undefined {
+  const abas = ABAS_DO_MODELO[detalhe.modelo];
+  if (!abas || detalhe.modelo !== "copsoq") return abas;
+  return abas.map((a) =>
+    a.valor === "plano" || a.valor === "conformidade"
+      ? {
+          valor: a.valor,
+          rotulo: (
+            <>
+              {a.rotulo} <ContadorNr1 pesquisaId={detalhe.id} tipo={a.valor} />
+            </>
+          ),
+        }
+      : a,
+  );
+}
+
+/** Leva a uma aba; com a dimensão, o plano abre nela. */
+function irParaComDimensao(
+  pesquisaId: string,
+  onTrocarAba: (aba: AbaDoModelo) => void,
+) {
+  return (aba: DestinoDaVisaoGeral, dimensaoId?: string) => {
+    if (aba === "plano" && dimensaoId)
+      pedirDimensaoNoPlano(pesquisaId, dimensaoId);
+    onTrocarAba(aba);
+  };
+}
 
 /** O primeiro recorte (anônima: o primeiro campo de "Separar respostas por"). */
 export function primeiroRecorte(
@@ -97,6 +160,8 @@ export function grupoDoModelo(
   },
   doGrupo: ResultadosPesquisa | null,
   empresa: ResultadosPesquisa,
+  /** O resultado do grupo visível não carregou (erro, não sigilo). */
+  falhou = false,
 ): GrupoDoModelo {
   const base: GrupoDoModelo = {
     id: g.id,
@@ -104,6 +169,7 @@ export function grupoDoModelo(
     respostas: g.respostas,
     visivel: g.visivel && doGrupo !== null,
     oculto: g.oculto ?? (g.visivel ? null : "minimo"),
+    ...(falhou ? { falhou: true } : {}),
     nr1: null,
     isfb: null,
   };
@@ -160,6 +226,7 @@ function useGrupos(
     if (!ativo || !campo) return;
     let vivo = true;
     const lista = geral.grupos?.[campo] ?? [];
+    const FALHOU = "falhou" as const;
     Promise.all(
       lista.map((g) =>
         g.visivel
@@ -168,12 +235,19 @@ function useGrupos(
                 campo,
                 grupoId: g.id,
               }),
-            ).catch(() => null)
+            ).catch(() => FALHOU)
           : Promise.resolve(null),
       ),
     ).then((resultados) => {
       if (vivo)
-        setGrupos(lista.map((g, i) => grupoDoModelo(g, resultados[i]!, geral)));
+        setGrupos(
+          lista.map((g, i) => {
+            const r = resultados[i]!;
+            return r === FALHOU
+              ? grupoDoModelo(g, null, geral, true)
+              : grupoDoModelo(g, r, geral);
+          }),
+        );
     });
     return () => {
       vivo = false;
@@ -213,6 +287,7 @@ export function PainelDoModelo({
   );
   const r = painelDe(detalhe, geral, campo, grupos);
 
+  const hoje = diaCivilDeHoje();
   if (nr1 && aba === "conformidade") {
     return (
       <ConformidadeNr1
@@ -220,6 +295,17 @@ export function PainelDoModelo({
         podeEditar={podeEditar}
         onVerResultados={() => onTrocarAba?.("geral")}
         onVerPlano={() => onTrocarAba?.("plano")}
+        onBaixarTudo={async () => {
+          if (!acompanhamento.gravado) return;
+          await baixarPacoteDaConformidade({
+            servico,
+            servicoDosModelos,
+            detalhe,
+            geral,
+            acompanhamento: acompanhamento.gravado,
+            hoje,
+          });
+        }}
       />
     );
   }
@@ -235,6 +321,16 @@ export function PainelDoModelo({
           r={r.nr1}
           acompanhamento={acompanhamento}
           podeEditar={podeEditar}
+          hoje={hoje}
+          onBaixarPdf={() =>
+            void baixarPdfDoPlano({
+              servico,
+              detalhe,
+              geral,
+              acompanhamento: acompanhamento.gravado,
+              hoje,
+            })
+          }
         />
       );
     if (aba === "analises")
@@ -244,7 +340,9 @@ export function PainelDoModelo({
         resultado={r}
         acompanhamento={acompanhamento.gravado}
         detalhe={detalhe}
-        {...(onTrocarAba ? { onIrPara: onTrocarAba } : {})}
+        {...(onTrocarAba
+          ? { onIrPara: irParaComDimensao(detalhe.id, onTrocarAba) }
+          : {})}
       />
     );
   }
@@ -260,10 +358,13 @@ export function VisaoGeralNr1DoRegistro({
   detalhe,
   geral,
   servicoDosModelos = SERVICO_DOS_MODELOS,
+  onTrocarAba,
 }: {
   readonly detalhe: PesquisaDetalhe;
   readonly geral: ResultadosPesquisa;
   readonly servicoDosModelos?: ServicoDosModelos;
+  /** Leva ao plano (na dimensão) e à conformidade. */
+  readonly onTrocarAba?: (aba: AbaDoModelo) => void;
 }) {
   const acompanhamento = useAcompanhamentoNr1(servicoDosModelos, detalhe.id);
   return (
@@ -271,6 +372,9 @@ export function VisaoGeralNr1DoRegistro({
       resultado={painelDe(detalhe, geral)}
       acompanhamento={acompanhamento.gravado}
       detalhe={detalhe}
+      {...(onTrocarAba
+        ? { onIrPara: irParaComDimensao(detalhe.id, onTrocarAba) }
+        : {})}
     />
   );
 }

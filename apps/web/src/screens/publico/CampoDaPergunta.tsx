@@ -489,6 +489,14 @@ export function CampoDaPergunta({
             : tipo === "nota_0_10" && config.enps
               ? ["Nada provável", "Muito provável"]
               : ["Mínimo", "Máximo"];
+      // T216 — com rótulos em fileira: os das pontas também aparecem acima
+      // (quando a pergunta os define), e `decrescente` mostra do maior para
+      // o menor (a saúde da NR-1: "5 Excelente" primeiro).
+      const emFileira = rotulos !== null && !soRotulos;
+      const decrescente = emFileira && config.decrescente === true;
+      const pontasAcima =
+        emFileira && Boolean(config.rotuloMinimo || config.rotuloMaximo);
+      const pontos = intervalo(de, ate);
       controle = (
         <GrupoDeRadios
           base={base}
@@ -497,9 +505,17 @@ export function CampoDaPergunta({
           disposicao={soRotulos ? "lista" : "linha"}
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
-          extremos={rotulos ? null : extremos}
+          extremos={
+            !rotulos
+              ? extremos
+              : pontasAcima
+                ? decrescente
+                  ? [extremos[1], extremos[0]]
+                  : extremos
+                : null
+          }
           degrade={degrade}
-          opcoes={intervalo(de, ate).map((n) => ({
+          opcoes={(decrescente ? [...pontos].reverse() : pontos).map((n) => ({
             valor: String(n),
             ...(degrade
               ? { tom: Math.round(((n - de) / (ate - de)) * 100) }

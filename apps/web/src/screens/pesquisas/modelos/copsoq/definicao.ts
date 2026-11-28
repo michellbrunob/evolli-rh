@@ -57,10 +57,11 @@ export const ESCALAS_NR1: Readonly<
       "Muito satisfeito(a)",
     ],
   },
-  // Do melhor para o pior, como aparece para quem responde.
+  // Gravada do pior ao melhor (5 = Excelente) e mostrada de 5 a 1
+  // (`decrescente`), como aparece para quem responde.
   saude: {
     nome: "Saúde",
-    rotulos: ["Excelente", "Muito boa", "Boa", "Regular", "Fraca"],
+    rotulos: ["Fraca", "Regular", "Boa", "Muito boa", "Excelente"],
   },
 };
 
@@ -633,10 +634,13 @@ export const itensDoDominio = (dominio: string): ItemNr1[] =>
 export const dimensoesDoDominio = (dominio: string): DimensaoNr1[] =>
   DIMENSOES_NR1.filter((x) => x.dominio === dominio);
 
-/** Os quatro tipos de comportamento ofensivo (Q73 a Q76). */
+/**
+ * Os quatro tipos de comportamento ofensivo (Q73 a Q76), na ordem dos
+ * resultados: assédio, ameaça, conduta sexual e violência.
+ */
 export const TIPOS_DE_OFENSA: readonly { id: string; rotulo: string }[] = [
   { id: "Q73", rotulo: "Assédio moral" },
-  { id: "Q74", rotulo: "Conduta sexual indesejada" },
   { id: "Q75", rotulo: "Ameaça de violência" },
+  { id: "Q74", rotulo: "Conduta sexual indesejada" },
   { id: "Q76", rotulo: "Violência física" },
 ];

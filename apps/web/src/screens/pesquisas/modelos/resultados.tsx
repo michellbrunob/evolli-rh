@@ -74,7 +74,11 @@ export function paginaIndividualDoModelo(x: {
 }
 import { IndividualNr1Tela } from "./copsoq/IndividualNr1";
 import { IndividualIsfb, VisaoGeralIsfb } from "./isfb/VisaoGeralIsfb";
-import { painelDe, VisaoGeralNr1DoRegistro } from "./registro";
+import {
+  painelDe,
+  VisaoGeralNr1DoRegistro,
+  type AbaDoModelo,
+} from "./registro";
 
 /**
  * Avaliação 90°/180° e Onboarding automático: resultados inteiros
@@ -87,7 +91,7 @@ export function visaoGeralDoModelo(
   detalhe: PesquisaDetalhe,
   geral: ResultadosPesquisa,
   /** Troca a aba dos resultados (atalhos da Visão geral). */
-  onIrPara?: (aba: "analises") => void,
+  onTrocarAba?: (aba: AbaDoModelo) => void,
 ): ReactNode | null {
   const r = geral.modelo;
   if (!r) return null;
@@ -99,12 +103,18 @@ export function visaoGeralDoModelo(
     case "tad":
       return <ResultadoTadVisao r={r} />;
     case "copsoq":
-      return <VisaoGeralNr1DoRegistro detalhe={detalhe} geral={geral} />;
+      return (
+        <VisaoGeralNr1DoRegistro
+          detalhe={detalhe}
+          geral={geral}
+          {...(onTrocarAba ? { onTrocarAba } : {})}
+        />
+      );
     case "isfb":
       return (
         <VisaoGeralIsfb
           resultado={painelDe(detalhe, geral)}
-          {...(onIrPara ? { onIrPara } : {})}
+          {...(onTrocarAba ? { onIrPara: onTrocarAba } : {})}
         />
       );
     case "enps":

@@ -90,6 +90,8 @@ export interface ConfigPergunta {
   inteiro?: boolean;
   /** Escala com `rotulos`: mostra só os rótulos, em lista (sem os números). */
   somenteRotulos?: boolean;
+  /** Escala com `rotulos`: os pontos aparecem do maior para o menor. */
+  decrescente?: boolean;
 }
 
 export interface CondicaoPergunta {

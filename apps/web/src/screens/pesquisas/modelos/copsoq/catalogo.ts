@@ -8,9 +8,11 @@ import {
   DOMINIOS_NR1,
   ESCALAS_NR1,
   dimensaoNr1,
+  dimensoesDoDominio,
   itensDoDominio,
   type ItemNr1,
 } from "./definicao";
+import { NIVEIS, NIVEL } from "./textos";
 
 const pergunta = (i: ItemNr1): PerguntaDoModelo => {
   const rotulos = [...ESCALAS_NR1[i.escala].rotulos];
@@ -26,6 +28,8 @@ const pergunta = (i: ItemNr1): PerguntaDoModelo => {
       rotuloMinimo: rotulos[0]!,
       rotuloMaximo: rotulos[4]!,
       rotulos,
+      // Saúde: 5 = Excelente, mostrada do melhor para o pior.
+      ...(i.escala === "saude" ? { decrescente: true } : {}),
     },
     selo: i.invertido
       ? `${ESCALAS_NR1[i.escala].nome} · invertida`
@@ -36,97 +40,39 @@ const pergunta = (i: ItemNr1): PerguntaDoModelo => {
 const R = "--modelo-laranja";
 const P = "--modelo-azul";
 
-export const DOMINIOS_RISCOS = [
-  {
-    titulo: "Exigências Laborais",
-    subtitulo: "O volume e o ritmo de trabalho",
-    cor: "--grafico-5",
-    quantidade: 8,
-    dimensoes: [
-      ["Exigências Quantitativas", R],
-      ["Ritmo de Trabalho", R],
-      ["Exigências Cognitivas", R],
-      ["Exigências Emocionais", R],
-    ],
-  },
-  {
-    titulo: "Organização e Conteúdo do Trabalho",
-    subtitulo: "Autonomia e sentido no trabalho",
-    cor: "--grafico-2",
-    quantidade: 12,
-    dimensoes: [
-      ["Influência no Trabalho", P],
-      ["Possibilidades de Desenvolvimento", P],
-      ["Significado do Trabalho", P],
-      ["Compromisso com o Local de Trabalho", P],
-    ],
-  },
-  {
-    titulo: "Relações Sociais e Liderança",
-    subtitulo: "Clareza, apoio e qualidade da liderança",
-    cor: "--grafico-1",
-    quantidade: 21,
-    dimensoes: [
-      ["Previsibilidade", P],
-      ["Reconhecimento", P],
-      ["Transparência do Papel", P],
-      ["Conflitos de Papéis", R],
-      ["Qualidade da Liderança", P],
-      ["Apoio Social de Superiores", P],
-      ["Apoio Social de Colegas", P],
-    ],
-  },
-  {
-    titulo: "Interface Trabalho-Indivíduo",
-    subtitulo: "Segurança, satisfação e vida pessoal",
-    cor: "--grafico-3",
-    quantidade: 8,
-    dimensoes: [
-      ["Insegurança Laboral", R],
-      ["Satisfação Laboral", P],
-      ["Conflito Trabalho-Família", R],
-    ],
-  },
-  {
-    titulo: "Valores no Local de Trabalho",
-    subtitulo: "Confiança, justiça e convivência",
-    cor: "--grafico-6",
-    quantidade: 12,
-    dimensoes: [
-      ["Confiança Vertical", P],
-      ["Confiança Horizontal", P],
-      ["Justiça e Respeito", P],
-      ["Comunidade Social no Trabalho", P],
-    ],
-  },
-  {
-    titulo: "Personalidade",
-    subtitulo: "Capacidade de lidar com problemas",
-    cor: "--grafico-7",
-    quantidade: 2,
-    dimensoes: [["Autoeficácia", P]],
-  },
-  {
-    titulo: "Saúde e Bem-Estar",
-    subtitulo: "Como o trabalho afeta a saúde",
-    cor: "--grafico-4",
-    quantidade: 9,
-    dimensoes: [
-      ["Saúde Geral", P],
-      ["Estresse", R],
-      ["Esgotamento", R],
-      ["Problemas para Dormir", R],
-      ["Sintomas Depressivos", R],
-    ],
-  },
-  {
-    titulo: "Comportamentos Ofensivos",
-    subtitulo: "Assédio, ameaças e violência nos últimos 12 meses",
-    cor: "--faixa-critico",
-    quantidade: 4,
-    dimensoes: [["Comportamentos Ofensivos", R]],
-  },
+/** O token de cor de cada domínio, na ordem de `DOMINIOS_NR1`. */
+const COR_DO_DOMINIO = [
+  "--grafico-5",
+  "--grafico-2",
+  "--grafico-1",
+  "--grafico-3",
+  "--grafico-6",
+  "--grafico-7",
+  "--grafico-4",
+  "--faixa-critico",
 ] as const;
+
+/**
+ * Os 8 domínios na página "Sobre o modelo", com os MESMOS nomes de
+ * dimensão dos resultados (vindos da definição).
+ */
+export const DOMINIOS_RISCOS = DOMINIOS_NR1.map((d, i) => ({
+  titulo: d.rotulo,
+  subtitulo: d.subtitulo,
+  cor: COR_DO_DOMINIO[i]!,
+  quantidade: itensDoDominio(d.id).length,
+  dimensoes: dimensoesDoDominio(d.id).map(
+    (x) => [x.rotulo, x.tipo === "risco" ? R : P] as const,
+  ),
+}));
+
+/** Token de cor de cada nível no exemplo (mesma ordem dos resultados). */
+const TOKEN_DO_NIVEL = {
+  critico: "--faixa-critico",
+  alto: "--modelo-laranja",
+  medio: "--faixa-atencao",
+  baixo: "--faixa-forte",
+} as const;
 
 export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
   id: "copsoq",
@@ -199,6 +145,44 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
           valor: "8",
           texto: "de 29 dimensões em risco alto ou crítico",
           cor: "--faixa-critico",
+        },
+        // 29 quadradinhos do maior risco ao menor: 3 críticas, 5 altas, 9
+        // médias e 12 baixas (dados fictícios).
+        quadradinhos: [
+          ...Array.from({ length: 3 }, () => TOKEN_DO_NIVEL.critico),
+          ...Array.from({ length: 5 }, () => TOKEN_DO_NIVEL.alto),
+          ...Array.from({ length: 9 }, () => TOKEN_DO_NIVEL.medio),
+          ...Array.from({ length: 12 }, () => TOKEN_DO_NIVEL.baixo),
+        ],
+        matriz: {
+          titulo: "Severidade × prevalência",
+          // Severidade da mais alta para a mais baixa; prevalência crescente.
+          celulas: [
+            [
+              { valor: 0, cor: TOKEN_DO_NIVEL.medio },
+              { valor: 1, cor: TOKEN_DO_NIVEL.alto },
+              { valor: 2, cor: TOKEN_DO_NIVEL.critico },
+              { valor: 1, cor: TOKEN_DO_NIVEL.critico },
+            ],
+            [
+              { valor: 2, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 3, cor: TOKEN_DO_NIVEL.medio },
+              { valor: 3, cor: TOKEN_DO_NIVEL.alto },
+              { valor: 0, cor: TOKEN_DO_NIVEL.critico },
+            ],
+            [
+              { valor: 4, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 2, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 4, cor: TOKEN_DO_NIVEL.medio },
+              { valor: 1, cor: TOKEN_DO_NIVEL.alto },
+            ],
+            [
+              { valor: 3, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 1, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 0, cor: TOKEN_DO_NIVEL.baixo },
+              { valor: 2, cor: TOKEN_DO_NIVEL.medio },
+            ],
+          ],
         },
         barras: [
           {
@@ -284,22 +268,15 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
       { titulo: "Satisfação", texto: "Muito insatisfeito → Muito satisfeito" },
       { titulo: "Saúde", texto: "Fraca → Excelente" },
     ],
+    // Os mesmos rótulos e ações dos resultados.
     regua: {
       titulo: "Os níveis de risco",
-      faixas: [
-        {
-          rotulo: "Crítico",
-          intervalo: "ação imediata",
-          cor: "--faixa-critico",
-        },
-        {
-          rotulo: "Alto",
-          intervalo: "ação prioritária",
-          cor: "--modelo-laranja",
-        },
-        { rotulo: "Médio", intervalo: "acompanhar", cor: "--faixa-atencao" },
-        { rotulo: "Baixo", intervalo: "manter", cor: "--faixa-forte" },
-      ],
+      faixas: NIVEIS.map((n) => ({
+        rotulo: NIVEL[n].rotulo,
+        intervalo: NIVEL[n].acao,
+        texto: NIVEL[n].frase,
+        cor: TOKEN_DO_NIVEL[n],
+      })),
     },
   },
 };

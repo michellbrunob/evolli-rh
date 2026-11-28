@@ -350,13 +350,15 @@ describe("catálogo e autopercepção no assistente", () => {
     expect(secoes).toHaveLength(8);
     const perguntas = secoes.flatMap((s) => s.perguntas);
     expect(perguntas.map((p) => p.chave)).toEqual(ITENS_NR1.map((i) => i.id));
+    // Saúde: gravada com 5 = Excelente, mostrada de 5 a 1.
     expect(perguntas[63]!.config.rotulos).toEqual([
-      "Excelente",
-      "Muito boa",
-      "Boa",
-      "Regular",
       "Fraca",
+      "Regular",
+      "Boa",
+      "Muito boa",
+      "Excelente",
     ]);
+    expect(perguntas[63]!.config.decrescente).toBe(true);
     expect(perguntas.every((p) => p.obrigatoria)).toBe(true);
     expect(perguntas.every((p) => p.texto.length <= 300)).toBe(true);
     expect(perguntas.every((p) => (p.rotulo ?? "").length <= 40)).toBe(true);
@@ -430,11 +432,12 @@ describe("resultados da NR-1", () => {
       />,
     );
     const abas = await screen.findAllByRole("tab");
+    // Plano e conformidade ganham o contador quando o acompanhamento chega.
     expect(abas.map((a) => a.textContent)).toEqual([
       "Visão geral",
       "Por grupo",
-      "Plano de ação",
-      "Conformidade NR-1",
+      expect.stringMatching(/^Plano de ação/),
+      expect.stringMatching(/^Conformidade NR-1/),
       expect.stringMatching(/^Respostas/),
     ]);
     expect(

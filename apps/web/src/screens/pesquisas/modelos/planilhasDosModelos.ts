@@ -187,6 +187,9 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
   const minimo = d.minimoPorGrupo;
   const sigilo = (n: number | null): CelulaXlsx =>
     n === null ? `Menos de ${minimo}` : n;
+  // Frequência oculta: abaixo do mínimo ou escondida para não sair por
+  // subtração (sigilo complementar) — nunca zero.
+  const oculta = (n: number | null): CelulaXlsx => (n === null ? "Oculto" : n);
   const destaques: CelulaXlsx[][] = [
     ["Ranking de prioridades"],
     ["#", "Dimensão", "Nível", "% em risco", "Severidade", "Escore"],
@@ -228,12 +231,13 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
   const cabOfensivos = destaques.length - 1;
   for (const t of TIPOS_DE_OFENSA) {
     const x = r.ofensivos.tipos.find((y) => y.id === t.id);
+    // `null` é sigilo: não vira zero.
     destaques.push([
       t.rotulo,
-      sigilo(x?.raramente ?? 0),
-      sigilo(x?.asVezes ?? 0),
-      sigilo(x?.frequentementeOuSempre ?? 0),
-      sigilo(x?.relataram ?? 0),
+      x ? oculta(x.raramente) : 0,
+      x ? oculta(x.asVezes) : 0,
+      x ? oculta(x.frequentementeOuSempre) : 0,
+      x ? sigilo(x.relataram) : 0,
     ]);
   }
   abas.push({

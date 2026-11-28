@@ -10,18 +10,27 @@ import { StatusBadge, type StatusVariant } from "../../../components";
 import { plural } from "../../../format/plural";
 import { NIVEL } from "./copsoq/textos";
 import "./Modelos.css";
+import "./copsoq/Nr1.css";
 
+/**
+ * As cores dos níveis da NR-1: crítico vermelho, alto laranja, médio âmbar
+ * e baixo verde. O alto usa a pílula de atenção com o tom laranja do
+ * modelo (o sistema não tem variante laranja).
+ */
 export const VARIANTE_DO_NIVEL: Readonly<Record<NivelNr1, StatusVariant>> = {
   critico: "danger",
   alto: "warning",
-  medio: "info",
+  medio: "warning",
   baixo: "success",
 };
 
 export function SeloDoNivel({ nivel }: { readonly nivel: NivelNr1 | null }) {
   if (!nivel) return <span className="pesquisas__suave">—</span>;
   return (
-    <StatusBadge variant={VARIANTE_DO_NIVEL[nivel]}>
+    <StatusBadge
+      variant={VARIANTE_DO_NIVEL[nivel]}
+      {...(nivel === "alto" ? { className: "nr1__selo-alto" } : {})}
+    >
       {NIVEL[nivel].rotulo}
     </StatusBadge>
   );

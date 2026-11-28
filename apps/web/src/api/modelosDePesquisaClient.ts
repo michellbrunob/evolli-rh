@@ -6,6 +6,8 @@
  *   GET /pesquisas/:id/modelo/respostas/:respostaId   uma resposta
  *   GET /pesquisas/:id/modelo/acompanhamento          etapas e plano
  *   PUT /pesquisas/:id/modelo/acompanhamento          grava (CSRF)
+ *   POST|GET|DELETE …/acompanhamento/evidencias/:etapa[/:arquivoId]
+ *                                                     arquivos de evidência
  *
  * Os tipos seguem `apps/api/src/pesquisas/modelos/` (apêndice de
  * `docs/decisions/t216-pesquisas.md`).
@@ -20,6 +22,12 @@ import type {
 } from "./resultadosDosModelos";
 export type * from "./resultadosDosModelos";
 import { pedir } from "./pesquisasClient";
+import { ApiError } from "./colaboradoresClient";
+import {
+  clearCsrfToken,
+  descartarTokenSeDesatualizado,
+  tokenCsrfParaGravacao,
+} from "./csrfClient";
 
 export interface GrupoDoModelo {
   id: string;
@@ -27,6 +35,8 @@ export interface GrupoDoModelo {
   respostas: number;
   visivel: boolean;
   oculto: MotivoOculto | null;
+  /** O resultado do grupo não carregou (erro, não sigilo). */
+  falhou?: boolean;
   nr1: {
     pressao: number | null;
     recursos: number | null;
@@ -86,6 +96,15 @@ export interface MedidaDoPlano {
   situacao: SituacaoDaMedida;
 }
 
+/** Um arquivo de evidência da etapa (PDF, imagem ou apresentação). */
+export interface ArquivoDaEtapa {
+  id: string;
+  nome: string;
+  formato: "pdf" | "jpg" | "png" | "webp" | "pptx";
+  tamanhoBytes: number;
+  enviadoEm: string;
+}
+
 export interface EtapaDoAcompanhamento {
   id: EtapaNr1;
   itens: boolean[];
@@ -93,6 +112,8 @@ export interface EtapaDoAcompanhamento {
   concluidaEm: string | null;
   concluida: boolean;
   automatica: boolean;
+  /** Arquivos de evidência (só nas etapas que a empresa conclui). */
+  arquivos?: ArquivoDaEtapa[];
 }
 
 export interface AcompanhamentoNr1 {
@@ -134,13 +155,97 @@ export const gravarAcompanhamentoNr1 = (
     entrada,
   );
 
+const rotaDaEvidencia = (pesquisaId: string, etapa: string, arquivo = "") =>
+  `/v1/pesquisas/${id(pesquisaId)}/modelo/acompanhamento/evidencias/${id(etapa)}${arquivo ? `/${id(arquivo)}` : ""}`;
+
+/** "Ata.PDF" → "pdf"; sem extensão, vazio. */
+function extensaoDe(nome: string): string {
+  const ponto = nome.lastIndexOf(".");
+  return ponto < 0 ? "" : nome.slice(ponto + 1).toLowerCase();
+}
+
+async function falha(res: Response): Promise<never> {
+  const erro: unknown = await res.json().catch(() => ({}));
+  throw new ApiError(res.status, "Erro na requisição.", erro);
+}
+
+/** Anexa um arquivo à etapa: bytes no corpo; tipo, extensão e nome nos cabeçalhos. */
+export async function enviarEvidenciaNr1(
+  pesquisaId: string,
+  etapa: EtapaNr1,
+  arquivo: File,
+): Promise<AcompanhamentoNr1> {
+  const res = await fetch(rotaDaEvidencia(pesquisaId, etapa), {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/octet-stream",
+      "x-csrf-token": await tokenCsrfParaGravacao(),
+      "x-evolli-evidencia-tipo": arquivo.type || "application/octet-stream",
+      "x-evolli-evidencia-extensao": extensaoDe(arquivo.name),
+      "x-evolli-evidencia-nome": encodeURIComponent(arquivo.name),
+    },
+    body: arquivo,
+  });
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) return falha(res);
+  return res.json() as Promise<AcompanhamentoNr1>;
+}
+
+/** O arquivo da etapa, em memória do navegador (download privado). */
+export async function baixarEvidenciaNr1(
+  pesquisaId: string,
+  etapa: EtapaNr1,
+  arquivoId: string,
+): Promise<Blob> {
+  const res = await fetch(rotaDaEvidencia(pesquisaId, etapa, arquivoId), {
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { Accept: "*/*" },
+  });
+  if (res.status === 401) clearCsrfToken();
+  if (!res.ok) return falha(res);
+  return res.blob();
+}
+
+/** Remove o arquivo da etapa. */
+export async function removerEvidenciaNr1(
+  pesquisaId: string,
+  etapa: EtapaNr1,
+  arquivoId: string,
+): Promise<AcompanhamentoNr1> {
+  const res = await fetch(rotaDaEvidencia(pesquisaId, etapa, arquivoId), {
+    method: "DELETE",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "x-csrf-token": await tokenCsrfParaGravacao(),
+    },
+  });
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (!res.ok) return falha(res);
+  return res.json() as Promise<AcompanhamentoNr1>;
+}
+
 /** As chamadas dos modelos (as telas recebem um falso nos testes). */
 export interface ServicoDosModelos {
   readonly acompanhamentoNr1: typeof acompanhamentoNr1;
   readonly gravarAcompanhamentoNr1: typeof gravarAcompanhamentoNr1;
+  /** Arquivos de evidência (ausentes: a tela não oferece o envio). */
+  readonly enviarEvidenciaNr1?: typeof enviarEvidenciaNr1;
+  readonly baixarEvidenciaNr1?: typeof baixarEvidenciaNr1;
+  readonly removerEvidenciaNr1?: typeof removerEvidenciaNr1;
 }
 
 export const SERVICO_DOS_MODELOS: ServicoDosModelos = {
   acompanhamentoNr1,
   gravarAcompanhamentoNr1,
+  enviarEvidenciaNr1,
+  baixarEvidenciaNr1,
+  removerEvidenciaNr1,
 };

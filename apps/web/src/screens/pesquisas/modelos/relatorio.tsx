@@ -596,8 +596,9 @@ export function DocumentoNr1({
                 <tbody>
                   {TIPOS_DE_OFENSA.map((t) => {
                     const x = r.ofensivos.tipos.find((y) => y.id === t.id);
+                    // Oculta: abaixo do mínimo ou pelo sigilo complementar.
                     const c = (n: number | null | undefined) =>
-                      n === null ? `menos de ${minimo}` : String(n ?? 0);
+                      n === null ? "oculto" : String(n ?? 0);
                     return (
                       <tr key={t.id}>
                         <td>{t.rotulo}</td>

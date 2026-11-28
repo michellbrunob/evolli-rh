@@ -59,6 +59,8 @@ export interface ConfigPergunta {
   readonly inteiro?: boolean;
   /** Escala com `rotulos`: mostra só os rótulos, em lista (sem os números). */
   readonly somenteRotulos?: boolean;
+  /** Escala com `rotulos`: os pontos aparecem do maior para o menor. */
+  readonly decrescente?: boolean;
 }
 
 export interface Pergunta {

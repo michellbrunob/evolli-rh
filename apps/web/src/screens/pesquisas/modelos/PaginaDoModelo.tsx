@@ -46,6 +46,40 @@ export function JanelaDeExemplo({ e }: { readonly e: ExemploDoResultado }) {
             <span className="pesquisas__suave">{e.destaque.texto}</span>
           </p>
         ) : null}
+        {e.quadradinhos ? (
+          <span
+            className="sobre__quadradinhos"
+            role="img"
+            aria-label={`${e.quadradinhos.length} itens por nível`}
+          >
+            {e.quadradinhos.map((c, i) => (
+              <span key={i} style={{ background: cor(c) }} />
+            ))}
+          </span>
+        ) : null}
+        {e.matriz ? (
+          <div className="sobre__mini-matriz">
+            <span className="pesquisas__suave">{e.matriz.titulo}</span>
+            <div
+              className="sobre__mini-matriz-grade"
+              role="img"
+              aria-label={e.matriz.titulo}
+            >
+              {e.matriz.celulas.flatMap((linha, l) =>
+                linha.map((c, k) => (
+                  <span
+                    key={`${l}-${k}`}
+                    style={{
+                      background: `color-mix(in srgb, ${cor(c.cor)} 28%, transparent)`,
+                    }}
+                  >
+                    {c.valor || ""}
+                  </span>
+                )),
+              )}
+            </div>
+          </div>
+        ) : null}
         {e.barras ? (
           <ul className="sobre__barras">
             {e.barras.map((b) => (

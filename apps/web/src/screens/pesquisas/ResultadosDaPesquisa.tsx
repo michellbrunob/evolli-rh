@@ -92,8 +92,8 @@ import { planilhaDisc } from "./modelos/disc/exportarDisc";
 import { perfilComportamental } from "./modelos/disc/tiposDisc";
 import { enderecoDaRota, type AbaDosResultados } from "./rotasDePesquisas";
 import {
-  ABAS_DO_MODELO,
   PainelDoModelo,
+  abasDoModeloDaPesquisa,
   temTelasProprias,
 } from "./modelos/registro";
 import {
@@ -377,7 +377,7 @@ function ResultadosInterno({
   const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
   const participantes = detalhe.participantesTotal ?? detalhe.participantes;
   const proprio = ehModeloComTelaPropria(detalhe.modelo);
-  const proprias = ABAS_DO_MODELO[detalhe.modelo];
+  const proprias = abasDoModeloDaPesquisa(detalhe);
   const abas: { valor: Aba; rotulo: ReactNode }[] = [
     ...(proprias ?? []),
     ...(proprias ? [] : [{ valor: "geral" as const, rotulo: "Visão geral" }]),
