@@ -7,6 +7,7 @@ import {
   envioVencido,
   horarioValido,
   intervaloDoAgendador,
+  jornadasDoOnboarding,
   lembreteDevido,
   noPublico,
   planejarEnvios,
@@ -161,6 +162,60 @@ describe("T216 — configuração do envio do onboarding", () => {
         hoje,
       ).erros,
     ).toEqual([{ campo: "agendadoPara", motivo: "obrigatorio" }]);
+  });
+
+  it("e-mail personalizado: cor principal e cor de fundo clara (#RRGGBB)", () => {
+    const personalizado = {
+      modelo: "personalizado",
+      assunto: "Assunto",
+      titulo: "Título",
+      mensagem: "Mensagem.",
+    };
+    const ok = conferirConfigOnboarding(
+      {
+        email: {
+          ...personalizado,
+          corPrincipal: "#1F6FEB",
+          corFundo: "#F7F9FC",
+        },
+      },
+      "confidencial",
+      hoje,
+    );
+    expect(ok.erros).toEqual([]);
+    expect(ok.config!.email).toEqual({
+      ...personalizado,
+      corPrincipal: "#1f6feb",
+      corFundo: "#f7f9fc",
+    });
+    // Sem cor: o visual padrão.
+    expect(
+      conferirConfigOnboarding({ email: personalizado }, "confidencial", hoje)
+        .config!.email,
+    ).toMatchObject({ corPrincipal: null, corFundo: null });
+    // No padrão, as cores não ficam gravadas.
+    expect(
+      conferirConfigOnboarding(
+        { email: { modelo: "padrao", corPrincipal: "#1f6feb" } },
+        "confidencial",
+        hoje,
+      ).config!.email,
+    ).toEqual(CONFIG_PADRAO.email);
+    for (const [corPrincipal, corFundo] of [
+      ["azul", null],
+      ["#12345", null],
+      ["#1f6feb", "#1f6feb"], // fundo escuro
+      ["#1f6feb", "#808080"],
+      [null, "fff"],
+    ] as const) {
+      const r = conferirConfigOnboarding(
+        { email: { ...personalizado, corPrincipal, corFundo } },
+        "confidencial",
+        hoje,
+      );
+      expect(r.config).toBeNull();
+      expect(r.erros).toEqual([{ campo: "email", motivo: "invalido" }]);
+    }
   });
 
   it("horário: das 06:00 às 21:00, de 30 em 30 minutos", () => {
@@ -509,5 +564,117 @@ describe("T216 — convites já criados e dias úteis (provas extras)", () => {
     expect(dataDaRodada("2026-10-27", 30, false, new Set(["2026-11-26"]))).toBe(
       "2026-11-26",
     );
+  });
+});
+
+describe("T216 — jornada de cada pessoa (identificada)", () => {
+  it("admissão, cargo, unidade e as rodadas: respondidas, pendentes e puladas", () => {
+    const j = jornadasDoOnboarding(
+      [
+        {
+          colaboradorId: ID(1),
+          nome: "Ana",
+          rodada: 60,
+          situacao: "agendado",
+          dataPrevista: "2027-01-26",
+        },
+        {
+          colaboradorId: ID(1),
+          nome: "Ana",
+          rodada: 30,
+          situacao: "respondido",
+          dataPrevista: "2026-12-27",
+        },
+        {
+          colaboradorId: ID(2),
+          nome: "Bia",
+          rodada: 30,
+          situacao: "pulado",
+          dataPrevista: "2026-12-01",
+        },
+        {
+          colaboradorId: ID(3),
+          nome: "Caio Inativo",
+          rodada: 30,
+          situacao: "enviado",
+          dataPrevista: "2026-11-20",
+        },
+      ],
+      new Map([
+        [
+          ID(1),
+          { admissao: "2026-11-27", cargo: "Analista", unidade: "Matriz" },
+        ],
+        [ID(2), { admissao: "2026-11-01", cargo: null, unidade: null }],
+      ]),
+    );
+    expect(j).toEqual([
+      {
+        colaboradorId: ID(1),
+        nome: "Ana",
+        admissao: "2026-11-27",
+        cargo: "Analista",
+        unidade: "Matriz",
+        rodadas: [
+          { rodada: 30, dataPrevista: "2026-12-27", situacao: "respondido" },
+          { rodada: 60, dataPrevista: "2027-01-26", situacao: "agendado" },
+        ],
+        respondidas: 1,
+      },
+      {
+        colaboradorId: ID(2),
+        nome: "Bia",
+        admissao: "2026-11-01",
+        cargo: null,
+        unidade: null,
+        rodadas: [
+          { rodada: 30, dataPrevista: "2026-12-01", situacao: "pulado" },
+        ],
+        respondidas: 0,
+      },
+      {
+        colaboradorId: ID(3),
+        nome: "Caio Inativo",
+        admissao: null,
+        cargo: null,
+        unidade: null,
+        rodadas: [
+          { rodada: 30, dataPrevista: "2026-11-20", situacao: "enviado" },
+        ],
+        respondidas: 0,
+      },
+    ]);
+  });
+
+  it("ordem por nome (pt-BR) e lista vazia sem convites", () => {
+    expect(jornadasDoOnboarding([], new Map())).toEqual([]);
+    const j = jornadasDoOnboarding(
+      [
+        {
+          colaboradorId: ID(2),
+          nome: "Érica",
+          rodada: 30,
+          situacao: "respondido",
+          dataPrevista: "2026-12-01",
+        },
+        {
+          colaboradorId: ID(1),
+          nome: "Davi",
+          rodada: 30,
+          situacao: "respondido",
+          dataPrevista: "2026-12-01",
+        },
+        {
+          colaboradorId: ID(3),
+          nome: "Fábio",
+          rodada: 0,
+          situacao: "respondido",
+          dataPrevista: "2026-12-01",
+        },
+      ],
+      new Map(),
+    );
+    expect(j.map((x) => x.nome)).toEqual(["Davi", "Érica", "Fábio"]);
+    expect(j.map((x) => x.respondidas)).toEqual([1, 1, 1]);
   });
 });

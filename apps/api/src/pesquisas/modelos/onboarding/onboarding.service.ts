@@ -42,6 +42,7 @@ import {
   aceitaResposta,
   conferirConfigOnboarding,
   configGravada,
+  jornadasDoOnboarding,
   noPublico,
   proximasRodadas,
   ultimoDiaParaResponder,
@@ -376,9 +377,29 @@ export class OnboardingService {
       },
     });
     const anonima = p.identificacao === "anonima";
+    // Identificada: a jornada de cada pessoa (cadastro e rodadas).
+    const jornadas =
+      p.identificacao === "identificada"
+        ? jornadasDoOnboarding(
+            linhas.map((l) => ({
+              colaboradorId: l.colaboradorId,
+              nome: l.colaborador.nome,
+              rodada: l.rodada,
+              situacao: l.situacao,
+              dataPrevista: diaDe(l.dataPrevista),
+            })),
+            new Map(
+              (await pessoasAtivas(this.prisma, empresaId)).map((a) => [
+                a.id,
+                { admissao: a.admissao, cargo: a.cargo, unidade: a.unidade },
+              ]),
+            ),
+          )
+        : null;
     return {
       identificacao: p.identificacao,
       horario: config.horario,
+      jornadas,
       itens: linhas.map((l) => ({
         id: l.id,
         colaboradorId: l.colaboradorId,

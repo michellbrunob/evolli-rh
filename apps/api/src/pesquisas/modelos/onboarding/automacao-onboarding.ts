@@ -54,6 +54,10 @@ export interface EmailDoOnboarding {
   assunto: string | null;
   titulo: string | null;
   mensagem: string | null;
+  /** Personalizado: a cor principal (`#rrggbb`); `null` = a do Evolli. */
+  corPrincipal: string | null;
+  /** Personalizado: a cor de fundo, sempre clara (`#rrggbb`). */
+  corFundo: string | null;
 }
 
 export interface ConfigOnboarding {
@@ -82,12 +86,41 @@ export const CONFIG_PADRAO: ConfigOnboarding = {
   soDiasUteis: true,
   incluirAtrasados: false,
   publico: { tipo: "todos" },
-  email: { modelo: "padrao", assunto: null, titulo: null, mensagem: null },
+  email: {
+    modelo: "padrao",
+    assunto: null,
+    titulo: null,
+    mensagem: null,
+    corPrincipal: null,
+    corFundo: null,
+  },
 };
 
 export const LIMITES_DO_EMAIL = { assunto: 80, titulo: 60, mensagem: 600 };
 
 const HORARIO = /^(\d{2}):(\d{2})$/;
+const COR = /^#[0-9a-f]{6}$/i;
+/** O fundo do e-mail precisa ser claro (o texto do corpo é escuro). */
+export const LUMINANCIA_MINIMA_DO_FUNDO = 0.8;
+
+/** Luminância relativa (WCAG) de `#rrggbb`, de 0 a 1. */
+export function luminancia(hex: string): number {
+  const canal = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+}
+
+/** A cor informada (minúscula), `null` sem cor, `undefined` se inválida. */
+function corOpcional(v: unknown, clara: boolean): string | null | undefined {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "string" || !COR.test(v)) return undefined;
+  const cor = v.toLowerCase();
+  return clara && luminancia(cor) < LUMINANCIA_MINIMA_DO_FUNDO
+    ? undefined
+    : cor;
+}
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -239,11 +272,15 @@ export function conferirConfigOnboarding(
   const assunto = textoOpcional(e.assunto, LIMITES_DO_EMAIL.assunto);
   const titulo = textoOpcional(e.titulo, LIMITES_DO_EMAIL.titulo);
   const mensagem = textoOpcional(e.mensagem, LIMITES_DO_EMAIL.mensagem);
+  const corPrincipal = corOpcional(e.corPrincipal, false);
+  const corFundo = corOpcional(e.corFundo, true);
   if (
     (modeloEmail !== "padrao" && modeloEmail !== "personalizado") ||
     assunto === undefined ||
     titulo === undefined ||
     mensagem === undefined ||
+    corPrincipal === undefined ||
+    corFundo === undefined ||
     (modeloEmail === "personalizado" && (!assunto || !titulo || !mensagem))
   ) {
     erros.push({ campo: "email", motivo: "invalido" });
@@ -271,8 +308,10 @@ export function conferirConfigOnboarding(
               assunto: assunto ?? null,
               titulo: titulo ?? null,
               mensagem: mensagem ?? null,
+              corPrincipal: corPrincipal ?? null,
+              corFundo: corFundo ?? null,
             }
-          : { modelo: "padrao", assunto: null, titulo: null, mensagem: null },
+          : CONFIG_PADRAO.email,
     },
     erros,
   };
@@ -281,7 +320,12 @@ export function conferirConfigOnboarding(
 /** A configuração gravada (com o padrão no que faltar). */
 export function configGravada(bruto: unknown): ConfigOnboarding {
   const c = ehRegistro(bruto) ? bruto : {};
-  return { ...CONFIG_PADRAO, ...(c as Partial<ConfigOnboarding>) };
+  const gravada = { ...CONFIG_PADRAO, ...(c as Partial<ConfigOnboarding>) };
+  // Configurações anteriores às cores do e-mail.
+  return {
+    ...gravada,
+    email: { ...CONFIG_PADRAO.email, ...gravada.email },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -521,4 +565,67 @@ export function intervaloDoAgendador(
   const n = Number(bruto);
   if (!Number.isInteger(n) || n < 0) return 0;
   return n === 0 ? 0 : Math.max(n, 10_000);
+}
+
+// ---------------------------------------------------------------------------
+// Jornada de cada pessoa (identificada)
+
+export interface EnvioDaJornada {
+  colaboradorId: string;
+  nome: string;
+  rodada: number;
+  situacao: string;
+  dataPrevista: Dia;
+}
+
+export interface CadastroDaJornada {
+  admissao: Dia | null;
+  cargo: string | null;
+  unidade: string | null;
+}
+
+export interface JornadaDoOnboarding extends CadastroDaJornada {
+  colaboradorId: string;
+  nome: string;
+  rodadas: { rodada: number; dataPrevista: Dia; situacao: string }[];
+  respondidas: number;
+}
+
+/**
+ * Uma linha por pessoa convidada: o cadastro (admissão, cargo e unidade;
+ * vazio para quem saiu) e os convites por rodada, em ordem. Só na
+ * identificada (nas outras, ligar a pessoa à resposta não é permitido).
+ */
+export function jornadasDoOnboarding(
+  envios: readonly EnvioDaJornada[],
+  cadastro: ReadonlyMap<string, CadastroDaJornada>,
+): JornadaDoOnboarding[] {
+  const porPessoa = new Map<string, EnvioDaJornada[]>();
+  for (const e of envios) {
+    porPessoa.set(e.colaboradorId, [
+      ...(porPessoa.get(e.colaboradorId) ?? []),
+      e,
+    ]);
+  }
+  return [...porPessoa.entries()]
+    .map(([colaboradorId, lista]) => {
+      const c = cadastro.get(colaboradorId);
+      const rodadas = [...lista]
+        .sort((a, b) => a.rodada - b.rodada)
+        .map((e) => ({
+          rodada: e.rodada,
+          dataPrevista: e.dataPrevista,
+          situacao: e.situacao,
+        }));
+      return {
+        colaboradorId,
+        nome: lista[0]!.nome,
+        admissao: c?.admissao ?? null,
+        cargo: c?.cargo ?? null,
+        unidade: c?.unidade ?? null,
+        rodadas,
+        respondidas: rodadas.filter((x) => x.situacao === "respondido").length,
+      };
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
