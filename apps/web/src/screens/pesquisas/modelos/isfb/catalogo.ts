@@ -5,6 +5,14 @@
  */
 import type { ModeloDaGaleria } from "../tipos";
 import { SECOES_ISFB } from "./definicao";
+import {
+  minutosCurtos,
+  perguntasParaOTempo,
+  tempoNoTexto,
+  tempoParaResponder,
+} from "../../tempoEstimado";
+
+const PERGUNTAS_ISFB = perguntasParaOTempo(SECOES_ISFB);
 
 export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   id: "isfb",
@@ -25,8 +33,7 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   sobre:
     "15 perguntas viram uma nota de 0 a 100, com 3 perguntas opcionais de autopercepção.",
   nomeBase: "Saúde financeira",
-  boasVindas:
-    "Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva cerca de 5 minutos.",
+  boasVindas: `Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva ${tempoNoTexto(PERGUNTAS_ISFB)}.`,
   secoes: SECOES_ISFB,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 0, maximo: 4 } },
@@ -35,11 +42,11 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   fixo: true,
   pagina: {
     titulo: "Saúde financeira · Índice de 0 a 100",
-    selo: "5 a 8 min",
+    selo: minutosCurtos(PERGUNTAS_ISFB),
     texto:
       "15 perguntas viram uma nota de 0 a 100 por pessoa, que dá para comparar com a média do país. As 3 de autopercepção são opcionais.",
     metadados: [
-      "Cerca de 5 minutos para responder",
+      `${tempoParaResponder(PERGUNTAS_ISFB)} para responder`,
       "Identificada, CPF confidencial ou anônima",
       "Score de 0 a 100 e perfis do time",
     ],
@@ -138,7 +145,7 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
     ],
     ficha: [
       ["Perguntas", "15 + 3 opcionais"],
-      ["Tempo", "Cerca de 5 minutos"],
+      ["Tempo", tempoParaResponder(PERGUNTAS_ISFB)],
       ["Resultado", "Score de 0 a 100 por pessoa"],
       ["Frequência", "Semestral"],
     ],

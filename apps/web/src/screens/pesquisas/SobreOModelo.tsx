@@ -21,7 +21,7 @@ import {
   secoesDoModelo,
   totalDePerguntas,
 } from "./modelosDePesquisa";
-import { minutosEstimados } from "./PreVisualizacao";
+import { minutosDoModelo } from "./tempoEstimado";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import { PaginaDoModelo } from "./modelos/PaginaDoModelo";
 import { textoParaOPainel } from "./modelos/empresa";
@@ -218,7 +218,7 @@ export function SobreOModelo({
             acao={
               <span className="pesquisas__suave">
                 <IconeTempo tamanho={14} />
-                {` cerca de ${plural(minutosEstimados(total), "minuto", "minutos")}`}
+                {` cerca de ${plural(minutosDoModelo(m), "minuto", "minutos")}`}
               </span>
             }
           >

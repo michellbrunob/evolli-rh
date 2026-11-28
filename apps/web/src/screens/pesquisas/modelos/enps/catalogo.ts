@@ -13,6 +13,7 @@ import type {
   PerguntaPadrao,
 } from "../tipos";
 import { CalculoDoEnps, PrincipalDoEnps } from "./SobreEnps";
+import { perguntasParaOTempo, tempoParaResponder } from "../../tempoEstimado";
 
 export const CHAVE_PRINCIPAL_DO_ENPS = "enps_principal";
 
@@ -179,11 +180,13 @@ export const ENPS: ModeloDaGaleria = {
     selo: "8 perguntas",
     texto:
       "Uma nota de 0 a 10 diz quanto as pessoas indicariam a empresa como lugar para trabalhar. As complementares e as abertas explicam a nota.",
-    metadados: [
-      "Cerca de 3 minutos para responder",
-      "Identificada, CPF confidencial ou anônima",
-      "eNPS de −100 a 100",
-    ],
+    get metadados() {
+      return [
+        `${tempoParaResponder(perguntasParaOTempo(ENPS.secoes))} para responder`,
+        "Identificada, CPF confidencial ou anônima",
+        "eNPS de −100 a 100",
+      ];
+    },
     botaoVer: "Ver as perguntas",
     botaoCriar: "Criar pesquisa",
     numeros: [

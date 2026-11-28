@@ -13,6 +13,13 @@ import {
   type ItemNr1,
 } from "./definicao";
 import { NIVEIS, NIVEL } from "./textos";
+import { tempoNoTexto, tempoParaResponder } from "../../tempoEstimado";
+
+/** As perguntas da página pública (o tempo sai da regra única). */
+const PERGUNTAS_NR1 = DOMINIOS_NR1.reduce(
+  (t, d) => t + itensDoDominio(d.id).length,
+  0,
+);
 
 const pergunta = (i: ItemNr1): PerguntaDoModelo => {
   const rotulos = [...ESCALAS_NR1[i.escala].rotulos];
@@ -93,8 +100,7 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
   sobre:
     "Mostra como a organização do trabalho afeta a saúde mental e entrega o inventário de riscos psicossociais que o PGR pede.",
   nomeBase: "Riscos psicossociais",
-  boasVindas:
-    "Esta pesquisa olha para como o trabalho afeta você, como pede a NR-1. Não há resposta certa ou errada: responda com sinceridade, pensando no seu dia a dia. Leva cerca de 23 minutos.",
+  boasVindas: `Esta pesquisa olha para como o trabalho afeta você, como pede a NR-1. Não há resposta certa ou errada: responda com sinceridade, pensando no seu dia a dia. Leva ${tempoNoTexto(PERGUNTAS_NR1)}.`,
   secoes: DOMINIOS_NR1.map((d, i) => ({
     titulo: d.rotulo,
     cor: DOMINIOS_RISCOS[i]!.cor,
@@ -115,7 +121,7 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
     texto:
       "Avalia como a organização do trabalho afeta a saúde mental das pessoas e entrega o inventário de riscos psicossociais que o PGR exige.",
     metadados: [
-      "Cerca de 23 minutos para responder",
+      `${tempoParaResponder(PERGUNTAS_NR1)} para responder`,
       "Anônima ou por CPF",
       "Matriz de risco e plano de ação",
     ],
@@ -256,7 +262,7 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
     ficha: [
       ["Instrumento", "Questionário padronizado de riscos psicossociais"],
       ["Perguntas", "76, fixas"],
-      ["Tempo", "Cerca de 23 minutos"],
+      ["Tempo", tempoParaResponder(PERGUNTAS_NR1)],
       ["Identificação", "Anônima ou por CPF"],
       ["Recortes", "A partir de 3 respostas"],
       ["Reaplicação", "Anual"],

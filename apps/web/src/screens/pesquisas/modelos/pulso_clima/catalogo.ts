@@ -10,6 +10,7 @@ import type {
   PerguntaDoModelo,
   SecaoDoModelo,
 } from "../tipos";
+import { perguntasParaOTempo, tempoParaResponder } from "../../tempoEstimado";
 
 export const DIMENSOES_PULSO_CLIMA = [
   {
@@ -302,7 +303,7 @@ export const PULSO_CLIMA: ModeloDaGaleria = {
     texto:
       "8 dimensões de clima em 22 afirmações de 1 a 5, mais o eNPS (empresa) e o LNPS (liderança direta). Mostra onde o clima está forte e onde pede ação, com os comentários de cada dimensão.",
     metadados: [
-      "Cerca de 7 minutos para responder",
+      `${tempoParaResponder(perguntasParaOTempo(SECOES))} para responder`,
       "Identificada, CPF confidencial ou anônima",
       "Score por dimensão, eNPS e LNPS",
     ],

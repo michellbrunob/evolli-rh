@@ -6,6 +6,7 @@
  */
 import { diaPorExtenso } from "../datas";
 import type { ModeloDaGaleria, PerguntaDoModelo } from "../tipos";
+import { tempoParaResponder } from "../../tempoEstimado";
 
 export const ROTULOS_TAD = [
   "Nada verdadeiro",
@@ -173,7 +174,7 @@ export const TAD: ModeloDaGaleria = {
     texto:
       "Pela Teoria da Autodeterminação, a motivação que vem de dentro depende de 3 necessidades: autonomia, competência e relacionamento. As 21 afirmações, de 1 a 7, mostram quanto cada uma está satisfeita.",
     metadados: [
-      "Cerca de 6 minutos para responder",
+      `${tempoParaResponder(ITENS_TAD.length)} para responder`,
       "Identificada, CPF confidencial ou anônima",
       "Score de 1 a 7, por pessoa e no time",
     ],

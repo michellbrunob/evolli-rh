@@ -4,6 +4,7 @@
  */
 import type { ConfigPergunta } from "../../../../api/pesquisasClient";
 import type { ModeloDaGaleria } from "../tipos";
+import { perguntasParaOTempo, tempoNoTexto } from "../../tempoEstimado";
 
 export const ESCALA_1_10: Omit<ConfigPergunta, "opcoes"> = {
   minimo: 1,
@@ -39,8 +40,9 @@ export const PULSO: ModeloDaGaleria = {
   sobre:
     "Mede em poucos minutos permanência, clareza, apoio da gestão, reconhecimento e orgulho, com o eNPS. Feita para repetir todo mês.",
   nomeBase: "Pulso",
-  boasVindas:
-    "São poucas perguntas e leva cerca de 3 minutos. Responda pensando nas últimas semanas.",
+  get boasVindas() {
+    return `São poucas perguntas e leva ${tempoNoTexto(perguntasParaOTempo(PULSO.secoes, PULSO.comentarioFinal))}. Responda pensando nas últimas semanas.`;
+  },
   secoes: [
     {
       titulo: null,

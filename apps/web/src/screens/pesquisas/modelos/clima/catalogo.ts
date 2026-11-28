@@ -11,6 +11,11 @@ import type {
   PerguntaDoModelo,
   SecaoDoModelo,
 } from "../tipos";
+import {
+  minutosCurtos,
+  perguntasParaOTempo,
+  tempoParaResponder,
+} from "../../tempoEstimado";
 
 export const DIMENSOES_CLIMA = [
   {
@@ -347,7 +352,7 @@ export const CLIMA: ModeloDaGaleria = {
     texto:
       "60 afirmações de 1 a 5 em 5 dimensões, mais 2 perguntas abertas. Mostra o índice do time (o % de respostas favoráveis), cada dimensão e onde o clima pede atenção.",
     metadados: [
-      "Cerca de 19 minutos para responder",
+      `${tempoParaResponder(perguntasParaOTempo(SECOES))} para responder`,
       "Identificada, CPF confidencial ou anônima",
       "Índice do time de 0% a 100%",
     ],
@@ -357,7 +362,10 @@ export const CLIMA: ModeloDaGaleria = {
       { valor: "5", rotulo: "dimensões" },
       { valor: "60", rotulo: "afirmações de 1 a 5" },
       { valor: "2", rotulo: "perguntas abertas" },
-      { valor: "15 min", rotulo: "para responder" },
+      {
+        valor: minutosCurtos(perguntasParaOTempo(SECOES)),
+        rotulo: "para responder",
+      },
     ],
     conteudo: [
       {

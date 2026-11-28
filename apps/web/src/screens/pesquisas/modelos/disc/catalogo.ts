@@ -6,6 +6,7 @@
  */
 import type { ModeloDaGaleria } from "../tipos";
 import { BLOCOS_DISC, PERGUNTA_DO_BLOCO, chaveDoBloco } from "./blocos";
+import { tempoParaResponder } from "../../tempoEstimado";
 
 export const FATORES_DISC = [
   {
@@ -89,7 +90,7 @@ export const PERFIL_COMPORTAMENTAL: ModeloDaGaleria = {
     texto:
       "Mostra como cada pessoa age, se comunica e decide. Ajuda a montar times, dar feedback e planos de desenvolvimento.",
     metadados: [
-      "Cerca de 8 minutos para responder",
+      `${tempoParaResponder(BLOCOS_DISC.length)} para responder`,
       "CPF, confidencial ou anônima",
       "Resultado individual e do time",
     ],
@@ -165,7 +166,7 @@ export const PERFIL_COMPORTAMENTAL: ModeloDaGaleria = {
     ],
     ficha: [
       ["Formato", "28 blocos de 4 frases"],
-      ["Tempo", "Cerca de 8 minutos"],
+      ["Tempo", tempoParaResponder(BLOCOS_DISC.length)],
       ["Resultado", "% de D, I, S e C"],
       ["Identificação", "3 opções"],
     ],

@@ -1487,3 +1487,10 @@ Regras:
   `{ evolucao: AnalisesPesquisa["evolucao"] }`, a mesma lista de `analises` (mesmas regras de mínimo e de
   cancelada), sem exigir `campo`. A aba Análises do eNPS lê a evolução por esse caminho: a anônima sem
   "separar por" também mostra a evolução. `analises` continua exigindo `campo` (400 sem ele).
+- **Tempo estimado sem literal:** nenhum catálogo escreve os minutos à mão. `tempoEstimado.ts` ganhou
+  `perguntasParaOTempo` (conta como a página pública: todas as perguntas das seções, com os comentários
+  por dimensão, e o comentário final), `minutosDoModelo`, `tempoParaResponder` ("Cerca de N minutos"),
+  `tempoNoTexto` e `minutosCurtos`; os catálogos e o "Como a pessoa responde" do Sobre usam essas
+  funções (Pulso e Clima passa a 10 minutos, igual à página pública; Clima, 19 em todo lugar). Um teste
+  lê o código dos catálogos e recusa qualquer "N min"/"N minutos" escrito; ficam de fora o tempo "por
+  pessoa"/"por avaliação" das Avaliações e o `minutos` dos modelos prontos da Personalizada.
