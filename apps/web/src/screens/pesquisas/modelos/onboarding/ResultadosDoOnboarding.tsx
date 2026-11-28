@@ -4,16 +4,22 @@
  * intenção de ficar, o principal motivo para ficar, a recomendação, o peso
  * de cada bloco, contatos e o que melhorar/manter) e Envios (os convites
  * por pessoa, com "Pular envio"). Cada rodada só mostra números com 3
- * respostas ou mais. Exporta a planilha (.xlsx) no padrão do módulo.
+ * respostas ou mais. Exporta a planilha (.xlsx) no padrão do módulo e o
+ * relatório em PDF (rota própria). Fora da anônima, "Ver por" recorta por
+ * departamento, unidade ou centro de custo (cada rodada continua com o
+ * mínimo de 3 respostas); na identificada, cada pessoa tem a sua jornada
+ * (admissão, cargo, unidade e as rodadas). A intenção de ficar entre duas
+ * rodadas aparece num diagrama de fluxo.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { Secao } from "../../../../api/pesquisasClient";
+import type { CampoGrupo, Secao } from "../../../../api/pesquisasClient";
 import { Button, StatusBadge } from "../../../../components";
 import { plural } from "../../../../format/plural";
 import { baixarArquivo } from "../../../dashboard/exportacao";
 import { TIPO_MIME_XLSX } from "../../../pessoas/importacao/planilhaXlsx";
 import { Esqueleto } from "../../../../ui/movimento";
 import { CampoDeBusca } from "../../componentes";
+import { enderecoDaRota } from "../../rotasDePesquisas";
 import {
   FAIXAS,
   ROTULOS_DA_INTENCAO,
@@ -23,6 +29,7 @@ import {
 import type {
   ClienteDoOnboarding,
   EnviosDoOnboarding,
+  JornadaDoOnboarding,
   ResultadosDoOnboarding as Resultados,
   SituacaoDoEnvio,
 } from "./cliente";
@@ -32,6 +39,13 @@ import { ROTULO_DA_SITUACAO } from "./regrasDoOnboarding";
 import "../AvaliacaoOnboarding.css";
 
 type Aba = "geral" | "envios";
+
+/** Os recortes que a API sabe fazer (lotação gravada no envio). */
+const CAMPOS_DO_RECORTE: readonly { campo: CampoGrupo; rotulo: string }[] = [
+  { campo: "departamento", rotulo: "Departamento" },
+  { campo: "unidade", rotulo: "Unidade" },
+  { campo: "centroCusto", rotulo: "Centro de custo" },
+];
 
 const TOM_DA_SITUACAO: Readonly<
   Record<SituacaoDoEnvio, "neutral" | "success" | "warning" | "info" | "danger">
@@ -67,10 +81,19 @@ export function ResultadosDoOnboarding({
   const [falha, setFalha] = useState(false);
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [recarga, setRecarga] = useState(0);
+  const [recorte, setRecorte] = useState<{
+    campo: CampoGrupo;
+    grupoId: string;
+  } | null>(null);
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([cliente.resultados(pesquisaId), cliente.envios(pesquisaId)])
+    Promise.all([
+      recorte
+        ? cliente.resultados(pesquisaId, recorte)
+        : cliente.resultados(pesquisaId),
+      cliente.envios(pesquisaId),
+    ])
       .then(([a, b]) => {
         if (!vivo) return;
         setR(a);
@@ -80,7 +103,7 @@ export function ResultadosDoOnboarding({
     return () => {
       vivo = false;
     };
-  }, [cliente, pesquisaId, recarga]);
+  }, [cliente, pesquisaId, recarga, recorte]);
 
   if (falha) {
     return (
@@ -110,7 +133,17 @@ export function ResultadosDoOnboarding({
         >
           Exportar Excel (.xlsx)
         </Button>
-        <Button variant="secondary" onClick={() => window.print()}>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            // O relatório em PDF: páginas A4 próprias, em outra aba.
+            window.open(
+              enderecoDaRota({ tela: "relatorio", id: pesquisaId }),
+              "_blank",
+              "noopener",
+            )
+          }
+        >
           Exportar PDF
         </Button>
       </div>
@@ -139,6 +172,9 @@ export function ResultadosDoOnboarding({
         </button>
       </div>
       <div role="tabpanel" className="pesquisas__resultados">
+        {aba === "geral" && r.identificacao !== "anonima" ? (
+          <VerPor r={r} recorte={recorte} onRecorte={setRecorte} />
+        ) : null}
         {aba === "geral" ? (
           <VisaoGeral
             r={r}
@@ -360,6 +396,17 @@ function VisaoGeral({
             r.fluxo.visivel ? (
               <div aria-label="Para onde foi a intenção de ficar">
                 <p className="pesquisas__rotulo">{`Para onde foi a intenção de ficar (${rotuloDaRodada(r.fluxo.de)} → ${rotuloDaRodada(r.fluxo.para)})`}</p>
+                <DiagramaDoFluxo
+                  de={rotuloDaRodada(r.fluxo.de)}
+                  para={rotuloDaRodada(r.fluxo.para)}
+                  fluxos={r.fluxo.fluxos}
+                  ordem={
+                    perguntaDaChave(secoes, "q13")?.config.opcoes?.map(
+                      (o) => o.id,
+                    ) ?? []
+                  }
+                  rotulo={intencaoRotulo}
+                />
                 <ul className="onboarding__lista">
                   {r.fluxo.fluxos.map((f) => (
                     <li
@@ -564,6 +611,9 @@ function Envios({
     "todos" | "proximos" | "enviados" | "sem_email"
   >("todos");
   const [busca, setBusca] = useState("");
+  const [jornada, setJornada] = useState<string | null>(null);
+  const jornadaAberta =
+    envios.jornadas?.find((j) => j.colaboradorId === jornada) ?? null;
   const termo = busca.trim().toLocaleLowerCase("pt-BR");
   const itens = envios.itens.filter((e) => {
     if (termo && !e.nome.toLocaleLowerCase("pt-BR").includes(termo))
@@ -616,6 +666,9 @@ function Envios({
         valor={busca}
         onMudar={setBusca}
       />
+      {jornadaAberta ? (
+        <Jornada j={jornadaAberta} onFechar={() => setJornada(null)} />
+      ) : null}
       <table className="pesquisas__tabela">
         <thead>
           <tr>
@@ -630,7 +683,20 @@ function Envios({
           {itens.map((e) => (
             <tr key={e.id}>
               <td>{formatarDiaCivil(e.dataPrevista)}</td>
-              <th scope="row">{e.nome}</th>
+              <th scope="row">
+                {envios.jornadas ? (
+                  <button
+                    type="button"
+                    className="pesquisas__acao-texto"
+                    aria-label={`Ver a jornada de ${e.nome}`}
+                    onClick={() => setJornada(e.colaboradorId)}
+                  >
+                    {e.nome}
+                  </button>
+                ) : (
+                  e.nome
+                )}
+              </th>
               <td>{rotuloDaRodada(e.rodada)}</td>
               <td>
                 <StatusBadge variant={TOM_DA_SITUACAO[e.situacao]}>
@@ -661,5 +727,265 @@ function Envios({
         </p>
       ) : null}
     </section>
+  );
+}
+
+/** "Ver por": o recorte por grupo (fora da anônima). */
+function VerPor({
+  r,
+  recorte,
+  onRecorte,
+}: {
+  readonly r: Resultados;
+  readonly recorte: { campo: CampoGrupo; grupoId: string } | null;
+  readonly onRecorte: (
+    x: { campo: CampoGrupo; grupoId: string } | null,
+  ) => void;
+}) {
+  const [campo, setCampo] = useState<CampoGrupo>(
+    recorte?.campo ?? "departamento",
+  );
+  const grupos = r.grupos[campo] ?? [];
+  const nomeDoGrupo = recorte
+    ? (r.grupos[recorte.campo] ?? []).find((g) => g.id === recorte.grupoId)
+        ?.nome
+    : null;
+  return (
+    <div className="onboarding__ver-por" role="group" aria-label="Ver por">
+      <label className="pesquisas__campo">
+        <span className="pesquisas__rotulo">Ver por</span>
+        <select
+          value={campo}
+          onChange={(e) => {
+            setCampo(e.target.value as CampoGrupo);
+            onRecorte(null);
+          }}
+        >
+          {CAMPOS_DO_RECORTE.map((c) => (
+            <option key={c.campo} value={c.campo}>
+              {c.rotulo}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="pesquisas__campo">
+        <span className="pesquisas__rotulo">Grupo</span>
+        <select
+          value={recorte?.campo === campo ? recorte.grupoId : ""}
+          onChange={(e) =>
+            onRecorte(
+              e.target.value ? { campo, grupoId: e.target.value } : null,
+            )
+          }
+        >
+          <option value="">Todas as respostas</option>
+          {grupos.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="pesquisas__suave">
+        {nomeDoGrupo
+          ? `Mostrando só ${nomeDoGrupo}. Cada rodada continua com o mínimo de 3 respostas, para ninguém ser identificado.`
+          : "Cada grupo só mostra números com 3 respostas ou mais na rodada."}
+      </p>
+    </div>
+  );
+}
+
+/** A jornada de uma pessoa (identificada): cadastro e rodadas. */
+function Jornada({
+  j,
+  onFechar,
+}: {
+  readonly j: JornadaDoOnboarding;
+  readonly onFechar: () => void;
+}) {
+  return (
+    <section
+      className="pesquisas__cartao-secao"
+      aria-label={`Jornada de ${j.nome}`}
+    >
+      <h2 className="pesquisas__cartao-secao-titulo">{`Jornada de ${j.nome}`}</h2>
+      <dl className="avaliacao__resumo">
+        <div>
+          <dt>Admissão</dt>
+          <dd>{j.admissao ? formatarDiaCivil(j.admissao) : "—"}</dd>
+        </div>
+        <div>
+          <dt>Cargo</dt>
+          <dd>{j.cargo ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Unidade</dt>
+          <dd>{j.unidade ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Rodadas respondidas</dt>
+          <dd>{`${j.respondidas} de ${j.rodadas.length}`}</dd>
+        </div>
+      </dl>
+      <ol className="onboarding__lista" aria-label="Rodadas">
+        {j.rodadas.map((x) => (
+          <li key={x.rodada}>
+            {`${rotuloDaRodada(x.rodada)} · ${formatarDiaCivil(x.dataPrevista)} · ${
+              ROTULO_DA_SITUACAO[x.situacao as SituacaoDoEnvio] ?? x.situacao
+            }`}
+          </li>
+        ))}
+      </ol>
+      <Button variant="subtle" onClick={onFechar}>
+        Fechar a jornada
+      </Button>
+    </section>
+  );
+}
+
+/**
+ * O fluxo da intenção de ficar entre duas rodadas (diagrama de faixas):
+ * à esquerda a resposta na 1ª rodada, à direita na 2ª; a espessura de cada
+ * faixa é o número de pessoas. Só aparece com 3 pessoas ou mais.
+ */
+export function DiagramaDoFluxo({
+  de,
+  para,
+  fluxos,
+  ordem,
+  rotulo,
+}: {
+  readonly de: string;
+  readonly para: string;
+  readonly fluxos: readonly { de: string; para: string; quantidade: number }[];
+  /** A ordem das opções (a da pergunta). */
+  readonly ordem: readonly string[];
+  readonly rotulo: (opcaoId: string) => string;
+}) {
+  const total = fluxos.reduce((t, f) => t + f.quantidade, 0);
+  if (total === 0) return null;
+  const pos = (id: string) => {
+    const i = ordem.indexOf(id);
+    return i < 0 ? ordem.length : i;
+  };
+  const lado = (chave: "de" | "para") =>
+    [...new Set(fluxos.map((f) => f[chave]))].sort((a, b) => pos(a) - pos(b));
+  const esquerda = lado("de");
+  const direita = lado("para");
+  const LARGURA = 640;
+  const ALTURA = 220;
+  const NO = 14;
+  const VAO = 10;
+  const util = (n: number) => ALTURA - VAO * Math.max(n - 1, 0);
+  const escala = (n: number) => util(n) / total;
+  const nos = (ids: readonly string[], chave: "de" | "para") => {
+    const k = escala(ids.length);
+    let y = 0;
+    return new Map(
+      ids.map((id) => {
+        const q = fluxos
+          .filter((f) => f[chave] === id)
+          .reduce((t, f) => t + f.quantidade, 0);
+        const no = { y, altura: q * k, quantidade: q };
+        y += q * k + VAO;
+        return [id, no];
+      }),
+    );
+  };
+  const nosE = nos(esquerda, "de");
+  const nosD = nos(direita, "para");
+  const kE = escala(esquerda.length);
+  const kD = escala(direita.length);
+  const usadoE = new Map<string, number>();
+  const usadoD = new Map<string, number>();
+  const ordenados = [...fluxos].sort(
+    (a, b) => pos(a.de) - pos(b.de) || pos(a.para) - pos(b.para),
+  );
+  const x0 = 170;
+  const x1 = LARGURA - 170;
+  const faixas = ordenados.map((f) => {
+    const a = nosE.get(f.de)!;
+    const b = nosD.get(f.para)!;
+    const ya = a.y + (usadoE.get(f.de) ?? 0);
+    const yb = b.y + (usadoD.get(f.para) ?? 0);
+    const ha = f.quantidade * kE;
+    const hb = f.quantidade * kD;
+    usadoE.set(f.de, (usadoE.get(f.de) ?? 0) + ha);
+    usadoD.set(f.para, (usadoD.get(f.para) ?? 0) + hb);
+    const meio = (x0 + NO + x1) / 2;
+    const d = [
+      `M ${x0 + NO} ${ya}`,
+      `C ${meio} ${ya}, ${meio} ${yb}, ${x1} ${yb}`,
+      `L ${x1} ${yb + hb}`,
+      `C ${meio} ${yb + hb}, ${meio} ${ya + ha}, ${x0 + NO} ${ya + ha}`,
+      "Z",
+    ].join(" ");
+    return { f, d, mesma: f.de === f.para };
+  });
+  return (
+    <svg
+      className="onboarding__fluxo"
+      viewBox={`0 -24 ${LARGURA} ${ALTURA + 32}`}
+      role="img"
+      aria-label={`Fluxo da intenção de ficar de ${de} para ${para}: ${plural(total, "pessoa", "pessoas")}`}
+    >
+      <text x={x0} y={-10} className="onboarding__fluxo-titulo">
+        {de}
+      </text>
+      <text
+        x={x1 + NO}
+        y={-10}
+        textAnchor="end"
+        className="onboarding__fluxo-titulo"
+      >
+        {para}
+      </text>
+      {faixas.map(({ f, d, mesma }) => (
+        <path
+          key={`${f.de}-${f.para}`}
+          d={d}
+          className={`onboarding__fluxo-faixa${mesma ? "" : " onboarding__fluxo-faixa--mudou"}`}
+        />
+      ))}
+      {[...nosE].map(([id, n]) => (
+        <g key={`e-${id}`}>
+          <rect
+            x={x0}
+            y={n.y}
+            width={NO}
+            height={Math.max(n.altura, 1)}
+            className="onboarding__fluxo-no"
+          />
+          <text
+            x={x0 - 6}
+            y={n.y + n.altura / 2}
+            textAnchor="end"
+            dominantBaseline="middle"
+            className="onboarding__fluxo-rotulo"
+          >
+            {`${rotulo(id)} (${n.quantidade})`}
+          </text>
+        </g>
+      ))}
+      {[...nosD].map(([id, n]) => (
+        <g key={`d-${id}`}>
+          <rect
+            x={x1}
+            y={n.y}
+            width={NO}
+            height={Math.max(n.altura, 1)}
+            className="onboarding__fluxo-no"
+          />
+          <text
+            x={x1 + NO + 6}
+            y={n.y + n.altura / 2}
+            dominantBaseline="middle"
+            className="onboarding__fluxo-rotulo"
+          >
+            {`${rotulo(id)} (${n.quantidade})`}
+          </text>
+        </g>
+      ))}
+    </svg>
   );
 }

@@ -13,6 +13,7 @@ import { baixarArquivo } from "../../../dashboard/exportacao";
 import { TIPO_MIME_XLSX } from "../../../pessoas/importacao/planilhaXlsx";
 import { Esqueleto } from "../../../../ui/movimento";
 import { Avatar, iniciaisDe } from "../../componentes";
+import { enderecoDaRota } from "../../rotasDePesquisas";
 import {
   ALINHAMENTO,
   CALIBRACAO,
@@ -137,7 +138,17 @@ export function ResultadosDaAvaliacao({
         >
           Exportar Excel (.xlsx)
         </Button>
-        <Button variant="secondary" onClick={() => window.print()}>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            // O relatório em PDF: páginas A4 próprias, em outra aba.
+            window.open(
+              enderecoDaRota({ tela: "relatorio", id: pesquisaId }),
+              "_blank",
+              "noopener",
+            )
+          }
+        >
           Exportar PDF
         </Button>
       </div>

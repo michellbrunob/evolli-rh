@@ -46,6 +46,7 @@ import {
   textoDasProximas,
   textoDoBotaoFinal,
 } from "./regrasDoOnboarding";
+import { DocumentoDoOnboarding } from "./RelatorioDoOnboarding";
 import { ResultadosDoOnboarding } from "./ResultadosDoOnboarding";
 
 const HOJE = "2026-11-27";
@@ -1041,5 +1042,230 @@ describe("T216 — e-mail e envio do onboarding (R3)", () => {
     expect(siglaDaEmpresa("Empresa Sintética Ltda")).toBe("ES");
     expect(siglaDaEmpresa("alfa")).toBe("A");
     expect(siglaDaEmpresa(null)).toBe("RH");
+  });
+});
+
+const JORNADAS = [
+  {
+    colaboradorId: "c1",
+    nome: "Ana Teste",
+    admissao: "2026-10-27",
+    cargo: "Analista",
+    unidade: "Matriz",
+    rodadas: [
+      { rodada: 30, dataPrevista: "2026-11-26", situacao: "respondido" },
+      { rodada: 60, dataPrevista: "2026-12-26", situacao: "agendado" },
+    ],
+    respondidas: 1,
+  },
+];
+
+describe("T216 — resultados do onboarding (R3)", () => {
+  const montar = (
+    r: Resultados = resultados(),
+    e: EnviosDoOnboarding = envios(),
+  ) => {
+    const cliente = {
+      resultados: vi.fn(async (_id: string, _recorte?: unknown) => r),
+      envios: vi.fn(async () => e),
+      pular: vi.fn(async () => undefined),
+    };
+    render(
+      <ResultadosDoOnboarding
+        pesquisaId="onb-1"
+        nome="Onboarding"
+        secoes={SECOES}
+        cliente={cliente}
+        hoje={HOJE}
+      />,
+    );
+    return cliente;
+  };
+
+  it("Exportar PDF abre a rota do relatório em outra aba, sem imprimir a tela", async () => {
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    montar();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Exportar PDF" }),
+    );
+    expect(abrir).toHaveBeenCalledWith(
+      expect.stringContaining("#/pesquisas/onb-1/relatorio"),
+      "_blank",
+      "noopener",
+    );
+    expect(imprimir).not.toHaveBeenCalled();
+    abrir.mockRestore();
+    imprimir.mockRestore();
+  });
+
+  it("Ver por: recorta por grupo e avisa do mínimo de 3; a anônima não recorta", async () => {
+    const cliente = montar(
+      resultados({
+        identificacao: "confidencial",
+        grupos: {
+          departamento: [{ id: "d1", nome: "Operações" }],
+          unidade: [{ id: "u1", nome: "Matriz" }],
+        },
+      }),
+    );
+    const verPor = await screen.findByRole("group", { name: "Ver por" });
+    fireEvent.change(within(verPor).getByLabelText("Grupo"), {
+      target: { value: "d1" },
+    });
+    await waitFor(() =>
+      expect(cliente.resultados).toHaveBeenLastCalledWith("onb-1", {
+        campo: "departamento",
+        grupoId: "d1",
+      }),
+    );
+    expect(
+      await within(verPor).findByText(/Mostrando só Operações/),
+    ).toBeInTheDocument();
+    fireEvent.change(within(verPor).getByLabelText("Ver por"), {
+      target: { value: "unidade" },
+    });
+    await waitFor(() =>
+      expect(cliente.resultados).toHaveBeenLastCalledWith("onb-1"),
+    );
+    expect(
+      within(verPor).getByRole("option", { name: "Matriz" }),
+    ).toBeInTheDocument();
+  });
+
+  it("na anônima não há 'Ver por'", async () => {
+    montar(resultados({ identificacao: "anonima" }));
+    await screen.findByRole("region", { name: "Rodada 30 dias" });
+    expect(
+      screen.queryByRole("group", { name: "Ver por" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("identificada: a jornada de cada pessoa pelos envios", async () => {
+    montar(resultados(), { ...envios(), jornadas: JORNADAS });
+    fireEvent.click(await screen.findByRole("tab", { name: "Envios (3)" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver a jornada de Ana Teste" }),
+    );
+    const j = screen.getByRole("region", { name: "Jornada de Ana Teste" });
+    expect(j).toHaveTextContent("Admissão27/10/2026");
+    expect(j).toHaveTextContent("CargoAnalista");
+    expect(j).toHaveTextContent("UnidadeMatriz");
+    expect(j).toHaveTextContent("Rodadas respondidas1 de 2");
+    expect(
+      within(j).getByText("30 dias · 26/11/2026 · Respondeu"),
+    ).toBeInTheDocument();
+    expect(
+      within(j).getByText("60 dias · 26/12/2026 · Agendado"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(j).getByRole("button", { name: "Fechar a jornada" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Jornada de Ana Teste" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sem jornada (fora da identificada), o nome não abre nada", async () => {
+    montar(resultados(), {
+      ...envios(),
+      identificacao: "confidencial",
+      jornadas: null,
+    });
+    fireEvent.click(await screen.findByRole("tab", { name: "Envios (3)" }));
+    expect(
+      screen.queryByRole("button", { name: /Ver a jornada/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a intenção de ficar entre as rodadas vira um diagrama de fluxo", async () => {
+    montar();
+    const diagrama = await screen.findByRole("img", {
+      name: "Fluxo da intenção de ficar de 30 dias para 60 dias: 3 pessoas",
+    });
+    expect(diagrama).toHaveTextContent("Quer ficar (3)");
+    expect(diagrama).toHaveTextContent("Fica, mas pensa em opções (3)");
+    expect(
+      diagrama.querySelectorAll(".onboarding__fluxo-faixa--mudou"),
+    ).toHaveLength(1);
+  });
+});
+
+describe("T216 — relatório em PDF do onboarding (R3)", () => {
+  it("capa, sumário e as 5 seções com rodadas, mudança, vontade de ficar e jornada", () => {
+    render(
+      <DocumentoDoOnboarding
+        r={resultados()}
+        envios={{ ...envios(), jornadas: JORNADAS }}
+        nome="Onboarding · 30 e 60 dias"
+        secoes={SECOES}
+        empresa="Empresa Sintética"
+        hoje="2026-11-28"
+      />,
+    );
+    expect(
+      screen.getByText("Pesquisa de Onboarding · 30 dias e 60 dias"),
+    ).toBeInTheDocument();
+    const indice = screen.getByLabelText("Índice geral");
+    expect(indice).toHaveTextContent("30 diasSaudável80");
+    expect(screen.getByLabelText("O que mudou")).toHaveTextContent("−5");
+    expect(screen.getByLabelText("Funil dos convites")).toHaveTextContent(
+      "Responderam3",
+    );
+    for (const secao of [
+      "01 Índice por rodada e blocos",
+      "02 O que mudou entre as rodadas",
+      "03 Vontade de ficar",
+      "04 Peso de cada bloco",
+      "05 Jornada, contatos e comentários",
+    ]) {
+      expect(screen.getByRole("region", { name: secao })).toBeInTheDocument();
+    }
+    expect(
+      within(screen.getByRole("table", { name: "Índice por bloco" })).getByRole(
+        "row",
+        { name: /Onboarding e treinamento/ },
+      ),
+    ).toHaveTextContent("78 · Saudável71 · Saudável");
+    expect(
+      screen.getByRole("table", { name: "Vontade de ficar" }),
+    ).toHaveTextContent("Quer ficar 75%");
+    expect(screen.getByRole("table", { name: "Jornada" })).toHaveTextContent(
+      "Ana Teste27/10/2026Analista · Matriz30 dias: Respondeu · 60 dias: Agendado",
+    );
+    expect(screen.getByText("ana@example.test")).toBeInTheDocument();
+    expect(screen.getByText("5 / 5")).toBeInTheDocument();
+  });
+
+  it("sem jornada fora da identificada; rodada sem 3 respostas não mostra o índice", () => {
+    const r = resultados({ identificacao: "confidencial" });
+    render(
+      <DocumentoDoOnboarding
+        r={{
+          ...r,
+          rodadas: [
+            { ...r.rodadas[0]!, visivel: false, faltam: 1, indice: null },
+          ],
+          comparacoes: [],
+        }}
+        envios={{ ...envios(), identificacao: "confidencial", jornadas: null }}
+        nome="Onboarding"
+        secoes={SECOES}
+        empresa=""
+        hoje="2026-11-28"
+      />,
+    );
+    expect(screen.getByLabelText("Índice geral")).toHaveTextContent(
+      "Faltam 1 resposta",
+    );
+    expect(
+      screen.getByRole("region", { name: "05 Contatos e comentários" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "Jornada" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/A comparação aparece quando duas rodadas/),
+    ).toBeInTheDocument();
   });
 });

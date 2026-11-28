@@ -183,3 +183,26 @@ export const HORARIOS: readonly string[] = Array.from(
 
 export const PRAZOS = [3, 5, 7, 10, 15] as const;
 export const LEMBRETES = [2, 3, 5] as const;
+
+/** O texto de cada opção das perguntas (pelo id da opção). */
+export function textosDasOpcoes(
+  secoes: readonly Secao[],
+): ReadonlyMap<string, string> {
+  const m = new Map<string, string>();
+  for (const s of secoes)
+    for (const p of s.perguntas)
+      for (const o of p.config.opcoes ?? []) m.set(o.id, o.texto);
+  return m;
+}
+
+/** O rótulo curto da intenção de ficar (q13), na ordem das opções. */
+export function rotuloDaIntencao(
+  secoes: readonly Secao[],
+  opcaoId: string,
+): string {
+  const q13 = perguntaDaChave(secoes, "q13");
+  const i = q13?.config.opcoes?.findIndex((o) => o.id === opcaoId) ?? -1;
+  return i >= 0 && i < ROTULOS_DA_INTENCAO.length
+    ? ROTULOS_DA_INTENCAO[i]!
+    : (textosDasOpcoes(secoes).get(opcaoId) ?? "");
+}

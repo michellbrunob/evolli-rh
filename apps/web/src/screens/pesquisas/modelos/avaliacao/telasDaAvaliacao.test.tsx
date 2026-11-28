@@ -22,6 +22,10 @@ import {
 } from "./dadosDeTeste";
 import { planilhaDaAvaliacao, nomeDaPlanilha } from "./exportacaoDaAvaliacao";
 import { ResponderAvaliacao } from "./ResponderAvaliacao";
+import {
+  DocumentoDaAvaliacao,
+  RelatorioDaAvaliacao,
+} from "./RelatorioDaAvaliacao";
 import { ResultadosDaAvaliacao } from "./ResultadosDaAvaliacao";
 
 afterEach(() => sessionStorage.clear());
@@ -425,5 +429,107 @@ describe("T216 — avaliações na ficha", () => {
       <AvaliacoesDaFicha colaboradorId="p1" carregar={vi.fn(async () => [])} />,
     );
     await waitFor(() => expect(vazio.container).toBeEmptyDOMElement());
+  });
+});
+
+describe("T216 — relatório em PDF da avaliação (R3)", () => {
+  it("180°: capa, sumário, as 5 seções numeradas e o rodapé paginado", () => {
+    const r = resultadosFalsos();
+    render(
+      <DocumentoDaAvaliacao
+        r={r}
+        nome="Avaliação 180° – Ciclo 2026.2"
+        modelo="avaliacao180"
+        empresa="Empresa Alfa"
+        hoje="2026-11-28"
+      />,
+    );
+    expect(
+      screen.getByText("Avaliação de desempenho · Avaliação 180°"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nota do time")).toHaveTextContent("3,5");
+    expect(screen.getByLabelText("Nota do time")).toHaveTextContent("Bom");
+    expect(
+      within(
+        screen.getByRole("list", { name: "Média por competência" }),
+      ).getAllByRole("listitem"),
+    ).toHaveLength(8);
+    for (const secao of [
+      "01 Resultado do time",
+      "02 Mapa de talentos",
+      "03 Pessoas",
+      "04 Calibração e recortes",
+      "05 Gestor × autoavaliação",
+    ]) {
+      expect(screen.getByRole("region", { name: secao })).toBeInTheDocument();
+    }
+    expect(
+      screen.getByRole("table", { name: "Pessoas avaliadas" }),
+    ).toHaveTextContent(r.pessoas[0]!.nome);
+    expect(screen.getByText("6 / 6")).toBeInTheDocument();
+    expect(screen.getAllByText(/Empresa Alfa/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Confidencial · nominal (RH e DP)"),
+    ).toBeInTheDocument();
+  });
+
+  it("90°: sem o comparativo; 5 páginas", () => {
+    render(
+      <DocumentoDaAvaliacao
+        r={resultadosFalsos()}
+        nome="Avaliação 90°"
+        modelo="avaliacao90"
+        empresa=""
+        hoje="2026-11-28"
+      />,
+    );
+    expect(
+      screen.queryByRole("region", { name: "05 Gestor × autoavaliação" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("5 / 5")).toBeInTheDocument();
+    expect(screen.queryByText("6 / 6")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Metodologia" }),
+    ).toBeInTheDocument();
+  });
+
+  it("a rota do relatório monta o documento com o título do arquivo", async () => {
+    const antes = document.title;
+    const cliente = { resultados: vi.fn(async () => resultadosFalsos()) };
+    const { unmount } = render(
+      <RelatorioDaAvaliacao
+        pesquisaId="pesq-1"
+        nome="Avaliação 180°"
+        modelo="avaliacao180"
+        empresa="Empresa Alfa"
+        imprimir={false}
+        hoje="2026-11-28"
+        cliente={cliente}
+      />,
+    );
+    expect(
+      await screen.findByRole("region", { name: "01 Resultado do time" }),
+    ).toBeInTheDocument();
+    expect(cliente.resultados).toHaveBeenCalledWith("pesq-1");
+    expect(document.title).toMatch(/relatorio/);
+    unmount();
+    expect(document.title).toBe(antes);
+  });
+
+  it("Exportar PDF abre a rota do relatório em outra aba, sem imprimir a tela", async () => {
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    montarResultados();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Exportar PDF" }),
+    );
+    expect(abrir).toHaveBeenCalledWith(
+      expect.stringContaining("#/pesquisas/pesq-1/relatorio"),
+      "_blank",
+      "noopener",
+    );
+    expect(imprimir).not.toHaveBeenCalled();
+    abrir.mockRestore();
+    imprimir.mockRestore();
   });
 });

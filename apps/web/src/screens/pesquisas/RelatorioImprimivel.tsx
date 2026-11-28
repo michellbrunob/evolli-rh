@@ -59,6 +59,8 @@ import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
 import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
 import { RelatorioEnps } from "./modelos/enps/RelatorioEnps";
+import { ehModeloComTelaPropria } from "./modelos/integracao";
+import { RelatorioProprio } from "./modelos/relatorioProprio";
 import "./RelatorioImprimivel.css";
 
 const COR_DA_FAIXA: Readonly<Record<Faixa, string>> = {
@@ -958,6 +960,16 @@ export function RelatorioDaPesquisa({
     );
   if (dados.detalhe.modelo === "enps")
     return <RelatorioEnps carregado={dados} imprimir={imprimir} />;
+  // Avaliação e onboarding: o relatório da tela própria.
+  if (ehModeloComTelaPropria(dados.detalhe.modelo))
+    return (
+      <RelatorioProprio
+        detalhe={dados.detalhe}
+        empresa={dados.empresa}
+        imprimir={imprimir}
+        hoje={hoje}
+      />
+    );
   // Modelos com metodologia própria: o relatório deles (modelos/relatorio).
   if (temRelatorioProprio(dados.detalhe.modelo))
     return <RelatorioDoModelo carregado={dados} imprimir={imprimir} />;

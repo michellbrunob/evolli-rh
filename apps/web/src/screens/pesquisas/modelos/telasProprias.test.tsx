@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PesquisaDetalhe } from "../../../api/pesquisasClient";
 import { DETALHE, RESUMO, lista, servicoFalso } from "../dadosDeTeste";
 import { PesquisasModulo } from "../PesquisasModulo";
+import { RelatorioDaPesquisa } from "../RelatorioImprimivel";
 import type { RotaDePesquisas } from "../rotasDePesquisas";
 import { ResultadosDaPesquisa } from "../ResultadosDaPesquisa";
 import { clienteDaAvaliacao } from "./avaliacao/cliente";
@@ -304,5 +305,64 @@ describe("T216 — rascunho dos modelos com tela própria", () => {
       expect(clienteDoOnboarding.obter).toHaveBeenCalledWith("p-o"),
     );
     expect(servico.criarPesquisa).not.toHaveBeenCalled();
+  });
+});
+
+describe("T216 — relatório em PDF dos modelos com tela própria", () => {
+  it("a rota do relatório monta o relatório próprio da avaliação", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...DETALHE,
+          id: "p-a",
+          nome: "Avaliação 90° – Ciclo 2026.2",
+          modelo: "avaliacao90",
+          identificacao: "identificada",
+        } as PesquisaDetalhe),
+      ),
+    });
+    render(
+      <RelatorioDaPesquisa
+        servico={servico}
+        pesquisaId="p-a"
+        imprimir={false}
+        hoje="2026-11-28"
+      />,
+    );
+    expect(
+      await screen.findByText("Avaliação de desempenho · Avaliação 90°"),
+    ).toBeInTheDocument();
+    expect(clienteDaAvaliacao.resultados).toHaveBeenCalledWith("p-a");
+    expect(
+      screen.queryByText("Relatório de resultados"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a rota do relatório monta o relatório próprio do onboarding", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...DETALHE,
+          id: "p-o",
+          nome: "Onboarding · 30 e 60 dias",
+          modelo: "onboarding",
+          identificacao: "confidencial",
+        } as PesquisaDetalhe),
+      ),
+    });
+    render(
+      <RelatorioDaPesquisa
+        servico={servico}
+        pesquisaId="p-o"
+        imprimir={false}
+        hoje="2026-11-28"
+      />,
+    );
+    expect(
+      await screen.findByRole("region", {
+        name: "01 Índice por rodada e blocos",
+      }),
+    ).toBeInTheDocument();
+    expect(clienteDoOnboarding.resultados).toHaveBeenCalledWith("p-o");
   });
 });
