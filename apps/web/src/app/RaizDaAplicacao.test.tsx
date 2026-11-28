@@ -1,6 +1,14 @@
 import { act, render, screen } from "@testing-library/react";
 import { configure } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { RaizDaAplicacao } from "./RaizDaAplicacao";
 import { tokenDaPesquisaPublica } from "./rotaPublica";
 
@@ -39,6 +47,14 @@ function instalarFetch() {
 function urls(espiao: ReturnType<typeof instalarFetch>): string[] {
   return espiao.mock.calls.map(([entrada]) => String(entrada));
 }
+
+// Pré-carrega os dois pacotes sob demanda uma vez: a primeira transformação
+// do shell inteiro é lenta no ambiente de teste (e mais ainda com a máquina
+// carregada); depois disso o `lazy` resolve na hora, como no navegador.
+beforeAll(async () => {
+  await import("./AutenticacaoApp");
+  await import("../screens/publico/ResponderPesquisa");
+}, 180_000);
 
 beforeEach(() => {
   window.sessionStorage.clear();
