@@ -103,12 +103,13 @@ const escolha = (
   chave: string,
   tipo: "escolha_unica" | "multipla_escolha",
   opcoes: number,
-  obrigatoria: boolean,
+  /** `undefined`: aceita obrigatória ou opcional. */
+  obrigatoria: boolean | undefined,
 ): ItemFixo => ({
   chave,
   tipo,
   config: (c) => c.opcoes?.length === opcoes && c.outro !== true,
-  obrigatoria,
+  ...(obrigatoria === undefined ? {} : { obrigatoria }),
 });
 
 /** As 18 perguntas, conferidas ao gravar; a autopercepção (O1–O3) é opcional. */
@@ -128,8 +129,9 @@ export const ESTRUTURA_ISFB: EstruturaFixa = {
       "Q11",
       "Q12",
     ].map((q) => escala(q)),
-    // Quem não tem nenhum produto segue sem marcar (vale 0).
-    escolha("Q13", "multipla_escolha", PRODUTOS.length, false),
+    // O assistente grava a Q13 obrigatória; os rascunhos antigos (opcional,
+    // sem produtos vale 0) seguem aceitos.
+    escolha("Q13", "multipla_escolha", PRODUTOS.length, undefined),
     escolha("Q14", "escolha_unica", OPCOES_Q14.length, true),
     escolha("Q15", "escolha_unica", OPCOES_Q15.length, true),
   ],

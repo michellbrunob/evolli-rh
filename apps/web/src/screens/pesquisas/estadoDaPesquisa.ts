@@ -480,8 +480,9 @@ export function errosDaPergunta(
     const textos = opcoes.map((o) => o.texto.trim().toLowerCase());
     if (new Set(textos).size !== textos.length)
       erros.push("Há opções repetidas.");
-    if (p.tipo === "multipla_escolha" && p.config.maximo !== undefined) {
-      const m = p.config.maximo;
+    const m = p.config.maximo;
+    // `null` (como a API devolve) e ausente: sem limite.
+    if (p.tipo === "multipla_escolha" && m != null) {
       const total = opcoes.length + (p.config.outro ? 1 : 0);
       if (!Number.isInteger(m) || m < 1 || m > total)
         erros.push(`O máximo de marcações vai de 1 a ${total}.`);
@@ -491,12 +492,12 @@ export function errosDaPergunta(
     const min = p.config.minimo ?? 1;
     const max = p.config.maximo;
     if (min !== 0 && min !== 1) erros.push("A escala começa em 0 ou em 1.");
-    if (max === undefined || !Number.isInteger(max) || max < 2 || max > 10)
+    if (max == null || !Number.isInteger(max) || max < 2 || max > 10)
       erros.push("A escala termina entre 2 e 10.");
   }
   if (p.tipo === "numero") {
     const { minimo, maximo } = p.config;
-    if (minimo !== undefined && maximo !== undefined && minimo > maximo)
+    if (minimo != null && maximo != null && minimo > maximo)
       erros.push("O mínimo não pode ser maior que o máximo.");
   }
   if (p.condicao) {

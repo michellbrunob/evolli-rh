@@ -204,7 +204,7 @@ export function erroDaPergunta(
       }
       const total = v.opcoes.length + (v.outro !== null ? 1 : 0);
       const maximo = p.config.maximo;
-      return maximo !== undefined && total > maximo
+      return maximo != null && total > maximo
         ? `Escolha até ${maximo === 1 ? "1 opção" : `${maximo} opções`}.`
         : null;
     }
@@ -218,7 +218,9 @@ export function erroDaPergunta(
       if (p.config.inteiro && !Number.isInteger(n)) {
         return "Informe um número inteiro, sem casas decimais.";
       }
-      const { minimo, maximo } = p.config;
+      // `null` (como a API devolve) e ausente: sem limite.
+      const minimo = p.config.minimo ?? undefined;
+      const maximo = p.config.maximo ?? undefined;
       const fora =
         (minimo !== undefined && n < minimo) ||
         (maximo !== undefined && n > maximo);

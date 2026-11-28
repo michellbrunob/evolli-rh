@@ -589,6 +589,16 @@ function EtapaConfigurar({
     (p) => p.tipo === "nota_0_10" && p.config.enps,
   );
   const noLimite = principais.length >= m.limite;
+  // Modelo fixo: as perguntas não aparecem uma a uma, então um erro nelas
+  // (que barra o avanço) precisa de um aviso geral.
+  const erroDasFixas =
+    m.modelo === "disc" || m.fixo
+      ? (erros?.perguntas ??
+        Object.entries(erros ?? {}).find(([k]) =>
+          k.startsWith("pergunta:"),
+        )?.[1] ??
+        null)
+      : null;
   const idNome = `${ids}-nome`;
   const idDescricao = `${ids}-descricao`;
 
@@ -733,6 +743,11 @@ function EtapaConfigurar({
         />
       ) : null}
 
+      {erroDasFixas ? (
+        <p className="pesquisas__erro" role="alert">
+          {`Há um problema nas perguntas deste modelo e a pesquisa não pode seguir: ${erroDasFixas} Recarregue a página; se continuar, fale com o suporte.`}
+        </p>
+      ) : null}
       {m.modelo === "disc" ? (
         <CartaoDosBlocos blocos={principais} />
       ) : m.modelo === "clima" ? (

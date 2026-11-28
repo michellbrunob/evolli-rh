@@ -88,7 +88,9 @@ describe("estrutura da saúde financeira", () => {
         (i) => i.chave === c,
       )!;
     expect(item("Q13").tipo).toBe("multipla_escolha");
-    expect(item("Q13").obrigatoria).toBe(false);
+    // Q13: o assistente grava obrigatória; a opcional dos rascunhos antigos
+    // segue aceita (sem produtos vale 0).
+    expect(item("Q13").obrigatoria).toBeUndefined();
     expect(item("Q14").obrigatoria).toBe(true);
     expect(item("O1").obrigatoria).toBe(false);
     const opcoes = (n: number) =>
@@ -240,7 +242,7 @@ describe("nota de uma pessoa", () => {
     expect(calcularPessoaIsfb(sem)).toBeNull();
     const semRenda = valores(MEIO).filter((v) => v.perguntaId !== "Q14");
     expect(calcularPessoaIsfb(semRenda)).toBeNull();
-    // Q13 é opcional: sem produtos vale 0.
+    // Q13 ausente (rascunhos antigos, opcional): sem produtos vale 0.
     const semProdutos = valores(MEIO).filter((v) => v.perguntaId !== "Q13");
     expect(calcularPessoaIsfb(semProdutos)!.sinais).toEqual(["sem_reserva"]);
   });

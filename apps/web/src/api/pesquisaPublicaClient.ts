@@ -47,11 +47,11 @@ export interface Opcao {
 export interface ConfigPergunta {
   readonly opcoes?: readonly Opcao[];
   readonly outro?: boolean;
-  readonly maximo?: number;
+  readonly maximo?: number | null;
   readonly respostaBoa?: "sim" | "nao" | null;
   readonly enps?: boolean;
   readonly lnps?: boolean;
-  readonly minimo?: number;
+  readonly minimo?: number | null;
   readonly rotuloMinimo?: string | null;
   readonly rotuloMaximo?: string | null;
   /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */

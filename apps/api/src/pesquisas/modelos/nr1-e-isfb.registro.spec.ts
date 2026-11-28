@@ -134,6 +134,18 @@ describe("estrutura conferida pela chave", () => {
     };
     expect(errosDaEstruturaDoModelo("isfb", menos)).toEqual(recusa);
   });
+
+  it("saúde financeira: a Q13 (produtos) obrigatória é aceita; a opcional antiga também", () => {
+    const obrigatoria = secoesIsfb();
+    obrigatoria[0]!.perguntas[12]!.obrigatoria = true;
+    expect(obrigatoria[0]!.perguntas[12]!.chave).toBe("Q13");
+    expect(errosDaEstruturaDoModelo("isfb", obrigatoria)).toEqual([]);
+    expect(errosDaEstruturaDoModelo("isfb", secoesIsfb())).toEqual([]);
+    // As demais seguem conferidas: a Q14 opcional é recusada.
+    const q14 = secoesIsfb();
+    q14[0]!.perguntas[13]!.obrigatoria = false;
+    expect(errosDaEstruturaDoModelo("isfb", q14)).toEqual(recusa);
+  });
 });
 
 describe("opções pela posição", () => {

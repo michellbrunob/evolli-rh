@@ -77,12 +77,12 @@ export interface ConfigPergunta {
   opcoes?: Opcao[];
   outro?: boolean;
   /** Escolhas: máximo de marcações; escala e número: o teto. */
-  maximo?: number;
+  maximo?: number | null;
   respostaBoa?: "sim" | "nao" | null;
   enps?: boolean;
   /** Nota 0–10 de recomendação da liderança direta (LNPS). */
   lnps?: boolean;
-  minimo?: number;
+  minimo?: number | null;
   rotuloMinimo?: string | null;
   rotuloMaximo?: string | null;
   /** Escala: o rótulo de cada ponto, do mínimo ao máximo. */

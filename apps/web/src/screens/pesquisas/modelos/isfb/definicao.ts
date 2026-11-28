@@ -318,7 +318,7 @@ function perguntaDoItem(i: ItemIsfb): PerguntaDoModelo {
     chave: i.id,
     texto: i.texto,
     rotulo: i.rotulo.slice(0, 40),
-    obrigatoria: i.etapa !== "autopercepcao" && i.id !== "Q13",
+    obrigatoria: i.etapa !== "autopercepcao",
   };
   if (opcoes) {
     return {

@@ -265,11 +265,14 @@ function ajudaDoTipo(
         ? `Você deu ${valor} de 5 estrelas.`
         : "De 1 a 5 estrelas.";
     case "multipla_escolha":
-      return config.maximo !== undefined
+      return config.maximo != null
         ? `Escolha até ${config.maximo === 1 ? "1 opção" : `${config.maximo} opções`}.`
         : "Escolha quantas opções quiser.";
     case "numero": {
-      const { minimo, maximo, inteiro } = config;
+      // `null` (como a API devolve) e ausente: sem limite.
+      const minimo = config.minimo ?? undefined;
+      const maximo = config.maximo ?? undefined;
+      const inteiro = config.inteiro;
       const partes = [
         inteiro ? "Número inteiro" : null,
         minimo !== undefined && maximo !== undefined
@@ -579,7 +582,7 @@ export function CampoDaPergunta({
           : { opcoes: [], outro: null };
       const maximo = config.maximo;
       const total = v.opcoes.length + (v.outro !== null ? 1 : 0);
-      const cheio = maximo !== undefined && total >= maximo;
+      const cheio = maximo != null && total >= maximo;
       const itens = [
         ...(config.opcoes ?? []).map((o) => ({ id: o.id, texto: o.texto })),
         ...(config.outro ? [{ id: OUTRO, texto: "Outro" }] : []),

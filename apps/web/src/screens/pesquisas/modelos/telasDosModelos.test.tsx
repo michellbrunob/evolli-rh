@@ -370,7 +370,7 @@ describe("catálogo e autopercepção no assistente", () => {
     expect(perguntas.map((p) => p.chave)).toEqual(ITENS_ISFB.map((i) => i.id));
     const q13 = perguntas.find((p) => p.chave === "Q13")!;
     expect(q13.tipo).toBe("multipla_escolha");
-    expect(q13.obrigatoria).toBe(false);
+    expect(q13.obrigatoria).toBe(true);
     expect(q13.config.opcoes).toHaveLength(14);
     expect(q13.config.opcoes![3]!.texto).toBe("Poupança");
     expect(perguntas.find((p) => p.chave === "Q2")!.config).toMatchObject({
@@ -378,7 +378,8 @@ describe("catálogo e autopercepção no assistente", () => {
       maximo: 4,
       somenteRotulos: true,
     });
-    expect(perguntas.filter((p) => p.obrigatoria)).toHaveLength(14);
+    // As 15 da nota; só a autopercepção é opcional.
+    expect(perguntas.filter((p) => p.obrigatoria)).toHaveLength(15);
   });
 
   it("o interruptor tira e volta a autopercepção", () => {
