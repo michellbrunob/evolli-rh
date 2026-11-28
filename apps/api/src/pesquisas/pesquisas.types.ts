@@ -1,3 +1,4 @@
+import type { GrupoDoEnps } from "./modelos/enps/calculo";
 import type {
   ResultadoDoModelo,
   ResultadoIndividualDoModelo,
@@ -315,6 +316,8 @@ export interface AnalisesPesquisa {
     nome: string;
     publicadaEm: string;
     mediaGeral: number | null;
+    /** eNPS da pesquisa (só no modelo eNPS; `null` sem nota ou oculto). */
+    enps?: number | null;
   }[];
 }
 
@@ -339,6 +342,8 @@ export interface RespostaResumo {
   }[];
   /** O resumo da resposta no modelo (ex.: o índice do Clima), se houver. */
   resumoDoModelo?: ResumoDaRespostaDoModelo | null;
+  /** Só no modelo eNPS: a nota da pergunta principal e o grupo. */
+  enps?: { nota: number; grupo: GrupoDoEnps } | null;
 }
 
 export interface RespostaDetalhe extends RespostaResumo {

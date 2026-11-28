@@ -17,6 +17,8 @@ import type {
   IndividualIsfbDoModelo,
   ResultadoIsfbDoModelo,
 } from "./isfb/calculo";
+import type { ResultadoEnps, ResultadoIndividualEnps } from "./enps/calculo";
+import type { ErroDeCampo } from "../../common/erros/recusa-por-campo";
 
 /** Faixas do score 0–100: < 50 · 50–69 · 70–84 · ≥ 85. */
 export type FaixaDeScore = "critico" | "atencao" | "saudavel" | "forte";
@@ -202,13 +204,15 @@ export type ResultadoDoModelo =
   | ResultadoClima
   | ResultadoTad
   | ResultadoNr1DoModelo
-  | ResultadoIsfbDoModelo;
+  | ResultadoIsfbDoModelo
+  | ResultadoEnps;
 
 export type ResultadoIndividualDoModelo =
   | ResultadoIndividualTad
   | IndividualNr1DoModelo
   | IndividualIsfbDoModelo
-  | ResultadoIndividualClima;
+  | ResultadoIndividualClima
+  | ResultadoIndividualEnps;
 
 /** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
 export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;
@@ -252,7 +256,10 @@ export interface ModeloRegistrado {
   modelo: Modelo;
   /** Metodologia fixa: a API confere os itens ao gravar. */
   estrutura?: EstruturaFixa;
-  /** Conferência própria das perguntas (no lugar de `estrutura`). */
+  /**
+   * Conferência própria da estrutura (no lugar de `estrutura`), para o
+   * modelo que só fixa parte dos itens (o eNPS fixa a principal).
+   */
   conferir?: (secoes: readonly Secao[]) => ErroDeCampo[];
   /** O resultado agregado das respostas visíveis. */
   calcular?: (

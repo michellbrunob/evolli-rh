@@ -43,6 +43,7 @@ import {
   resumoDaRespostaDoModelo,
 } from "./modelos/indice";
 import { conferirEstruturaDisc } from "./modelos/disc/regras-disc";
+import { enpsVisivel, notaPrincipalDoEnps } from "./modelos/enps/calculo";
 import {
   montarResultadoDisc,
   type ResultadoDisc,
@@ -1197,6 +1198,19 @@ export class PesquisasService {
           m.minimoPorGrupo,
           m.identificacao === "confidencial",
         ),
+        // eNPS: o índice de cada pesquisa (a mesma regra do mínimo).
+        ...(p.modelo === "enps"
+          ? {
+              enps: enpsVisivel(
+                m.secoes as unknown as Secao[],
+                valoresDe
+                  .filter((v) => v.pesquisaId === m.id)
+                  .map((v) => v.valores as unknown as ValorRespondido[]),
+                m.minimoPorGrupo,
+                m.identificacao === "confidencial",
+              ),
+            }
+          : {}),
       }));
 
     return montarAnalises({
@@ -1266,6 +1280,15 @@ export class PesquisasService {
         ),
         grupos: gruposDe(r),
         ...resumoDoModeloDa(p.modelo, secoes, r),
+        // eNPS: a nota principal e o grupo (a coluna da lista).
+        ...(p.modelo === "enps"
+          ? {
+              enps: notaPrincipalDoEnps(
+                secoes,
+                new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+              ),
+            }
+          : {}),
       },
     }));
     // Exibição: da mais recente para a mais antiga; o número continua sendo

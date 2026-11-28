@@ -27,6 +27,8 @@ import { ESTRUTURA_NR1 } from "./copsoq/definicao";
 import { calcularIsfbDoModelo, individualIsfbDoModelo } from "./isfb/calculo";
 import { ESTRUTURA_ISFB } from "./isfb/definicao";
 import { ESTRUTURA_TAD } from "./tad/definicao";
+import { calcularEnps, individualDoEnps } from "./enps/calculo";
+import { conferirEstruturaDoEnps } from "./enps/definicao";
 import type {
   ContextoDoModelo,
   ModeloRegistrado,
@@ -73,6 +75,13 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     estrutura: ESTRUTURA_ISFB,
     calcular: calcularIsfbDoModelo,
     individual: individualIsfbDoModelo,
+  },
+  // eNPS: só a principal é fixa; as demais perguntas são livres.
+  enps: {
+    modelo: "enps",
+    conferir: conferirEstruturaDoEnps,
+    calcular: calcularEnps,
+    individual: individualDoEnps,
   },
 };
 
