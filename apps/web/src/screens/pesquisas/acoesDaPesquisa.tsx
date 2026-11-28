@@ -3,7 +3,8 @@
  * o menu de status (título, ponto colorido e o que cada um faz), a janela
  * de exclusão (o que se perde, em números, e a sugestão de só finalizar) e
  * a gaveta "Duplicar pesquisa" (empresa de destino e o aviso do link novo).
- * Cada ação termina num aviso flutuante.
+ * Cada ação termina num aviso flutuante (as falhas no tom de erro); a falha
+ * com a janela ou a gaveta ainda aberta aparece dentro dela.
  */
 import { useEffect, useState } from "react";
 import type {
@@ -99,6 +100,7 @@ export function MenuDeStatus({
     } catch {
       avisar("Não foi possível mudar o status.", {
         texto: "Atualize a página e tente de novo.",
+        tom: "erro",
       });
     } finally {
       setMudando(false);
@@ -199,9 +201,12 @@ export function JanelaDeExclusao({
   const avisar = useAvisar();
   const [ocupado, setOcupado] = useState(false);
   const [detalhe, setDetalhe] = useState<PesquisaDetalhe | null>(null);
+  /** A falha ao finalizar fica na própria janela (aberta por cima de tudo). */
+  const [falha, setFalha] = useState<string | null>(null);
 
   useEffect(() => {
     setDetalhe(null);
+    setFalha(null);
     if (!pesquisa) return;
     let vivo = true;
     Promise.resolve(servico.obterPesquisa(pesquisa.id))
@@ -224,6 +229,7 @@ export function JanelaDeExclusao({
     } catch {
       avisar("Não foi possível excluir a pesquisa.", {
         texto: "Tente de novo.",
+        tom: "erro",
       });
       onFechar();
     } finally {
@@ -234,6 +240,7 @@ export function JanelaDeExclusao({
   async function finalizar() {
     if (!pesquisa) return;
     setOcupado(true);
+    setFalha(null);
     try {
       const d = await servico.alterarStatusDaPesquisa(
         pesquisa.id,
@@ -242,9 +249,7 @@ export function JanelaDeExclusao({
       avisar(AVISO_DO_STATUS.finalizada);
       onFinalizada(d);
     } catch {
-      avisar("Não foi possível finalizar a pesquisa.", {
-        texto: "Tente de novo.",
-      });
+      setFalha("Não foi possível finalizar a pesquisa. Tente de novo.");
     } finally {
       setOcupado(false);
     }
@@ -321,6 +326,11 @@ export function JanelaDeExclusao({
               </Button>
             </div>
           ) : null}
+          {falha ? (
+            <p className="pesquisas__erro" role="alert">
+              {falha}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </Dialog>
@@ -353,8 +363,11 @@ export function GavetaDeDuplicar({
   const [ativa, setAtiva] = useState<string>("");
   const [destino, setDestino] = useState<string>("");
   const [ocupado, setOcupado] = useState(false);
+  /** A falha fica na própria gaveta: um aviso flutuante cobriria o rodapé. */
+  const [falha, setFalha] = useState<string | null>(null);
 
   useEffect(() => {
+    setFalha(null);
     if (!pesquisa) return;
     let vivo = true;
     Promise.all([
@@ -375,6 +388,7 @@ export function GavetaDeDuplicar({
   async function confirmar() {
     if (!pesquisa) return;
     setOcupado(true);
+    setFalha(null);
     try {
       const copia = await servico.duplicarPesquisa(
         pesquisa.id,
@@ -388,9 +402,7 @@ export function GavetaDeDuplicar({
       });
       onDuplicada(copia, naAtiva);
     } catch {
-      avisar("Não foi possível duplicar a pesquisa.", {
-        texto: "Tente de novo.",
-      });
+      setFalha("Não foi possível duplicar a pesquisa. Tente de novo.");
     } finally {
       setOcupado(false);
     }
@@ -440,6 +452,11 @@ export function GavetaDeDuplicar({
         <p className="pesquisas__nota">
           A cópia ganha um link novo. O link desta pesquisa continua o mesmo.
         </p>
+        {falha ? (
+          <p className="pesquisas__erro" role="alert">
+            {falha}
+          </p>
+        ) : null}
       </div>
     </Sheet>
   );

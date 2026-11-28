@@ -1,6 +1,6 @@
 /**
  * T216 — avisos flutuantes do módulo Pesquisas ("Pesquisa pausada.",
- * "Pergunta excluída · Desfazer"…). Um só aviso por vez, no canto da tela,
+ * "Pergunta excluída · Desfazer"…; as falhas no tom de erro). Um só aviso por vez, no canto da tela,
  * sobrevivendo à troca de tela dentro do módulo. Tela montada sozinha (sem o
  * módulo em volta) ganha o próprio provedor.
  */
@@ -20,6 +20,8 @@ export type Avisar = (
   extra?: {
     readonly texto?: string;
     readonly acao?: { readonly rotulo: string; readonly onClick: () => void };
+    /** "erro" nas falhas ("Não foi possível…"): cor, ícone e alerta. */
+    readonly tom?: "erro";
   },
 ) => void;
 
@@ -39,6 +41,7 @@ export function ProvedorDeAvisos({
       titulo,
       ...(extra?.texto ? { texto: extra.texto } : {}),
       ...(extra?.acao ? { acao: extra.acao } : {}),
+      ...(extra?.tom ? { tom: extra.tom } : {}),
     });
   }, []);
   const valor = useMemo(() => avisar, [avisar]);

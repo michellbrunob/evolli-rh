@@ -1,4 +1,5 @@
-/* T215 — aviso flutuante de sucesso (canto inferior direito). */
+/* T215 — aviso flutuante de sucesso (canto inferior direito); T216 — e o
+   tom de erro. */
 .aviso-flutuante {
   position: fixed;
   right: var(--space-lg);
@@ -15,6 +16,19 @@
   color: var(--status-success-ink);
   box-shadow: var(--sombra-flutuante);
   animation: ev-aviso-entra var(--movimento-aviso) var(--movimento-curva-suave);
+}
+
+/* T216 — tom de erro ("Não foi possível…"). */
+.aviso-flutuante--erro {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+/* T216 — com uma janela ou gaveta aberta, o aviso sobe acima do rodapé dela
+   (não cobre Cancelar nem a ação principal). */
+body:has(.ev-janela__rodape) .aviso-flutuante {
+  bottom: calc(var(--altura-rodape-pagina) + var(--space-md));
 }
 
 .aviso-flutuante__icone {

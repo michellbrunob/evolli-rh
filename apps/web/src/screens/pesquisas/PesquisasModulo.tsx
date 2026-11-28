@@ -801,11 +801,8 @@ function ListaDePesquisas({
 
   async function copiar(p: PesquisaResumo) {
     if (!p.link) return;
-    avisar(
-      (await copiarLink(p.link))
-        ? "Link copiado."
-        : "Não foi possível copiar o link.",
-    );
+    if (await copiarLink(p.link)) avisar("Link copiado.");
+    else avisar("Não foi possível copiar o link.", { tom: "erro" });
   }
 
   const semNenhuma = itens !== null && itens.length === 0;

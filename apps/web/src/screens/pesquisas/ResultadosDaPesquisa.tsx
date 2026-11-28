@@ -310,14 +310,17 @@ function ResultadosInterno({
         TIPO_MIME_XLSX,
       );
     } catch {
-      avisar("Não foi possível exportar.", { texto: "Tente de novo." });
+      avisar("Não foi possível exportar.", {
+        texto: "Tente de novo.",
+        tom: "erro",
+      });
     }
   }
 
   async function copiar() {
     if (!detalhe?.link) return;
     if (await copiarLink(detalhe.link)) avisar("Link copiado.");
-    else avisar("Não foi possível copiar o link.");
+    else avisar("Não foi possível copiar o link.", { tom: "erro" });
   }
 
   if (falhou) {
