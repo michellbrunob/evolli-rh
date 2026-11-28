@@ -6,7 +6,6 @@
  */
 import type { ReactNode } from "react";
 import type {
-  ModeloPesquisa,
   PesquisaDetalhe,
   RespostaDetalhe,
   RespostaResumo,
