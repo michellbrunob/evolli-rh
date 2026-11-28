@@ -497,40 +497,40 @@ describe("T216 — eNPS: Análises", () => {
     },
   };
 
-  function montar(identificacao: PesquisaDetalhe["identificacao"]) {
+  const EVOLUCAO = [
+    {
+      pesquisaId: "a",
+      nome: "eNPS – 3º trimestre 2026",
+      publicadaEm: "2026-08-01T12:00:00.000Z",
+      mediaGeral: 7,
+      enps: -10,
+    },
+    {
+      pesquisaId: "b",
+      nome: "eNPS – 4º trimestre 2026",
+      publicadaEm: "2026-11-01T12:00:00.000Z",
+      mediaGeral: 7,
+      enps: 25,
+    },
+  ];
+
+  function montar(
+    identificacao: PesquisaDetalhe["identificacao"],
+    resultadosGerais: ResultadosPesquisa = comGrupos,
+  ) {
     const servico = servicoFalso({
       resultadosDaPesquisa: vi.fn(async () => ({
         ...comGrupos,
         modelo: { ...R, indice: 67, zona: "qualidade" as const },
       })),
-      analisesDaPesquisa: vi.fn(async () => ({
-        campo: "departamento" as const,
-        colunas: [],
-        linhas: [],
-        evolucao: [
-          {
-            pesquisaId: "a",
-            nome: "eNPS – 3º trimestre 2026",
-            publicadaEm: "2026-08-01T12:00:00.000Z",
-            mediaGeral: 7,
-            enps: -10,
-          },
-          {
-            pesquisaId: "b",
-            nome: "eNPS – 4º trimestre 2026",
-            publicadaEm: "2026-11-01T12:00:00.000Z",
-            mediaGeral: 7,
-            enps: 25,
-          },
-        ],
-      })),
+      evolucaoDaPesquisa: vi.fn(async () => ({ evolucao: EVOLUCAO })),
     });
     render(
       <>
         {analisesDoModelo({
           servico,
           detalhe: { ...detalhe, identificacao, minimoPorGrupo: 3 },
-          geral: comGrupos,
+          geral: resultadosGerais,
           respostas: null,
         })}
       </>,
@@ -556,6 +556,22 @@ describe("T216 — eNPS: Análises", () => {
     ).toHaveAccessibleName(
       "Evolução do eNPS: eNPS – 3º trimestre 2026 · 01/08/2026 -10; eNPS – 4º trimestre 2026 · 01/11/2026 25",
     );
+  });
+
+  it("anônima sem recorte: a evolução carrega mesmo sem grupo para agrupar", async () => {
+    const servico = montar("anonima", { ...geral, recortes: [], grupos: {} });
+    expect(
+      await screen.findByRole("img", { name: /Evolução do eNPS/ }),
+    ).toHaveAccessibleName(
+      "Evolução do eNPS: eNPS – 3º trimestre 2026 · 01/08/2026 -10; eNPS – 4º trimestre 2026 · 01/11/2026 25",
+    );
+    expect(servico.evolucaoDaPesquisa).toHaveBeenCalledWith(detalhe.id);
+    expect(servico.analisesDaPesquisa).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(
+        "A evolução aparece a partir da segunda pesquisa eNPS.",
+      ),
+    ).toBeNull();
   });
 
   it("o que mais pesa na nota: só na identificada, do maior peso para o menor", async () => {

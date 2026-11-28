@@ -1480,3 +1480,10 @@ Regras:
 - Zona da afirmação (planilha/PDF): média ≥ 4 favorável, 3–3,99 neutra,
   abaixo desfavorável. Alerta: atenção com desfavorável ≥ 30% ou média < 3;
   alto com ≥ 50% ou média < 2,5.
+
+## Clima, eNPS e tempo estimado — revisão 4 (28/11/2026)
+
+- **Evolução sem recorte:** `GET /pesquisas/:id/evolucao` (leitura de pesquisa) devolve
+  `{ evolucao: AnalisesPesquisa["evolucao"] }`, a mesma lista de `analises` (mesmas regras de mínimo e de
+  cancelada), sem exigir `campo`. A aba Análises do eNPS lê a evolução por esse caminho: a anônima sem
+  "separar por" também mostra a evolução. `analises` continua exigindo `campo` (400 sem ele).

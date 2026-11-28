@@ -1868,6 +1868,11 @@ describe("T216 — Pesquisas (e2e)", () => {
         mediaGeral: 8,
       });
       await get(`/v1/pesquisas/${id}/analises`, rhA).expect(400);
+      // A evolução sem recorte: a mesma lista, sem pedir o campo.
+      const semRecorte = await get(`/v1/pesquisas/${id}/evolucao`, rhA).expect(
+        200,
+      );
+      expect(semRecorte.body).toEqual({ evolucao: mapa.body.evolucao });
       // Um pulso publicado sem resposta não entra na evolução.
       await publicada({
         modelo: "pulso",

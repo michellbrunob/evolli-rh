@@ -51,6 +51,7 @@ export type ServicoDePesquisas = Pick<
   | "resultadosDaPesquisa"
   | "respostasDaPesquisa"
   | "analisesDaPesquisa"
+  | "evolucaoDaPesquisa"
   | "respostaDaPesquisa"
   | "listarCandidatos"
   | "contagemDoTime"
@@ -126,6 +127,7 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   resultadosDaPesquisa: cliente.resultadosDaPesquisa,
   respostasDaPesquisa: cliente.respostasDaPesquisa,
   analisesDaPesquisa: cliente.analisesDaPesquisa,
+  evolucaoDaPesquisa: cliente.evolucaoDaPesquisa,
   respostaDaPesquisa: cliente.respostaDaPesquisa,
   listarCandidatos: cliente.listarCandidatos,
   contagemDoTime: cliente.contagemDoTime,

@@ -250,6 +250,19 @@ export class PesquisasController {
     return this.service.analises(id, q.campo, ctx(actor, req));
   }
 
+  @Get(":pesquisaId/evolucao")
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission("pesquisa", "read")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({ summary: "Evolução entre as pesquisas do mesmo modelo" })
+  evolucao(
+    @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.service.evolucao(id, ctx(actor, req));
+  }
+
   @Get(":pesquisaId/respostas")
   @UseGuards(AuthorizationGuard)
   @RequirePermission("resposta_pesquisa", "read")

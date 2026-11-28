@@ -1166,7 +1166,36 @@ export class PesquisasService {
       ]);
     }
     const respostas = await this.carregarRespostas(p, false);
+    const evolucao = await this.evolucaoDoModelo(p, empresaId);
 
+    return montarAnalises({
+      campo,
+      secoes: p.secoes as unknown as Secao[],
+      respostas,
+      nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
+      minimoPorGrupo: p.minimoPorGrupo,
+      minimoNaVisaoGeral: p.identificacao === "confidencial",
+      evolucao,
+    });
+  }
+
+  /**
+   * A evolução entre as pesquisas do mesmo modelo, sem recorte (a mesma
+   * da aba Análises): a pesquisa anônima sem "separar por" também tem.
+   */
+  async evolucao(
+    id: string,
+    ctx: PessoasAuditContext,
+  ): Promise<Pick<AnalisesPesquisa, "evolucao">> {
+    const empresaId = this.empresaDaSessao(ctx, "leitura");
+    const p = await this.obterLinha(this.prisma, id, empresaId, ctx);
+    return { evolucao: await this.evolucaoDoModelo(p, empresaId) };
+  }
+
+  private async evolucaoDoModelo(
+    p: LinhaPesquisa,
+    empresaId: string,
+  ): Promise<AnalisesPesquisa["evolucao"]> {
     const mesmas = await this.prisma.pesquisa.findMany({
       where: {
         empresaId,
@@ -1190,7 +1219,7 @@ export class PesquisasService {
       select: { pesquisaId: true, valores: true },
     });
     const porId = new Map(mesmas.map((m) => [m.id, m]));
-    const evolucao = montarEvolucao(mesmas, valoresDe).map((e) => {
+    return montarEvolucao(mesmas, valoresDe).map((e) => {
       const m = porId.get(e.pesquisaId)!;
       // eNPS: o índice de cada pesquisa (a mesma regra do mínimo).
       return p.modelo === "enps"
@@ -1206,16 +1235,6 @@ export class PesquisasService {
             ),
           }
         : e;
-    });
-
-    return montarAnalises({
-      campo,
-      secoes: p.secoes as unknown as Secao[],
-      respostas,
-      nomesDosGrupos: await this.nomesDosGruposDe(empresaId, respostas),
-      minimoPorGrupo: p.minimoPorGrupo,
-      minimoNaVisaoGeral: p.identificacao === "confidencial",
-      evolucao,
     });
   }
 

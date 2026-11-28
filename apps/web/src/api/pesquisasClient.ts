@@ -606,6 +606,13 @@ export const analisesDaPesquisa = (pesquisaId: string, campo: CampoGrupo) =>
     "GET",
   );
 
+/** `GET /pesquisas/:id/evolucao`: a evolução do modelo, sem recorte. */
+export const evolucaoDaPesquisa = (pesquisaId: string) =>
+  pedir<Pick<AnalisesPesquisa, "evolucao">>(
+    `/pesquisas/${id(pesquisaId)}/evolucao`,
+    "GET",
+  );
+
 export const respostaDaPesquisa = (pesquisaId: string, respostaId: string) =>
   pedir<RespostaDetalhe>(
     `/pesquisas/${id(pesquisaId)}/respostas/${id(respostaId)}`,

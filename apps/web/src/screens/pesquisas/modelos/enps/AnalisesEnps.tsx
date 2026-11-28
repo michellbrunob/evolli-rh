@@ -163,7 +163,16 @@ export function AnalisesEnps({
         }),
       );
     });
-    Promise.resolve(servico.analisesDaPesquisa(detalhe.id, campo))
+    return () => {
+      vivo = false;
+    };
+  }, [servico, detalhe.id, geral, campo]);
+
+  // A evolução não depende do recorte: a anônima sem "separar por" também
+  // compara com as pesquisas eNPS anteriores.
+  useEffect(() => {
+    let vivo = true;
+    Promise.resolve(servico.evolucaoDaPesquisa(detalhe.id))
       .then((d) => {
         if (vivo) setEvolucao(d?.evolucao ?? []);
       })
@@ -173,7 +182,7 @@ export function AnalisesEnps({
     return () => {
       vivo = false;
     };
-  }, [servico, detalhe.id, geral, campo]);
+  }, [servico, detalhe.id]);
 
   const perguntas = perguntasEmOrdem(detalhe.secoes);
   const rotuloDe = (id: string) => {
@@ -296,7 +305,9 @@ export function AnalisesEnps({
             <p className="pesquisas__suave">Pesquisas eNPS anteriores</p>
           </div>
         </header>
-        {pontos.length >= 2 ? (
+        {evolucao === null ? (
+          <Esqueleto rotulo="Carregando a evolução…" linhas={2} />
+        ) : pontos.length >= 2 ? (
           <>
             <EvolucaoDoEnps pontos={pontos} />
             <BarraDasZonas />

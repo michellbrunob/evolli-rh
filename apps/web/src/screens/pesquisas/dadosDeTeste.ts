@@ -426,6 +426,9 @@ export function servicoFalso(
       Promise.resolve({ ...RESPOSTA_DETALHE, id }),
     ),
     analisesDaPesquisa: vi.fn(() => Promise.resolve(ANALISES)),
+    evolucaoDaPesquisa: vi.fn(() =>
+      Promise.resolve({ evolucao: ANALISES.evolucao }),
+    ),
     listarAtivos: vi.fn(() => Promise.resolve(ATIVOS)),
     listarCandidatos: vi.fn(listarCandidatosFalso()),
     listarTodosCandidatos: vi.fn(() => Promise.resolve(CANDIDATOS)),
