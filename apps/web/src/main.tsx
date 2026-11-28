@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { AutenticacaoApp } from "./app/AutenticacaoApp";
+// T216 — a raiz resolve a rota pública (#/p/<token>) antes do portão de
+// sessão; fora dela, monta o AutenticacaoApp de sempre.
+import { RaizDaAplicacao } from "./app/RaizDaAplicacao";
 // T209 — fundação de interface (Tailwind sem preflight, prefixo `ev`).
 import "./ui/estilos.css";
 import "./ui/movimento.css";
@@ -18,7 +20,7 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <AutenticacaoApp />
+    <RaizDaAplicacao />
   </StrictMode>,
 );
 

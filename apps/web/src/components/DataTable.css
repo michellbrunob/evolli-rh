@@ -38,9 +38,11 @@
   border: 0;
 }
 
+/* T216 — o respiro de baixo desconta a linha divisória (1 px): o texto fica
+   no centro da célula. */
 .evolli-datatable__th,
 .evolli-datatable__td {
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) - 1px);
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--divider-soft);

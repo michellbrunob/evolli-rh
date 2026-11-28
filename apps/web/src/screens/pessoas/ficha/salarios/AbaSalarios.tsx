@@ -29,7 +29,7 @@ import type {
   GravarAlteracaoSalarialDto,
   HistoricoSalarialApi,
 } from "../../../../api/salariosClient";
-import { Button, FormActions } from "../../../../components";
+import { Button, FormActions, StatusBadge } from "../../../../components";
 import {
   Dialog,
   DropdownMenu,
@@ -748,9 +748,7 @@ function LinhaDoTempo({
                 </span>
                 <span className="salarios__selos">
                   {vigente ? (
-                    <span className="salarios__selo salarios__selo--vigente">
-                      Vigente
-                    </span>
+                    <StatusBadge variant="success">Vigente</StatusBadge>
                   ) : null}
                   {a.origem === "admissao" ? (
                     <span className="salarios__selo">Admissão</span>

@@ -152,8 +152,8 @@ export function RelatoriosScreen({ onTituloIdChange }: RelatoriosScreenProps) {
               aria-controls={`relatorios-panel-${aba.id}`}
               className={
                 selecionada
-                  ? "relatorios-screen__tab relatorios-screen__tab--ativa"
-                  : "relatorios-screen__tab"
+                  ? "evolli-aba relatorios-screen__tab relatorios-screen__tab--ativa"
+                  : "evolli-aba relatorios-screen__tab"
               }
               onClick={() => setAbaAtiva(aba.id)}
             >

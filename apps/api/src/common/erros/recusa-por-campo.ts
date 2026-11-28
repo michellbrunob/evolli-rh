@@ -63,7 +63,24 @@ export type MotivoDoCampo =
   | "ja_recebe"
   // T215 — Aprovar um "ajuste sugerido": a sugestão ainda espera a resposta
   // de quem pediu (pelo Portal, quando ele existir).
-  | "aguardando_resposta";
+  | "aguardando_resposta"
+  // T216 — Pesquisas: a identificação não muda depois de publicar; perguntas
+  // e participantes que já têm resposta não saem.
+  | "nao_editavel"
+  | "com_respostas"
+  // T216 — publicar sem nenhum participante identificável pelo link (sem
+  // CPF e nascimento): só com confirmação explícita.
+  | "ninguem_identificavel"
+  // T216 — modelo de metodologia fixa (Pulso e Clima, Clima, TAD): os itens
+  // do modelo precisam estar todos, com o tipo e a escala do modelo.
+  | "estrutura_do_modelo"
+  // T216 — Avaliação 90°/180° e Onboarding automático: time sem pessoas,
+  // gestor que não entra pelo link (sem CPF e nascimento), pessoa em dois
+  // times, prazo que não cabe e convite fora da rodada.
+  | "sem_pessoas"
+  | "gestor_nao_identificavel"
+  | "repetida"
+  | "fora_do_prazo";
 
 /**
  * Caminhos públicos de campo. Lista fechada: só estes saem na resposta, e o
@@ -152,7 +169,52 @@ export type CampoPublico =
   | "dataNascimento"
   | "cpf"
   | "telefone"
-  | "email";
+  | "email"
+  // T216 — Pesquisas (assistente, publicação e resposta pelo link).
+  | "boasVindas"
+  | "identificacao"
+  | "secoes"
+  | "participantes"
+  | "encerraEm"
+  | "minimoPorGrupo"
+  | "respostas"
+  | "status"
+  // T216 — ampliação: separação por grupo (anônima) e o recorte das análises.
+  | "separarPor"
+  | "grupos"
+  | "campo"
+  | CampoDePergunta
+  // T216 — Avaliação 90°/180° (times, comentários, prazos, lembretes) e o
+  // envio automático do Onboarding.
+  | "times"
+  | "comentarios"
+  | "liberarNoPortal"
+  | "visibilidade"
+  | "prazoAutoavaliacao"
+  | "lembretes"
+  | "envio"
+  | "rodadas"
+  | "horario"
+  | "prazoDias"
+  | "lembreteDias"
+  | "agendadoPara"
+  | "publico"
+  | "rodada"
+  // T216 — acompanhamento da NR-1 (etapas, plano de ação e profissional).
+  | "etapas"
+  | "plano"
+  | "profissionalSst";
+
+/**
+ * T216 — o id de uma pergunta da pesquisa como campo do erro (o contrato
+ * responde "por perguntaId"). Só sai por `campoDaPergunta`, que recebe um id
+ * já conferido no formato (`[A-Za-z0-9_-]{1,40}`), nunca texto livre.
+ */
+export type CampoDePergunta = string & { readonly __campoDePergunta: true };
+
+export function campoDaPergunta(id: string): CampoDePergunta {
+  return id as CampoDePergunta;
+}
 
 export interface ErroDeCampo {
   campo: CampoPublico;
@@ -209,6 +271,13 @@ export type CodigoDeRecusa =
   | "anexo_arquivo_malformado"
   | "anexo_com_macro"
   | "anexo_reprovado_antivirus"
+  // T216 — arquivos de evidência da conformidade com a NR-1.
+  | "evidencia_arquivo_vazio"
+  | "evidencia_arquivo_grande_demais"
+  | "evidencia_formato_invalido"
+  | "evidencia_arquivo_malformado"
+  | "evidencia_com_macro"
+  | "evidencia_reprovada_antivirus"
   // T215 — Publicar a escala sem mudança no rascunho do período.
   | "escala_nada_para_publicar";
 
@@ -231,7 +300,10 @@ export type CodigoDeIndisponibilidade =
   | "documento_verificacao_indisponivel"
   // T215 — anexo da ausência.
   | "anexo_verificacao_indisponivel"
-  | "anexo_armazenamento_indisponivel";
+  | "anexo_armazenamento_indisponivel"
+  // T216 — arquivos de evidência da conformidade com a NR-1.
+  | "evidencia_verificacao_indisponivel"
+  | "evidencia_armazenamento_indisponivel";
 
 export class IndisponibilidadeException extends ServiceUnavailableException {
   constructor(readonly codigo: CodigoDeIndisponibilidade) {

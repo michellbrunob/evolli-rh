@@ -247,6 +247,12 @@ describe("T215 — menu da célula", () => {
     expect(
       screen.getByText("Rascunho · 1 mudança não publicada"),
     ).toBeInTheDocument();
+    // T216 — rascunho é o status padrão de atenção.
+    expect(
+      screen
+        .getByText("Rascunho · 1 mudança não publicada")
+        .closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--warning");
     const aviso = screen.getByRole("status", {
       name: "Folga em 25/11 no rascunho",
     });
@@ -946,6 +952,11 @@ describe("T215 — publicar a escala", () => {
     expect(
       screen.getByText("Publicada em 24/11 por Ana RH"),
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByText("Publicada em 24/11 por Ana RH")
+        .closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--success");
     expect(
       screen.getByRole("button", { name: "Publicar mudanças" }),
     ).not.toHaveAttribute("aria-disabled", "true");

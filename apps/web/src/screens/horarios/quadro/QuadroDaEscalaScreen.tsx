@@ -41,7 +41,7 @@ import {
   AvisoFlutuante,
   type ConteudoDoAviso,
 } from "../../../ui/AvisoFlutuante";
-import { Button } from "../../../components";
+import { Button, StatusBadge } from "../../../components";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1470,18 +1470,18 @@ export function QuadroDaEscalaScreen({
             <p className="quadro__subtitulo">
               {titulo}
               {publicacao ? (
-                <span className="quadro__selo-publicada">
+                <StatusBadge variant="success" className="quadro__selo">
                   {`Publicada em ${diaMesCurto(diaCivilDeHoje(new Date(publicacao.publicadaEm)))}${
                     publicacao.publicadaPor
                       ? ` por ${publicacao.publicadaPor}`
                       : ""
                   }`}
-                </span>
+                </StatusBadge>
               ) : null}
               {mudancas > 0 ? (
-                <span className="quadro__selo-rascunho">
+                <StatusBadge variant="warning" className="quadro__selo">
                   {`Rascunho · ${plural(mudancas, "mudança não publicada", "mudanças não publicadas")}`}
-                </span>
+                </StatusBadge>
               ) : null}
             </p>
           </div>

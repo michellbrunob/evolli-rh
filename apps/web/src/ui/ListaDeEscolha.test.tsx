@@ -238,4 +238,39 @@ describe("ListaDeEscolha", () => {
     expect(opcao).toHaveTextContent("5x2");
     expect(opcao).toHaveTextContent("Segunda a sexta");
   });
+
+  it("perto do pé da tela abre para cima; com direção 'abaixo', sempre embaixo", () => {
+    const pertoDoPe = {
+      top: window.innerHeight - 50,
+      bottom: window.innerHeight - 10,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 40,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+    const { unmount } = render(<Controlada />);
+    vi.spyOn(campo(), "getBoundingClientRect").mockReturnValue(pertoDoPe);
+    fireEvent.click(campo());
+    expect(lista()).toHaveClass("lista-escolha__lista--acima");
+    unmount();
+    render(
+      <>
+        <label htmlFor="d">Departamento</label>
+        <ListaDeEscolha
+          id="d"
+          direcao="abaixo"
+          opcoes={GENEROS}
+          valor=""
+          onMudar={() => undefined}
+        />
+      </>,
+    );
+    const outro = screen.getByRole("combobox", { name: "Departamento" });
+    vi.spyOn(outro, "getBoundingClientRect").mockReturnValue(pertoDoPe);
+    fireEvent.click(outro);
+    expect(lista()).not.toHaveClass("lista-escolha__lista--acima");
+  });
 });

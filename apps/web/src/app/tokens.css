@@ -101,6 +101,56 @@
   --turno-oliva: #6f8f2a;
   --turno-mostarda: #b08a18;
   --turno-violeta: #b24fc9;
+  /* T216 — Pesquisas: o par fundo/tinta do ícone de cada modelo da galeria,
+     os selos (novo, NR-1) e o quadro da NR-1. */
+  --modelo-rosa-fundo: #ffeaf3;
+  --modelo-rosa: #e4488a;
+  --modelo-coral-fundo: #ffede8;
+  --modelo-coral: #e5533d;
+  --modelo-azul-fundo: #eaf1ff;
+  --modelo-azul: #3667e0;
+  --modelo-teal-fundo: #e3f6f3;
+  --modelo-teal: #0e9384;
+  --modelo-verde-fundo: #e6f6ec;
+  --modelo-verde: #16a34a;
+  --modelo-roxo-fundo: #f2edff;
+  --modelo-roxo: #7c4ddb;
+  --modelo-laranja-fundo: #ffefe3;
+  --modelo-laranja: #ea6c0a;
+  --modelo-esmeralda-fundo: #e4f6ee;
+  --modelo-esmeralda: #0f8f5c;
+  --modelo-celeste-fundo: #e3f3fc;
+  --modelo-celeste: #0284c7;
+  --modelo-ambar-fundo: #fff3dc;
+  --modelo-ambar: #d97706;
+  --modelo-cinza-fundo: #f0f0f3;
+  --modelo-cinza: #4b4b57;
+  --selo-novo-fundo: #ffeaf3;
+  --selo-novo-tinta: #c8306f;
+  --selo-nr1-fundo: #e8f6ee;
+  --selo-nr1-tinta: #1f7a48;
+  --quadro-nr1-borda: #bfe6cd;
+  --quadro-nr1-fundo: #e8f7ed;
+  --cartao-modelo-borda: #eaeaee;
+  --cartao-modelo-foco: #f4a3c5;
+  /* Faixas dos resultados dos modelos (score 0–100, níveis). */
+  --faixa-critico: #ef4444;
+  --faixa-critico-fundo: #fee2e2;
+  --faixa-atencao: #f59e0b;
+  --faixa-atencao-fundo: #fef3c7;
+  --faixa-saudavel: #22c55e;
+  --faixa-saudavel-fundo: #dcfce7;
+  --faixa-forte: #16a34a;
+  --faixa-forte-fundo: #bbf7d0;
+  /* Cores das dimensões e pilares dos modelos (paleta de gráfico). */
+  --grafico-1: #3b82f6;
+  --grafico-2: #8b5cf6;
+  --grafico-3: #f59e0b;
+  --grafico-4: #10b981;
+  --grafico-5: #ef4444;
+  --grafico-6: #06b6d4;
+  --grafico-7: #ec4899;
+  --grafico-8: #059669;
   --status-success-surface: #eaf6ee;
   --status-success-border: #b7dfc5;
   --status-warning-ink: #8a5a00;
@@ -201,7 +251,7 @@
     Arial, sans-serif;
   /* T209 — escala do ecossistema (decisão da proprietária de 2026-11-17),
      compacta: texto de 14px; ajuda e apoio de 13px; título de seção de
-     16px; título de página de 26px. Entrelinha 1,45; o texto corrido com
+     16px; título de página de 26px. Entrelinha 1,47 (T216); o texto corrido com
      -0,005em e os títulos com -0,02em. */
   --text-caption: 0.8125rem; /* 13px — ajuda, apoio, legenda */
   --text-ui: 0.875rem; /* 14px — item de navegação, botão, campo */
@@ -209,11 +259,16 @@
   --text-lead: 1rem; /* 16px — título de seção */
   --text-title: 1.625rem; /* 26px — título de página */
   --text-display: clamp(1.625rem, 1.4rem + 1vw, 2rem); /* 26→32px */
-  --leading-body: 1.45;
+  /* T216 — 1,47 (antes 1,45): a altura natural da fonte fica entre 1,43 e
+     1,46 em; com 1,47 a sobra da linha é dividida por igual em cima e
+     embaixo de 11 a 16 px, e o texto fica no centro de botões, abas, itens
+     de menu e células (medido: diferença menor que 1 px). */
+  --leading-body: 1.47;
   --leading-tight: 1.2;
   --tracking-body: -0.005em;
   --tracking-tight: -0.02em;
   --weight-regular: 400;
+  --weight-medium: 500;
   --weight-strong: 600;
   --weight-bold: 700;
 
@@ -227,6 +282,8 @@
      altura e botão quadrado de ícone com 36 px, mais enxutos, como pediu a
      proprietária. O alvo continua acima dos 24 px do WCAG 2.5.8. */
   --altura-botao: 2.5rem;
+  /* T216 — espessura do indicador da aba sublinhada (padrão de abas). */
+  --aba-indicador: 3px;
   --botao-icone: 2.25rem;
   /* T215 — medidas globais de página (medidas na referência, 2026-11-25).
      Página com menu de seções: coluna do menu, recuo do item a partir da
@@ -377,6 +434,18 @@ body {
   :where(input[type="checkbox"]) {
     transition: none;
   }
+}
+
+/* ---- T216 — aba sublinhada padrão -------------------------------------------
+   Toda aba com o indicador embaixo leva a classe `evolli-aba` (o TabsTrigger
+   já põe). O indicador é uma borda inferior; a mesma espessura vai em cima,
+   transparente, para o rótulo ficar no centro da aba e não 3 px acima. A
+   tela segue dando cor, respiro lateral e fonte; a classe dobrada vence o
+   `border: none` das telas. */
+.evolli-aba.evolli-aba {
+  border-top: var(--aba-indicador) solid transparent;
+  border-bottom-width: var(--aba-indicador);
+  line-height: var(--leading-body);
 }
 
 /* ---- T210 — temas de Configurações › Aparência -------------------------

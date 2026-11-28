@@ -1,6 +1,6 @@
 # Estado de execução do Spec Kit — Evolli RH
 
-**Última convergência:** 2026-10-01
+**Última convergência:** 2026-11-27
 
 **Base Git verificada:** `origin/main` em `8c3d8c3` (T140 e T142 integradas)
 
@@ -3407,11 +3407,11 @@ sem matrícula (idempotência por ator e empresa, regra da T179).
 **Fora de escopo:** API, migration, RBAC, auditoria e regra de admissão; dependência nova;
 Documentos.
 
-## Documentos do colaborador — T213 (validação visual aprovada; aguarda publicação)
+## Documentos do colaborador — T213 (integrada)
 
-| Tarefa | Estado                                                          | Resultado principal                                                        |
-| ------ | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| T213   | **Validação visual aprovada em 23/11/2026; aguarda publicação** | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
+| Tarefa | Estado                                    | Resultado principal                                                        |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------- |
+| T213   | **Integrada** (PR #207, squash `7ff3a2a`) | Documentos do colaborador com arquivo no R2 privado, quarentena e etapa 4. |
 
 **Arquivos reais:** bloqueados até o ClamAV estar configurado e a revisão de segurança estar
 concluída; até lá, só arquivos sintéticos. Tecnicamente, o envio depende de verificador
@@ -3430,20 +3430,20 @@ seção da ficha) ([documento de decisão](../docs/decisions/t213-documentos-col
 configuráveis, OCR, assinatura, leitura automática, compartilhamento externo, vencimentos e
 envio pela importação.
 
-## Dashboard e login — T214 (implementada localmente; aguarda separação)
+## Dashboard e login — T214 (integrada)
 
-| Tarefa | Estado                                             | Resultado principal                                  |
-| ------ | -------------------------------------------------- | ---------------------------------------------------- |
-| T214   | **Implementada localmente (`515b7e0`), só a tela** | Card principal do Dashboard, "i" do cálculo e login. |
+| Tarefa | Estado                                    | Resultado principal                                  |
+| ------ | ----------------------------------------- | ---------------------------------------------------- |
+| T214   | **Integrada** (PR #207, squash `7ff3a2a`) | Card principal do Dashboard, "i" do cálculo e login. |
 
 **Situação:** empilhada na branch da T215; sem PR. A separação em entrega própria aguarda
 autorização.
 
-## Colaboradores — T215 (em andamento local; sem PR)
+## Colaboradores — T215 (integrada)
 
-| Tarefa | Estado                     | Resultado principal                                                       |
-| ------ | -------------------------- | ------------------------------------------------------------------------- |
-| T215   | **Em andamento, só local** | Lista, edição, ficha nova e as abas Dados, Salários e Férias e ausências. |
+| Tarefa | Estado                                    | Resultado principal                                                       |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------- |
+| T215   | **Integrada** (PR #207, squash `7ff3a2a`) | Lista, edição, ficha nova e as abas Dados, Salários e Férias e ausências. |
 
 **Aba Férias e ausências da ficha (24/11/2026):** regra de férias por vínculo (CLT e Estágio
 com saldo; PJ e Freelancer sem férias; Aprendiz e os tipos não decididos sem cálculo
@@ -3456,3 +3456,18 @@ municipais ainda não entram nos dias úteis
 
 **Fora de escopo:** Portal do colaborador, fluxo do gestor, férias coletivas, políticas de
 férias e mudança automática de status.
+
+## Integração conjunta — T213, T214 e T215
+
+As três entregas entraram em `main` pela PR #207 (squash `7ff3a2a`, 27/11/2026), com a CI de push 3/3
+verde (run 45995281985). A branch de trabalho reunia commits das três; a integração usou um commit único
+com a declaração `Spec-Kit-Entrega: T213, T214, T215`. A PR #206 (rascunho da T213) ficou redundante.
+Os registros acima de "aguarda publicação", "empilhada" e "só local" valem como histórico.
+
+## Pesquisas — T216 (em andamento; sem PR)
+
+| Tarefa | Estado           | Escopo                                                                     |
+| ------ | ---------------- | -------------------------------------------------------------------------- |
+| T216   | **Em andamento** | Lista, modelos, assistente, resultados, resposta pelo link e aba da ficha. |
+
+**Decisão:** [t216-pesquisas.md](../docs/decisions/t216-pesquisas.md).

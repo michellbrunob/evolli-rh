@@ -41,7 +41,6 @@ import {
   IconeCalendario,
   IconeFolha,
   IconeHubBeneficios,
-  IconePesquisas,
   IconePortal,
   IconeRecrutamento,
   IconeRoadmap,
@@ -171,11 +170,10 @@ export const MENU_LATERAL: readonly SecaoDoMenu[] = [
         ],
       },
       {
-        tipo: "em-desenvolvimento",
-        id: "pesquisas",
+        // T216 — Pesquisas: módulo real (RH e DP operam; master técnico lê).
+        tipo: "modulo",
+        grupo: "Pesquisas",
         rotulo: "Pesquisas",
-        icone: IconePesquisas,
-        papeis: PAPEIS_OPERACAO_DE_PESSOAS,
       },
       {
         tipo: "em-desenvolvimento",

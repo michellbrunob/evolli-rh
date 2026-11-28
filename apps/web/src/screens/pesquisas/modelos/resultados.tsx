@@ -1,0 +1,319 @@
+/**
+ * T216 — o registro das telas de resultado dos modelos com cálculo próprio.
+ * A Visão geral usa a tela do modelo quando a API manda
+ * `ResultadosPesquisa.modelo`; o resultado individual usa a do modelo
+ * quando vem `RespostaDetalhe.modelo`. Cada frente acrescenta a sua linha.
+ */
+import type { ReactNode } from "react";
+import type {
+  PesquisaDetalhe,
+  RespostaDetalhe,
+  RespostaResumo,
+  ResultadosPesquisa,
+  Secao,
+} from "../../../api/pesquisasClient";
+import type { ServicoDePesquisas } from "../servicoDePesquisas";
+import { AnalisesClima } from "./clima/AnalisesClima";
+import { temTelasDoClima } from "./clima/catalogo";
+import { AnalisesEnps } from "./enps/AnalisesEnps";
+import { IndividualEnps, RespostasEnps } from "./enps/RespostasEnps";
+import { VisaoGeralEnps } from "./enps/VisaoGeralEnps";
+import type { AbaDosResultados } from "../rotasDePesquisas";
+import { ComentariosPulsoClima } from "./pulso_clima/ComentariosPulsoClima";
+import { IndividualPulsoClima } from "./pulso_clima/IndividualPulsoClima";
+import { RespostasNaRegua, temRespostasNaRegua } from "./RespostasNaRegua";
+import { ResultadoClimaVisao } from "./clima/ResultadoClima";
+import {
+  ListaDeRespostasClima,
+  VisaoIndividualClima,
+} from "./clima/RespostasClima";
+import { ResultadoPulsoClima } from "./pulso_clima/ResultadoPulsoClima";
+import {
+  IndividualTad,
+  PainelTad,
+  ResultadoTadVisao,
+} from "./tad/ResultadoTad";
+import { ResultadoIndividualDisc } from "./disc/ResultadoIndividualDisc";
+import { ResultadosDisc, type AbaDisc } from "./disc/ResultadosDisc";
+import type { CarregarPerfil } from "./disc/tiposDisc";
+
+/**
+ * Modelos com tela própria em todas as abas (o resultado vem de uma rota
+ * própria, não de `ResultadosPesquisa.modelo`): Perfil comportamental
+ * (DISC). `null` quando o modelo usa as abas comuns.
+ */
+export function abasDoModelo(x: {
+  readonly detalhe: PesquisaDetalhe;
+  readonly aba: AbaDisc;
+  readonly carregarPerfil?: CarregarPerfil | undefined;
+  readonly onAbrirResposta: (respostaId: string) => void;
+  readonly onIrParaAnalises: () => void;
+}): ReactNode | null {
+  if (x.detalhe.modelo !== "disc") return null;
+  return (
+    <ResultadosDisc
+      detalhe={x.detalhe}
+      aba={x.aba}
+      {...(x.carregarPerfil ? { carregar: x.carregarPerfil } : {})}
+      onAbrirResposta={x.onAbrirResposta}
+      onIrParaAnalises={x.onIrParaAnalises}
+    />
+  );
+}
+
+/** A página do resultado individual própria do modelo (DISC), ou `null`. */
+export function paginaIndividualDoModelo(x: {
+  readonly pesquisa: PesquisaDetalhe;
+  readonly respostaId: string;
+  readonly carregarPerfil?: CarregarPerfil | undefined;
+  readonly onVoltar: () => void;
+  readonly onIr?: ((respostaId: string) => void) | undefined;
+}): ReactNode | null {
+  if (x.pesquisa.modelo !== "disc") return null;
+  return (
+    <ResultadoIndividualDisc
+      pesquisa={x.pesquisa}
+      respostaId={x.respostaId}
+      {...(x.carregarPerfil ? { carregar: x.carregarPerfil } : {})}
+      onVoltar={x.onVoltar}
+      onIr={x.onIr}
+    />
+  );
+}
+import { IndividualNr1Tela } from "./copsoq/IndividualNr1";
+import { IndividualIsfb, VisaoGeralIsfb } from "./isfb/VisaoGeralIsfb";
+import {
+  painelDe,
+  VisaoGeralNr1DoRegistro,
+  type AbaDoModelo,
+} from "./registro";
+
+/**
+ * Avaliação 90°/180° e Onboarding automático: resultados inteiros
+ * próprios (rotas próprias da API), no lugar das abas da pesquisa.
+ */
+export { ResultadosProprios, ehModeloComTelaPropria } from "./integracao";
+
+/** A Visão geral própria do modelo, ou `null` (usa a visão por pergunta). */
+export function visaoGeralDoModelo(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  /** Troca a aba dos resultados (atalhos da Visão geral). */
+  onTrocarAba?: (aba: AbaDoModelo) => void,
+): ReactNode | null {
+  const r = geral.modelo;
+  if (!r) return null;
+  switch (r.modelo) {
+    case "pulso_clima":
+      return (
+        <ResultadoPulsoClima
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaComentarios: () => onTrocarAba("comentarios") }
+            : {})}
+        />
+      );
+    case "clima":
+      return (
+        <ResultadoClimaVisao
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaAnalises: () => onTrocarAba("analises") }
+            : {})}
+        />
+      );
+    case "tad":
+      return <ResultadoTadVisao r={r} />;
+    case "copsoq":
+      return (
+        <VisaoGeralNr1DoRegistro
+          detalhe={detalhe}
+          geral={geral}
+          {...(onTrocarAba ? { onTrocarAba } : {})}
+        />
+      );
+    case "isfb":
+      return (
+        <VisaoGeralIsfb
+          resultado={painelDe(detalhe, geral)}
+          {...(onTrocarAba ? { onIrPara: onTrocarAba } : {})}
+        />
+      );
+    case "enps":
+      return (
+        <VisaoGeralEnps
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaAnalises: () => onTrocarAba("analises") }
+            : {})}
+        />
+      );
+    default:
+      return null;
+  }
+}
+
+/** O resultado da pessoa no modelo (resultado individual), ou `null`. */
+export function resultadoIndividualDoModelo(
+  resposta: RespostaDetalhe,
+): ReactNode | null {
+  const r = resposta.modelo;
+  if (!r) return null;
+  switch (r.modelo) {
+    case "tad":
+      return <PainelTad r={r} titulo="Score geral de motivação" />;
+    case "copsoq":
+      return <IndividualNr1Tela p={r} />;
+    case "isfb":
+      return <IndividualIsfb p={r} />;
+    default:
+      return null;
+  }
+}
+
+/** A aba Análises própria do modelo (Clima, eNPS), ou `null` (usa a comum). */
+export function analisesDoModelo(x: {
+  readonly servico: ServicoDePesquisas;
+  readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  readonly respostas: readonly RespostaResumo[] | null;
+  readonly onDuplicar?: () => void;
+}): ReactNode | null {
+  const r = x.geral.modelo;
+  if (r?.modelo === "enps")
+    return (
+      <AnalisesEnps
+        servico={x.servico}
+        detalhe={x.detalhe}
+        geral={x.geral}
+        r={r}
+        {...(x.onDuplicar ? { onDuplicar: x.onDuplicar } : {})}
+      />
+    );
+  if (!temTelasDoClima(x.detalhe, x.geral)) return null;
+  return (
+    <AnalisesClima
+      servico={x.servico}
+      detalhe={x.detalhe}
+      geral={x.geral}
+      respostas={x.respostas}
+      {...(x.onDuplicar ? { onDuplicar: x.onDuplicar } : {})}
+    />
+  );
+}
+
+/** A lista da aba Respostas própria do modelo (Clima, eNPS), ou `null`. */
+export function listaDeRespostasDoModelo(x: {
+  readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  readonly respostas: readonly RespostaResumo[] | null;
+  readonly onAbrir: (id: string) => void;
+}): ReactNode | null {
+  // TAD e Pulso e Clima: o score na régua do modelo.
+  if (temRespostasNaRegua(x.detalhe.modelo))
+    return (
+      <RespostasNaRegua
+        detalhe={x.detalhe}
+        respostas={x.respostas}
+        onAbrir={x.onAbrir}
+      />
+    );
+  if (x.detalhe.modelo === "enps")
+    return (
+      <RespostasEnps
+        detalhe={x.detalhe}
+        respostas={x.respostas}
+        onAbrir={x.onAbrir}
+      />
+    );
+  if (!temTelasDoClima(x.detalhe, x.geral)) return null;
+  return (
+    <ListaDeRespostasClima
+      detalhe={x.detalhe}
+      respostas={x.respostas}
+      onAbrir={x.onAbrir}
+    />
+  );
+}
+
+/**
+ * A visão geral própria do resultado individual (Clima, eNPS, TAD, Pulso e
+ * Clima), no lugar dos indicadores comuns (média de 0 a 10, recomendação),
+ * ou `null`.
+ */
+export function visaoIndividualDoModelo(
+  resposta: RespostaDetalhe,
+  secoes: readonly Secao[],
+  /** "Ver todas as respostas" (a aba Respostas do individual). */
+  onVerRespostas?: () => void,
+): ReactNode | null {
+  const r = resposta.modelo;
+  if (r?.modelo === "tad") return <IndividualTad r={r} />;
+  if (r?.modelo === "pulso_clima") return <IndividualPulsoClima p={r} />;
+  if (r?.modelo === "enps")
+    return <IndividualEnps p={r} resposta={resposta} secoes={secoes} />;
+  if (r?.modelo !== "clima") return null;
+  return (
+    <VisaoIndividualClima
+      resposta={resposta}
+      p={r}
+      secoes={secoes}
+      onVerRespostas={onVerRespostas}
+    />
+  );
+}
+
+/**
+ * A contagem da aba Respostas do resultado individual, quando o modelo
+ * conta diferente (Clima: só as afirmações; as abertas ficam à parte), ou
+ * `null` (todas as respostas).
+ */
+export function contagemIndividualDoModelo(
+  resposta: RespostaDetalhe,
+): number | null {
+  return resposta.modelo?.modelo === "clima"
+    ? resposta.modelo.afirmacoes.length
+    : null;
+}
+
+/**
+ * As abas a mais do modelo, depois de Análises (Pulso e Clima: Comentários,
+ * com a contagem). Vazio nos demais.
+ */
+export function abasExtrasDoModelo(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa | null,
+): readonly { valor: AbaDosResultados; rotulo: string; contagem: number }[] {
+  if (detalhe.modelo !== "pulso_clima") return [];
+  const r = geral?.modelo?.modelo === "pulso_clima" ? geral.modelo : null;
+  return [
+    {
+      valor: "comentarios",
+      rotulo: "Comentários",
+      contagem: r ? r.comentarios.reduce((n, c) => n + c.quantidade, 0) : 0,
+    },
+  ];
+}
+
+/** O conteúdo de uma aba a mais do modelo, ou `null`. */
+export function abaExtraDoModelo(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  aba: AbaDosResultados,
+): ReactNode | null {
+  if (aba !== "comentarios" || detalhe.modelo !== "pulso_clima") return null;
+  const r = geral.modelo?.modelo === "pulso_clima" ? geral.modelo : null;
+  if (!r)
+    return (
+      <div className="pesquisas__aba-vazia">
+        <strong>Ainda sem comentários.</strong>
+      </div>
+    );
+  return <ComentariosPulsoClima detalhe={detalhe} geral={geral} r={r} />;
+}

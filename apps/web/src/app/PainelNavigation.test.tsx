@@ -60,6 +60,8 @@ describe("estrutura dos grupos", () => {
       "Jornada",
       // T215 — Benefícios (Remuneração › Benefícios).
       "Benefícios",
+      // T216 — Pesquisas (Pessoas › Pesquisas).
+      "Pesquisas",
       "Liderança",
       // T215 — Segurança (Sessões ativas e Permissões de acesso).
       "Segurança",
@@ -171,6 +173,8 @@ describe("o estado declarado bate com o código", () => {
     "importar-colaboradores":
       "src/screens/pessoas/importacao/ImportarColaboradoresScreen.tsx",
     beneficios: "src/screens/beneficios/BeneficiosModulo.tsx",
+    // T216 — Pesquisas (lista, galeria, assistente e resultados).
+    pesquisas: "src/screens/pesquisas/PesquisasModulo.tsx",
     "politicas-ferias":
       "src/screens/pessoas/ferias/politicas/PoliticasFeriasScreen.tsx",
     cadastros: "src/screens/horarios/EstruturaOrganizacionalScreen.tsx",
@@ -671,12 +675,12 @@ describe("módulo, submenu e destino ativo (T159 — evolução visual)", () => 
     // Benefícios, Hub de Benefícios, Suporte e Roadmap). T211 — módulos no
     // menu: Dashboard, Colaboradores, Liderança e Configurações. T215 — e
     // Segurança. T215 — Benefícios virou módulo (sai dos itens em
-    // desenvolvimento).
+    // desenvolvimento). T216 — Pesquisas também virou módulo.
     const modulosNoMenu = MENU_LATERAL.flatMap((secao) =>
       secao.entradas.filter((e) => e.tipo === "modulo"),
     ).length;
-    expect(modulosNoMenu).toBe(6);
-    expect(icones.length).toBe(modulosNoMenu + 8);
+    expect(modulosNoMenu).toBe(7);
+    expect(icones.length).toBe(modulosNoMenu + 7);
     for (const icone of icones) {
       expect(icone).toHaveAttribute("aria-hidden", "true");
       expect(icone).toHaveAttribute("focusable", "false");

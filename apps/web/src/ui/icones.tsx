@@ -18,11 +18,14 @@ import {
   ArrowLeft2,
   ArrowRight,
   ArrowRight2,
+  ArrowUp2,
   Building,
   Calendar,
   Clock,
   Copy,
   Danger,
+  ExportSquare,
+  HambergerMenu,
   ColorSwatch,
   Cup,
   DocumentDownload,
@@ -62,6 +65,7 @@ import {
   Setting,
   ShieldTick,
   TickCircle,
+  TickSquare,
   Trash,
   UserAdd,
   Warning2,
@@ -87,8 +91,33 @@ import {
   MessageText1,
   Money2,
   Sms,
+  Link1,
   Teacher,
   Timer1,
+  Chart2,
+  TrendUp,
+  TrendDown,
+  Category,
+  Text,
+  TextalignLeft,
+  RecordCircle,
+  LikeDislike,
+  Slider,
+  Speedometer,
+  Smileys,
+  Hashtag,
+  Flash,
+  Activity,
+  EmojiHappy,
+  Like1,
+  UserTick,
+  LampOn,
+  EmptyWallet,
+  MedalStar,
+  UserOctagon,
+  Magicpen,
+  Note,
+  Chart,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -226,6 +255,17 @@ export const IconeMaisAcoes = decorativo(More, "Linear");
 export const IconeVoltar = decorativo(ArrowLeft2, "Linear");
 export const IconeAvancar = decorativo(ArrowRight2, "Linear");
 export const IconeAbrir = decorativo(ArrowDown2, "Linear");
+/** T216 — mover um item da lista para cima ou para baixo. */
+export const IconeSubir = decorativo(ArrowUp2, "Linear");
+export const IconeDescer = decorativo(ArrowDown2, "Linear");
+/** T216 — o pegador de arrastar (reordenar). */
+export const IconeArrastar = decorativo(HambergerMenu, "Linear");
+/** T216 — abrir em outra aba (link público da pesquisa). */
+export const IconeNovaAba = decorativo(ExportSquare, "Linear");
+/** T216 — copiar o link de uma pesquisa. */
+export const IconeLink = decorativo(Link1, "Linear");
+/** T216 — confirmar uma edição na própria linha. */
+export const IconeVisto = decorativo(TickSquare, "Linear");
 export const IconeMais = decorativo(Add, "Linear");
 /** O "mais" girado 45°: o X de fechar, no mesmo traço. */
 export const IconeFechar = decorativo(Add, "Linear", "ev-icone--fechar");
@@ -234,3 +274,48 @@ export const IconeMostrarSenha = decorativo(Eye, "Linear");
 export const IconeOcultarSenha = decorativo(EyeSlash, "Linear");
 export const IconeEntrar = decorativo(ArrowRight, "Linear");
 export const IconeCadeado = decorativo(Lock, "Linear");
+/** T216 — os indicadores dos resultados de uma pesquisa. */
+export const IconeMediaGeral = decorativo(Chart2, "Bulk");
+export const IconeRecomendacao = decorativo(ShieldTick, "Bulk");
+export const IconeEmAlta = decorativo(TrendUp, "Linear");
+export const IconeEmBaixa = decorativo(TrendDown, "Linear");
+/** T216 — as seções de uma pesquisa personalizada. */
+export const IconeSecoes = decorativo(Category, "Bulk");
+/** T216 — um ícone próprio para cada tipo de pergunta. */
+export const IconeTextoCurto = decorativo(Text, "Bulk");
+export const IconeParagrafo = decorativo(TextalignLeft, "Bulk");
+export const IconeEscolhaUnica = decorativo(RecordCircle, "Bulk");
+export const IconeMultiplaEscolha = decorativo(TickSquare, "Bulk");
+export const IconeSimNao = decorativo(LikeDislike, "Bulk");
+export const IconeEscala = decorativo(Slider, "Bulk");
+export const IconeNota = decorativo(Speedometer, "Bulk");
+export const IconeConcordancia = decorativo(Smileys, "Bulk");
+/** T216 — os tipos de 4 pontos (concordância e satisfação, sem o neutro). */
+export const IconeConcordancia4 = decorativo(Like1, "Linear");
+export const IconeSatisfacao4 = decorativo(EmojiHappy, "Linear");
+export const IconeNumero = decorativo(Hashtag, "Bulk");
+
+// ---- T216 — Pesquisas: os modelos da galeria e os fatos dos cards (Bulk) ----
+export const IconeModeloPulso = decorativo(Flash, "Bulk");
+export const IconeModeloPulsoClima = decorativo(Activity, "Bulk");
+export const IconeModeloClima = decorativo(EmojiHappy, "Bulk");
+export const IconeModeloEnps = decorativo(Like1, "Bulk");
+export const IconeModeloOnboarding = decorativo(UserTick, "Bulk");
+export const IconeModeloMotivacao = decorativo(LampOn, "Bulk");
+export const IconeModeloRiscos = decorativo(ShieldTick, "Bulk");
+export const IconeModeloSaudeFinanceira = decorativo(EmptyWallet, "Bulk");
+export const IconeModeloAvaliacao90 = decorativo(MedalStar, "Bulk");
+export const IconeModeloAvaliacao180 = decorativo(Profile2User, "Bulk");
+export const IconeModeloPerfil = decorativo(UserOctagon, "Bulk");
+export const IconeModeloPersonalizada = decorativo(Magicpen, "Bulk");
+/** Fatos do card: perguntas, escala, dimensões, competências e envio. */
+export const IconeFatoPerguntas = decorativo(Note, "Bulk");
+export const IconeFatoEscala = decorativo(Chart, "Bulk");
+export const IconeFatoDimensoes = decorativo(Category, "Bulk");
+export const IconeFatoCompetencias = decorativo(MedalStar, "Bulk");
+export const IconeFatoAutomatico = decorativo(Timer1, "Bulk");
+export const IconeFatoDuasPessoas = decorativo(Profile2User, "Bulk");
+export const IconeFatoPerfis = decorativo(UserOctagon, "Bulk");
+export const IconeFatoPersonalizada = decorativo(Magicpen, "Bulk");
+/** O escudo do quadro "Precisa cumprir a NR-1?". */
+export const IconeEscudoNr1 = decorativo(ShieldTick, "Bulk");

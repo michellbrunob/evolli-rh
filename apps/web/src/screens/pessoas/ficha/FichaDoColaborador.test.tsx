@@ -13,6 +13,7 @@ import {
   within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { pesquisasDoColaborador } from "../../../api/pesquisasClient";
 import { FichaDoColaborador } from "./FichaDoColaborador";
 import {
   buscarColaborador,
@@ -68,6 +69,7 @@ vi.mock("../../../api/cargoClient");
 vi.mock("../../../api/organizacaoClient");
 vi.mock("../../../api/movimentacaoClient");
 vi.mock("../../../api/escalaClient");
+vi.mock("../../../api/pesquisasClient");
 
 const ID = "8f0c2a4e-1b2c-4d3e-8f4a-5b6c7d8e9f01";
 const GESTORA = "3c2b1a09-8f7e-4d6c-9b5a-4e3d2c1b0a99";
@@ -282,9 +284,12 @@ describe("T215 — ficha: cabeçalho, faixa e Portal", () => {
     const portal = await screen.findByRole("region", {
       name: "Portal do colaborador",
     });
+    // T216 — o selo do portal é o status padrão (neutro).
     expect(
-      await within(portal).findByText("Não convidada"),
-    ).toBeInTheDocument();
+      (await within(portal).findByText("Não convidada")).closest(
+        ".evolli-badge",
+      ),
+    ).toHaveClass("evolli-badge--neutral");
     expect(
       within(portal).getByText(
         "A Maria ainda não tem acesso. Envie o convite para ela criar a conta.",
@@ -301,7 +306,9 @@ describe("T215 — ficha: cabeçalho, faixa e Portal", () => {
     const portal = await screen.findByRole("region", {
       name: "Portal do colaborador",
     });
-    expect(await within(portal).findByText("Sem e-mail")).toBeInTheDocument();
+    expect(
+      (await within(portal).findByText("Sem e-mail")).closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--danger");
     expect(
       within(portal).getByText(
         "Cadastre um e-mail para poder enviar o convite do portal.",
@@ -758,5 +765,27 @@ describe("T215 — cabeçalho com a escala da ficha", () => {
         "Carga horária e escala44h semanais · 5x2",
       ),
     );
+  });
+});
+
+describe("T216 — ficha: aba Pesquisas", () => {
+  it("RH e DP veem as pesquisas respondidas da pessoa", async () => {
+    vi.mocked(pesquisasDoColaborador).mockResolvedValue([]);
+    montar({ aba: "pesquisas" });
+    expect(
+      await screen.findByRole("heading", { name: "Pesquisas respondidas" }),
+    ).toBeInTheDocument();
+    expect(pesquisasDoColaborador).toHaveBeenCalledWith(ID);
+    expect(screen.queryByText(/próximas versões/)).toBeNull();
+  });
+
+  it("quem só lê a ficha não consulta as respostas", async () => {
+    montar({ aba: "pesquisas", podeEditar: false });
+    expect(
+      await screen.findByText(
+        "As respostas de pesquisas ficam visíveis só para o RH e o DP.",
+      ),
+    ).toBeInTheDocument();
+    expect(pesquisasDoColaborador).not.toHaveBeenCalled();
   });
 });

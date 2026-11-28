@@ -2375,6 +2375,12 @@ describe("T207 — Distribuição do time e Tempo de casa", () => {
     for (const nome of ["Distribuição do time", "Tempo de casa"]) {
       const b = bloco(nome);
       expect(within(b).getByText("Não exibido por privacidade")).toBeVisible();
+      // T216 — o estado do bloco é o status padrão (neutro).
+      expect(
+        within(b)
+          .getByText("Não exibido por privacidade")
+          .closest(".evolli-badge"),
+      ).toHaveClass("evolli-badge--neutral");
       expect(within(b).queryByRole("list")).toBeNull();
       expect(within(b).queryByRole("button")).toBeNull();
       expect(b).not.toHaveTextContent("Operações");

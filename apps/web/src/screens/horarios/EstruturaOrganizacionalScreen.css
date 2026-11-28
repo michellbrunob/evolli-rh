@@ -108,7 +108,7 @@
 .estrutura-organizacional-screen__aba {
   padding: var(--space-xs) var(--space-md);
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--aba-indicador) solid transparent;
   margin-bottom: -1px;
   background: none;
   cursor: pointer;

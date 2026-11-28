@@ -1097,8 +1097,8 @@ export function DashboardScreen({
                 tabIndex={selecionada ? 0 : -1}
                 className={
                   selecionada
-                    ? "dashboard__aba dashboard__aba--ativa"
-                    : "dashboard__aba"
+                    ? "evolli-aba dashboard__aba dashboard__aba--ativa"
+                    : "evolli-aba dashboard__aba"
                 }
                 onClick={() => {
                   if (!selecionada) onTrocarAba?.(a);

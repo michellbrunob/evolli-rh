@@ -9,6 +9,7 @@
  * menu de reticências: trocar a vista, baixar o CSV e imprimir só o bloco.
  * Sem dado (carregando, falha, teto ou menos de 3 pessoas), nenhum menu.
  */
+import { StatusBadge } from "../../components";
 import { useRef, type ReactNode } from "react";
 import {
   InfoComoCalculamos,
@@ -69,9 +70,7 @@ function PoucaGente({
 }) {
   return (
     <div className="dashboard__vazio-quadro">
-      <p className="dashboard__selo dashboard__selo--estado">
-        Não exibido por privacidade
-      </p>
+      <StatusBadge>Não exibido por privacidade</StatusBadge>
       <p className="dashboard__vazio-texto">
         Com menos de {MINIMO_DO_GRUPO} {quem}, {assunto} não é mostrado para não
         identificar ninguém.

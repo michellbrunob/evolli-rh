@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { IconeEditar, IconeEmpresa, IconeMais } from "../../ui/icones";
-import { Button, PageHeader } from "../../components";
+import { Button, PageHeader, StatusBadge } from "../../components";
 import {
   listarEmpresasDaConta,
   type EmpresaDaContaApi,
@@ -167,9 +167,9 @@ export function EmpresasScreen({
                             <span className="empresas__nome">
                               {e.nome}
                               {e.principal ? (
-                                <span className="empresas__selo">
+                                <StatusBadge variant="info">
                                   Principal
-                                </span>
+                                </StatusBadge>
                               ) : null}
                             </span>
                             <span className="empresas__cnpj">

@@ -50,6 +50,8 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
     expect(b).toHaveAttribute("data-variant", "primary");
     // T215 — altura padrão do botão de texto.
     expect(b.className).toMatch(/ev:min-h-\[var\(--altura-botao\)\]/);
+    // T216 — o rótulo não quebra linha dentro do botão.
+    expect(b.className).toMatch(/ev:whitespace-nowrap/);
   });
 
   it("IconButton exige rótulo; o ícone é decorativo", () => {
@@ -102,11 +104,15 @@ describe("T209 — Button, IconButton, Card, Input, Select e Badge", () => {
     expect(select.className).toMatch(/ev:min-h-\[var\(--touch-target\)\]/);
   });
 
-  it("Badge diz o estado em texto, com os tokens semânticos", () => {
+  it("Badge diz o estado em texto, no mesmo visual do status padrão (T216)", () => {
     render(<Badge variant="success">Ativo</Badge>);
-    const badge = screen.getByText("Ativo");
+    const badge = screen.getByText("Ativo").closest("[data-variant]");
     expect(badge).toHaveAttribute("data-variant", "success");
-    expect(badge.className).toMatch(/status-success-ink/);
+    expect(badge).toHaveClass("evolli-badge", "evolli-badge--success");
+    expect(badge?.querySelector(".evolli-badge__ponto")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 });
 
@@ -163,6 +169,20 @@ describe("T209 — Tabs (ativação manual)", () => {
     expect(abas[1]).toHaveAttribute("aria-selected", "true");
     expect(abas[1]).toHaveAttribute("aria-controls", "painel");
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Aba b");
+  });
+
+  it("T216 — cada aba leva a classe da aba sublinhada padrão, somada à de quem usa", () => {
+    render(
+      <TabsList label="Grupos">
+        <TabsTrigger selected controls="p" className="tela__aba">
+          Aba
+        </TabsTrigger>
+      </TabsList>,
+    );
+    expect(screen.getByRole("tab", { name: "Aba" })).toHaveClass(
+      "evolli-aba",
+      "tela__aba",
+    );
   });
 });
 

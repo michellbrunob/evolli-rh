@@ -47,6 +47,11 @@ export interface ListaDeEscolhaProps {
   readonly "aria-labelledby"?: string;
   readonly "aria-describedby"?: string;
   readonly "aria-invalid"?: boolean | "true" | "false";
+  /**
+   * T216 — "abaixo": abre sempre embaixo do campo (a página rola), como nos
+   * filtros dos resultados. Padrão "auto": acima quando falta espaço embaixo.
+   */
+  readonly direcao?: "auto" | "abaixo";
 }
 
 /** Espaço mínimo embaixo do campo para abrir para baixo. */
@@ -68,6 +73,7 @@ export function ListaDeEscolha({
   "aria-labelledby": ariaLabelledby,
   "aria-describedby": ariaDescribedby,
   "aria-invalid": ariaInvalid,
+  direcao = "auto",
 }: ListaDeEscolhaProps) {
   const prefixo = useId();
   const idDaLista = `${prefixo}-lista`;
@@ -86,7 +92,9 @@ export function ListaDeEscolha({
   function abrir(indice: number) {
     if (disabled || opcoes.length === 0) return;
     const caixa = botao.current?.getBoundingClientRect();
-    if (caixa && typeof window !== "undefined") {
+    if (direcao === "abaixo") {
+      setAcima(false);
+    } else if (caixa && typeof window !== "undefined") {
       const embaixo = window.innerHeight - caixa.bottom;
       setAcima(embaixo < ALTURA_DA_LISTA && caixa.top > embaixo);
     }

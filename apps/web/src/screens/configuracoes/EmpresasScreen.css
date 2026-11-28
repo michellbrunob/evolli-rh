@@ -105,15 +105,6 @@
   overflow-wrap: break-word;
 }
 
-.empresas__selo {
-  padding: 0.0625rem 0.5rem;
-  border-radius: var(--radius-pill);
-  background: var(--evolli-azul-suave);
-  color: var(--color-action);
-  font-size: 0.6875rem;
-  font-weight: var(--weight-strong);
-}
-
 .empresas__cnpj {
   color: var(--color-ink-subtle);
   font-size: 0.75rem;

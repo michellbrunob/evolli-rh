@@ -590,6 +590,7 @@ export function DetalheDoBeneficio({
       >
         <button
           type="button"
+          className="evolli-aba"
           role="tab"
           aria-selected={aba === "pessoas"}
           onClick={() => setAba("pessoas")}
@@ -598,6 +599,7 @@ export function DetalheDoBeneficio({
         </button>
         <button
           type="button"
+          className="evolli-aba"
           role="tab"
           aria-selected={aba === "historico"}
           onClick={() => setAba("historico")}

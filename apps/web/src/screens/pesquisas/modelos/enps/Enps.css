@@ -1,0 +1,396 @@
+/* T216 — telas do eNPS (Sobre, Visão geral, Respostas, individual). Só tokens. */
+
+[data-grupo="promotor"] {
+  --grupo-cor: var(--faixa-saudavel);
+  --grupo-fundo: var(--faixa-saudavel-fundo);
+  --grupo-tinta: var(--status-success-ink);
+}
+[data-grupo="neutro"] {
+  --grupo-cor: var(--faixa-atencao);
+  --grupo-fundo: var(--faixa-atencao-fundo);
+  --grupo-tinta: var(--status-warning-ink);
+}
+[data-grupo="detrator"] {
+  --grupo-cor: var(--faixa-critico);
+  --grupo-fundo: var(--faixa-critico-fundo);
+  --grupo-tinta: var(--status-danger-ink);
+}
+
+/* ---- Sobre o modelo ---------------------------------------------------- */
+
+.enps-sobre__principal,
+.enps-sobre__calculo {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.enps-sobre__principal p,
+.enps-sobre__calculo p {
+  margin: 0;
+}
+
+.enps-notas {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enps-notas li {
+  display: grid;
+  place-items: center;
+  min-height: 2.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.enps-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.enps-legenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.enps-legenda li > span {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--grupo-cor);
+}
+
+.enps-formula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: var(--weight-strong);
+}
+
+.enps-formula__pilula {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--grupo-fundo, var(--surface-neutral));
+  color: var(--grupo-tinta, var(--color-ink));
+  line-height: 1.2;
+}
+
+.enps-formula__pilula--resultado {
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.enps-zonas {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.enps-zonas__barra {
+  position: relative;
+  display: flex;
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  overflow: visible;
+}
+
+.enps-zonas__barra > span[data-faixa="critico"] {
+  background: var(--faixa-critico);
+}
+.enps-zonas__barra > span[data-faixa="atencao"] {
+  background: var(--faixa-atencao);
+}
+.enps-zonas__barra > span[data-faixa="saudavel"] {
+  background: var(--faixa-saudavel);
+}
+.enps-zonas__barra > span[data-faixa="forte"] {
+  background: var(--faixa-forte);
+}
+.enps-zonas__barra > span[data-faixa]:first-child {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+.enps-zonas__barra > span[data-faixa]:nth-last-child(1),
+.enps-zonas__barra > span[data-faixa]:nth-child(4) {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.enps-zonas__marcador {
+  position: absolute;
+  top: -0.25rem;
+  width: 0.25rem;
+  height: 1.25rem;
+  margin-left: -0.125rem;
+  border-radius: 2px;
+  background: var(--color-ink);
+}
+
+.enps-zonas__rotulos {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.enps-zonas__rotulos li {
+  display: grid;
+  flex-basis: 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.enps-zonas__rotulos span {
+  color: var(--color-ink-muted);
+}
+
+/* ---- Visão geral ------------------------------------------------------- */
+
+.enps-topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 52rem) {
+  .enps-topo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.enps-medidor {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  text-align: center;
+}
+
+.enps-medidor svg {
+  width: 100%;
+  max-width: 18rem;
+  height: auto;
+}
+
+.enps-medidor__valor {
+  font-size: 2.25rem;
+  font-weight: var(--weight-strong);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.enps-conta {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.enps-grupos {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enps-grupos li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-left: 4px solid var(--grupo-cor);
+  border-radius: var(--radius-sm);
+}
+
+.enps-grupos__pct {
+  font-size: 1.5rem;
+  font-weight: var(--weight-strong);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.enps-distribuicao {
+  display: flex;
+  width: 100%;
+  min-width: 8rem;
+  height: 0.625rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-neutral);
+}
+
+.enps-distribuicao > span {
+  background: var(--grupo-cor);
+}
+
+.enps-tabela td,
+.enps-tabela th {
+  vertical-align: middle;
+}
+
+.enps-abertas {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enps-abertas li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+}
+
+.enps-abertas blockquote {
+  margin: 0;
+}
+
+/* ---- Respostas e individual -------------------------------------------- */
+
+.enps-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.enps-nota__numero {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+}
+
+.enps-selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.enps-individual__nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.enps-individual__nota .enps-nota__numero {
+  min-width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.75rem;
+}
+
+.enps-diferenca[data-sinal="mais"] {
+  color: var(--status-success-ink);
+}
+.enps-diferenca[data-sinal="menos"] {
+  color: var(--status-danger-ink);
+}
+
+/* Complementares: a contagem sob a barra e a média no selo do grupo. */
+.enps-distribuicao-celula {
+  display: grid;
+  gap: 2px;
+}
+
+.enps-media {
+  display: inline-block;
+  min-width: 2.5rem;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+  font-weight: var(--weight-strong);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Relatório (PDF) --------------------------------------------------- */
+
+.enps-relatorio__duas {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 4mm;
+  align-items: start;
+}
+
+.enps-relatorio__grupos {
+  display: grid;
+  gap: 2mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enps-relatorio__grupos li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2mm;
+  padding: 3mm;
+  border-radius: var(--radius-sm);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+}
+
+.enps-relatorio__grupos li > span {
+  display: grid;
+}
+
+.enps-relatorio__colunas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4mm;
+  align-items: start;
+}
+
+.relatorio__faixas li[data-faixa-enps="critico"] {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+.relatorio__faixas li[data-faixa-enps="atencao"] {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.relatorio__faixas li[data-faixa-enps="saudavel"],
+.relatorio__faixas li[data-faixa-enps="forte"] {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}

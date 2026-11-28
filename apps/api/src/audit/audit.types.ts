@@ -115,6 +115,17 @@ export const AUDIT_ACTIONS = [
   // T215 — "Ajustar período": reinício da contagem e sua remoção, sem datas.
   "pessoas_periodo_reiniciado",
   "pessoas_periodo_reinicio_removido",
+  // T216 — Pesquisas: o `resourceId` é o id da PESQUISA (ou do
+  // COLABORADOR, na aba da ficha). Nunca nome, perguntas, participantes
+  // ou conteúdo de resposta.
+  "pesquisas_pesquisa_criada",
+  "pesquisas_pesquisa_alterada",
+  "pesquisas_pesquisa_publicada",
+  "pesquisas_pesquisa_status_alterado",
+  "pesquisas_pesquisa_excluida",
+  "pesquisas_pesquisa_duplicada",
+  "pesquisas_respostas_consultadas",
+  "pesquisas_resposta_recebida",
   // T215 — ficha: leitura (dados de saúde) e anexo, sem conteúdo.
   "pessoas_ausencia_consultada",
   "pessoas_ausencia_anexo_enviado",
@@ -373,7 +384,11 @@ export type AuditResource =
   | "politica_ferias"
   // T215 — benefício e dependente: o `resourceId` é o id do registro.
   | "beneficio"
-  | "dependente_colaborador";
+  | "dependente_colaborador"
+  // T216 — a pesquisa (o `resourceId` é o id dela) e as respostas
+  // individuais (id da pesquisa, ou do COLABORADOR na aba da ficha).
+  | "pesquisa"
+  | "resposta_pesquisa";
 
 export type RecordAuditEventInput =
   | {

@@ -117,6 +117,8 @@ const DESCRICAO_DO_DESTINO: Readonly<Record<string, string>> = {
     "Admissão em página própria: cria o colaborador, o vínculo previsto e o ato de admissão na empresa ativa.",
   beneficios:
     "Benefícios da empresa: quem recebe, quanto a empresa paga e quanto é descontado de cada pessoa, mês a mês.",
+  pesquisas:
+    "Pesquisas de clima, engajamento e experiência: modelos, quem responde, link de resposta, participação e resultados.",
   "politicas-ferias":
     "Regras que o sistema confere nos pedidos e registros de férias: antecedência, períodos, datas bloqueadas e aprovação.",
   "importar-colaboradores":

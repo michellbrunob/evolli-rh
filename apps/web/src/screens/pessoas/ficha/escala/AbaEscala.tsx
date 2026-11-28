@@ -43,7 +43,12 @@ import {
   falhaPorSessaoExpirada,
   falhaPorTokenDesatualizado,
 } from "../../../../api/csrfClient";
-import { Button, FormActions } from "../../../../components";
+import {
+  Button,
+  FormActions,
+  StatusBadge,
+  type StatusVariant,
+} from "../../../../components";
 import { Sheet } from "../../../../ui";
 import {
   AvisoFlutuante,
@@ -193,6 +198,13 @@ const ROTULO_SITUACAO: Record<Situacao, string> = {
   vigente: "Vigente",
   programada: "Programada",
   encerrada: "Encerrada",
+};
+
+/** T216 — a situação de cada escala no status padrão do sistema. */
+const VARIANTE_SITUACAO: Record<Situacao, StatusVariant> = {
+  vigente: "success",
+  programada: "info",
+  encerrada: "neutral",
 };
 
 type Turno = {
@@ -731,14 +743,10 @@ function Resumo({
             {e.turno?.nome ?? "Sem turno fixo"}
           </span>
           {programada ? (
-            <span className="escala-ficha__selo escala-ficha__selo--programada">
-              Programada
-            </span>
+            <StatusBadge variant="info">Programada</StatusBadge>
           ) : null}
           {e.turno && !e.turno.ativo ? (
-            <span className="escala-ficha__selo escala-ficha__selo--alerta">
-              Turno inativo
-            </span>
+            <StatusBadge variant="warning">Turno inativo</StatusBadge>
           ) : null}
         </p>
         <p className="escala-ficha__sub">
@@ -905,7 +913,7 @@ function ProximosDias({
               )}
               {celula?.origem === "publicado" ||
               celula?.tipo === "ausencia" ? null : (
-                <span className="escala-ficha__etiqueta">Não publicado</span>
+                <StatusBadge variant="warning">Não publicado</StatusBadge>
               )}
             </li>
           );
@@ -1142,11 +1150,9 @@ function Historico({
                       ? `${e.turno.nome} · ${faixaDoTurno(e.turno)}`
                       : "Sem turno fixo"}
                   </span>
-                  <span
-                    className={`escala-ficha__selo escala-ficha__selo--${situacao}`}
-                  >
+                  <StatusBadge variant={VARIANTE_SITUACAO[situacao]}>
                     {ROTULO_SITUACAO[situacao]}
-                  </span>
+                  </StatusBadge>
                 </p>
                 <p className="escala-ficha__linha-detalhe">
                   {`${formatarDiaCivil(e.vigenciaInicio)} até ${ultimo ? formatarDiaCivil(ultimo) : "atual"} · Ficha do colaborador${e.definidaPor ? ` · ${e.definidaPor}` : ""} em ${formatarDiaCivil(e.definidaEm.slice(0, 10))}`}

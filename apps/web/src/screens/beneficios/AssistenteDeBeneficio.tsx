@@ -1484,7 +1484,7 @@ export function AssistenteDeBeneficio({
                   <td className="beneficios__forte">
                     {m ? (
                       p.pendencia ? (
-                        <span className="beneficios__alerta">Pendente</span>
+                        <StatusBadge variant="warning">Pendente</StatusBadge>
                       ) : (
                         formatarCentavos(p.desconto)
                       )
@@ -2030,12 +2030,12 @@ function ExemplosDoVt({
               </td>
               <td className="beneficios__forte">
                 {x.calculo.pendencia ? (
-                  <span className="beneficios__alerta">
-                    Pendente{" "}
+                  <>
+                    <StatusBadge variant="warning">Pendente</StatusBadge>{" "}
                     <span className="beneficios__suave">
                       completar cadastro
                     </span>
-                  </span>
+                  </>
                 ) : (
                   <>
                     {formatarCentavos(x.calculo.desconto)}

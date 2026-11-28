@@ -84,6 +84,24 @@ export async function descartarTokenSeDesatualizado(
 }
 
 /**
+ * T216 — uma gravação que repete UMA vez quando a página ficou
+ * desatualizada: num 403 `csrf_invalido` o token local é descartado e
+ * `enviar` roda de novo (pedindo o token renovado). A recusa vem antes de
+ * gravar, então repetir é seguro; o 403 de permissão não repete.
+ */
+export async function repetirSeTokenDesatualizado(
+  enviar: () => Promise<Response>,
+): Promise<Response> {
+  let res = await enviar();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar();
+    await descartarTokenSeDesatualizado(res);
+  }
+  return res;
+}
+
+/**
  * T179 — a gravação nem saiu: a renovação do token CSRF falhou por rede ou
  * 5xx (`CsrfRequestError`), antes do pedido de gravação. Não é envio incerto.
  */

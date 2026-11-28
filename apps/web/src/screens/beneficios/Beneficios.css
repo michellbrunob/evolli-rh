@@ -122,7 +122,7 @@
 .beneficios__abas button {
   padding: var(--space-xs) var(--space-sm);
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--aba-indicador) solid transparent;
   background: transparent;
   color: var(--color-ink-muted);
   font: inherit;

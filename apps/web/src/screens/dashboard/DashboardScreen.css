@@ -107,7 +107,7 @@
   min-height: var(--touch-target);
   padding: 0 var(--space-md);
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: var(--aba-indicador) solid transparent;
   background: transparent;
   color: var(--color-ink-muted);
   font: inherit;
@@ -454,12 +454,6 @@
   height: 0.5rem;
   border-radius: var(--radius-pill);
   background: var(--evolli-verde-agua);
-}
-
-.dashboard__selo--estado {
-  border: 1px solid var(--status-neutral-border);
-  background: var(--status-neutral-surface);
-  color: var(--status-neutral-ink);
 }
 
 /* ---- Indicadores ------------------------------------------------------- */

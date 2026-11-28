@@ -36,6 +36,31 @@ describe("T215 — aviso flutuante", () => {
     expect(onFechar).toHaveBeenCalledTimes(1);
   });
 
+  it("tom de erro: alerta (anunciado na hora), cor e ícone de erro", () => {
+    render(
+      <AvisoFlutuante
+        aviso={{ id: 3, titulo: "Não foi possível salvar.", tom: "erro" }}
+        onFechar={() => {}}
+      />,
+    );
+    const aviso = screen.getByRole("alert", {
+      name: "Não foi possível salvar.",
+    });
+    expect(aviso).toHaveClass("aviso-flutuante--erro");
+    expect(aviso).not.toHaveAttribute("aria-live", "polite");
+    expect(aviso.querySelector("[data-icone='erro']")).not.toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("sem tom, sucesso: status educado com o visto", () => {
+    render(
+      <AvisoFlutuante aviso={{ id: 4, titulo: "Salvo" }} onFechar={() => {}} />,
+    );
+    const aviso = screen.getByRole("status", { name: "Salvo" });
+    expect(aviso).not.toHaveClass("aviso-flutuante--erro");
+    expect(aviso.querySelector("[data-icone='sucesso']")).not.toBeNull();
+  });
+
   it("sem aviso, nada", () => {
     const { container } = render(
       <AvisoFlutuante aviso={null} onFechar={() => {}} />,

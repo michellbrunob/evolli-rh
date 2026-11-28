@@ -1,0 +1,110 @@
+/* T216 — Motivação (TAD): o resultado na página pública. Só tokens. */
+
+.tad-publico {
+  display: grid;
+  gap: var(--space-md);
+  justify-items: center;
+  text-align: center;
+}
+
+.tad-publico p {
+  margin: 0;
+}
+
+.tad-publico__geral {
+  display: grid;
+  gap: var(--space-xxs);
+  width: 100%;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline);
+}
+
+.tad-publico__geral[data-faixa="forte"] {
+  background: var(--faixa-forte-fundo, var(--status-success-surface));
+}
+
+.tad-publico__geral[data-faixa="atencao"] {
+  background: var(--faixa-atencao-fundo, var(--status-warning-surface));
+}
+
+.tad-publico__geral[data-faixa="critico"] {
+  background: var(--faixa-critico-fundo, var(--status-danger-surface));
+}
+
+.tad-publico__rotulo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.tad-publico__valor {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.tad-publico__valor strong {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tad-publico__pilares {
+  display: grid;
+  gap: var(--space-sm);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.tad-publico__pilares li {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.tad-publico__pilar-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.tad-publico__pilar-valor {
+  margin-left: auto;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.tad-publico__mapa {
+  width: 100%;
+}
+
+.tad-publico__subtitulo {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-body);
+}
+
+.tad-publico__aviso {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+  text-align: left;
+}
+
+@media print {
+  .tad-publico__acoes {
+    display: none;
+  }
+}

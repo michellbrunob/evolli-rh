@@ -18,7 +18,7 @@ export function TrilhaDeTeste() {
       <button type="button" onClick={complemento.onVoltar}>
         Colaboradores
       </button>
-      <span aria-current="page">{complemento.rotulo}</span>
+      <span aria-current="page">{complemento.niveis.at(-1)?.rotulo ?? ""}</span>
     </nav>
   );
 }

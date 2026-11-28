@@ -1,0 +1,624 @@
+/**
+ * T216 — página pública de resposta. Celular primeiro: uma coluna, alvos de
+ * toque de 44 px, sem largura fixa. Cartão centrado sobre fundo neutro;
+ * abertura, identificação e agradecimento centralizados; uma pergunta por
+ * tela com a barra de progresso fina no topo da página. Só tokens (cor,
+ * espaço, raio, tipografia); botões pelo componente do sistema
+ * (`--radius-botao`).
+ */
+
+.pesquisa-publica {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+}
+
+/* Faixa da prévia e barra de progresso: presas ao topo da página. */
+.pesquisa-publica__fixo {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.pesquisa-previa-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--status-warning-border);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-align: center;
+}
+
+.pesquisa-previa-faixa__sair {
+  min-height: var(--botao-icone);
+}
+
+/* Barra de progresso fina, de ponta a ponta, no topo da página. */
+.pesquisa-progresso {
+  height: var(--space-xxs);
+  background: var(--divider-soft);
+}
+
+.pesquisa-progresso__preenchido {
+  display: block;
+  height: 100%;
+  background: var(--color-action);
+}
+
+/*
+ * A barra muda de largura sem transição: na última tela ela já aparece cheia
+ * (uma transição deixava a captura da tela no meio do caminho).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .pesquisa-publica__cartao > * {
+    animation: pesquisa-entrada var(--movimento-curto) ease-out;
+  }
+}
+
+@keyframes pesquisa-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-xxs));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pesquisa-publica__topo {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-lg) var(--space-md) var(--space-md);
+}
+
+.pesquisa-publica__principal {
+  display: flex;
+  flex: 1 0 auto;
+  justify-content: center;
+  align-items: center;
+  padding: 0 var(--space-md) var(--space-xl);
+}
+
+.pesquisa-publica__cartao {
+  width: 100%;
+  max-width: 40rem;
+  padding: var(--space-xl) var(--space-md);
+  background: var(--surface-canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+@media (min-width: 640px) {
+  .pesquisa-publica__cartao {
+    padding: var(--space-2xl) var(--space-2xl);
+  }
+}
+
+.pesquisa-publica__rodape {
+  padding: 0 var(--space-md) var(--space-lg);
+  text-align: center;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+/* Telas centralizadas: abertura, identificação, avisos, agradecimento. */
+.pesquisa-publica__centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  text-align: center;
+}
+
+.pesquisa-publica__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.pesquisa-publica__selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisa-publica__simbolo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--touch-target) + var(--space-md));
+  height: calc(var(--touch-target) + var(--space-md));
+  border-radius: var(--radius-pill);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+/* Agradecimento: o visto grande, em círculo verde cheio. */
+.pesquisa-publica__simbolo--sucesso {
+  width: calc(var(--touch-target) * 2);
+  height: calc(var(--touch-target) * 2);
+  margin-bottom: var(--space-xs);
+  background: var(--status-success-ink);
+  color: var(--color-on-action);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.pesquisa-publica__titulo {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+
+.pesquisa-publica__titulo--grande {
+  font-size: var(--text-display);
+}
+
+/*
+ * Os títulos (tabIndex -1) só recebem foco por programa, a cada tela nova,
+ * para o leitor de tela anunciar onde se está: sem contorno visível. Nenhum
+ * deles é alcançável pelo Tab.
+ */
+.pesquisa-publica__titulo:focus,
+.pesquisa-publica__titulo:focus-visible,
+.pesquisa-pergunta__texto:focus,
+.pesquisa-pergunta__texto:focus-visible {
+  outline: none;
+}
+
+.pesquisa-publica__texto {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+
+.pesquisa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pesquisa-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.pesquisa-publica__nota,
+.pesquisa-publica__aviso {
+  margin: 0;
+  padding: var(--space-sm);
+  width: 100%;
+  line-height: 1.5;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-info-border);
+  background: var(--status-info-surface);
+  color: var(--status-info-ink);
+}
+
+.pesquisa-publica__aviso {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.pesquisa-publica__legenda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-publica__erro {
+  margin: 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-danger-border);
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisa-publica__status {
+  margin: 0;
+  text-align: center;
+  color: var(--color-ink-muted);
+}
+
+/* Botão largo da abertura, da identificação e da nova tentativa. */
+.pesquisa-publica__largo {
+  width: 100%;
+  min-height: var(--touch-target);
+  margin-top: var(--space-sm);
+}
+
+/* Separação por grupo (anônima). */
+.pesquisa-grupos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: left;
+}
+
+.pesquisa-grupos__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/* Uma pergunta por tela. */
+.pesquisa-contador {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pesquisa-contador__secao {
+  font-weight: var(--weight-regular);
+}
+
+.pesquisa-pergunta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.pesquisa-pergunta__texto {
+  margin: 0 0 var(--space-xxs);
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+
+.pesquisa-pergunta__ajuda {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pesquisa-publica__navegacao {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.pesquisa-publica__navegacao > * {
+  min-height: var(--touch-target);
+}
+
+.pesquisa-publica__navegacao > :last-child {
+  flex: 0 1 auto;
+}
+
+.pesquisa-pergunta__obrigatoria {
+  color: var(--status-danger-ink);
+  white-space: nowrap;
+}
+
+.pesquisa-pergunta__opcional {
+  white-space: nowrap;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-pergunta__descricao {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-pergunta__rotulo-menor {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.pesquisa-pergunta__erro {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--status-danger-ink);
+}
+
+.pesquisa-pergunta__erro-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.pesquisa-campo {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  font: inherit;
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-sm);
+}
+
+textarea.pesquisa-campo {
+  min-height: calc(var(--touch-target) * 3);
+  resize: vertical;
+}
+
+.pesquisa-campo[aria-invalid="true"] {
+  border-color: var(--status-danger-ink);
+}
+
+.pesquisa-outro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin-top: var(--space-xs);
+}
+
+/* Opções: o rótulo é o botão; o rádio nativo fica só para leitor e teclado. */
+.pesquisa-opcoes {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.pesquisa-opcoes--lista {
+  flex-direction: column;
+}
+
+.pesquisa-opcoes--linha {
+  display: grid;
+  grid-template-columns: repeat(var(--colunas-celular, 5), minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .pesquisa-opcoes--linha {
+    grid-template-columns: repeat(var(--colunas, 5), minmax(0, 1fr));
+  }
+}
+
+.pesquisa-opcoes--estrelas {
+  flex-wrap: wrap;
+}
+
+.pesquisa-opcao {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--borda-controle);
+  border-radius: var(--radius-botao);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pesquisa-opcoes--lista .pesquisa-opcao {
+  justify-content: flex-start;
+  font-weight: var(--weight-regular);
+  text-align: left;
+}
+
+.pesquisa-opcao:hover {
+  background: var(--surface-neutral);
+}
+
+.pesquisa-opcao--marcada,
+.pesquisa-opcao--marcada:hover {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.pesquisa-opcao--caixa.pesquisa-opcao--marcada,
+.pesquisa-opcao--caixa.pesquisa-opcao--marcada:hover {
+  color: var(--color-ink);
+  border-color: var(--color-action);
+  background: var(--surface-neutral);
+}
+
+.pesquisa-opcao:focus-within {
+  outline: var(--foco-anel);
+  outline-offset: 2px;
+}
+
+.pesquisa-opcao:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pesquisa-opcao__entrada {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pesquisa-opcoes--estrelas .pesquisa-opcao {
+  font-size: var(--text-title);
+  line-height: 1;
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-opcoes--estrelas .pesquisa-opcao--ativa {
+  color: var(--status-warning-ink);
+}
+
+.pesquisa-opcoes--estrelas
+  .pesquisa-opcao:not(.pesquisa-opcao--ativa)
+  [aria-hidden="true"] {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--color-ink-subtle);
+}
+
+.pesquisa-opcoes--estrelas .pesquisa-opcao--marcada,
+.pesquisa-opcoes--estrelas .pesquisa-opcao--marcada:hover {
+  border-color: var(--color-action);
+  background: var(--surface-canvas);
+}
+
+.pesquisa-extremos {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-subtle);
+}
+
+.pesquisa-extremos > :last-child {
+  text-align: right;
+}
+
+.pesquisa-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Perguntas sem cartão em volta: página limpa, de ponta a ponta. */
+.pesquisa-publica--limpa {
+  background: var(--surface-canvas);
+}
+
+.pesquisa-publica--limpa .pesquisa-publica__cartao {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Dentro de uma seção (Personalizada), cada pergunta é um subtítulo. */
+.pesquisa-pergunta__texto--2 {
+  font-size: var(--text-lead);
+}
+
+.pesquisa-publica__perguntas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.pesquisa-publica__perguntas > .pesquisa-pergunta + .pesquisa-pergunta {
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--divider-soft);
+}
+
+/* Os extremos da escala ficam acima da fileira de quadrados. */
+.pesquisa-grupo > .pesquisa-extremos {
+  margin-bottom: var(--space-xxs);
+}
+
+/* T216 — escala com o rótulo de cada ponto (ex.: 1 a 7 da TAD): o número em
+   cima e o texto curto embaixo, no mesmo botão. */
+.pesquisa-opcao__ponto {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xxs);
+  text-align: center;
+}
+
+.pesquisa-opcao__ponto > span {
+  font-size: var(--text-caption, 0.75rem);
+  font-weight: var(--weight-regular, 400);
+  line-height: 1.2;
+}
+
+/* T216 — escala de 7 pontos com rótulos (TAD): os botões em degradê, do
+   tom de alerta (1) ao de sucesso (7); marcado, o botão fica cheio. */
+.pesquisa-opcoes--degrade .pesquisa-opcao {
+  --cor-do-ponto: color-mix(
+    in srgb,
+    var(--status-success-ink) var(--tom, 50%),
+    var(--status-danger-ink)
+  );
+  border-color: var(--cor-do-ponto);
+  background: color-mix(
+    in srgb,
+    var(--cor-do-ponto) 10%,
+    var(--surface-canvas)
+  );
+}
+
+.pesquisa-opcoes--degrade .pesquisa-opcao:hover {
+  background: color-mix(
+    in srgb,
+    var(--cor-do-ponto) 20%,
+    var(--surface-canvas)
+  );
+}
+
+.pesquisa-opcoes--degrade .pesquisa-opcao--marcada,
+.pesquisa-opcoes--degrade .pesquisa-opcao--marcada:hover {
+  border-color: var(--cor-do-ponto);
+  background: var(--cor-do-ponto);
+  color: var(--color-on-action);
+}

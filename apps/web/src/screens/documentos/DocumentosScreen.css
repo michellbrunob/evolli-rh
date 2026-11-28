@@ -25,7 +25,7 @@
   min-height: var(--touch-target);
   padding: var(--space-sm) var(--space-md);
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: var(--aba-indicador) solid transparent;
   background: transparent;
   color: var(--color-ink-muted);
   font: inherit;

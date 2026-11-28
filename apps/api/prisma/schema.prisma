@@ -558,6 +558,17 @@ enum AuditAction {
   pessoas_politica_ferias_reativada   @map("pessoas.politica_ferias.reativada")
   pessoas_periodo_reiniciado          @map("pessoas.periodo_aquisitivo.reiniciado")
   pessoas_periodo_reinicio_removido   @map("pessoas.periodo_aquisitivo.reinicio_removido")
+  /// T216 — Pesquisas: o `resourceId` é o id da PESQUISA (ou do
+  /// COLABORADOR, na leitura da aba da ficha). Nunca nome, perguntas,
+  /// participantes ou o conteúdo de resposta nenhuma.
+  pesquisas_pesquisa_criada           @map("pesquisas.pesquisa.criada")
+  pesquisas_pesquisa_alterada         @map("pesquisas.pesquisa.alterada")
+  pesquisas_pesquisa_publicada        @map("pesquisas.pesquisa.publicada")
+  pesquisas_pesquisa_status_alterado  @map("pesquisas.pesquisa.status_alterado")
+  pesquisas_pesquisa_excluida         @map("pesquisas.pesquisa.excluida")
+  pesquisas_pesquisa_duplicada        @map("pesquisas.pesquisa.duplicada")
+  pesquisas_respostas_consultadas     @map("pesquisas.respostas.consultadas")
+  pesquisas_resposta_recebida         @map("pesquisas.resposta.recebida")
   // T215 — aba Férias e ausências da ficha: a leitura (dados de saúde) e o
   // anexo (atestado ou documento). Sem conteúdo, nome, formato ou tamanho.
   pessoas_ausencia_consultada         @map("pessoas.ausencia.consultada")
@@ -942,6 +953,8 @@ model Empresa {
   documentosColaborador       DocumentoColaborador[]
   versoesDocumentoColaborador VersaoDocumentoColaborador[]
   limpezasDocumentoPendentes  LimpezaDocumentoColaboradorPendente[]
+  // T216 — Pesquisas.
+  pesquisas                   Pesquisa[]
 
   @@index([status])
   @@map("empresa")
@@ -1301,6 +1314,15 @@ model Colaborador {
   /// T215 — Férias e ausências.
   ausencias                  Ausencia[]
   reiniciosPeriodoAquisitivo ReinicioPeriodoAquisitivo[]
+  /// T216 — Pesquisas: onde a pessoa é participante e as respostas
+  /// IDENTIFICADAS dela (confidencial e anônima não guardam a pessoa).
+  participacoesPesquisa      PesquisaParticipante[]
+  respostasPesquisa          PesquisaResposta[]
+  /// T216 — Avaliação 90°/180° (quem avalia e quem é avaliado) e os convites
+  /// do onboarding.
+  avaliacoesFeitas           PesquisaAvaliacaoPar[]      @relation("AvaliadorDaPesquisa")
+  avaliacoesRecebidas        PesquisaAvaliacaoPar[]      @relation("AvaliadoDaPesquisa")
+  enviosPesquisa             PesquisaEnvio[]
 
   @@index([situacao])
   @@map("colaborador")
@@ -3667,4 +3689,231 @@ model DependenteColaborador {
 
   @@index([empresaId, colaboradorId])
   @@map("dependente_colaborador")
+}
+
+/// T216 — Pesquisas: identificação (não muda depois de publicar).
+enum IdentificacaoPesquisa {
+  identificada
+  confidencial
+  anonima
+}
+
+/// T216 — status gravado. Com `encerra_em` vencido, ativa e pausada contam
+/// como finalizada na leitura (sem job).
+enum StatusPesquisa {
+  rascunho
+  ativa
+  pausada
+  finalizada
+  cancelada
+}
+
+/// T216 — o modelo de partida (galeria).
+enum ModeloPesquisa {
+  pulso
+  clima
+  enps
+  onboarding
+  desligamento
+  beneficios
+  treinamento
+  personalizada
+  pulso_clima
+  tad
+  copsoq
+  isfb
+  avaliacao90
+  avaliacao180
+  disc
+}
+
+/// T216 — a pesquisa da empresa. As seções e perguntas ficam em `secoes`
+/// (JSONB), conferidas e normalizadas pela aplicação antes de gravar
+/// (`estrutura-pesquisa.ts`). O `token` é o link público: 32 bytes
+/// aleatórios em base64url. Excluir é lógico.
+model Pesquisa {
+  id             String                @id @default(uuid())
+  empresaId      String                @map("empresa_id")
+  nome           String                @db.VarChar(120)
+  boasVindas     String?               @map("boas_vindas") @db.VarChar(1000)
+  modelo         ModeloPesquisa
+  identificacao  IdentificacaoPesquisa
+  status         StatusPesquisa        @default(rascunho)
+  secoes         Json
+  /// Participantes = todos os ativos da empresa, resolvidos ao publicar.
+  todos          Boolean               @default(false)
+  /// Data e hora do encerramento (instante). Prazos antigos, só com a data,
+  /// viraram 23:59 daquele dia no horário de Brasília.
+  encerraEm      DateTime?             @map("encerra_em")
+  minimoPorGrupo Int                   @default(3) @map("minimo_por_grupo")
+  /// Só na anônima: até 2 campos (`departamento`, `centroCusto`, `unidade`)
+  /// que quem responde escolhe antes das perguntas.
+  separarPor     String[]              @default([]) @map("separar_por")
+  /// Configuração própria do modelo: na avaliação 90°/180°, comentários,
+  /// prazos, lembretes e quem vê o quê; no onboarding, o envio (agora,
+  /// agendado ou automático), o público e o e-mail. Conferida pela aplicação.
+  configModelo   Json?                 @map("config_modelo")
+  /// Acompanhamento do modelo (riscos psicossociais: etapas da NR-1 e o
+  /// plano de ação), conferido pela aplicação (`modelos/`).
+  acompanhamento Json?
+  token          String                @unique @db.VarChar(64)
+  publicadaEm    DateTime?             @map("publicada_em")
+  excluidaEm     DateTime?             @map("excluida_em")
+  excluidaPorId  String?               @map("excluida_por_id")
+  criadaPorId    String                @map("criada_por_id")
+  criadaEm       DateTime              @default(now()) @map("criada_em")
+  atualizadaEm   DateTime              @updatedAt @map("atualizada_em")
+
+  empresa       Empresa                @relation(fields: [empresaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  participantes PesquisaParticipante[]
+  respostas     PesquisaResposta[]
+  passes        PesquisaPasse[]
+  tentativas    PesquisaTentativa[]
+  pares         PesquisaAvaliacaoPar[]
+  envios        PesquisaEnvio[]
+
+  @@unique([id, empresaId])
+  @@index([empresaId])
+  @@map("pesquisa")
+}
+
+/// T216 — quem responde. `respondeu_em` é só o DIA (nunca o horário): na
+/// confidencial, é o que marca a participação e impede a segunda resposta
+/// sem ligar a pessoa à resposta. Na anônima, nunca é preenchido.
+model PesquisaParticipante {
+  id            String    @id @default(uuid())
+  pesquisaId    String    @map("pesquisa_id")
+  empresaId     String    @map("empresa_id")
+  colaboradorId String    @map("colaborador_id")
+  respondeuEm   DateTime? @map("respondeu_em") @db.Date
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  pesquisa    Pesquisa        @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador     @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  passes      PesquisaPasse[]
+
+  @@unique([pesquisaId, colaboradorId])
+  @@index([colaboradorId])
+  @@map("pesquisa_participante")
+}
+
+/// T216 — uma resposta. `colaborador_id` só na identificada (o banco recusa
+/// nas outras, por gatilho); os grupos (departamento, centro de custo e
+/// unidade) só na confidencial e na anônima (o recorte, sem a pessoa). Na confidencial,
+/// `respondida_em` guarda só o dia. Imutável: a aplicação não altera nem
+/// apaga resposta.
+model PesquisaResposta {
+  id             String   @id @default(uuid())
+  pesquisaId     String   @map("pesquisa_id")
+  empresaId      String   @map("empresa_id")
+  colaboradorId  String?  @map("colaborador_id")
+  departamentoId String?  @map("departamento_id")
+  /// Confidencial: gravados no envio (lotação); anônima: a escolha de quem
+  /// respondeu. Nunca na identificada (o recorte usa a lotação vigente).
+  centroCustoId  String?  @map("centro_custo_id")
+  unidadeId      String?  @map("unidade_id")
+  valores        Json
+  respondidaEm   DateTime @map("respondida_em")
+  /// Onboarding: a rodada (30, 60 ou 90 dias de casa); 0 = envio único (e
+  /// todas as demais pesquisas). Na identificada, uma resposta por pessoa e
+  /// rodada.
+  rodada         Int      @default(0)
+
+  pesquisa    Pesquisa              @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador?          @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  par         PesquisaAvaliacaoPar?
+
+  @@unique([pesquisaId, colaboradorId, rodada])
+  @@index([colaboradorId])
+  @@map("pesquisa_resposta")
+}
+
+/// T216 — passe da resposta (identificada e confidencial): devolvido depois
+/// de CPF + nascimento baterem. Só o hash (SHA-256) fica gravado; vale 2
+/// horas e uma vez (a resposta apaga os passes do participante).
+model PesquisaPasse {
+  id             String   @id @default(uuid())
+  pesquisaId     String   @map("pesquisa_id")
+  participanteId String   @map("participante_id")
+  hash           String   @unique @db.VarChar(64)
+  expiraEm       DateTime @map("expira_em")
+  criadoEm       DateTime @default(now()) @map("criado_em")
+
+  pesquisa     Pesquisa             @relation(fields: [pesquisaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  participante PesquisaParticipante @relation(fields: [participanteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([participanteId])
+  @@index([pesquisaId])
+  @@map("pesquisa_passe")
+}
+
+/// T216 — Avaliação 90°/180°: quem avalia quem. `papel` = `gestor` (o gestor
+/// avalia a pessoa do time) ou `autoavaliacao` (a pessoa se avalia; só na
+/// 180°). Uma avaliação por pessoa avaliada e papel. A resposta fica em
+/// `pesquisa_resposta` (sem a pessoa); o par liga a resposta ao avaliado e ao
+/// avaliador — a avaliação é sempre nominal.
+model PesquisaAvaliacaoPar {
+  id           String    @id @default(uuid())
+  pesquisaId   String    @map("pesquisa_id")
+  empresaId    String    @map("empresa_id")
+  avaliadorId  String    @map("avaliador_id")
+  avaliadoId   String    @map("avaliado_id")
+  papel        String    @db.VarChar(20)
+  respostaId   String?   @unique @map("resposta_id")
+  respondidaEm DateTime? @map("respondida_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+
+  pesquisa  Pesquisa          @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  avaliador Colaborador       @relation("AvaliadorDaPesquisa", fields: [avaliadorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  avaliado  Colaborador       @relation("AvaliadoDaPesquisa", fields: [avaliadoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  resposta  PesquisaResposta? @relation(fields: [respostaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([pesquisaId, avaliadoId, papel])
+  @@index([avaliadorId])
+  @@index([avaliadoId])
+  @@map("pesquisa_avaliacao_par")
+}
+
+/// T216 — convites por pessoa. Onboarding: um por pessoa e rodada (30, 60 ou
+/// 90 dias de casa; 0 = envio único). Avaliação: `rodada` é o marco do aviso
+/// (0 convite; 1, 2 e 3 os lembretes de 7 dias, 3 dias e do dia; 4 o de
+/// depois do prazo). `situacao`: agendado, aguardando_email (o Evolli ainda
+/// não envia e-mail), enviado, sem_email, respondido ou pulado. Na
+/// confidencial, `respondido_em` guarda só o dia e nada liga o convite à
+/// resposta.
+model PesquisaEnvio {
+  id            String    @id @default(uuid())
+  pesquisaId    String    @map("pesquisa_id")
+  empresaId     String    @map("empresa_id")
+  colaboradorId String    @map("colaborador_id")
+  rodada        Int
+  dataPrevista  DateTime  @map("data_prevista") @db.Date
+  situacao      String    @default("agendado") @db.VarChar(20)
+  enviadoEm     DateTime? @map("enviado_em")
+  lembreteEm    DateTime? @map("lembrete_em")
+  respondidoEm  DateTime? @map("respondido_em") @db.Date
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+
+  pesquisa    Pesquisa    @relation(fields: [pesquisaId, empresaId], references: [id, empresaId], onDelete: Restrict, onUpdate: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([pesquisaId, colaboradorId, rodada])
+  @@index([colaboradorId])
+  @@index([situacao, dataPrevista])
+  @@map("pesquisa_envio")
+}
+
+/// T216 — tentativa ERRADA de identificação no link, para o limite de 5 por
+/// IP e pesquisa em 15 minutos. Não guarda o CPF nem a data informados.
+model PesquisaTentativa {
+  id         String   @id @default(uuid())
+  pesquisaId String   @map("pesquisa_id")
+  ip         String?  @db.VarChar(64)
+  criadaEm   DateTime @default(now()) @map("criada_em")
+
+  pesquisa Pesquisa @relation(fields: [pesquisaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([pesquisaId, ip, criadaEm])
+  @@map("pesquisa_tentativa")
 }

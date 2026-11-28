@@ -277,40 +277,6 @@
   color: var(--status-info-ink);
 }
 
-/* ---------------------------------------------------------------- Selos */
-
-.escala-ficha__selo,
-.escala-ficha__etiqueta {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-xs);
-  border: 1px solid var(--status-neutral-border);
-  border-radius: var(--radius-pill);
-  background: var(--status-neutral-surface);
-  color: var(--status-neutral-ink);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  white-space: nowrap;
-}
-
-.escala-ficha__selo--vigente {
-  border-color: var(--status-success-border);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-}
-
-.escala-ficha__selo--programada {
-  border-color: var(--status-info-border);
-  background: var(--status-info-surface);
-  color: var(--status-info-ink);
-}
-
-.escala-ficha__selo--alerta {
-  border-color: var(--status-warning-border);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
-}
-
 /* --------------------------------------------------------- Próximos dias */
 
 .escala-ficha__dias {

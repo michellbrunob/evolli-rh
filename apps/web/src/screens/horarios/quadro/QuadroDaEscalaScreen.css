@@ -1082,25 +1082,9 @@
   border-style: dashed;
 }
 
-.quadro__selo-rascunho {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
+/* Selos de publicação e rascunho: o status padrão, só com o respiro. */
+.quadro__selo {
   margin-left: var(--space-sm);
-  padding: 2px var(--space-xs);
-  border-radius: var(--radius-pill);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.quadro__selo-rascunho::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
 }
 
 .quadro__falha {
@@ -1389,27 +1373,6 @@
 .quadro__acoes [aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.55;
-}
-
-.quadro__selo-publicada {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  margin-left: var(--space-sm);
-  padding: 2px var(--space-xs);
-  border-radius: var(--radius-pill);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.quadro__selo-publicada::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
 }
 
 /* O resumo numa caixa neutra, abaixo do período (como a referência). */

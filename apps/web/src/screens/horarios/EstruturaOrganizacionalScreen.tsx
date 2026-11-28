@@ -990,7 +990,7 @@ export function EstruturaOrganizacionalScreen({
         <button
           role="tab"
           type="button"
-          className={`estrutura-organizacional-screen__aba${abaAtiva === "unidades" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          className={`evolli-aba estrutura-organizacional-screen__aba${abaAtiva === "unidades" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
           aria-selected={abaAtiva === "unidades"}
           onClick={() => setAbaAtiva("unidades")}
         >
@@ -999,7 +999,7 @@ export function EstruturaOrganizacionalScreen({
         <button
           role="tab"
           type="button"
-          className={`estrutura-organizacional-screen__aba${abaAtiva === "departamentos" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          className={`evolli-aba estrutura-organizacional-screen__aba${abaAtiva === "departamentos" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
           aria-selected={abaAtiva === "departamentos"}
           onClick={() => setAbaAtiva("departamentos")}
         >
@@ -1008,7 +1008,7 @@ export function EstruturaOrganizacionalScreen({
         <button
           role="tab"
           type="button"
-          className={`estrutura-organizacional-screen__aba${abaAtiva === "areas" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          className={`evolli-aba estrutura-organizacional-screen__aba${abaAtiva === "areas" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
           aria-selected={abaAtiva === "areas"}
           onClick={() => setAbaAtiva("areas")}
         >
@@ -1017,7 +1017,7 @@ export function EstruturaOrganizacionalScreen({
         <button
           role="tab"
           type="button"
-          className={`estrutura-organizacional-screen__aba${abaAtiva === "equipes" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
+          className={`evolli-aba estrutura-organizacional-screen__aba${abaAtiva === "equipes" ? " estrutura-organizacional-screen__aba--ativa" : ""}`}
           aria-selected={abaAtiva === "equipes"}
           onClick={() => setAbaAtiva("equipes")}
         >

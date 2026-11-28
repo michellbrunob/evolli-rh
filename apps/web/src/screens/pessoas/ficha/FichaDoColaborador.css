@@ -285,29 +285,6 @@
   color: var(--color-ink-subtle);
 }
 
-.ficha-ref__selo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0 var(--space-xs);
-  border-radius: var(--radius-pill);
-  background: var(--surface-neutral);
-  color: var(--color-ink-muted);
-  font-size: var(--text-caption);
-}
-
-.ficha-ref__selo-ponto {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.ficha-ref__selo--perigo {
-  background: var(--status-danger-surface);
-  color: var(--status-danger-ink);
-}
-
 .ficha-ref__portal-botao {
   display: inline-flex;
   align-items: center;
@@ -487,7 +464,7 @@
   min-height: var(--touch-target);
   padding: var(--space-sm) 0;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--aba-indicador) solid transparent;
   background: none;
   color: var(--color-ink-muted);
   font: inherit;
@@ -723,42 +700,6 @@
 .ficha-ref__botao-perigo {
   background: var(--status-danger-ink);
   border-color: var(--status-danger-ink);
-}
-
-/* Selo do status: bolinha e texto, como a referência. */
-.ficha-ref__status-selo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem var(--space-xs);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-}
-
-.ficha-ref__status-selo::before {
-  content: "";
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.ficha-ref__status-selo--ativo {
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-}
-.ficha-ref__status-selo--inativo {
-  background: var(--surface-neutral);
-  color: var(--color-ink-muted);
-}
-.ficha-ref__status-selo--desligado {
-  background: var(--status-danger-surface);
-  color: var(--status-danger-ink);
-}
-.ficha-ref__status-selo--em_admissao {
-  background: var(--status-info-surface);
-  color: var(--status-info-ink);
 }
 
 /* O submenu (Alterar status) usa o conteúdo cru do Radix: o fundo, a borda,

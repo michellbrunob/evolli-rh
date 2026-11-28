@@ -580,8 +580,8 @@ export function AdministracaoLiderancaScreen({
                   aria-controls="painel-ligacoes"
                   className={
                     aba === "ligacoes"
-                      ? "admin-lideranca__aba admin-lideranca__aba--ativa"
-                      : "admin-lideranca__aba"
+                      ? "evolli-aba admin-lideranca__aba admin-lideranca__aba--ativa"
+                      : "evolli-aba admin-lideranca__aba"
                   }
                   onClick={() => setAba("ligacoes")}
                 >
@@ -595,8 +595,8 @@ export function AdministracaoLiderancaScreen({
                   aria-controls="painel-atribuicoes"
                   className={
                     aba === "atribuicoes"
-                      ? "admin-lideranca__aba admin-lideranca__aba--ativa"
-                      : "admin-lideranca__aba"
+                      ? "evolli-aba admin-lideranca__aba admin-lideranca__aba--ativa"
+                      : "evolli-aba admin-lideranca__aba"
                   }
                   onClick={() => setAba("atribuicoes")}
                 >

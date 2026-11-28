@@ -11,30 +11,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../../ui";
-import {
-  IconeEmVerificacao,
-  IconeMaisAcoes,
-  IconePlanilha,
-  IconeNaoEnviado,
-  IconeRelogio,
-  IconeReprovado,
-  IconeSucesso,
-} from "../../../ui/icones";
+import { StatusBadge, type StatusVariant } from "../../../components";
+import { IconeMaisAcoes, IconePlanilha } from "../../../ui/icones";
 import { ROTULO_DO_ESTADO, type EstadoNaTela } from "./documentosDoColaborador";
 import "./documentos.css";
 
 /**
- * T213 — peças comuns da etapa 4 e da ficha: o selo do estado (ícone e
- * texto; a cor nunca fala sozinha) e a linha do documento (nome à esquerda,
+ * T213 — peças comuns da etapa 4 e da ficha: o selo do estado (T216: o
+ * status padrão, com o texto; a cor nunca fala sozinha) e a linha do documento (nome à esquerda,
  * estado ao centro, ações à direita; empilha em telas estreitas).
  */
 
-const ICONE_DO_ESTADO: Readonly<Record<EstadoNaTela, () => JSX.Element>> = {
-  pendente: () => <IconeRelogio tamanho={14} />,
-  em_verificacao: () => <IconeEmVerificacao tamanho={14} />,
-  aprovado: () => <IconeSucesso tamanho={14} />,
-  reprovado: () => <IconeReprovado tamanho={14} />,
-  nao_enviado: () => <IconeNaoEnviado tamanho={14} />,
+const VARIANTE_DO_ESTADO: Readonly<Record<EstadoNaTela, StatusVariant>> = {
+  pendente: "warning",
+  em_verificacao: "info",
+  aprovado: "success",
+  reprovado: "danger",
+  nao_enviado: "danger",
 };
 
 export function EstadoDoDocumento({
@@ -45,15 +38,10 @@ export function EstadoDoDocumento({
   /** Texto no lugar do rótulo padrão (ex.: "Enviando…"). */
   readonly rotulo?: string;
 }) {
-  const Icone = ICONE_DO_ESTADO[estado];
   return (
-    <span
-      className={`documentos__estado documentos__estado--${estado}`}
-      data-estado={estado}
-    >
-      <Icone />
+    <StatusBadge variant={VARIANTE_DO_ESTADO[estado]}>
       {rotulo ?? ROTULO_DO_ESTADO[estado]}
-    </span>
+    </StatusBadge>
   );
 }
 

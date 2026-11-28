@@ -125,6 +125,10 @@ describe("T209 — Configurações › Empresas", () => {
     expect(linhas).toHaveLength(2);
     expect(linhas[0]).toHaveTextContent("Empresa Alfa Sintetica");
     expect(linhas[0]).toHaveTextContent("Principal");
+    // T216 — o selo "Principal" é o status padrão (informação).
+    expect(
+      within(linhas[0]!).getByText("Principal").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--info");
     expect(linhas[0]).toHaveTextContent("11.222.333/0001-81");
     expect(linhas[0]).toHaveTextContent("6 ativos");
     expect(linhas[0]).toHaveTextContent("Cidade Sintetica/MG");

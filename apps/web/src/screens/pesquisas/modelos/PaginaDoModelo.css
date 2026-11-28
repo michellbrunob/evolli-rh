@@ -1,0 +1,478 @@
+/* T216 — página "Sobre o modelo" dos modelos da galeria. Só tokens. */
+
+.sobre__metadados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.sobre__recebe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: center;
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface-neutral);
+}
+
+.sobre__sobretitulo {
+  margin: 0;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sobre__recebe-titulo,
+.sobre__bloco-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: var(--weight-strong);
+}
+
+.sobre__recebe-textos {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.sobre__itens {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sobre__itens li {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.sobre__itens li > span:last-child {
+  display: grid;
+}
+
+.sobre__visto {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--selo-novo-fundo);
+  color: var(--color-action);
+}
+
+.sobre__janela {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.sobre__janela-topo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--text-caption);
+}
+
+.sobre__janela-topo > span {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--borda-controle);
+}
+
+.sobre__janela-topo > strong {
+  margin-left: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-weight: var(--weight-regular);
+}
+
+.sobre__janela-corpo {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.sobre__destaque {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.sobre__destaque > strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.sobre__barras {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sobre__barras li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+}
+
+.sobre__barra-trilho,
+.sobre__halter {
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.sobre__barra-trilho > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+}
+
+.sobre__barra-valor {
+  min-width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sobre__halter-linha {
+  position: absolute;
+  top: 3px;
+  height: 2px;
+  background: var(--color-ink-subtle);
+}
+
+.sobre__halter-ponto {
+  position: absolute;
+  top: -1px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: var(--radius-pill);
+  background: var(--grafico-1);
+}
+
+.sobre__halter-ponto[data-lado="b"] {
+  background: var(--color-action);
+}
+
+.sobre__cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sobre__cartoes li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+}
+
+.sobre__cartoes strong {
+  font-size: 1.25rem;
+}
+
+.sobre__tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-caption);
+}
+
+.sobre__tabela th,
+.sobre__tabela td {
+  padding: var(--space-xxs) var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+}
+
+.sobre__colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.sobre__colunas[data-sem-lateral] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 760px) {
+  .sobre__recebe,
+  .sobre__colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sobre__conteudo,
+.sobre__lateral {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.sobre__bloco,
+.sobre__cartao {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.sobre__cartao {
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.sobre__bloco p {
+  margin: 0;
+}
+
+.sobre__legenda,
+.sobre__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.sobre__chips li {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+}
+
+.sobre__grupos {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sobre__grupos > li {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.sobre__numero {
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.sobre__grupo-textos {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.sobre__grupo-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.sobre__quantidade {
+  white-space: nowrap;
+}
+
+.sobre__passos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sobre__passos li {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.sobre__passo-rotulo {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+}
+
+.sobre__ficha {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.sobre__ficha > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-caption);
+}
+
+.sobre__ficha dt {
+  color: var(--color-ink-muted);
+}
+
+.sobre__ficha dd {
+  margin: 0;
+  text-align: right;
+}
+
+.sobre__escalas,
+.sobre__regua {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+
+.sobre__escalas li {
+  display: grid;
+}
+
+.sobre__regua li {
+  display: grid;
+  grid-template-columns: 0.75rem auto 1fr;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.sobre__regua-cor {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.sobre__regua-texto {
+  grid-column: 2 / -1;
+  color: var(--color-ink-muted);
+}
+
+.sobre__uso {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+}
+
+.sobre__uso p {
+  margin: 0;
+}
+
+/* T216 — exemplo da NR-1: fileira de quadradinhos e mini matriz 4 × 4. */
+.sobre__quadradinhos {
+  display: grid;
+  grid-template-columns: repeat(29, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.sobre__quadradinhos > span {
+  aspect-ratio: 1;
+  border-radius: 2px;
+}
+
+.sobre__mini-matriz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.sobre__mini-matriz-grade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 12rem;
+}
+
+.sobre__mini-matriz-grade > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+}
+
+/* Dimensões em cartões (grade). */
+.sobre__grupos--cartoes {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-sm);
+}
+
+.sobre__grupos--cartoes > li {
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+/* Réguas e quadros lado a lado. */
+.sobre__reguas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-md);
+}
+
+.sobre__regua-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--text-body);
+}
+
+.sobre__regua-barra {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.sobre__regua-barra > span {
+  flex: 1;
+}

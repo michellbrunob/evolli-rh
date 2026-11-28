@@ -10,20 +10,15 @@
 }
 
 .nova-empresa__cnpj > input {
-  padding-right: 4.75rem;
+  padding-right: 6rem;
 }
 
 .nova-empresa__selo-valido {
   position: absolute;
   top: 50%;
   right: 0.625rem;
+  display: inline-flex;
   transform: translateY(-50%);
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-pill);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-  font-size: 0.75rem;
-  font-weight: var(--weight-strong);
   pointer-events: none;
 }
 

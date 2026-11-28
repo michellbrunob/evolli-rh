@@ -1,0 +1,57 @@
+/* T216 — a gaveta dos modelos prontos da Personalizada. */
+.submodelo {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.submodelo p {
+  margin: 0;
+}
+
+.submodelo__secao {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.submodelo__secao-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.submodelo__perguntas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.submodelo__perguntas li {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.submodelo__perguntas li + li {
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.submodelo__selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs);
+}
+
+.submodelo__rodape {
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+}
+
+.submodelo__rodape p {
+  margin: 0;
+  font-size: var(--text-caption);
+}

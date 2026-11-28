@@ -146,6 +146,13 @@ describe("T215 — Aplicar modelo de escala", () => {
     expect(screen.getByRole("radio", { name: /^5x2/ })).toHaveTextContent(
       "Padrão da EC 141",
     );
+    // T216 — os selos das escalas no status padrão do sistema.
+    expect(
+      screen.getByText("Padrão da EC 141").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--success");
+    expect(
+      screen.getByText("Convenção a partir de 16/12").closest(".evolli-badge"),
+    ).toHaveClass("evolli-badge--warning");
     fireEvent.click(seis);
     proxima();
     await screen.findByRole("heading", { name: /Turnos e folgas/ });

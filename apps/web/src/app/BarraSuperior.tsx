@@ -105,8 +105,8 @@ export function BarraSuperior({
   onSessoesAtivas,
   onSair,
 }: BarraSuperiorProps) {
-  // T209 — o nível que a página declarou (o nome na ficha): entra no fim, e
-  // o último nível da rota vira a volta para ele.
+  // T209 — os níveis que a página declarou (o nome na ficha; a pesquisa e a
+  // resposta): entram no fim, e o último nível da rota vira a volta.
   const complemento = useComplementoDaTrilha();
   const trilha: readonly ItemDaTrilha[] = complemento
     ? [
@@ -115,7 +115,7 @@ export function BarraSuperior({
           ...item,
           onSelecionar: complemento.onVoltar,
         })),
-        { rotulo: complemento.rotulo },
+        ...complemento.niveis,
       ]
     : trilhaDaRota;
   const nome = conta?.nomeExibicao ?? NOME_SEM_EXIBICAO;
@@ -158,7 +158,11 @@ export function BarraSuperior({
                       {(item.destinoId || item.onSelecionar) && !ultimo ? (
                         <button
                           type="button"
-                          className="barra-superior__trilha-link"
+                          className={
+                            item.discreto
+                              ? "barra-superior__trilha-link barra-superior__trilha-link--discreto"
+                              : "barra-superior__trilha-link"
+                          }
                           onClick={() =>
                             item.onSelecionar
                               ? item.onSelecionar()

@@ -46,9 +46,9 @@ const MENSAGEM =
   "Em desenvolvimento. Esta funcionalidade ainda não está disponível.";
 
 /** Itens indisponíveis de primeiro nível, na ordem do menu. */
+// T216 — Pesquisas virou módulo (sai da lista).
 const ITENS_EM_DESENVOLVIMENTO = [
   "Portal",
-  "Pesquisas",
   "Calendário",
   "Folha de Pagamento",
   "Hub de Benefícios",
@@ -294,7 +294,7 @@ describe("T209 — menu completo no desktop (expandido)", () => {
       });
     try {
       render(<App papelDoAtor="rh" />);
-      fireEvent.click(item("Pesquisas"));
+      fireEvent.click(item("Calendário"));
       await waitFor(() => expect(visibilidadeNoFoco.length).toBeGreaterThan(0));
       expect(visibilidadeNoFoco).not.toContain("hidden");
     } finally {
@@ -315,7 +315,7 @@ describe("T209 — menu completo no desktop (expandido)", () => {
 
   it("um aviso por vez: acionar outro item troca o aviso", () => {
     render(<App papelDoAtor="rh" />);
-    fireEvent.click(item("Pesquisas"));
+    fireEvent.click(item("Calendário"));
     fireEvent.click(item("Roadmap"));
     expect(
       screen.getAllByRole("dialog", { name: "Em desenvolvimento" }),

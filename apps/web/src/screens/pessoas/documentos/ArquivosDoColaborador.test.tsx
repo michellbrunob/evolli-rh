@@ -139,20 +139,25 @@ describe("ArquivosDoColaborador (T215) — textos da referência", () => {
 });
 
 describe("ArquivosDoColaborador (T213) — lista e estados", () => {
-  it("cada estado aparece com texto e ícone; categorias sem arquivo ficam Pendente", async () => {
+  it("cada estado aparece com texto no status padrão; categorias sem arquivo ficam Pendente", async () => {
     montar();
     await screen.findByText("Contrato sintético");
-    const estados: [string, string][] = [
-      ["RG", "Aprovado"],
-      ["CPF", "Em verificação"],
-      ["Certidões", "Reprovado"],
-      ["Comprovante de endereço", "Pendente"],
-      ["Carteira de Trabalho", "Pendente"],
+    const estados: [string, string, string][] = [
+      ["RG", "Aprovado", "success"],
+      ["CPF", "Em verificação", "info"],
+      ["Certidões", "Reprovado", "danger"],
+      ["Comprovante de endereço", "Pendente", "warning"],
+      ["Carteira de Trabalho", "Pendente", "warning"],
     ];
-    for (const [nome, estado] of estados) {
-      const selo = within(linhaDe(nome)).getByText(estado);
-      expect(selo.querySelector("svg")).not.toBeNull();
-      expect(selo.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    for (const [nome, estado, variante] of estados) {
+      const selo = within(linhaDe(nome))
+        .getByText(estado)
+        .closest(".evolli-badge");
+      expect(selo).toHaveClass(`evolli-badge--${variante}`);
+      expect(selo?.querySelector(".evolli-badge__ponto")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
     }
   });
 

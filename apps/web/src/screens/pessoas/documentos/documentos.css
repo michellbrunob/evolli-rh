@@ -85,44 +85,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Selo do estado: ícone + texto, sempre. */
-.documentos__estado {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  padding: var(--space-xxs) var(--space-sm);
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-strong);
-  white-space: nowrap;
-}
-
-.documentos__estado--pendente {
-  border-color: var(--status-warning-border);
-  background: var(--status-warning-surface);
-  color: var(--status-warning-ink);
-}
-
-.documentos__estado--em_verificacao {
-  border-color: var(--status-info-border);
-  background: var(--status-info-surface);
-  color: var(--status-info-ink);
-}
-
-.documentos__estado--aprovado {
-  border-color: var(--status-success-border);
-  background: var(--status-success-surface);
-  color: var(--status-success-ink);
-}
-
-.documentos__estado--reprovado,
-.documentos__estado--nao_enviado {
-  border-color: var(--status-danger-border);
-  background: var(--status-danger-surface);
-  color: var(--status-danger-ink);
-}
-
 /* O arquivo na linha: ícone, nome com reticências e tamanho. */
 .documentos__arquivo {
   display: flex;

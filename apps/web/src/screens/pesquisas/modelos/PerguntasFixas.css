@@ -1,0 +1,79 @@
+/* T216 — perguntas de metodologia fixa no assistente (acordeões). */
+.fixas__cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.fixas__grupos {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fixas__grupo {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+.fixas__gatilho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fixas__seta {
+  margin-left: auto;
+  transition: transform 200ms ease;
+}
+.fixas__seta--aberta {
+  transform: rotate(180deg);
+}
+.fixas__corpo {
+  display: grid;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+.fixas__perguntas {
+  display: grid;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fixas__perguntas li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--hairline);
+}
+.fixas__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fixas__comentario {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+}
+.fixas__comentario > span {
+  display: grid;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fixas__seta {
+    transition: none;
+  }
+}

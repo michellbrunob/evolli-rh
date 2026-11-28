@@ -20,7 +20,15 @@ export interface ItemDaTrilha {
   readonly destinoId?: string;
   /** T209 — volta declarada pela página (o pai de um nível complementar). */
   readonly onSelecionar?: () => void;
+  /** T216 — link sem sublinhado (cinza; a tinta forte no passar). */
+  readonly discreto?: boolean;
 }
+
+/**
+ * T216 — módulos com trilha própria: sem a seção do menu ("Pesquisas /
+ * Nova pesquisa", não "Pessoas / Pesquisas / …") e com os links discretos.
+ */
+const MODULOS_DE_TRILHA_PROPRIA: ReadonlySet<string> = new Set(["Pesquisas"]);
 
 /**
  * A tela real atrás do destino, quando o rótulo do destino é o do módulo:
@@ -74,13 +82,17 @@ export function trilhaDoDestino(destinoId: string): ItemDaTrilha[] {
   const principal =
     grupo.destinos.find((d) => !d.agrupadoEm && d.estado === "funcional") ??
     grupo.destinos[0];
-  if (secao) somar({ rotulo: secao });
+  const propria = MODULOS_DE_TRILHA_PROPRIA.has(grupo.titulo);
+  if (secao && !propria) somar({ rotulo: secao });
   somar({
     rotulo: modulo,
     ...(principal && principal.id !== destino.id
       ? { destinoId: principal.id }
       : {}),
   });
+  if (propria) {
+    return itens.map((item) => ({ ...item, discreto: true }));
+  }
   if (destino.agrupadoEm) {
     somar({ rotulo: base.label, destinoId: base.id });
     somar({ rotulo: destino.label });

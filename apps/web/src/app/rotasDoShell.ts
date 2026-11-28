@@ -40,6 +40,8 @@
  * capacidade de sempre, e o servidor decide cada requisição.
  */
 
+import { rotaDePesquisasDoFragmento } from "../screens/pesquisas/rotasDePesquisas";
+
 /** Destinos com URL própria. Fechada: destino fora dela não tem rota. */
 const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   // T178 — o id segue `pessoas` (o contêiner, aberto na aba Colaboradores).
@@ -52,6 +54,8 @@ const ROTA_POR_DESTINO: Readonly<Record<string, string>> = {
   "politicas-ferias": "#/pessoas/politicas-ferias",
   // T215 — o módulo Benefícios (as subtelas vivem dentro dele).
   beneficios: "#/beneficios",
+  // T216 — o módulo Pesquisas (as subtelas vivem dentro dele).
+  pesquisas: "#/pesquisas",
   // T182 — tela própria do catálogo de jornadas: recarregar volta a ela.
   // T215 — o quadro da escala (o id fica `jornadas-trabalho`) e os turnos,
   // sub-página dele.
@@ -152,6 +156,11 @@ export interface RotaDaFicha {
   readonly colaboradorId: string;
   readonly aba: AbaDaFicha;
   readonly competencia?: string;
+  /**
+   * T216 — a pesquisa aberta na aba Pesquisas (`…/:id/pesquisas/:pesquisaId`):
+   * recarregar reabre a mesma resposta.
+   */
+  readonly pesquisa?: string;
   /**
    * T215 — a página "Editar colaborador", na seção pedida
    * (`…/:id/editar/:secao`). Presente, ela ocupa o lugar da ficha.
@@ -272,6 +281,11 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
     return { colaboradorId, aba: antiga };
   }
   if (!(ABAS_DA_FICHA as readonly string[]).includes(aba)) return null;
+  // T216 — a pesquisa aberta na aba Pesquisas (UUID, conferido aqui).
+  if (aba === "pesquisas" && competencia !== undefined)
+    return UUID.test(competencia)
+      ? { colaboradorId, aba: "pesquisas", pesquisa: competencia }
+      : null;
   return competencia === undefined
     ? { colaboradorId, aba: aba as AbaDaFicha }
     : null;
@@ -284,6 +298,9 @@ export function fichaDaRota(fragmento: string): RotaDaFicha | null {
 export function rotaDaFicha(ficha: RotaDaFicha): string {
   if (ficha.edicao !== undefined) {
     return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/editar/${ficha.edicao}`;
+  }
+  if (ficha.aba === "pesquisas" && ficha.pesquisa !== undefined) {
+    return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/pesquisas/${ficha.pesquisa}`;
   }
   return `${PREFIXO_DA_FICHA}${ficha.colaboradorId}/${ficha.aba}`;
 }
@@ -707,6 +724,8 @@ export function rotaDoDashboard(
  */
 export function destinoDaRota(fragmento: string): string | null {
   if (dashboardDaRota(fragmento) !== null) return "dashboard";
+  // T216 — toda tela do módulo Pesquisas (lista, assistentes, resultados...).
+  if (rotaDePesquisasDoFragmento(fragmento) !== null) return "pesquisas";
   if (fragmento === ROTA_DO_MODULO_CONFIGURACOES) return "configuracoes";
   const alternativa = ROTAS_ALTERNATIVAS[fragmento];
   if (alternativa) return alternativa;

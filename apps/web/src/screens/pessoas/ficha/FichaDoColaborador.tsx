@@ -55,7 +55,7 @@ import {
 } from "../../../api/movimentacaoClient";
 import { useTrilhaComplementar } from "../../../app/trilhaComplementar";
 import { AREAS_DE_EDICAO, AreaDeEdicao } from "../../../app/edicoesPendentes";
-import { Button, FormActions } from "../../../components";
+import { Button, FormActions, StatusBadge } from "../../../components";
 import type { StatusVariant } from "../../../components";
 import {
   Dialog,
@@ -94,6 +94,7 @@ import type { ServicoDeAusencias } from "../ferias/tiposAusencia";
 import { AbaEscala } from "./escala/AbaEscala";
 import { rotaDoDestino } from "../../../app/rotasDoShell";
 import { AbaBeneficios } from "./beneficios/AbaBeneficios";
+import { AbaPesquisas } from "./pesquisas/AbaPesquisas";
 import { primeiroNome } from "../tratamento";
 import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
 import { useLotacaoVigente } from "./useLotacaoVigente";
@@ -319,6 +320,10 @@ export interface FichaDoColaboradorProps {
   readonly colaboradorId: string;
   readonly aba: AbaDaFichaDeReferencia;
   readonly onTrocarAba: (aba: AbaDaFichaDeReferencia) => void;
+  /** T216 — a pesquisa aberta na aba Pesquisas, vinda da URL. */
+  readonly pesquisaAberta?: string | null;
+  /** T216 — abrir (id) ou fechar (`null`) uma pesquisa: a URL muda. */
+  readonly onAbrirPesquisa?: (pesquisaId: string | null) => void;
   readonly onVoltar: () => void;
   /** RH e DP: editam, desligam e desativam. */
   readonly podeEditar?: boolean;
@@ -347,6 +352,8 @@ export function FichaDoColaborador({
   colaboradorId,
   aba,
   onTrocarAba,
+  pesquisaAberta,
+  onAbrirPesquisa,
   onVoltar,
   podeEditar = false,
   onEditar,
@@ -678,11 +685,12 @@ export function FichaDoColaborador({
                 </h1>
                 {dados ? (
                   <>
-                    <span
-                      className={`ficha-ref__status-selo ficha-ref__status-selo--${status}`}
+                    <StatusBadge
+                      variant={statusAtual.variante}
+                      className="ficha-ref__status-selo"
                     >
                       {statusAtual.rotulo}
-                    </span>
+                    </StatusBadge>
                     {vinculo ? (
                       <span className="ficha-ref__contrato">
                         {ROTULO_DO_TIPO_DE_VINCULO[vinculo.tipo]}
@@ -916,21 +924,9 @@ export function FichaDoColaborador({
                 </h2>
                 {dados ? (
                   email ? (
-                    <span className="ficha-ref__selo">
-                      <span
-                        className="ficha-ref__selo-ponto"
-                        aria-hidden="true"
-                      />
-                      {`Não ${trato.convidado}`}
-                    </span>
+                    <StatusBadge>{`Não ${trato.convidado}`}</StatusBadge>
                   ) : (
-                    <span className="ficha-ref__selo ficha-ref__selo--perigo">
-                      <span
-                        className="ficha-ref__selo-ponto"
-                        aria-hidden="true"
-                      />
-                      Sem e-mail
-                    </span>
+                    <StatusBadge variant="danger">Sem e-mail</StatusBadge>
                   )
                 ) : null}
               </span>
@@ -991,8 +987,8 @@ export function FichaDoColaborador({
                 tabIndex={selecionada ? 0 : -1}
                 className={
                   selecionada
-                    ? "ficha-ref__aba ficha-ref__aba--atual"
-                    : "ficha-ref__aba"
+                    ? "evolli-aba ficha-ref__aba ficha-ref__aba--atual"
+                    : "evolli-aba ficha-ref__aba"
                 }
                 onClick={() => !selecionada && onTrocarAba(a)}
               >
@@ -1186,6 +1182,27 @@ export function FichaDoColaborador({
                     }
                   : {})}
               />
+            ) : null
+          ) : aba === "pesquisas" ? (
+            // T216 — só as identificadas que a pessoa respondeu; leitura de
+            // RH e DP (o servidor decide e audita).
+            dados ? (
+              podeEditar ? (
+                <AbaPesquisas
+                  colaboradorId={colaboradorId}
+                  primeiroNome={primeiroNome(nome)}
+                  {...(onAbrirPesquisa
+                    ? {
+                        pesquisaAberta: pesquisaAberta ?? null,
+                        onAbrirPesquisa,
+                      }
+                    : {})}
+                />
+              ) : (
+                <p className="ficha-ref__em-breve-texto" role="status">
+                  As respostas de pesquisas ficam visíveis só para o RH e o DP.
+                </p>
+              )
             ) : null
           ) : aba === "documentos" ? (
             // Os arquivos só são lidos com o colaborador confirmado na
