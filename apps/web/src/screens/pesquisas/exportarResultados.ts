@@ -7,6 +7,7 @@
  * servidor o mande; respostas individuais saem com o nome só na
  * identificada, numeradas na anônima e nunca na confidencial. Nada leva CPF.
  */
+import { abasDoModelo } from "./modelos/exportacao";
 import type {
   CampoGrupo,
   Identificacao,
@@ -336,6 +337,10 @@ export function planilhaDosResultados(
     larguras: [28, 16, 70],
     ...titulo(resumo, [DEPOIS_DO_CABECALHO, linhaDoResultado]),
   });
+
+  // T216 — as abas próprias do modelo (dimensões, pilares), logo depois.
+  if (!rel.numerosOcultos)
+    abas.push(...abasDoModelo(geral, rel.empresa, rel.nome));
 
   // 2. Perguntas (as de escala; o eNPS tem a aba dele).
   const menorNota = Math.min(10, ...rel.perguntas.map((p) => p.escala.minimo));

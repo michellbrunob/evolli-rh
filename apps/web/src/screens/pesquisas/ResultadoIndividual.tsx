@@ -5,6 +5,7 @@
  * cada pergunta comparada com a média do time) e Respostas (tudo o que foi
  * respondido). Também abre pela aba Pesquisas da ficha.
  */
+import { resultadoIndividualDoModelo } from "./modelos/resultados";
 import { useEffect, useState } from "react";
 import { useTrilhaComplementar } from "../../app/trilhaComplementar";
 import type {
@@ -376,6 +377,7 @@ export function PaginaDaResposta({
         />
       ) : (
         <>
+          {resultadoIndividualDoModelo(r)}
           <section
             className="pesquisas__indicadores"
             aria-label="Indicadores da resposta"

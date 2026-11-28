@@ -70,6 +70,7 @@ import {
 } from "./acoesDaPesquisa";
 import { GarantirAvisos, useAvisar } from "./avisos";
 import { modeloDaGaleria } from "./modelosDePesquisa";
+import { visaoGeralDoModelo } from "./modelos/resultados";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
@@ -570,7 +571,9 @@ function ResultadosInterno({
               </div>
             </section>
           ) : (
-            <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
+            (visaoGeralDoModelo(detalhe, geral) ?? (
+              <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
+            ))
           )
         ) : aba === "analises" ? (
           <Analises servico={servico} detalhe={detalhe} geral={geral} />
