@@ -135,7 +135,8 @@ describe("{empresa} no painel", () => {
     await waitFor(() => expect(baixarArquivo).toHaveBeenCalledTimes(1));
     const [bytes] = vi.mocked(baixarArquivo).mock.calls[0]!;
     const abas = JSON.stringify(await lerAbasXlsx(bytes as Uint8Array));
-    expect(abas).toContain("Tenho orgulho da nossa empresa.");
+    // Na planilha, o nome da empresa ativa entra no lugar do marcador.
+    expect(abas).toContain("Tenho orgulho da Empresa Alfa.");
     expect(abas).not.toContain("{empresa}");
   });
 
@@ -204,9 +205,10 @@ describe("{empresa} no painel", () => {
       />,
     );
     await screen.findByRole("list", { name: "Sumário" });
+    // No PDF, o nome da empresa ativa entra no lugar do marcador.
     await waitFor(() =>
       expect(document.body.textContent).toContain(
-        "Tenho orgulho da nossa empresa.",
+        "Tenho orgulho da Empresa Alfa.",
       ),
     );
     semMarcador();
@@ -221,7 +223,7 @@ describe("{empresa} no painel", () => {
     );
     await waitFor(() =>
       expect(document.body.textContent).toContain(
-        "Tenho orgulho da nossa empresa.",
+        "Tenho orgulho da Empresa Alfa.",
       ),
     );
     semMarcador();

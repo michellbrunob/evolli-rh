@@ -56,7 +56,7 @@ describe("A1 — grupo oculto para proteger um grupo menor", () => {
     expect(textoDoOculto(undefined, 1)).toBe("Oculto · menos de 1 resposta");
   });
 
-  it("no mapa e no PDF, o vizinho oculto não mostra números nem a contagem", async () => {
+  it("no mapa e no PDF, o vizinho oculto não mostra números (a contagem aparece desde a 4ª revisão)", async () => {
     const analises = {
       ...ANALISES,
       linhas: ANALISES.linhas.map((l) =>
@@ -91,7 +91,7 @@ describe("A1 — grupo oculto para proteger um grupo menor", () => {
     });
     const operacoes = within(mapa).getAllByRole("row")[2]!;
     expect(operacoes).toHaveTextContent("Oculto · protege um grupo menor");
-    expect(operacoes).not.toHaveTextContent("6 respostas");
+    expect(operacoes).toHaveTextContent("6 respostas");
     expect(operacoes).not.toHaveTextContent("6,1");
     const rel = montarRelatorio({
       detalhe: ANONIMA,
@@ -228,8 +228,9 @@ describe("A2, A3, C5 e C6 — exportações", () => {
         .map((l) => l[1])
         .sort(),
     ).toEqual(["Financeiro", "Oculto", "—"]);
+    // A recomendação sai como "eNPS · …" e não conta na numeração.
     expect(linhas[3]!.filter((c) => /coment/i.test(c))).toEqual([
-      "5. Comentários",
+      "4. Comentários",
     ]);
   });
 

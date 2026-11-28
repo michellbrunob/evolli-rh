@@ -457,6 +457,7 @@ describe("R3-A-12 — por departamento e eNPS por departamento", () => {
       "Participantes",
       "Por departamento",
       "Comentários",
+      "Evolução",
       "Alertas",
       "Metodologia",
     ]);
@@ -525,7 +526,7 @@ describe("R3-A-12 — por departamento e eNPS por departamento", () => {
     expect(enps[i + 4]!.slice(0, 3)).toEqual(["Vendas", "3", "—"]);
   });
 
-  it("o vizinho oculto para proteger um grupo menor não mostra nem a contagem", async () => {
+  it("o vizinho oculto para proteger um grupo menor mostra só a contagem (4ª revisão)", async () => {
     const protegido = relDoPulso({
       analises: {
         ...ANALISES_PULSO,
@@ -546,12 +547,12 @@ describe("R3-A-12 — por departamento e eNPS por departamento", () => {
     const vendas = abas["Por departamento"]!.find((l) => l[0] === "Vendas")!;
     expect(vendas.slice(0, 3)).toEqual([
       "Vendas",
-      "—",
+      "3",
       "Oculto · protege um grupo menor",
     ]);
     const noEnps = abas["eNPS"]!.filter((l) => l[0] === "Vendas");
     expect(noEnps.map((l) => l.slice(0, 3))).toEqual([
-      ["Vendas", "—", "Oculto · protege um grupo menor"],
+      ["Vendas", "3", "Oculto · protege um grupo menor"],
     ]);
     // Abaixo do mínimo, a contagem aparece (como no mapa).
     expect(

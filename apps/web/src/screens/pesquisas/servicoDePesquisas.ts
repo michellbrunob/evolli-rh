@@ -91,6 +91,18 @@ export type ServicoDePesquisas = Pick<
   readonly quemEmite?: () => Promise<string | null>;
 };
 
+/**
+ * Quem emite os relatórios: o nome de exibição da conta; sem ele, o outro
+ * identificador que a conta tem (o e-mail de acesso). Nunca o e-mail quando
+ * há nome.
+ */
+export function quemEmiteDaConta(conta: {
+  readonly nomeExibicao?: string | null;
+  readonly email?: string | null;
+}): string | null {
+  return conta.nomeExibicao?.trim() || conta.email?.trim() || null;
+}
+
 const TETO_DE_PESSOAS = 5000;
 
 /** Todas as páginas de candidatos de um filtro (até o teto). */
@@ -165,5 +177,5 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
     const e = r.itens[0];
     return e ? { id: e.id, nome: e.nome } : null;
   },
-  quemEmite: async () => (await obterUsuarioAtual()).nomeExibicao ?? null,
+  quemEmite: async () => quemEmiteDaConta(await obterUsuarioAtual()),
 };

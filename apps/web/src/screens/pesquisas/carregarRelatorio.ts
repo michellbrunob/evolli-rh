@@ -36,8 +36,10 @@ export async function carregarRelatorio(
     Promise.resolve(servico.empresaAtiva()).catch(() => null),
     Promise.resolve(servico.quemEmite?.() ?? null).catch(() => null),
   ]);
-  // Planilha e PDF nunca levam o marcador `{empresa}` cru.
-  const detalhe = detalheParaOPainel(gravada);
+  // Planilha e PDF nunca levam o marcador `{empresa}` cru: o nome da
+  // empresa ativa (ou "nossa empresa") entra no lugar.
+  const nomeDaEmpresa = empresa?.nome ?? "";
+  const detalhe = detalheParaOPainel(gravada, nomeDaEmpresa);
   const lista =
     detalhe.identificacao === "confidencial"
       ? null
@@ -77,7 +79,6 @@ export async function carregarRelatorio(
           if (r) porGrupo.set(l.grupoId!, r);
         }),
     );
-  const nomeDaEmpresa = empresa?.nome ?? "";
   return {
     detalhe,
     geral,
@@ -89,7 +90,9 @@ export async function carregarRelatorio(
       empresa: nomeDaEmpresa,
       hoje,
       respostas: lista,
-      analises: analises ? analisesParaOPainel(analises) : null,
+      analises: analises
+        ? analisesParaOPainel(analises, nomeDaEmpresa)
+        : null,
       evolucao,
       emitidoPor,
       porGrupo,

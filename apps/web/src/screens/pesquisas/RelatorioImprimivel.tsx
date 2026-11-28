@@ -714,11 +714,14 @@ export function DocumentoDaResposta({
   resposta: r,
   empresa,
   hoje,
+  emitidoPor = null,
 }: {
   readonly detalhe: PesquisaDetalhe;
   readonly resposta: RespostaDetalhe;
   readonly empresa: string;
   readonly hoje: string;
+  /** Quem emitiu (nome de exibição ou outro identificador da conta). */
+  readonly emitidoPor?: string | null;
 }) {
   const identificada = detalhe.identificacao === "identificada" && r.nome;
   const titulo = identificada ? r.nome! : `Resposta anônima #${r.numero}`;
@@ -844,7 +847,10 @@ export function DocumentoDaResposta({
           itens={[
             ["Empresa", empresa || "—"],
             ["Pesquisa", detalhe.nome],
-            ["Emitido em", formatarDiaCivil(hoje)],
+            [
+              "Emitido em",
+              `${formatarDiaCivil(hoje)}${emitidoPor ? ` · ${emitidoPor}` : ""}`,
+            ],
             ["Classificação", CLASSIFICACAO_INDIVIDUAL[detalhe.identificacao]],
           ]}
         />
@@ -1008,6 +1014,7 @@ export function RelatorioDaResposta({
     detalhe: PesquisaDetalhe;
     resposta: RespostaDetalhe;
     empresa: string;
+    emitidoPor: string | null;
   } | null>(null);
   const [falhou, setFalhou] = useState(false);
   useEffect(() => {
@@ -1016,15 +1023,17 @@ export function RelatorioDaResposta({
       Promise.resolve(servico.obterPesquisa(pesquisaId)),
       Promise.resolve(servico.respostaDaPesquisa(pesquisaId, respostaId)),
       Promise.resolve(servico.empresaAtiva()).catch(() => null),
+      Promise.resolve(servico.quemEmite?.() ?? null).catch(() => null),
     ])
-      .then(([detalhe, resposta, empresa]) => {
+      .then(([detalhe, resposta, empresa, emitidoPor]) => {
         if (!vivo) return;
         // Na confidencial não há resultado individual.
         if (detalhe.identificacao === "confidencial") return setFalhou(true);
         setDados({
-          detalhe: detalheParaOPainel(detalhe),
+          detalhe: detalheParaOPainel(detalhe, empresa?.nome ?? null),
           resposta,
           empresa: empresa?.nome ?? "",
+          emitidoPor: emitidoPor?.trim() || null,
         });
       })
       .catch(() => {

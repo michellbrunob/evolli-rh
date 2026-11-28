@@ -147,6 +147,7 @@ describe("planilha (.xlsx)", () => {
       "Participantes",
       "Por departamento",
       "Comentários",
+      "Evolução",
       "Alertas",
       "Metodologia",
     ]);

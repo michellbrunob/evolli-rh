@@ -14,6 +14,7 @@ import { planilhaDoEnps } from "./modelos/enps/exportarEnps";
 import type {
   CampoGrupo,
   Identificacao,
+  ParticipanteDaPesquisa,
   Pergunta,
   PesquisaDetalhe,
   RespostaDetalhe,
@@ -35,10 +36,12 @@ import {
   type RelatorioDeResultados,
 } from "./dadosDoRelatorio";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import { textoParaOPainel } from "./modelos/empresa";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { ehDeEscala } from "./indicadores";
 import {
   ROTULO_DA_IDENTIFICACAO,
+  ROTULO_DO_MODELO,
   ROTULO_DO_TIPO,
   ROTULOS_DA_CONCORDANCIA,
   rotulosDosPontos,
@@ -47,9 +50,11 @@ import {
   umaCasa,
 } from "./textosDasPesquisas";
 
-/** A contagem do grupo; o vizinho oculto para proteger um menor, nem ela. */
-const respostasDoGrupo = (g: GrupoDoRelatorio): CelulaXlsx =>
-  g.oculto === "protege_grupo_menor" ? "—" : g.respostas;
+/**
+ * A contagem do grupo, até no oculto (o total e o menor já a revelam); os
+ * números do grupo oculto, não.
+ */
+const respostasDoGrupo = (g: GrupoDoRelatorio): CelulaXlsx => g.respostas;
 
 /** "Departamento", "Centro de custo", "Unidade". */
 const rotuloDoCampo = (campo: CampoGrupo) =>
@@ -614,8 +619,8 @@ export function planilhaDosResultados(
         identificada ? "Nome" : "Participante",
         ...colunasDeGrupo,
         ...(identificada ? ["Respondida em"] : []),
-        ...todas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
-        "Média",
+        ...cabecalhosDasPerguntas(todas, rel.empresa),
+        "Média (1 a 10)",
       ],
       // Anônima: ordem embaralhada e numerada nela (nunca a de chegada).
       ...(identificada
@@ -695,6 +700,17 @@ export function planilhaDosResultados(
     });
   }
 
+  // 4c. Preenchimento e Participação: só presença (quem respondeu), nunca a
+  // nota; só com convidados (a anônima não tem).
+  const convidados =
+    detalhe.identificacao === "anonima" ? [] : detalhe.participantesLista;
+  if (convidados.length > 0) {
+    abas.push(
+      abaDoPreenchimento(rel, convidados),
+      abaDaParticipacao(rel, convidados),
+    );
+  }
+
   // 5. Comentários (em ordem alfabética fora da identificada).
   const comAutor = rel.identificacao === "identificada";
   const comentarios: CelulaXlsx[][] = [
@@ -715,6 +731,9 @@ export function planilhaDosResultados(
     larguras: [40, 80, ...(comAutor ? [26] : [])],
     ...titulo(comentarios, [DEPOIS_DO_CABECALHO]),
   });
+
+  // 5b. Evolução: a média e o eNPS nas pesquisas do mesmo modelo.
+  abas.push(abaDaEvolucao(rel, detalhe));
 
   // 6. Alertas.
   const alertas: CelulaXlsx[][] = [
@@ -761,6 +780,18 @@ export function planilhaDosResultados(
       "Grupos pequenos",
       `Grupos com menos de ${rel.minimoPorGrupo} respostas não mostram números, para ninguém ser reconhecido.`,
     ],
+    ...(convidados.length > 0
+      ? [
+          [
+            "Preenchimento e participação",
+            "Convidados, quem respondeu e quem falta, por grupo e por pessoa. Ação: ok com 50% ou mais de preenchimento; cobrar abaixo disso. Só presença, nunca a nota.",
+          ],
+        ]
+      : []),
+    [
+      "Evolução",
+      "Média geral e eNPS das pesquisas do mesmo modelo, da mais antiga para a mais recente. Canceladas e as sem média visível ficam de fora.",
+    ],
   ];
   abas.push({
     nome: "Metodologia",
@@ -769,7 +800,251 @@ export function planilhaDosResultados(
     ...titulo(metodologia, [DEPOIS_DO_CABECALHO]),
   });
 
+  // O índice das abas, no fim do Resumo (com as abas que existem de fato).
+  const indice: CelulaXlsx[][] = [
+    [],
+    ["Abas desta planilha", ""],
+    ...abas.slice(1).map((a) => [a.nome, descricaoDaAba(a.nome)]),
+  ];
+  abas[0] = {
+    ...abas[0]!,
+    linhas: [...resumo, ...indice],
+    linhasDeCabecalho: [
+      DEPOIS_DO_CABECALHO,
+      linhaDoResultado,
+      resumo.length + 1,
+    ],
+  };
+
   return montarXlsx(abas);
+}
+
+/** O que cada aba traz (o índice do Resumo). */
+const DESCRICAO_DA_ABA: Readonly<Record<string, string>> = {
+  Perguntas: "Média, favorável e quantas pessoas deram cada nota",
+  eNPS: "Promotores, neutros, detratores e o eNPS de cada grupo",
+  Participantes:
+    "Uma linha por resposta, com o grupo e a nota de cada pergunta",
+  Preenchimento: "Convidados, respostas e % por grupo, com ok ou cobrar",
+  Participação: "Quem respondeu, por combinação de grupos e por pessoa",
+  Comentários: "O que as pessoas escreveram",
+  Evolução: "Média e eNPS nas pesquisas anteriores do mesmo modelo",
+  Alertas: "Perguntas e grupos que pedem atenção",
+  Metodologia: "Como cada número é calculado",
+};
+
+function descricaoDaAba(nome: string): string {
+  if (DESCRICAO_DA_ABA[nome]) return DESCRICAO_DA_ABA[nome]!;
+  if (nome.startsWith("Por "))
+    return `Média, favorável e eNPS de cada ${nome.slice(4)}`;
+  return "Os resultados próprios do modelo";
+}
+
+/**
+ * Os cabeçalhos das perguntas na aba Participantes: "1. <texto>", com o
+ * texto inteiro (e o nome da empresa no lugar do marcador); a recomendação
+ * sai como "eNPS · <texto>" e não conta na numeração.
+ */
+function cabecalhosDasPerguntas(
+  todas: readonly Pergunta[],
+  empresa: string,
+): string[] {
+  let n = 0;
+  return todas.map((p) => {
+    const texto = textoParaOPainel(p.texto, empresa);
+    if (p.tipo === "nota_0_10" && p.config.enps) return `eNPS · ${texto}`;
+    n += 1;
+    return `${n}. ${texto}`;
+  });
+}
+
+/** Preenchimento (0–100) e a ação: ok com metade ou mais; senão, cobrar. */
+const preenchimento = (responderam: number, total: number) =>
+  total > 0 ? Math.round((responderam / total) * 100) : 0;
+const acaoDoPreenchimento = (pct: number) => (pct >= 50 ? "ok" : "cobrar");
+
+const CAMPOS_DA_LOTACAO: readonly {
+  readonly rotulo: string;
+  readonly sem: string;
+  readonly de: (p: ParticipanteDaPesquisa) => string | null | undefined;
+}[] = [
+  {
+    rotulo: "Departamento",
+    sem: "Sem departamento",
+    de: (p) => p.departamento,
+  },
+  {
+    rotulo: "Centro de custo",
+    sem: "Sem centro de custo",
+    de: (p) => p.centroCusto,
+  },
+  { rotulo: "Unidade", sem: "Sem unidade", de: (p) => p.unidade },
+];
+
+/** Agrupa as pessoas por uma chave (os sem grupo no fim), em ordem de nome. */
+function agrupar(
+  pessoas: readonly ParticipanteDaPesquisa[],
+  chave: (p: ParticipanteDaPesquisa) => string | null,
+): [string | null, ParticipanteDaPesquisa[]][] {
+  const grupos = new Map<string | null, ParticipanteDaPesquisa[]>();
+  for (const p of pessoas) {
+    const k = chave(p);
+    grupos.set(k, [...(grupos.get(k) ?? []), p]);
+  }
+  return [...grupos.entries()].sort(([a], [b]) =>
+    a === null ? 1 : b === null ? -1 : a.localeCompare(b, "pt-BR"),
+  );
+}
+
+const responderam = (pessoas: readonly ParticipanteDaPesquisa[]) =>
+  pessoas.filter((p) => p.respondeu === true).length;
+
+/** Preenchimento: convidados, respostas, quem falta e a ação, por grupo. */
+function abaDoPreenchimento(
+  rel: RelatorioDeResultados,
+  convidados: readonly ParticipanteDaPesquisa[],
+): AbaXlsx {
+  const linhas: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Preenchimento", rel, "só presença, nunca a nota"),
+  ];
+  const cabecalhos: number[] = [];
+  const linha = (
+    nome: string,
+    pessoas: readonly ParticipanteDaPesquisa[],
+  ): CelulaXlsx[] => {
+    const sim = responderam(pessoas);
+    const pct = preenchimento(sim, pessoas.length);
+    return [
+      nome,
+      pessoas.length,
+      sim,
+      pessoas.length - sim,
+      porcento(pct),
+      acaoDoPreenchimento(pct),
+    ];
+  };
+  CAMPOS_DA_LOTACAO.forEach((campo, i) => {
+    // Departamento sempre; centro de custo e unidade quando o cadastro tem.
+    if (i > 0 && !convidados.some((p) => campo.de(p))) return;
+    if (i > 0) linhas.push([]);
+    linhas.push([
+      campo.rotulo,
+      "Convidados",
+      "Responderam",
+      "Faltam",
+      "Preenchimento",
+      "Ação",
+    ]);
+    cabecalhos.push(linhas.length - 1);
+    if (i === 0) linhas.push(linha("Toda a empresa", convidados));
+    for (const [nome, pessoas] of agrupar(
+      convidados,
+      (p) => campo.de(p) ?? null,
+    ))
+      linhas.push(linha(nome ?? campo.sem, pessoas));
+  });
+  return {
+    nome: "Preenchimento",
+    larguras: [32, 12, 13, 9, 15, 10],
+    titulo: true,
+    linhasDeCabecalho: cabecalhos,
+    linhas,
+  };
+}
+
+/** Participação: por combinação de grupos e por pessoa (sim ou não). */
+function abaDaParticipacao(
+  rel: RelatorioDeResultados,
+  convidados: readonly ParticipanteDaPesquisa[],
+): AbaXlsx {
+  const grupo = (p: ParticipanteDaPesquisa, i: number) =>
+    CAMPOS_DA_LOTACAO[i]!.de(p) ?? "—";
+  const linhas: CelulaXlsx[][] = [
+    ...cabecalhoDaAba("Participação", rel, "só presença, nunca a nota"),
+    [
+      "Departamento",
+      "Centro de custo",
+      "Unidade",
+      "Convidados",
+      "Responderam",
+      "Preenchimento",
+    ],
+  ];
+  const cabecalhos = [linhas.length - 1];
+  // Quem não tem nenhum grupo no cadastro fica no fim.
+  for (const [, pessoas] of agrupar(convidados, (p) =>
+    CAMPOS_DA_LOTACAO.some((c) => c.de(p))
+      ? [0, 1, 2].map((i) => grupo(p, i)).join("\u0000")
+      : null,
+  )) {
+    const sim = responderam(pessoas);
+    linhas.push([
+      grupo(pessoas[0]!, 0),
+      grupo(pessoas[0]!, 1),
+      grupo(pessoas[0]!, 2),
+      pessoas.length,
+      sim,
+      porcento(preenchimento(sim, pessoas.length)),
+    ]);
+  }
+  linhas.push(
+    [],
+    ["Nome", "Departamento", "Centro de custo", "Unidade", "Respondeu"],
+  );
+  cabecalhos.push(linhas.length - 1);
+  for (const p of [...convidados].sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR"),
+  ))
+    linhas.push([
+      p.nome,
+      grupo(p, 0),
+      grupo(p, 1),
+      grupo(p, 2),
+      p.respondeu ? "Sim" : "Não",
+    ]);
+  return {
+    nome: "Participação",
+    larguras: [30, 26, 22, 12, 13, 15],
+    titulo: true,
+    linhasDeCabecalho: cabecalhos,
+    linhas,
+  };
+}
+
+/** Evolução: média geral e eNPS nas pesquisas do mesmo modelo. */
+function abaDaEvolucao(
+  rel: RelatorioDeResultados,
+  detalhe: PesquisaDetalhe,
+): AbaXlsx {
+  const linhas: CelulaXlsx[][] = [
+    ...cabecalhoDaAba(
+      "Evolução",
+      rel,
+      "pesquisas do mesmo modelo, da mais antiga para a mais recente",
+    ),
+    ["Pesquisa", "Publicada em", "Média geral (1 a 10)", "eNPS"],
+    ...rel.evolucao.map((e): CelulaXlsx[] => [
+      e.nome,
+      serialDoInstante(e.publicadaEm) ?? formatarInstante(e.publicadaEm),
+      decimal(e.mediaGeral),
+      typeof e.enps === "number" ? e.enps : "—",
+    ]),
+  ];
+  if (rel.evolucao.length <= 1)
+    linhas.push(
+      [],
+      [
+        `Esta é a primeira pesquisa ${ROTULO_DO_MODELO[detalhe.modelo]} com respostas: a evolução aparece a partir da próxima.`,
+      ],
+    );
+  return {
+    nome: "Evolução",
+    larguras: [40, 18, 20, 10],
+    formatos: { 1: "data" },
+    titulo: true,
+    linhasDeCabecalho: [DEPOIS_DO_CABECALHO],
+    linhas,
+  };
 }
 
 /** O que cada número quer dizer (planilha e relatório em PDF). */
