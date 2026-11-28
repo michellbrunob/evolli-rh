@@ -178,19 +178,77 @@ export interface ResultadoIndividualTad {
   pilares: PilarTad[];
 }
 
+// ---------------------------------------------------------------------
+// eNPS
+
+/** 9–10 promotor · 7–8 neutro · 0–6 detrator. */
+export type GrupoDoEnps = "promotor" | "neutro" | "detrator";
+
+/** Crítica < 0 · aperfeiçoamento 0–49 · qualidade 50–74 · excelência 75+. */
+export type ZonaDoEnps =
+  "critica" | "aperfeicoamento" | "qualidade" | "excelencia";
+
+/** Uma complementar (nota de 0 a 10) no agregado. */
+export interface ComplementarDoEnps {
+  perguntaId: string;
+  respostas: number;
+  /** De 0 a 10, uma casa. */
+  media: number | null;
+  /** Quantas notas 0–6, 7–8 e 9–10. */
+  detratores: number;
+  neutros: number;
+  promotores: number;
+  /** Correlação com a principal (−1 a 1, duas casas), ou `null`. */
+  peso: number | null;
+}
+
+export interface ResultadoDoEnps {
+  modelo: "enps";
+  perguntaId: string | null;
+  respostas: number;
+  promotores: number;
+  neutros: number;
+  detratores: number;
+  /** −100 a 100; `null` sem notas. */
+  indice: number | null;
+  zona: ZonaDoEnps | null;
+  distribuicao: { valor: number; quantidade: number }[];
+  /** Da maior média para a menor (empate: a ordem da pesquisa). */
+  complementares: ComplementarDoEnps[];
+}
+
+export interface ResultadoIndividualDoEnps {
+  modelo: "enps";
+  nota: number | null;
+  grupo: GrupoDoEnps | null;
+  enpsTime: number | null;
+  /** % de promotores no time. */
+  promotoresTime: number | null;
+  zonaTime: ZonaDoEnps | null;
+  /** Na ordem da pesquisa: a nota, a média do time e a diferença. */
+  complementares: {
+    perguntaId: string;
+    nota: number | null;
+    time: number | null;
+    diferenca: number | null;
+  }[];
+}
+
 /** Acrescente aqui o resultado de cada modelo com cálculo próprio. */
 export type ResultadoDoModelo =
   | ResultadoPulsoClima
   | ResultadoClima
   | ResultadoTad
   | ResultadoNr1
-  | ResultadoIsfb;
+  | ResultadoIsfb
+  | ResultadoDoEnps;
 
 export type ResultadoIndividualDoModelo =
   | ResultadoIndividualTad
   | IndividualNr1
   | PessoaIsfb
-  | ResultadoIndividualClima;
+  | ResultadoIndividualClima
+  | ResultadoIndividualDoEnps;
 
 /** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
 export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;

@@ -392,6 +392,8 @@ export function PaginaDaResposta({
           secoes={secoes}
           valores={r.valores}
         />
+      ) : visaoIndividualDoModelo(r, secoes) ? (
+        visaoIndividualDoModelo(r, secoes)
       ) : (
         (visaoIndividualDoModelo(r, secoes) ?? (
           <>

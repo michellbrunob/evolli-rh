@@ -18,7 +18,6 @@ import type {
   ResultadoIsfbDoModelo,
 } from "./isfb/calculo";
 import type { ResultadoEnps, ResultadoIndividualEnps } from "./enps/calculo";
-import type { ErroDeCampo } from "../../common/erros/recusa-por-campo";
 
 /** Faixas do score 0–100: < 50 · 50–69 · 70–84 · ≥ 85. */
 export type FaixaDeScore = "critico" | "atencao" | "saudavel" | "forte";

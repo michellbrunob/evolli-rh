@@ -15,6 +15,9 @@ import type {
 import type { ServicoDePesquisas } from "../servicoDePesquisas";
 import { AnalisesClima } from "./clima/AnalisesClima";
 import { temTelasDoClima } from "./clima/catalogo";
+import { AnalisesEnps } from "./enps/AnalisesEnps";
+import { IndividualEnps, RespostasEnps } from "./enps/RespostasEnps";
+import { VisaoGeralEnps } from "./enps/VisaoGeralEnps";
 import { ResultadoClimaVisao } from "./clima/ResultadoClima";
 import {
   ListaDeRespostasClima,
@@ -97,6 +100,8 @@ export function visaoGeralDoModelo(
       return <VisaoGeralNr1DoRegistro detalhe={detalhe} geral={geral} />;
     case "isfb":
       return <VisaoGeralIsfb resultado={painelDe(detalhe, geral)} />;
+    case "enps":
+      return <VisaoGeralEnps detalhe={detalhe} geral={geral} r={r} />;
     default:
       return null;
   }
@@ -120,7 +125,7 @@ export function resultadoIndividualDoModelo(
   }
 }
 
-/** A aba Análises própria do modelo (Clima), ou `null` (usa a comum). */
+/** A aba Análises própria do modelo (Clima, eNPS), ou `null` (usa a comum). */
 export function analisesDoModelo(x: {
   readonly servico: ServicoDePesquisas;
   readonly detalhe: PesquisaDetalhe;
@@ -128,6 +133,16 @@ export function analisesDoModelo(x: {
   readonly respostas: readonly RespostaResumo[] | null;
   readonly onDuplicar?: () => void;
 }): ReactNode | null {
+  const r = x.geral.modelo;
+  if (r?.modelo === "enps")
+    return (
+      <AnalisesEnps
+        servico={x.servico}
+        detalhe={x.detalhe}
+        geral={x.geral}
+        r={r}
+      />
+    );
   if (!temTelasDoClima(x.detalhe, x.geral)) return null;
   return (
     <AnalisesClima
@@ -140,13 +155,21 @@ export function analisesDoModelo(x: {
   );
 }
 
-/** A lista da aba Respostas própria do modelo (Clima), ou `null`. */
+/** A lista da aba Respostas própria do modelo (Clima, eNPS), ou `null`. */
 export function listaDeRespostasDoModelo(x: {
   readonly detalhe: PesquisaDetalhe;
   readonly geral: ResultadosPesquisa;
   readonly respostas: readonly RespostaResumo[] | null;
   readonly onAbrir: (id: string) => void;
 }): ReactNode | null {
+  if (x.detalhe.modelo === "enps")
+    return (
+      <RespostasEnps
+        detalhe={x.detalhe}
+        respostas={x.respostas}
+        onAbrir={x.onAbrir}
+      />
+    );
   if (!temTelasDoClima(x.detalhe, x.geral)) return null;
   return (
     <ListaDeRespostasClima
@@ -158,7 +181,7 @@ export function listaDeRespostasDoModelo(x: {
 }
 
 /**
- * A visão geral própria do resultado individual (Clima), no lugar dos
+ * A visão geral própria do resultado individual (Clima, eNPS), no lugar dos
  * indicadores comuns (média de 0 a 10, recomendação), ou `null`.
  */
 export function visaoIndividualDoModelo(
@@ -166,6 +189,8 @@ export function visaoIndividualDoModelo(
   secoes: readonly Secao[],
 ): ReactNode | null {
   const r = resposta.modelo;
+  if (r?.modelo === "enps")
+    return <IndividualEnps p={r} resposta={resposta} secoes={secoes} />;
   if (r?.modelo !== "clima") return null;
   return <VisaoIndividualClima resposta={resposta} p={r} secoes={secoes} />;
 }

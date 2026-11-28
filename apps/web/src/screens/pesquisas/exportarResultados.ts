@@ -10,6 +10,7 @@
 import { abasDoModelo } from "./modelos/exportacao";
 import { abasDaPlanilhaClima } from "./modelos/clima/planilhaClima";
 import { temTelasDoClima } from "./modelos/clima/catalogo";
+import { planilhaDoEnps } from "./modelos/enps/exportarEnps";
 import type {
   CampoGrupo,
   Identificacao,
@@ -281,6 +282,9 @@ export function planilhaDosResultados(
         respostas,
       }),
     );
+  // T216 — eNPS: as abas do modelo no lugar das genéricas.
+  if (detalhe.modelo === "enps")
+    return planilhaDoEnps(rel, detalhe, geral, respostas);
   const abas: AbaXlsx[] = [];
   const titulo = (linhas: CelulaXlsx[][], cabecalhos: number[]) => ({
     titulo: true,

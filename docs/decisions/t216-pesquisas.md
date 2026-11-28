@@ -561,7 +561,7 @@ Decisões:
   saudável 70–84 · forte ≥ 85; eNPS e LNPS com crítico < 0 · em ajuste 0–29 · bom 30–69 · excelente ≥ 70.
 - **Pesquisa de Clima:** 60 afirmações (5 dimensões × 3 subdimensões × 4) e 2 abertas; % favorável
   (4–5), neutro e desfavorável por dimensão e subdimensão, com a faixa pelo % favorável.
-- **eNPS:** a principal (0 a 10), 5 complementares de 1 a 5 e 2 abertas; as zonas do eNPS de sempre.
+- **eNPS:** a principal (0 a 10), 5 complementares de 0 a 10 e 2 abertas; ver "eNPS — modelo próprio".
 - **Motivação (TAD):** 21 afirmações de 1 a 7 (os 7 pontos com rótulo), 9 invertidas (`8 − resposta`);
   pilar = média dos itens; geral = média dos 3 pilares; time = média das pessoas; alto ≥ 5,5 · moderado
   3,5 a 5,49 · baixo < 3,5. A pessoa tem o próprio resultado (resultado individual).
@@ -1077,3 +1077,81 @@ interface ResultadoIndividualClima {
   distribuicao: { resposta: number[]; time: number[] | null }; // notas 1 a 5: quantas da pessoa; % do time
 }
 ```
+
+## eNPS — modelo próprio (3ª revisão, 28/11/2026)
+
+Decisões:
+
+- **Perguntas:** a principal (nota 0–10 com `enps`, chave `enps_principal`) é fixa: no assistente fica sem
+  "Excluir" e sem arrastar, e a API recusa (`secoes` → `estrutura_do_modelo`) estrutura sem exatamente uma
+  nota de eNPS, que seja a principal. As 5 complementares são escala de 0 a 10 com as pontas da principal
+  ("Nada provável" / "Muito provável"); as 2 abertas são obrigatórias. O resto é livre (editar, remover,
+  somar até 15); "Adicionar pergunta" oferece escala de 0 a 10 ou texto livre.
+- **Nome padrão:** "eNPS – 4º trimestre 2026". Resumo da etapa Enviar: "1 principal · 5 complementares ·
+  2 abertas" (plural pela quantidade; grupos vazios saem).
+- **Cálculo** (`apps/api/src/pesquisas/modelos/enps/calculo.ts`): eNPS = % promotores (9–10) − %
+  detratores (0–6), inteiro, de −100 a 100; zonas crítica < 0 · aperfeiçoamento 0–49 · qualidade 50–74 ·
+  excelência 75–100. Complementar = toda nota 0–10 que não é de recomendação (escala 0–10 ou nota sem
+  eNPS/LNPS): média com uma casa (arredonda para longe do zero), contagem 0–6 · 7–8 · 9–10 e o "peso" =
+  correlação de Pearson com a principal (duas casas; `null` com menos de 3 pares ou sem variação); da
+  maior média para a menor, empate pela ordem da pesquisa. Pesquisa antiga sem a chave: a nota marcada
+  como eNPS é a principal.
+- **Visão geral:** medidor −100..100 (marcas 0, 50, 75) com a zona e a conta "X% promotores − Y%
+  detratores = Z"; "Quem respondeu o quê" (3 cartões: % e pessoas); histograma 0–10 por grupo;
+  complementares (Pergunta · Distribuição 0–6 · 7–8 · 9–10 · Média) e a frase do ponto que mais pede
+  atenção; "Respostas abertas" com 3 e "Ver as N respostas". Fora da identificada, as abertas seguem a
+  ordem alfabética dos resultados (a de chegada ligaria o texto à pessoa); na identificada, as mais
+  recentes primeiro.
+- **Respostas:** pílulas Todos · Promotores · Neutros · Detratores (com contagem) e a coluna "Nota
+  principal" com o grupo. **Resultado individual:** nota, grupo e o que significa, "eNPS do time … · N%
+  são promotores", cada complementar com nota, time (uma casa) e diferença, e as abertas da pessoa (sem
+  média geral 0–10, sem "últimos pulsos").
+- **Análises:** eNPS por grupo (departamento, centro de custo ou unidade; ocultos abaixo do mínimo),
+  evolução do eNPS a partir da segunda pesquisa do modelo e, só na identificada, "O que mais pesa na
+  nota" (o peso de cada complementar). "eNPS por tempo de casa" fica para a próxima fatia (depende da
+  data de admissão nas respostas).
+- **Planilha:** abas Visão geral (convidados, respondentes = todas as respostas, taxa, eNPS, zona, grupos
+  "n (x%)", primeira e última resposta, identificação, escala e fórmula), Gráficos (barras em texto),
+  Complementares (média e contagem por grupo), Respostas abertas e, fora da confidencial, Respostas
+  individuais (nota principal e grupo). Números ocultos: nenhuma nota sai. **PDF:** relatório próprio
+  (capa, 01 resultado, 02 distribuição, 03 complementares, 04 abertas, 05 como ler).
+- **Sobre o modelo:** selo "8 perguntas", 4 números, cartão da principal com as 11 notas por grupo,
+  complementares, abertas e "Como o eNPS é calculado" (fórmula em pílulas e a barra das zonas); sem "O
+  que você recebe" nem ficha técnica.
+
+Contrato:
+
+```ts
+// ResultadosPesquisa.modelo (modelo "enps")
+interface ResultadoEnps {
+  modelo: "enps";
+  perguntaId: string | null;          // a principal
+  respostas: number;                  // notas na principal
+  promotores: number; neutros: number; detratores: number;
+  indice: number | null;              // −100 a 100
+  zona: "critica" | "aperfeicoamento" | "qualidade" | "excelencia" | null;
+  distribuicao: { valor: number; quantidade: number }[]; // 0 a 10
+  complementares: {
+    perguntaId: string; respostas: number;
+    media: number | null;             // 0 a 10, uma casa
+    detratores: number; neutros: number; promotores: number;
+    peso: number | null;              // correlação com a principal
+  }[];                                // da maior média para a menor
+}
+// RespostaDetalhe.modelo (modelo "enps")
+interface ResultadoIndividualEnps {
+  modelo: "enps";
+  nota: number | null; grupo: "promotor" | "neutro" | "detrator" | null;
+  enpsTime: number | null; promotoresTime: number | null; zonaTime: Zona | null;
+  complementares: { perguntaId: string; nota: number | null; time: number | null;
+                    diferenca: number | null }[]; // na ordem da pesquisa
+}
+// RespostaResumo.enps (só no modelo eNPS): a nota principal e o grupo
+enps?: { nota: number; grupo: "promotor" | "neutro" | "detrator" } | null;
+// AnalisesPesquisa.evolucao[].enps (só no modelo eNPS; null sem nota ou oculto)
+enps?: number | null;
+```
+
+Na tela: o catálogo ganhou `chavesFixas`, `tiposParaAdicionar` e `resumoDasPerguntas`; a página "Sobre"
+ganhou o bloco `componente`; o registro das telas (`modelos/resultados.tsx`) ganhou `analisesDoModelo`,
+`listaDeRespostasDoModelo` e `visaoIndividualDoModelo`; a API ganhou `conferir` no registro dos modelos.

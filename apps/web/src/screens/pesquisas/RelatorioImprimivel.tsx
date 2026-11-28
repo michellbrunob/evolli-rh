@@ -58,6 +58,7 @@ import { temTelasDoClima } from "./modelos/clima/catalogo";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
 import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
+import { RelatorioEnps } from "./modelos/enps/RelatorioEnps";
 import "./RelatorioImprimivel.css";
 
 const COR_DA_FAIXA: Readonly<Record<Faixa, string>> = {
@@ -952,6 +953,8 @@ export function RelatorioDaPesquisa({
     return (
       <RelatorioClima carregado={dados} servico={servico} imprimir={imprimir} />
     );
+  if (dados.detalhe.modelo === "enps")
+    return <RelatorioEnps carregado={dados} imprimir={imprimir} />;
   // Modelos com metodologia própria: o relatório deles (modelos/relatorio).
   if (temRelatorioProprio(dados.detalhe.modelo))
     return <RelatorioDoModelo carregado={dados} imprimir={imprimir} />;
