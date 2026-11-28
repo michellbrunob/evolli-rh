@@ -130,7 +130,7 @@ describe("T216 — Motivação (TAD)", () => {
       )?.geral,
     ).toBe(7);
     expect(
-      resultadoIndividualDoModelo("clima", estrutura(), valores(7, 1)),
+      resultadoIndividualDoModelo("pulso", estrutura(), valores(7, 1)),
     ).toBeNull();
   });
 });

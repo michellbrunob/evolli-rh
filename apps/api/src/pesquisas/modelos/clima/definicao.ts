@@ -1,9 +1,13 @@
 /**
  * T216 — Pesquisa de Clima: 60 afirmações de concordância (1 a 5) em 5
  * dimensões × 3 subdimensões × 4 afirmações, e 2 perguntas abertas.
- * Metodologia fixa: a API confere os itens.
+ *
+ * As perguntas são editáveis: o RH muda o texto, remove e acrescenta
+ * afirmações (numa dimensão) ou perguntas de texto livre. A API confere só
+ * a chave e o tipo de cada pergunta (`conferirEstruturaDoClima`).
  */
-import type { EstruturaFixa, ItemFixo } from "../tipos";
+import type { ErroDeCampo } from "../../../common/erros/recusa-por-campo";
+import type { Secao } from "../../pesquisas.types";
 
 export const DIMENSOES_CLIMA = [
   {
@@ -75,13 +79,85 @@ export const AFIRMACOES_CLIMA: readonly {
 
 export const ABERTAS_CLIMA = ["clima_aberta_01", "clima_aberta_02"] as const;
 
-export const ESTRUTURA_CLIMA: EstruturaFixa = {
-  itens: AFIRMACOES_CLIMA.map((a): ItemFixo => ({
-    chave: a.chave,
-    tipo: "concordancia",
-  })),
-  opcionais: ABERTAS_CLIMA.map((chave): ItemFixo => ({
-    chave,
-    tipo: "paragrafo",
-  })),
-};
+export type DimensaoClima = (typeof DIMENSOES_CLIMA)[number]["chave"];
+
+const CHAVES_DAS_DIMENSOES: readonly string[] = DIMENSOES_CLIMA.map(
+  (d) => d.chave,
+);
+
+const FIXAS = new Map(AFIRMACOES_CLIMA.map((a) => [a.chave, a]));
+
+/** Afirmação acrescentada pelo RH: `clima_<dimensão>_<sufixo>`. */
+const ACRESCENTADA = /^clima_([a-z]+)_[A-Za-z0-9-]+$/;
+
+/** Pergunta aberta (as 2 do modelo e as de texto livre acrescentadas). */
+export const PREFIXO_DAS_ABERTAS = "clima_aberta_";
+
+/**
+ * A dimensão (e a subdimensão, nas 60 do modelo) de uma afirmação pela
+ * chave; `null` quando a chave não é de afirmação do Clima.
+ */
+export function afirmacaoDaChave(
+  chave: string | null | undefined,
+): { dimensao: string; subdimensao: string | null } | null {
+  if (!chave) return null;
+  const fixa = FIXAS.get(chave);
+  if (fixa) return { dimensao: fixa.dimensao, subdimensao: fixa.subdimensao };
+  if (chave.startsWith(PREFIXO_DAS_ABERTAS)) return null;
+  const m = ACRESCENTADA.exec(chave);
+  return m && CHAVES_DAS_DIMENSOES.includes(m[1]!)
+    ? { dimensao: m[1]!, subdimensao: null }
+    : null;
+}
+
+/** As afirmações da pesquisa, na ordem em que aparecem. */
+export function afirmacoesDaPesquisa(secoes: readonly Secao[]): {
+  chave: string;
+  dimensao: string;
+  subdimensao?: string;
+}[] {
+  const saida: { chave: string; dimensao: string; subdimensao?: string }[] = [];
+  for (const s of secoes) {
+    for (const p of s.perguntas) {
+      const a = p.tipo === "concordancia" ? afirmacaoDaChave(p.chave) : null;
+      if (!a) continue;
+      saida.push({
+        chave: p.chave!,
+        dimensao: a.dimensao,
+        ...(a.subdimensao ? { subdimensao: a.subdimensao } : {}),
+      });
+    }
+  }
+  return saida;
+}
+
+/**
+ * Perguntas editáveis: cada pergunta tem uma chave do Clima, uma vez só,
+ * com o tipo dela (afirmação → concordância de 1 a 5; aberta → texto
+ * livre), e há pelo menos uma afirmação. Erro único em `secoes`.
+ */
+export function conferirEstruturaDoClima(
+  secoes: readonly Secao[],
+): ErroDeCampo[] {
+  const recusa: ErroDeCampo[] = [
+    { campo: "secoes", motivo: "estrutura_do_modelo" },
+  ];
+  const vistas = new Set<string>();
+  let afirmacoes = 0;
+  for (const s of secoes) {
+    for (const p of s.perguntas) {
+      const chave = p.chave ?? null;
+      if (!chave || vistas.has(chave)) return recusa;
+      vistas.add(chave);
+      if (chave.startsWith(PREFIXO_DAS_ABERTAS)) {
+        if (p.tipo !== "paragrafo") return recusa;
+      } else if (afirmacaoDaChave(chave)) {
+        if (p.tipo !== "concordancia") return recusa;
+        afirmacoes += 1;
+      } else {
+        return recusa;
+      }
+    }
+  }
+  return afirmacoes > 0 ? [] : recusa;
+}

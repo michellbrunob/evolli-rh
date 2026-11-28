@@ -10,8 +10,12 @@
  */
 import type { ErroDeCampo } from "../../common/erros/recusa-por-campo";
 import type { Modelo, Secao } from "../pesquisas.types";
-import { calcularClima } from "./clima/calculo";
-import { ESTRUTURA_CLIMA } from "./clima/definicao";
+import {
+  calcularClima,
+  individualDoClima,
+  resumoDaRespostaDoClima,
+} from "./clima/calculo";
+import { conferirEstruturaDoClima } from "./clima/definicao";
 import { conferirEstruturaFixa } from "./comum";
 import { ESTRUTURA_DISC } from "./disc/definicao-disc";
 import { ESTRUTURA_DA_AVALIACAO } from "./avaliacao/definicao";
@@ -29,6 +33,7 @@ import type {
   RespostaDoModelo,
   ResultadoDoModelo,
   ResultadoIndividualDoModelo,
+  ResumoDaRespostaDoModelo,
 } from "./tipos";
 
 export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
@@ -37,10 +42,13 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     estrutura: ESTRUTURA_PULSO_CLIMA,
     calcular: calcularPulsoClima,
   },
+  // Clima: perguntas editáveis (a API confere só chave e tipo).
   clima: {
     modelo: "clima",
-    estrutura: ESTRUTURA_CLIMA,
+    conferir: conferirEstruturaDoClima,
     calcular: calcularClima,
+    individual: individualDoClima,
+    resumoDaResposta: resumoDaRespostaDoClima,
   },
   // Avaliação 90°/180°: as 24 afirmações fixas; o cálculo e os resultados
   // nominais ficam nas rotas próprias (`modelos/avaliacao/`).
@@ -73,7 +81,9 @@ export function errosDaEstruturaDoModelo(
   modelo: Modelo,
   secoes: readonly Secao[],
 ): ErroDeCampo[] {
-  const estrutura = MODELOS_REGISTRADOS[modelo]?.estrutura;
+  const registrado = MODELOS_REGISTRADOS[modelo];
+  if (registrado?.conferir) return registrado.conferir(secoes);
+  const estrutura = registrado?.estrutura;
   return estrutura ? conferirEstruturaFixa(estrutura, secoes) : [];
 }
 
@@ -86,6 +96,16 @@ export function resultadoDoModelo(
 ): ResultadoDoModelo | null {
   const calcular = MODELOS_REGISTRADOS[modelo]?.calcular;
   return calcular ? calcular(secoes, respostas, contexto) : null;
+}
+
+/** O resumo de uma resposta na lista (ex.: o índice do Clima), ou `null`. */
+export function resumoDaRespostaDoModelo(
+  modelo: Modelo,
+  secoes: readonly Secao[],
+  valores: ReadonlyMap<string, unknown>,
+): ResumoDaRespostaDoModelo | null {
+  const resumo = MODELOS_REGISTRADOS[modelo]?.resumoDaResposta;
+  return resumo ? resumo(secoes, valores) : null;
 }
 
 /** O resultado de uma pessoa no modelo, ou `null`. */

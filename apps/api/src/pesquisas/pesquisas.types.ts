@@ -1,11 +1,13 @@
 import type {
   ResultadoDoModelo,
   ResultadoIndividualDoModelo,
+  ResumoDaRespostaDoModelo,
 } from "./modelos/tipos";
 
 export type {
   ResultadoDoModelo,
   ResultadoIndividualDoModelo,
+  ResumoDaRespostaDoModelo,
 } from "./modelos/tipos";
 
 /**
@@ -335,6 +337,8 @@ export interface RespostaResumo {
     grupo: string | null;
     oculto: MotivoOculto | null;
   }[];
+  /** O resumo da resposta no modelo (ex.: o índice do Clima), se houver. */
+  resumoDoModelo?: ResumoDaRespostaDoModelo | null;
 }
 
 export interface RespostaDetalhe extends RespostaResumo {

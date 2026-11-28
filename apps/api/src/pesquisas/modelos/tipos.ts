@@ -7,6 +7,7 @@
  * O resultado do modelo vai em `ResultadosPesquisa.modelo` (agregado) e em
  * `RespostaDetalhe.modelo` (a pessoa), discriminado por `modelo`.
  */
+import type { ErroDeCampo } from "../../common/erros/recusa-por-campo";
 import type { Modelo, Pergunta, Secao, TipoPergunta } from "../pesquisas.types";
 import type {
   IndividualNr1DoModelo,
@@ -96,18 +97,71 @@ export interface ResultadoPulsoClima {
   comentarios: ComentarioDoModelo[];
 }
 
+/** Faixas do % favorável do Clima: < 50 · 50–64 · 65–79 · ≥ 80. */
+export type FaixaClima = "critica" | "atencao" | "boa" | "excelente";
+
+/** Uma dimensão (ou subdimensão) do Clima, com a faixa do % favorável. */
+export interface DimensaoClima extends Omit<
+  DimensaoDoModelo,
+  "faixa" | "subdimensoes"
+> {
+  faixa: FaixaClima | null;
+  subdimensoes?: DimensaoClima[];
+}
+
 export interface ResultadoClima {
   modelo: "clima";
-  /** % favorável (4–5) sobre todas as respostas das 60 afirmações. */
+  /** O índice: % favorável (4–5) sobre todas as respostas das afirmações. */
   favoravel: number | null;
   neutro: number | null;
   desfavoravel: number | null;
+  /** Respostas das afirmações somadas (favoráveis, neutras, desfavoráveis). */
+  notas: { favoraveis: number; neutras: number; desfavoraveis: number };
   /** Média dos scores das afirmações (0–100, inteiro). */
   score: number | null;
   /** A faixa do % favorável. */
-  faixa: FaixaDeScore | null;
-  dimensoes: DimensaoDoModelo[];
+  faixa: FaixaClima | null;
+  dimensoes: DimensaoClima[];
   afirmacoes: AfirmacaoDoModelo[];
+}
+
+/** O índice de uma resposta na lista (aba Respostas). */
+export interface ResumoDaRespostaClima {
+  modelo: "clima";
+  /** % favorável das afirmações respondidas pela pessoa. */
+  indice: number | null;
+  faixa: FaixaClima | null;
+}
+
+/** O resultado de uma resposta do Clima, comparado com o time. */
+export interface ResultadoIndividualClima {
+  modelo: "clima";
+  indice: number | null;
+  faixa: FaixaClima | null;
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number;
+  /** O índice do time (todas as respostas visíveis); `null` sem comparação. */
+  time: { indice: number | null; faixa: FaixaClima | null } | null;
+  dimensoes: {
+    chave: string;
+    rotulo: string;
+    indice: number | null;
+    faixa: FaixaClima | null;
+    time: number | null;
+  }[];
+  afirmacoes: {
+    chave: string;
+    perguntaId: string;
+    dimensao: string;
+    /** A nota da pessoa (1 a 5); `null` sem resposta. */
+    nota: number | null;
+    /** A média do time (duas casas) e o % favorável do time. */
+    mediaTime: number | null;
+    favoravelTime: number | null;
+  }[];
+  /** Quantas notas 1 a 5 a pessoa deu e o % do time em cada nota. */
+  distribuicao: { resposta: number[]; time: number[] | null };
 }
 
 export type NivelTad = "alto" | "moderado" | "baixo";
@@ -151,7 +205,13 @@ export type ResultadoDoModelo =
   | ResultadoIsfbDoModelo;
 
 export type ResultadoIndividualDoModelo =
-  ResultadoIndividualTad | IndividualNr1DoModelo | IndividualIsfbDoModelo;
+  | ResultadoIndividualTad
+  | IndividualNr1DoModelo
+  | IndividualIsfbDoModelo
+  | ResultadoIndividualClima;
+
+/** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
+export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;
 
 /**
  * O que o cálculo do modelo pode precisar além das respostas: o sigilo das
@@ -192,6 +252,8 @@ export interface ModeloRegistrado {
   modelo: Modelo;
   /** Metodologia fixa: a API confere os itens ao gravar. */
   estrutura?: EstruturaFixa;
+  /** Conferência própria das perguntas (no lugar de `estrutura`). */
+  conferir?: (secoes: readonly Secao[]) => ErroDeCampo[];
   /** O resultado agregado das respostas visíveis. */
   calcular?: (
     secoes: readonly Secao[],
@@ -205,4 +267,9 @@ export interface ModeloRegistrado {
     /** As respostas do time (comparação), quando o modelo usa. */
     respostas?: readonly RespostaDoModelo[],
   ) => ResultadoIndividualDoModelo | null;
+  /** O resumo de uma resposta na lista (aba Respostas). */
+  resumoDaResposta?: (
+    secoes: readonly Secao[],
+    valores: ReadonlyMap<string, unknown>,
+  ) => ResumoDaRespostaDoModelo | null;
 }

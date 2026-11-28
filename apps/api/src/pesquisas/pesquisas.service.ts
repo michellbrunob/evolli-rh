@@ -40,6 +40,7 @@ import { conferirSecoes, totalDePerguntas } from "./estrutura-pesquisa";
 import {
   errosDaEstruturaDoModelo,
   resultadoIndividualDoModelo,
+  resumoDaRespostaDoModelo,
 } from "./modelos/indice";
 import { conferirEstruturaDisc } from "./modelos/disc/regras-disc";
 import {
@@ -1264,6 +1265,7 @@ export class PesquisasService {
           new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
         ),
         grupos: gruposDe(r),
+        ...resumoDoModeloDa(p.modelo, secoes, r),
       },
     }));
     // Exibição: da mais recente para a mais antiga; o número continua sendo
@@ -1414,4 +1416,18 @@ export class PesquisasService {
       valores: l.valores as unknown as ValorRespondido[],
     }));
   }
+}
+
+/** O resumo da resposta no modelo (ex.: o índice do Clima), só se houver. */
+function resumoDoModeloDa(
+  modelo: Modelo,
+  secoes: readonly Secao[],
+  r: { valores: readonly ValorRespondido[] },
+): Pick<RespostaResumo, "resumoDoModelo"> {
+  const resumo = resumoDaRespostaDoModelo(
+    modelo,
+    secoes,
+    new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+  );
+  return resumo ? { resumoDoModelo: resumo } : {};
 }
