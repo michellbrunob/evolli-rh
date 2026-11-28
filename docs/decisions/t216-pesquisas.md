@@ -1280,3 +1280,50 @@ concluir a etapa só com arquivo. Envio e remoção auditados como `pesquisas_pe
   da escala); falha ao carregar um grupo aparece como erro, não como sigilo. Selos: crítico vermelho,
   alto laranja, médio âmbar, baixo verde. Página "Sobre" com os mesmos nomes de dimensão e de ação dos
   resultados e o exemplo com 29 quadradinhos e a mini matriz.
+
+## 3ª revisão — evolução, resultado individual e exportações gerais (28/11/2026)
+
+Decisões (valem para a exportação genérica, usada pela Personalizada e pelo Pulso):
+
+- **Evolução** (`GET /pesquisas/:id/analises`, `evolucao`): sai de `montarEvolucao` (função pura em
+  `analises-pesquisa.ts`). Pesquisa **cancelada nunca conta**; pesquisa sem média visível (sem
+  resposta ou confidencial abaixo do mínimo) fica fora — a lista não traz mais `mediaGeral: null`.
+- **Faixas de escalas de 4 pontos:** só duas (1–2 desfavorável, 3–4 favorável), sem a faixa do meio.
+- **Cartões dos resultados:** perguntas de texto (comentários) não têm número nem contam; as demais
+  seguem 1, 2, 3… A legenda do eNPS no cartão de indicador usa rótulos curtos ("prom.", "detr.").
+- **Mapa por grupo:** a contagem de respostas fica embaixo do nome de cada grupo, inclusive do grupo
+  oculto por mínimo; o vizinho oculto para proteger um grupo menor continua sem a contagem (decisão
+  A1). Rótulos de média: "de 1 a 10".
+- **Resultado individual:** a recomendação (0 a 10) entra no fim de "Respostas por pergunta"; os
+  quatro cartões mostram o número grande colorido pela faixa, com "/10" (ou o máximo da escala da
+  pergunta); a diferença arredonda o meio para cima no valor com sinal (−2,75 → −2,7); diferença zero
+  diz "igual ao time".
+- **Planilha (.xlsx):** a linha 2 de toda aba traz empresa · pesquisa · identificação · "emitido em
+  <data> por <nome de exibição>" (e a regra da aba, quando há). Período das respostas com as horas da
+  primeira e da última. Nova aba **"Por <campo do recorte>"** (Respostas, Média geral, Favorável, eNPS
+  e uma coluna por tema; grupo abaixo do mínimo "Oculto · menos de N respostas") e, na aba eNPS, a
+  tabela **eNPS por <campo>**. **Alertas** só com regras críticas, uma linha por pergunta (texto da
+  pergunta; departamento vazio quando é a empresa toda): média abaixo de 6,5 ou menos da metade
+  favorável; grupos visíveis com média abaixo de 6,5 ou 1 ponto (ou mais) abaixo da empresa.
+  **Participantes da anônima** em ordem embaralhada de forma estável pela pesquisa e numerados nessa
+  ordem; o que não foi respondido fica vazio.
+- **PDF:** o rodapé da capa traz o período com as horas e "Emitido em <data> · <nome>"; rótulos de
+  média "de 1 a 10"; o rótulo da pergunta quebra entre palavras (nunca no meio de uma palavra).
+
+Contrato novo (web):
+
+```ts
+// ServicoDePesquisas.quemEmite?: () => Promise<string | null>  // nome de exibição (GET /users/me)
+// montarRelatorio({ …, emitidoPor?: string | null,
+//                   porGrupo?: Map<grupoId, ResultadosPesquisa> })  // resultados de cada grupo visível
+// RelatorioDeResultados ganha:
+//   periodoComHoras: string;          // "dd/mm/aaaa hh:mm a dd/mm/aaaa hh:mm" (sem lista: os dias)
+//   emitidoPor: string | null;
+//   grupos: { campo; colunas: string[];
+//             linhas: { grupoId | null; nome; respostas; visivel; oculto;
+//                       mediaGeral; favoravel; enps: { indice; promotores; neutros; detratores;
+//                       total } | null; medias }[] } | null;
+// carregarRelatorio pede GET /pesquisas/:id/resultados?campo=&grupoId= de cada grupo visível do
+// recorte (o servidor reaplica o mínimo) para o favorável e o eNPS por grupo.
+// embaralharDeFormaEstavel(itens, semente): permutação determinística (FNV-1a + xorshift).
+```

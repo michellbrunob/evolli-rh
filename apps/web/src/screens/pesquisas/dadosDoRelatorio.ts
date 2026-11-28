@@ -10,7 +10,9 @@
  */
 import type {
   AnalisesPesquisa,
+  CampoGrupo,
   Identificacao,
+  IndicadoresDosResultados,
   Pergunta,
   PesquisaDetalhe,
   ResultadoPergunta,
@@ -21,6 +23,7 @@ import type {
 import {
   diaCivilDeHoje,
   formatarCompetenciaPorExtenso,
+  formatarInstante,
   formatarIntervaloDeDias,
   mesDoDia,
 } from "../../format/data";
@@ -95,6 +98,27 @@ export interface PerguntaDoRelatorio {
   readonly porNota: readonly { nota: number; quantidade: number }[];
 }
 
+/** Um grupo do recorte (a 1ª linha é "Toda a empresa", `grupoId` nulo). */
+export interface GrupoDoRelatorio {
+  readonly grupoId: string | null;
+  readonly nome: string;
+  readonly respostas: number;
+  readonly visivel: boolean;
+  readonly oculto: "minimo" | "protege_grupo_menor" | null;
+  readonly mediaGeral: number | null;
+  /** Percentual (0–100) de notas favoráveis nas perguntas de escala. */
+  readonly favoravel: number | null;
+  readonly enps: {
+    readonly indice: number;
+    readonly promotores: number;
+    readonly neutros: number;
+    readonly detratores: number;
+    readonly total: number;
+  } | null;
+  /** Média (0–10) de cada coluna do recorte (o tema de cada pergunta). */
+  readonly medias: readonly (number | null)[];
+}
+
 export interface AlertaDoRelatorio {
   readonly severidade: "Alta" | "Média";
   readonly onde: "Pergunta" | "Departamento";
@@ -113,7 +137,11 @@ export interface RelatorioDeResultados {
   readonly empresa: string;
   readonly mesDeReferencia: string;
   readonly periodo: string;
+  /** O período com as horas da primeira e da última resposta. */
+  readonly periodoComHoras: string;
   readonly emitidoEm: string;
+  /** Quem emitiu (o nome de exibição da conta), quando conhecido. */
+  readonly emitidoPor: string | null;
   readonly classificacao: string;
   readonly convidados: number | null;
   readonly respostas: number;
@@ -141,6 +169,15 @@ export interface RelatorioDeResultados {
   }[];
   /** Mapa por departamento (só com recorte); `null` sem recorte. */
   readonly departamentos: AnalisesPesquisa | null;
+  /**
+   * O recorte com médias, favorável e eNPS de cada grupo (a planilha "Por
+   * departamento"); `null` sem recorte. Grupo oculto vem sem números.
+   */
+  readonly grupos: {
+    readonly campo: CampoGrupo;
+    readonly colunas: readonly string[];
+    readonly linhas: readonly GrupoDoRelatorio[];
+  } | null;
   readonly evolucao: AnalisesPesquisa["evolucao"];
   readonly alertas: readonly AlertaDoRelatorio[];
   readonly minimoPorGrupo: number;
@@ -177,6 +214,47 @@ function porNotaDe(
   });
 }
 
+/** "%" favorável somando as faixas das perguntas de escala (sem o eNPS). */
+function favoravelDasPerguntas(
+  todas: readonly Pergunta[],
+  resultados: ResultadosPesquisa,
+): number | null {
+  const porId = new Map(resultados.perguntas.map((r) => [r.perguntaId, r]));
+  let altas = 0;
+  let total = 0;
+  for (const p of todas) {
+    if (!ehDeEscala(p) || (p.tipo === "nota_0_10" && p.config.enps)) continue;
+    const r = porId.get(p.id);
+    const f =
+      r && "faixas" in r && r.faixas
+        ? r.faixas
+        : faixasDe(distribuicaoDe(r), escalaDe(p));
+    altas += f.alta;
+    total += f.baixa + f.media + f.alta;
+  }
+  return pct(altas, total);
+}
+
+const enpsDoGrupo = (
+  e: IndicadoresDosResultados["enps"],
+): GrupoDoRelatorio["enps"] =>
+  e
+    ? {
+        indice: e.indice,
+        promotores: e.promotores,
+        neutros: e.neutros,
+        detratores: e.detratores,
+        total: e.promotores + e.neutros + e.detratores,
+      }
+    : null;
+
+/** Diferença em décimos, sem o erro do ponto flutuante (7,8 − 6,8 = 1). */
+const decimos = (a: number, b: number) => Math.round((a - b) * 10);
+
+/** "28/11/2026 00:27". */
+const instanteCurto = (iso: string) =>
+  formatarInstante(iso).replace(" às ", " ");
+
 /** O dia civil (Brasília) de um instante. */
 const diaDo = (iso: string) => diaCivilDeHoje(new Date(iso));
 
@@ -190,6 +268,10 @@ export function montarRelatorio(x: {
   /** Lista de respostas (o período); ausente na confidencial. */
   readonly respostas?: readonly RespostaResumo[] | null;
   readonly analises?: AnalisesPesquisa | null;
+  /** Quem emite (nome de exibição da conta). */
+  readonly emitidoPor?: string | null;
+  /** Os resultados de cada grupo visível do recorte, pelo id do grupo. */
+  readonly porGrupo?: ReadonlyMap<string, ResultadosPesquisa> | null;
 }): RelatorioDeResultados {
   const { detalhe: d, geral } = x;
   const porId = new Map(geral.perguntas.map((r) => [r.perguntaId, r]));
@@ -271,62 +353,108 @@ export function montarRelatorio(x: {
   const inicio =
     dias[0] ?? (d.publicadaEm ? diaDo(d.publicadaEm) : diaDo(d.criadaEm));
   const fim = dias.at(-1) ?? x.hoje;
+  const instantes = (x.respostas ?? []).map((r) => r.respondidaEm).sort();
+  const periodoComHoras =
+    instantes.length > 0
+      ? `${instanteCurto(instantes[0]!)} a ${instanteCurto(instantes.at(-1)!)}`
+      : formatarIntervaloDeDias(inicio, fim);
   const convidados = d.identificacao === "anonima" ? null : d.participantes;
 
   const analises = x.analises ?? null;
+  const temRecorte =
+    analises !== null && analises.linhas.some((l) => l.grupoId !== null);
+
+  // O recorte: a empresa toda e cada grupo (os ocultos, sem números).
+  const grupos: RelatorioDeResultados["grupos"] =
+    analises && temRecorte
+      ? {
+          campo: analises.campo,
+          colunas: analises.colunas.map((c) => c.rotulo),
+          linhas: analises.linhas.map((l): GrupoDoRelatorio => {
+            const oculto = l.visivel ? null : (l.oculto ?? "minimo");
+            const base = {
+              grupoId: l.grupoId,
+              nome: l.grupoId === null ? "Toda a empresa" : l.nome,
+              respostas: l.respostas,
+              visivel: l.visivel,
+              oculto,
+            };
+            if (!l.visivel)
+              return {
+                ...base,
+                mediaGeral: null,
+                favoravel: null,
+                enps: null,
+                medias: analises.colunas.map(() => null),
+              };
+            const doGrupo =
+              l.grupoId === null ? geral : x.porGrupo?.get(l.grupoId);
+            const visivel = doGrupo?.filtro.visivel !== false;
+            return {
+              ...base,
+              mediaGeral: l.media,
+              favoravel:
+                doGrupo && visivel
+                  ? favoravelDasPerguntas(todas, doGrupo)
+                  : null,
+              enps:
+                doGrupo && visivel
+                  ? enpsDoGrupo(indicadoresDe(d, doGrupo).enps)
+                  : null,
+              medias: l.medias,
+            };
+          }),
+        }
+      : null;
+
+  // Alertas: só as regras críticas, uma linha por pergunta ou grupo.
   const alertas: AlertaDoRelatorio[] = [];
-  for (const p of perguntas) {
+  for (const p of [...perguntas].sort((a, b) => a.numero - b.numero)) {
     if (p.media10 === null) continue;
-    const base = {
-      onde: "Pergunta" as const,
-      oQue: p.rotulo,
-      departamento: "Toda a empresa",
-      media: p.media10,
-      favoravel: p.favoravel,
-      respostas: p.respostas,
-    };
-    if (p.favoravel !== null && p.favoravel < 50)
+    const motivo =
+      p.faixa === "baixa"
+        ? "Média abaixo de 6,5."
+        : p.favoravel !== null && p.favoravel < 50
+          ? "Menos da metade das respostas é favorável."
+          : null;
+    if (motivo)
       alertas.push({
-        ...base,
         severidade: "Alta",
-        motivo: "Menos da metade das respostas é favorável.",
-      });
-    if (p.faixa === "baixa")
-      alertas.push({
-        ...base,
-        severidade: "Alta",
-        motivo: "Média abaixo de 6,5.",
-      });
-    else if (p.faixa === "media")
-      alertas.push({
-        ...base,
-        severidade: "Média",
-        motivo: "Média entre 6,5 e 7,9.",
+        onde: "Pergunta",
+        oQue: p.texto,
+        // A empresa toda: sem departamento.
+        departamento: "",
+        media: p.media10,
+        favoravel: p.favoravel,
+        respostas: p.respostas,
+        motivo,
       });
   }
-  if (analises) {
-    for (const l of analises.linhas) {
-      if (l.grupoId === null || !l.visivel || l.media === null) continue;
-      const faixa = faixaDaMedia10(l.media);
-      if (faixa === "alta") continue;
-      alertas.push({
-        severidade: faixa === "baixa" ? "Alta" : "Média",
-        onde: "Departamento",
-        oQue: l.nome,
-        departamento: l.nome,
-        media: l.media,
-        favoravel: null,
-        respostas: l.respostas,
-        motivo:
-          faixa === "baixa"
-            ? "Média do grupo abaixo de 6,5."
-            : "Média do grupo entre 6,5 e 7,9.",
-      });
+  if (grupos) {
+    const daEmpresa =
+      grupos.linhas.find((l) => l.grupoId === null)?.mediaGeral ??
+      ind.mediaGeral;
+    for (const l of grupos.linhas) {
+      if (l.grupoId === null || !l.visivel || l.mediaGeral === null) continue;
+      const motivo =
+        faixaDaMedia10(l.mediaGeral) === "baixa"
+          ? "Média do grupo abaixo de 6,5."
+          : daEmpresa !== null && decimos(daEmpresa, l.mediaGeral) >= 10
+            ? "Média do grupo 1 ponto ou mais abaixo da empresa."
+            : null;
+      if (motivo)
+        alertas.push({
+          severidade: "Alta",
+          onde: "Departamento",
+          oQue: l.nome,
+          departamento: l.nome,
+          media: l.mediaGeral,
+          favoravel: l.favoravel,
+          respostas: l.respostas,
+          motivo,
+        });
     }
   }
-  alertas.sort((a, b) =>
-    a.severidade === b.severidade ? 0 : a.severidade === "Alta" ? -1 : 1,
-  );
 
   return {
     nome: d.nome,
@@ -335,7 +463,9 @@ export function montarRelatorio(x: {
     empresa: x.empresa,
     mesDeReferencia: maiuscula(formatarCompetenciaPorExtenso(mesDoDia(fim))),
     periodo: formatarIntervaloDeDias(inicio, fim),
+    periodoComHoras,
     emitidoEm: x.hoje,
+    emitidoPor: x.emitidoPor?.trim() || null,
     classificacao: CLASSIFICACAO[d.identificacao],
     convidados,
     respostas: Math.max(geral.respostas, d.respostas),
@@ -351,10 +481,8 @@ export function montarRelatorio(x: {
     maior: comMedia[0] ?? null,
     menor: comMedia.length > 1 ? comMedia.at(-1)! : null,
     comentarios,
-    departamentos:
-      analises && analises.linhas.some((l) => l.grupoId !== null)
-        ? analises
-        : null,
+    departamentos: temRecorte ? analises : null,
+    grupos,
     // Só aplicações com respostas (como a aba Análises).
     evolucao: (analises?.evolucao ?? []).filter((e) => e.mediaGeral !== null),
     alertas,

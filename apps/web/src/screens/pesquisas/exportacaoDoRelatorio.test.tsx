@@ -145,6 +145,7 @@ describe("planilha (.xlsx)", () => {
       "Perguntas",
       "eNPS",
       "Participantes",
+      "Por departamento",
       "Comentários",
       "Alertas",
       "Metodologia",
@@ -159,11 +160,13 @@ describe("planilha (.xlsx)", () => {
     const abas = await abasDe("identificada");
     const resumo = abas["Resumo"]!;
     expect(resumo[0]![0]).toBe("Resumo");
-    expect(resumo[1]![0]).toBe("Empresa Alfa · Clima de novembro");
+    expect(resumo[1]![0]).toBe(
+      "Empresa Alfa · Clima de novembro · Identificada · emitido em 27/11/2026",
+    );
     const linha = (rotulo: string) => resumo.find((l) => l[0] === rotulo)!;
     expect(linha("Respostas")[1]).toBe("8");
     expect(linha("Taxa de participação")[1]).toBe("0.8");
-    expect(linha("Média geral (de 0 a 10)").slice(1)).toEqual([
+    expect(linha("Média geral (1 a 10)").slice(1)).toEqual([
       "8.5",
       "Saudável · 8 ou mais",
     ]);
@@ -176,7 +179,7 @@ describe("planilha (.xlsx)", () => {
       "Escala",
       "Respostas",
       "Média",
-      "Média (0 a 10)",
+      "Média (1 a 10)",
       "Faixa",
       "Favorável",
       "Neutro",
@@ -217,8 +220,11 @@ describe("planilha (.xlsx)", () => {
       "5",
       "0.63",
     ]);
-    const notas = enps.slice(enps.findIndex((l) => l[0] === "Nota") + 1);
-    expect(notas).toHaveLength(11);
+    const inicio = enps.findIndex((l) => l[0] === "Nota") + 1;
+    const notas = enps.slice(inicio, inicio + 11);
+    expect(notas.map((l) => l[0])).toEqual(
+      Array.from({ length: 11 }, (_, i) => String(i)),
+    );
     expect(notas[10]!.slice(0, 2)).toEqual(["10", "5"]);
   });
 
@@ -285,7 +291,7 @@ describe("relatório em PDF (página imprimível)", () => {
       screen.getByText("Empresa Alfa · 03/11 – 27/11/2026"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Média geral 8,5 de 0 a 10" }),
+      screen.getByRole("img", { name: "Média geral 8,5 de 1 a 10" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Saudável · 8 ou mais")).toBeInTheDocument();
     const sumario = screen.getByRole("list", { name: "Sumário" });

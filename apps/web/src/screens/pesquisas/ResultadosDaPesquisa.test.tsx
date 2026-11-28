@@ -498,6 +498,7 @@ describe("Resultados — Exportar", () => {
       "Resumo",
       "Perguntas",
       "eNPS",
+      "Por departamento",
       "Comentários",
       "Alertas",
       "Metodologia",

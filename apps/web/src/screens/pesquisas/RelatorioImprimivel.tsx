@@ -341,13 +341,13 @@ export function DocumentoDoRelatorio({
             </p>
             <Medidor
               valor={rel.mediaGeral}
-              rotulo={`Média geral ${rel.mediaGeral === null ? "sem dados" : umaCasa(rel.mediaGeral)} de 0 a 10`}
+              rotulo={`Média geral ${rel.mediaGeral === null ? "sem dados" : umaCasa(rel.mediaGeral)} de 1 a 10`}
             />
             <SeloDaFaixa faixa={rel.faixaGeral} />
           </div>
           <div className="relatorio__cartao">
             <p className="relatorio__cartao-titulo">
-              Por pergunta<span>Média de 0 a 10</span>
+              Por pergunta<span>Média de 1 a 10</span>
             </p>
             <ul
               className="relatorio__lista-perguntas"
@@ -409,8 +409,11 @@ export function DocumentoDoRelatorio({
         <RodapeDaCapa
           itens={[
             ["Empresa", rel.empresa || "—"],
-            ["Período", rel.periodo],
-            ["Emitido em", formatarDiaCivil(rel.emitidoEm)],
+            ["Período", rel.periodoComHoras],
+            [
+              "Emitido em",
+              `${formatarDiaCivil(rel.emitidoEm)}${rel.emitidoPor ? ` · ${rel.emitidoPor}` : ""}`,
+            ],
             ["Classificação", rel.classificacao],
           ]}
         />
@@ -436,7 +439,7 @@ export function DocumentoDoRelatorio({
         <div className="relatorio__quadro">
           <h2>Como ler este relatório</h2>
           <p>
-            Toda média é mostrada de 0 a 10, mesmo quando a pergunta usa outra
+            Toda média é mostrada de 1 a 10, mesmo quando a pergunta usa outra
             escala. A cor diz em que faixa a média está:
           </p>
           <ul className="relatorio__faixas" aria-label="Faixas da média">
@@ -469,7 +472,7 @@ export function DocumentoDoRelatorio({
                 {rel.mediaGeral === null ? "—" : umaCasa(rel.mediaGeral)}
               </strong>
               <span>
-                de 0 a 10
+                de 1 a 10
                 {rel.faixaGeral ? ` · ${NOME_DA_FAIXA[rel.faixaGeral]}` : ""}
               </span>
             </div>
@@ -763,7 +766,7 @@ export function DocumentoDaResposta({
             </p>
             <Medidor
               valor={ind.media}
-              rotulo={`Média da resposta ${ind.media === null ? "sem dados" : umaCasa(ind.media)} de 0 a 10`}
+              rotulo={`Média da resposta ${ind.media === null ? "sem dados" : umaCasa(ind.media)} de 1 a 10`}
             />
             {comparado !== null ? (
               <span

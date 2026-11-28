@@ -31,6 +31,7 @@ import {
 import {
   INTERVALO_DA_ZONA,
   textoDaFaixa,
+  type GrupoDoRelatorio,
   type RelatorioDeResultados,
 } from "./dadosDoRelatorio";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
@@ -42,8 +43,17 @@ import {
   ROTULOS_DA_CONCORDANCIA,
   rotulosDosPontos,
   percentual,
+  textoDoOculto,
   umaCasa,
 } from "./textosDasPesquisas";
+
+/** A contagem do grupo; o vizinho oculto para proteger um menor, nem ela. */
+const respostasDoGrupo = (g: GrupoDoRelatorio): CelulaXlsx =>
+  g.oculto === "protege_grupo_menor" ? "—" : g.respostas;
+
+/** "Departamento", "Centro de custo", "Unidade". */
+const rotuloDoCampo = (campo: CampoGrupo) =>
+  CAMPOS_DE_GRUPO.find((x) => x.campo === campo)?.rotulo ?? "Grupo";
 
 export const SEM_RESPOSTA = "Sem resposta";
 
@@ -73,6 +83,12 @@ export function serialDoDia(dia: string): number | null {
 /** Tipos cuja resposta vai à planilha como número. */
 function respostaNumerica(p: Pergunta): boolean {
   return ehDeEscala(p) || p.tipo === "numero";
+}
+
+/** A célula na planilha: como `celulaDaResposta`, mas vazia sem resposta. */
+function celulaNaPlanilha(p: Pergunta, valor: unknown): string | number {
+  const c = celulaDaResposta(p, valor);
+  return c === SEM_RESPOSTA ? "" : c;
 }
 
 /** A célula da resposta: número, data serial ou texto. */
@@ -250,12 +266,58 @@ const decimal = (v: number | null): CelulaXlsx =>
 const ROTULO_DA_ESCALA = (e: { minimo: number; maximo: number }) =>
   `${e.minimo} a ${e.maximo}`;
 
-/** Título na linha 1 e "<Empresa> · <pesquisa>" na linha 2. */
+/**
+ * Título na linha 1; na 2, "<Empresa> · <pesquisa> · <identificação> ·
+ * emitido em <data> por <quem>" e, se houver, a nota da aba.
+ */
 function cabecalhoDaAba(
   titulo: string,
   rel: RelatorioDeResultados,
+  nota?: string,
 ): CelulaXlsx[][] {
-  return [[titulo], [`${rel.empresa || "Empresa"} · ${rel.nome}`], []];
+  const emitido = `emitido em ${formatarDiaCivil(rel.emitidoEm)}${rel.emitidoPor ? ` por ${rel.emitidoPor}` : ""}`;
+  return [
+    [titulo],
+    [
+      [
+        rel.empresa || "Empresa",
+        rel.nome,
+        ROTULO_DA_IDENTIFICACAO[rel.identificacao],
+        emitido,
+        ...(nota ? [nota] : []),
+      ].join(" · "),
+    ],
+    [],
+  ];
+}
+
+/**
+ * A ordem das respostas na planilha da anônima: embaralhada de forma
+ * estável pela pesquisa (a mesma a cada exportação), sem expor a ordem de
+ * chegada.
+ */
+export function embaralharDeFormaEstavel<T>(
+  itens: readonly T[],
+  semente: string,
+): T[] {
+  let h = 2_166_136_261;
+  for (let i = 0; i < semente.length; i += 1) {
+    h ^= semente.charCodeAt(i);
+    h = Math.imul(h, 16_777_619);
+  }
+  h = h || 1;
+  const proximo = () => {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    return (h >>> 0) / 4_294_967_296;
+  };
+  const r = [...itens];
+  for (let i = r.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(proximo() * (i + 1));
+    [r[i], r[j]] = [r[j]!, r[i]!];
+  }
+  return r;
 }
 
 const DEPOIS_DO_CABECALHO = 3;
@@ -301,7 +363,7 @@ export function planilhaDosResultados(
     ...(rel.participacao !== null
       ? [["Taxa de participação", porcento(rel.participacao)]]
       : []),
-    ["Período das respostas", rel.periodo],
+    ["Período das respostas", rel.periodoComHoras],
     ["Identificação", ROTULO_DA_IDENTIFICACAO[rel.identificacao]],
     [],
     ["Resultado", "", ""],
@@ -316,7 +378,7 @@ export function planilhaDosResultados(
   else
     resumo.push(
       [
-        "Média geral (de 0 a 10)",
+        "Média geral (1 a 10)",
         decimal(rel.mediaGeral),
         rel.faixaGeral
           ? textoDaFaixa(rel.faixaGeral)
@@ -381,7 +443,7 @@ export function planilhaDosResultados(
       "Escala",
       "Respostas",
       "Média",
-      "Média (0 a 10)",
+      "Média (1 a 10)",
       "Faixa",
       "Favorável",
       "Neutro",
@@ -456,12 +518,45 @@ export function planilhaDosResultados(
         n.quantidade,
         porcento(percentual(n.quantidade, e.total)),
       ]);
+    // O eNPS de cada grupo do recorte (os pequenos, ocultos).
+    if (rel.grupos) {
+      const nome = rotuloDoCampo(rel.grupos.campo);
+      enps.push(
+        [],
+        [
+          `eNPS por ${nome.toLowerCase()} (grupos com ${rel.minimoPorGrupo}+ respostas)`,
+        ],
+        [nome, "Respostas", "eNPS", "Promotores", "Neutros", "Detratores"],
+      );
+      cabecalhosDoEnps.push(enps.length - 1);
+      for (const g of rel.grupos.linhas) {
+        if (g.grupoId === null) continue;
+        enps.push(
+          !g.visivel
+            ? [
+                g.nome,
+                respostasDoGrupo(g),
+                textoDoOculto(g.oculto, rel.minimoPorGrupo),
+              ]
+            : g.enps
+              ? [
+                  g.nome,
+                  g.respostas,
+                  g.enps.indice,
+                  porcento(percentual(g.enps.promotores, g.enps.total)),
+                  porcento(percentual(g.enps.neutros, g.enps.total)),
+                  porcento(percentual(g.enps.detratores, g.enps.total)),
+                ]
+              : [g.nome, g.respostas, "—"],
+        );
+      }
+    }
   } else {
     enps.push(["Esta pesquisa não tem a pergunta de recomendação (eNPS)."]);
   }
   abas.push({
     nome: "eNPS",
-    larguras: [24, 12, 40],
+    larguras: [24, 12, 40, 12, 12, 12],
     ...titulo(enps, cabecalhosDoEnps),
   });
 
@@ -505,7 +600,13 @@ export function planilhaDosResultados(
       if (p.tipo === "data") formatos[fixas + i] = "data";
     });
     const participantes: CelulaXlsx[][] = [
-      ...cabecalhoDaAba("Participantes", rel),
+      ...cabecalhoDaAba(
+        "Participantes",
+        rel,
+        identificada
+          ? undefined
+          : `ordem embaralhada; grupos com menos de ${rel.minimoPorGrupo} respostas aparecem como Oculto`,
+      ),
       [
         identificada ? "Nome" : "Participante",
         ...colunasDeGrupo,
@@ -513,10 +614,14 @@ export function planilhaDosResultados(
         ...todas.map((p, i) => `${i + 1}. ${p.rotulo || p.texto}`),
         "Média",
       ],
-      ...individuais.map((r): CelulaXlsx[] => {
+      // Anônima: ordem embaralhada e numerada nela (nunca a de chegada).
+      ...(identificada
+        ? individuais
+        : embaralharDeFormaEstavel(individuais, detalhe.id)
+      ).map((r, i): CelulaXlsx[] => {
         const valores = new Map(r.valores.map((v) => [v.perguntaId, v.valor]));
         return [
-          identificada ? (r.nome ?? "") : `Participante ${r.numero}`,
+          identificada ? (r.nome ?? "") : `Participante ${i + 1}`,
           ...gruposDa(r),
           ...(identificada
             ? [
@@ -524,10 +629,9 @@ export function planilhaDosResultados(
                   formatarInstante(r.respondidaEm),
               ]
             : []),
+          // O que não foi respondido fica vazio.
           ...todas.map((p) =>
-            valores.has(p.id)
-              ? celulaDaResposta(p, valores.get(p.id))
-              : SEM_RESPOSTA,
+            valores.has(p.id) ? celulaNaPlanilha(p, valores.get(p.id)) : "",
           ),
           decimal(r.media),
         ];
@@ -544,6 +648,47 @@ export function planilhaDosResultados(
       ],
       formatos,
       ...titulo(participantes, [DEPOIS_DO_CABECALHO]),
+    });
+  }
+
+  // 4b. Por departamento (ou o campo do recorte): números de cada grupo.
+  if (rel.grupos && !rel.numerosOcultos) {
+    const nome = rotuloDoCampo(rel.grupos.campo);
+    const porGrupo: CelulaXlsx[][] = [
+      ...cabecalhoDaAba(
+        `Resultado por ${nome.toLowerCase()}`,
+        rel,
+        `grupos com menos de ${rel.minimoPorGrupo} respostas ficam ocultos`,
+      ),
+      [
+        nome,
+        "Respostas",
+        "Média geral",
+        "Favorável",
+        "eNPS",
+        ...rel.grupos.colunas,
+      ],
+      ...rel.grupos.linhas.map((g): CelulaXlsx[] =>
+        g.visivel
+          ? [
+              g.nome,
+              g.respostas,
+              decimal(g.mediaGeral),
+              porcento(g.favoravel),
+              g.enps ? g.enps.indice : "—",
+              ...g.medias.map(decimal),
+            ]
+          : [
+              g.nome,
+              respostasDoGrupo(g),
+              textoDoOculto(g.oculto, rel.minimoPorGrupo),
+            ],
+      ),
+    ];
+    abas.push({
+      nome: `Por ${nome.toLowerCase()}`,
+      larguras: [28, 11, 12, 11, 8, ...rel.grupos.colunas.map(() => 14)],
+      ...titulo(porGrupo, [DEPOIS_DO_CABECALHO]),
     });
   }
 
@@ -570,13 +715,17 @@ export function planilhaDosResultados(
 
   // 6. Alertas.
   const alertas: CelulaXlsx[][] = [
-    ...cabecalhoDaAba("Alertas", rel),
+    ...cabecalhoDaAba(
+      "Alertas",
+      rel,
+      `perguntas com média abaixo de 6,5 ou menos da metade favorável; grupos (${rel.minimoPorGrupo}+ respostas) com média abaixo de 6,5 ou 1 ponto abaixo da empresa`,
+    ),
     [
       "Severidade",
       "Onde",
       "O quê",
       "Departamento",
-      "Média (0 a 10)",
+      "Média (1 a 10)",
       "Favorável",
       "Respostas",
       "Motivo",
@@ -624,7 +773,7 @@ export function planilhaDosResultados(
 export const METODOLOGIA: readonly (readonly [string, string])[] = [
   [
     "Escala",
-    "As perguntas de nota usam a escala do modelo (de 1 a 10, de 1 a 5 ou de 0 a 10). Para comparar, toda média é levada à escala de 0 a 10.",
+    "As perguntas de nota usam a escala do modelo (de 1 a 10, de 1 a 5 ou de 0 a 10). Para comparar, toda média é levada à escala de 1 a 10.",
   ],
   [
     "Média da pergunta",

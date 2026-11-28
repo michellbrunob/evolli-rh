@@ -30,10 +30,11 @@ export async function carregarRelatorio(
   pesquisaId: string,
   hoje: string,
 ): Promise<RelatorioCarregado> {
-  const [gravada, geral, empresa] = await Promise.all([
+  const [gravada, geral, empresa, emitidoPor] = await Promise.all([
     Promise.resolve(servico.obterPesquisa(pesquisaId)),
     Promise.resolve(servico.resultadosDaPesquisa(pesquisaId)),
     Promise.resolve(servico.empresaAtiva()).catch(() => null),
+    Promise.resolve(servico.quemEmite?.() ?? null).catch(() => null),
   ]);
   // Planilha e PDF nunca levam o marcador `{empresa}` cru.
   const detalhe = detalheParaOPainel(gravada);
@@ -51,6 +52,23 @@ export async function carregarRelatorio(
         servico.analisesDaPesquisa(pesquisaId, campo),
       ).catch(() => null)
     : null;
+  // Os números de cada grupo visível (favorável e eNPS por grupo); o
+  // servidor aplica o mínimo de novo.
+  const porGrupo = new Map<string, ResultadosPesquisa>();
+  if (campo && analises)
+    await Promise.all(
+      analises.linhas
+        .filter((l) => l.grupoId !== null && l.visivel)
+        .map(async (l) => {
+          const r = await Promise.resolve(
+            servico.resultadosDaPesquisa(pesquisaId, {
+              campo,
+              grupoId: l.grupoId!,
+            }),
+          ).catch(() => null);
+          if (r) porGrupo.set(l.grupoId!, r);
+        }),
+    );
   const nomeDaEmpresa = empresa?.nome ?? "";
   return {
     detalhe,
@@ -64,6 +82,8 @@ export async function carregarRelatorio(
       hoje,
       respostas: lista,
       analises: analises ? analisesParaOPainel(analises) : null,
+      emitidoPor,
+      porGrupo,
     }),
   };
 }

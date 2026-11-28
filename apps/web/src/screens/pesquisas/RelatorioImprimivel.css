@@ -233,7 +233,7 @@
 
 .relatorio__lista-perguntas li {
   display: grid;
-  grid-template-columns: 6px minmax(0, 1fr) 30mm 10mm;
+  grid-template-columns: 6px minmax(0, 1fr) 22mm 9mm;
   align-items: center;
   gap: 2mm;
 }
@@ -243,9 +243,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Rótulos inteiros (quebram a linha, sem reticências). */
+/* Rótulos inteiros: quebram a linha entre palavras, sem reticências e sem
+   partir uma palavra que caiba sozinha na linha. */
 .relatorio__rotulo {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .relatorio__barra {

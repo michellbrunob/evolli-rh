@@ -221,11 +221,13 @@ describe("A2, A3, C5 e C6 — exportações", () => {
       planilhaDosResultados(rel, ANONIMA, geral, anonimas),
     );
     const linhas = abas["Participantes"]!;
-    expect(linhas.slice(4).map((l) => l[1])).toEqual([
-      "Financeiro",
-      "Oculto",
-      "—",
-    ]);
+    // A ordem é embaralhada (anônima): confere o conjunto.
+    expect(
+      linhas
+        .slice(4)
+        .map((l) => l[1])
+        .sort(),
+    ).toEqual(["Financeiro", "Oculto", "—"]);
     expect(linhas[3]!.filter((c) => /coment/i.test(c))).toEqual([
       "5. Comentários",
     ]);

@@ -19,6 +19,7 @@ import {
 import { listarEmpresasDoContexto } from "../../api/contextoEmpresarialClient";
 import { listarEmpresas } from "../../api/organizacaoClient";
 import * as cliente from "../../api/pesquisasClient";
+import { obterUsuarioAtual } from "../../api/usersClient";
 import type { CampoGrupo } from "../../api/pesquisasClient";
 import { distinguirNomesRepetidos } from "./nomesDosGrupos";
 import {
@@ -85,6 +86,8 @@ export type ServicoDePesquisas = Pick<
   readonly empresaAtiva: () => Promise<{ id: string; nome: string } | null>;
   /** Perfil comportamental (DISC); sem ele, a tela usa o cliente real. */
   readonly perfilComportamental?: CarregarPerfil;
+  /** O nome de quem emite os relatórios (a conta da sessão). */
+  readonly quemEmite?: () => Promise<string | null>;
 };
 
 const TETO_DE_PESSOAS = 5000;
@@ -160,4 +163,5 @@ export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
     const e = r.itens[0];
     return e ? { id: e.id, nome: e.nome } : null;
   },
+  quemEmite: async () => (await obterUsuarioAtual()).nomeExibicao ?? null,
 };
