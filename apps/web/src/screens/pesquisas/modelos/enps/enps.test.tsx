@@ -22,7 +22,10 @@ import type {
 } from "../../../../api/pesquisasClient";
 import { lerAbasXlsx } from "../../../pessoas/importacao/planilhaXlsx";
 import { AssistenteDoModelo } from "../../AssistenteDoModelo";
-import type { RelatorioCarregado } from "../../carregarRelatorio";
+import {
+  carregarRelatorio,
+  type RelatorioCarregado,
+} from "../../carregarRelatorio";
 import { DETALHE, RESULTADOS, servicoFalso } from "../../dadosDeTeste";
 import { montarRelatorio } from "../../dadosDoRelatorio";
 import { estadoDoModelo, perguntasEmOrdem } from "../../estadoDaPesquisa";
@@ -830,27 +833,235 @@ describe("T216 — eNPS: planilha e relatório", () => {
     expect(JSON.stringify(abas)).toContain("Números ocultos");
   });
 
-  it("o relatório imprimível próprio: capa, resultado, distribuição, complementares e abertas", () => {
+  const documento = (relatorio: ReturnType<typeof rel>, d = detalhe) => {
     const carregado: RelatorioCarregado = {
-      detalhe,
+      detalhe: d,
       geral,
       empresa: "Empresa Exemplo",
       lista: null,
-      rel: rel("anonima"),
+      rel: relatorio,
     };
     render(<DocumentoEnps carregado={carregado} />);
+  };
+
+  it("PDF sem recorte: a evolução vem do caminho sem campo", async () => {
+    const evolucao = [
+      {
+        pesquisaId: "a",
+        nome: "eNPS – 3º trimestre 2026",
+        publicadaEm: "2026-08-01T12:00:00.000Z",
+        mediaGeral: 7,
+        enps: -10,
+      },
+      {
+        pesquisaId: "b",
+        nome: "eNPS – 4º trimestre 2026",
+        publicadaEm: "2026-11-01T12:00:00.000Z",
+        mediaGeral: 7,
+        enps: 25,
+      },
+    ];
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(async () => detalhe),
+      resultadosDaPesquisa: vi.fn(async () => ({
+        ...geral,
+        recortes: [],
+        departamentos: [],
+      })),
+      evolucaoDaPesquisa: vi.fn(async () => ({ evolucao })),
+    });
+    const { rel: r } = await carregarRelatorio(
+      servico,
+      detalhe.id,
+      "2026-11-28",
+    );
+    expect(servico.analisesDaPesquisa).not.toHaveBeenCalled();
+    expect(servico.evolucaoDaPesquisa).toHaveBeenCalledWith(detalhe.id);
+    expect(r.evolucao.map((e) => e.enps)).toEqual([-10, 25]);
+  });
+
+  it("PDF: capa com o medidor, quem respondeu e as complementares", () => {
+    documento(rel("anonima"));
     expect(
-      screen.getByRole("heading", { level: 1, name: detalhe.nome }),
+      screen.getByRole("heading", { level: 1, name: "eNPS do time" }),
     ).toBeInTheDocument();
-    const resultado = screen.getByRole("region", { name: "01 Resultado" });
-    expect(resultado).toHaveTextContent("50% promotores − 25% detratores = 25");
+    expect(
+      screen.getByRole("img", { name: /eNPS 25, de −100 a 100/ }),
+    ).toBeInTheDocument();
+    const quem = screen.getByRole("list", { name: "Quem respondeu na capa" });
+    expect(
+      within(quem)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "Promotores · notas 9–102 pessoas50%",
+      "Neutros · notas 7–81 pessoa25%",
+      "Detratores · notas 0–61 pessoa25%",
+    ]);
+    const comp = screen.getByRole("list", {
+      name: "Complementares na capa",
+    });
+    expect(
+      within(comp)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "Ambiente7,8",
+      "Satisfação geral7,3",
+      "Liderança direta6,8",
+      "Crescimento5,5",
+      "Reconhecimento4,5",
+    ]);
+  });
+
+  it("PDF: sumário com as 6 seções e como ler este relatório", () => {
+    documento(rel("anonima"));
+    const sumario = screen.getByRole("list", { name: "Sumário" });
+    expect(
+      within(sumario)
+        .getAllByRole("listitem")
+        .map((l) => l.querySelector("strong")!.textContent),
+    ).toEqual([
+      "Resumo executivo",
+      "Quem respondeu o quê",
+      "Perguntas complementares",
+      "eNPS por departamento",
+      "Evolução",
+      "Comentários e metodologia",
+    ]);
+    const zonas = screen.getByRole("list", { name: "Zonas do eNPS" });
+    expect(
+      within(zonas)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "Crítica−100 a −1",
+      "Aperfeiçoamento0 a 49",
+      "Qualidade50 a 74",
+      "Excelência75 a 100",
+    ]);
+  });
+
+  it("PDF: resumo, quem respondeu o quê, complementares e os vazios de departamento e evolução", () => {
+    documento(rel("anonima"));
+    const resumo = screen.getByRole("region", { name: "01 Resumo executivo" });
+    expect(resumo).toHaveTextContent("Promotores50%2 pessoas");
+    expect(
+      within(resumo)
+        .getByRole("list", { name: "Principais conclusões" })
+        .querySelectorAll("li"),
+    ).toHaveLength(3);
+    expect(resumo).toHaveTextContent(
+      "Reconhecimento tem a menor média entre as complementares (4,5).",
+    );
+    const quem = screen.getByRole("region", {
+      name: "02 Quem respondeu o quê",
+    });
+    expect(
+      within(quem).getByRole("figure", { name: /Distribuição das notas/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "03 Perguntas complementares" }),
-    ).toHaveTextContent("Reconhecimento é o ponto que mais pede atenção");
+    ).toHaveTextContent("1 · 1 · 2 pessoas");
     expect(
-      screen.getByRole("region", { name: "04 Respostas abertas" }),
-    ).toHaveTextContent("Diálogo");
+      screen.getByRole("region", { name: "04 eNPS por departamento" }),
+    ).toHaveTextContent(
+      "Sem departamento informado para agrupar as respostas.",
+    );
+    expect(
+      screen.getByRole("region", { name: "05 Evolução" }),
+    ).toHaveTextContent("A evolução aparece a partir da 2ª pesquisa eNPS.");
     expect(screen.queryByText(/Média geral/)).toBeNull();
+  });
+
+  it("PDF: comentários em 2 colunas (identificada: mais recentes primeiro) e a metodologia", () => {
+    documento(rel("identificada"), {
+      ...detalhe,
+      identificacao: "identificada",
+    });
+    const sec = screen.getByRole("region", {
+      name: "06 Comentários e metodologia",
+    });
+    const colunas = within(sec).getAllByRole("group");
+    expect(colunas.map((c) => c.getAttribute("aria-label"))).toEqual([
+      "O que você mais gosta em trabalhar aqui?",
+      "O que você melhoraria aqui?",
+    ]);
+    // O servidor manda na ordem de chegada; o PDF começa pela mais recente.
+    expect(
+      within(colunas[0]!)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual(["“Colegas”", "“Benefícios”", "“Ambiente”"]);
+    expect(sec).toHaveTextContent("eNPS = % de promotores");
+  });
+
+  it("PDF: eNPS por departamento (oculto abaixo do mínimo) e a evolução com 2 pesquisas", () => {
+    const base = rel("anonima");
+    documento({
+      ...base,
+      grupos: {
+        campo: "departamento",
+        colunas: [],
+        linhas: [
+          {
+            grupoId: "d1",
+            nome: "Comercial",
+            respostas: 3,
+            visivel: true,
+            oculto: null,
+            mediaGeral: 7,
+            favoravel: 50,
+            enps: {
+              indice: 67,
+              promotores: 2,
+              neutros: 1,
+              detratores: 0,
+              total: 3,
+            },
+            medias: [],
+          },
+          {
+            grupoId: "d2",
+            nome: "Financeiro",
+            respostas: 1,
+            visivel: false,
+            oculto: "minimo",
+            mediaGeral: null,
+            favoravel: null,
+            enps: null,
+            medias: [],
+          },
+        ],
+      },
+      evolucao: [
+        {
+          pesquisaId: "a",
+          nome: "eNPS – 3º trimestre 2026",
+          publicadaEm: "2026-08-01T12:00:00.000Z",
+          mediaGeral: 7,
+          enps: -10,
+        },
+        {
+          pesquisaId: "b",
+          nome: "eNPS – 4º trimestre 2026",
+          publicadaEm: "2026-11-01T12:00:00.000Z",
+          mediaGeral: 7,
+          enps: 25,
+        },
+      ],
+    });
+    const tabela = screen.getByRole("table", { name: "eNPS por departamento" });
+    const linhas = within(tabela).getAllByRole("row").slice(1);
+    expect(linhas[0]).toHaveTextContent("Comercial+67Zona de qualidade3");
+    expect(linhas[1]).toHaveTextContent("Financeiro");
+    expect(linhas[1]).toHaveTextContent("Oculto");
+    expect(
+      within(screen.getByRole("region", { name: "05 Evolução" })).getByRole(
+        "img",
+        { name: /Evolução do eNPS/ },
+      ),
+    ).toBeInTheDocument();
   });
 });
 

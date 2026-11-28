@@ -268,6 +268,8 @@ export function montarRelatorio(x: {
   /** Lista de respostas (o período); ausente na confidencial. */
   readonly respostas?: readonly RespostaResumo[] | null;
   readonly analises?: AnalisesPesquisa | null;
+  /** A evolução sem recorte (quando não há `analises`). */
+  readonly evolucao?: AnalisesPesquisa["evolucao"] | null;
   /** Quem emite (nome de exibição da conta). */
   readonly emitidoPor?: string | null;
   /** Os resultados de cada grupo visível do recorte, pelo id do grupo. */
@@ -484,7 +486,9 @@ export function montarRelatorio(x: {
     departamentos: temRecorte ? analises : null,
     grupos,
     // Só aplicações com respostas (como a aba Análises).
-    evolucao: (analises?.evolucao ?? []).filter((e) => e.mediaGeral !== null),
+    evolucao: (analises?.evolucao ?? x.evolucao ?? []).filter(
+      (e) => e.mediaGeral !== null,
+    ),
     alertas,
     minimoPorGrupo: d.minimoPorGrupo,
     numerosOcultos: !geral.filtro.visivel,

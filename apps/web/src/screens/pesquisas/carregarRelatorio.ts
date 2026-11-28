@@ -52,6 +52,14 @@ export async function carregarRelatorio(
         servico.analisesDaPesquisa(pesquisaId, campo),
       ).catch(() => null)
     : null;
+  // Sem recorte, a evolução vem do caminho que não pede o campo.
+  const evolucao = analises
+    ? analises.evolucao
+    : ((
+        await Promise.resolve(servico.evolucaoDaPesquisa(pesquisaId)).catch(
+          () => null,
+        )
+      )?.evolucao ?? []);
   // Os números de cada grupo visível (favorável e eNPS por grupo); o
   // servidor aplica o mínimo de novo.
   const porGrupo = new Map<string, ResultadosPesquisa>();
@@ -82,6 +90,7 @@ export async function carregarRelatorio(
       hoje,
       respostas: lista,
       analises: analises ? analisesParaOPainel(analises) : null,
+      evolucao,
       emitidoPor,
       porGrupo,
     }),

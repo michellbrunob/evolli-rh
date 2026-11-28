@@ -1501,3 +1501,13 @@ Regras:
 - **Análises do Clima e do eNPS:** o seletor "Agrupar por" aparece sempre (sem recorte, só
   "Departamento"); no vazio de uma pesquisa sem "separar por", o botão "Ativar segmentação na próxima
   pesquisa" abre a duplicação (a pessoa liga "Separar respostas por" no assistente da cópia).
+- **Visão geral do eNPS:** abertas em blocos por pergunta (`modelos/RespostasAbertas.tsx`: "N respostas",
+  as 3 primeiras, "Ver as N respostas", atalho "Ver temas em Análises"); identificada, as mais recentes
+  primeiro; fora dela, a ordem alfabética do servidor (privacidade). Complementares com a contagem de
+  cada grupo sob a barra, a média num selo da cor do grupo (`grupoDaMedia`: ≥ 9, 7 a 8,9, abaixo de 7) e
+  a legenda.
+- **PDF do eNPS** (espelha o do Clima, 4 páginas): capa (medidor, quem respondeu, complementares),
+  sumário com 6 seções e "Como ler este relatório", 01 resumo executivo, 02 quem respondeu o quê,
+  03 complementares, 04 eNPS por departamento (vazio explicado), 05 evolução, 06 comentários em 2
+  colunas e metodologia. `carregarRelatorio` usa `GET /pesquisas/:id/evolucao` quando não há recorte
+  (`montarRelatorio` ganhou a entrada `evolucao`).
