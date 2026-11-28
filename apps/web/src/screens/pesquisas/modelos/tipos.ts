@@ -266,7 +266,7 @@ export interface ModeloDaGaleria {
   readonly ritmo: string;
   /** Frequência sugerida ("Mensal", "Uma vez"). */
   readonly frequencia: string;
-  /** Nome-base da pesquisa ("Pulso" → "Pulso – novembro de 2026"). */
+  /** Nome-base da pesquisa ("Pulso" → "Pulso – Novembro 2026"). */
   readonly nomeBase: string;
   readonly boasVindas: string | null;
   readonly secoes: readonly SecaoDoModelo[];
@@ -297,7 +297,7 @@ export interface ModeloDaGaleria {
     readonly cor: string;
     readonly chaves: readonly string[];
   }[];
-  /** O nome sugerido da pesquisa (padrão: "<nomeBase> – <mês de ano>"). */
+  /** O nome sugerido da pesquisa (padrão: "<nomeBase> – <Mês> <ano>"). */
   readonly nomeDaPesquisa?: (hoje: string) => string;
   readonly pagina?: PaginaSobre;
 }

@@ -62,9 +62,13 @@ export interface EstadoDaPesquisa {
   readonly link: string | null;
 }
 
-/** "Pulso – novembro de 2026". */
+/** "Pulso – Novembro 2026": mês com inicial maiúscula, sem "de". */
 export function nomeSugerido(nomeBase: string, hoje: string): string {
-  return `${nomeBase} – ${formatarCompetenciaPorExtenso(hoje.slice(0, 7))}`;
+  const [mes = "", ano = ""] = formatarCompetenciaPorExtenso(
+    hoje.slice(0, 7),
+    "barra",
+  ).split("/");
+  return `${nomeBase} – ${mes.charAt(0).toUpperCase()}${mes.slice(1)} ${ano}`;
 }
 
 /** A última pergunta, quando é o comentário final (paragrafo opcional). */

@@ -78,7 +78,7 @@ describe("Assistente do modelo — Configurar", () => {
     ).toBeInTheDocument();
     const entrada = ultimaEntrada(servico.criarPesquisa);
     expect(entrada.modelo).toBe("pulso");
-    expect(entrada.nome).toBe("Pulso – novembro de 2026");
+    expect(entrada.nome).toBe("Pulso – Novembro 2026");
     expect(entrada.identificacao).toBe("identificada");
     expect(
       screen.getByRole("heading", { level: 1, name: "Nova pesquisa Pulso" }),
