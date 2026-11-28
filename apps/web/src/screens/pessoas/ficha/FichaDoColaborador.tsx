@@ -419,9 +419,12 @@ export function FichaDoColaborador({
   useEffect(() => {
     if (!dados || naAbaDocumentos.current) return undefined;
     let vivo = true;
-    listarDocumentosDoColaborador(colaboradorId)
+    // O contador é acessório: qualquer falha (ou resposta sem lista) só o
+    // deixa de fora, nunca derruba a ficha.
+    Promise.resolve()
+      .then(() => listarDocumentosDoColaborador(colaboradorId))
       .then((lista) => {
-        if (vivo) setQuantosDocumentos(lista.length);
+        if (vivo && Array.isArray(lista)) setQuantosDocumentos(lista.length);
       })
       .catch(() => undefined);
     return () => {

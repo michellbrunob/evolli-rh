@@ -2072,11 +2072,12 @@ describe("T200 — guarda de saída no App", () => {
 
 describe("T201 — aba Documentos da ficha no shell", () => {
   // T215 — a aba Documentos da ficha mostra os arquivos do colaborador.
+  // T217 — a aba é a tabela do que foi enviado.
   beforeEach(() => {
     vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([]);
   });
   const painelDocumentos = () =>
-    screen.findByRole("list", { name: "Documentos principais" });
+    screen.findByRole("table", { name: "Documentos enviados" });
 
   it("rota direta abre a aba Documentos; recarregar a mantém", async () => {
     window.history.replaceState(null, "", `/${rotaDe(ana, "documentos")}`);
@@ -2102,8 +2103,10 @@ describe("T201 — aba Documentos da ficha no shell", () => {
     window.history.replaceState(null, "", `/${rotaDe(ana, "escala")}`);
     render(<App papelDoAtor="rh" />);
     await esperarFicha(ana.nome);
-    // Só ao abrir a aba os documentos são lidos.
-    expect(listarDocumentosDoColaborador).not.toHaveBeenCalled();
+    // T217 — a ficha lê a lista uma vez para o contador da aba.
+    await waitFor(() =>
+      expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(1),
+    );
     const aba = screen.getByRole("tab", { name: "Documentos" });
     aba.focus();
     fireEvent.click(aba);
