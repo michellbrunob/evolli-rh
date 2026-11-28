@@ -17,14 +17,12 @@ function montar() {
 }
 
 describe("Sobre o modelo — Pulso", () => {
-  it("cabeçalho com título e selo; os 4 números", () => {
+  it("cabeçalho com título e selo; os 4 números com ícone, o número em destaque e o rótulo embaixo", () => {
     montar();
     const titulo = screen.getByRole("heading", { level: 1 });
-    expect(titulo).toHaveTextContent(
-      "Pesquisa Pulso · Leitura rápida e frequente",
-    );
-    expect(titulo).toHaveTextContent("5 perguntas");
+    expect(titulo).toHaveTextContent(/^Pesquisa PulsoRápida · recorrente$/);
     const numeros = screen.getByLabelText("Em números");
+    expect(numeros).toHaveClass("pesquisas__faixa--numeros");
     const pares = within(numeros)
       .getAllByRole("definition")
       .map(
@@ -36,6 +34,9 @@ describe("Sobre o modelo — Pulso", () => {
       "1 comentário opcional",
       "Mensal frequência sugerida",
     ]);
+    // Um ícone por bloco.
+    for (const dd of within(numeros).getAllByRole("definition"))
+      expect(dd.querySelector("svg")).not.toBeNull();
   });
 
   it("as perguntas por jeito de responder, com obrigatórias e opcionais", () => {
@@ -50,19 +51,63 @@ describe("Sobre o modelo — Pulso", () => {
     expect(document.body.textContent).not.toContain("{empresa}");
   });
 
-  it("como a pessoa responde: dá para marcar uma nota na prévia", () => {
+  it("como a pessoa responde: a prévia funciona — nota, cor da faixa e Próxima", () => {
     montar();
     const como = screen.getByRole("region", { name: "Como a pessoa responde" });
     expect(como).toHaveTextContent("cerca de 3 minutos");
     expect(como).toHaveTextContent("Pergunta 1 de 7");
-    const notas = within(como).getByRole("radiogroup", {
-      name: "Prévia: escolha uma nota",
-    });
-    const radios = within(notas).getAllByRole("radio");
-    expect(radios).toHaveLength(10);
-    fireEvent.click(within(notas).getByRole("radio", { name: "8" }));
-    expect(within(notas).getByRole("radio", { name: "8" })).toBeChecked();
-    expect(within(notas).getByRole("radio", { name: "7" })).not.toBeChecked();
+    expect(
+      within(como).getByRole("progressbar", { name: "Progresso da prévia" }),
+    ).toHaveAttribute("aria-valuenow", "1");
+    expect(como).toHaveTextContent("nossa empresa");
+    expect(como).toHaveTextContent("Discordo totalmente");
+    expect(como).toHaveTextContent("Concordo totalmente");
+    const proxima = within(como).getByRole("button", { name: "Próxima →" });
+    expect(proxima).toBeDisabled();
+    const notas = () =>
+      within(como).getByRole("radiogroup", {
+        name: "Prévia: escolha uma nota",
+      });
+    expect(within(notas()).getAllByRole("radio")).toHaveLength(10);
+    // A nota marcada pega a cor da faixa.
+    fireEvent.click(within(notas()).getByRole("radio", { name: "3" }));
+    expect(within(notas()).getByRole("radio", { name: "3" })).toBeChecked();
+    expect(
+      within(notas()).getByRole("radio", { name: "3" }).closest("label"),
+    ).toHaveAttribute("data-faixa", "baixa");
+    fireEvent.click(within(notas()).getByRole("radio", { name: "9" }));
+    expect(
+      within(notas()).getByRole("radio", { name: "9" }).closest("label"),
+    ).toHaveAttribute("data-faixa", "alta");
+    expect(proxima).toBeEnabled();
+    fireEvent.click(proxima);
+    expect(como).toHaveTextContent("Pergunta 2 de 7");
+    expect(como).toHaveTextContent(
+      "Sei com clareza o que esperam do meu trabalho.",
+    );
+    // A pergunta nova começa sem nota.
+    expect(within(notas()).queryByRole("radio", { checked: true })).toBeNull();
+    expect(
+      within(como).getByRole("button", { name: "Próxima →" }),
+    ).toBeDisabled();
+  });
+
+  it("a prévia vai até o fim (recomendação de 0 a 10 e comentário) e recomeça", () => {
+    montar();
+    const como = screen.getByRole("region", { name: "Como a pessoa responde" });
+    for (let i = 0; i < 5; i += 1) {
+      fireEvent.click(within(como).getByRole("radio", { name: "8" }));
+      fireEvent.click(within(como).getByRole("button", { name: "Próxima →" }));
+    }
+    expect(como).toHaveTextContent("Pergunta 6 de 7");
+    expect(within(como).getAllByRole("radio")).toHaveLength(11);
+    fireEvent.click(within(como).getByRole("radio", { name: "0" }));
+    fireEvent.click(within(como).getByRole("button", { name: "Próxima →" }));
+    expect(como).toHaveTextContent("Pergunta 7 de 7");
+    // O comentário é opcional: dá para seguir sem escrever.
+    expect(within(como).getByRole("textbox")).toBeInTheDocument();
+    fireEvent.click(within(como).getByRole("button", { name: "Recomeçar" }));
+    expect(como).toHaveTextContent("Pergunta 1 de 7");
   });
 
   it("o que o RH vê; sem 'O que você recebe' nem ficha técnica", () => {

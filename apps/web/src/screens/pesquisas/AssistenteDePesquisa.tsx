@@ -601,6 +601,7 @@ function AssistenteDePesquisaInterno({
     <>
       {confirmacao.janela}
       <CadastroEmEtapas
+        className="pesquisas__personalizada"
         tituloId={PESQUISAS_TITULO_ID}
         iconeDoCabecalho={<IconeDoModelo id={estado.modelo} tamanho="lg" />}
         titulo={

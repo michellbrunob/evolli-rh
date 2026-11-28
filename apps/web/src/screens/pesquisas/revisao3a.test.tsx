@@ -194,20 +194,21 @@ describe("R3-A-11 — resultado individual", () => {
     expect(linhas).toHaveLength(3);
     expect(linhas[2]).toHaveTextContent("Recomendação · 0 a 10");
     expect(linhas[2]).toHaveTextContent("Quanto você indicaria a empresa?");
-    expect(linhas[2]).toHaveTextContent("10 /10");
-    expect(linhas[2]).toHaveTextContent("+1,6time 8,4");
+    expect(linhas[2]).toHaveTextContent("10/10");
+    expect(linhas[2]).toHaveTextContent("+1,6 acima do timetime 8,4");
   });
 
-  it("os quatro cartões com o número grande colorido pela faixa e /10", async () => {
+  it("os quatro cartões com o número grande e /10; desde a 4ª revisão, só os extremos coloridos", async () => {
     abrir(RESPOSTA_DETALHE);
     const ind = await screen.findByRole("region", {
       name: "Indicadores da resposta",
     });
     const numeros = [...ind.querySelectorAll(".pesquisas__indicador-numero")];
     expect(numeros.map((n) => n.textContent)).toEqual(["10,0", "10", "5", "5"]);
+    // Média geral e recomendação em cor neutra (a faixa vai no selo).
     expect(numeros.map((n) => n.getAttribute("data-faixa"))).toEqual([
-      "alta",
-      "alta",
+      null,
+      null,
       "alta",
       "alta",
     ]);
@@ -242,14 +243,20 @@ describe("R3-A-11 — resultado individual", () => {
     expect(ind).toHaveTextContent("−2,7 abaixo do time (9,8)");
     expect(ind).toHaveTextContent("igual ao time (4,0)");
     expect(ind).not.toHaveTextContent("0,0 em relação");
+    // 7,0 atenção e recomendação 6 (detrator) nos selos; 4 de 5 vira 8.
+    const selos = [
+      ...ind.querySelectorAll(
+        ".pesquisas__indicador-valor .pesquisas__nota-colorida",
+      ),
+    ].map((n) => n.getAttribute("data-faixa"));
+    expect(selos).toEqual(["media", "baixa"]);
     const cores = [...ind.querySelectorAll(".pesquisas__indicador-numero")].map(
       (n) => n.getAttribute("data-faixa"),
     );
-    // 7,0 atenção; recomendação 6 é detrator; 4 de 5 vira 8 (saudável).
-    expect(cores).toEqual(["media", "baixa", "alta", "alta"]);
+    expect(cores).toEqual([null, null, "alta", "alta"]);
     const tabela = screen.getByRole("table", { name: "Comparação com o time" });
     expect(within(tabela).getAllByRole("row")[1]).toHaveTextContent(
-      "igualtime 4,0",
+      "igual ao timetime 4,0",
     );
   });
 

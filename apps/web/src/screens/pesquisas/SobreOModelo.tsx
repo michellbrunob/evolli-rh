@@ -7,9 +7,17 @@
 import { Button } from "../../components";
 import { plural } from "../../format/plural";
 import { IconButton } from "../../ui";
-import { IconeTempo, IconeVer, IconeVoltar } from "../../ui/icones";
+import {
+  IconeCalendario,
+  IconeComentario,
+  IconeFatoPerguntas,
+  IconeRecomendacao,
+  IconeTempo,
+  IconeVer,
+  IconeVoltar,
+} from "../../ui/icones";
 import type { Pergunta } from "../../api/pesquisasClient";
-import { useId, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { CartaoDeSecao, IconeDoModelo } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { GavetaDoModelo } from "./GaleriaDeModelos";
@@ -22,6 +30,7 @@ import {
   totalDePerguntas,
 } from "./modelosDePesquisa";
 import { minutosDoModelo } from "./tempoEstimado";
+import { PreviaDeResposta, telasDaPrevia } from "./PreviaDeResposta";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import { PaginaDoModelo } from "./modelos/PaginaDoModelo";
 import { textoParaOPainel } from "./modelos/empresa";
@@ -56,6 +65,16 @@ export function grupoDaPergunta(p: Pergunta): string {
   }
 }
 
+/** O ícone de cada número da faixa (página do Pulso). */
+const ICONE_DO_NUMERO: Readonly<
+  Record<"perguntas" | "recomendacao" | "comentario" | "frequencia", ReactNode>
+> = {
+  perguntas: <IconeFatoPerguntas tamanho={16} />,
+  recomendacao: <IconeRecomendacao tamanho={16} />,
+  comentario: <IconeComentario tamanho={16} />,
+  frequencia: <IconeCalendario tamanho={16} />,
+};
+
 /** Exemplo ilustrativo do resultado de uma pergunta de 1 a 10. */
 const EXEMPLO = [0, 0, 0, 1, 0, 1, 2, 5, 6, 5].map((q, i) => ({
   valor: i + 1,
@@ -73,8 +92,6 @@ export function SobreOModelo({
 }) {
   const m = modeloDaGaleria(id);
   const [gaveta, setGaveta] = useState(false);
-  const [nota, setNota] = useState<number | null>(null);
-  const idDaPrevia = useId();
   // A página das perguntas (layout "perguntas") usa este corpo, com o
   // cabeçalho e os números do catálogo.
   const pg = m.pagina?.layout === "perguntas" ? m.pagina : null;
@@ -95,9 +112,12 @@ export function SobreOModelo({
     const g = grupoDaPergunta(p);
     grupos.set(g, [...(grupos.get(g) ?? []), p]);
   }
-  const exemplo = principais.find((p) => p.tipo === "escala") ?? principais[0];
   const total = totalDePerguntas(m);
-  const numeros: readonly { valor: string; rotulo: string }[] = pg?.numeros ?? [
+  const numeros: readonly {
+    valor: string;
+    rotulo: string;
+    icone?: keyof typeof ICONE_DO_NUMERO;
+  }[] = pg?.numeros ?? [
     ...[...grupos.entries()].slice(0, 2).map(([g, ps]) => ({
       valor: String(ps.length),
       rotulo: `${ps.length === 1 ? "pergunta" : "perguntas"} · ${minusculaSemSigla(g)}`,
@@ -141,14 +161,25 @@ export function SobreOModelo({
         </div>
       </header>
 
+      {/* Na página do Pulso: o número em destaque, o rótulo embaixo e um
+          ícone por bloco. */}
       <dl
-        className="pesquisas__faixa"
+        className={
+          pg ? "pesquisas__faixa pesquisas__faixa--numeros" : "pesquisas__faixa"
+        }
         aria-label={pg ? "Em números" : "Resumo do modelo"}
       >
         {numeros.map((x) => (
           <div key={x.rotulo}>
             <dt>{x.rotulo}</dt>
-            <dd>{x.valor}</dd>
+            <dd>
+              {x.icone ? (
+                <span className="pesquisas__faixa-icone" aria-hidden="true">
+                  {ICONE_DO_NUMERO[x.icone]}
+                </span>
+              ) : null}
+              {x.valor}
+            </dd>
           </div>
         ))}
       </dl>
@@ -222,54 +253,9 @@ export function SobreOModelo({
               </span>
             }
           >
-            {exemplo ? (
-              <div className="pesquisas__mock-resposta">
-                <p className="pesquisas__suave">{`Pergunta 1 de ${total}`}</p>
-                <span className="pesquisas__progresso-fino">
-                  <span
-                    style={{ width: `${(1 / Math.max(1, total)) * 100}%` }}
-                  />
-                </span>
-                <strong id={`${idDaPrevia}-texto`}>
-                  {textoParaOPainel(exemplo.texto)}
-                </strong>
-                {exemplo.tipo === "escala" ? (
-                  <span
-                    role="radiogroup"
-                    aria-label="Prévia: escolha uma nota"
-                    className="pesquisas__previa-escala pesquisas__previa-escala--viva"
-                  >
-                    {Array.from(
-                      {
-                        length:
-                          (exemplo.config.maximo ?? 5) -
-                          (exemplo.config.minimo ?? 1) +
-                          1,
-                      },
-                      (_, i) => (exemplo.config.minimo ?? 1) + i,
-                    ).map((v) => (
-                      <label key={v} data-marcada={nota === v ? "" : undefined}>
-                        <input
-                          type="radio"
-                          name={idDaPrevia}
-                          value={v}
-                          checked={nota === v}
-                          onChange={() => setNota(v)}
-                        />
-                        {v}
-                      </label>
-                    ))}
-                  </span>
-                ) : null}
-                <span className="pesquisas__mock-botao" aria-hidden="true">
-                  Próxima →
-                </span>
-              </div>
-            ) : (
-              <p className="pesquisas__suave">
-                Uma pergunta por tela, com barra de progresso.
-              </p>
-            )}
+            <PreviaDeResposta
+              telas={telasDaPrevia(principais, m.comentarioFinal ?? null)}
+            />
           </CartaoDeSecao>
           <CartaoDeSecao
             titulo="O que o RH vê"

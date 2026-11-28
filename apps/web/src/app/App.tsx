@@ -775,6 +775,8 @@ function conteudoDoDestino(
         onNavegar={pesquisas.onNavegar}
         // T216 — acesso global (sem empresa ativa): pede a escolha.
         semEmpresa={empresaAtiva === null}
+        // T216 — o nome no lugar de `{empresa}` nas perguntas do painel.
+        nomeDaEmpresa={empresaAtiva?.nome ?? null}
       />
     );
   }

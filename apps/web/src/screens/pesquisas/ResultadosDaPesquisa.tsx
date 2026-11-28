@@ -786,18 +786,20 @@ function PoucasRespostas({
   readonly motivo?: MotivoOculto | null | undefined;
 }) {
   return (
-    <div className="pesquisas__aba-vazia">
-      <IconeCadeado tamanho={18} />
+    <div className="pesquisas__recorte-pequeno">
+      <span className="pesquisas__recorte-pequeno-icone" aria-hidden="true">
+        <IconeCadeado tamanho={20} />
+      </span>
       <strong>
         {motivo === "protege_grupo_menor"
           ? "Oculto para proteger um grupo menor"
-          : "Poucas respostas para mostrar"}
+          : "Recorte com poucas respostas"}
       </strong>
-      <span className="pesquisas__suave">
+      <p className="pesquisas__suave">
         {motivo === "protege_grupo_menor"
           ? "Mostrar este grupo deixaria deduzir as respostas de um grupo com menos pessoas. Para proteger quem respondeu, os números não aparecem."
-          : `Este grupo tem menos de ${plural(minimo, "resposta", "respostas")}. Para proteger quem respondeu, os números não aparecem.`}
-      </span>
+          : `Este recorte tem menos de ${plural(minimo, "resposta", "respostas")}. Para proteger quem respondeu, os números não aparecem.`}
+      </p>
     </div>
   );
 }
@@ -1024,35 +1026,35 @@ function VisaoGeral({
 
       <div className="pesquisas__secao-cabeca">
         <h2 className="pesquisas__secao-titulo">Resultados por pergunta</h2>
-        {recortes.length > 0 ? (
-          <div className="pesquisas__filtros-direita">
-            {recortes.map((campo) => {
-              const rotulo =
-                CAMPOS_DE_GRUPO.find((c) => c.campo === campo)?.rotulo ?? campo;
-              const opcoes = opcoesDoCampo(campo, geral, grupos);
-              return (
-                <div key={campo} className="pesquisas__filtro-lista">
-                  <label
-                    htmlFor={`${base}-${campo}`}
-                    className="pesquisas__rotulo-do-filtro"
-                  >
-                    {rotulo}
-                  </label>
-                  <ListaDeEscolha
-                    id={`${base}-${campo}`}
-                    opcoes={[
-                      { valor: "", rotulo: "Todos" },
-                      ...opcoes.map((o) => ({ valor: o.id, rotulo: o.nome })),
-                    ]}
-                    valor={recorte?.campo === campo ? recorte.grupoId : ""}
-                    onMudar={(v) => void filtrar(campo, v)}
-                    direcao="abaixo"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
+        {/* Os três campos sempre; o que não separa a pesquisa fica em
+            "Todos", desabilitado. */}
+        <div className="pesquisas__filtros-direita">
+          {CAMPOS_DE_GRUPO.map(({ campo, rotulo }) => {
+            const separa = recortes.includes(campo);
+            const opcoes = separa ? opcoesDoCampo(campo, geral, grupos) : [];
+            return (
+              <div key={campo} className="pesquisas__filtro-lista">
+                <label
+                  htmlFor={`${base}-${campo}`}
+                  className="pesquisas__rotulo-do-filtro"
+                >
+                  {rotulo}
+                </label>
+                <ListaDeEscolha
+                  id={`${base}-${campo}`}
+                  opcoes={[
+                    { valor: "", rotulo: "Todos" },
+                    ...opcoes.map((o) => ({ valor: o.id, rotulo: o.nome })),
+                  ]}
+                  valor={recorte?.campo === campo ? recorte.grupoId : ""}
+                  onMudar={(v) => void filtrar(campo, v)}
+                  disabled={!separa}
+                  direcao="abaixo"
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {recorte && falhaDoFiltro ? (
@@ -1628,13 +1630,11 @@ function Analises({
                             <span>
                               {l.grupoId === null ? "Toda a empresa" : l.nome}
                             </span>
-                            {/* O vizinho oculto para proteger um grupo menor
-                              não mostra nem a contagem. */}
-                            {l.oculto !== "protege_grupo_menor" ? (
-                              <span className="pesquisas__suave">
-                                {plural(l.respostas, "resposta", "respostas")}
-                              </span>
-                            ) : null}
+                            {/* A contagem aparece até no grupo oculto (o
+                              total e o menor já a revelam); os números, não. */}
+                            <span className="pesquisas__suave">
+                              {plural(l.respostas, "resposta", "respostas")}
+                            </span>
                           </span>
                         </th>
                         {l.visivel ? (

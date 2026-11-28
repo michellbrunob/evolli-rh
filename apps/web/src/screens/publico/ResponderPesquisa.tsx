@@ -498,9 +498,16 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     setEtapa({ tipo: "tela", id });
   }
 
+  /**
+   * A escolha de cada grupo: na NR-1 é obrigatória (sem pré-seleção); no
+   * Pulso e nos outros modelos, "Prefiro não informar" já vem marcado.
+   */
+  const escolhaObrigatoria = pesquisa?.modelo === "copsoq";
+  const grupoDe = (g: GrupoPublico) =>
+    grupos[g.campo] ?? (escolhaObrigatoria ? undefined : NAO_INFORMAR);
   /** O grupo foi escolhido: uma opção da lista ou "Prefiro não informar". */
   const grupoEscolhido = (g: GrupoPublico) => {
-    const v = grupos[g.campo];
+    const v = grupoDe(g);
     return v === NAO_INFORMAR || g.opcoes.some((o) => o.id === v);
   };
 
@@ -861,7 +868,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                       }
                       {...(semEscolha ? { "aria-invalid": true } : {})}
                       vazio="Escolha uma opção"
-                      valor={grupos[g.campo] ?? ""}
+                      valor={grupoDe(g) ?? ""}
                       onMudar={(v) =>
                         setGrupos((atual) => ({ ...atual, [g.campo]: v }))
                       }

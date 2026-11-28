@@ -1342,6 +1342,10 @@ textarea.pesquisas__campo {
   background: var(--status-success-ink);
 }
 
+.pesquisas__ponto--erro {
+  background: var(--status-danger-ink);
+}
+
 .pesquisas__ponto[data-faixa="baixa"] {
   background: var(--status-danger-ink);
 }
@@ -3370,10 +3374,8 @@ textarea.pesquisas__campo {
 }
 
 .pesquisas__proximas-texto {
-  overflow: hidden;
   font-size: 0.78125rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Seletor de tipos agrupado. */
@@ -3874,4 +3876,123 @@ body:has(.pesquisas__rodape) .aviso-flutuante {
 
 .pesquisas--com-rodape > .pesquisas__rodape {
   margin-top: auto;
+}
+
+/* T216 — 4ª revisão (base e fluxo). */
+
+/* A legenda do eNPS no cartão de indicador fica numa linha só. */
+.pesquisas__indicador .pesquisas__legenda {
+  flex-wrap: nowrap;
+  gap: var(--space-xs);
+}
+
+.pesquisas__indicador .pesquisas__legenda li {
+  white-space: nowrap;
+}
+
+/* Personalizada com pouco conteúdo: o rodapé fica no pé da tela. */
+.cadastro-etapas.pesquisas__personalizada {
+  min-height: calc(
+    100dvh - var(--altura-barra-superior, 60px) - var(--main-recuo-y, 0px)
+  );
+}
+
+.pesquisas__personalizada > .cadastro-etapas__form {
+  flex: 1 1 auto;
+}
+
+.pesquisas__personalizada .cadastro-etapas__rodape {
+  margin-top: auto;
+}
+
+/* Recorte com poucas respostas (ou oculto para proteger um grupo menor). */
+.pesquisas__recorte-pequeno {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xl) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  text-align: center;
+}
+
+.pesquisas__recorte-pequeno-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.pesquisas__recorte-pequeno p {
+  max-width: 32rem;
+  margin: 0;
+}
+
+/* Resultado individual: histórico e comentário lado a lado, depois da tabela. */
+.pesquisas__indicadores--dois {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+/* A nota da tabela num quadrado na cor da faixa. */
+.pesquisas__nota-com-escala {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xxs);
+}
+
+.pesquisas__nota-quadrado {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 var(--space-xxs);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.pesquisas__nota-quadrado[data-faixa="baixa"] {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
+}
+
+.pesquisas__nota-quadrado[data-faixa="media"] {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+}
+
+.pesquisas__nota-quadrado[data-faixa="alta"] {
+  background: var(--status-success-surface);
+  color: var(--status-success-ink);
+}
+
+/* Cabeçalho da régua: "○ Resposta | Média do time" e as pontas. */
+.pesquisas__legenda-da-regua {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs) var(--space-sm);
+  font-weight: var(--weight-medium);
+}
+
+.pesquisas__legenda-da-regua > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.pesquisas__legenda-resposta {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 2px solid var(--color-ink);
+  border-radius: 50%;
+}
+
+.pesquisas__legenda-time {
+  width: 2px;
+  height: 0.75rem;
+  background: var(--color-ink-muted);
 }

@@ -1277,8 +1277,10 @@ null` (número). Os tipos do cliente dizem `number | null`; `null` e ausente val
 - **Tempo estimado (regra única):** `max(3, round(n × 0,3))` minutos — página pública, API
   (`minutosEstimados`), assistentes, Onboarding e o texto de todos os catálogos (um teste confere
   que o número escrito em cada modelo é o da regra). Avaliações seguem "por pessoa".
-- **"Separar por" na anônima:** sem pré-seleção; a pessoa escolhe um grupo ou "Prefiro não
-  informar" (que vai como `null`) antes de iniciar.
+- **"Separar por" na anônima:** (revisto na 4ª revisão) no Pulso e nos modelos comuns, "Prefiro
+  não informar" já vem marcado e "Iniciar" entra direto; na NR-1 (`copsoq`) a escolha é
+  obrigatória, sem pré-seleção, com "Prefiro não informar" entre as opções. "Prefiro não
+  informar" vai como `null`.
 - **Falha ao gravar:** página desatualizada (403 `csrf_invalido`), sessão expirada (401 ou renovação
   recusada), sem permissão (403), 409, 422 e 5xx têm mensagem própria; "verifique a conexão" só sem
   resposta do servidor.
@@ -1529,3 +1531,77 @@ Regras:
 - **Assistente do Clima:** grupos por dimensão recolhíveis (só o primeiro aberto; o cabeçalho mostra
   "Afirmações 13–24"; "Expandir todas"/"Recolher todas"; o grupo que recebe uma pergunta nova abre) e a
   alça "Arrastar pergunta N" reordena só dentro da mesma dimensão (arrastar ou setas ↑/↓).
+
+## 4ª revisão — base, fluxo, resultados gerais e exportação geral (28/11/2026)
+
+Decisões:
+
+- **CSRF desatualizado:** toda escrita do cliente de Pesquisas (`pedir`) que recebe 403
+  `csrf_invalido` descarta o token, renova e repete UMA vez (o pedido não foi aplicado); outro 403
+  ou a segunda recusa seguem como erro. Vale para rascunho, publicação, status, duplicar e excluir.
+- **Gravação automática do assistente dos modelos:** a falha troca "Rascunho salvo às" por
+  "Rascunho não salvo" (com "· tentando de novo" enquanto houver tentativa) e mostra a mensagem
+  de `mensagemDaFalha`. Falha passageira (`falhaPassageira`: rede, pedido que não saiu, 5xx, token
+  desatualizado) tenta de novo sozinha com recuo — 2 s, 4 s e 8 s — e para; sessão expirada,
+  permissão, 409 e 422 não tentam sozinhos. Depois disso, só uma nova mudança regrava. A mudança
+  de status mostra o motivo (`motivoDaFalha`) no aviso.
+- **Nome da empresa no painel:** o shell entrega `nomeDaEmpresa` ao módulo; enquanto o módulo
+  está na tela, o marcador `{empresa}` das perguntas vira o nome da empresa ativa no Sobre o
+  modelo, assistente, resultados, resultado individual, planilha e PDF (sem nome, "nossa
+  empresa"). A pesquisa gravada continua com o marcador.
+- **Grupos de nome repetido:** "Nome (código)" também nos resultados (filtro, mapa das Análises),
+  participantes, planilha e PDF — a API compara com o catálogo ativo e os grupos pedidos.
+- **Filtros dos resultados:** Departamento, Centro de custo e Unidade aparecem sempre; os que não
+  separam a pesquisa ficam em "Todos", desabilitados. Recorte pequeno: cartão "Recorte com poucas
+  respostas" (borda, ícone em círculo e o texto).
+- **Grupo oculto para proteger um menor:** mostra a contagem de respostas (no mapa e na planilha);
+  os números seguem ocultos (supressão secundária mantida). No PDF, "—" como antes.
+- **Resultado individual:** os quatro cartões (média geral e recomendação em cor neutra, com o
+  selo da faixa ou do grupo ao lado; nota mais alta e mais baixa coloridas; sem régua na média);
+  depois "Respostas por pergunta" (nota num quadrado colorido, cabeçalho "Resposta | Média do
+  time" e "1 … 10", diferença "+1,5 acima do time", "−0,4 abaixo do time" ou "igual ao time");
+  por fim "Média nos últimos pulsos" e "Comentário livre". Anônima e confidencial: "Ainda sem
+  histórico". Resposta inexistente (400/404): "Resposta não encontrada", só com a volta.
+- **Quem emitiu:** sem nome de exibição, o outro identificador da conta (o e-mail de acesso) na
+  linha 2 da planilha e nos PDFs (o geral e o de uma resposta).
+- **Sobre o modelo do Pulso:** título "Pesquisa Pulso" com o selo "Rápida · recorrente"; faixa de
+  números com ícone, número em destaque e o rótulo embaixo; a prévia "Como a pessoa responde"
+  funciona (nota na cor da faixa, rótulos das pontas, "Próxima →" só com a nota, comentário
+  opcional e "Recomeçar" na última tela).
+- **Planilha geral (Pulso e Personalizada):** o Resumo ganha o índice "Abas desta planilha" (as abas
+  que existem, com o que cada uma traz); novas abas **Preenchimento** (convidados, respostas,
+  faltam, % e ação "ok" com 50% ou mais, "cobrar" abaixo — por departamento com o total, por
+  centro de custo e por unidade quando o cadastro tem) e **Participação** (por combinação de
+  departamento × centro de custo × unidade e por pessoa, Sim/Não) — só presença, nunca a nota; só
+  com convidados (a anônima não tem as duas). **Evolução** com a média geral e o eNPS das pesquisas
+  do mesmo modelo (o dado das Análises); na primeira, o aviso de que a evolução vem a partir da
+  próxima. Participantes: cabeçalhos com o texto inteiro ("1. <texto>") e "eNPS · <texto>" na
+  recomendação; "Média (1 a 10)". Sem "Análise por IA".
+- **Página pública com "Separar por":** ver a regra revista acima (pré-seleção fora da NR-1).
+
+Contrato novo:
+
+```ts
+// API
+// ParticipanteDaLista (GET /pesquisas/:id → participantesLista[]) ganha:
+//   centroCusto: string | null; unidade: string | null;   // da lotação vigente
+// AnalisesPesquisa.evolucao[].enps?: number   // fora do modelo eNPS, só quando há índice
+// nomesDosGrupos(db, empresaId, ids): nome repetido no catálogo → "Nome (código)"
+// Identificada: RespostaResumo.departamento com o mesmo nome dos grupos.
+
+// Web
+// pedir(): repete UMA vez a escrita recusada com 403 csrf_invalido.
+// falhaPassageira(erro): boolean; motivoDaFalha(erro): string   (falhasDaGravacao.ts)
+// AssistenteDoModelo: prop recuoDoRascunho?: number (ms; dobra a cada tentativa, até 3)
+// PesquisasModulo: prop nomeDaEmpresa?: string | null
+// modelos/empresa.ts: definirEmpresaDoPainel(nome), useEmpresaDoPainel(nome);
+//   textoParaOPainel(texto, empresa?), secoesParaOPainel(secoes, empresa?),
+//   detalheParaOPainel(detalhe, empresa?), analisesParaOPainel(analises, empresa?)
+// posicaoDaLista(gatilho, limiteDeBaixo, altura, limiteDeCima = 0)
+// quemEmiteDaConta({ nomeExibicao, email }): string | null
+// DocumentoDaResposta: prop emitidoPor?: string | null
+// PaginaSobre.numeros[].icone?: "perguntas" | "recomendacao" | "comentario" | "frequencia"
+// PreviaDeResposta / telasDaPrevia(perguntas, comentarioFinal)
+// ParticipanteDaPesquisa: centroCusto?: string | null; unidade?: string | null
+```
+

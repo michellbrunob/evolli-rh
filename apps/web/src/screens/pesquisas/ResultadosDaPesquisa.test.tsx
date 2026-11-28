@@ -302,7 +302,7 @@ describe("Resultados — Visão geral", () => {
     expect(cartao).toHaveTextContent("Pessoa Exemplo");
   });
 
-  it("recorte abaixo do mínimo: 'Poucas respostas para mostrar'", async () => {
+  it("recorte abaixo do mínimo: 'Recorte com poucas respostas'", async () => {
     const { servico } = montar({
       resultadosDaPesquisa: vi.fn((_id: string, recorte?: unknown) =>
         Promise.resolve(
@@ -320,7 +320,7 @@ describe("Resultados — Visão geral", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
     fireEvent.click(screen.getByRole("option", { name: "Financeiro" }));
     expect(
-      await screen.findByText("Poucas respostas para mostrar"),
+      await screen.findByText("Recorte com poucas respostas"),
     ).toBeInTheDocument();
     expect(servico.resultadosDaPesquisa).toHaveBeenLastCalledWith("p-1", "d-2");
     expect(screen.queryByRole("region", { name: "eNPS" })).toBeNull();
@@ -333,7 +333,10 @@ describe("Resultados — Visão geral", () => {
       ),
     });
     await screen.findByRole("region", { name: "Indicadores" });
-    expect(screen.queryByRole("combobox", { name: "Departamento" })).toBeNull();
+    // Fora dos recortes, o filtro aparece em "Todos", desabilitado.
+    expect(
+      screen.getByRole("combobox", { name: "Departamento" }),
+    ).toBeDisabled();
     fireEvent.click(screen.getByRole("combobox", { name: "Unidade" }));
     fireEvent.click(await screen.findByRole("option", { name: "Filial Sul" }));
     await waitFor(() =>
@@ -500,6 +503,7 @@ describe("Resultados — Exportar", () => {
       "eNPS",
       "Por departamento",
       "Comentários",
+      "Evolução",
       "Alertas",
       "Metodologia",
     ]);
@@ -517,8 +521,10 @@ describe("Resultados — Exportar", () => {
     expect(ana![0]).toBe("Ana Exemplo");
     // 20/11/2026 11:23 (Brasília) como data serial do Excel.
     expect(Number(ana![2])).toBeCloseTo(46346 + (11 * 60 + 23) / 1440, 5);
-    const nota = cabecalho!.findIndex((c) => c.startsWith("1."));
+    // A recomendação sai como "eNPS · <texto>"; a numeração segue nas outras.
+    const nota = cabecalho!.findIndex((c) => c.startsWith("eNPS · "));
     expect(ana![nota]).toBe("10");
+    expect(ana![cabecalho!.findIndex((c) => c.startsWith("1."))]).toBe("5");
   });
 
   it("Excel na anônima numera os participantes, sem nome", async () => {

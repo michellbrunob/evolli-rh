@@ -44,16 +44,14 @@ describe("Resultado individual", () => {
     const ind = screen.getByRole("region", { name: "Indicadores da resposta" });
     expect(ind).toHaveTextContent("Média geral10,0 /10");
     expect(ind).toHaveTextContent("+1,5 acima do time (8,5)");
-    expect(ind).toHaveTextContent(
-      "Recomendação10 /10Promotor · eNPS do time 50",
-    );
+    expect(ind).toHaveTextContent("Recomendação10 /10PromotoreNPS do time 50");
     const tabela = screen.getByRole("table", { name: "Comparação com o time" });
     const [, linha] = within(tabela).getAllByRole("row");
     expect(linha).toHaveTextContent("Tenho clareza das prioridades.");
     // Nota inteira, sem ",0".
-    expect(linha).toHaveTextContent("5 /5");
-    expect(linha).not.toHaveTextContent("5,0 /5");
-    expect(linha).toHaveTextContent("+0,8time 4,3");
+    expect(linha).toHaveTextContent("5/5");
+    expect(linha).not.toHaveTextContent("5,0/5");
+    expect(linha).toHaveTextContent("+0,8 acima do timetime 4,3");
   });
 
   it("faixa da média, últimos pulsos, comentário livre e o seletor de respostas", async () => {
@@ -86,8 +84,14 @@ describe("Resultado individual", () => {
       name: "Indicadores da resposta",
     });
     expect(ind).toHaveTextContent("Média geral10,0 /108 ou mais");
-    expect(ind).toHaveTextContent("Média nos últimos pulsos7,5 /10");
-    expect(ind).toHaveTextContent("Comentário livreNenhum comentário deixado.");
+    // Histórico e comentário vêm depois de "Respostas por pergunta".
+    const historico = screen.getByRole("region", {
+      name: "Histórico e comentário",
+    });
+    expect(historico).toHaveTextContent("Média nos últimos pulsos7,5 /10");
+    expect(historico).toHaveTextContent(
+      "Comentário livreNenhum comentário deixado.",
+    );
     // "1 de 2 ⌄": todas as respostas, da mais recente, com a média.
     fireEvent.pointerDown(
       await screen.findByRole("button", {
@@ -121,10 +125,10 @@ describe("Resultado individual", () => {
         onVoltar={vi.fn()}
       />,
     );
-    const ind = await screen.findByRole("region", {
-      name: "Indicadores da resposta",
+    const historico = await screen.findByRole("region", {
+      name: "Histórico e comentário",
     });
-    expect(ind).toHaveTextContent(
+    expect(historico).toHaveTextContent(
       "Média nos últimos pulsosSem pulsos anteriores para comparar.",
     );
   });

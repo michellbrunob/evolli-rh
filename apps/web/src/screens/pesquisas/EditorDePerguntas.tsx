@@ -135,19 +135,23 @@ const numeroDe = (v: string): number | undefined =>
 const ALTURA_DA_LISTA = 448;
 /** Folga entre a lista e o que a limita (rodapé fixo ou topo da tela). */
 const FOLGA_DA_LISTA = 8;
+/** O que fica preso no topo da tela por cima do conteúdo. */
+const TOPO_FIXO = ".barra-superior, [data-topo-fixo]";
 
 /**
  * Para onde a lista abre: para baixo quando cabe até o rodapé fixo do
  * assistente (ou o fim da tela); senão, para o lado com mais espaço — e
- * nunca atrás do rodapé. A altura fica limitada ao espaço que sobra.
+ * nunca atrás do rodapé nem da barra fixa do topo (`limiteDeCima`, o pé da
+ * barra). A altura fica limitada ao espaço que sobra.
  */
 export function posicaoDaLista(
   gatilho: { readonly top: number; readonly bottom: number },
   limiteDeBaixo: number,
   altura: number,
+  limiteDeCima = 0,
 ): { readonly acima: boolean; readonly alturaMaxima: number } {
   const abaixo = limiteDeBaixo - gatilho.bottom - FOLGA_DA_LISTA;
-  const acima = gatilho.top - FOLGA_DA_LISTA;
+  const acima = gatilho.top - Math.max(0, limiteDeCima) - FOLGA_DA_LISTA;
   const precisa = Math.min(altura, ALTURA_DA_LISTA);
   const paraCima = precisa > abaixo && acima > abaixo;
   return {
@@ -188,7 +192,14 @@ function ListaDeTipos({
     const r = gatilho.getBoundingClientRect();
     // Sem medidas (fora do navegador), fica como está: para baixo.
     if (r.top === 0 && r.bottom === 0) return;
-    setPosicao(posicaoDaLista(r, limite, lista.scrollHeight));
+    // A barra fixa do topo (e cabeçalhos presos) cobrem o começo da tela.
+    const topo = Math.max(
+      0,
+      ...[...document.querySelectorAll<HTMLElement>(TOPO_FIXO)].map(
+        (el) => el.getBoundingClientRect().bottom,
+      ),
+    );
+    setPosicao(posicaoDaLista(r, limite, lista.scrollHeight, topo));
   }, []);
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>("button")?.focus();

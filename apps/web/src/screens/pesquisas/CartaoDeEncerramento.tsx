@@ -42,8 +42,9 @@ export function CartaoDeEncerramento({
   // A data passada aparece já no campo, sem esperar o avanço da etapa.
   const aviso = erro ?? erroDoEncerramento(data, hora, hoje) ?? undefined;
   const titulo = compacto ? "Encerramento" : "Encerrar automaticamente";
+  // Com a data inválida, a frase não promete encerrar numa data.
   const frase = ligado
-    ? data
+    ? data && !aviso
       ? `Depois de ${formatarDiaCivil(data)} às ${hora}, o link avisa que a pesquisa encerrou e não aceita mais respostas. Você ainda pode finalizar antes, pelo status.`
       : "Depois da data e da hora escolhidas, o link avisa que a pesquisa encerrou e não aceita mais respostas."
     : "Sem prazo, a pesquisa fica aberta até você mudar o status para Finalizada.";

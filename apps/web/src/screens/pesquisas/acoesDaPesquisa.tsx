@@ -31,6 +31,7 @@ import {
 } from "../../ui";
 import { IconeAbrir, IconeCopiar, IconeRemover } from "../../ui/icones";
 import { useAvisar } from "./avisos";
+import { motivoDaFalha } from "./falhasDaGravacao";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import {
@@ -97,9 +98,9 @@ export function MenuDeStatus({
       const d = await servico.alterarStatusDaPesquisa(pesquisa.id, status);
       onMudou(d);
       avisar(AVISO_DO_STATUS[status]);
-    } catch {
+    } catch (erro) {
       avisar("Não foi possível mudar o status.", {
-        texto: "Atualize a página e tente de novo.",
+        texto: motivoDaFalha(erro),
         tom: "erro",
       });
     } finally {

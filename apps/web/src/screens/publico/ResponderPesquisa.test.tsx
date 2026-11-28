@@ -329,9 +329,37 @@ describe("T216 — pesquisa indisponível", () => {
 });
 
 describe("T216 — separação por grupo (anônima)", () => {
-  it("escolhe os grupos antes de começar: sem pré-seleção, 'Prefiro não informar' é uma escolha", async () => {
+  it("Pulso e modelos comuns: 'Prefiro não informar' já vem marcado e Iniciar entra direto", async () => {
     const cliente = criarCliente(
-      pesquisaDeTeste("anonima", { grupos: GRUPOS }),
+      pesquisaDeTeste("anonima", { grupos: GRUPOS, modelo: "pulso" }),
+    );
+    await abrir(cliente);
+    const depto = screen.getByRole("combobox", { name: "Departamento" });
+    const unidade = screen.getByRole("combobox", { name: "Unidade" });
+    expect(depto).toHaveTextContent("Prefiro não informar");
+    expect(unidade).toHaveTextContent("Prefiro não informar");
+    fireEvent.click(depto);
+    fireEvent.click(screen.getByRole("option", { name: "Operações" }));
+    iniciar();
+    expect(
+      screen.queryByRole("button", { name: "Iniciar pesquisa" }),
+    ).not.toBeInTheDocument();
+    irAoFim();
+    enviar();
+    await screen.findByRole("heading", {
+      name: "Agradecemos a sua participação!",
+    });
+    expect(cliente.enviarRespostas).toHaveBeenCalledWith(
+      TOKEN,
+      expect.objectContaining({
+        grupos: { departamento: "d2", unidade: null },
+      }),
+    );
+  });
+
+  it("NR-1: escolhe os grupos antes de começar: sem pré-seleção, 'Prefiro não informar' é uma escolha", async () => {
+    const cliente = criarCliente(
+      pesquisaDeTeste("anonima", { grupos: GRUPOS, modelo: "copsoq" }),
     );
     await abrir(cliente);
     const depto = screen.getByRole("combobox", { name: "Departamento" });

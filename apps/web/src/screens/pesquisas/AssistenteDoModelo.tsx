@@ -83,7 +83,7 @@ import {
   ROTULO_DA_IDENTIFICACAO,
   novoId,
 } from "./textosDasPesquisas";
-import { mensagemDaFalha } from "./falhasDaGravacao";
+import { falhaPassageira, mensagemDaFalha } from "./falhasDaGravacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 
 const ETAPAS_COMPLETAS = [
@@ -143,6 +143,11 @@ function explicacaoDaEscala(m: ModeloDaGaleria): {
 const horaDe = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
+/** Novas tentativas sozinhas do rascunho depois de uma falha passageira. */
+const TENTATIVAS_AUTOMATICAS = 3;
+/** Espera (ms) da 1ª nova tentativa; dobra a cada vez (2 s, 4 s, 8 s). */
+const RECUO_DO_RASCUNHO = 2000;
+
 /** A tela sozinha (fora do módulo) ganha o próprio provedor de avisos. */
 export function AssistenteDoModelo(
   props: Parameters<typeof AssistenteDoModeloInterno>[0],
@@ -161,6 +166,7 @@ function AssistenteDoModeloInterno({
   hoje,
   agora = () => new Date(),
   atrasoDoRascunho = 1200,
+  recuoDoRascunho = RECUO_DO_RASCUNHO,
   onCancelar,
   onConcluir,
   onVerResultados,
@@ -178,6 +184,11 @@ function AssistenteDoModeloInterno({
   readonly agora?: () => Date;
   /** Espera (ms) antes de gravar o rascunho depois de uma mudança. */
   readonly atrasoDoRascunho?: number;
+  /**
+   * Espera (ms) da 1ª nova tentativa depois de uma falha passageira; dobra a
+   * cada tentativa, até `TENTATIVAS_AUTOMATICAS`.
+   */
+  readonly recuoDoRascunho?: number;
   /** Sair: rascunho guardado (ou edição descartada). */
   readonly onCancelar: (mensagem?: string) => void;
   readonly onConcluir: () => void;
@@ -210,8 +221,17 @@ function AssistenteDoModeloInterno({
 
   const idRef = useRef<string | null>(estado.id);
   const filaRef = useRef<Promise<unknown>>(Promise.resolve());
-  /** O conteúdo cuja gravação automática falhou: só tenta de novo com outra mudança. */
-  const falhouRef = useRef<string | null>(null);
+  /**
+   * A gravação automática que falhou: o conteúdo, quantas vezes e a mensagem.
+   * Falha passageira tenta de novo sozinha, com recuo, até o limite; depois
+   * (ou falha que não passa sozinha), só com outra mudança.
+   */
+  const [falhaDoRascunho, setFalhaDoRascunho] = useState<{
+    readonly serial: string;
+    readonly tentativas: number;
+    readonly passageira: boolean;
+    readonly mensagem: string;
+  } | null>(null);
   /** Funções vindas de fora, lidas na hora (o shell as recria a cada desenho). */
   const externosRef = useRef({
     servico,
@@ -261,7 +281,7 @@ function AssistenteDoModeloInterno({
           d = await ext.servico.alterarPesquisa(idRef.current, corpo);
         }
         if (d) setGravada(d);
-        falhouRef.current = null;
+        setFalhaDoRascunho(null);
         setReferencia(texto);
         const quando = ext.agora();
         setSalvoAs(horaDe(quando));
@@ -276,24 +296,54 @@ function AssistenteDoModeloInterno({
   }, []);
 
   // Rascunho gravado ao abrir (modelo novo) e a cada mudança, com espera.
+  // Falha passageira: nova tentativa com recuo (dobra a cada vez), até o
+  // limite; o mesmo conteúdo nunca regrava sem parar.
   useEffect(() => {
     if (publicadaAntes || gerada || serial === referencia) return;
-    if (falhouRef.current === serial) return;
+    const anterior =
+      falhaDoRascunho?.serial === serial ? falhaDoRascunho : null;
+    if (
+      anterior &&
+      (!anterior.passageira || anterior.tentativas > TENTATIVAS_AUTOMATICAS)
+    )
+      return;
     const t = window.setTimeout(
       () => {
-        gravar(estado).catch(() => {
-          falhouRef.current = serial;
-          setFalha(
-            "Não foi possível salvar o rascunho. Vamos tentar de novo na próxima mudança.",
-          );
+        gravar(estado).catch((erro: unknown) => {
+          setFalhaDoRascunho({
+            serial,
+            tentativas: (anterior?.tentativas ?? 0) + 1,
+            passageira: falhaPassageira(erro),
+            mensagem: mensagemDaFalha(erro, "salvar o rascunho"),
+          });
         });
       },
-      idRef.current === null ? 0 : atrasoDoRascunho,
+      anterior
+        ? recuoDoRascunho * 2 ** (anterior.tentativas - 1)
+        : idRef.current === null
+          ? 0
+          : atrasoDoRascunho,
     );
     return () => window.clearTimeout(t);
     // `estado` acompanha `serial`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serial, referencia, publicadaAntes, gerada, atrasoDoRascunho, gravar]);
+  }, [
+    serial,
+    referencia,
+    publicadaAntes,
+    gerada,
+    atrasoDoRascunho,
+    recuoDoRascunho,
+    gravar,
+    falhaDoRascunho,
+  ]);
+  /** Ainda vai tentar de novo sozinha (a falha do conteúdo atual). */
+  const falhaAtual =
+    falhaDoRascunho?.serial === serial ? falhaDoRascunho : null;
+  const tentandoDeNovo =
+    falhaAtual !== null &&
+    falhaAtual.passageira &&
+    falhaAtual.tentativas <= TENTATIVAS_AUTOMATICAS;
 
   // O navegador lembra onde a pessoa parou.
   useEffect(() => {
@@ -431,6 +481,14 @@ function AssistenteDoModeloInterno({
               />
               {`Pesquisa criada às ${criadaAs}`}
             </>
+          ) : falhaAtual ? (
+            <>
+              <span
+                className="pesquisas__ponto pesquisas__ponto--erro"
+                aria-hidden="true"
+              />
+              {`Rascunho não salvo${tentandoDeNovo ? " · tentando de novo" : ""}`}
+            </>
           ) : gravando && !salvoAs ? (
             "Salvando rascunho…"
           ) : salvoAs ? (
@@ -514,9 +572,14 @@ function AssistenteDoModeloInterno({
         />
       )}
 
-      {falha ? (
+      {falha || falhaAtual ? (
         <p className="pesquisas__erro" role="alert">
-          {falha}
+          {falha ??
+            `${falhaAtual!.mensagem} ${
+              tentandoDeNovo
+                ? "Uma nova tentativa sai sozinha em instantes."
+                : "A próxima mudança tenta de novo."
+            }`}
         </p>
       ) : null}
 

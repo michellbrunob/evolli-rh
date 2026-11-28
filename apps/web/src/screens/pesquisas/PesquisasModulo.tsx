@@ -108,6 +108,7 @@ import {
   participacao,
   podeEditarPesquisa,
 } from "./textosDasPesquisas";
+import { useEmpresaDoPainel } from "./modelos/empresa";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import {
   AssistenteProprio,
@@ -146,10 +147,17 @@ export function PesquisasModulo(props: {
   ) => void;
   /** Acesso global, sem empresa ativa: nada é consultado. */
   readonly semEmpresa?: boolean;
+  /**
+   * O nome da empresa ativa: entra no lugar do marcador `{empresa}` das
+   * perguntas em todo o painel (sem ele, "nossa empresa").
+   */
+  readonly nomeDaEmpresa?: string | null;
 }) {
+  const { nomeDaEmpresa, ...resto } = props;
+  useEmpresaDoPainel(nomeDaEmpresa);
   return (
     <ProvedorDeAvisos>
-      <Modulo {...props} />
+      <Modulo {...resto} />
     </ProvedorDeAvisos>
   );
 }

@@ -71,15 +71,17 @@ const diferenca = (v: number, time: number) => {
   return `${d > 0 ? "+" : d < 0 ? "−" : ""}${umaCasa(Math.abs(d))}`;
 };
 
-/** "+1,5 acima do time (8,5)", "−0,4 abaixo…" ou "igual ao time (8,5)". */
-const comparadoAoTime = (v: number, time: number) => {
+/** "+1,5 acima do time", "−0,4 abaixo do time" ou "igual ao time". */
+const frenteAoTime = (v: number, time: number) => {
   const d = diferencaComUmaCasa(v, time);
-  const quanto =
-    d === 0
-      ? "igual ao time"
-      : `${diferenca(v, time)} ${d > 0 ? "acima" : "abaixo"} do time`;
-  return `${quanto} (${umaCasa(time)})`;
+  return d === 0
+    ? "igual ao time"
+    : `${diferenca(v, time)} ${d > 0 ? "acima" : "abaixo"} do time`;
 };
+
+/** "+1,5 acima do time (8,5)", "−0,4 abaixo…" ou "igual ao time (8,5)". */
+const comparadoAoTime = (v: number, time: number) =>
+  `${frenteAoTime(v, time)} (${umaCasa(time)})`;
 
 function grupoDoEnps(v: number): string {
   return v >= 9 ? "Promotor" : v >= 7 ? "Neutro" : "Detrator";
@@ -210,7 +212,7 @@ export function PaginaDaResposta({
   readonly onTitulo?: (titulo: string) => void;
 }) {
   const [r, setR] = useState<RespostaDetalhe | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  const [falhou, setFalhou] = useState<Falha | null>(null);
   const [tentativa, setTentativa] = useState(0);
   const [aba, setAba] = useState<"geral" | "respostas">("geral");
   const [todasAsRespostas, setTodasAsRespostas] = useState<
@@ -239,13 +241,13 @@ export function PaginaDaResposta({
 
   useEffect(() => {
     let vivo = true;
-    setFalhou(false);
+    setFalhou(null);
     Promise.resolve(carregar(respostaId))
       .then((d) => {
         if (vivo) setR(d);
       })
-      .catch(() => {
-        if (vivo) setFalhou(true);
+      .catch((erro: unknown) => {
+        if (vivo) setFalhou(tipoDaFalha(erro));
       });
     return () => {
       vivo = false;
@@ -265,6 +267,37 @@ export function PaginaDaResposta({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tituloCarregado]);
 
+  if (falhou === "nao-encontrada")
+    return (
+      <div className="pesquisas">
+        <header className="pesquisas__cabecalho">
+          <IconButton
+            label="Voltar"
+            icon={<IconeVoltar tamanho={18} />}
+            className="pesquisas__voltar"
+            onClick={onVoltar}
+          />
+          <h1
+            id={PESQUISAS_TITULO_ID}
+            className="pesquisas__titulo"
+            tabIndex={-1}
+          >
+            Resposta não encontrada
+          </h1>
+        </header>
+        <div className="pesquisas__caixa-erro" role="alert">
+          <p className="pesquisas__erro">
+            O endereço não corresponde a uma resposta desta pesquisa. Ela pode
+            ter sido excluída.
+          </p>
+          <div className="pesquisas__acoes">
+            <Button variant="secondary" onClick={onVoltar}>
+              {rotuloVoltar}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   if (falhou)
     return (
       <div className="pesquisas">
@@ -457,35 +490,26 @@ export function PaginaDaResposta({
           >
             <div className="pesquisas__indicador">
               <h3>Média geral</h3>
+              {/* O número em cor neutra; a faixa vai no selo, ao lado. */}
               <p className="pesquisas__indicador-valor">
-                <span
-                  className="pesquisas__indicador-numero"
-                  {...(ind.media !== null
-                    ? { "data-faixa": faixaDaMedia10(ind.media) }
-                    : {})}
-                >
+                <span className="pesquisas__indicador-numero">
                   {ind.media === null ? "—" : umaCasa(ind.media)}
                 </span>
                 <span className="pesquisas__indicador-sufixo"> /10</span>
+                {ind.media !== null ? (
+                  <span
+                    className="pesquisas__nota-colorida pesquisas__indicador-selo"
+                    data-faixa={faixaDaMedia10(ind.media)}
+                  >
+                    {ROTULO_DA_FAIXA_DA_MEDIA[faixaDaMedia10(ind.media)]}
+                  </span>
+                ) : null}
               </p>
-              {ind.media !== null ? (
-                <span
-                  className="pesquisas__nota-colorida"
-                  data-faixa={faixaDaMedia10(ind.media)}
-                >
-                  {ROTULO_DA_FAIXA_DA_MEDIA[faixaDaMedia10(ind.media)]}
-                </span>
-              ) : null}
               {ind.media !== null && ind.mediaTime !== null ? (
                 <p className="pesquisas__suave">
                   {comparadoAoTime(ind.media, ind.mediaTime)}
                 </p>
               ) : null}
-              <Regua
-                valor={ind.media}
-                referencia={ind.mediaTime}
-                rotulo="Média geral da resposta"
-              />
             </div>
             <div className="pesquisas__indicador">
               <h3>Recomendação</h3>
@@ -496,17 +520,22 @@ export function PaginaDaResposta({
               ) : (
                 <>
                   <p className="pesquisas__indicador-valor">
-                    <span
-                      className="pesquisas__indicador-numero"
-                      data-faixa={faixaDaRecomendacao(ind.recomendacao)}
-                    >
+                    <span className="pesquisas__indicador-numero">
                       {ind.recomendacao}
                     </span>
                     <span className="pesquisas__indicador-sufixo"> /10</span>
+                    <span
+                      className="pesquisas__nota-colorida pesquisas__indicador-selo"
+                      data-faixa={faixaDaRecomendacao(ind.recomendacao)}
+                    >
+                      {grupoDoEnps(ind.recomendacao)}
+                    </span>
                   </p>
-                  <p className="pesquisas__suave">
-                    {`${grupoDoEnps(ind.recomendacao)}${ind.enpsTime !== null ? ` · eNPS do time ${ind.enpsTime}` : ""}`}
-                  </p>
+                  {ind.enpsTime !== null ? (
+                    <p className="pesquisas__suave">
+                      {`eNPS do time ${ind.enpsTime}`}
+                    </p>
+                  ) : null}
                 </>
               )}
             </div>
@@ -546,9 +575,7 @@ export function PaginaDaResposta({
                       </p>
                       {time !== null ? (
                         <p className="pesquisas__suave">
-                          {diferencaComUmaCasa(x.valor, time) === 0
-                            ? `igual ao time (${umaCasa(time)})`
-                            : `${diferenca(x.valor, time)} em relação ao time (${umaCasa(time)})`}
+                          {comparadoAoTime(x.valor, time)}
                         </p>
                       ) : null}
                     </>
@@ -558,34 +585,6 @@ export function PaginaDaResposta({
                 </div>
               );
             })}
-            <div className="pesquisas__indicador">
-              <h3>Média nos últimos pulsos</h3>
-              {typeof ind.mediaUltimosPulsos === "number" ? (
-                <>
-                  <p className="pesquisas__indicador-valor">
-                    {umaCasa(ind.mediaUltimosPulsos)}
-                    <span className="pesquisas__suave"> /10</span>
-                  </p>
-                  {ind.media !== null ? (
-                    <p className="pesquisas__suave">{`${diferenca(ind.media, ind.mediaUltimosPulsos)} nesta resposta`}</p>
-                  ) : null}
-                </>
-              ) : (
-                <p className="pesquisas__suave">
-                  Sem pulsos anteriores para comparar.
-                </p>
-              )}
-            </div>
-            <div className="pesquisas__indicador pesquisas__indicador--largo">
-              <h3>Comentário livre</h3>
-              {comentario ? (
-                <blockquote className="pesquisas__comentario">
-                  {comentario}
-                </blockquote>
-              ) : (
-                <p className="pesquisas__suave">Nenhum comentário deixado.</p>
-              )}
-            </div>
           </section>
 
           <section
@@ -611,7 +610,28 @@ export function PaginaDaResposta({
                     <tr>
                       <th scope="col">Pergunta</th>
                       <th scope="col">Nota</th>
-                      <th scope="col">Comparação com o time</th>
+                      <th scope="col">
+                        <span className="pesquisas__legenda-da-regua">
+                          <span>
+                            <span
+                              className="pesquisas__legenda-resposta"
+                              aria-hidden="true"
+                            />
+                            Resposta
+                          </span>
+                          <span>
+                            <span
+                              className="pesquisas__legenda-time"
+                              aria-hidden="true"
+                            />
+                            Média do time
+                          </span>
+                        </span>
+                        <span className="pesquisas__regua-pontas">
+                          <span>1</span> <span aria-hidden="true">…</span>{" "}
+                          <span>10</span>
+                        </span>
+                      </th>
                       <th scope="col">Diferença</th>
                     </tr>
                   </thead>
@@ -646,11 +666,14 @@ export function PaginaDaResposta({
                             {nota10 === null ? (
                               "—"
                             ) : (
-                              <span
-                                className="pesquisas__nota-colorida"
-                                data-faixa={faixaDaMedia10(nota10)}
-                              >
-                                {`${nota(valorDaNota)} /${e.maximo}`}
+                              <span className="pesquisas__nota-com-escala">
+                                <span
+                                  className="pesquisas__nota-quadrado"
+                                  data-faixa={faixaDaMedia10(nota10)}
+                                >
+                                  {nota(valorDaNota)}
+                                </span>
+                                <span className="pesquisas__suave">{`/${e.maximo}`}</span>
                               </span>
                             )}
                           </td>
@@ -665,12 +688,7 @@ export function PaginaDaResposta({
                             {nota10 !== null && v.mediaTime !== null ? (
                               <span className="pesquisas__pessoa-textos">
                                 <span className="pesquisas__forte">
-                                  {diferencaComUmaCasa(
-                                    valorDaNota,
-                                    v.mediaTime,
-                                  ) === 0
-                                    ? "igual"
-                                    : diferenca(valorDaNota, v.mediaTime)}
+                                  {frenteAoTime(valorDaNota, v.mediaTime)}
                                 </span>
                                 <span className="pesquisas__suave">{`time ${umaCasa(v.mediaTime)}`}</span>
                               </span>
@@ -685,6 +703,51 @@ export function PaginaDaResposta({
                 </table>
               </div>
             )}
+          </section>
+
+          <section
+            className="pesquisas__indicadores pesquisas__indicadores--dois"
+            aria-label="Histórico e comentário"
+          >
+            <div className="pesquisas__indicador">
+              <h3>Média nos últimos pulsos</h3>
+              {identificacao !== "identificada" ? (
+                // Sem pessoa, não há histórico de quem respondeu.
+                <>
+                  <p className="pesquisas__forte">Ainda sem histórico</p>
+                  <p className="pesquisas__suave">
+                    O histórico de cada pessoa só existe nas pesquisas
+                    identificadas.
+                  </p>
+                </>
+              ) : typeof ind.mediaUltimosPulsos === "number" ? (
+                <>
+                  <p className="pesquisas__indicador-valor">
+                    <span className="pesquisas__indicador-numero">
+                      {umaCasa(ind.mediaUltimosPulsos)}
+                    </span>
+                    <span className="pesquisas__indicador-sufixo"> /10</span>
+                  </p>
+                  {ind.media !== null ? (
+                    <p className="pesquisas__suave">{`${diferenca(ind.media, ind.mediaUltimosPulsos)} nesta resposta`}</p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="pesquisas__suave">
+                  Sem pulsos anteriores para comparar.
+                </p>
+              )}
+            </div>
+            <div className="pesquisas__indicador">
+              <h3>Comentário livre</h3>
+              {comentario ? (
+                <blockquote className="pesquisas__comentario">
+                  {comentario}
+                </blockquote>
+              ) : (
+                <p className="pesquisas__suave">Nenhum comentário deixado.</p>
+              )}
+            </div>
           </section>
         </>
       )}

@@ -262,6 +262,8 @@ export interface PaginaSobre {
   readonly numeros?: readonly {
     readonly valor: string;
     readonly rotulo: string;
+    /** Ícone do bloco (página do Pulso). */
+    readonly icone?: "perguntas" | "recomendacao" | "comentario" | "frequencia";
   }[];
   readonly recebe?: {
     readonly titulo: string;
