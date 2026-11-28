@@ -1155,3 +1155,43 @@ enps?: number | null;
 Na tela: o catálogo ganhou `chavesFixas`, `tiposParaAdicionar` e `resumoDasPerguntas`; a página "Sobre"
 ganhou o bloco `componente`; o registro das telas (`modelos/resultados.tsx`) ganhou `analisesDoModelo`,
 `listaDeRespostasDoModelo` e `visaoIndividualDoModelo`; a API ganhou `conferir` no registro dos modelos.
+
+## Revisão 3 — assistente da personalizada e página pública (28/11/2026)
+
+**Contrato (API):** na abertura pública (`GET /v1/publico/pesquisas/:token`, anônima com
+"Separar respostas por"), `grupos[].opcoes[].nome` de um item cujo nome se repete no catálogo
+ativo da empresa (comparação sem maiúsculas, acentos e espaços nas pontas) vem com o código do
+cadastro: `"Comercial (D02)"`. Os nomes únicos não mudam; o `id` continua o mesmo e o código não
+vai em campo próprio. O catálogo da escolha do Onboarding usa a mesma função (`catalogoAtivo`).
+O painel aplica a mesma regra em `listarGrupos` (assistente, "Separar respostas por" e prévia).
+
+**Assistente da personalizada:**
+
+- A lista suspensa dos tipos de pergunta mede o espaço até o rodapé fixo do assistente e abre
+  para cima quando não cabe embaixo (altura limitada ao espaço que sobra).
+- Rascunho retomado (`<id>/rascunho`) volta à etapa em que a pessoa parou, com "Parou na etapa
+  N de M · salvo em …" no cabeçalho; as etapas depois dela ficam por ver (antes, todas apareciam
+  concluídas). A lembrança é do navegador (`rascunhosLocais`): a etapa gravada é a etapa para
+  onde a pessoa vai ao avançar, ou a etapa em que estava ao "Salvar rascunho". Sem lembrança,
+  começa na etapa 1. Pesquisa publicada em edição segue com todas as etapas abertas.
+- Prazo com data passada (e mínimo por grupo fora de 3 a 10) avisa no próprio campo ao digitar e
+  não trava o rascunho: o corpo do rascunho (`entradaDoRascunho`) leva o último valor gravado
+  desses campos e o resto continua salvando — no assistente dos modelos (gravação automática) e
+  no "Salvar rascunho" da personalizada ("Rascunho salvo, menos o prazo: corrija na etapa Envio e
+  prazo."). Publicar continua barrado pela validação da etapa.
+- Mini-escala da faixa do assistente com borda e fundo próprios; cartões dos roteiros com quem
+  responde ("Gestor avalia o time", "Gestor e autoavaliação"); a gaveta "Ver perguntas" começa
+  direto na lista quando o primeiro grupo não tem nome.
+
+**Página pública:**
+
+- Personalizada (seção inteira): "Próximo"/"Enviar respostas" fica ativo; a tela diz "Falta
+  responder N perguntas obrigatórias" e o clique marca as pendentes, foca a primeira e a traz
+  para o meio da tela. Uma pergunta por tela (modelos prontos) continua esperando a resposta.
+- Comentário final opcional dos modelos (última pergunta, texto, não obrigatória): caixa de
+  várias linhas com "Escreva aqui, se quiser.", com o mesmo limite do tipo (300 na resposta curta).
+- A barra de progresso muda de largura sem transição: na última tela já aparece cheia.
+
+**Não aplicável:** incluir campos personalizados de seleção dos Colaboradores em "Separar
+respostas por" — o Evolli ainda não tem campos personalizados (a seção "Campos extras" da ficha é
+só o estado vazio, sem servidor).
