@@ -7,6 +7,7 @@
  * encerramento automático) e a tela final. Servidor simulado.
  */
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -260,6 +261,54 @@ describe("Assistente do modelo — Configurar", () => {
     expect(
       screen.queryByRole("radiogroup", { name: "Quem vai responder" }),
     ).toBeNull();
+  });
+});
+
+describe("Assistente do modelo — rascunho com a API fora", () => {
+  it("não tenta de novo sem parar quando a gravação falha e a tela é redesenhada", async () => {
+    const servico = servicoFalso();
+    servico.criarPesquisa.mockRejectedValue(new Error("fora do ar"));
+    const props = {
+      servico,
+      modeloId: "pulso" as const,
+      hoje: HOJE,
+      atrasoDoRascunho: 0,
+      onCancelar: vi.fn(),
+      onConcluir: vi.fn(),
+      onVerResultados: vi.fn(),
+      onEditarGerada: vi.fn(),
+    };
+    // O shell redesenha o assistente com funções novas a cada vez.
+    const { rerender } = render(
+      <AssistenteDoModelo {...props} agora={() => AGORA()} />,
+    );
+    expect(
+      await screen.findByText(/Não foi possível salvar o rascunho/),
+    ).toBeInTheDocument();
+    for (let i = 0; i < 5; i++) {
+      rerender(
+        <AssistenteDoModelo
+          {...props}
+          agora={() => AGORA()}
+          onRascunhoCriado={() => undefined}
+        />,
+      );
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 5));
+      });
+    }
+    expect(servico.criarPesquisa).toHaveBeenCalledTimes(1);
+
+    // Uma mudança nova tenta de novo, uma vez.
+    servico.criarPesquisa.mockClear();
+    fireEvent.change(screen.getByLabelText(/Nome da pesquisa/), {
+      target: { value: "Pulso do time" },
+    });
+    await waitFor(() => expect(servico.criarPesquisa).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(servico.criarPesquisa).toHaveBeenCalledTimes(1);
   });
 });
 

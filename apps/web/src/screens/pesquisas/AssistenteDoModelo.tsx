@@ -203,6 +203,11 @@ function AssistenteDoModeloInterno({
 
   const idRef = useRef<string | null>(estado.id);
   const filaRef = useRef<Promise<unknown>>(Promise.resolve());
+  /** O conteúdo cuja gravação automática falhou: só tenta de novo com outra mudança. */
+  const falhouRef = useRef<string | null>(null);
+  /** Funções vindas de fora, lidas na hora (o shell as recria a cada desenho). */
+  const externosRef = useRef({ servico, agora, onRascunhoCriado });
+  externosRef.current = { servico, agora, onRascunhoCriado };
   const entrada = useMemo(() => entradaDoEstado(estado), [estado]);
   const serial = JSON.stringify(entrada);
   const pendente = serial !== referencia;
@@ -217,49 +222,50 @@ function AssistenteDoModeloInterno({
   );
 
   /** Grava o rascunho (cria na primeira vez), em fila. */
-  const gravar = useCallback(
-    (e: EstadoDaPesquisa): Promise<string | null> => {
-      const corpo = entradaDoEstado(e);
-      const texto = JSON.stringify(corpo);
-      const passo = filaRef.current.then(async () => {
-        if (!corpo.nome) return idRef.current;
-        setGravando(true);
-        try {
-          let d: PesquisaDetalhe;
-          if (idRef.current === null) {
-            d = await servico.criarPesquisa(corpo);
-            idRef.current = d.id;
-            setEstado((s) => ({ ...s, id: d.id, link: d.link }));
-            onRascunhoCriado?.(d.id);
-          } else {
-            d = await servico.alterarPesquisa(idRef.current, corpo);
-          }
-          if (d) setGravada(d);
-          setReferencia(texto);
-          const quando = agora();
-          setSalvoAs(horaDe(quando));
-          setFalha(null);
-          return idRef.current;
-        } finally {
-          setGravando(false);
+  const gravar = useCallback((e: EstadoDaPesquisa): Promise<string | null> => {
+    const corpo = entradaDoEstado(e);
+    const texto = JSON.stringify(corpo);
+    const passo = filaRef.current.then(async () => {
+      if (!corpo.nome) return idRef.current;
+      setGravando(true);
+      try {
+        let d: PesquisaDetalhe;
+        const ext = externosRef.current;
+        if (idRef.current === null) {
+          d = await ext.servico.criarPesquisa(corpo);
+          idRef.current = d.id;
+          setEstado((s) => ({ ...s, id: d.id, link: d.link }));
+          ext.onRascunhoCriado?.(d.id);
+        } else {
+          d = await ext.servico.alterarPesquisa(idRef.current, corpo);
         }
-      });
-      filaRef.current = passo.catch(() => undefined);
-      return passo;
-    },
-    [servico, agora, onRascunhoCriado],
-  );
+        if (d) setGravada(d);
+        falhouRef.current = null;
+        setReferencia(texto);
+        const quando = ext.agora();
+        setSalvoAs(horaDe(quando));
+        setFalha(null);
+        return idRef.current;
+      } finally {
+        setGravando(false);
+      }
+    });
+    filaRef.current = passo.catch(() => undefined);
+    return passo;
+  }, []);
 
   // Rascunho gravado ao abrir (modelo novo) e a cada mudança, com espera.
   useEffect(() => {
     if (publicadaAntes || gerada || serial === referencia) return;
+    if (falhouRef.current === serial) return;
     const t = window.setTimeout(
       () => {
-        gravar(estado).catch(() =>
+        gravar(estado).catch(() => {
+          falhouRef.current = serial;
           setFalha(
             "Não foi possível salvar o rascunho. Vamos tentar de novo na próxima mudança.",
-          ),
-        );
+          );
+        });
       },
       idRef.current === null ? 0 : atrasoDoRascunho,
     );
