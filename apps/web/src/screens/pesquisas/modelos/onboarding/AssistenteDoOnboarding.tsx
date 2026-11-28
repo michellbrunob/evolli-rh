@@ -1589,6 +1589,34 @@ function EtapaEmail({
             </span>
           </label>
         </div>
+        {!personalizado ? (
+          <section
+            className="pesquisas__campos onboarding__conteudo-padrao"
+            aria-label="Conteúdo do padrão"
+          >
+            <h3 className="pesquisas__rotulo">Conteúdo do padrão</h3>
+            <p className="pesquisas__suave">
+              Somente leitura: o padrão não pode ser editado. Para mudar o
+              texto, escolha Personalizado.
+            </p>
+            <label className="pesquisas__campo">
+              <span className="pesquisas__rotulo">Remetente</span>
+              <input readOnly value={nomeDaEmpresa ?? "A empresa ativa"} />
+            </label>
+            <label className="pesquisas__campo">
+              <span className="pesquisas__rotulo">Assunto</span>
+              <input readOnly value={assunto} />
+            </label>
+            <label className="pesquisas__campo">
+              <span className="pesquisas__rotulo">Título</span>
+              <input readOnly value={titulo} />
+            </label>
+            <label className="pesquisas__campo">
+              <span className="pesquisas__rotulo">Mensagem</span>
+              <textarea readOnly rows={4} value={mensagem} />
+            </label>
+          </section>
+        ) : null}
         {personalizado ? (
           <div
             role="tablist"

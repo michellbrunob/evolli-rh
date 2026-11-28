@@ -1335,3 +1335,83 @@ describe("T216 — perguntas do onboarding publicado (nova versão)", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("T216 — e-mail padrão do onboarding (4ª revisão)", () => {
+  it("Padrão: 'Conteúdo do padrão' com remetente, assunto, título e mensagem bloqueados", async () => {
+    montarAssistente();
+    proximo(/Próximo: Perguntas/);
+    await screen.findByText(/17 perguntas · 8 blocos/);
+    proximo(/Próximo: Quem recebe/);
+    await screen.findByRole("radio", { name: /Escolher pessoas/ });
+    proximo(/Próximo: E-mail/);
+    const conteudo = await screen.findByRole("region", {
+      name: "Conteúdo do padrão",
+    });
+    const remetente = within(conteudo).getByLabelText("Remetente");
+    const assunto = within(conteudo).getByLabelText("Assunto");
+    const titulo = within(conteudo).getByLabelText("Título");
+    const mensagem = within(conteudo).getByLabelText("Mensagem");
+    for (const campo of [remetente, assunto, titulo, mensagem])
+      expect(campo).toHaveAttribute("readonly");
+    expect(remetente).toHaveValue("Empresa Sintética");
+    expect(assunto).toHaveValue(
+      "Como estão seus primeiros dias na Empresa Sintética?",
+    );
+    expect(titulo).toHaveValue("Como estão seus primeiros dias?");
+    expect((mensagem as HTMLTextAreaElement).value).toMatch(
+      /^Você está nos primeiros dias/,
+    );
+    // A prévia continua ao lado.
+    expect(
+      screen.getByRole("group", { name: "Prévia do e-mail" }),
+    ).toBeInTheDocument();
+    // Personalizado: os campos editáveis no lugar do conteúdo do padrão.
+    fireEvent.click(screen.getByRole("radio", { name: /Personalizado/ }));
+    expect(
+      screen.queryByRole("region", { name: "Conteúdo do padrão" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Assunto")).not.toHaveAttribute("readonly");
+  });
+});
+
+describe("T216 — resultados do onboarding: o que a revisão não conseguiu ver com dados (4ª revisão)", () => {
+  const montar = (r: Resultados) =>
+    render(
+      <ResultadosDoOnboarding
+        pesquisaId="onb-1"
+        nome="Onboarding"
+        secoes={SECOES}
+        cliente={{
+          resultados: vi.fn(async (_id: string, _recorte?: unknown) => r),
+          envios: vi.fn(async () => envios()),
+          pular: vi.fn(async () => undefined),
+        }}
+        hoje={HOJE}
+      />,
+    );
+
+  it("'Ver por' oferece os recortes que a API faz: departamento, unidade e centro de custo", async () => {
+    montar(
+      resultados({
+        identificacao: "confidencial",
+        grupos: {
+          departamento: [{ id: "d1", nome: "Operações" }],
+          unidade: [{ id: "u1", nome: "Matriz" }],
+          centroCusto: [{ id: "c1", nome: "CC 100" }],
+        },
+      }),
+    );
+    const verPor = await screen.findByRole("group", { name: "Ver por" });
+    expect(
+      within(within(verPor).getByLabelText("Ver por"))
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Departamento", "Unidade", "Centro de custo"]);
+    fireEvent.change(within(verPor).getByLabelText("Ver por"), {
+      target: { value: "centroCusto" },
+    });
+    expect(
+      within(verPor).getByRole("option", { name: "CC 100" }),
+    ).toBeInTheDocument();
+  });
+});

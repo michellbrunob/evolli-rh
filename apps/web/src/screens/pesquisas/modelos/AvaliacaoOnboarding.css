@@ -682,3 +682,12 @@
 .avaliacao__barra-relatorio {
   background: var(--color-action);
 }
+
+/* E-mail padrão do onboarding: o conteúdo aparece bloqueado (só leitura). */
+.onboarding__conteudo-padrao input[readonly],
+.onboarding__conteudo-padrao textarea[readonly] {
+  background: var(--surface-neutral);
+  color: var(--texto-suave, var(--color-ink));
+  cursor: default;
+  resize: none;
+}
