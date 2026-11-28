@@ -61,6 +61,12 @@ export function paginaIndividualDoModelo(x: {
   );
 }
 
+/**
+ * Avaliação 90°/180° e Onboarding automático: resultados inteiros
+ * próprios (rotas próprias da API), no lugar das abas da pesquisa.
+ */
+export { ResultadosProprios, ehModeloComTelaPropria } from "./integracao";
+
 /** A Visão geral própria do modelo, ou `null` (usa a visão por pergunta). */
 export function visaoGeralDoModelo(
   detalhe: PesquisaDetalhe,

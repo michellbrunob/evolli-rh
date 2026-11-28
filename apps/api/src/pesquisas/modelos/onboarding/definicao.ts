@@ -57,8 +57,12 @@ export const SATISFACAO_4 = [
   "Muito satisfeito",
 ] as const;
 
-/** Uma pergunta de 4 pontos (concordância ou satisfação), que entra no índice. */
+/**
+ * Uma pergunta de 4 pontos (concordância ou satisfação, sem meio-termo),
+ * que entra no índice: os tipos de 4 pontos ou uma escala de 1 a 4.
+ */
 export function ehItemDe4Pontos(p: Pergunta): boolean {
+  if (p.tipo === "concordancia_4" || p.tipo === "satisfacao_4") return true;
   return (
     p.tipo === "escala" &&
     (p.config.minimo ?? 1) === 1 &&
@@ -66,14 +70,17 @@ export function ehItemDe4Pontos(p: Pergunta): boolean {
   );
 }
 
-/** A pergunta de um papel, se ainda existir na estrutura. */
+/**
+ * A pergunta de um papel, se ainda existir na estrutura: pela chave do item
+ * do modelo (`Pergunta.chave`) ou, sem chave, pelo id.
+ */
 export function perguntaDoPapel(
   secoes: readonly Secao[],
   papel: Papel,
 ): Pergunta | null {
-  const id = PAPEIS[papel];
+  const chave = PAPEIS[papel];
   for (const s of secoes) {
-    const p = s.perguntas.find((x) => x.id === id);
+    const p = s.perguntas.find((x) => (x.chave ?? x.id) === chave);
     if (p) return p;
   }
   return null;

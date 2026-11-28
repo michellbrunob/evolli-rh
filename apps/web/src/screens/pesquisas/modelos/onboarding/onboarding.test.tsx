@@ -47,15 +47,15 @@ describe("T216 — questionário do onboarding", () => {
   it("17 perguntas em 8 blocos, 14 obrigatórias, cerca de 5 minutos", () => {
     const s = secoesDoOnboarding();
     expect(TOTAL_DE_PERGUNTAS).toBe(17);
-    expect(s.map((x) => x.id)).toEqual([
-      "b1",
-      "b2",
-      "b3",
-      "b4",
-      "b5",
-      "b6",
-      "b7",
-      "b8",
+    expect(s.map((x) => x.titulo)).toEqual([
+      "Onboarding e treinamento",
+      "Liderança",
+      "Colegas",
+      "Remuneração",
+      "Ferramentas e feedback",
+      "Rotina e crescimento",
+      "Motivação e permanência",
+      "Para fechar",
     ]);
     expect(s.map((x) => x.perguntas.length)).toEqual([2, 2, 1, 2, 2, 2, 4, 2]);
     const c = contarPerguntas(s);
@@ -75,16 +75,7 @@ describe("T216 — questionário do onboarding", () => {
     const p = secoesDoOnboarding().flatMap((x) => x.perguntas);
     const q = (chave: string) => p.find((x) => x.chave === chave)!;
     expect(tipoDaPergunta(q("q1"))).toBe("concord4");
-    expect(q("q1").config).toMatchObject({
-      minimo: 1,
-      maximo: 4,
-      rotulos: [
-        "Discordo totalmente",
-        "Discordo parcialmente",
-        "Concordo parcialmente",
-        "Concordo totalmente",
-      ],
-    });
+    expect(q("q1").tipo).toBe("concordancia_4");
     expect(tipoDaPergunta(q("q7"))).toBe("satisf4");
     expect(q("q7").tipo).toBe("satisfacao_4");
     expect(tipoDaPergunta(q("q12"))).toBe("unica");
@@ -425,6 +416,11 @@ describe("T216 — assistente do onboarding", () => {
   });
 });
 
+const SECOES = secoesDoOnboarding();
+const opcao = (chave: string, i: number) =>
+  SECOES.flatMap((x) => x.perguntas).find((p) => p.chave === chave)!.config
+    .opcoes![i]!.id;
+
 function resultados(extra: Partial<Resultados> = {}): Resultados {
   const bloco = (id: string, titulo: string, indice: number) => ({
     id,
@@ -457,13 +453,15 @@ function resultados(extra: Partial<Resultados> = {}): Resultados {
         ],
         intencao: {
           opcoes: [
-            { opcaoId: "q13_o1", quantidade: 3, percentual: 75 },
-            { opcaoId: "q13_o2", quantidade: 1, percentual: 25 },
+            { opcaoId: opcao("q13", 0), quantidade: 3, percentual: 75 },
+            { opcaoId: opcao("q13", 1), quantidade: 1, percentual: 25 },
           ],
           querContinuar: 100,
         },
         motivos: {
-          opcoes: [{ opcaoId: "q12_o1", quantidade: 4, percentual: 100 }],
+          opcoes: [
+            { opcaoId: opcao("q12", 0), quantidade: 4, percentual: 100 },
+          ],
           outros: [],
         },
         recomendacao: {
@@ -508,7 +506,7 @@ function resultados(extra: Partial<Resultados> = {}): Resultados {
       para: 60,
       pessoas: 3,
       visivel: true,
-      fluxos: [{ de: "q13_o1", para: "q13_o2", quantidade: 3 }],
+      fluxos: [{ de: opcao("q13", 0), para: opcao("q13", 1), quantidade: 3 }],
     },
     contatos: ["ana@example.test"],
     melhorar: ["Mais treino no primeiro dia"],
@@ -580,7 +578,7 @@ describe("T216 — resultados do onboarding", () => {
       <ResultadosDoOnboarding
         pesquisaId="onb-1"
         nome="Onboarding"
-        secoes={secoesDoOnboarding()}
+        secoes={SECOES}
         cliente={cliente}
         hoje={HOJE}
       />,
@@ -678,12 +676,7 @@ describe("T216 — resultados do onboarding", () => {
 
   it("planilha com as abas do padrão e sem CPF", () => {
     const texto = new TextDecoder().decode(
-      planilhaDoOnboarding(
-        "Onboarding",
-        secoesDoOnboarding(),
-        resultados(),
-        envios(),
-      ),
+      planilhaDoOnboarding("Onboarding", SECOES, resultados(), envios()),
     );
     for (const aba of [
       "Resumo",

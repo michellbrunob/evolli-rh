@@ -64,7 +64,7 @@ import { baixarArquivo } from "../dashboard/exportacao";
 import {
   ResultadosProprios,
   ehModeloComTelaPropria,
-} from "./modelos/integracao";
+} from "./modelos/resultados";
 import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
 import { seloDoTipo } from "./AssistenteDoModelo";
 import {

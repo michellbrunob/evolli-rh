@@ -316,3 +316,83 @@ describe("T216 — intenção entre rodadas, contatos, textos e funil", () => {
     });
   });
 });
+
+describe("T216 — onboarding com o catálogo da galeria (tipos de 4 pontos e chave)", () => {
+  // Ids gerados no uso; o papel vem da chave do item.
+  const p = (
+    id: string,
+    chave: string,
+    tipo: Pergunta["tipo"],
+    config: Pergunta["config"] = {},
+  ): Pergunta => ({
+    id,
+    chave,
+    tipo,
+    texto: chave,
+    rotulo: null,
+    descricao: null,
+    obrigatoria: false,
+    config,
+    condicao: null,
+  });
+  const secoes: Secao[] = [
+    {
+      id: "s-a",
+      titulo: "Bloco A",
+      descricao: null,
+      perguntas: [
+        p("x1", "q1", "concordancia_4"),
+        p("x7", "q7", "satisfacao_4"),
+      ],
+    },
+    {
+      id: "s-b",
+      titulo: "Bloco B",
+      descricao: null,
+      perguntas: [
+        p("x13", "q13", "escolha_unica", {
+          opcoes: [
+            { id: "i1", texto: "a" },
+            { id: "i2", texto: "b" },
+          ],
+          outro: false,
+        }),
+        p("x14", "q14", "texto_curto"),
+        p("x15", "q15", "nota_0_10", { enps: true }),
+        p("x16", "q16", "paragrafo"),
+      ],
+    },
+  ];
+  const rs = [
+    resp({
+      x1: 4,
+      x7: 1,
+      x13: { opcao: "i1" },
+      x14: "a@example.test",
+      x15: 10,
+      x16: "Mais café",
+    }),
+    resp({ x1: 3, x7: 2, x13: { opcao: "i2" }, x15: 9 }),
+    resp({ x1: 2, x7: 3, x13: { opcao: "i1" }, x15: 0 }),
+  ];
+
+  it("concordância e satisfação de 4 pontos entram no índice do bloco", () => {
+    const r = resultadoDaRodada(30, secoes, rs);
+    // (100 + 66.7 + 33.3 + 0 + 33.3 + 66.7) / 6 = 50
+    expect(r.blocos.map((b) => [b.id, b.indice])).toEqual([["s-a", 50]]);
+    expect(r.indice).toBe(50);
+    expect(r.faixa).toBe("atencao");
+  });
+
+  it("os papéis vêm da chave, não do id", () => {
+    const r = resultadoDaRodada(30, secoes, rs);
+    expect(r.intencao!.querContinuar).toBe(100);
+    expect(r.recomendacao).toMatchObject({
+      promotores: 2,
+      detratores: 1,
+      indice: 33,
+    });
+    expect(contatos(secoes, rs)).toEqual(["a@example.test"]);
+    expect(textosDoPapel(secoes, rs, "melhorar")).toEqual(["Mais café"]);
+  });
+});

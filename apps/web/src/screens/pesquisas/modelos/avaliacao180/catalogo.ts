@@ -6,9 +6,9 @@
  */
 import {
   BLOCO_DAS_COMPETENCIAS,
-  GRUPOS_DAS_COMPETENCIAS,
   REGUA_DAS_AVALIACOES,
 } from "../avaliacao90/catalogo";
+import { SECOES_DA_AVALIACAO } from "../avaliacao/catalogo";
 import type { ModeloDaGaleria } from "../tipos";
 
 export const AVALIACAO_180: ModeloDaGaleria = {
@@ -31,8 +31,7 @@ export const AVALIACAO_180: ModeloDaGaleria = {
     "Gestor e pessoa respondem as mesmas 8 competências; o resultado mostra onde as visões se encontram e onde se afastam.",
   nomeBase: "Avaliação 180°",
   boasVindas: null,
-  secoes: [],
-  grupos: GRUPOS_DAS_COMPETENCIAS,
+  secoes: SECOES_DA_AVALIACAO,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 1, maximo: 5 } },
   limite: 24,

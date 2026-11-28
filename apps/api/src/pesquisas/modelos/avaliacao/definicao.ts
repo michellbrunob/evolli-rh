@@ -1,4 +1,5 @@
 import type { Pergunta, Secao } from "../../pesquisas.types";
+import type { EstruturaFixa } from "../tipos";
 
 /**
  * T216 — Avaliação 90° e 180°: o catálogo fixo (8 competências × 3
@@ -299,6 +300,7 @@ export function secoesDaAvaliacao(): Secao[] {
     descricao: null,
     perguntas: c.itens.map((i): Pergunta => ({
       id: i.id,
+      chave: i.id,
       tipo: "escala",
       texto: i.gestor,
       rotulo: i.rotulo,
@@ -315,3 +317,17 @@ export function secoesDaAvaliacao(): Secao[] {
     })),
   }));
 }
+
+/**
+ * A metodologia fixa para o registro dos modelos: as 24 afirmações (pela
+ * chave), escala de 1 a 5, todas obrigatórias.
+ */
+export const ESTRUTURA_DA_AVALIACAO: EstruturaFixa = {
+  itens: ITENS.map((i) => ({
+    chave: i.id,
+    tipo: "escala",
+    obrigatoria: true,
+    config: (c) => (c.minimo ?? 1) === 1 && (c.maximo ?? 5) === 5,
+  })),
+  opcionais: [],
+};

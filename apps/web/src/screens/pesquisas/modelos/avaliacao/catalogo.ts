@@ -11,6 +11,7 @@ import type {
   Secao,
 } from "../../../../api/pesquisasClient";
 import type { StatusVariant } from "../../../../components";
+import type { SecaoDoModelo } from "../tipos";
 
 export const MODELOS_DE_AVALIACAO = ["avaliacao90", "avaliacao180"] as const;
 export type ModeloDeAvaliacao = (typeof MODELOS_DE_AVALIACAO)[number];
@@ -525,6 +526,7 @@ export function secoesDaAvaliacao(): Secao[] {
     descricao: null,
     perguntas: c.itens.map((i): Pergunta => ({
       id: i.id,
+      chave: i.id,
       tipo: "escala",
       texto: i.gestor,
       rotulo: i.rotulo,
@@ -541,6 +543,31 @@ export function secoesDaAvaliacao(): Secao[] {
     })),
   }));
 }
+
+/**
+ * As 24 afirmações para a galeria (gaveta, assistente e página "Sobre o
+ * modelo"): uma seção por competência, com a chave de cada item.
+ */
+export const SECOES_DA_AVALIACAO: readonly SecaoDoModelo[] = CATALOGO.map(
+  (c) => ({
+    titulo: c.rotulo,
+    cor: c.cor,
+    perguntas: c.itens.map((i) => ({
+      chave: i.id,
+      tipo: "escala" as const,
+      texto: i.gestor,
+      rotulo: i.rotulo,
+      obrigatoria: true,
+      config: {
+        minimo: 1,
+        maximo: 5,
+        rotuloMinimo: ROTULOS_DA_ESCALA[0],
+        rotuloMaximo: ROTULOS_DA_ESCALA[4],
+        rotulos: [...ROTULOS_DA_ESCALA],
+      },
+    })),
+  }),
+);
 
 /** Nome padrão: "Avaliação 90° – Ciclo 2026.2" (1 = jan–jun, 2 = jul–dez). */
 export function nomePadrao(modelo: ModeloDeAvaliacao, hoje: string): string {

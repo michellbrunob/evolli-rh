@@ -14,6 +14,7 @@ import { calcularClima } from "./clima/calculo";
 import { ESTRUTURA_CLIMA } from "./clima/definicao";
 import { conferirEstruturaFixa } from "./comum";
 import { ESTRUTURA_DISC } from "./disc/definicao-disc";
+import { ESTRUTURA_DA_AVALIACAO } from "./avaliacao/definicao";
 import { calcularPulsoClima } from "./pulso_clima/calculo";
 import { ESTRUTURA_PULSO_CLIMA } from "./pulso_clima/definicao";
 import { calcularTad, individualDaTad } from "./tad/calculo";
@@ -36,6 +37,10 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     estrutura: ESTRUTURA_CLIMA,
     calcular: calcularClima,
   },
+  // Avaliação 90°/180°: as 24 afirmações fixas; o cálculo e os resultados
+  // nominais ficam nas rotas próprias (`modelos/avaliacao/`).
+  avaliacao90: { modelo: "avaliacao90", estrutura: ESTRUTURA_DA_AVALIACAO },
+  avaliacao180: { modelo: "avaliacao180", estrutura: ESTRUTURA_DA_AVALIACAO },
   tad: {
     modelo: "tad",
     estrutura: ESTRUTURA_TAD,

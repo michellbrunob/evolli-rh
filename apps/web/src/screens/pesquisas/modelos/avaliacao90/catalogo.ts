@@ -4,6 +4,7 @@
  * gestores e o cálculo ficam com a frente das avaliações: ela preenche
  * `secoes` e tira `grupos`. As competências valem também para o 180°.
  */
+import { SECOES_DA_AVALIACAO } from "../avaliacao/catalogo";
 import type { BlocoDoSobre, ModeloDaGaleria, PaginaSobre } from "../tipos";
 
 export const COMPETENCIAS = [
@@ -115,8 +116,7 @@ export const AVALIACAO_90: ModeloDaGaleria = {
     "O gestor direto avalia cada pessoa do time em 8 competências; mostra destaques, o que desenvolver e se os gestores avaliam com o mesmo critério.",
   nomeBase: "Avaliação 90°",
   boasVindas: null,
-  secoes: [],
-  grupos: GRUPOS_DAS_COMPETENCIAS,
+  secoes: SECOES_DA_AVALIACAO,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 1, maximo: 5 } },
   limite: 24,

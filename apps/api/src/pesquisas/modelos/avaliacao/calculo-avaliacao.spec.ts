@@ -19,7 +19,9 @@ import {
   umaCasa,
   type Notas,
 } from "./calculo-avaliacao";
+import { conferirEstruturaFixa } from "../comum";
 import {
+  ESTRUTURA_DA_AVALIACAO,
   CATALOGO,
   COMPETENCIAS,
   ITENS,
@@ -473,5 +475,41 @@ describe("T216 — 180°: gestor × autoavaliação", () => {
     expect(r[3]!.competencias).toEqual(["adaptabilidade"]);
     const so = roteiroDeFeedback(comparativoDaPessoa(todas(3), todas(3)));
     expect(so).toEqual([{ passo: "plano", competencias: [] }]);
+  });
+});
+
+describe("T216 — metodologia fixa da avaliação (registro dos modelos)", () => {
+  it("as seções do catálogo conferem", () => {
+    expect(
+      conferirEstruturaFixa(ESTRUTURA_DA_AVALIACAO, secoesDaAvaliacao()),
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      "sem uma afirmação",
+      (s: ReturnType<typeof secoesDaAvaliacao>) => s[0]!.perguntas.pop(),
+    ],
+    [
+      "escala de 1 a 10",
+      (s: ReturnType<typeof secoesDaAvaliacao>) =>
+        (s[1]!.perguntas[0]!.config.maximo = 10),
+    ],
+    [
+      "afirmação opcional",
+      (s: ReturnType<typeof secoesDaAvaliacao>) =>
+        (s[2]!.perguntas[1]!.obrigatoria = false),
+    ],
+    [
+      "sem a chave",
+      (s: ReturnType<typeof secoesDaAvaliacao>) =>
+        delete s[3]!.perguntas[2]!.chave,
+    ],
+  ])("recusa: %s", (_caso, estragar) => {
+    const s = secoesDaAvaliacao();
+    estragar(s);
+    expect(conferirEstruturaFixa(ESTRUTURA_DA_AVALIACAO, s)).toEqual([
+      { campo: "secoes", motivo: "estrutura_do_modelo" },
+    ]);
   });
 });

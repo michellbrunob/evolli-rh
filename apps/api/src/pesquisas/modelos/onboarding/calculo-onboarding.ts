@@ -1,7 +1,6 @@
 import type { Pergunta, Secao } from "../../pesquisas.types";
 import {
   ehItemDe4Pontos,
-  PAPEIS,
   perguntaDoPapel,
   ROTULOS_DA_INTENCAO,
 } from "./definicao";
@@ -440,10 +439,10 @@ export function textosDoPapel(
   respostas: readonly RespostaDoOnboarding[],
   papel: "melhorar" | "gosta",
 ): string[] {
-  const id = PAPEIS[papel];
-  if (!perguntaDoPapel(secoes, papel)) return [];
+  const p = perguntaDoPapel(secoes, papel);
+  if (!p) return [];
   return respostas
-    .map((r) => r.valores.get(id))
+    .map((r) => r.valores.get(p.id))
     .filter((v): v is string => typeof v === "string" && v.trim() !== "")
     .map((v) => v.trim())
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
