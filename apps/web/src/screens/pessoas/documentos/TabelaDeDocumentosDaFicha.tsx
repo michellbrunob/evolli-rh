@@ -232,6 +232,8 @@ export function TabelaDeDocumentosDaFicha({
         id: "remover",
         rotulo: "Remover",
         aoEscolher: () => setRemovendo(documento),
+        perigo: true,
+        icone: <IconeRemover tamanho={16} />,
       },
     ];
     return (
@@ -241,25 +243,29 @@ export function TabelaDeDocumentosDaFicha({
         className="tabela-documentos__linha"
       >
         <td className="tabela-documentos__celula tabela-documentos__celula--documento">
-          <span className="tabela-documentos__icone" aria-hidden="true">
-            <IconeDocumento tamanho={18} />
-          </span>
-          <span className="tabela-documentos__identificacao">
-            <span className="tabela-documentos__tipo">
-              <strong>{tipo}</strong>
-              {aprovado ? null : (
-                <StatusBadge
-                  variant={documento.estado === "reprovado" ? "danger" : "info"}
-                >
-                  {ROTULO_DO_ESTADO[documento.estado]}
-                </StatusBadge>
-              )}
+          <span className="tabela-documentos__documento">
+            <span className="tabela-documentos__icone" aria-hidden="true">
+              <IconeDocumento tamanho={18} />
             </span>
-            <span
-              className="tabela-documentos__arquivo"
-              title={nomeDoArquivo(documento)}
-            >
-              {nomeDoArquivo(documento)}
+            <span className="tabela-documentos__identificacao">
+              <span className="tabela-documentos__tipo">
+                <strong>{tipo}</strong>
+                {aprovado ? null : (
+                  <StatusBadge
+                    variant={
+                      documento.estado === "reprovado" ? "danger" : "info"
+                    }
+                  >
+                    {ROTULO_DO_ESTADO[documento.estado]}
+                  </StatusBadge>
+                )}
+              </span>
+              <span
+                className="tabela-documentos__arquivo"
+                title={nomeDoArquivo(documento)}
+              >
+                {nomeDoArquivo(documento)}
+              </span>
             </span>
           </span>
         </td>
@@ -311,8 +317,10 @@ export function TabelaDeDocumentosDaFicha({
       return [0, 1, 2].map((i) => (
         <tr key={i} className="tabela-documentos__linha" aria-hidden="true">
           <td className="tabela-documentos__celula tabela-documentos__celula--documento">
-            <span className="tabela-documentos__esqueleto tabela-documentos__esqueleto--icone" />
-            <span className="tabela-documentos__esqueleto tabela-documentos__esqueleto--largo" />
+            <span className="tabela-documentos__documento">
+              <span className="tabela-documentos__esqueleto tabela-documentos__esqueleto--icone" />
+              <span className="tabela-documentos__esqueleto tabela-documentos__esqueleto--largo" />
+            </span>
           </td>
           <td className="tabela-documentos__celula">
             <span className="tabela-documentos__esqueleto" />
@@ -429,6 +437,7 @@ export function TabelaDeDocumentosDaFicha({
       <Dialog
         aberto={removendo !== null}
         titulo="Remover este arquivo da ficha?"
+        className="tabela-documentos__janela-perigo"
         icone={<IconeRemover tamanho={20} />}
         descricao={
           removendo

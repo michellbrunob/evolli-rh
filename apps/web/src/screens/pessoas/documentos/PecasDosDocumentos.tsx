@@ -183,6 +183,9 @@ export interface AcaoDoMenu {
   readonly id: string;
   readonly rotulo: string;
   readonly aoEscolher: () => void;
+  /** T217 — ação destrutiva (Remover): cor de perigo e ícone. */
+  readonly perigo?: boolean;
+  readonly icone?: ReactNode;
 }
 
 /** O "⋯" da linha: as ações do arquivo num menu acessível. */
@@ -204,7 +207,16 @@ export function MenuDoArquivo({
       </DropdownMenuTrigger>
       <DropdownMenuContent aria-label={`Mais ações: ${nome}`}>
         {acoes.map((acao) => (
-          <DropdownMenuItem key={acao.id} onSelect={acao.aoEscolher}>
+          <DropdownMenuItem
+            key={acao.id}
+            onSelect={acao.aoEscolher}
+            {...(acao.perigo ? { className: "documentos__item-perigo" } : {})}
+          >
+            {acao.icone ? (
+              <span className="documentos__item-icone" aria-hidden="true">
+                {acao.icone}
+              </span>
+            ) : null}
             {acao.rotulo}
           </DropdownMenuItem>
         ))}

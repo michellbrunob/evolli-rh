@@ -262,6 +262,7 @@ describe("TabelaDeDocumentosDaFicha (T217) — remover", () => {
     abrirMenu(screen.getByRole("button", { name: "Mais ações: RG" }));
     const itens = await screen.findAllByRole("menuitem");
     expect(itens.map((i) => i.textContent)).toEqual(["Remover"]);
+    expect(itens[0]).toHaveClass("documentos__item-perigo");
     fireEvent.click(itens[0]!);
     const janela = await screen.findByRole("dialog");
     expect(

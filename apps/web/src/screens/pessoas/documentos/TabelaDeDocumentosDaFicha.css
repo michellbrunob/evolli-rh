@@ -92,7 +92,7 @@
 }
 
 .tabela-documentos__linha {
-  height: 4.25rem;
+  height: calc(4.25rem - 1px);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -112,18 +112,13 @@
   padding-left: calc(var(--space-md) + 3px);
 }
 
-.tabela-documentos__celula--documento,
-.tabela-documentos__celula--documento > * {
-  min-width: 0;
-}
-
-/* Ícone na caixinha + rótulo e nome do arquivo, lado a lado. */
-.tabela-documentos__celula--documento {
+/* Ícone na caixinha + rótulo e nome do arquivo, lado a lado (a célula
+   continua célula de tabela; o arranjo fica no bloco de dentro). */
+.tabela-documentos__documento {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 4.25rem;
-  box-sizing: border-box;
+  min-width: 0;
 }
 
 .tabela-documentos__icone {
@@ -358,4 +353,13 @@
     right: var(--space-sm);
     width: auto;
   }
+}
+
+/* A confirmação de remoção leva o ícone no tom de perigo. */
+.tabela-documentos__janela-perigo
+  header
+  > div
+  > [aria-hidden="true"]:first-child {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-ink);
 }

@@ -203,3 +203,14 @@
     transform: none;
   }
 }
+
+/* T217 — item destrutivo do menu "⋯" (Remover): ícone e cor de perigo. */
+.documentos__item-perigo.documentos__item-perigo {
+  gap: var(--space-xs);
+  color: var(--status-danger-ink);
+}
+
+.documentos__item-icone {
+  display: inline-flex;
+  flex: none;
+}
