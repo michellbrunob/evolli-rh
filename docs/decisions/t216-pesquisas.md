@@ -81,7 +81,8 @@ não é exigida; no resultado, mostra quantas pessoas a viram.
 
 - **Status:** `rascunho` → `ativa` (Publicar) ⇄ `pausada`; `ativa`/`pausada` → `finalizada` ou
   `cancelada`. Finalizada e cancelada não voltam. Com `encerraEm` vencido, a pesquisa conta como
-  finalizada (sem job: calculado na leitura). Só rascunho, ativa e pausada editam.
+  finalizada (sem job: calculado na leitura). Rascunho, ativa, pausada e finalizada editam
+  (a finalizada sem mudar o encerramento); cancelada não.
 - **Edição depois de publicar:** nome, boas-vindas, prazo e mínimo por grupo sempre; perguntas só
   enquanto não houver resposta; participantes podem ser incluídos (nunca removidos depois de
   responderem). Identificação nunca.
@@ -1384,3 +1385,26 @@ Contrato novo (web):
 // recorte (o servidor reaplica o mínimo) para o favorável e o eNPS por grupo.
 // embaralharDeFormaEstavel(itens, semente): permutação determinística (FNV-1a + xorshift).
 ```
+
+## Revisão 3 — lista, fluxo e ações (28/11/2026)
+
+- **Finalizada edita:** `PUT /v1/pesquisas/:id` aceita a finalizada (nome, boas-vindas,
+  participantes); mudar ou tirar `encerraEm` dela é 422 `{ campo: "encerraEm", motivo:
+  "nao_editavel" }` (reabriria o link de uma pesquisa encerrada pelo prazo). Cancelada continua 409.
+  Na tela, a finalizada mantém "Editar" (cabeçalho e menu da linha) e mostra "Copiar link"
+  desabilitado; a página Editar troca o cartão de encerramento por um aviso.
+- **Aviso flutuante:** `ConteudoDoAviso.tom?: "sucesso" | "erro"` (componente do sistema). Erro:
+  cor e ícone de erro e `role="alert"`. Falha com janela ou gaveta aberta aparece dentro dela.
+- **Rascunho retomado:** a rota `<id>/rascunho` vale pela primeira leitura; publicar mostra a tela
+  final mesmo se a pesquisa for relida.
+- **Trilha:** "Pesquisas / Nova pesquisa / <modelo>" (sobre o modelo, assistente, rascunho);
+  "Nova pesquisa / Pesquisa personalizada"; resultados com o nome da pesquisa.
+- **Lista:** as pílulas contam o que a busca e o tipo deixam; sem resultado, estado vazio com
+  "Limpar filtros" e colunas de largura fixa.
+- **Resultados:** recorte que falha mostra erro com "Tentar novamente" (nunca números antigos sob o
+  filtro novo; só vale a resposta do último pedido); o seletor abre para baixo
+  (`ListaDeEscolha.direcao = "abaixo"`), mais largo e alinhado à direita.
+- **Rotas inválidas:** 400/404 ao abrir resultados ou resultado individual → "Pesquisa não
+  encontrada" com a volta; outra falha → "Tentar novamente".
+- **Assistentes:** trocar de etapa e a tela final voltam ao topo; com pouco conteúdo, o rodapé
+  fica no pé da tela.
