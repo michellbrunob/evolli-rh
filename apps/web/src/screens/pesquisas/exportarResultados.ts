@@ -130,12 +130,6 @@ export function textoDoValor(p: Pergunta, valor: unknown): string {
       return plural(Number(valor), "estrela", "estrelas");
     case "data":
       return formatarDiaCivil(String(valor));
-    case "escala": {
-      // Questionários fixos: o rótulo do ponto marcado.
-      const r = p.config.rotulos?.[Number(valor) - (p.config.minimo ?? 1)];
-      if (r) return r;
-      return typeof valor === "number" ? numero(valor) : String(valor);
-    }
     default:
       return typeof valor === "number" ? numero(valor) : String(valor);
   }
@@ -347,7 +341,13 @@ export function planilhaDosResultados(
 
   // T216 — as abas próprias do modelo (dimensões, pilares), logo depois.
   if (!rel.numerosOcultos)
-    abas.push(...abasDoModelo(geral, rel.empresa, rel.nome));
+    abas.push(
+      ...abasDoModelo(geral, rel.empresa, rel.nome, {
+        minimoPorGrupo: rel.minimoPorGrupo,
+        respostas,
+        secoes: detalhe.secoes,
+      }),
+    );
 
   // 2. Perguntas (as de escala; o eNPS tem a aba dele).
   const menorNota = Math.min(10, ...rel.perguntas.map((p) => p.escala.minimo));

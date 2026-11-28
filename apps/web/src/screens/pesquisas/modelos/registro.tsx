@@ -1,42 +1,35 @@
 /**
- * T216 — o ponto de registro das telas dos modelos com metodologia própria.
- * Os resultados (`ResultadosDaPesquisa`), o resultado individual, a
- * exportação e o relatório consultam aqui o que é próprio de cada modelo:
- * as abas, o painel de cada aba, a planilha e o documento imprimível.
+ * T216 — as abas próprias da NR-1 e da saúde financeira nos resultados.
+ * O resultado do modelo vem em `ResultadosPesquisa.modelo` (a Visão geral é
+ * registrada em `modelos/resultados.tsx`); aqui ficam as abas a mais (Por
+ * grupo, Plano de ação, Conformidade NR-1 e Análises), os recortes (um
+ * resultado por grupo visível) e o acompanhamento da NR-1.
  */
 import { useEffect, useState } from "react";
 import type {
   CampoGrupo,
   ModeloPesquisa,
   PesquisaDetalhe,
+  ResultadosPesquisa,
 } from "../../../api/pesquisasClient";
 import {
   SERVICO_DOS_MODELOS,
-  type IndividualDoModelo,
+  type GrupoDoModelo,
+  type ResultadoDoPainel,
   type ServicoDosModelos,
 } from "../../../api/modelosDePesquisaClient";
-import { Esqueleto } from "../../../ui/movimento";
+import type { AbaDosResultados } from "../rotasDePesquisas";
+import type { ServicoDePesquisas } from "../servicoDePesquisas";
 import {
   ConformidadeNr1,
   PlanoDeAcaoNr1,
   useAcompanhamentoNr1,
 } from "./copsoq/AcompanhamentoNr1";
-import { IndividualNr1Tela } from "./copsoq/IndividualNr1";
 import { PorGrupoNr1, VisaoGeralNr1 } from "./copsoq/VisaoGeralNr1";
-import {
-  AnalisesIsfb,
-  IndividualIsfb,
-  VisaoGeralIsfb,
-} from "./isfb/VisaoGeralIsfb";
-import {
-  EstadoDoCarregamento,
-  PoucasRespostasDoModelo,
-  useResultadoDoModelo,
-} from "./ui";
+import { AnalisesIsfb, VisaoGeralIsfb } from "./isfb/VisaoGeralIsfb";
+import { PoucasRespostasDoModelo } from "./ui";
 
-/** As abas dos resultados (as genéricas mais as próprias da NR-1). */
-export type AbaDoModelo =
-  "geral" | "analises" | "plano" | "conformidade" | "respostas";
+export type AbaDoModelo = AbaDosResultados;
 
 export const ABAS_DO_MODELO: Partial<
   Record<ModeloPesquisa, readonly { valor: AbaDoModelo; rotulo: string }[]>
@@ -53,67 +46,174 @@ export const ABAS_DO_MODELO: Partial<
   ],
 };
 
-/** O primeiro recorte (anônima: o primeiro campo de "Separar respostas por"). */
-export function primeiroRecorte(d: PesquisaDetalhe): CampoGrupo | null {
-  return d.identificacao === "anonima"
-    ? (d.separarPor?.[0] ?? null)
-    : "departamento";
-}
-
 export const temTelasProprias = (modelo: ModeloPesquisa): boolean =>
   ABAS_DO_MODELO[modelo] !== undefined;
 
-export function PainelDoModelo({
-  detalhe,
-  aba,
-  podeEditar,
-  servico = SERVICO_DOS_MODELOS,
-  onTrocarAba,
-}: {
-  readonly detalhe: PesquisaDetalhe;
-  readonly aba: AbaDoModelo;
-  readonly podeEditar: boolean;
-  readonly servico?: ServicoDosModelos;
-  readonly onTrocarAba?: (aba: AbaDoModelo) => void;
-}) {
-  return detalhe.modelo === "copsoq" ? (
-    <PainelNr1
-      detalhe={detalhe}
-      aba={aba}
-      podeEditar={podeEditar}
-      servico={servico}
-      {...(onTrocarAba ? { onTrocarAba } : {})}
-    />
-  ) : (
-    <PainelIsfb detalhe={detalhe} aba={aba} servico={servico} />
-  );
+/** O primeiro recorte (anônima: o primeiro campo de "Separar respostas por"). */
+export function primeiroRecorte(
+  d: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+): CampoGrupo | null {
+  const recortes = geral.recortes ?? [];
+  if (d.identificacao === "anonima")
+    return d.separarPor?.[0] ?? recortes[0] ?? null;
+  return recortes.includes("departamento")
+    ? "departamento"
+    : (recortes[0] ?? null);
 }
 
-function PainelNr1({
+/** O resultado da empresa no formato das telas. */
+export function painelDe(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  campo: CampoGrupo | null = null,
+  grupos: GrupoDoModelo[] | null = null,
+): ResultadoDoPainel {
+  const m = geral.modelo ?? null;
+  const nr1 = m?.modelo === "copsoq" ? m : null;
+  const isfb = m?.modelo === "isfb" ? m : null;
+  return {
+    modelo: detalhe.modelo === "isfb" ? "isfb" : "copsoq",
+    respostas: geral.respostas,
+    visivel: geral.filtro.visivel && (nr1 !== null || isfb !== null),
+    minimoPorGrupo: detalhe.minimoPorGrupo,
+    recortes: geral.recortes ?? [],
+    nr1,
+    isfb,
+    campo,
+    grupos,
+    semGrupo: 0,
+  };
+}
+
+/** O resumo de um grupo a partir do resultado dele (ou oculto). */
+export function grupoDoModelo(
+  g: {
+    id: string;
+    nome: string;
+    respostas: number;
+    visivel: boolean;
+    oculto?: "minimo" | "protege_grupo_menor" | null;
+  },
+  doGrupo: ResultadosPesquisa | null,
+  empresa: ResultadosPesquisa,
+): GrupoDoModelo {
+  const base: GrupoDoModelo = {
+    id: g.id,
+    nome: g.nome,
+    respostas: g.respostas,
+    visivel: g.visivel && doGrupo !== null,
+    oculto: g.oculto ?? (g.visivel ? null : "minimo"),
+    nr1: null,
+    isfb: null,
+  };
+  const m = doGrupo?.modelo;
+  const e = empresa.modelo;
+  if (m?.modelo === "copsoq") {
+    const ref = e?.modelo === "copsoq" ? e : null;
+    base.nr1 = {
+      pressao: m.pressao,
+      recursos: m.recursos,
+      destaque:
+        ref !== null &&
+        m.pressao !== null &&
+        m.recursos !== null &&
+        ref.pressao !== null &&
+        ref.recursos !== null &&
+        m.pressao > ref.pressao &&
+        m.recursos < ref.recursos,
+      niveis: m.niveis,
+      precisamDeAcao: m.precisamDeAcao,
+      dimensoes: m.dimensoes.map((x) => ({
+        id: x.id,
+        escore: x.escore,
+        percentualEmRisco: x.percentuais.risco,
+        nivel: x.nivel,
+      })),
+    };
+  } else if (m?.modelo === "isfb") {
+    base.isfb = {
+      isfb: m.isfb,
+      faixa: m.faixa,
+      saude: {
+        baixa: m.saude.baixa.quantidade,
+        no_limite: m.saude.no_limite.quantidade,
+        saudavel: m.saude.saudavel.quantidade,
+      },
+      comTresOuMaisSinais:
+        (m.sinaisAcumulados[3] ?? 0) + (m.sinaisAcumulados[4] ?? 0),
+    };
+  }
+  return base;
+}
+
+/** Os grupos do recorte: um resultado da pesquisa por grupo visível. */
+function useGrupos(
+  servico: ServicoDePesquisas,
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  campo: CampoGrupo | null,
+  ativo: boolean,
+): GrupoDoModelo[] | null {
+  const [grupos, setGrupos] = useState<GrupoDoModelo[] | null>(null);
+  useEffect(() => {
+    if (!ativo || !campo) return;
+    let vivo = true;
+    const lista = geral.grupos?.[campo] ?? [];
+    Promise.all(
+      lista.map((g) =>
+        g.visivel
+          ? Promise.resolve(
+              servico.resultadosDaPesquisa(detalhe.id, {
+                campo,
+                grupoId: g.id,
+              }),
+            ).catch(() => null)
+          : Promise.resolve(null),
+      ),
+    ).then((resultados) => {
+      if (vivo)
+        setGrupos(lista.map((g, i) => grupoDoModelo(g, resultados[i]!, geral)));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [servico, detalhe.id, geral, campo, ativo]);
+  return grupos;
+}
+
+export function PainelDoModelo({
   detalhe,
+  geral,
+  servico,
   aba,
   podeEditar,
-  servico,
+  servicoDosModelos = SERVICO_DOS_MODELOS,
   onTrocarAba,
 }: {
   readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  /** Os resultados de cada grupo (recortes). */
+  readonly servico: ServicoDePesquisas;
   readonly aba: AbaDoModelo;
   readonly podeEditar: boolean;
-  readonly servico: ServicoDosModelos;
+  /** O acompanhamento da NR-1 (testes: um falso). */
+  readonly servicoDosModelos?: ServicoDosModelos;
   readonly onTrocarAba?: (aba: AbaDoModelo) => void;
 }) {
   const [campo, setCampo] = useState<CampoGrupo | null>(() =>
-    primeiroRecorte(detalhe),
+    primeiroRecorte(detalhe, geral),
   );
-  const comCampo = aba === "analises";
-  const res = useResultadoDoModelo(
-    servico,
+  const nr1 = detalhe.modelo === "copsoq";
+  const grupos = useGrupos(servico, detalhe, geral, campo, aba === "analises");
+  const acompanhamento = useAcompanhamentoNr1(
+    servicoDosModelos,
     detalhe.id,
-    comCampo ? campo : null,
+    nr1,
   );
-  const acompanhamento = useAcompanhamentoNr1(servico, detalhe.id);
+  const r = painelDe(detalhe, geral, campo, grupos);
 
-  if (aba === "conformidade") {
+  if (nr1 && aba === "conformidade") {
     return (
       <ConformidadeNr1
         acompanhamento={acompanhamento}
@@ -123,62 +223,29 @@ function PainelNr1({
       />
     );
   }
-  if (res.fase !== "pronto") {
-    return <EstadoDoCarregamento fase={res.fase} onTentar={res.tentarDeNovo} />;
-  }
-  const r = res.dados;
-  if (!r.visivel || !r.nr1) {
+  if (!r.visivel) {
     return (
       <PoucasRespostasDoModelo detalhe={detalhe} minimo={r.minimoPorGrupo} />
     );
   }
-  if (aba === "plano") {
+  if (r.nr1) {
+    if (aba === "plano")
+      return (
+        <PlanoDeAcaoNr1
+          r={r.nr1}
+          acompanhamento={acompanhamento}
+          podeEditar={podeEditar}
+        />
+      );
+    if (aba === "analises")
+      return <PorGrupoNr1 resultado={r} campo={campo} onCampo={setCampo} />;
     return (
-      <PlanoDeAcaoNr1
-        r={r.nr1}
-        acompanhamento={acompanhamento}
-        podeEditar={podeEditar}
+      <VisaoGeralNr1
+        resultado={r}
+        acompanhamento={acompanhamento.gravado}
+        detalhe={detalhe}
+        {...(onTrocarAba ? { onIrPara: onTrocarAba } : {})}
       />
-    );
-  }
-  if (aba === "analises") {
-    return <PorGrupoNr1 resultado={r} campo={campo} onCampo={setCampo} />;
-  }
-  return (
-    <VisaoGeralNr1
-      resultado={r}
-      acompanhamento={acompanhamento.gravado}
-      detalhe={detalhe}
-      {...(onTrocarAba ? { onIrPara: onTrocarAba } : {})}
-    />
-  );
-}
-
-function PainelIsfb({
-  detalhe,
-  aba,
-  servico,
-}: {
-  readonly detalhe: PesquisaDetalhe;
-  readonly aba: AbaDoModelo;
-  readonly servico: ServicoDosModelos;
-}) {
-  const [campo, setCampo] = useState<CampoGrupo | null>(() =>
-    primeiroRecorte(detalhe),
-  );
-  const comCampo = aba === "analises";
-  const res = useResultadoDoModelo(
-    servico,
-    detalhe.id,
-    comCampo ? campo : null,
-  );
-  if (res.fase !== "pronto") {
-    return <EstadoDoCarregamento fase={res.fase} onTentar={res.tentarDeNovo} />;
-  }
-  const r = res.dados;
-  if (!r.visivel || !r.isfb) {
-    return (
-      <PoucasRespostasDoModelo detalhe={detalhe} minimo={r.minimoPorGrupo} />
     );
   }
   return aba === "analises" ? (
@@ -188,44 +255,22 @@ function PainelIsfb({
   );
 }
 
-/** O resultado próprio do modelo numa resposta (resultado individual). */
-export function IndividualDoModeloTela({
-  pesquisaId,
-  respostaId,
-  servico = SERVICO_DOS_MODELOS,
+/** A Visão geral da NR-1 com os números do acompanhamento (plano e etapas). */
+export function VisaoGeralNr1DoRegistro({
+  detalhe,
+  geral,
+  servicoDosModelos = SERVICO_DOS_MODELOS,
 }: {
-  readonly pesquisaId: string;
-  readonly respostaId: string;
-  readonly servico?: ServicoDosModelos;
+  readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  readonly servicoDosModelos?: ServicoDosModelos;
 }) {
-  const [dados, setDados] = useState<IndividualDoModelo | null>(null);
-  const [falhou, setFalhou] = useState(false);
-  useEffect(() => {
-    let vivo = true;
-    setDados(null);
-    Promise.resolve(servico.individualDoModelo(pesquisaId, respostaId))
-      .then((d) => {
-        if (vivo) setDados(d);
-      })
-      .catch(() => {
-        if (vivo) setFalhou(true);
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [servico, pesquisaId, respostaId]);
-  if (falhou)
-    return (
-      <p className="pesquisas__erro" role="alert">
-        Não foi possível calcular o resultado desta resposta.
-      </p>
-    );
-  if (!dados) return <Esqueleto rotulo="Calculando o resultado…" linhas={3} />;
-  if (dados.nr1) return <IndividualNr1Tela p={dados.nr1} />;
-  if (dados.isfb) return <IndividualIsfb p={dados.isfb} />;
+  const acompanhamento = useAcompanhamentoNr1(servicoDosModelos, detalhe.id);
   return (
-    <p className="pesquisas__suave">
-      Esta resposta não tem as perguntas que formam a nota.
-    </p>
+    <VisaoGeralNr1
+      resultado={painelDe(detalhe, geral)}
+      acompanhamento={acompanhamento.gravado}
+      detalhe={detalhe}
+    />
   );
 }

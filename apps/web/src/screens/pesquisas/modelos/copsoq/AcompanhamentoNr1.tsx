@@ -55,6 +55,8 @@ export function entradaDoAcompanhamento(
 export function useAcompanhamentoNr1(
   servico: ServicoDosModelos,
   pesquisaId: string,
+  /** Só a NR-1 tem acompanhamento. */
+  ativo = true,
 ) {
   const [gravado, setGravado] = useState<AcompanhamentoNr1 | null>(null);
   const [rascunho, setRascunho] = useState<AcompanhamentoNr1Entrada | null>(
@@ -63,6 +65,7 @@ export function useAcompanhamentoNr1(
   const [falha, setFalha] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   useEffect(() => {
+    if (!ativo) return;
     let vivo = true;
     Promise.resolve(servico.acompanhamentoNr1(pesquisaId))
       .then((a) => {
@@ -76,7 +79,7 @@ export function useAcompanhamentoNr1(
     return () => {
       vivo = false;
     };
-  }, [servico, pesquisaId]);
+  }, [servico, pesquisaId, ativo]);
   const pendente =
     gravado !== null &&
     rascunho !== null &&

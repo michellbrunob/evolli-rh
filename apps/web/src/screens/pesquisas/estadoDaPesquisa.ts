@@ -23,7 +23,6 @@ import {
   partesDoEncerramento,
 } from "./encerramento";
 import { modeloDaGaleria, secoesDoModelo } from "./modelosDePesquisa";
-import { ehQuestionarioFixo } from "./modelos/catalogo";
 import {
   LIMITES,
   novoId,
@@ -494,8 +493,7 @@ export function validarPerguntas(e: EstadoDaPesquisa): Erros {
   const erros: Record<string, string> = {};
   const todas = perguntasEmOrdem(e.secoes);
   if (todas.length === 0) erros.perguntas = "Inclua pelo menos uma pergunta.";
-  // Questionários fixos (NR-1: 76 perguntas) não seguem o teto da montagem.
-  if (todas.length > LIMITES.perguntas && !ehQuestionarioFixo(e.modelo))
+  if (todas.length > LIMITES.perguntas)
     erros.perguntas = `A pesquisa pode ter até ${LIMITES.perguntas} perguntas (hoje são ${todas.length}).`;
   if (e.secoes.length > LIMITES.secoes)
     erros.perguntas = `A pesquisa pode ter até ${LIMITES.secoes} seções.`;

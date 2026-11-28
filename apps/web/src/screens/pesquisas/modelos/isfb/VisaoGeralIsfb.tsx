@@ -7,7 +7,7 @@ import { useState } from "react";
 import type {
   FaixaIsfb,
   PessoaIsfb,
-  ResultadoDoModelo,
+  ResultadoDoPainel,
   ResultadoIsfb,
 } from "../../../../api/modelosDePesquisaClient";
 import type { CampoGrupo } from "../../../../api/pesquisasClient";
@@ -224,7 +224,7 @@ function Anel({
 export function VisaoGeralIsfb({
   resultado,
 }: {
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
 }) {
   const r = resultado.isfb!;
   const [filtro, setFiltro] = useState<string>("todas");
@@ -584,7 +584,7 @@ export function AnalisesIsfb({
   campo,
   onCampo,
 }: {
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
   readonly campo: CampoGrupo | null;
   readonly onCampo: (c: CampoGrupo) => void;
 }) {

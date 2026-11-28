@@ -12,7 +12,7 @@ import type {
   AcompanhamentoNr1,
   DimensaoNr1Resultado,
   NivelNr1,
-  ResultadoDoModelo,
+  ResultadoDoPainel,
   ResultadoNr1,
 } from "../../../../api/modelosDePesquisaClient";
 import type {
@@ -213,7 +213,7 @@ export function VisaoGeralNr1({
   detalhe,
   onIrPara,
 }: {
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
   readonly acompanhamento: AcompanhamentoNr1 | null;
   readonly detalhe: PesquisaDetalhe;
   readonly onIrPara?: (aba: "plano" | "conformidade") => void;
@@ -689,7 +689,7 @@ export function PorGrupoNr1({
   campo,
   onCampo,
 }: {
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
   readonly campo: CampoGrupo | null;
   readonly onCampo: (c: CampoGrupo) => void;
 }) {

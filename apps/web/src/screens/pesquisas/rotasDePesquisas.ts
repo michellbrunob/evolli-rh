@@ -22,7 +22,9 @@
 
 import { modeloDaGaleria } from "./modelosDePesquisa";
 
-export type AbaDosResultados = "geral" | "analises" | "respostas";
+/** `plano` e `conformidade`: abas próprias da NR-1 (modelos/registro). */
+export type AbaDosResultados =
+  "geral" | "analises" | "respostas" | "plano" | "conformidade";
 
 export type RotaDePesquisas =
   | { readonly tela: "lista" }
@@ -57,7 +59,13 @@ export const ROTA_DA_LISTA: RotaDePesquisas = { tela: "lista" };
 const PREFIXO = "#/pesquisas";
 const PREFIXO_COM_BARRA = "#/pesquisas/";
 const PREFIXO_COM_BUSCA = "#/pesquisas?";
-const ABAS: readonly AbaDosResultados[] = ["geral", "analises", "respostas"];
+const ABAS: readonly AbaDosResultados[] = [
+  "geral",
+  "analises",
+  "respostas",
+  "plano",
+  "conformidade",
+];
 
 const parte = (t: string) => {
   try {

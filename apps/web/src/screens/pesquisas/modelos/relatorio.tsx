@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import {
   SERVICO_DOS_MODELOS,
   type AcompanhamentoNr1,
-  type ResultadoDoModelo,
+  type ResultadoDoPainel,
   type ServicoDosModelos,
 } from "../../../api/modelosDePesquisaClient";
 import type { ModeloPesquisa } from "../../../api/pesquisasClient";
@@ -66,6 +66,7 @@ import {
   umaCasaBr,
 } from "./isfb/textos";
 import { leituraAutomatica } from "./isfb/VisaoGeralIsfb";
+import { painelDe } from "./registro";
 import {
   BarraDeFaixas,
   BarraPercentual,
@@ -107,32 +108,28 @@ export function RelatorioDoModelo({
   readonly servico?: ServicoDosModelos;
 }) {
   const { detalhe } = carregado;
-  const [dados, setDados] = useState<{
-    resultado: ResultadoDoModelo;
-    acompanhamento: AcompanhamentoNr1 | null;
-  } | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  // O resultado do modelo já vem nos resultados da pesquisa; a NR-1 traz
+  // também o acompanhamento (plano e etapas).
+  const resultado = painelDe(detalhe, carregado.geral);
+  const [acompanhamento, setAcompanhamento] =
+    useState<AcompanhamentoNr1 | null>(null);
+  const [pronto, setPronto] = useState(detalhe.modelo !== "copsoq");
   useEffect(() => {
+    if (detalhe.modelo !== "copsoq") return;
     let vivo = true;
-    Promise.all([
-      Promise.resolve(servico.resultadoDoModelo(detalhe.id)),
-      detalhe.modelo === "copsoq"
-        ? Promise.resolve(servico.acompanhamentoNr1(detalhe.id)).catch(
-            () => null,
-          )
-        : Promise.resolve(null),
-    ])
-      .then(([resultado, acompanhamento]) => {
-        if (vivo) setDados({ resultado, acompanhamento });
-      })
-      .catch(() => {
-        if (vivo) setFalhou(true);
+    Promise.resolve(servico.acompanhamentoNr1(detalhe.id))
+      .catch(() => null)
+      .then((a) => {
+        if (!vivo) return;
+        setAcompanhamento(a);
+        setPronto(true);
       });
     return () => {
       vivo = false;
     };
   }, [servico, detalhe.id, detalhe.modelo]);
-  if (!dados) return <Carregando falhou={falhou} />;
+  if (!pronto) return <Carregando falhou={false} />;
+  const dados = { resultado, acompanhamento };
   const titulo = nomeDoArquivo([detalhe.nome, "relatorio"], "pdf").replace(
     /\.pdf$/,
     "",
@@ -163,7 +160,7 @@ export function DocumentoNr1({
   acompanhamento,
 }: {
   readonly carregado: RelatorioCarregado;
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
   readonly acompanhamento: AcompanhamentoNr1 | null;
 }) {
   const { detalhe, empresa, rel } = carregado;
@@ -755,7 +752,7 @@ export function DocumentoIsfb({
   resultado,
 }: {
   readonly carregado: RelatorioCarregado;
-  readonly resultado: ResultadoDoModelo;
+  readonly resultado: ResultadoDoPainel;
 }) {
   const { detalhe, empresa, rel } = carregado;
   const r = resultado.visivel ? resultado.isfb : null;

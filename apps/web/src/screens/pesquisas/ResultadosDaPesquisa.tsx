@@ -91,7 +91,6 @@ import {
   PainelDoModelo,
   temTelasProprias,
 } from "./modelos/registro";
-import { planilhaDoModelo } from "./modelos/exportacao";
 import {
   BarraEmpilhada,
   BarrasPorNota,
@@ -290,19 +289,13 @@ function ResultadosInterno({
         pesquisaId,
         carregado.lista,
       );
-      const propria = await planilhaDoModelo(
-        carregado,
-        completas,
-        servicoDosModelos,
-      );
       baixarArquivo(
-        propria ??
-          planilhaDosResultados(
-            carregado.rel,
-            carregado.detalhe,
-            carregado.geral,
-            completas,
-          ),
+        planilhaDosResultados(
+          carregado.rel,
+          carregado.detalhe,
+          carregado.geral,
+          completas,
+        ),
         nomeDaExportacao(detalhe.nome, "xlsx"),
         TIPO_MIME_XLSX,
       );
@@ -633,14 +626,6 @@ function ResultadosInterno({
                 )}
               </div>
             </section>
-          ) : temTelasProprias(detalhe.modelo) ? (
-            <PainelDoModelo
-              detalhe={detalhe}
-              aba="geral"
-              podeEditar={podeEditar}
-              {...(servicoDosModelos ? { servico: servicoDosModelos } : {})}
-              onTrocarAba={setAba}
-            />
           ) : (
             (visaoGeralDoModelo(detalhe, geral) ?? (
               <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
@@ -649,9 +634,11 @@ function ResultadosInterno({
         ) : temTelasProprias(detalhe.modelo) && aba !== "respostas" ? (
           <PainelDoModelo
             detalhe={detalhe}
+            geral={geral}
+            servico={servico}
             aba={aba}
             podeEditar={podeEditar}
-            {...(servicoDosModelos ? { servico: servicoDosModelos } : {})}
+            {...(servicoDosModelos ? { servicoDosModelos } : {})}
             onTrocarAba={setAba}
           />
         ) : aba === "analises" ? (

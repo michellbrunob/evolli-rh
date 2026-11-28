@@ -443,6 +443,8 @@ export function CampoDaPergunta({
         config.rotulos.length === ate - de + 1
           ? config.rotulos
           : null;
+      // Só os rótulos, em lista (saúde financeira: "Nada" a "Totalmente").
+      const soRotulos = rotulos !== null && config.somenteRotulos === true;
       const extremos: readonly [string, string] =
         config.rotuloMinimo || config.rotuloMaximo
           ? [config.rotuloMinimo || "Mínimo", config.rotuloMaximo || "Máximo"]
@@ -456,13 +458,15 @@ export function CampoDaPergunta({
           base={base}
           descritores={descritores}
           erro={erro}
-          disposicao="linha"
+          disposicao={soRotulos ? "lista" : "linha"}
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
           extremos={rotulos ? null : extremos}
           opcoes={intervalo(de, ate).map((n) => ({
             valor: String(n),
-            rotulo: rotulos ? (
+            rotulo: soRotulos ? (
+              rotulos[n - de]!
+            ) : rotulos ? (
               <span className="pesquisa-opcao__ponto">
                 <strong>{n}</strong>
                 <span>{rotulos[n - de]}</span>

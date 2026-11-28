@@ -1,9 +1,37 @@
 /**
- * T216 — Riscos psicossociais (NR-1): card, gaveta e página "Sobre o
- * modelo". As 76 perguntas (8 domínios, 29 dimensões) e o cálculo ficam com
- * a frente deste modelo: ela preenche `secoes` e tira `grupos`.
+ * T216 — Riscos psicossociais (NR-1): card, gaveta, página "Sobre o
+ * modelo" e as 76 perguntas (8 domínios, 29 dimensões), com a chave de cada
+ * item (`Q1`…) que a API confere. Itens e escalas em `./definicao`.
  */
-import type { ModeloDaGaleria } from "../tipos";
+import type { ModeloDaGaleria, PerguntaDoModelo } from "../tipos";
+import {
+  DOMINIOS_NR1,
+  ESCALAS_NR1,
+  dimensaoNr1,
+  itensDoDominio,
+  type ItemNr1,
+} from "./definicao";
+
+const pergunta = (i: ItemNr1): PerguntaDoModelo => {
+  const rotulos = [...ESCALAS_NR1[i.escala].rotulos];
+  return {
+    chave: i.id,
+    tipo: "escala",
+    texto: i.texto,
+    rotulo: `${i.id} · ${dimensaoNr1(i.dimensao).rotulo}`.slice(0, 40),
+    obrigatoria: true,
+    config: {
+      minimo: 1,
+      maximo: 5,
+      rotuloMinimo: rotulos[0]!,
+      rotuloMaximo: rotulos[4]!,
+      rotulos,
+    },
+    selo: i.invertido
+      ? `${ESCALAS_NR1[i.escala].nome} · invertida`
+      : ESCALAS_NR1[i.escala].nome,
+  };
+};
 
 const R = "--modelo-laranja";
 const P = "--modelo-azul";
@@ -119,17 +147,22 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
   sobre:
     "Mostra como a organização do trabalho afeta a saúde mental e entrega o inventário de riscos psicossociais que o PGR pede.",
   nomeBase: "Riscos psicossociais",
-  boasVindas: null,
-  secoes: [],
-  grupos: DOMINIOS_RISCOS.map((d) => ({
-    titulo: d.titulo,
-    cor: d.cor,
-    quantidade: d.quantidade,
+  boasVindas:
+    "Esta pesquisa olha para como o trabalho afeta você, como pede a NR-1. Não há resposta certa ou errada: responda com sinceridade, pensando no seu dia a dia. Leva cerca de 15 minutos.",
+  secoes: DOMINIOS_NR1.map((d, i) => ({
+    titulo: d.rotulo,
+    cor: DOMINIOS_RISCOS[i]!.cor,
+    perguntas: itensDoDominio(d.id).map(pergunta),
   })),
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 1, maximo: 5 } },
   limite: 76,
+  minimo: 76,
   fixo: true,
+  legendaDaEscala: [
+    "5 escalas de resposta",
+    "Frequência · Intensidade · Concordância · Satisfação · Saúde (do melhor para o pior)",
+  ],
   pagina: {
     titulo: "NR-1 · Riscos psicossociais",
     selo: "76 perguntas",

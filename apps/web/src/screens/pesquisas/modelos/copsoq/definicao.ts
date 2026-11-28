@@ -7,7 +7,6 @@
  * empresa pode trocá-los pela redação oficial do instrumento, se tiver
  * licença — o servidor guarda só o texto e mantém ids, escalas e ordem.
  */
-import type { ModeloDaGaleria } from "../../modelosDePesquisa";
 
 export type EscalaNr1 =
   "frequencia" | "intensidade" | "concordancia" | "satisfacao" | "saude";
@@ -641,45 +640,3 @@ export const TIPOS_DE_OFENSA: readonly { id: string; rotulo: string }[] = [
   { id: "Q75", rotulo: "Ameaça de violência" },
   { id: "Q76", rotulo: "Violência física" },
 ];
-
-/** O modelo na galeria (a ligação com a galeria é feita à parte). */
-export const MODELO_NR1: ModeloDaGaleria = {
-  id: "copsoq",
-  modelo: "copsoq",
-  nome: "Riscos psicossociais (NR-1)",
-  categoria: null,
-  descricao:
-    "76 perguntas padronizadas em 8 domínios para mapear os riscos psicossociais do trabalho.",
-  cor: "--turno-verde",
-  destaques: ["8 domínios", "Matriz de risco"],
-  sobre:
-    "Avalia como a organização do trabalho afeta a saúde mental e monta o inventário de riscos psicossociais que vai para o PGR.",
-  ritmo: "Anual",
-  frequencia: "Anual",
-  nomeBase: "NR-1 · Riscos psicossociais",
-  boasVindas:
-    "Esta pesquisa olha para como o trabalho afeta você, como pede a NR-1. Não há resposta certa ou errada: responda com sinceridade, pensando no seu dia a dia. Leva cerca de 15 minutos.",
-  secoes: DOMINIOS_NR1.map((dom) => ({
-    id: dom.id,
-    titulo: dom.rotulo,
-    perguntas: itensDoDominio(dom.id).map((i) => {
-      const rotulos = [...ESCALAS_NR1[i.escala].rotulos];
-      return {
-        id: i.id,
-        tipo: "escala" as const,
-        texto: i.texto,
-        rotulo: `${i.id} · ${dimensaoNr1(i.dimensao).rotulo}`.slice(0, 40),
-        config: {
-          minimo: 1,
-          maximo: 5,
-          rotuloMinimo: rotulos[0]!,
-          rotuloMaximo: rotulos[4]!,
-          rotulos,
-        },
-      };
-    }),
-  })),
-  comentarioFinal: null,
-  perguntaPadrao: { tipo: "escala", config: { minimo: 1, maximo: 5 } },
-  limite: ITENS_NR1.length,
-};

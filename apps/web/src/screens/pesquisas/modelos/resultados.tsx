@@ -60,6 +60,9 @@ export function paginaIndividualDoModelo(x: {
     />
   );
 }
+import { IndividualNr1Tela } from "./copsoq/IndividualNr1";
+import { IndividualIsfb, VisaoGeralIsfb } from "./isfb/VisaoGeralIsfb";
+import { painelDe, VisaoGeralNr1DoRegistro } from "./registro";
 
 /**
  * Avaliação 90°/180° e Onboarding automático: resultados inteiros
@@ -81,6 +84,10 @@ export function visaoGeralDoModelo(
       return <ResultadoClimaVisao detalhe={detalhe} geral={geral} r={r} />;
     case "tad":
       return <ResultadoTadVisao r={r} />;
+    case "copsoq":
+      return <VisaoGeralNr1DoRegistro detalhe={detalhe} geral={geral} />;
+    case "isfb":
+      return <VisaoGeralIsfb resultado={painelDe(detalhe, geral)} />;
     default:
       return null;
   }
@@ -95,6 +102,10 @@ export function resultadoIndividualDoModelo(
   switch (r.modelo) {
     case "tad":
       return <PainelTad r={r} titulo="Score geral de motivação" />;
+    case "copsoq":
+      return <IndividualNr1Tela p={r} />;
+    case "isfb":
+      return <IndividualIsfb p={r} />;
     default:
       return null;
   }

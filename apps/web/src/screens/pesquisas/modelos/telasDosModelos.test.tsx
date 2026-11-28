@@ -1,45 +1,54 @@
 /**
- * T216 — telas da NR-1 e da saúde financeira: questionário fixo no
- * assistente, resultados, plano de ação, conformidade, resultado
- * individual, planilha e a escala com o rótulo de cada ponto.
+ * T216 — telas da NR-1 e da saúde financeira: catálogo e autopercepção no
+ * assistente, resultados (Visão geral pelo registro e as abas próprias),
+ * plano de ação, conformidade, resultado individual, planilha e a escala
+ * com rótulos na resposta pelo link.
  */
 import {
+  configure,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { configure } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   AcompanhamentoNr1,
   DimensaoNr1Resultado,
   NivelNr1,
-  ResultadoDoModelo,
+  PessoaIsfb,
   ResultadoIsfb,
+  ResultadoNr1,
   ServicoDosModelos,
 } from "../../../api/modelosDePesquisaClient";
 import type {
   PesquisaDetalhe,
   RespostaDetalhe,
+  ResultadosPesquisa,
 } from "../../../api/pesquisasClient";
 import { CampoDaPergunta } from "../../publico/CampoDaPergunta";
-import { DETALHE, RESPOSTA_DETALHE, servicoFalso } from "../dadosDeTeste";
+import {
+  DETALHE,
+  RESPOSTA_DETALHE,
+  RESULTADOS,
+  servicoFalso,
+} from "../dadosDeTeste";
 import { modeloDaGaleria, secoesDoModelo } from "../modelosDePesquisa";
 import { ResultadosDaPesquisa } from "../ResultadosDaPesquisa";
-import { DIMENSOES_NR1 } from "./copsoq/definicao";
-import { abasDaPlanilhaIsfb, abasDaPlanilhaNr1 } from "./exportacao";
-import { leituraAutomatica } from "./isfb/VisaoGeralIsfb";
+import { DIMENSOES_NR1, ITENS_NR1 } from "./copsoq/definicao";
+import { abasDoModelo } from "./exportacao";
 import {
-  QuestionarioFixo,
+  InterruptorDaAutopercepcao,
   comAutopercepcao,
-  resumoDoQuestionarioFixo,
-  seloDaPerguntaFixa,
-} from "./QuestionarioFixo";
-import { IndividualDoModeloTela, PainelDoModelo } from "./registro";
+  temAutopercepcao,
+} from "./isfb/Autopercepcao";
+import { ITENS_ISFB } from "./isfb/definicao";
+import { IndividualIsfb, leituraAutomatica } from "./isfb/VisaoGeralIsfb";
+import { PainelDoModelo, VisaoGeralNr1DoRegistro } from "./registro";
+import { resultadoIndividualDoModelo, visaoGeralDoModelo } from "./resultados";
 
-// As análises carregam em duas etapas (sem e com o recorte): folga na suíte cheia.
+// Os recortes carregam um resultado por grupo: folga na suíte cheia.
 configure({ asyncUtilTimeout: 4000 });
 
 const NIVEIS_DE_TESTE: Record<string, NivelNr1> = {
@@ -83,62 +92,52 @@ const PRIORIDADES = [
   ...DIMENSOES_NR1.map((d) => d.id).filter((id) => !(id in NIVEIS_DE_TESTE)),
 ];
 
-const RESULTADO_NR1: ResultadoDoModelo = {
+const MODELO_NR1: ResultadoNr1 = {
   modelo: "copsoq",
   respostas: 4,
-  visivel: true,
-  minimoPorGrupo: 3,
-  recortes: ["departamento"],
-  nr1: {
-    respostas: 4,
-    dimensoes: DIMENSOES,
-    prioridades: PRIORIDADES,
-    niveis: { critico: 1, alto: 2, medio: 1, baixo: 25 },
-    precisamDeAcao: 3,
-    matriz: [
-      [[], [], [], ["exigencias_quantitativas"]],
-      [[], [], ["apoio_social_colegas", "ritmo_trabalho"], []],
-      [[], [], [], []],
-      [["burnout"], [], [], []],
-    ],
-    dominios: [
-      {
-        id: "exigencias_laborais",
-        dimensoes: 4,
-        precisamDeAcao: 2,
-        percentualEmRisco: 31.3,
-      },
-    ],
-    saude: [
-      {
-        id: "burnout",
-        pessoasEmRisco: 1,
-        pessoas: 4,
-        percentualEmRisco: 25,
-        nivel: "medio",
-      },
-    ],
-    ofensivos: {
-      pessoas: 4,
-      relataram: null,
-      percentual: null,
-      tipos: [
-        {
-          id: "Q73",
-          raramente: null,
-          asVezes: 0,
-          frequentementeOuSempre: 0,
-          relataram: null,
-        },
-      ],
+  dimensoes: DIMENSOES,
+  prioridades: PRIORIDADES,
+  niveis: { critico: 1, alto: 2, medio: 1, baixo: 25 },
+  precisamDeAcao: 3,
+  matriz: [
+    [[], [], [], ["exigencias_quantitativas"]],
+    [[], [], ["apoio_social_colegas", "ritmo_trabalho"], []],
+    [[], [], [], []],
+    [["burnout"], [], [], []],
+  ],
+  dominios: [
+    {
+      id: "exigencias_laborais",
+      dimensoes: 4,
+      precisamDeAcao: 2,
+      percentualEmRisco: 31.3,
     },
-    pressao: 3.31,
-    recursos: 2.9,
+  ],
+  saude: [
+    {
+      id: "burnout",
+      pessoasEmRisco: 1,
+      pessoas: 4,
+      percentualEmRisco: 25,
+      nivel: "medio",
+    },
+  ],
+  ofensivos: {
+    pessoas: 4,
+    relataram: null,
+    percentual: null,
+    tipos: [
+      {
+        id: "Q73",
+        raramente: null,
+        asVezes: 0,
+        frequentementeOuSempre: 0,
+        relataram: null,
+      },
+    ],
   },
-  isfb: null,
-  campo: null,
-  grupos: null,
-  semGrupo: 0,
+  pressao: 3.31,
+  recursos: 2.9,
 };
 
 const ACOMPANHAMENTO: AcompanhamentoNr1 = {
@@ -209,6 +208,7 @@ const ACOMPANHAMENTO: AcompanhamentoNr1 = {
 };
 
 const ISFB: ResultadoIsfb = {
+  modelo: "isfb",
   pessoas: 3,
   isfb: 53,
   faixa: "baixa",
@@ -284,20 +284,41 @@ const ISFB: ResultadoIsfb = {
   ],
 };
 
-const RESULTADO_ISFB: ResultadoDoModelo = {
-  ...RESULTADO_NR1,
-  modelo: "isfb",
+/** Os resultados da pesquisa com o resultado do modelo. */
+const GERAL_NR1: ResultadosPesquisa = {
+  ...RESULTADOS,
+  respostas: 4,
+  recortes: ["departamento"],
+  grupos: {
+    departamento: [
+      {
+        id: "g1",
+        nome: "Comercial",
+        respostas: 3,
+        visivel: true,
+        oculto: null,
+      },
+      {
+        id: "g2",
+        nome: "Financeiro",
+        respostas: 1,
+        visivel: false,
+        oculto: "minimo",
+      },
+    ],
+  },
+  modelo: MODELO_NR1,
+};
+const GERAL_ISFB: ResultadosPesquisa = {
+  ...GERAL_NR1,
   respostas: 3,
-  nr1: null,
-  isfb: ISFB,
+  modelo: ISFB,
 };
 
 function servicoDosModelos(
   extra: Partial<ServicoDosModelos> = {},
 ): ServicoDosModelos {
   return {
-    resultadoDoModelo: vi.fn(() => Promise.resolve(RESULTADO_NR1)),
-    individualDoModelo: vi.fn(() => Promise.reject(new Error("sem"))),
     acompanhamentoNr1: vi.fn(() => Promise.resolve(ACOMPANHAMENTO)),
     gravarAcompanhamentoNr1: vi.fn((_id, e) =>
       Promise.resolve({
@@ -323,71 +344,79 @@ const SAUDE_FIN: PesquisaDetalhe = {
   separarPor: ["departamento"],
 };
 
-describe("questionário fixo no assistente", () => {
-  it("NR-1: 8 domínios sem edição, 5 escalas e o selo da escala de cada item", () => {
+describe("catálogo e autopercepção no assistente", () => {
+  it("NR-1: 76 perguntas com a chave do item, em 8 domínios, e o selo da escala", () => {
     const secoes = secoesDoModelo(modeloDaGaleria("copsoq"));
-    render(
-      <QuestionarioFixo
-        modelo="copsoq"
-        secoes={secoes}
-        travado={false}
-        onMudar={vi.fn()}
-      />,
-    );
-    const cartao = screen.getByRole("region", { name: "Perguntas" });
-    expect(within(cartao).getByText("76")).toBeInTheDocument();
-    expect(cartao.querySelectorAll("details")).toHaveLength(8);
-    expect(
-      within(cartao).getByText(/não podem ser editadas/),
-    ).toBeInTheDocument();
-    expect(
-      within(cartao).queryByRole("button", { name: /Adicionar/ }),
-    ).toBeNull();
-    const q64 = secoes[6]!.perguntas[0]!;
-    expect(seloDaPerguntaFixa("copsoq", q64)).toBe("Saúde");
-    expect(resumoDoQuestionarioFixo("copsoq", secoes)).toBe(
-      "76 perguntas fixas em 8 domínios",
-    );
+    expect(secoes).toHaveLength(8);
+    const perguntas = secoes.flatMap((s) => s.perguntas);
+    expect(perguntas.map((p) => p.chave)).toEqual(ITENS_NR1.map((i) => i.id));
+    expect(perguntas[63]!.config.rotulos).toEqual([
+      "Excelente",
+      "Muito boa",
+      "Boa",
+      "Regular",
+      "Fraca",
+    ]);
+    expect(perguntas.every((p) => p.obrigatoria)).toBe(true);
+    expect(perguntas.every((p) => p.texto.length <= 300)).toBe(true);
+    expect(perguntas.every((p) => (p.rotulo ?? "").length <= 40)).toBe(true);
+    expect(modeloDaGaleria("copsoq").fixo).toBe(true);
   });
 
-  it("saúde financeira: o interruptor tira e volta a autopercepção", () => {
+  it("saúde financeira: 18 perguntas, opções na ordem do modelo", () => {
+    const perguntas = secoesDoModelo(modeloDaGaleria("isfb")).flatMap(
+      (s) => s.perguntas,
+    );
+    expect(perguntas.map((p) => p.chave)).toEqual(ITENS_ISFB.map((i) => i.id));
+    const q13 = perguntas.find((p) => p.chave === "Q13")!;
+    expect(q13.tipo).toBe("multipla_escolha");
+    expect(q13.obrigatoria).toBe(false);
+    expect(q13.config.opcoes).toHaveLength(14);
+    expect(q13.config.opcoes![3]!.texto).toBe("Poupança");
+    expect(perguntas.find((p) => p.chave === "Q2")!.config).toMatchObject({
+      minimo: 0,
+      maximo: 4,
+      somenteRotulos: true,
+    });
+    expect(perguntas.filter((p) => p.obrigatoria)).toHaveLength(14);
+  });
+
+  it("o interruptor tira e volta a autopercepção", () => {
     const secoes = secoesDoModelo(modeloDaGaleria("isfb"));
     const onMudar = vi.fn();
     render(
-      <QuestionarioFixo
-        modelo="isfb"
+      <InterruptorDaAutopercepcao
         secoes={secoes}
         travado={false}
         onMudar={onMudar}
       />,
     );
-    expect(screen.getByText("18 de 18")).toBeInTheDocument();
     const interruptor = screen.getByRole("switch", {
       name: "Incluir autopercepção",
     });
     expect(interruptor).toHaveAttribute("aria-checked", "true");
     fireEvent.click(interruptor);
     const sem = onMudar.mock.calls[0]![0];
-    expect(sem.map((s: { id: string }) => s.id)).not.toContain("autopercepcao");
-    expect(resumoDoQuestionarioFixo("isfb", sem)).toBe(
-      "15 perguntas do índice",
-    );
-    expect(comAutopercepcao(sem, true).map((s) => s.id)).toContain(
-      "autopercepcao",
-    );
-    expect(seloDaPerguntaFixa("isfb", secoes[0]!.perguntas[1]!)).toBe(
-      "Nada → Totalmente · invertida",
-    );
-    expect(seloDaPerguntaFixa("isfb", secoes[0]!.perguntas[0]!)).toBe(
-      "5 opções",
-    );
+    expect(temAutopercepcao(sem)).toBe(false);
+    expect(
+      sem.flatMap((s: { perguntas: unknown[] }) => s.perguntas),
+    ).toHaveLength(15);
+    const com = comAutopercepcao(sem, true);
+    expect(temAutopercepcao(com)).toBe(true);
+    expect(
+      com
+        .flatMap((s) => s.perguntas)
+        .map((p) => p.chave)
+        .slice(-3),
+    ).toEqual(["O1", "O2", "O3"]);
   });
 });
 
 describe("resultados da NR-1", () => {
-  it("abas próprias e a visão geral com níveis, matriz e prioridades", async () => {
+  it("abas próprias e a visão geral pelo registro", async () => {
     const servico = servicoFalso({
       obterPesquisa: vi.fn(() => Promise.resolve(NR1)),
+      resultadosDaPesquisa: vi.fn(() => Promise.resolve(GERAL_NR1)),
     });
     render(
       <ResultadosDaPesquisa
@@ -421,29 +450,49 @@ describe("resultados da NR-1", () => {
     expect(
       screen.getByText("2 de 3 em risco alto ou crítico"),
     ).toBeInTheDocument();
-    // Sigilo: menos de 3 pessoas.
     expect(screen.getAllByText(/menos de 3 pessoas/).length).toBeGreaterThan(0);
-    expect(screen.getByText("1 de 7 etapas")).toBeInTheDocument();
-    // Ranking: alto e crítico por padrão; "Todas" mostra as 29.
     const ranking = screen.getByRole("region", {
       name: "Ranking de prioridades",
     });
     expect(within(ranking).getAllByRole("row")).toHaveLength(4);
     fireEvent.click(within(ranking).getByRole("button", { name: /Todas/ }));
     expect(within(ranking).getAllByRole("row")).toHaveLength(30);
+  }, 20_000);
+
+  it("a visão geral mostra o andamento da conformidade", async () => {
+    render(
+      <VisaoGeralNr1DoRegistro
+        detalhe={NR1}
+        geral={GERAL_NR1}
+        servicoDosModelos={servicoDosModelos()}
+      />,
+    );
+    expect(await screen.findByText("1 de 7 etapas")).toBeInTheDocument();
+    expect(screen.getByText("0 medidas")).toBeInTheDocument();
+  });
+
+  it("sem o resultado do modelo, a visão geral do registro não aparece", () => {
+    expect(visaoGeralDoModelo(NR1, { ...GERAL_NR1, modelo: null })).toBeNull();
   });
 
   it("plano de ação: o RH escreve a medida e salva", async () => {
     const sm = servicoDosModelos();
     render(
-      <PainelDoModelo detalhe={NR1} aba="plano" podeEditar servico={sm} />,
+      <PainelDoModelo
+        detalhe={NR1}
+        geral={GERAL_NR1}
+        servico={servicoFalso()}
+        aba="plano"
+        podeEditar
+        servicoDosModelos={sm}
+      />,
     );
     expect(
       await screen.findByRole("region", {
         name: "Medidas de Exigências Quantitativas",
       }),
     ).toBeInTheDocument();
-    const salvar = screen.getByRole("button", { name: "Salvar plano" });
+    const salvar = await screen.findByRole("button", { name: "Salvar plano" });
     expect(salvar).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "+ Adicionar medida" }));
     fireEvent.change(screen.getByLabelText("O que fazer"), {
@@ -465,16 +514,17 @@ describe("resultados da NR-1", () => {
         situacao: "planejada",
       }),
     ]);
-    // Sem permissão de edição, nada se edita.
   });
 
   it("plano sem permissão: só leitura", async () => {
     render(
       <PainelDoModelo
         detalhe={NR1}
+        geral={GERAL_NR1}
+        servico={servicoFalso()}
         aba="plano"
         podeEditar={false}
-        servico={servicoDosModelos()}
+        servicoDosModelos={servicoDosModelos()}
       />,
     );
     await screen.findByRole("region", { name: /Medidas de/ });
@@ -489,9 +539,11 @@ describe("resultados da NR-1", () => {
     render(
       <PainelDoModelo
         detalhe={NR1}
+        geral={GERAL_NR1}
+        servico={servicoFalso()}
         aba="conformidade"
         podeEditar
-        servico={sm}
+        servicoDosModelos={sm}
       />,
     );
     expect(
@@ -525,65 +577,42 @@ describe("resultados da NR-1", () => {
     expect(screen.getByText("Prevista para 11/2027")).toBeInTheDocument();
   });
 
-  it("confidencial abaixo do mínimo: nada aparece", async () => {
-    const sm = servicoDosModelos({
-      resultadoDoModelo: vi.fn(() =>
-        Promise.resolve({ ...RESULTADO_NR1, visivel: false, nr1: null }),
-      ),
-    });
+  it("confidencial abaixo do mínimo: nada aparece", () => {
     render(
       <PainelDoModelo
         detalhe={{ ...NR1, identificacao: "confidencial", respostas: 2 }}
-        aba="geral"
+        geral={{
+          ...GERAL_NR1,
+          modelo: null,
+          filtro: { ...GERAL_NR1.filtro, visivel: false },
+        }}
+        servico={servicoFalso()}
+        aba="analises"
         podeEditar
-        servico={sm}
+        servicoDosModelos={servicoDosModelos()}
       />,
     );
     expect(
-      await screen.findByText("Poucas respostas para mostrar"),
+      screen.getByText("Poucas respostas para mostrar"),
     ).toBeInTheDocument();
   });
 
-  it("por grupo: pede o recorte e oculta grupo abaixo do mínimo", async () => {
-    const sm = servicoDosModelos({
-      resultadoDoModelo: vi.fn((_id, campo) =>
-        Promise.resolve({
-          ...RESULTADO_NR1,
-          campo: campo ?? null,
-          grupos: campo
-            ? [
-                {
-                  id: "g1",
-                  nome: "Comercial",
-                  respostas: 3,
-                  visivel: true,
-                  oculto: null,
-                  nr1: {
-                    pressao: 3.6,
-                    recursos: 2.5,
-                    destaque: true,
-                    niveis: { critico: 1, alto: 0, medio: 0, baixo: 28 },
-                    precisamDeAcao: 1,
-                    dimensoes: [],
-                  },
-                  isfb: null,
-                },
-                {
-                  id: "g2",
-                  nome: "Financeiro",
-                  respostas: 1,
-                  visivel: false,
-                  oculto: "minimo" as const,
-                  nr1: null,
-                  isfb: null,
-                },
-              ]
-            : null,
-        }),
-      ),
-    });
+  it("por grupo: um resultado por grupo visível; o pequeno fica oculto", async () => {
+    const doGrupo: ResultadosPesquisa = {
+      ...GERAL_NR1,
+      respostas: 3,
+      modelo: { ...MODELO_NR1, pressao: 3.6, recursos: 2.5, precisamDeAcao: 1 },
+    };
+    const resultadosDaPesquisa = vi.fn(() => Promise.resolve(doGrupo));
     render(
-      <PainelDoModelo detalhe={NR1} aba="analises" podeEditar servico={sm} />,
+      <PainelDoModelo
+        detalhe={NR1}
+        geral={GERAL_NR1}
+        servico={servicoFalso({ resultadosDaPesquisa })}
+        aba="analises"
+        podeEditar
+        servicoDosModelos={servicoDosModelos()}
+      />,
     );
     expect(
       await screen.findByText("Mais pressão e menos recursos"),
@@ -591,29 +620,18 @@ describe("resultados da NR-1", () => {
     expect(
       screen.getByText("Oculto · menos de 3 respostas"),
     ).toBeInTheDocument();
-    expect(sm.resultadoDoModelo).toHaveBeenLastCalledWith(
-      "p-1",
-      "departamento",
-    );
+    expect(resultadosDaPesquisa).toHaveBeenCalledTimes(1);
+    expect(resultadosDaPesquisa).toHaveBeenCalledWith("p-1", {
+      campo: "departamento",
+      grupoId: "g1",
+    });
   });
 });
 
 describe("resultados da saúde financeira", () => {
-  it("nota do time, faixa, sinais e perfis", async () => {
-    const sm = servicoDosModelos({
-      resultadoDoModelo: vi.fn(() => Promise.resolve(RESULTADO_ISFB)),
-    });
-    render(
-      <PainelDoModelo
-        detalhe={SAUDE_FIN}
-        aba="geral"
-        podeEditar
-        servico={sm}
-      />,
-    );
-    expect(
-      (await screen.findAllByText("Baixa · 50 a 56")).length,
-    ).toBeGreaterThan(1);
+  it("nota do time, faixa, sinais e renda oculta", () => {
+    render(<>{visaoGeralDoModelo(SAUDE_FIN, GERAL_ISFB)}</>);
+    expect(screen.getAllByText("Baixa · 50 a 56").length).toBeGreaterThan(1);
     expect(screen.getByText("Brasil 56,7 · −3,7")).toBeInTheDocument();
     expect(
       screen.getByText("67% dizem que dinheiro gera estresse em casa"),
@@ -627,22 +645,23 @@ describe("resultados da saúde financeira", () => {
   });
 
   it("análises: sinais acumulados, crédito × reserva e abertura a apoio", async () => {
-    const sm = servicoDosModelos({
-      resultadoDoModelo: vi.fn(() => Promise.resolve(RESULTADO_ISFB)),
-    });
+    const resultadosDaPesquisa = vi.fn(() =>
+      Promise.resolve({ ...GERAL_ISFB, respostas: 3 }),
+    );
     render(
       <PainelDoModelo
         detalhe={SAUDE_FIN}
+        geral={GERAL_ISFB}
+        servico={servicoFalso({ resultadosDaPesquisa })}
         aba="analises"
         podeEditar
-        servico={sm}
+        servicoDosModelos={servicoDosModelos()}
       />,
     );
-    expect(
-      await screen.findByText("1 pessoa com 3 ou 4 sinais"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 pessoa com 3 ou 4 sinais")).toBeInTheDocument();
     expect(screen.getByText("Risco de dívida cara")).toBeInTheDocument();
     expect(screen.getByText("Sabem que precisam")).toBeInTheDocument();
+    expect(await screen.findByText("Comercial")).toBeInTheDocument();
   });
 
   it("leitura automática por regras", () => {
@@ -653,46 +672,42 @@ describe("resultados da saúde financeira", () => {
     });
   });
 
-  it("resultado individual da resposta", async () => {
-    const sm = servicoDosModelos({
-      individualDoModelo: vi.fn(() =>
-        Promise.resolve({
-          modelo: "isfb" as const,
-          respostaId: "r-1",
-          nr1: null,
-          isfb: {
-            isfb: 96,
-            faixa: "otima" as const,
-            saude: "saudavel" as const,
-            dimensoes: {
-              seguranca: 96,
-              habilidade: 96,
-              comportamento: 96,
-              liberdade: 94,
-            },
-            autopercepcao: null,
-            baseBaixa: false,
-            perfil: "estaveis" as const,
-            sinais: [],
-            abertura: null,
-            produtos: [],
-            pontos: {},
-            renda: 6,
-            isfbDoTime: 53,
-            mediaDoBrasil: 56.7,
-            dimensoesDoTime: { seguranca: 51 },
-          },
-        }),
-      ),
-    });
+  it("resultado individual pelo registro", () => {
+    const pessoa: PessoaIsfb = {
+      modelo: "isfb",
+      isfb: 96,
+      faixa: "otima",
+      saude: "saudavel",
+      dimensoes: {
+        seguranca: 96,
+        habilidade: 96,
+        comportamento: 96,
+        liberdade: 94,
+      },
+      autopercepcao: null,
+      baseBaixa: false,
+      perfil: "estaveis",
+      sinais: [],
+      abertura: null,
+      produtos: [],
+      pontos: {},
+      renda: 6,
+      isfbDoTime: 53,
+      mediaDoBrasil: 56.7,
+      dimensoesDoTime: { seguranca: 51 },
+    };
     render(
-      <IndividualDoModeloTela pesquisaId="p-1" respostaId="r-1" servico={sm} />,
+      <>
+        {resultadoIndividualDoModelo({ ...RESPOSTA_DETALHE, modelo: pessoa })}
+      </>,
     );
-    expect(await screen.findByText("Ótima · 83 a 100")).toBeInTheDocument();
+    expect(screen.getByText("Ótima · 83 a 100")).toBeInTheDocument();
     expect(
       screen.getByText(/\+39,3 pontos em relação à média do Brasil/),
     ).toBeInTheDocument();
     expect(screen.getByText("Estáveis")).toBeInTheDocument();
+    render(<IndividualIsfb p={{ ...pessoa, sinais: ["sem_reserva"] }} />);
+    expect(screen.getByText("Sem reserva")).toBeInTheDocument();
   });
 });
 
@@ -701,40 +716,19 @@ describe("planilha", () => {
     ...RESPOSTA_DETALHE,
     nome: null,
     numero: 2,
-    valores: [{ perguntaId: "Q1", valor: 4, mediaTime: null }],
+    valores: [{ perguntaId: "q-Q1", valor: 4, mediaTime: null }],
   };
 
-  it("NR-1: abas, resultados por dimensão e respostas numeradas", () => {
-    const abas = abasDaPlanilhaNr1({
-      detalhe: { ...NR1, secoes: secoesDoModelo(modeloDaGaleria("copsoq")) },
-      empresa: "Empresa Sintética",
-      resultado: RESULTADO_NR1,
-      acompanhamento: {
-        ...ACOMPANHAMENTO,
-        plano: [
-          {
-            id: "m1",
-            dimensaoId: "burnout",
-            titulo: "Pausas",
-            descricao: null,
-            controle: "protecao",
-            responsavel: null,
-            prazo: "2027-01-31",
-            indicador: null,
-            situacao: "planejada",
-          },
-        ],
-      },
-      respostas: [RESPOSTA],
+  it("NR-1: dimensões, matriz, domínios, destaques e metodologia", () => {
+    const abas = abasDoModelo(GERAL_NR1, "Empresa Sintética", "NR-1", {
+      minimoPorGrupo: 3,
     });
     expect(abas.map((a) => a.nome)).toEqual([
-      "Resumo",
+      "Dimensões NR-1",
       "Matriz Psicossocial",
       "Domínios",
       "Destaques",
-      "Plano de ação",
       "Metodologia e NR-1",
-      "Respostas Individuais",
     ]);
     const linha = abas[0]!.linhas.find(
       (l) => l[1] === "Exigências Quantitativas",
@@ -742,58 +736,23 @@ describe("planilha", () => {
     expect(linha[3]).toBe("Risco");
     expect(linha[9]).toBe("Crítico");
     expect(linha[10]).toEqual({ numero: 0.75, formato: "percentual" });
-    expect(abas[4]!.linhas[1]).toEqual([
-      "Burnout (Esgotamento)",
-      "Pausas",
-      "",
-      "Proteção individual e coletiva",
-      "",
-      "31/01/2027",
-      "",
-      "Planejada",
+    const destaques = abas[3]!.linhas;
+    expect(destaques).toContainEqual([
+      "Relataram ao menos um tipo",
+      "Menos de 3",
+      "—",
     ]);
-    const respostas = abas[6]!;
-    expect(respostas.linhas[0]!.slice(0, 3)).toEqual([
-      "Resposta",
-      "Respondeu em",
-      "Q1",
-    ]);
-    expect(respostas.linhas[1]![0]).toBe("Resposta #2");
-    expect(respostas.linhas[1]![2]).toBe(4);
   });
 
-  it("NR-1 confidencial (sem respostas individuais) e oculta", () => {
-    const sem = abasDaPlanilhaNr1({
-      detalhe: NR1,
-      empresa: "",
-      resultado: RESULTADO_NR1,
-      acompanhamento: null,
-      respostas: null,
-    });
-    expect(sem.map((a) => a.nome)).not.toContain("Respostas Individuais");
-    const oculta = abasDaPlanilhaNr1({
-      detalhe: NR1,
-      empresa: "",
-      resultado: { ...RESULTADO_NR1, visivel: false, nr1: null },
-      acompanhamento: null,
-      respostas: null,
-    });
-    expect(oculta.map((a) => a.nome)).toEqual(["Resumo"]);
-  });
-
-  it("saúde financeira: resumo, pessoas e perguntas", () => {
-    const abas = abasDaPlanilhaIsfb({
-      detalhe: {
-        ...SAUDE_FIN,
-        secoes: secoesDoModelo(modeloDaGaleria("isfb")),
-      },
-      empresa: "Empresa Sintética",
-      resultado: RESULTADO_ISFB,
+  it("saúde financeira: índice, pessoas (com a nota) e perguntas", () => {
+    const secoes = secoesDoModelo(modeloDaGaleria("isfb"));
+    const abas = abasDoModelo(GERAL_ISFB, "Empresa Sintética", "SF", {
+      minimoPorGrupo: 3,
       respostas: [RESPOSTA],
-      individuais: [null],
+      secoes,
     });
     expect(abas.map((a) => a.nome)).toEqual([
-      "Resumo",
+      "Saúde financeira",
       "Pessoas",
       "Perguntas",
       "Abertura a apoio",
@@ -807,8 +766,9 @@ describe("planilha", () => {
       "Média do Brasil (referência nacional, 2024)",
       { numero: 56.7, formato: "decimal" },
     ]);
-    // Q1 da resposta: a opção marcada não existe no valor (4) → texto.
+    expect(abas[1]!.linhas[0]!.slice(11, 13)).toEqual(["Q1", "Q2"]);
     expect(abas[1]!.linhas[1]![0]).toBe("Resposta #2");
+    expect(abas[1]!.linhas[1]![2]).toBe("—");
     expect(abas[2]!.linhas[1]).toEqual([
       "Q2",
       "Dinheiro não gera estresse em casa",
@@ -820,6 +780,12 @@ describe("planilha", () => {
       0,
       1,
     ]);
+    // Confidencial: sem a aba de pessoas.
+    expect(
+      abasDoModelo(GERAL_ISFB, "E", "SF", { respostas: null }).map(
+        (a) => a.nome,
+      ),
+    ).not.toContain("Pessoas");
   });
 });
 
@@ -835,8 +801,7 @@ describe("escala com o rótulo de cada ponto (resposta pelo link)", () => {
         aoMudar={aoMudar}
       />,
     );
-    const sempre = screen.getByRole("radio", { name: /5\s*Sempre/ });
-    fireEvent.click(sempre);
+    fireEvent.click(screen.getByRole("radio", { name: /5\s*Sempre/ }));
     expect(aoMudar).toHaveBeenCalledWith(5);
     unmount();
     const q2 = secoesDoModelo(modeloDaGaleria("isfb"))[0]!.perguntas[1]!;

@@ -39,6 +39,10 @@ import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { enderecoDaPrevia } from "./rotasDePesquisas";
 import { SepararRespostasPor } from "./SepararRespostasPor";
 import {
+  AvisoDaSaudeFinanceira,
+  InterruptorDaAutopercepcao,
+} from "./modelos/isfb/Autopercepcao";
+import {
   BarraDeEtapas,
   CartaoDeSecao,
   ICONE_DA_IDENTIFICACAO,
@@ -686,6 +690,8 @@ function EtapaConfigurar({
         </div>
       </CartaoDeSecao>
 
+      {estado.modelo === "isfb" ? <AvisoDaSaudeFinanceira /> : null}
+
       {estado.identificacao === "anonima" ? (
         <SepararRespostasPor
           servico={servico}
@@ -698,7 +704,16 @@ function EtapaConfigurar({
       {m.modelo === "disc" ? (
         <CartaoDosBlocos blocos={principais} />
       ) : m.fixo ? (
-        <PerguntasFixas modelo={m} secoes={estado.secoes} />
+        <>
+          <PerguntasFixas modelo={m} secoes={estado.secoes} />
+          {estado.modelo === "isfb" ? (
+            <InterruptorDaAutopercepcao
+              secoes={estado.secoes}
+              travado={publicada}
+              onMudar={(secoes) => onMudar({ secoes })}
+            />
+          ) : null}
+        </>
       ) : (
         <CartaoDeSecao
           titulo="Perguntas"

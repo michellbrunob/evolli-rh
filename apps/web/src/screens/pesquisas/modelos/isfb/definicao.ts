@@ -6,7 +6,7 @@
  * autopercepção (O1 a O3). Enunciados do Evolli, medindo o mesmo ponto de
  * cada item; a empresa pode trocá-los pela redação oficial se tiver licença.
  */
-import type { ModeloDaGaleria } from "../../modelosDePesquisa";
+import type { PerguntaDoModelo, SecaoDoModelo } from "../tipos";
 
 export const ROTULOS_DA_CONCORDANCIA = [
   "Nada",
@@ -32,6 +32,8 @@ export interface EtapaIsfb {
   readonly rotulo: string;
   readonly curto: string;
   readonly cor: string;
+  /** Token de cor do grupo (gaveta e assistente). */
+  readonly corDoGrafico: string;
   readonly papel: "nota" | "ajusta" | "opcional";
   readonly texto: string;
 }
@@ -42,6 +44,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Segurança Financeira",
     curto: "Segurança",
     cor: "#DC2626",
+    corDoGrafico: "--grafico-5",
     papel: "nota",
     texto: "Se a renda cobre os gastos, o aperto e o estresse com dinheiro.",
   },
@@ -50,6 +53,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Habilidade Financeira",
     curto: "Habilidade",
     cor: "#2563EB",
+    corDoGrafico: "--grafico-1",
     papel: "nota",
     texto: "Decidir, buscar informação e reconhecer bons investimentos.",
   },
@@ -58,6 +62,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Comportamento Financeiro",
     curto: "Comportamento",
     cor: "#059669",
+    corDoGrafico: "--grafico-8",
     papel: "nota",
     texto: "Controlar gastos, poupar e cumprir metas.",
   },
@@ -66,6 +71,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Liberdade Financeira",
     curto: "Liberdade",
     cor: "#7C3AED",
+    corDoGrafico: "--grafico-2",
     papel: "nota",
     texto: "Garantir o futuro e conseguir aproveitar a vida.",
   },
@@ -74,6 +80,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Base Financeira",
     curto: "Base",
     cor: "#D97706",
+    corDoGrafico: "--grafico-3",
     papel: "ajusta",
     texto: "Produtos financeiros da casa, renda e escolaridade.",
   },
@@ -82,6 +89,7 @@ export const ETAPAS_ISFB: readonly EtapaIsfb[] = [
     rotulo: "Autopercepção Financeira",
     curto: "Autopercepção",
     cor: "#EC4899",
+    corDoGrafico: "--grafico-7",
     papel: "opcional",
     texto: "Perceber quando falta informação ou as contas saem do controle.",
   },
@@ -300,14 +308,14 @@ const OPCOES_DE: Readonly<
 /** Seção de autopercepção (opcional) no assistente. */
 export const SECAO_OPCIONAL_ISFB = "autopercepcao";
 
-function perguntaDoItem(i: ItemIsfb) {
+function perguntaDoItem(i: ItemIsfb): PerguntaDoModelo {
   const opcoes = OPCOES_DE[i.id];
   const rotulos =
     i.tipo === "frequencia"
       ? [...ROTULOS_DA_FREQUENCIA]
       : [...ROTULOS_DA_CONCORDANCIA];
   const base = {
-    id: i.id,
+    chave: i.id,
     texto: i.texto,
     rotulo: i.rotulo.slice(0, 40),
     obrigatoria: i.etapa !== "autopercepcao" && i.id !== "Q13",
@@ -320,7 +328,6 @@ function perguntaDoItem(i: ItemIsfb) {
           ? ("multipla_escolha" as const)
           : ("escolha_unica" as const),
       opcoes: opcoes.map((o) => o.texto),
-      idsDasOpcoes: opcoes.map((o) => o.id),
       config: { outro: false },
     };
   }
@@ -335,31 +342,13 @@ function perguntaDoItem(i: ItemIsfb) {
       rotulos,
       somenteRotulos: true,
     },
+    ...(i.invertido ? { selo: "Invertida" } : {}),
   };
 }
 
-export const MODELO_ISFB: ModeloDaGaleria = {
-  id: "isfb",
-  modelo: "isfb",
-  nome: "Saúde financeira",
-  categoria: null,
-  descricao:
-    "15 perguntas que viram uma nota de 0 a 100 por pessoa, comparável com a média do Brasil.",
-  cor: "--turno-laranja",
-  destaques: ["Nota de 0 a 100", "Complementa a NR-1"],
-  sobre:
-    "Mede a saúde financeira das pessoas em 4 dimensões e mostra os perfis do time, os sinais de alerta e os temas de apoio.",
-  ritmo: "Semestral",
-  frequencia: "Semestral",
-  nomeBase: "Saúde financeira",
-  boasVindas:
-    "Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva cerca de 6 minutos.",
-  secoes: ETAPAS_ISFB.map((e) => ({
-    id: e.id,
-    titulo: e.rotulo,
-    perguntas: ITENS_ISFB.filter((i) => i.etapa === e.id).map(perguntaDoItem),
-  })),
-  comentarioFinal: null,
-  perguntaPadrao: { tipo: "escala", config: { minimo: 0, maximo: 4 } },
-  limite: ITENS_ISFB.length,
-};
+/** As 6 etapas com as perguntas (o assistente pode tirar a autopercepção). */
+export const SECOES_ISFB: readonly SecaoDoModelo[] = ETAPAS_ISFB.map((e) => ({
+  titulo: e.rotulo,
+  cor: e.corDoGrafico,
+  perguntas: ITENS_ISFB.filter((i) => i.etapa === e.id).map(perguntaDoItem),
+}));

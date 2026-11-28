@@ -1,38 +1,30 @@
 /**
- * T216 — a planilha (.xlsx) dos modelos com metodologia própria, gerada no
- * navegador com o mesmo gerador do módulo.
+ * T216 — as abas da planilha (.xlsx) da NR-1 e da saúde financeira, logo
+ * depois do Resumo (`abasDoModelo`, em `modelos/exportacao.ts`).
  *
- * NR-1: Resumo (com os resultados por dimensão), Matriz psicossocial,
- * Domínios, Destaques, Plano de ação, Metodologia e NR-1 e, fora da
- * confidencial, Respostas individuais (numeradas na anônima).
- * Saúde financeira: Resumo, Pessoas (fora da confidencial) e Perguntas.
- * Nada leva CPF; o nome só na identificada.
+ * NR-1: Dimensões (resultados por dimensão), Matriz psicossocial, Domínios,
+ * Destaques e Metodologia; o plano de ação e as etapas entram quando vêm
+ * junto. Saúde financeira: o índice, as pessoas (fora da confidencial, com a
+ * nota de cada resposta) e as perguntas. As respostas individuais já saem na
+ * aba própria da planilha. Nada leva CPF; o nome só na identificada.
  */
-import {
-  SERVICO_DOS_MODELOS,
-  type AcompanhamentoNr1,
-  type IndividualDoModelo,
-  type ResultadoDoModelo,
-  type ServicoDosModelos,
+import type {
+  AcompanhamentoNr1,
+  ResultadoIsfb,
+  ResultadoNr1,
 } from "../../../api/modelosDePesquisaClient";
 import type {
   Pergunta,
-  PesquisaDetalhe,
   RespostaDetalhe,
+  Secao,
 } from "../../../api/pesquisasClient";
 import { formatarDiaCivil, formatarInstante } from "../../../format/data";
-import {
-  montarXlsx,
-  type AbaXlsx,
-  type CelulaXlsx,
+import type {
+  AbaXlsx,
+  CelulaXlsx,
 } from "../../pessoas/importacao/planilhaXlsx";
-import type { RelatorioCarregado } from "../carregarRelatorio";
 import { perguntasEmOrdem } from "../estadoDaPesquisa";
-import { SEM_RESPOSTA, textoDoValor } from "../exportarResultados";
-import {
-  ROTULO_DA_IDENTIFICACAO,
-  ROTULO_DO_STATUS,
-} from "../textosDasPesquisas";
+import { textoDoValor } from "../exportarResultados";
 import { dimensaoNr1, dominioNr1, TIPOS_DE_OFENSA } from "./copsoq/definicao";
 import {
   ETAPAS_DA_CONFORMIDADE,
@@ -66,17 +58,10 @@ const dec = (n: number | null): CelulaXlsx =>
 
 function cabecalho(
   titulo: string,
-  detalhe: PesquisaDetalhe,
   empresa: string,
+  nome: string,
 ): CelulaXlsx[][] {
-  return [
-    [`${titulo} — ${detalhe.nome}`],
-    ["Empresa", empresa || "—"],
-    ["Status", ROTULO_DO_STATUS[detalhe.status]],
-    ["Criada em", formatarInstante(detalhe.criadaEm)],
-    ["Identificação", ROTULO_DA_IDENTIFICACAO[detalhe.identificacao]],
-    [],
-  ];
+  return [[titulo], [`${empresa || "Empresa"} · ${nome}`], []];
 }
 
 /** Quem respondeu: o nome na identificada; "Resposta #N" nas outras. */
@@ -86,26 +71,27 @@ const valorDe = (r: RespostaDetalhe, id: string) =>
   r.valores.find((v) => v.perguntaId === id)?.valor;
 
 export interface DadosDaPlanilhaNr1 {
-  readonly detalhe: PesquisaDetalhe;
   readonly empresa: string;
-  readonly resultado: ResultadoDoModelo;
-  readonly acompanhamento: AcompanhamentoNr1 | null;
-  readonly respostas: readonly RespostaDetalhe[] | null;
+  readonly nome: string;
+  /** `null`: números ocultos (confidencial abaixo do mínimo). */
+  readonly resultado: ResultadoNr1 | null;
+  readonly minimoPorGrupo: number;
+  readonly acompanhamento?: AcompanhamentoNr1 | null;
 }
 
 export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
-  const r = d.resultado.nr1;
+  const r = d.resultado;
   const abas: AbaXlsx[] = [];
   const resumo: CelulaXlsx[][] = [
-    ...cabecalho("Riscos psicossociais (NR-1)", d.detalhe, d.empresa),
-    ["Respondentes", d.resultado.respostas],
+    ...cabecalho("Riscos psicossociais (NR-1)", d.empresa, d.nome),
+    ["Respondentes", r?.respostas ?? 0],
     ["Dimensões", 29],
   ];
   const linhasDeCabecalho: number[] = [];
-  if (!r || !d.resultado.visivel) {
+  if (!r) {
     resumo.push([
       "Números ocultos",
-      `Menos de ${d.resultado.minimoPorGrupo} respostas: para proteger quem respondeu, os resultados não aparecem.`,
+      `Menos de ${d.minimoPorGrupo} respostas: para proteger quem respondeu, os resultados não aparecem.`,
     ]);
   } else {
     resumo.push(
@@ -152,13 +138,13 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
     }
   }
   abas.push({
-    nome: "Resumo",
+    nome: "Dimensões NR-1",
     linhas: resumo,
     titulo: true,
     linhasDeCabecalho,
     larguras: [28, 34, 48, 10, 8, 8, 14, 12, 12, 14, 10, 14, 12],
   });
-  if (!r || !d.resultado.visivel) return abas;
+  if (!r) return abas;
 
   abas.push({
     nome: "Matriz Psicossocial",
@@ -198,7 +184,7 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
     ],
   });
 
-  const minimo = d.resultado.minimoPorGrupo;
+  const minimo = d.minimoPorGrupo;
   const sigilo = (n: number | null): CelulaXlsx =>
     n === null ? `Menos de ${minimo}` : n;
   const destaques: CelulaXlsx[][] = [
@@ -258,34 +244,35 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
     linhas: destaques,
   });
 
-  const a = d.acompanhamento;
-  abas.push({
-    nome: "Plano de ação",
-    cabecalho: true,
-    larguras: [32, 40, 50, 26, 22, 14, 34, 14],
-    linhas: [
-      [
-        "Dimensão",
-        "Medida",
-        "Como",
-        "Controle",
-        "Responsável",
-        "Prazo",
-        "Indicador",
-        "Situação",
+  const a = d.acompanhamento ?? null;
+  if (a)
+    abas.push({
+      nome: "Plano de ação",
+      cabecalho: true,
+      larguras: [32, 40, 50, 26, 22, 14, 34, 14],
+      linhas: [
+        [
+          "Dimensão",
+          "Medida",
+          "Como",
+          "Controle",
+          "Responsável",
+          "Prazo",
+          "Indicador",
+          "Situação",
+        ],
+        ...(a?.plano ?? []).map((m) => [
+          dimensaoNr1(m.dimensaoId).rotulo,
+          m.titulo,
+          m.descricao ?? "",
+          ROTULO_DO_CONTROLE[m.controle],
+          m.responsavel ?? "",
+          m.prazo ? formatarDiaCivil(m.prazo) : "",
+          m.indicador ?? "",
+          ROTULO_DA_SITUACAO[m.situacao],
+        ]),
       ],
-      ...(a?.plano ?? []).map((m) => [
-        dimensaoNr1(m.dimensaoId).rotulo,
-        m.titulo,
-        m.descricao ?? "",
-        ROTULO_DO_CONTROLE[m.controle],
-        m.responsavel ?? "",
-        m.prazo ? formatarDiaCivil(m.prazo) : "",
-        m.indicador ?? "",
-        ROTULO_DA_SITUACAO[m.situacao],
-      ]),
-    ],
-  });
+    });
 
   const metodologia: CelulaXlsx[][] = [
     ["Metodologia e NR-1"],
@@ -343,51 +330,33 @@ export function abasDaPlanilhaNr1(d: DadosDaPlanilhaNr1): AbaXlsx[] {
     linhas: metodologia,
   });
 
-  if (d.respostas) {
-    const perguntas = perguntasEmOrdem(d.detalhe.secoes);
-    abas.push({
-      nome: "Respostas Individuais",
-      cabecalho: true,
-      formatos: { 1: "dataHora" },
-      linhas: [
-        ["Resposta", "Respondeu em", ...perguntas.map((p) => p.id)],
-        ...d.respostas.map((resp) => [
-          autor(resp),
-          formatarInstante(resp.respondidaEm),
-          ...perguntas.map((p) => {
-            const v = valorDe(resp, p.id);
-            return typeof v === "number" ? v : SEM_RESPOSTA;
-          }),
-        ]),
-      ],
-    });
-  }
   return abas;
 }
 
 export interface DadosDaPlanilhaIsfb {
-  readonly detalhe: PesquisaDetalhe;
   readonly empresa: string;
-  readonly resultado: ResultadoDoModelo;
+  readonly nome: string;
+  readonly resultado: ResultadoIsfb | null;
+  readonly minimoPorGrupo: number;
+  /** As respostas (fora da confidencial), com o resultado de cada uma. */
   readonly respostas: readonly RespostaDetalhe[] | null;
-  /** O resultado de cada resposta (mesma ordem de `respostas`). */
-  readonly individuais: readonly (IndividualDoModelo | null)[] | null;
+  readonly secoes: readonly Secao[];
 }
 
 export function abasDaPlanilhaIsfb(d: DadosDaPlanilhaIsfb): AbaXlsx[] {
-  const r = d.resultado.isfb;
+  const r = d.resultado;
   const resumo: CelulaXlsx[][] = [
-    ...cabecalho("Saúde financeira", d.detalhe, d.empresa),
-    ["Respostas", d.resultado.respostas],
+    ...cabecalho("Saúde financeira", d.empresa, d.nome),
+    ["Pessoas com nota", r?.pessoas ?? 0],
   ];
   const abas: AbaXlsx[] = [];
-  if (!r || !d.resultado.visivel) {
+  if (!r) {
     resumo.push([
       "Números ocultos",
-      `Menos de ${d.resultado.minimoPorGrupo} respostas: para proteger quem respondeu, os resultados não aparecem.`,
+      `Menos de ${d.minimoPorGrupo} respostas: para proteger quem respondeu, os resultados não aparecem.`,
     ]);
     abas.push({
-      nome: "Resumo",
+      nome: "Saúde financeira",
       titulo: true,
       linhas: resumo,
       larguras: [40, 20, 20],
@@ -440,15 +409,15 @@ export function abasDaPlanilhaIsfb(d: DadosDaPlanilhaIsfb): AbaXlsx[] {
     ]);
   }
   abas.push({
-    nome: "Resumo",
+    nome: "Saúde financeira",
     titulo: true,
     linhasDeCabecalho: [cabDims, cabSaude, cabSinais, cabPerfis],
     larguras: [44, 14, 14],
     linhas: resumo,
   });
 
-  if (d.respostas && d.individuais) {
-    const perguntas = perguntasEmOrdem(d.detalhe.secoes);
+  if (d.respostas) {
+    const perguntas = perguntasEmOrdem(d.secoes);
     const textoDe = (p: Pergunta, v: unknown) => textoDoValor(p, v);
     abas.push({
       nome: "Pessoas",
@@ -466,10 +435,10 @@ export function abasDaPlanilhaIsfb(d: DadosDaPlanilhaIsfb): AbaXlsx[] {
           "Autopercepção",
           "Perfil",
           "Sinais",
-          ...perguntas.map((p) => p.id),
+          ...perguntas.map((p) => p.chave ?? p.id),
         ],
-        ...d.respostas.map((resp, i) => {
-          const x = d.individuais![i]?.isfb ?? null;
+        ...d.respostas.map((resp) => {
+          const x = resp.modelo?.modelo === "isfb" ? resp.modelo : null;
           return [
             autor(resp),
             formatarInstante(resp.respondidaEm),
@@ -530,50 +499,4 @@ export function abasDaPlanilhaIsfb(d: DadosDaPlanilhaIsfb): AbaXlsx[] {
     });
   }
   return abas;
-}
-
-/** A planilha própria do modelo, ou `null` para os modelos sem ela. */
-export async function planilhaDoModelo(
-  carregado: RelatorioCarregado,
-  respostas: readonly RespostaDetalhe[] | null,
-  servico: ServicoDosModelos = SERVICO_DOS_MODELOS,
-): Promise<Uint8Array | null> {
-  const { detalhe, empresa } = carregado;
-  if (detalhe.modelo === "copsoq") {
-    const [resultado, acompanhamento] = await Promise.all([
-      servico.resultadoDoModelo(detalhe.id),
-      Promise.resolve(servico.acompanhamentoNr1(detalhe.id)).catch(() => null),
-    ]);
-    return montarXlsx(
-      abasDaPlanilhaNr1({
-        detalhe,
-        empresa,
-        resultado,
-        acompanhamento,
-        respostas,
-      }),
-    );
-  }
-  if (detalhe.modelo === "isfb") {
-    const resultado = await servico.resultadoDoModelo(detalhe.id);
-    const individuais = respostas
-      ? await Promise.all(
-          respostas.map((r) =>
-            Promise.resolve(servico.individualDoModelo(detalhe.id, r.id)).catch(
-              () => null,
-            ),
-          ),
-        )
-      : null;
-    return montarXlsx(
-      abasDaPlanilhaIsfb({
-        detalhe,
-        empresa,
-        resultado,
-        respostas,
-        individuais,
-      }),
-    );
-  }
-  return null;
 }

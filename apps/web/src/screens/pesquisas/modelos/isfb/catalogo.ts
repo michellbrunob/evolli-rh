@@ -1,9 +1,10 @@
 /**
- * T216 — Saúde financeira: card, gaveta e página "Sobre o modelo". As 18
- * perguntas (15 + 3 opcionais), as tabelas de conversão e o score 0–100
- * ficam com a frente deste modelo: ela preenche `secoes` e tira `grupos`.
+ * T216 — Saúde financeira: card, gaveta, página "Sobre o modelo" e as 18
+ * perguntas (15 + 3 opcionais de autopercepção), com a chave de cada item
+ * (`Q1`…, `O1`…) que a API confere. As opções valem pela posição.
  */
 import type { ModeloDaGaleria } from "../tipos";
+import { SECOES_ISFB } from "./definicao";
 
 export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   id: "isfb",
@@ -24,19 +25,13 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
   sobre:
     "15 perguntas viram uma nota de 0 a 100, com 3 perguntas opcionais de autopercepção.",
   nomeBase: "Saúde financeira",
-  boasVindas: null,
-  secoes: [],
-  grupos: [
-    { titulo: "Segurança", cor: "--grafico-5", quantidade: 4 },
-    { titulo: "Habilidade", cor: "--grafico-1", quantidade: 3 },
-    { titulo: "Comportamento", cor: "--grafico-8", quantidade: 3 },
-    { titulo: "Liberdade", cor: "--grafico-2", quantidade: 2 },
-    { titulo: "Base financeira", cor: "--grafico-3", quantidade: 3 },
-    { titulo: "Autopercepção (opcional)", cor: "--grafico-7", quantidade: 3 },
-  ],
+  boasVindas:
+    "Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva cerca de 6 minutos.",
+  secoes: SECOES_ISFB,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 0, maximo: 4 } },
   limite: 18,
+  minimo: 15,
   fixo: true,
   pagina: {
     titulo: "Saúde financeira · Índice de 0 a 100",

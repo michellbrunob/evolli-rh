@@ -3,13 +3,17 @@
  * Pulso e Clima ("Dimensões": score 0–100, classificação, respostas,
  * perguntas, o geral, o eNPS e o LNPS), Clima ("Dimensões" com as
  * subdimensões, % favorável, neutro e desfavorável) e TAD ("Pilares":
- * time, pilares e as pessoas por nível). Entram logo depois do Resumo.
+ * time, pilares e as pessoas por nível), NR-1 e saúde financeira
+ * (`planilhasDosModelos.ts`). Entram logo depois do Resumo.
  */
 import type {
   DimensaoDoModelo,
   RecomendacaoDoModelo,
+  RespostaDetalhe,
   ResultadosPesquisa,
+  Secao,
 } from "../../../api/pesquisasClient";
+import { abasDaPlanilhaIsfb, abasDaPlanilhaNr1 } from "./planilhasDosModelos";
 import type {
   AbaXlsx,
   CelulaXlsx,
@@ -67,6 +71,12 @@ export function abasDoModelo(
   geral: ResultadosPesquisa,
   empresa: string,
   nome: string,
+  /** NR-1 e saúde financeira: o mínimo por grupo, as respostas e as perguntas. */
+  extra: {
+    readonly minimoPorGrupo?: number;
+    readonly respostas?: readonly RespostaDetalhe[] | null;
+    readonly secoes?: readonly Secao[];
+  } = {},
 ): AbaXlsx[] {
   const r = geral.modelo;
   if (!r) return [];
@@ -189,6 +199,22 @@ export function abasDoModelo(
         },
       ];
     }
+    case "copsoq":
+      return abasDaPlanilhaNr1({
+        empresa,
+        nome,
+        resultado: r,
+        minimoPorGrupo: extra.minimoPorGrupo ?? 3,
+      });
+    case "isfb":
+      return abasDaPlanilhaIsfb({
+        empresa,
+        nome,
+        resultado: r,
+        minimoPorGrupo: extra.minimoPorGrupo ?? 3,
+        respostas: extra.respostas ?? null,
+        secoes: extra.secoes ?? [],
+      });
     default:
       return [];
   }

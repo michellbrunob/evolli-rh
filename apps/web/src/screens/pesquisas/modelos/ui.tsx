@@ -1,18 +1,13 @@
 /**
  * T216 — peças visuais comuns aos resultados dos modelos com metodologia
  * própria: selo de nível, barra das três faixas, quadradinhos, mini
- * cartões e o carregamento dos dados do modelo.
+ * cartões e o aviso de poucas respostas.
  */
-import { useEffect, useState, type ReactNode } from "react";
-import type { CampoGrupo, PesquisaDetalhe } from "../../../api/pesquisasClient";
-import type {
-  NivelNr1,
-  ResultadoDoModelo,
-  ServicoDosModelos,
-} from "../../../api/modelosDePesquisaClient";
+import type { ReactNode } from "react";
+import type { PesquisaDetalhe } from "../../../api/pesquisasClient";
+import type { NivelNr1 } from "../../../api/modelosDePesquisaClient";
 import { StatusBadge, type StatusVariant } from "../../../components";
 import { plural } from "../../../format/plural";
-import { Esqueleto } from "../../../ui/movimento";
 import { NIVEL } from "./copsoq/textos";
 import "./Modelos.css";
 
@@ -142,64 +137,6 @@ export function pessoasOuSigilo(n: number | null, minimo: number): string {
   return n === null
     ? `menos de ${plural(minimo, "pessoa", "pessoas")}`
     : plural(n, "pessoa", "pessoas");
-}
-
-type Estado<T> =
-  | { readonly fase: "carregando" }
-  | { readonly fase: "erro" }
-  | { readonly fase: "pronto"; readonly dados: T };
-
-/** Carrega o resultado do modelo (com o recorte, se houver). */
-export function useResultadoDoModelo(
-  servico: ServicoDosModelos,
-  pesquisaId: string,
-  campo: CampoGrupo | null = null,
-  versao = 0,
-): Estado<ResultadoDoModelo> & { tentarDeNovo: () => void } {
-  const [estado, setEstado] = useState<Estado<ResultadoDoModelo>>({
-    fase: "carregando",
-  });
-  const [tentativa, setTentativa] = useState(0);
-  useEffect(() => {
-    let vivo = true;
-    setEstado({ fase: "carregando" });
-    Promise.resolve(servico.resultadoDoModelo(pesquisaId, campo ?? undefined))
-      .then((dados) => {
-        if (vivo) setEstado({ fase: "pronto", dados });
-      })
-      .catch(() => {
-        if (vivo) setEstado({ fase: "erro" });
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [servico, pesquisaId, campo, versao, tentativa]);
-  return { ...estado, tentarDeNovo: () => setTentativa((t) => t + 1) };
-}
-
-export function EstadoDoCarregamento({
-  fase,
-  onTentar,
-}: {
-  readonly fase: "carregando" | "erro";
-  readonly onTentar: () => void;
-}) {
-  return fase === "carregando" ? (
-    <Esqueleto rotulo="Calculando os resultados…" linhas={5} />
-  ) : (
-    <div className="pesquisas__caixa-erro" role="alert">
-      <p className="pesquisas__erro">
-        Não foi possível calcular os resultados.
-      </p>
-      <button
-        type="button"
-        className="evolli-button evolli-button--secondary"
-        onClick={onTentar}
-      >
-        Tentar novamente
-      </button>
-    </div>
-  );
 }
 
 /** Confidencial abaixo do mínimo: nada aparece. */
