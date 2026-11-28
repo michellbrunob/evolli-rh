@@ -1857,14 +1857,15 @@ describe("T216 — Pesquisas (e2e)", () => {
             medias: [null],
           },
         ],
-        evolucao: [
-          {
-            pesquisaId: id,
-            nome: "Pesquisa de clima sintética",
-            publicadaEm: expect.any(String),
-            mediaGeral: 8,
-          },
-        ],
+        // Os pulsos de testes anteriores da mesma empresa também entram;
+        // esta pesquisa, a mais recente, fecha a lista.
+        evolucao: expect.any(Array),
+      });
+      expect(mapa.body.evolucao.at(-1)).toEqual({
+        pesquisaId: id,
+        nome: "Pesquisa de clima sintética",
+        publicadaEm: expect.any(String),
+        mediaGeral: 8,
       });
       await get(`/v1/pesquisas/${id}/analises`, rhA).expect(400);
       // Um pulso publicado sem resposta não entra na evolução.
@@ -1896,12 +1897,12 @@ describe("T216 — Pesquisas (e2e)", () => {
         rhA,
       ).expect(200);
       expect(
-        evolucao.body.evolucao.map(
-          (e: { pesquisaId: string; mediaGeral: number }) => [
+        evolucao.body.evolucao
+          .slice(-2)
+          .map((e: { pesquisaId: string; mediaGeral: number }) => [
             e.pesquisaId,
             e.mediaGeral,
-          ],
-        ),
+          ]),
       ).toEqual([
         [id, 8],
         [segundo.id, 4],
