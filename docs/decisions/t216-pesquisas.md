@@ -976,3 +976,27 @@ Fora desta entrega: plano de ação gerado por IA, análise por IA, anexos de ev
 a descrição de onde estão), "Baixar tudo (.zip)", benefícios × necessidades (depende do módulo
 Benefícios), recortes por faixa salarial/etária/tempo de casa/sexo e o resultado individual imediato
 na página pública da saúde financeira.
+
+## Ajustes da 3ª revisão — Personalizada e gerais (28/11/2026)
+
+- **Marcador `{empresa}` no painel:** a pesquisa gravada guarda o marcador; o painel troca por "nossa
+  empresa" ao carregar a pesquisa para os resultados (Visão geral, maior e menor média, Análises),
+  o resultado individual, as respostas da pessoa (também na ficha), a planilha e o PDF
+  (`modelos/empresa.ts`: `detalheParaOPainel`, `secoesParaOPainel`, `analisesParaOPainel`). Editar
+  recebe a pesquisa como foi gravada. A página pública continua trocando pelo nome da empresa.
+- **Nome padrão por mês:** "Pulso – Novembro 2026" (mês com inicial maiúscula, sem "de") em todo
+  modelo sem nome próprio; semestre, ciclo, data e nomes fixos não mudam.
+- **Página pública:** a concordância de 1 a 5 é uma fileira de 5 quadrados com número e rótulo, com
+  as pontas acima; a escala de 7 pontos com rótulo por ponto (TAD) tem os botões em degradê.
+- **Personalizada:** Benefícios ("O que você usa" 3 / "O que mudaria" 3), Treinamento ("O
+  treinamento" 4 / "Para melhorar" 3) e Desligamento ("Sua saída" 3 / "Sua experiência" 5) em duas
+  seções. `ModeloDaGaleria.minutos` guarda o tempo do modelo pronto (2, 3, 2, 1, 2 e 2 min) e o card
+  mostra o formato do modelo. A gaveta do modelo pronto (`GavetaDoSubmodelo`) mostra "N perguntas ·
+  N min · formato", a descrição, "Quando usar", "Seção N · título", o tipo de cada pergunta,
+  "Mostra outra pergunta" (origem de condição), "Opcional", a nota "Tudo pode ser editado depois de
+  usar o modelo." e "Fechar" / "Usar este modelo" (sem "Sobre o modelo").
+- **"Sobre o modelo" do Pulso:** `PaginaSobre.layout = "perguntas"` usa a página das perguntas com o
+  título, o selo, o texto, os botões e os 4 números do catálogo (5 de 1 a 10 · 1 de recomendação ·
+  1 comentário · Mensal), as perguntas agrupadas pelo jeito de responder (obrigatórias e opcionais),
+  "Como a pessoa responde" com uma prévia em que dá para marcar a nota e "O que o RH vê" (rosca e
+  barras). Sem "O que você recebe", ficha técnica ou janela de exemplo.
