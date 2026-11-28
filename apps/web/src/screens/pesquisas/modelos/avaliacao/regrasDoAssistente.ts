@@ -71,7 +71,8 @@ export function contar(
 ): Contagem {
   const validos = times.filter((t) => t.incluido && t.pessoas.length > 0);
   const pessoas = validos.flatMap((t) => t.pessoas);
-  const auto = modelo === "avaliacao180" ? pessoas.filter((p) => p.identificavel) : [];
+  const auto =
+    modelo === "avaliacao180" ? pessoas.filter((p) => p.identificavel) : [];
   return {
     gestores: validos.length,
     pessoas: pessoas.length,

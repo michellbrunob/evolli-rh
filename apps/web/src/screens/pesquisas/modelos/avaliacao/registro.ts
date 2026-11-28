@@ -64,11 +64,25 @@ export const AVALIACAO_90: DefinicaoDaAvaliacao = {
     titulo: "Avaliação 90° · Avaliação de desempenho",
     texto:
       "O gestor direto avalia cada pessoa do time em 8 competências. Você vê os destaques, o que desenvolver e se os gestores avaliam com o mesmo critério.",
-    metadados: ["3 a 4 min por pessoa", "Nominal: só o RH vê as notas", "Sugestão: a cada 6 meses"],
+    metadados: [
+      "3 a 4 min por pessoa",
+      "Nominal: só o RH vê as notas",
+      "Sugestão: a cada 6 meses",
+    ],
     recebe: [
-      { titulo: "Nota por pessoa e por competência", texto: "De 1 a 5, em 5 níveis, de Insuficiente a Excepcional." },
-      { titulo: "Mapa de talentos", texto: "Entrega × Pessoas: quem é referência e quem precisa de apoio." },
-      { titulo: "O que desenvolver", texto: "As competências abaixo de 3 de cada pessoa, para o plano com o RH." },
+      {
+        titulo: "Nota por pessoa e por competência",
+        texto: "De 1 a 5, em 5 níveis, de Insuficiente a Excepcional.",
+      },
+      {
+        titulo: "Mapa de talentos",
+        texto: "Entrega × Pessoas: quem é referência e quem precisa de apoio.",
+      },
+      {
+        titulo: "O que desenvolver",
+        texto:
+          "As competências abaixo de 3 de cada pessoa, para o plano com o RH.",
+      },
     ],
     comoFunciona: [
       "Você escolhe quem avalia: gestores e times vêm da liderança cadastrada; dá para mover pessoas e definir o prazo.",
@@ -108,9 +122,19 @@ export const AVALIACAO_180: DefinicaoDaAvaliacao = {
       "Sugestão: a cada 6 meses",
     ],
     recebe: [
-      { titulo: "Gestor × autoavaliação", texto: "As duas notas lado a lado em cada competência, com a diferença." },
-      { titulo: "Mapa da conversa", texto: "Forças confirmadas, pontos cegos e forças que a pessoa não vê." },
-      { titulo: "Roteiro de feedback", texto: "A ordem da conversa com cada pessoa." },
+      {
+        titulo: "Gestor × autoavaliação",
+        texto:
+          "As duas notas lado a lado em cada competência, com a diferença.",
+      },
+      {
+        titulo: "Mapa da conversa",
+        texto: "Forças confirmadas, pontos cegos e forças que a pessoa não vê.",
+      },
+      {
+        titulo: "Roteiro de feedback",
+        texto: "A ordem da conversa com cada pessoa.",
+      },
     ],
     comoFunciona: [
       "Você escolhe quem avalia: gestores e times vêm da liderança cadastrada; dá para mover pessoas e definir prazos.",
@@ -126,6 +150,7 @@ export const AVALIACAO_180: DefinicaoDaAvaliacao = {
       ["Quem vê", "RH; gestor depois de enviar; pessoa se liberar"],
       ["Resultado", "Comparativo por pessoa, gestor e time"],
     ],
-    usoRecomendado: "A diferença é ponto de partida para a conversa, não veredito.",
+    usoRecomendado:
+      "A diferença é ponto de partida para a conversa, não veredito.",
   },
 };

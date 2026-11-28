@@ -22,7 +22,11 @@ import {
   nota1,
 } from "./catalogo";
 import type { ClienteDaAvaliacao, ResultadoDaPessoa as Dados } from "./cliente";
-import { BarraDaNota, Halteres, RodaDeCompetencias } from "./graficosDaAvaliacao";
+import {
+  BarraDaNota,
+  Halteres,
+  RodaDeCompetencias,
+} from "./graficosDaAvaliacao";
 
 export function ResultadoDaPessoa({
   pesquisaId,
@@ -72,7 +76,9 @@ export function ResultadoDaPessoa({
         <div className="pesquisas__titulos">
           <h2 className="pesquisas__titulo">{d.nome}</h2>
           <p className="pesquisas__subtitulo">
-            {[d.cargo, d.departamento, `Gestor: ${d.gestor.nome}`].filter(Boolean).join(" · ")}
+            {[d.cargo, d.departamento, `Gestor: ${d.gestor.nome}`]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </header>
@@ -84,12 +90,18 @@ export function ResultadoDaPessoa({
       ) : (
         <>
           <div className="avaliacao__indicadores">
-            <section className="pesquisas__cartao-secao" aria-label="Nota geral">
+            <section
+              className="pesquisas__cartao-secao"
+              aria-label="Nota geral"
+            >
               <p className="pesquisas__rotulo">Nota geral (gestor)</p>
               <p className="avaliacao__nota-grande">
-                {nota1(g.nota.geral)} <span className="pesquisas__suave">/5</span>
+                {nota1(g.nota.geral)}{" "}
+                <span className="pesquisas__suave">/5</span>
               </p>
-              {nivel ? <StatusBadge variant={nivel.tom}>{nivel.rotulo}</StatusBadge> : null}
+              {nivel ? (
+                <StatusBadge variant={nivel.tom}>{nivel.rotulo}</StatusBadge>
+              ) : null}
               <p className="pesquisas__suave">{`Time: ${nota1(d.time.media)}`}</p>
               <dl className="avaliacao__eixos">
                 <div>
@@ -102,17 +114,34 @@ export function ResultadoDaPessoa({
                 </div>
                 <div>
                   <dt>Mapa de talentos</dt>
-                  <dd>{g.nota.quadrante ? QUADRANTES[g.nota.quadrante].rotulo : "—"}</dd>
+                  <dd>
+                    {g.nota.quadrante
+                      ? QUADRANTES[g.nota.quadrante].rotulo
+                      : "—"}
+                  </dd>
                 </div>
               </dl>
             </section>
-            <section className="pesquisas__cartao-secao" aria-label="Roda de competências">
+            <section
+              className="pesquisas__cartao-secao"
+              aria-label="Roda de competências"
+            >
               <RodaDeCompetencias
                 rotulo={`Competências de ${d.nome}, de 1 a 5`}
                 series={[
-                  { nome: "Gestor", classe: "avaliacao__radar-serie--gestor", valores: g.nota.competencias },
+                  {
+                    nome: "Gestor",
+                    classe: "avaliacao__radar-serie--gestor",
+                    valores: g.nota.competencias,
+                  },
                   ...(a
-                    ? [{ nome: "Autoavaliação", classe: "avaliacao__radar-serie--auto", valores: a.nota.competencias }]
+                    ? [
+                        {
+                          nome: "Autoavaliação",
+                          classe: "avaliacao__radar-serie--auto",
+                          valores: a.nota.competencias,
+                        },
+                      ]
                     : []),
                 ]}
               />
@@ -120,7 +149,10 @@ export function ResultadoDaPessoa({
           </div>
 
           {g.alertas.length ? (
-            <p className="avaliacao__aviso avaliacao__aviso--atencao" role="note">
+            <p
+              className="avaliacao__aviso avaliacao__aviso--atencao"
+              role="note"
+            >
               {g.alertas
                 .map((x) =>
                   x.tipo === "linha_reta"
@@ -132,8 +164,13 @@ export function ResultadoDaPessoa({
           ) : null}
 
           {d.comparativo ? (
-            <section className="pesquisas__cartao-secao" aria-label="Gestor × autoavaliação">
-              <h3 className="pesquisas__cartao-secao-titulo">Gestor × autoavaliação</h3>
+            <section
+              className="pesquisas__cartao-secao"
+              aria-label="Gestor × autoavaliação"
+            >
+              <h3 className="pesquisas__cartao-secao-titulo">
+                Gestor × autoavaliação
+              </h3>
               <p className="pesquisas__suave">
                 {`Nota geral: gestor ${nota1(d.comparativo.gestor)} · autoavaliação ${nota1(d.comparativo.autoavaliacao)} · ${diferenca1(d.comparativo.diferenca)}${d.comparativo.alinhamento ? ` (${ALINHAMENTO[d.comparativo.alinhamento]})` : ""}`}
               </p>
@@ -166,56 +203,89 @@ export function ResultadoDaPessoa({
               ) : null}
             </section>
           ) : d.temAutoavaliacao && !a ? (
-            <p className="pesquisas__nota">A autoavaliação ainda não foi enviada.</p>
+            <p className="pesquisas__nota">
+              A autoavaliação ainda não foi enviada.
+            </p>
           ) : null}
 
           {d.desenvolver.length ? (
-            <section className="pesquisas__cartao-secao" aria-label="O que desenvolver">
-              <h3 className="pesquisas__cartao-secao-titulo">O que desenvolver</h3>
-              <p className="pesquisas__suave">Competências abaixo de 3, da menor para a maior.</p>
+            <section
+              className="pesquisas__cartao-secao"
+              aria-label="O que desenvolver"
+            >
+              <h3 className="pesquisas__cartao-secao-titulo">
+                O que desenvolver
+              </h3>
+              <p className="pesquisas__suave">
+                Competências abaixo de 3, da menor para a maior.
+              </p>
               <ul>
                 {d.desenvolver.map((c) => (
-                  <li key={c}>{`${competencia(c).rotulo} · ${nota1(g.nota.competencias[c])}`}</li>
+                  <li
+                    key={c}
+                  >{`${competencia(c).rotulo} · ${nota1(g.nota.competencias[c])}`}</li>
                 ))}
               </ul>
             </section>
           ) : null}
 
-          <section className="pesquisas__cartao-secao" aria-label="Por competência">
-            <h3 className="pesquisas__cartao-secao-titulo">Por competência e afirmação</h3>
+          <section
+            className="pesquisas__cartao-secao"
+            aria-label="Por competência"
+          >
+            <h3 className="pesquisas__cartao-secao-titulo">
+              Por competência e afirmação
+            </h3>
             {CATALOGO.map((c) => (
               <div key={c.id} className="avaliacao__bloco-competencia">
                 <p className="avaliacao__bloco-titulo">
-                  <span className="avaliacao__bolinha" style={{ ["--cor" as string]: `var(${c.cor})` }} aria-hidden="true" />
+                  <span
+                    className="avaliacao__bolinha"
+                    style={{ ["--cor" as string]: `var(${c.cor})` }}
+                    aria-hidden="true"
+                  />
                   <strong>{c.rotulo}</strong>
-                  <span className="avaliacao__numero">{nota1(g.nota.competencias[c.id])}</span>
+                  <span className="avaliacao__numero">
+                    {nota1(g.nota.competencias[c.id])}
+                  </span>
                   <span className="pesquisas__suave">{`time ${nota1(d.time.competencias[c.id])}`}</span>
                 </p>
                 <ul>
                   {c.itens.map((i) => (
                     <li key={i.id} className="avaliacao__linha-item">
                       <span>{i.gestor}</span>
-                      <BarraDaNota nota={g.notas[i.id] ?? null} cor={c.cor} rotulo={`${i.rotulo}: ${g.notas[i.id] ?? "—"}`} />
-                      <span className="avaliacao__numero">{g.notas[i.id] ?? "—"}</span>
-                      {a ? <span className="avaliacao__numero pesquisas__suave">{`auto ${a.notas[i.id] ?? "—"}`}</span> : null}
+                      <BarraDaNota
+                        nota={g.notas[i.id] ?? null}
+                        cor={c.cor}
+                        rotulo={`${i.rotulo}: ${g.notas[i.id] ?? "—"}`}
+                      />
+                      <span className="avaliacao__numero">
+                        {g.notas[i.id] ?? "—"}
+                      </span>
+                      {a ? (
+                        <span className="avaliacao__numero pesquisas__suave">{`auto ${a.notas[i.id] ?? "—"}`}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
                 {g.comentarios[c.id] ? (
                   <blockquote className="avaliacao__comentario">
-                    <span className="pesquisas__suave">Gestor:</span> {g.comentarios[c.id]}
+                    <span className="pesquisas__suave">Gestor:</span>{" "}
+                    {g.comentarios[c.id]}
                   </blockquote>
                 ) : null}
                 {a?.comentarios[c.id] ? (
                   <blockquote className="avaliacao__comentario">
-                    <span className="pesquisas__suave">Autoavaliação:</span> {a.comentarios[c.id]}
+                    <span className="pesquisas__suave">Autoavaliação:</span>{" "}
+                    {a.comentarios[c.id]}
                   </blockquote>
                 ) : null}
               </div>
             ))}
           </section>
           <p className="pesquisas__nota">
-            Diferença entre as visões é ponto de partida para conversa, não veredito.
+            Diferença entre as visões é ponto de partida para conversa, não
+            veredito.
           </p>
         </>
       )}

@@ -13,11 +13,7 @@ import type { PesquisaDetalhe } from "../../../../api/pesquisasClient";
 import { Button } from "../../../../components";
 import { plural } from "../../../../format/plural";
 import { IconButton } from "../../../../ui";
-import {
-  IconeFechar,
-  IconeMais,
-  IconeVoltar,
-} from "../../../../ui/icones";
+import { IconeFechar, IconeMais, IconeVoltar } from "../../../../ui/icones";
 import { Esqueleto } from "../../../../ui/movimento";
 import {
   Avatar,
@@ -289,7 +285,9 @@ export function AssistenteDaAvaliacao({
         lembretes: det.lembretes.length,
       });
     } catch {
-      setFalha("Não foi possível criar a avaliação. Rascunho guardado: você pode continuar depois.");
+      setFalha(
+        "Não foi possível criar a avaliação. Rascunho guardado: você pode continuar depois.",
+      );
     } finally {
       setGravando(false);
     }
@@ -304,7 +302,11 @@ export function AssistenteDaAvaliacao({
         onClick={onVoltar}
       />
       <div className="pesquisas__titulos">
-        <h1 id={PESQUISAS_TITULO_ID} className="pesquisas__titulo" tabIndex={-1}>
+        <h1
+          id={PESQUISAS_TITULO_ID}
+          className="pesquisas__titulo"
+          tabIndex={-1}
+        >
           {e180 ? "Nova Avaliação 180°" : "Nova Avaliação 90°"}
         </h1>
         <p className="pesquisas__subtitulo">
@@ -316,12 +318,18 @@ export function AssistenteDaAvaliacao({
       <p className="pesquisas__salvo" role="status">
         {gerada ? (
           <>
-            <span className="pesquisas__ponto pesquisas__ponto--sucesso" aria-hidden="true" />
+            <span
+              className="pesquisas__ponto pesquisas__ponto--sucesso"
+              aria-hidden="true"
+            />
             {`Avaliação criada às ${hora()}`}
           </>
         ) : salvoAs ? (
           <>
-            <span className="pesquisas__ponto pesquisas__ponto--sucesso" aria-hidden="true" />
+            <span
+              className="pesquisas__ponto pesquisas__ponto--sucesso"
+              aria-hidden="true"
+            />
             {`Rascunho salvo às ${salvoAs}`}
           </>
         ) : null}
@@ -334,7 +342,10 @@ export function AssistenteDaAvaliacao({
       <div className="pesquisas">
         {cabecalho}
         <BarraDeEtapas etapas={etapas} atual={etapas.length} />
-        <section className="pesquisas__cartao-secao avaliacao__sucesso" aria-label="Avaliação criada">
+        <section
+          className="pesquisas__cartao-secao avaliacao__sucesso"
+          aria-label="Avaliação criada"
+        >
           <h2 className="pesquisas__cartao-secao-titulo">
             {`${plural(gerada.gestores, "gestor avalia", "gestores avaliam")} ${plural(gerada.pessoas, "pessoa", "pessoas")}`}
           </h2>
@@ -386,7 +397,9 @@ export function AssistenteDaAvaliacao({
               {erroNome ? <p className="pesquisas__erro">{erroNome}</p> : null}
               <label className="pesquisas__campo">
                 <span className="pesquisas__rotulo">
-                  {e180 ? "Mensagem antes de começar (opcional)" : "Mensagem para os gestores (opcional)"}
+                  {e180
+                    ? "Mensagem antes de começar (opcional)"
+                    : "Mensagem para os gestores (opcional)"}
                 </span>
                 <textarea
                   rows={3}
@@ -418,9 +431,16 @@ export function AssistenteDaAvaliacao({
                 : "Um exemplo concreto ajuda a calibrar as notas e vira a base do plano de desenvolvimento."
             }
           >
-            <div className="pesquisas__escolhas pesquisas__escolhas--tres" role="radiogroup" aria-label="Comentários">
+            <div
+              className="pesquisas__escolhas pesquisas__escolhas--tres"
+              role="radiogroup"
+              aria-label="Comentários"
+            >
               {REGRAS_DE_COMENTARIOS.map((r) => (
-                <label key={r.valor} className="pesquisas__escolha pesquisas__escolha--vertical">
+                <label
+                  key={r.valor}
+                  className="pesquisas__escolha pesquisas__escolha--vertical"
+                >
                   <span className="pesquisas__escolha-topo">
                     <strong>{r.titulo}</strong>
                     <input
@@ -445,14 +465,29 @@ export function AssistenteDaAvaliacao({
               titulo="Quando cada um vê a outra avaliação"
               descricao="As duas avaliações são feitas sem ver a outra. Escolha o que o gestor vê depois de enviar."
             >
-              <div className="pesquisas__escolhas" role="radiogroup" aria-label="Quem vê o quê">
+              <div
+                className="pesquisas__escolhas"
+                role="radiogroup"
+                aria-label="Quem vê o quê"
+              >
                 {(
                   [
-                    ["depois_do_gestor", "Depois que o gestor enviar", "O gestor vê a autoavaliação só depois de enviar a dele."],
-                    ["so_rh", "Só o RH vê o comparativo", "O gestor nunca vê a autoavaliação."],
+                    [
+                      "depois_do_gestor",
+                      "Depois que o gestor enviar",
+                      "O gestor vê a autoavaliação só depois de enviar a dele.",
+                    ],
+                    [
+                      "so_rh",
+                      "Só o RH vê o comparativo",
+                      "O gestor nunca vê a autoavaliação.",
+                    ],
                   ] as const
                 ).map(([valor, titulo, texto]) => (
-                  <label key={valor} className="pesquisas__escolha pesquisas__escolha--vertical">
+                  <label
+                    key={valor}
+                    className="pesquisas__escolha pesquisas__escolha--vertical"
+                  >
                     <span className="pesquisas__escolha-topo">
                       <strong>{titulo}</strong>
                       <input
@@ -467,13 +502,18 @@ export function AssistenteDaAvaliacao({
                 ))}
               </div>
               <p className="pesquisas__nota">
-                A pessoa nunca vê a nota do gestor antes de enviar a autoavaliação.
+                A pessoa nunca vê a nota do gestor antes de enviar a
+                autoavaliação.
               </p>
             </CartaoDeSecao>
           ) : null}
 
           <CartaoDeSecao
-            titulo={e180 ? "Comparativo para a pessoa" : "Resultado para a pessoa avaliada"}
+            titulo={
+              e180
+                ? "Comparativo para a pessoa"
+                : "Resultado para a pessoa avaliada"
+            }
             descricao="Por padrão, só o RH vê os resultados."
           >
             <label className="avaliacao__interruptor">
@@ -485,7 +525,9 @@ export function AssistenteDaAvaliacao({
               />
               <span>
                 <strong>
-                  {e180 ? "Liberar o comparativo no Portal do Colaborador" : "Liberar o resultado no Portal do Colaborador"}
+                  {e180
+                    ? "Liberar o comparativo no Portal do Colaborador"
+                    : "Liberar o resultado no Portal do Colaborador"}
                 </strong>
                 <span className="pesquisas__suave">
                   {e180
@@ -618,7 +660,11 @@ function ListaDeCompetencias() {
             aria-expanded={aberta === c.id}
             onClick={() => setAberta(aberta === c.id ? null : c.id)}
           >
-            <span className="avaliacao__bolinha" style={{ ["--cor" as string]: `var(${c.cor})` }} aria-hidden="true" />
+            <span
+              className="avaliacao__bolinha"
+              style={{ ["--cor" as string]: `var(${c.cor})` }}
+              aria-hidden="true"
+            />
             <strong>{c.rotulo}</strong>
             <span className="pesquisas__suave">· 3 afirmações</span>
           </button>
@@ -683,8 +729,10 @@ function EtapaTimes({
       t.gestor.nome.toLocaleLowerCase("pt-BR").includes(termo) ||
       t.pessoas.some((p) => p.nome.toLocaleLowerCase("pt-BR").includes(termo)),
   );
-  const mudarTime = (gestorId: string, f: (t: TimeNoAssistente) => TimeNoAssistente) =>
-    setTimes((ts) => ts.map((t) => (t.gestor.id === gestorId ? f(t) : t)));
+  const mudarTime = (
+    gestorId: string,
+    f: (t: TimeNoAssistente) => TimeNoAssistente,
+  ) => setTimes((ts) => ts.map((t) => (t.gestor.id === gestorId ? f(t) : t)));
   const adicionarPessoa = (gestorId: string, p: PessoaResumida) => {
     setTimes((ts) => {
       if (!ts.some((t) => t.gestor.id === gestorId)) {
@@ -707,11 +755,23 @@ function EtapaTimes({
         : "Sem gestor no cadastro";
   return (
     <div className="avaliacao__times">
-      <div className="pesquisas__pilulas" role="group" aria-label="Como montar os times">
-        <button type="button" aria-pressed={modo === "organograma"} onClick={() => onModo("organograma")}>
+      <div
+        className="pesquisas__pilulas"
+        role="group"
+        aria-label="Como montar os times"
+      >
+        <button
+          type="button"
+          aria-pressed={modo === "organograma"}
+          onClick={() => onModo("organograma")}
+        >
           Pelo organograma
         </button>
-        <button type="button" aria-pressed={modo === "manual"} onClick={() => onModo("manual")}>
+        <button
+          type="button"
+          aria-pressed={modo === "manual"}
+          onClick={() => onModo("manual")}
+        >
           Escolher manualmente
         </button>
       </div>
@@ -719,7 +779,11 @@ function EtapaTimes({
         <strong>{contagem}</strong>
         {modo === "organograma" && org.semGestor.length ? (
           <span className="avaliacao__aviso avaliacao__aviso--atencao">
-            {plural(org.semGestor.length, "pessoa sem gestor", "pessoas sem gestor")}
+            {plural(
+              org.semGestor.length,
+              "pessoa sem gestor",
+              "pessoas sem gestor",
+            )}
           </span>
         ) : null}
         {modo === "organograma" && gestoresSemCpf ? (
@@ -734,12 +798,18 @@ function EtapaTimes({
         ) : null}
       </p>
       {times.length > 0 ? (
-        <CampoDeBusca rotulo="Buscar gestor ou pessoa" valor={busca} onMudar={onBusca} />
+        <CampoDeBusca
+          rotulo="Buscar gestor ou pessoa"
+          valor={busca}
+          onMudar={onBusca}
+        />
       ) : null}
 
       {modo === "manual" && times.length === 0 ? (
         <div className="pesquisas__sem-respostas">
-          <h3 className="pesquisas__cartao-secao-titulo">Nenhum gestor ainda</h3>
+          <h3 className="pesquisas__cartao-secao-titulo">
+            Nenhum gestor ainda
+          </h3>
           <p className="pesquisas__suave">
             Adicione os gestores e, em cada um, as pessoas que ele avalia.
           </p>
@@ -757,16 +827,25 @@ function EtapaTimes({
                   type="checkbox"
                   aria-label={`Incluir ${t.gestor.nome}`}
                   checked={t.incluido}
-                  onChange={(e) => mudarTime(t.gestor.id, (x) => ({ ...x, incluido: e.target.checked }))}
+                  onChange={(e) =>
+                    mudarTime(t.gestor.id, (x) => ({
+                      ...x,
+                      incluido: e.target.checked,
+                    }))
+                  }
                 />
                 <Avatar texto={iniciaisDe(t.gestor.nome)} />
                 <span className="avaliacao__time-nome">
                   <strong>{t.gestor.nome}</strong>
                   <span className="pesquisas__suave">
-                    {[t.gestor.cargo, t.gestor.departamento].filter(Boolean).join(" · ") || "Sem cargo"}
+                    {[t.gestor.cargo, t.gestor.departamento]
+                      .filter(Boolean)
+                      .join(" · ") || "Sem cargo"}
                   </span>
                 </span>
-                <span className="pesquisas__suave">{plural(t.pessoas.length, "pessoa", "pessoas")}</span>
+                <span className="pesquisas__suave">
+                  {plural(t.pessoas.length, "pessoa", "pessoas")}
+                </span>
                 <button
                   type="button"
                   className="pesquisas__acao-texto"
@@ -785,7 +864,9 @@ function EtapaTimes({
                         <Avatar texto={iniciaisDe(p.nome)} />
                         <span>
                           {p.nome}
-                          {p.cargo ? <span className="pesquisas__suave">{` · ${p.cargo}`}</span> : null}
+                          {p.cargo ? (
+                            <span className="pesquisas__suave">{` · ${p.cargo}`}</span>
+                          ) : null}
                         </span>
                         <IconButton
                           label={`Tirar ${p.nome} do time`}
@@ -812,8 +893,13 @@ function EtapaTimes({
                       onCancelar={() => setAdicionandoEm(null)}
                     />
                   ) : (
-                    <button type="button" className="pesquisas__acao-texto" onClick={() => setAdicionandoEm(t.gestor.id)}>
-                      <IconeMais tamanho={14} /> {`Adicionar pessoa ao time de ${t.gestor.nome}`}
+                    <button
+                      type="button"
+                      className="pesquisas__acao-texto"
+                      onClick={() => setAdicionandoEm(t.gestor.id)}
+                    >
+                      <IconeMais tamanho={14} />{" "}
+                      {`Adicionar pessoa ao time de ${t.gestor.nome}`}
                     </button>
                   )}
                 </div>
@@ -829,7 +915,10 @@ function EtapaTimes({
             rotulo="Adicionar gestor"
             pessoas={gestoresPossiveis}
             onEscolher={(g) => {
-              setTimes((ts) => [...ts, { gestor: g, pessoas: [], incluido: true }]);
+              setTimes((ts) => [
+                ...ts,
+                { gestor: g, pessoas: [], incluido: true },
+              ]);
               onAbrir(g.id);
               setNovoGestor(false);
             }}
@@ -843,9 +932,16 @@ function EtapaTimes({
       ) : null}
 
       {modo === "organograma" && semGestor.length ? (
-        <section className="avaliacao__sem-gestor" aria-label="Pessoas sem gestor no cadastro">
-          <h3 className="pesquisas__cartao-secao-titulo">Pessoas sem gestor no cadastro</h3>
-          <p className="pesquisas__suave">Escolha quem avalia ou deixe de fora desta avaliação.</p>
+        <section
+          className="avaliacao__sem-gestor"
+          aria-label="Pessoas sem gestor no cadastro"
+        >
+          <h3 className="pesquisas__cartao-secao-titulo">
+            Pessoas sem gestor no cadastro
+          </h3>
+          <p className="pesquisas__suave">
+            Escolha quem avalia ou deixe de fora desta avaliação.
+          </p>
           <ul>
             {semGestor.map((s) => (
               <li key={s.pessoa.id} className="avaliacao__pessoa">
@@ -871,7 +967,10 @@ function EtapaTimes({
                       </option>
                     ))}
                 </select>
-                <Button variant="subtle" onClick={() => onDeixarDeFora(s.pessoa.id)}>
+                <Button
+                  variant="subtle"
+                  onClick={() => onDeixarDeFora(s.pessoa.id)}
+                >
                   Deixar de fora
                 </Button>
               </li>
@@ -896,10 +995,16 @@ function EscolherPessoa({
 }) {
   const [termo, setTermo] = useState("");
   const t = termo.trim().toLocaleLowerCase("pt-BR");
-  const lista = pessoas.filter((p) => !t || p.nome.toLocaleLowerCase("pt-BR").includes(t)).slice(0, 20);
+  const lista = pessoas
+    .filter((p) => !t || p.nome.toLocaleLowerCase("pt-BR").includes(t))
+    .slice(0, 20);
   return (
     <div className="pesquisas__caixa-inline" role="group" aria-label={rotulo}>
-      <CampoDeBusca rotulo={`${rotulo}: buscar`} valor={termo} onMudar={setTermo} />
+      <CampoDeBusca
+        rotulo={`${rotulo}: buscar`}
+        valor={termo}
+        onMudar={setTermo}
+      />
       <ul className="avaliacao__escolher">
         {lista.length === 0 ? (
           <li className="pesquisas__suave">Ninguém disponível.</li>
@@ -908,7 +1013,9 @@ function EscolherPessoa({
             <li key={p.id}>
               <button type="button" onClick={() => onEscolher(p)}>
                 <strong>{p.nome}</strong>
-                {p.cargo ? <span className="pesquisas__suave">{` · ${p.cargo}`}</span> : null}
+                {p.cargo ? (
+                  <span className="pesquisas__suave">{` · ${p.cargo}`}</span>
+                ) : null}
               </button>
             </li>
           ))
@@ -959,22 +1066,44 @@ function EtapaPrazo(p: {
         <div className="avaliacao__linha-campos">
           <label className="pesquisas__campo">
             <span className="pesquisas__rotulo">Data limite</span>
-            <input type="date" value={p.prazoDia} onChange={(e) => p.onPrazo(e.target.value, p.prazoHora)} />
+            <input
+              type="date"
+              value={p.prazoDia}
+              onChange={(e) => p.onPrazo(e.target.value, p.prazoHora)}
+            />
           </label>
           <label className="pesquisas__campo">
             <span className="pesquisas__rotulo">Horário</span>
-            <input type="time" value={p.prazoHora} onChange={(e) => p.onPrazo(p.prazoDia, e.target.value)} />
+            <input
+              type="time"
+              value={p.prazoHora}
+              onChange={(e) => p.onPrazo(p.prazoDia, e.target.value)}
+            />
           </label>
         </div>
         <p className="pesquisas__suave">{legendaDoPrazo(p.hoje, p.prazoDia)}</p>
-        {p.erros.prazo ? <p className="pesquisas__erro">{p.erros.prazo}</p> : null}
+        {p.erros.prazo ? (
+          <p className="pesquisas__erro">{p.erros.prazo}</p>
+        ) : null}
         {p.e180 ? (
           <div className="avaliacao__prazo-auto">
-            <div className="pesquisas__pilulas" role="group" aria-label="Como fica o prazo da autoavaliação">
-              <button type="button" aria-pressed={!p.autoAntes} onClick={() => p.onAutoAntes(false)}>
+            <div
+              className="pesquisas__pilulas"
+              role="group"
+              aria-label="Como fica o prazo da autoavaliação"
+            >
+              <button
+                type="button"
+                aria-pressed={!p.autoAntes}
+                onClick={() => p.onAutoAntes(false)}
+              >
                 Mesmo prazo para os dois
               </button>
-              <button type="button" aria-pressed={p.autoAntes} onClick={() => p.onAutoAntes(true)}>
+              <button
+                type="button"
+                aria-pressed={p.autoAntes}
+                onClick={() => p.onAutoAntes(true)}
+              >
                 Autoavaliação termina antes
               </button>
             </div>
@@ -982,41 +1111,73 @@ function EtapaPrazo(p: {
               <>
                 <div className="avaliacao__linha-campos">
                   <label className="pesquisas__campo">
-                    <span className="pesquisas__rotulo">Prazo da autoavaliação</span>
-                    <input type="date" value={p.autoDia} onChange={(e) => p.onAuto(e.target.value, p.autoHora)} />
+                    <span className="pesquisas__rotulo">
+                      Prazo da autoavaliação
+                    </span>
+                    <input
+                      type="date"
+                      value={p.autoDia}
+                      onChange={(e) => p.onAuto(e.target.value, p.autoHora)}
+                    />
                   </label>
                   <label className="pesquisas__campo">
-                    <span className="pesquisas__rotulo">Horário da autoavaliação</span>
-                    <input type="time" value={p.autoHora} onChange={(e) => p.onAuto(p.autoDia, e.target.value)} />
+                    <span className="pesquisas__rotulo">
+                      Horário da autoavaliação
+                    </span>
+                    <input
+                      type="time"
+                      value={p.autoHora}
+                      onChange={(e) => p.onAuto(p.autoDia, e.target.value)}
+                    />
                   </label>
                 </div>
                 <p className="pesquisas__suave">
                   {`Termina antes: a pessoa responde primeiro. A pessoa tem até ${diaMes(p.autoDia)} e o gestor, até ${diaMes(p.prazoDia)}.`}
                 </p>
-                {p.erros.auto ? <p className="pesquisas__erro">{p.erros.auto}</p> : null}
+                {p.erros.auto ? (
+                  <p className="pesquisas__erro">{p.erros.auto}</p>
+                ) : null}
               </>
             ) : null}
           </div>
         ) : null}
       </CartaoDeSecao>
 
-      <CartaoDeSecao titulo="Lembrar quem não terminou" descricao="Aviso automático só para quem ainda tem pessoas pendentes.">
+      <CartaoDeSecao
+        titulo="Lembrar quem não terminou"
+        descricao="Aviso automático só para quem ainda tem pessoas pendentes."
+      >
         <label className="avaliacao__interruptor">
-          <input type="checkbox" role="switch" checked={p.lembrar} onChange={(e) => p.onLembrar(e.target.checked)} />
+          <input
+            type="checkbox"
+            role="switch"
+            checked={p.lembrar}
+            onChange={(e) => p.onLembrar(e.target.checked)}
+          />
           <span>
             <strong>Lembrar quem não terminou</strong>
-            <span className="pesquisas__suave">Os lembretes saem às 09:00.</span>
+            <span className="pesquisas__suave">
+              Os lembretes saem às 09:00.
+            </span>
           </span>
         </label>
         {p.lembrar ? (
-          <div className="avaliacao__checks" role="group" aria-label="Quando lembrar">
+          <div
+            className="avaliacao__checks"
+            role="group"
+            aria-label="Quando lembrar"
+          >
             {LEMBRETES.map((l) => (
               <label key={l}>
                 <input
                   type="checkbox"
                   checked={p.lembretes.includes(l)}
                   onChange={(e) =>
-                    p.onLembretes(e.target.checked ? [...p.lembretes, l] : p.lembretes.filter((x) => x !== l))
+                    p.onLembretes(
+                      e.target.checked
+                        ? [...p.lembretes, l]
+                        : p.lembretes.filter((x) => x !== l),
+                    )
                   }
                 />
                 {ROTULO_DO_LEMBRETE[l]}
@@ -1030,11 +1191,24 @@ function EtapaPrazo(p: {
         titulo={p.e180 ? "Como cada um recebe" : "Como os gestores recebem"}
         descricao="Cada pessoa entra com o próprio CPF e a data de nascimento e vê só o que é dela."
       >
-        <div className="pesquisas__escolhas" role="radiogroup" aria-label="Envio">
+        <div
+          className="pesquisas__escolhas"
+          role="radiogroup"
+          aria-label="Envio"
+        >
           <label className="pesquisas__escolha pesquisas__escolha--vertical">
             <span className="pesquisas__escolha-topo">
-              <strong>{p.e180 ? "Enviar e-mail para gestores e pessoas" : "Enviar e-mail para cada gestor"}</strong>
-              <input type="radio" name={`${p.ids}-envio`} checked={p.envio === "email"} onChange={() => p.onEnvio("email")} />
+              <strong>
+                {p.e180
+                  ? "Enviar e-mail para gestores e pessoas"
+                  : "Enviar e-mail para cada gestor"}
+              </strong>
+              <input
+                type="radio"
+                name={`${p.ids}-envio`}
+                checked={p.envio === "email"}
+                onChange={() => p.onEnvio("email")}
+              />
             </span>
             <span className="pesquisas__suave">
               {p.e180
@@ -1045,9 +1219,16 @@ function EtapaPrazo(p: {
           <label className="pesquisas__escolha pesquisas__escolha--vertical">
             <span className="pesquisas__escolha-topo">
               <strong>Só gerar o link</strong>
-              <input type="radio" name={`${p.ids}-envio`} checked={p.envio === "link"} onChange={() => p.onEnvio("link")} />
+              <input
+                type="radio"
+                name={`${p.ids}-envio`}
+                checked={p.envio === "link"}
+                onChange={() => p.onEnvio("link")}
+              />
             </span>
-            <span className="pesquisas__suave">Você copia e envia pelo canal que preferir.</span>
+            <span className="pesquisas__suave">
+              Você copia e envia pelo canal que preferir.
+            </span>
           </label>
         </div>
         {p.envio === "email" ? (
@@ -1060,9 +1241,13 @@ function EtapaPrazo(p: {
                 : `${c.gestoresComEmail} de ${plural(c.gestores, "gestor tem", "gestores têm")} e-mail no cadastro. Para quem não tem, envie o link.`}
             </p>
             <p className="avaliacao__aviso avaliacao__aviso--info" role="note">
-              O envio por e-mail entra na próxima etapa do Evolli. Até lá, os convites ficam aguardando e-mail e você envia o link.
+              O envio por e-mail entra na próxima etapa do Evolli. Até lá, os
+              convites ficam aguardando e-mail e você envia o link.
             </p>
-            <div className="avaliacao__previa-email" aria-label="Prévia do e-mail">
+            <div
+              className="avaliacao__previa-email"
+              aria-label="Prévia do e-mail"
+            >
               <p className="pesquisas__suave">Prévia do e-mail</p>
               <p>
                 <strong>{`Avalie o seu time até ${diaMes(p.prazoDia)}`}</strong>
@@ -1081,15 +1266,29 @@ function EtapaPrazo(p: {
           <div>
             <dt>Avaliação</dt>
             <dd>{`${p.nome} · 8 competências · comentários: ${regra.titulo.toLocaleLowerCase("pt-BR")}`}</dd>
-            <button type="button" className="pesquisas__acao-texto" onClick={() => p.onEditar(0)}>Editar</button>
+            <button
+              type="button"
+              className="pesquisas__acao-texto"
+              onClick={() => p.onEditar(0)}
+            >
+              Editar
+            </button>
           </div>
           <div>
             <dt>{p.e180 ? "Quem participa" : "Quem avalia"}</dt>
             <dd>
               {`${plural(c.gestores, "gestor avalia", "gestores avaliam")} ${plural(c.pessoas, "pessoa", "pessoas")}`}
-              {p.e180 ? ` · ${plural(c.autoavaliacoes, "autoavaliação", "autoavaliações")}` : ""}
+              {p.e180
+                ? ` · ${plural(c.autoavaliacoes, "autoavaliação", "autoavaliações")}`
+                : ""}
             </dd>
-            <button type="button" className="pesquisas__acao-texto" onClick={() => p.onEditar(1)}>Editar</button>
+            <button
+              type="button"
+              className="pesquisas__acao-texto"
+              onClick={() => p.onEditar(1)}
+            >
+              Editar
+            </button>
           </div>
           <div>
             <dt>Prazo</dt>
@@ -1101,7 +1300,13 @@ function EtapaPrazo(p: {
                 : prazoTexto}
               {` · ${textoDosLembretes(p.lembrar ? p.lembretes : [])}`}
             </dd>
-            <button type="button" className="pesquisas__acao-texto" onClick={() => p.onEditar(2)}>Editar</button>
+            <button
+              type="button"
+              className="pesquisas__acao-texto"
+              onClick={() => p.onEditar(2)}
+            >
+              Editar
+            </button>
           </div>
           <div>
             <dt>Envio</dt>

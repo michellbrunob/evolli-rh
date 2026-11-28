@@ -145,9 +145,16 @@ export function ResponderAvaliacao({
           : `${plural(pendentes, "avaliação pendente", "avaliações pendentes")}. Leva cerca de 4 minutos cada e dá para parar e continuar depois.`}
       </p>
       {auto ? (
-        <section aria-label="Sua autoavaliação" className="avaliacao-publica__grupo">
+        <section
+          aria-label="Sua autoavaliação"
+          className="avaliacao-publica__grupo"
+        >
           <h2 className="avaliacao-publica__subtitulo">Sua autoavaliação</h2>
-          <CartaoDoItem item={auto} rotulo="Fazer a autoavaliação" onAbrir={setAberto} />
+          <CartaoDoItem
+            item={auto}
+            rotulo="Fazer a autoavaliação"
+            onAbrir={setAberto}
+          />
         </section>
       ) : null}
       {time.length ? (
@@ -158,7 +165,11 @@ export function ResponderAvaliacao({
           <ul className="avaliacao-publica__lista">
             {time.map((i) => (
               <li key={i.parId}>
-                <CartaoDoItem item={i} rotulo={`Avaliar ${i.avaliado.nome}`} onAbrir={setAberto} />
+                <CartaoDoItem
+                  item={i}
+                  rotulo={`Avaliar ${i.avaliado.nome}`}
+                  onAbrir={setAberto}
+                />
                 {i.comparativo ? <ComparativoDoGestor item={i} /> : null}
               </li>
             ))}
@@ -184,8 +195,12 @@ function CartaoDoItem({
         {iniciais(item.avaliado.nome)}
       </span>
       <span className="avaliacao-publica__nome">
-        <strong>{item.papel === "autoavaliacao" ? "Você" : item.avaliado.nome}</strong>
-        {item.avaliado.cargo ? <span className="pesquisas__suave">{item.avaliado.cargo}</span> : null}
+        <strong>
+          {item.papel === "autoavaliacao" ? "Você" : item.avaliado.nome}
+        </strong>
+        {item.avaliado.cargo ? (
+          <span className="pesquisas__suave">{item.avaliado.cargo}</span>
+        ) : null}
       </span>
       {item.respondida ? (
         <span className="avaliacao-publica__situacao">Enviada</span>
@@ -254,7 +269,9 @@ function AvaliarPessoa({
   const medias = useMemo(() => {
     const m = {} as Record<Competencia, number | null>;
     for (const c of CATALOGO) {
-      const v = c.itens.map((i) => r.notas[i.id]).filter((x): x is number => typeof x === "number");
+      const v = c.itens
+        .map((i) => r.notas[i.id])
+        .filter((x): x is number => typeof x === "number");
       m[c.id] = v.length ? v.reduce((t, x) => t + x, 0) / v.length : null;
     }
     return m;
@@ -280,7 +297,10 @@ function AvaliarPessoa({
     try {
       await cliente.responder(token, item.parId, {
         passe,
-        respostas: ITENS.map((i) => ({ perguntaId: i.id, valor: r.notas[i.id]! })),
+        respostas: ITENS.map((i) => ({
+          perguntaId: i.id,
+          valor: r.notas[i.id]!,
+        })),
         comentarios: Object.fromEntries(
           Object.entries(r.comentarios).filter(([, t]) => t?.trim()),
         ),
@@ -307,7 +327,14 @@ function AvaliarPessoa({
 
   return (
     <div className="avaliacao-publica">
-      <div className="pesquisa-publica__progresso" role="progressbar" aria-label="Progresso" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progresso}>
+      <div
+        className="pesquisa-publica__progresso"
+        role="progressbar"
+        aria-label="Progresso"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progresso}
+      >
         <span style={{ width: `${progresso}%` }} />
       </div>
       <p className="avaliacao-publica__quem">
@@ -324,7 +351,11 @@ function AvaliarPessoa({
           <h2 className="pesquisa-publica__pergunta" id="avaliacao-afirmacao">
             {auto ? atual.autoavaliacao : atual.gestor}
           </h2>
-          <div role="radiogroup" aria-labelledby="avaliacao-afirmacao" className="avaliacao-publica__escala">
+          <div
+            role="radiogroup"
+            aria-labelledby="avaliacao-afirmacao"
+            className="avaliacao-publica__escala"
+          >
             {ROTULOS_DA_ESCALA.map((rotulo, i) => {
               const n = i + 1;
               return (
@@ -333,7 +364,9 @@ function AvaliarPessoa({
                     type="radio"
                     name={`nota-${atual.id}`}
                     checked={valor === n}
-                    onChange={() => mudar({ ...r, notas: { ...r.notas, [atual.id]: n } })}
+                    onChange={() =>
+                      mudar({ ...r, notas: { ...r.notas, [atual.id]: n } })
+                    }
                   />
                   <span aria-hidden="true">{n}</span>
                   <span className="pesquisas__so-leitor">{`${n} · ${rotulo}`}</span>
@@ -343,17 +376,26 @@ function AvaliarPessoa({
           </div>
           <p className="avaliacao-publica__pontas" aria-hidden="true">
             <span>{ROTULOS_DA_ESCALA[0]}</span>
-            <span>{valor ? `${valor} · ${ROTULOS_DA_ESCALA[valor - 1]}` : ""}</span>
+            <span>
+              {valor ? `${valor} · ${ROTULOS_DA_ESCALA[valor - 1]}` : ""}
+            </span>
             <span>{ROTULOS_DA_ESCALA[4]}</span>
           </p>
           <div className="avaliacao-publica__navegacao">
             <Button
               variant="subtle"
-              onClick={() => (r.posicao === 0 ? onSair(false) : mudar({ ...r, posicao: r.posicao - 1 }))}
+              onClick={() =>
+                r.posicao === 0
+                  ? onSair(false)
+                  : mudar({ ...r, posicao: r.posicao - 1 })
+              }
             >
               {r.posicao === 0 ? "← Voltar para a lista" : "← Anterior"}
             </Button>
-            <Button disabled={!valor} onClick={() => mudar({ ...r, posicao: r.posicao + 1 })}>
+            <Button
+              disabled={!valor}
+              onClick={() => mudar({ ...r, posicao: r.posicao + 1 })}
+            >
               Próximo →
             </Button>
           </div>
@@ -381,7 +423,12 @@ function AvaliarPessoa({
                   maxLength={1000}
                   required={obrigatorio}
                   value={r.comentarios[c.id] ?? ""}
-                  onChange={(e) => mudar({ ...r, comentarios: { ...r.comentarios, [c.id]: e.target.value } })}
+                  onChange={(e) =>
+                    mudar({
+                      ...r,
+                      comentarios: { ...r.comentarios, [c.id]: e.target.value },
+                    })
+                  }
                 />
               </label>
             );
@@ -392,7 +439,10 @@ function AvaliarPessoa({
             </p>
           ) : null}
           <div className="avaliacao-publica__navegacao">
-            <Button variant="subtle" onClick={() => mudar({ ...r, posicao: total - 1 })}>
+            <Button
+              variant="subtle"
+              onClick={() => mudar({ ...r, posicao: total - 1 })}
+            >
               ← Anterior
             </Button>
             <Button disabled={enviando} onClick={() => void enviar()}>

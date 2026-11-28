@@ -30,13 +30,21 @@ export function AvaliacoesDaFicha({
   }, [carregar, colaboradorId]);
   if (!itens || itens.length === 0) return null;
   return (
-    <section className="pesquisas__cartao-secao" aria-labelledby="ficha-avaliacoes-titulo">
+    <section
+      className="pesquisas__cartao-secao"
+      aria-labelledby="ficha-avaliacoes-titulo"
+    >
       <header className="pesquisas__cartao-secao-cabeca">
         <div>
-          <h2 id="ficha-avaliacoes-titulo" className="pesquisas__cartao-secao-titulo">
+          <h2
+            id="ficha-avaliacoes-titulo"
+            className="pesquisas__cartao-secao-titulo"
+          >
             Avaliações de desempenho
           </h2>
-          <p className="pesquisas__suave">{plural(itens.length, "avaliação", "avaliações")}</p>
+          <p className="pesquisas__suave">
+            {plural(itens.length, "avaliação", "avaliações")}
+          </p>
         </div>
       </header>
       <ul className="avaliacao__ficha">
@@ -48,8 +56,14 @@ export function AvaliacoesDaFicha({
                 {`${a.modelo === "avaliacao180" ? "Avaliação 180°" : "Avaliação 90°"}${a.gestor ? ` · gestor: ${a.gestor}` : ""} · ${formatarInstante(a.respondidaEm)}`}
               </span>
             </span>
-            <span className="avaliacao__numero">{a.geral === null ? "—" : `${nota1(a.geral)} /5`}</span>
-            {a.nivel ? <StatusBadge variant={NIVEIS[a.nivel].tom}>{NIVEIS[a.nivel].rotulo}</StatusBadge> : null}
+            <span className="avaliacao__numero">
+              {a.geral === null ? "—" : `${nota1(a.geral)} /5`}
+            </span>
+            {a.nivel ? (
+              <StatusBadge variant={NIVEIS[a.nivel].tom}>
+                {NIVEIS[a.nivel].rotulo}
+              </StatusBadge>
+            ) : null}
             {a.autoavaliacao !== null ? (
               <span className="pesquisas__suave">{`Autoavaliação ${nota1(a.autoavaliacao)}`}</span>
             ) : null}

@@ -36,7 +36,9 @@ export function RodaDeCompetencias({
           <polygon
             key={n}
             className="avaliacao__radar-grade"
-            points={CATALOGO.map((_, i) => ponto(i, total, n).join(",")).join(" ")}
+            points={CATALOGO.map((_, i) => ponto(i, total, n).join(",")).join(
+              " ",
+            )}
           />
         ))}
         {CATALOGO.map((c, i) => {
@@ -44,12 +46,20 @@ export function RodaDeCompetencias({
           const [tx, ty] = ponto(i, total, 6.1);
           return (
             <g key={c.id}>
-              <line className="avaliacao__radar-eixo" x1={CENTRO} y1={CENTRO} x2={x} y2={y} />
+              <line
+                className="avaliacao__radar-eixo"
+                x1={CENTRO}
+                y1={CENTRO}
+                x2={x}
+                y2={y}
+              />
               <text
                 className="avaliacao__radar-rotulo"
                 x={tx}
                 y={ty}
-                textAnchor={tx < CENTRO - 4 ? "end" : tx > CENTRO + 4 ? "start" : "middle"}
+                textAnchor={
+                  tx < CENTRO - 4 ? "end" : tx > CENTRO + 4 ? "start" : "middle"
+                }
                 dominantBaseline="middle"
               >
                 {c.rotulo}
@@ -61,7 +71,9 @@ export function RodaDeCompetencias({
           <polygon
             key={s.nome}
             className={`avaliacao__radar-serie ${s.classe}`}
-            points={CATALOGO.map((c, i) => ponto(i, total, s.valores[c.id] ?? 1).join(",")).join(" ")}
+            points={CATALOGO.map((c, i) =>
+              ponto(i, total, s.valores[c.id] ?? 1).join(","),
+            ).join(" ")}
           />
         ))}
       </svg>
@@ -69,7 +81,9 @@ export function RodaDeCompetencias({
         <ul>
           {series.map((s) =>
             CATALOGO.map((c) => (
-              <li key={`${s.nome}-${c.id}`}>{`${s.nome}, ${c.rotulo}: ${nota1(s.valores[c.id] ?? null)}`}</li>
+              <li
+                key={`${s.nome}-${c.id}`}
+              >{`${s.nome}, ${c.rotulo}: ${nota1(s.valores[c.id] ?? null)}`}</li>
             )),
           )}
         </ul>
@@ -125,32 +139,63 @@ export function Halteres({
   }[];
 }) {
   return (
-    <div className="avaliacao__halteres" role="table" aria-label="Gestor × autoavaliação por competência">
+    <div
+      className="avaliacao__halteres"
+      role="table"
+      aria-label="Gestor × autoavaliação por competência"
+    >
       <div role="row" className="avaliacao__halteres-legenda">
         <span role="columnheader">Competência</span>
         <span role="columnheader">
-          <span className="avaliacao__marca avaliacao__marca--gestor" aria-hidden="true" /> Gestor
-          <span className="avaliacao__marca avaliacao__marca--auto" aria-hidden="true" /> Autoavaliação
+          <span
+            className="avaliacao__marca avaliacao__marca--gestor"
+            aria-hidden="true"
+          />{" "}
+          Gestor
+          <span
+            className="avaliacao__marca avaliacao__marca--auto"
+            aria-hidden="true"
+          />{" "}
+          Autoavaliação
         </span>
         <span role="columnheader">Diferença</span>
       </div>
       {linhas.map((l) => {
         const g = l.gestor;
         const a = l.autoavaliacao;
-        const ini = g !== null && a !== null ? Math.min(posicaoNaRegua(g), posicaoNaRegua(a)) : 0;
-        const fim = g !== null && a !== null ? Math.max(posicaoNaRegua(g), posicaoNaRegua(a)) : 0;
+        const ini =
+          g !== null && a !== null
+            ? Math.min(posicaoNaRegua(g), posicaoNaRegua(a))
+            : 0;
+        const fim =
+          g !== null && a !== null
+            ? Math.max(posicaoNaRegua(g), posicaoNaRegua(a))
+            : 0;
         return (
           <div role="row" key={l.competencia} className="avaliacao__halter">
             <span role="cell">{competencia(l.competencia).rotulo}</span>
-            <span role="cell" className="avaliacao__halter-trilho" aria-label={`Gestor ${nota1(g)}, autoavaliação ${nota1(a)}`}>
+            <span
+              role="cell"
+              className="avaliacao__halter-trilho"
+              aria-label={`Gestor ${nota1(g)}, autoavaliação ${nota1(a)}`}
+            >
               {g !== null && a !== null ? (
-                <span className="avaliacao__halter-faixa" style={{ left: `${ini}%`, width: `${fim - ini}%` }} />
+                <span
+                  className="avaliacao__halter-faixa"
+                  style={{ left: `${ini}%`, width: `${fim - ini}%` }}
+                />
               ) : null}
               {g !== null ? (
-                <span className="avaliacao__marca avaliacao__marca--gestor" style={{ left: `${posicaoNaRegua(g)}%` }} />
+                <span
+                  className="avaliacao__marca avaliacao__marca--gestor"
+                  style={{ left: `${posicaoNaRegua(g)}%` }}
+                />
               ) : null}
               {a !== null ? (
-                <span className="avaliacao__marca avaliacao__marca--auto" style={{ left: `${posicaoNaRegua(a)}%` }} />
+                <span
+                  className="avaliacao__marca avaliacao__marca--auto"
+                  style={{ left: `${posicaoNaRegua(a)}%` }}
+                />
               ) : null}
             </span>
             <span role="cell" className="avaliacao__numero">

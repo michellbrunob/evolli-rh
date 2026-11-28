@@ -29,18 +29,37 @@ export function nomeDaPlanilha(nome: string): string {
   return nomeDoArquivo([nome, "avaliacao"], "xlsx");
 }
 
-export const METODOLOGIA_DA_AVALIACAO: readonly (readonly [string, string])[] = [
-  ["Escala", "Cada afirmação de 1 (Insuficiente) a 5 (Excepcional)."],
-  ["Competência", "Média das 3 afirmações da competência."],
-  ["Nota geral", "Média das 8 competências, com 1 casa."],
-  ["Eixo Entrega", "Média de Responsabilidade, Organização, Proatividade e Resolução de problemas."],
-  ["Eixo Pessoas", "Média de Comunicação, Trabalho em equipe, Liderança e Adaptabilidade."],
-  ["Níveis", "Insuficiente 1,0–1,9 · Em desenvolvimento 2,0–2,9 · Bom 3,0–3,9 · Excelente 4,0–4,4 · Excepcional 4,5–5,0."],
-  ["Mapa de talentos", "Alto: 4 ou mais; médio: 3 a 3,9; baixo: abaixo de 3, em Entrega e em Pessoas."],
-  ["Calibração", "Média dada pelo gestor menos a média da empresa; com 5 avaliações ou mais; 0,4 ou mais indica outro critério."],
-  ["Gestor × autoavaliação", "Diferença = autoavaliação − gestor; menos de 0,5 é alinhada."],
-  ["Recortes", "Grupos com menos de 3 pessoas avaliadas ficam ocultos."],
-];
+export const METODOLOGIA_DA_AVALIACAO: readonly (readonly [string, string])[] =
+  [
+    ["Escala", "Cada afirmação de 1 (Insuficiente) a 5 (Excepcional)."],
+    ["Competência", "Média das 3 afirmações da competência."],
+    ["Nota geral", "Média das 8 competências, com 1 casa."],
+    [
+      "Eixo Entrega",
+      "Média de Responsabilidade, Organização, Proatividade e Resolução de problemas.",
+    ],
+    [
+      "Eixo Pessoas",
+      "Média de Comunicação, Trabalho em equipe, Liderança e Adaptabilidade.",
+    ],
+    [
+      "Níveis",
+      "Insuficiente 1,0–1,9 · Em desenvolvimento 2,0–2,9 · Bom 3,0–3,9 · Excelente 4,0–4,4 · Excepcional 4,5–5,0.",
+    ],
+    [
+      "Mapa de talentos",
+      "Alto: 4 ou mais; médio: 3 a 3,9; baixo: abaixo de 3, em Entrega e em Pessoas.",
+    ],
+    [
+      "Calibração",
+      "Média dada pelo gestor menos a média da empresa; com 5 avaliações ou mais; 0,4 ou mais indica outro critério.",
+    ],
+    [
+      "Gestor × autoavaliação",
+      "Diferença = autoavaliação − gestor; menos de 0,5 é alinhada.",
+    ],
+    ["Recortes", "Grupos com menos de 3 pessoas avaliadas ficam ocultos."],
+  ];
 
 export function planilhaDaAvaliacao(
   nome: string,
@@ -70,7 +89,18 @@ export function planilhaDaAvaliacao(
   abas.push({
     nome: "Por pessoa",
     cabecalho: true,
-    larguras: [30, 26, 26, 10, 10, 10, 20, 26, ...(e180 ? [14, 12, 16] : []), ...CATALOGO.map(() => 14)],
+    larguras: [
+      30,
+      26,
+      26,
+      10,
+      10,
+      10,
+      20,
+      26,
+      ...(e180 ? [14, 12, 16] : []),
+      ...CATALOGO.map(() => 14),
+    ],
     linhas: [
       [
         "Pessoa",
@@ -109,7 +139,13 @@ export function planilhaDaAvaliacao(
     cabecalho: true,
     larguras: [26, 10, 14, 14, 40],
     linhas: [
-      ["Competência", "Média", "Abaixo de 3", "% abaixo de 3", "Afirmação mais baixa"],
+      [
+        "Competência",
+        "Média",
+        "Abaixo de 3",
+        "% abaixo de 3",
+        "Afirmação mais baixa",
+      ],
       ...r.time.competencias.map((c): CelulaXlsx[] => [
         competencia(c.competencia).rotulo,
         num(c.media),
@@ -195,7 +231,10 @@ export function planilhaDaAvaliacao(
     cabecalho: true,
     quebrarTexto: true,
     larguras: [26, 90],
-    linhas: [["Item", "Regra"], ...METODOLOGIA_DA_AVALIACAO.map(([a, b]) => [a, b])],
+    linhas: [
+      ["Item", "Regra"],
+      ...METODOLOGIA_DA_AVALIACAO.map(([a, b]) => [a, b]),
+    ],
   });
   return montarXlsx(abas);
 }

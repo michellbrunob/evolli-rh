@@ -44,7 +44,9 @@ export function organogramaFalso(): Organograma {
   };
 }
 
-export function detalheFalso(extra: Partial<PesquisaDetalhe> = {}): PesquisaDetalhe {
+export function detalheFalso(
+  extra: Partial<PesquisaDetalhe> = {},
+): PesquisaDetalhe {
   return {
     id: "pesq-1",
     nome: "Avaliação 90° – Ciclo 2026.2",
@@ -94,21 +96,40 @@ export function avaliacaoDetalheFalsa(): AvaliacaoDetalhe {
         ],
       },
     ],
-    totais: { gestores: 1, pessoas: 2, autoavaliacoes: 1, respondidas: 2, pendentes: 1 },
+    totais: {
+      gestores: 1,
+      pessoas: 2,
+      autoavaliacoes: 1,
+      respondidas: 2,
+      pendentes: 1,
+    },
     lembretes: [{ lembrete: "7_dias", quando: "2026-12-20T12:00:00.000Z" }],
     convites: { aguardandoEmail: 2, semEmail: 0, enviados: 0 },
   };
 }
 
 const todas = (n: number): Record<Competencia, number> =>
-  Object.fromEntries(COMPETENCIAS.map((c) => [c, n])) as Record<Competencia, number>;
+  Object.fromEntries(COMPETENCIAS.map((c) => [c, n])) as Record<
+    Competencia,
+    number
+  >;
 
-export const nota = (n: number, extra: Partial<NotaDaAvaliacao> = {}): NotaDaAvaliacao => ({
+export const nota = (
+  n: number,
+  extra: Partial<NotaDaAvaliacao> = {},
+): NotaDaAvaliacao => ({
   competencias: todas(n),
   geral: n,
   entrega: n,
   pessoas: n,
-  nivel: n >= 4.5 ? "excepcional" : n >= 4 ? "excelente" : n >= 3 ? "bom" : "em_desenvolvimento",
+  nivel:
+    n >= 4.5
+      ? "excepcional"
+      : n >= 4
+        ? "excelente"
+        : n >= 3
+          ? "bom"
+          : "em_desenvolvimento",
   quadrante: n >= 4 ? "referencia" : n >= 3 ? "solido" : "precisa_de_apoio",
   grupo: n >= 4 ? "destaque" : n >= 3 ? "esperado" : "apoio",
   ...extra,
@@ -181,11 +202,22 @@ export function resultadosFalsos(): ResultadosDaAvaliacao {
       },
     ],
     calibracao: [
-      { avaliadorId: "g1", nome: "Gestora Teste", avaliadas: 2, media: 3.5, diferenca: 0, leitura: "poucas" },
+      {
+        avaliadorId: "g1",
+        nome: "Gestora Teste",
+        avaliadas: 2,
+        media: 3.5,
+        diferenca: 0,
+        leitura: "poucas",
+      },
     ],
     recortes: {
-      tempoDeCasa: [{ grupo: "1_a_3_anos", avaliadas: 1, media: null, visivel: false }],
-      departamento: [{ grupo: "Operações", avaliadas: 1, media: null, visivel: false }],
+      tempoDeCasa: [
+        { grupo: "1_a_3_anos", avaliadas: 1, media: null, visivel: false },
+      ],
+      departamento: [
+        { grupo: "Operações", avaliadas: 1, media: null, visivel: false },
+      ],
     },
     comparativo: {
       completas: 1,
@@ -203,7 +235,9 @@ export function resultadosFalsos(): ResultadosDaAvaliacao {
 }
 
 export function pessoaFalsa(): ResultadoDaPessoa {
-  const notas = Object.fromEntries(CATALOGO.flatMap((c) => c.itens.map((i) => [i.id, 4])));
+  const notas = Object.fromEntries(
+    CATALOGO.flatMap((c) => c.itens.map((i) => [i.id, 4])),
+  );
   return {
     pesquisaId: "pesq-1",
     pesquisa: "Avaliação 180°",

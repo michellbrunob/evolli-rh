@@ -23,7 +23,8 @@ export interface PessoaResumida {
   temEmail: boolean;
 }
 
-export type MotivoSemGestor = "sem_gestor" | "gestor_sem_cpf" | "gestor_inativo";
+export type MotivoSemGestor =
+  "sem_gestor" | "gestor_sem_cpf" | "gestor_inativo";
 
 export interface Organograma {
   times: { gestor: PessoaResumida; pessoas: PessoaResumida[] }[];
@@ -231,7 +232,8 @@ export interface AvaliacaoDaFicha {
 const id = encodeURIComponent;
 
 export const clienteDaAvaliacao = {
-  organograma: () => pedir<Organograma>("/pesquisas/avaliacoes/organograma", "GET"),
+  organograma: () =>
+    pedir<Organograma>("/pesquisas/avaliacoes/organograma", "GET"),
   obter: (pesquisaId: string) =>
     pedir<AvaliacaoDetalhe>(`/pesquisas/${id(pesquisaId)}/avaliacao`, "GET"),
   salvar: (

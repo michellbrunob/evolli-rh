@@ -71,7 +71,9 @@ export function ResultadosDaAvaliacao({
       })
       .catch((e: unknown) => {
         if (!vivo) return;
-        setFalha((e as { status?: number })?.status === 403 ? "sem-acesso" : "erro");
+        setFalha(
+          (e as { status?: number })?.status === 403 ? "sem-acesso" : "erro",
+        );
       });
     return () => {
       vivo = false;
@@ -92,7 +94,8 @@ export function ResultadosDaAvaliacao({
       </p>
     );
   }
-  if (!r || !andamento) return <Esqueleto rotulo="Carregando a avaliação…" linhas={4} />;
+  if (!r || !andamento)
+    return <Esqueleto rotulo="Carregando a avaliação…" linhas={4} />;
 
   if (pessoa) {
     return (
@@ -125,7 +128,11 @@ export function ResultadosDaAvaliacao({
         <Button
           variant="secondary"
           onClick={() =>
-            baixarArquivo(planilhaDaAvaliacao(nome, r), nomeDaPlanilha(nome), TIPO_MIME_XLSX)
+            baixarArquivo(
+              planilhaDaAvaliacao(nome, r),
+              nomeDaPlanilha(nome),
+              TIPO_MIME_XLSX,
+            )
           }
         >
           Exportar Excel (.xlsx)
@@ -134,7 +141,11 @@ export function ResultadosDaAvaliacao({
           Exportar PDF
         </Button>
       </div>
-      <div role="tablist" aria-label="Resultados da avaliação" className="pesquisas__abas">
+      <div
+        role="tablist"
+        aria-label="Resultados da avaliação"
+        className="pesquisas__abas"
+      >
         {abas.map((a) => (
           <button
             key={a.valor}
@@ -151,10 +162,16 @@ export function ResultadosDaAvaliacao({
       <div role="tabpanel" className="pesquisas__resultados">
         {aba === "geral" ? (
           r.avaliadas === 0 ? (
-            <section className="pesquisas__sem-respostas" aria-label="Ainda sem avaliações">
-              <h2 className="pesquisas__cartao-secao-titulo">Ainda sem avaliações</h2>
+            <section
+              className="pesquisas__sem-respostas"
+              aria-label="Ainda sem avaliações"
+            >
+              <h2 className="pesquisas__cartao-secao-titulo">
+                Ainda sem avaliações
+              </h2>
               <p className="pesquisas__suave">
-                Os resultados aparecem assim que os gestores enviarem as primeiras avaliações.
+                Os resultados aparecem assim que os gestores enviarem as
+                primeiras avaliações.
               </p>
             </section>
           ) : (
@@ -182,7 +199,9 @@ function VisaoGeral({
   readonly nomeDe: Map<string, string>;
 }) {
   const nivel = r.time.nivel ? NIVEIS[r.time.nivel] : null;
-  const medias = Object.fromEntries(r.time.competencias.map((c) => [c.competencia, c.media]));
+  const medias = Object.fromEntries(
+    r.time.competencias.map((c) => [c.competencia, c.media]),
+  );
   return (
     <>
       <div className="avaliacao__indicadores">
@@ -191,21 +210,35 @@ function VisaoGeral({
           <p className="avaliacao__nota-grande">
             {nota1(r.time.media)} <span className="pesquisas__suave">/5</span>
           </p>
-          {nivel ? <StatusBadge variant={nivel.tom}>{nivel.rotulo}</StatusBadge> : null}
-          <p className="pesquisas__suave">Média das notas gerais das pessoas avaliadas.</p>
+          {nivel ? (
+            <StatusBadge variant={nivel.tom}>{nivel.rotulo}</StatusBadge>
+          ) : null}
+          <p className="pesquisas__suave">
+            Média das notas gerais das pessoas avaliadas.
+          </p>
         </section>
-        <section className="pesquisas__cartao-secao" aria-label="Roda de competências">
+        <section
+          className="pesquisas__cartao-secao"
+          aria-label="Roda de competências"
+        >
           <RodaDeCompetencias
             rotulo="Roda de competências do time, de 1 a 5"
             series={[
-              { nome: "Time", classe: "avaliacao__radar-serie--gestor", valores: medias },
+              {
+                nome: "Time",
+                classe: "avaliacao__radar-serie--gestor",
+                valores: medias,
+              },
               ...(e180 && r.comparativo
                 ? [
                     {
                       nome: "Autoavaliação",
                       classe: "avaliacao__radar-serie--auto",
                       valores: Object.fromEntries(
-                        r.comparativo.competencias.map((c) => [c.competencia, c.autoavaliacao]),
+                        r.comparativo.competencias.map((c) => [
+                          c.competencia,
+                          c.autoavaliacao,
+                        ]),
                       ),
                     },
                   ]
@@ -215,16 +248,27 @@ function VisaoGeral({
         </section>
       </div>
 
-      <section className="pesquisas__cartao-secao" aria-label="Do mais forte ao mais fraco">
-        <h2 className="pesquisas__cartao-secao-titulo">Do mais forte ao mais fraco</h2>
-        <p className="pesquisas__suave">Média de 1 a 5 de cada competência no time.</p>
+      <section
+        className="pesquisas__cartao-secao"
+        aria-label="Do mais forte ao mais fraco"
+      >
+        <h2 className="pesquisas__cartao-secao-titulo">
+          Do mais forte ao mais fraco
+        </h2>
+        <p className="pesquisas__suave">
+          Média de 1 a 5 de cada competência no time.
+        </p>
         <ol className="avaliacao__ranking">
           {r.time.competencias.map((c) => {
             const comp = competencia(c.competencia);
             return (
               <li key={c.competencia}>
                 <span>{comp.rotulo}</span>
-                <BarraDaNota nota={c.media} cor={comp.cor} rotulo={`${comp.rotulo}: ${nota1(c.media)}`} />
+                <BarraDaNota
+                  nota={c.media}
+                  cor={comp.cor}
+                  rotulo={`${comp.rotulo}: ${nota1(c.media)}`}
+                />
                 <strong className="avaliacao__numero">{nota1(c.media)}</strong>
               </li>
             );
@@ -233,8 +277,13 @@ function VisaoGeral({
       </section>
 
       {e180 && r.comparativo && r.comparativo.completas > 0 ? (
-        <section className="pesquisas__cartao-secao" aria-label="Gestor × autoavaliação">
-          <h2 className="pesquisas__cartao-secao-titulo">Gestor × autoavaliação</h2>
+        <section
+          className="pesquisas__cartao-secao"
+          aria-label="Gestor × autoavaliação"
+        >
+          <h2 className="pesquisas__cartao-secao-titulo">
+            Gestor × autoavaliação
+          </h2>
           <p className="pesquisas__suave">
             {`${plural(r.comparativo.completas, "avaliação completa", "avaliações completas")} · ordenado pela diferença (autoavaliação − gestor)`}
           </p>
@@ -245,42 +294,71 @@ function VisaoGeral({
         </section>
       ) : null}
 
-      <section className="pesquisas__cartao-secao" aria-label="Grupos pela nota">
-        <h2 className="pesquisas__cartao-secao-titulo">Grupos pela nota geral</h2>
+      <section
+        className="pesquisas__cartao-secao"
+        aria-label="Grupos pela nota"
+      >
+        <h2 className="pesquisas__cartao-secao-titulo">
+          Grupos pela nota geral
+        </h2>
         <div className="avaliacao__grupos">
-          {(Object.keys(GRUPOS_DA_NOTA) as (keyof typeof GRUPOS_DA_NOTA)[]).map((g) => (
-            <div key={g} className={`avaliacao__grupo avaliacao__grupo--${g}`}>
-              <strong>{`${GRUPOS_DA_NOTA[g].rotulo} · ${r.time.grupos[g].length}`}</strong>
-              <span className="pesquisas__suave">{GRUPOS_DA_NOTA[g].regra}</span>
-              <ul>
-                {r.time.grupos[g].map((id) => (
-                  <li key={id}>{nomeDe.get(id) ?? ""}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {(Object.keys(GRUPOS_DA_NOTA) as (keyof typeof GRUPOS_DA_NOTA)[]).map(
+            (g) => (
+              <div
+                key={g}
+                className={`avaliacao__grupo avaliacao__grupo--${g}`}
+              >
+                <strong>{`${GRUPOS_DA_NOTA[g].rotulo} · ${r.time.grupos[g].length}`}</strong>
+                <span className="pesquisas__suave">
+                  {GRUPOS_DA_NOTA[g].regra}
+                </span>
+                <ul>
+                  {r.time.grupos[g].map((id) => (
+                    <li key={id}>{nomeDe.get(id) ?? ""}</li>
+                  ))}
+                </ul>
+              </div>
+            ),
+          )}
         </div>
       </section>
 
-      <section className="pesquisas__cartao-secao" aria-label="Mapa de talentos">
+      <section
+        className="pesquisas__cartao-secao"
+        aria-label="Mapa de talentos"
+      >
         <h2 className="pesquisas__cartao-secao-titulo">Mapa de talentos</h2>
         <p className="pesquisas__suave">
-          Entrega (o que a pessoa faz acontecer) × Pessoas (como trabalha com os outros). Alto: 4 ou mais; médio: 3 a 3,9; baixo: abaixo de 3.
+          Entrega (o que a pessoa faz acontecer) × Pessoas (como trabalha com os
+          outros). Alto: 4 ou mais; médio: 3 a 3,9; baixo: abaixo de 3.
         </p>
-        <div className="avaliacao__mapa" role="table" aria-label="Mapa de talentos">
+        <div
+          className="avaliacao__mapa"
+          role="table"
+          aria-label="Mapa de talentos"
+        >
           {MAPA.map((linha, i) => (
             <div role="row" key={i} className="avaliacao__mapa-linha">
               <span role="rowheader" className="avaliacao__mapa-eixo">
                 {["Entrega alta", "Entrega média", "Entrega baixa"][i]}
               </span>
               {linha.map((q) => (
-                <div role="cell" key={q} className={`avaliacao__celula avaliacao__celula--${q}`}>
+                <div
+                  role="cell"
+                  key={q}
+                  className={`avaliacao__celula avaliacao__celula--${q}`}
+                >
                   <strong>{`${QUADRANTES[q].rotulo} · ${r.time.mapa[q].length}`}</strong>
-                  <span className="pesquisas__suave">{QUADRANTES[q].regra}</span>
+                  <span className="pesquisas__suave">
+                    {QUADRANTES[q].regra}
+                  </span>
                   <ul>
                     {r.time.mapa[q].map((id) => (
                       <li key={id}>
-                        <Avatar texto={iniciaisDe(nomeDe.get(id) ?? "")} rotulo={nomeDe.get(id) ?? ""} />
+                        <Avatar
+                          texto={iniciaisDe(nomeDe.get(id) ?? "")}
+                          rotulo={nomeDe.get(id) ?? ""}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -288,7 +366,10 @@ function VisaoGeral({
               ))}
             </div>
           ))}
-          <div role="row" className="avaliacao__mapa-linha avaliacao__mapa-rodape">
+          <div
+            role="row"
+            className="avaliacao__mapa-linha avaliacao__mapa-rodape"
+          >
             <span role="cell" />
             <span role="columnheader">Pessoas baixa</span>
             <span role="columnheader">Pessoas média</span>
@@ -297,7 +378,8 @@ function VisaoGeral({
         </div>
       </section>
       <p className="pesquisas__nota">
-        A nota é a percepção de um gestor: nunca use como critério único para promover ou desligar.
+        A nota é a percepção de um gestor: nunca use como critério único para
+        promover ou desligar.
       </p>
     </>
   );
@@ -330,28 +412,48 @@ function TabelaDePessoas({
         {r.pessoas.map((p) => (
           <tr key={p.colaboradorId}>
             <th scope="row">
-              <button type="button" className="pesquisas__acao-texto" onClick={() => onAbrir(p.colaboradorId)}>
+              <button
+                type="button"
+                className="pesquisas__acao-texto"
+                onClick={() => onAbrir(p.colaboradorId)}
+              >
                 {p.nome}
               </button>
-              {p.cargo ? <span className="pesquisas__suave">{p.cargo}</span> : null}
+              {p.cargo ? (
+                <span className="pesquisas__suave">{p.cargo}</span>
+              ) : null}
             </th>
             <td>{p.gestor.nome}</td>
-            <td className="avaliacao__numero">{p.nota ? nota1(p.nota.geral) : "Pendente"}</td>
+            <td className="avaliacao__numero">
+              {p.nota ? nota1(p.nota.geral) : "Pendente"}
+            </td>
             <td>
               {p.nota?.nivel ? (
-                <StatusBadge variant={NIVEIS[p.nota.nivel].tom}>{NIVEIS[p.nota.nivel].curto}</StatusBadge>
+                <StatusBadge variant={NIVEIS[p.nota.nivel].tom}>
+                  {NIVEIS[p.nota.nivel].curto}
+                </StatusBadge>
               ) : (
                 "—"
               )}
             </td>
-            <td>{p.nota?.quadrante ? QUADRANTES[p.nota.quadrante].rotulo : "—"}</td>
+            <td>
+              {p.nota?.quadrante ? QUADRANTES[p.nota.quadrante].rotulo : "—"}
+            </td>
             {e180 ? (
               <td className="avaliacao__numero">
-                {!p.temAutoavaliacao ? "Sem autoavaliação" : p.autoavaliacao ? nota1(p.autoavaliacao.geral) : "Pendente"}
+                {!p.temAutoavaliacao
+                  ? "Sem autoavaliação"
+                  : p.autoavaliacao
+                    ? nota1(p.autoavaliacao.geral)
+                    : "Pendente"}
               </td>
             ) : null}
             {e180 ? (
-              <td>{p.alinhamento ? `${diferenca1(p.diferenca)} · ${ALINHAMENTO[p.alinhamento]}` : "—"}</td>
+              <td>
+                {p.alinhamento
+                  ? `${diferenca1(p.diferenca)} · ${ALINHAMENTO[p.alinhamento]}`
+                  : "—"}
+              </td>
             ) : null}
             <td>
               {p.alertas.length === 0
@@ -401,10 +503,16 @@ function Analises({ r }: { readonly r: Resultados }) {
           </tbody>
         </table>
       </section>
-      <section className="pesquisas__cartao-secao" aria-label="Calibração entre gestores">
-        <h2 className="pesquisas__cartao-secao-titulo">Calibração entre gestores</h2>
+      <section
+        className="pesquisas__cartao-secao"
+        aria-label="Calibração entre gestores"
+      >
+        <h2 className="pesquisas__cartao-secao-titulo">
+          Calibração entre gestores
+        </h2>
         <p className="pesquisas__suave">
-          A média que cada gestor deu comparada com a da empresa. Com 5 avaliações ou mais; diferença de 0,4 ou mais indica outro critério.
+          A média que cada gestor deu comparada com a da empresa. Com 5
+          avaliações ou mais; diferença de 0,4 ou mais indica outro critério.
         </p>
         <table className="pesquisas__tabela">
           <thead>
@@ -431,11 +539,18 @@ function Analises({ r }: { readonly r: Resultados }) {
       </section>
       <section className="pesquisas__cartao-secao" aria-label="Recortes">
         <h2 className="pesquisas__cartao-secao-titulo">Recortes</h2>
-        <p className="pesquisas__suave">Grupos com menos de 3 pessoas avaliadas ficam ocultos.</p>
+        <p className="pesquisas__suave">
+          Grupos com menos de 3 pessoas avaliadas ficam ocultos.
+        </p>
         <div className="avaliacao__recortes">
           {(
             [
-              ["Tempo de casa", r.recortes.tempoDeCasa, (g: string) => TEMPO_DE_CASA[g as keyof typeof TEMPO_DE_CASA] ?? g],
+              [
+                "Tempo de casa",
+                r.recortes.tempoDeCasa,
+                (g: string) =>
+                  TEMPO_DE_CASA[g as keyof typeof TEMPO_DE_CASA] ?? g,
+              ],
               ["Departamento", r.recortes.departamento, (g: string) => g],
             ] as const
           ).map(([titulo, linhas, rotulo]) => (
@@ -446,7 +561,9 @@ function Analises({ r }: { readonly r: Resultados }) {
                   <tr key={l.grupo}>
                     <th scope="row">{rotulo(l.grupo)}</th>
                     <td>{plural(l.avaliadas, "pessoa", "pessoas")}</td>
-                    <td className="avaliacao__numero">{l.visivel ? nota1(l.media) : "Oculto · menos de 3"}</td>
+                    <td className="avaliacao__numero">
+                      {l.visivel ? nota1(l.media) : "Oculto · menos de 3"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -458,7 +575,13 @@ function Analises({ r }: { readonly r: Resultados }) {
   );
 }
 
-function Andamento({ det, e180 }: { readonly det: AvaliacaoDetalhe; readonly e180: boolean }) {
+function Andamento({
+  det,
+  e180,
+}: {
+  readonly det: AvaliacaoDetalhe;
+  readonly e180: boolean;
+}) {
   return (
     <section className="pesquisas__cartao-secao" aria-label="Andamento">
       <h2 className="pesquisas__cartao-secao-titulo">Andamento</h2>
@@ -484,16 +607,26 @@ function Andamento({ det, e180 }: { readonly det: AvaliacaoDetalhe; readonly e18
               {t.pessoas.map((p) => (
                 <li key={p.id} className="avaliacao__pessoa">
                   <span>{p.nome}</span>
-                  <StatusBadge variant={p.gestorRespondeu ? "success" : "neutral"}>
+                  <StatusBadge
+                    variant={p.gestorRespondeu ? "success" : "neutral"}
+                  >
                     {p.gestorRespondeu ? "Gestor avaliou" : "Gestor pendente"}
                   </StatusBadge>
                   {e180 ? (
                     p.autoavaliacao ? (
-                      <StatusBadge variant={p.autoavaliacao.respondeu ? "success" : "neutral"}>
-                        {p.autoavaliacao.respondeu ? "Autoavaliação feita" : "Autoavaliação pendente"}
+                      <StatusBadge
+                        variant={
+                          p.autoavaliacao.respondeu ? "success" : "neutral"
+                        }
+                      >
+                        {p.autoavaliacao.respondeu
+                          ? "Autoavaliação feita"
+                          : "Autoavaliação pendente"}
                       </StatusBadge>
                     ) : (
-                      <span className="pesquisas__suave">Sem autoavaliação (sem CPF)</span>
+                      <span className="pesquisas__suave">
+                        Sem autoavaliação (sem CPF)
+                      </span>
                     )
                   ) : null}
                 </li>
