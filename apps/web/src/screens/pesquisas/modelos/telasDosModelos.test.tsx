@@ -646,6 +646,15 @@ describe("resultados da saúde financeira", () => {
     ).toBeInTheDocument();
   });
 
+  it("a Visão geral da aba geral leva às Análises", () => {
+    const ir = vi.fn();
+    render(<>{visaoGeralDoModelo(SAUDE_FIN, GERAL_ISFB, ir)}</>);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver análises do time ›" }),
+    );
+    expect(ir).toHaveBeenCalledWith("analises");
+  });
+
   it("análises: sinais acumulados, crédito × reserva e abertura a apoio", async () => {
     const resultadosDaPesquisa = vi.fn(() =>
       Promise.resolve({ ...GERAL_ISFB, respostas: 3 }),

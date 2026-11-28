@@ -86,6 +86,8 @@ export { ResultadosProprios, ehModeloComTelaPropria } from "./integracao";
 export function visaoGeralDoModelo(
   detalhe: PesquisaDetalhe,
   geral: ResultadosPesquisa,
+  /** Troca a aba dos resultados (atalhos da Visão geral). */
+  onIrPara?: (aba: "analises") => void,
 ): ReactNode | null {
   const r = geral.modelo;
   if (!r) return null;
@@ -99,7 +101,12 @@ export function visaoGeralDoModelo(
     case "copsoq":
       return <VisaoGeralNr1DoRegistro detalhe={detalhe} geral={geral} />;
     case "isfb":
-      return <VisaoGeralIsfb resultado={painelDe(detalhe, geral)} />;
+      return (
+        <VisaoGeralIsfb
+          resultado={painelDe(detalhe, geral)}
+          {...(onIrPara ? { onIrPara } : {})}
+        />
+      );
     case "enps":
       return <VisaoGeralEnps detalhe={detalhe} geral={geral} r={r} />;
     default:

@@ -641,7 +641,7 @@ function ResultadosInterno({
               </div>
             </section>
           ) : (
-            (visaoGeralDoModelo(detalhe, geral) ?? (
+            (visaoGeralDoModelo(detalhe, geral, setAba) ?? (
               <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
             ))
           )
