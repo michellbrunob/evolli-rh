@@ -399,8 +399,15 @@ describe("T216 — onboarding com o catálogo da galeria (tipos de 4 pontos e ch
 
 describe("T216 — mínimo de 3 por rodada (provas extras)", () => {
   it("com 2 respostas a rodada fica oculta e não entra na comparação", () => {
-    const tres = resultadoDaRodada(30, SECOES, [resp({ q1: 4 }), resp({ q1: 4 }), resp({ q1: 4 })]);
-    const duas = resultadoDaRodada(60, SECOES, [resp({ q1: 1 }), resp({ q1: 1 })]);
+    const tres = resultadoDaRodada(30, SECOES, [
+      resp({ q1: 4 }),
+      resp({ q1: 4 }),
+      resp({ q1: 4 }),
+    ]);
+    const duas = resultadoDaRodada(60, SECOES, [
+      resp({ q1: 1 }),
+      resp({ q1: 1 }),
+    ]);
     expect(duas.visivel).toBe(false);
     expect(duas.intencao).toBeNull();
     expect(compararRodadas(tres, duas)).toBeNull();

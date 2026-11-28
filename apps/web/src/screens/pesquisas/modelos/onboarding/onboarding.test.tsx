@@ -699,9 +699,15 @@ describe("T216 — resultados do onboarding", () => {
 describe("T216 — anônima sem lembrete (provas extras)", () => {
   it("o que vai para a API na anônima nunca leva lembrete, em nenhum modo", () => {
     for (const modo of ["agora", "agendar", "automatizar"] as const) {
-      expect(configParaEnviar({ ...CONFIG_PADRAO, modo, lembreteDias: 5 }, "anonima").lembreteDias).toBeNull();
+      expect(
+        configParaEnviar({ ...CONFIG_PADRAO, modo, lembreteDias: 5 }, "anonima")
+          .lembreteDias,
+      ).toBeNull();
     }
-    expect(configParaEnviar({ ...CONFIG_PADRAO, lembreteDias: 5 }, "confidencial").lembreteDias).toBe(5);
+    expect(
+      configParaEnviar({ ...CONFIG_PADRAO, lembreteDias: 5 }, "confidencial")
+        .lembreteDias,
+    ).toBe(5);
   });
 
   it("o assistente grava a anônima sem lembrete", async () => {

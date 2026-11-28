@@ -764,40 +764,41 @@ type TipoPergunta = /* … */ | "escolha_forcada"; // só no modelo `disc`
 interface Opcao { id: string; texto: string; fator?: "D" | "I" | "S" | "C" } // `fator` só nos blocos
 // Bloco: config = { opcoes: 4 frases, cada fator uma vez (texto até 200) }; resposta = { opcao: id }.
 // POST/PUT /pesquisas com modelo `disc`: metodologia fixa do registro (`modelos/indice.ts`,
-//   `ESTRUTURA_DISC`): os 28 blocos `chave` `disc_01`…`disc_28`, uma vez cada, obrigatórios
-//   (senão 422 `secoes`/`estrutura_do_modelo`). Bloco inválido: 422 `<id>`/`invalido`.
+// `ESTRUTURA_DISC`): os 28 blocos `chave` `disc_01`…`disc_28`, uma vez cada, obrigatórios
+// (senão 422 `secoes`/`estrutura_do_modelo`). Bloco inválido: 422 `<id>`/`invalido`.
 // Outro modelo com bloco: 422 `<id>`/`nao_se_aplica`. Os resultados comuns contam as frases (`opcoes`).
 
-// GET /pesquisas/:id/perfil-comportamental?campo=&grupoId=   (leitura de pesquisa; outro modelo: 422 `modelo`)
+// GET /pesquisas/:id/perfil-comportamental?campo=&grupoId= (leitura de pesquisa; outro modelo: 422 `modelo`)
 type Pontos = Record<"D" | "I" | "S" | "C", number>;
 interface PerfilDisc {
-  pontos: Pontos; total: number; percentuais: Pontos; predominante: "D" | "I" | "S" | "C";
-  classe: { tipo: "mono" | "bi" | "tri"; fatores: string[]; codigo: string;
-            intensidade: "puro" | "acentuado" | "moderado" | "equilibrado" };
-  posicao: { x: number; y: number; area: number };
+pontos: Pontos; total: number; percentuais: Pontos; predominante: "D" | "I" | "S" | "C";
+classe: { tipo: "mono" | "bi" | "tri"; fatores: string[]; codigo: string;
+intensidade: "puro" | "acentuado" | "moderado" | "equilibrado" };
+posicao: { x: number; y: number; area: number };
 }
 interface ResultadoDisc {
-  pesquisaId: string; respostas: number; recortes: CampoGrupo[];
-  grupos: Partial<Record<CampoGrupo, DepartamentoDoResultado[]>>;
-  filtro: { campo: CampoGrupo | null; grupoId: string | null; respostas: number; visivel: boolean };
-  perfil: PerfilDisc | null;            // o time; null sem perfis ou com o recorte oculto
-  totalDePessoas: number; porPredominante: Pontos;
-  intensidades: Record<"puro" | "acentuado" | "moderado" | "equilibrado", number>;
-  areas: { area: number; pessoas: number }[];           // da mais cheia para a mais vazia
-  diversidade: { score: number; faixa: "pouco_diverso" | "moderado" | "equilibrado" | "altamente_diverso";
-                 ausentes: string[] };
-  lacunas: string[];
-  compatibilidade: { matriz: { a; b; relacao: "sinergia" | "neutro" | "atrito";
-                               tipo: "mesma_linguagem" | "complementar" | "pede_atencao"; pares: number }[];
-                     totalDePares: number; porTipo: Record<tipo, { pares: number; percentual: number }>;
-                     maiorAtencao: { a; b; pares: number } | null };
-  pontos: { x: number; y: number; area: number; fator: string }[]; // ordenados pela posição, sem a pessoa
-  pessoas: { respostaId: string; numero: number; nome: string | null; departamento: string | null;
-             respondidaEm: string; perfil: PerfilDisc }[];
+pesquisaId: string; respostas: number; recortes: CampoGrupo[];
+grupos: Partial<Record<CampoGrupo, DepartamentoDoResultado[]>>;
+filtro: { campo: CampoGrupo | null; grupoId: string | null; respostas: number; visivel: boolean };
+perfil: PerfilDisc | null; // o time; null sem perfis ou com o recorte oculto
+totalDePessoas: number; porPredominante: Pontos;
+intensidades: Record<"puro" | "acentuado" | "moderado" | "equilibrado", number>;
+areas: { area: number; pessoas: number }[]; // da mais cheia para a mais vazia
+diversidade: { score: number; faixa: "pouco_diverso" | "moderado" | "equilibrado" | "altamente_diverso";
+ausentes: string[] };
+lacunas: string[];
+compatibilidade: { matriz: { a; b; relacao: "sinergia" | "neutro" | "atrito";
+tipo: "mesma_linguagem" | "complementar" | "pede_atencao"; pares: number }[];
+totalDePares: number; porTipo: Record<tipo, { pares: number; percentual: number }>;
+maiorAtencao: { a; b; pares: number } | null };
+pontos: { x: number; y: number; area: number; fator: string }[]; // ordenados pela posição, sem a pessoa
+pessoas: { respostaId: string; numero: number; nome: string | null; departamento: string | null;
+respondidaEm: string; perfil: PerfilDisc }[];
 }
 // Recorte e mínimo como nos resultados (na confidencial, a visão geral também exige o mínimo).
 // `pessoas`: só RH e DP, na identificada (com o nome) e na anônima (numeradas); vazio na confidencial
 // e para o master. Com pessoas, a leitura é auditada (`pesquisas_respostas_consultadas`).
+
 ```
 
 Tela: os blocos entram no catálogo (`modelos/disc/catalogo.ts`, `secoes`); as abas de resultado e o
@@ -893,7 +894,8 @@ papéis pela `chave` do item (`q12`…`q17`) e conta no índice os tipos `concor
 (`modelos/onboarding/catalogo.ts`) e as telas próprias (`modelos/{avaliacao,onboarding}/`) entram
 por `modelos/resultados.tsx` (resultados inteiros, no lugar das abas) e pela rota
 `#/pesquisas/nova/<modelo>` (assistente próprio, `modelos/integracao.tsx`).
-```
+
+````
 
 ## Modelos com metodologia própria: Riscos psicossociais (NR-1) e Saúde financeira (27/11/2026)
 
@@ -963,7 +965,7 @@ interface AcompanhamentoNr1Entrada {
 // Resposta: as 7 etapas (`concluida`, `automatica`, `concluidaEm`), `concluidas`, `proxima` e
 // `revisarEm` (AAAA-MM, 1 ano depois da publicação). "mapear" conclui sozinha (anônima: 1ª resposta;
 // demais: todos os convidados); "plano" com a 1ª medida; concluir as outras exige item ou evidência.
-```
+````
 
 **Telas:** NR-1 com Visão geral (panorama, níveis, matriz, ranking, saúde, comportamentos ofensivos,
 perfil por domínio), Por grupo (um resultado por grupo visível: pressão, recursos e destaque), Plano de
