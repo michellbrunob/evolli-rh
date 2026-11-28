@@ -116,7 +116,16 @@ export function visaoGeralDoModelo(
         />
       );
     case "clima":
-      return <ResultadoClimaVisao detalhe={detalhe} geral={geral} r={r} />;
+      return (
+        <ResultadoClimaVisao
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaAnalises: () => onTrocarAba("analises") }
+            : {})}
+        />
+      );
     case "tad":
       return <ResultadoTadVisao r={r} />;
     case "copsoq":

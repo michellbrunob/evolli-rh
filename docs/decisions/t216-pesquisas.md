@@ -1511,3 +1511,8 @@ Regras:
   03 complementares, 04 eNPS por departamento (vazio explicado), 05 evolução, 06 comentários em 2
   colunas e metodologia. `carregarRelatorio` usa `GET /pesquisas/:id/evolucao` quando não há recorte
   (`montarRelatorio` ganhou a entrada `evolucao`).
+- **Visão geral do Clima:** medidor e "Todas as respostas" à esquerda, anéis à direita; "Puxa para
+  cima"/"Pede atenção" com o que a dimensão representa, empates juntos ("Todas as dimensões" quando
+  todas empatam), "abaixo da faixa Boa" e a afirmação mais baixa (`leituraDasDimensoes`); Destaques com
+  "Ver todas as afirmações"; "Resultado por afirmação" abre com o menor favorável primeiro; abertas no
+  bloco comum, com "Ver temas em Análises".

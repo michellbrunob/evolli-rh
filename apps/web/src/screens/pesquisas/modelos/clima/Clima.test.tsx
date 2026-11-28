@@ -36,6 +36,7 @@ import {
   visaoIndividualDoModelo,
 } from "../resultados";
 import {
+  DIMENSOES_CLIMA,
   chaveNova,
   dimensaoDaChave,
   nomeDaPesquisaDeClima,
@@ -367,14 +368,74 @@ describe("T216 — Clima: Visão geral", () => {
     expect(itens[0]).toHaveTextContent("1º lugar");
     expect(itens[0]).toHaveTextContent("Atenção");
     expect(itens[4]).toHaveTextContent("5º lugar");
-    expect(screen.getByText("Puxa para cima").parentElement).toHaveTextContent(
-      "Camaradagem · 50% favorável",
+    const cima = screen.getByText("Puxa para cima").parentElement!;
+    expect(cima).toHaveTextContent("Camaradagem · 50% favorável");
+    // O que a dimensão representa.
+    expect(cima).toHaveTextContent(DIMENSOES_CLIMA[4]!.texto);
+    // Empate no menor valor: as duas dimensões, abaixo da faixa Boa, e a
+    // afirmação mais baixa delas.
+    const atencao = screen.getByText("Pede atenção").parentElement!;
+    expect(atencao).toHaveTextContent(
+      "Credibilidade e Orgulho · 44% favorável · abaixo da faixa Boa",
     );
-    expect(screen.getByText("Pede atenção").parentElement).toHaveTextContent(
-      "Orgulho · 44% favorável",
+    expect(atencao).toHaveTextContent("Empatam no menor resultado.");
+    expect(atencao).toHaveTextContent(
+      `Afirmação mais baixa: “${perguntasEmOrdem(d.secoes)[0]!.texto}” (33%)`,
     );
     fireEvent.click(screen.getByRole("button", { name: "Ordem do modelo" }));
     expect(nomes()).toEqual(DIMS.map((x) => x[1]));
+  });
+
+  it("todas as dimensões empatadas: nenhuma se destaca e todas pedem atenção", () => {
+    const base = resultadoReal(d);
+    const empatado = geralDo(d, {
+      modelo: {
+        ...base,
+        dimensoes: base.dimensoes.map((x) => ({
+          ...x,
+          favoravel: 47,
+          faixa: "critica" as const,
+        })),
+      },
+    });
+    render(<>{visaoGeralDoModelo(d, empatado)}</>);
+    expect(screen.getByText("Puxa para cima").parentElement).toHaveTextContent(
+      "Nenhuma dimensão se destaca: todas têm 47% favorável.",
+    );
+    expect(screen.getByText("Pede atenção").parentElement).toHaveTextContent(
+      "Todas as dimensões · 47% favorável · abaixo da faixa Boa",
+    );
+  });
+
+  it("layout: o medidor e todas as respostas à esquerda, os anéis à direita", () => {
+    render(<>{visaoGeralDoModelo(d, geral)}</>);
+    const topo = document.querySelector(".clima-topo")!;
+    const [esquerda, direita] = [...topo.children];
+    expect(
+      within(esquerda as HTMLElement).getByRole("img", {
+        name: "Índice do time: 47%, Crítica",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(esquerda as HTMLElement).getByRole("region", {
+        name: "Todas as respostas",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(direita as HTMLElement).getByRole("list", { name: "Dimensões" }),
+    ).toBeInTheDocument();
+  });
+
+  it("destaques: 'Ver todas as afirmações' leva ao resultado por afirmação, com todas", () => {
+    render(<>{visaoGeralDoModelo(d, geral)}</>);
+    fireEvent.click(screen.getByRole("button", { name: /^Orgulho/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todas as afirmações" }),
+    );
+    expect(screen.getByText("60 afirmações")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Resultado por afirmação" }),
+    ).toHaveFocus();
   });
 
   it("destaques: as 3 mais e as 3 menos favoráveis", () => {
@@ -395,13 +456,21 @@ describe("T216 — Clima: Visão geral", () => {
     expect(menos[0]).toHaveTextContent("33%");
   });
 
-  it("resultado por afirmação: filtro por dimensão, menor primeiro e 8 por página", () => {
+  it("resultado por afirmação: filtro por dimensão, menor primeiro (já ligado) e 8 por página", () => {
     render(<>{visaoGeralDoModelo(d, geral)}</>);
     const linhas = () =>
       within(screen.getByRole("list", { name: "Afirmações" })).getAllByRole(
         "listitem",
       );
     expect(linhas()).toHaveLength(8);
+    // Abre com o menor favorável primeiro.
+    expect(
+      screen.getByRole("checkbox", { name: "Menor favorável primeiro" }),
+    ).toBeChecked();
+    expect(linhas()[0]).toHaveTextContent("Crítica");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Menor favorável primeiro" }),
+    );
     expect(screen.getByRole("button", { name: /Todas/ })).toHaveTextContent(
       "60",
     );
@@ -416,11 +485,36 @@ describe("T216 — Clima: Visão geral", () => {
     expect(linhas()[0]).toHaveTextContent("Crítica");
   });
 
-  it("respostas abertas com a contagem", () => {
-    render(<>{visaoGeralDoModelo(d, geral)}</>);
-    const abertas = screen.getByRole("heading", { name: /Respostas abertas/ });
-    expect(abertas).toHaveTextContent("6");
-    expect(screen.getByText("“texto 1A”")).toBeInTheDocument();
+  it("respostas abertas: um bloco por pergunta com a contagem e o atalho para Análises", () => {
+    const onTrocarAba = vi.fn();
+    render(<>{visaoGeralDoModelo(d, geral, onTrocarAba)}</>);
+    const abertas = screen.getByRole("region", { name: "Respostas abertas" });
+    const blocos = within(abertas).getAllByRole("group");
+    expect(blocos).toHaveLength(2);
+    expect(blocos[0]).toHaveTextContent("3 respostas");
+    // Fora da identificada: a ordem do servidor (alfabética).
+    expect(
+      within(blocos[0]!)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual(["texto 1A", "texto 1B", "texto 1C"]);
+    fireEvent.click(
+      within(abertas).getByRole("button", { name: "Ver temas em Análises" }),
+    );
+    expect(onTrocarAba).toHaveBeenCalledWith("analises");
+  });
+
+  it("respostas abertas na identificada: as mais recentes primeiro", () => {
+    const ident = detalheDoClima({ identificacao: "identificada" });
+    render(<>{visaoGeralDoModelo(ident, geralDo(ident))}</>);
+    const bloco = within(
+      screen.getByRole("region", { name: "Respostas abertas" }),
+    ).getAllByRole("group")[0]!;
+    expect(
+      within(bloco)
+        .getAllByRole("listitem")
+        .map((l) => l.querySelector("blockquote")!.textContent),
+    ).toEqual(["texto 1C", "texto 1B", "texto 1A"]);
   });
 });
 
