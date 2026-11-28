@@ -8,7 +8,7 @@ import { DETALHE } from "../../dadosDeTeste";
 import { secoesDoModelo } from "../../modelosDePesquisa";
 import { AREAS, PARES } from "./areas";
 import { BLOCOS_DISC } from "./blocos";
-import { MODELO_DISC } from "./definicao";
+import { PERFIL_COMPORTAMENTAL as MODELO_DISC } from "./catalogo";
 import { planilhaDisc } from "./exportarDisc";
 import { FATOR, FATORES } from "./fatores";
 import { perfilDasEscolhas } from "./perfilLocal";
@@ -48,6 +48,12 @@ describe("T216 — DISC: catálogo", () => {
       expect(p.config).not.toHaveProperty("outro");
     }
     expect(perguntas[0]!.rotulo).toBe(BLOCOS_DISC[0]!.tema);
+    expect(perguntas.map((p) => p.chave)).toEqual(
+      Array.from(
+        { length: 28 },
+        (_, i) => `disc_${String(i + 1).padStart(2, "0")}`,
+      ),
+    );
     expect(MODELO_DISC).toMatchObject({
       id: "disc",
       modelo: "disc",

@@ -1,4 +1,5 @@
 import { conferirSecoes } from "../../estrutura-pesquisa";
+import { errosDaEstruturaDoModelo } from "../indice";
 import { montarResultados } from "../../calculo-resultados";
 import type { Pergunta } from "../../pesquisas.types";
 import { conferirRespostas } from "../../validacao-respostas";
@@ -34,7 +35,9 @@ const secoesDe = (perguntas: unknown[]) => [
 ];
 
 const vinteOito = (): Record<string, unknown>[] =>
-  Array.from({ length: 28 }, (_, i) => bloco(`b${i + 1}`));
+  Array.from({ length: 28 }, (_, i) =>
+    bloco(`b${i + 1}`, { chave: `disc_${String(i + 1).padStart(2, "0")}` }),
+  );
 
 describe("T216 — DISC: configuração do bloco", () => {
   it("aceita 4 frases, uma por fator; apara o texto e descarta o resto", () => {
@@ -203,43 +206,45 @@ describe("T216 — DISC: resposta do bloco", () => {
   });
 });
 
-describe("T216 — DISC: estrutura do modelo", () => {
+describe("T216 — DISC: estrutura do modelo (metodologia fixa)", () => {
   const conferida = (perguntas: unknown[]) =>
     conferirSecoes(secoesDe(perguntas)).secoes;
+  const ERRO = [{ campo: "secoes", motivo: "estrutura_do_modelo" }];
 
-  it("disc: exatamente 28 blocos obrigatórios, sem condição", () => {
-    expect(conferirEstruturaDisc("disc", conferida(vinteOito()))).toEqual([]);
-    expect(
-      conferirEstruturaDisc("disc", conferida(vinteOito().slice(1))),
-    ).toEqual([{ campo: "secoes", motivo: "limite" }]);
-    expect(
-      conferirEstruturaDisc("disc", conferida([...vinteOito(), bloco("b29")])),
-    ).toEqual([{ campo: "secoes", motivo: "limite" }]);
-  });
-
-  it("disc: pergunta de outro tipo ou opcional é inválida", () => {
-    const perguntas = vinteOito();
-    perguntas[3] = bloco("b4", { obrigatoria: false });
-    perguntas[27] = {
-      ...bloco("b28"),
-      tipo: "texto_curto",
-      config: {},
-    };
-    expect(conferirEstruturaDisc("disc", conferida(perguntas))).toEqual([
-      { campo: "b4", motivo: "invalido" },
-      { campo: "b28", motivo: "invalido" },
-    ]);
-  });
-
-  it("disc: bloco com condição é inválido", () => {
+  it("disc: os 28 blocos, uma vez cada, valem", () => {
     const secoes = conferida(vinteOito());
-    secoes[0]!.perguntas[5] = {
-      ...secoes[0]!.perguntas[5]!,
-      condicao: { perguntaId: "b1", opcaoId: "b1-D" },
-    };
-    expect(conferirEstruturaDisc("disc", secoes)).toEqual([
-      { campo: "b6", motivo: "invalido" },
-    ]);
+    expect(secoes[0]!.perguntas[27]!.chave).toBe("disc_28");
+    expect(errosDaEstruturaDoModelo("disc", secoes)).toEqual([]);
+    expect(conferirEstruturaDisc("disc", secoes)).toEqual([]);
+  });
+
+  it("disc: bloco a menos, a mais ou repetido é recusado", () => {
+    expect(
+      errosDaEstruturaDoModelo("disc", conferida(vinteOito().slice(1))),
+    ).toEqual(ERRO);
+    expect(
+      errosDaEstruturaDoModelo(
+        "disc",
+        conferida([...vinteOito(), bloco("b29", { chave: "disc_29" })]),
+      ),
+    ).toEqual(ERRO);
+    const repetido = vinteOito();
+    repetido[1] = { ...repetido[1]!, chave: "disc_01" };
+    expect(errosDaEstruturaDoModelo("disc", conferida(repetido))).toEqual(ERRO);
+  });
+
+  it("disc: pergunta de outro tipo ou opcional é recusada", () => {
+    const opcional = vinteOito();
+    opcional[3] = { ...opcional[3]!, obrigatoria: false };
+    expect(errosDaEstruturaDoModelo("disc", conferida(opcional))).toEqual(ERRO);
+    const outroTipo = vinteOito();
+    outroTipo[27] = { ...outroTipo[27]!, tipo: "texto_curto", config: {} };
+    expect(errosDaEstruturaDoModelo("disc", conferida(outroTipo))).toEqual(
+      ERRO,
+    );
+    const semChave = vinteOito();
+    semChave[0] = { ...semChave[0]!, chave: null };
+    expect(errosDaEstruturaDoModelo("disc", conferida(semChave))).toEqual(ERRO);
   });
 
   it("outros modelos não aceitam o bloco", () => {

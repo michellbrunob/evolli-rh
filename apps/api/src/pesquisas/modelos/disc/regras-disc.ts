@@ -13,7 +13,6 @@ import {
   FATORES,
   FRASES_POR_BLOCO,
   type Fator,
-  NUMERO_DE_BLOCOS,
   TIPO_DO_BLOCO,
 } from "./definicao-disc";
 
@@ -74,31 +73,17 @@ export function conferirValorDoBloco(
 }
 
 /**
- * A estrutura conforme o modelo. No `disc`: só blocos, exatamente 28,
- * todos obrigatórios e sem condição. Nos demais modelos, o bloco não
- * existe (`nao_se_aplica` na pergunta).
+ * O bloco só existe no modelo `disc` (nos demais, `nao_se_aplica` na
+ * pergunta). Os 28 blocos do `disc` são a metodologia fixa do registro
+ * (`ESTRUTURA_DISC` em `modelos/indice.ts`).
  */
 export function conferirEstruturaDisc(
   modelo: Modelo,
   secoes: readonly Secao[],
 ): ErroDeCampo[] {
-  const perguntas = secoes.flatMap((s) => s.perguntas);
-  const erros: ErroDeCampo[] = [];
-  if (modelo !== "disc") {
-    for (const p of perguntas) {
-      if (p.tipo === TIPO_DO_BLOCO) {
-        erros.push({ campo: campoDaPergunta(p.id), motivo: "nao_se_aplica" });
-      }
-    }
-    return erros;
-  }
-  for (const p of perguntas) {
-    if (p.tipo !== TIPO_DO_BLOCO || !p.obrigatoria || p.condicao !== null) {
-      erros.push({ campo: campoDaPergunta(p.id), motivo: "invalido" });
-    }
-  }
-  if (perguntas.length !== NUMERO_DE_BLOCOS) {
-    erros.unshift({ campo: "secoes", motivo: "limite" });
-  }
-  return erros;
+  if (modelo === "disc") return [];
+  return secoes
+    .flatMap((s) => s.perguntas)
+    .filter((p) => p.tipo === TIPO_DO_BLOCO)
+    .map((p) => ({ campo: campoDaPergunta(p.id), motivo: "nao_se_aplica" }));
 }

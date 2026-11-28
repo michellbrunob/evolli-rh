@@ -311,8 +311,15 @@ export function gruposDaGaveta(m: ModeloDaGaleria): GrupoDaGaveta[] {
   const todas = perguntasEmOrdem(secoes).filter(
     (p) => !ehComentarioDeDimensao(p),
   );
+  // Bloco do DISC: as 4 frases (o enunciado é o mesmo em todos).
   const comTexto = (ps: typeof todas) =>
-    ps.map((p) => ({ id: p.id, texto: textoParaOPainel(p.texto) }));
+    ps.map((p) => ({
+      id: p.id,
+      texto:
+        p.tipo === "escolha_forcada"
+          ? (p.config.opcoes ?? []).map((o) => o.texto).join(" · ")
+          : textoParaOPainel(p.texto),
+    }));
   if (m.agrupamento) {
     return m.agrupamento.map((g) => {
       const ps = todas.filter((p) => p.chave && g.chaves.includes(p.chave));

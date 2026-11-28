@@ -22,7 +22,6 @@ import {
   totalDePerguntas,
 } from "./modelosDePesquisa";
 import { minutosEstimados } from "./PreVisualizacao";
-import { SobreODisc } from "./modelos/disc/SobreODisc";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import { PaginaDoModelo } from "./modelos/PaginaDoModelo";
 
@@ -61,18 +60,7 @@ const EXEMPLO = [0, 0, 0, 1, 0, 1, 2, 5, 6, 5].map((q, i) => ({
   quantidade: q,
 }));
 
-export function SobreOModelo(props: {
-  readonly id: string;
-  readonly onVoltar: () => void;
-  readonly onUsar: (id: string) => void;
-}) {
-  // Perfil comportamental (DISC): página própria.
-  if (props.id === "disc")
-    return <SobreODisc onVoltar={props.onVoltar} onUsar={props.onUsar} />;
-  return <SobreOModeloComum {...props} />;
-}
-
-function SobreOModeloComum({
+export function SobreOModelo({
   id,
   onVoltar,
   onUsar,

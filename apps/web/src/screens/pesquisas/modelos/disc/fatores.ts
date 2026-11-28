@@ -49,7 +49,7 @@ export interface ConteudoDoFator {
 export const FATOR: Readonly<Record<FatorDisc, ConteudoDoFator>> = {
   D: {
     nome: "Dominância",
-    cor: "--status-danger-ink",
+    cor: "--faixa-critico",
     foco: "Foco em resultados e desafios",
     palavras: ["Objetividade", "Decisão", "Resultado"],
     comportamentos: [
@@ -122,7 +122,7 @@ export const FATOR: Readonly<Record<FatorDisc, ConteudoDoFator>> = {
   },
   I: {
     nome: "Influência",
-    cor: "--turno-laranja",
+    cor: "--faixa-atencao",
     foco: "Foco em pessoas e entusiasmo",
     palavras: ["Comunicação", "Entusiasmo", "Persuasão"],
     comportamentos: [
@@ -195,7 +195,7 @@ export const FATOR: Readonly<Record<FatorDisc, ConteudoDoFator>> = {
   },
   S: {
     nome: "Estabilidade",
-    cor: "--turno-verde",
+    cor: "--faixa-forte",
     foco: "Foco em estabilidade e cooperação",
     palavras: ["Constância", "Cooperação", "Calma"],
     comportamentos: [
@@ -268,7 +268,7 @@ export const FATOR: Readonly<Record<FatorDisc, ConteudoDoFator>> = {
   },
   C: {
     nome: "Conformidade",
-    cor: "--turno-azul",
+    cor: "--grafico-1",
     foco: "Foco em qualidade e precisão",
     palavras: ["Precisão", "Análise", "Qualidade"],
     comportamentos: [

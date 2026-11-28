@@ -723,8 +723,9 @@ mexer nas rotas compartilhadas.
 type TipoPergunta = /* … */ | "escolha_forcada"; // só no modelo `disc`
 interface Opcao { id: string; texto: string; fator?: "D" | "I" | "S" | "C" } // `fator` só nos blocos
 // Bloco: config = { opcoes: 4 frases, cada fator uma vez (texto até 200) }; resposta = { opcao: id }.
-// POST/PUT /pesquisas com modelo `disc`: exatamente 28 blocos obrigatórios, sem condição
-//   (422 `secoes`/`limite`; pergunta de outro tipo, opcional ou com condição: 422 `<id>`/`invalido`).
+// POST/PUT /pesquisas com modelo `disc`: metodologia fixa do registro (`modelos/indice.ts`,
+//   `ESTRUTURA_DISC`): os 28 blocos `chave` `disc_01`…`disc_28`, uma vez cada, obrigatórios
+//   (senão 422 `secoes`/`estrutura_do_modelo`). Bloco inválido: 422 `<id>`/`invalido`.
 // Outro modelo com bloco: 422 `<id>`/`nao_se_aplica`. Os resultados comuns contam as frases (`opcoes`).
 
 // GET /pesquisas/:id/perfil-comportamental?campo=&grupoId=   (leitura de pesquisa; outro modelo: 422 `modelo`)
@@ -759,6 +760,7 @@ interface ResultadoDisc {
 // e para o master. Com pessoas, a leitura é auditada (`pesquisas_respostas_consultadas`).
 ```
 
-Tela: registro do modelo em `apps/web/src/screens/pesquisas/modelos/disc/definicao.ts` (`MODELO_DISC`,
-para a galeria incluir em `MODELOS_DE_PESQUISA`); resultados, perfil individual, planilha (7 abas) e
-relatório em PDF em `modelos/disc/`.
+Tela: os blocos entram no catálogo (`modelos/disc/catalogo.ts`, `secoes`); as abas de resultado e o
+perfil individual próprios são registrados em `modelos/resultados.tsx` (`abasDoModelo`,
+`paginaIndividualDoModelo`), porque o resultado vem da rota própria; planilha (7 abas) e relatório em
+PDF em `modelos/disc/`.

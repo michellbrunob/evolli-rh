@@ -70,7 +70,7 @@ import {
 } from "./acoesDaPesquisa";
 import { GarantirAvisos, useAvisar } from "./avisos";
 import { modeloDaGaleria } from "./modelosDePesquisa";
-import { visaoGeralDoModelo } from "./modelos/resultados";
+import { abasDoModelo, visaoGeralDoModelo } from "./modelos/resultados";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
@@ -78,7 +78,6 @@ import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { carregarRelatorio, respostasCompletas } from "./carregarRelatorio";
 import { nomeDaExportacao, planilhaDosResultados } from "./exportarResultados";
 import { enderecoDaRota } from "./rotasDePesquisas";
-import { ResultadosDisc } from "./modelos/disc/ResultadosDisc";
 import { planilhaDisc } from "./modelos/disc/exportarDisc";
 import { perfilComportamental } from "./modelos/disc/tiposDisc";
 import {
@@ -336,6 +335,17 @@ function ResultadosInterno({
 
   const anonima = detalhe.identificacao === "anonima";
   const semRespostas = detalhe.respostas === 0;
+  // Modelo com abas próprias (DISC); a Visão geral sem respostas é a comum.
+  const abasProprias =
+    aba === "geral" && semRespostas
+      ? null
+      : abasDoModelo({
+          detalhe,
+          aba,
+          carregarPerfil: servico.perfilComportamental,
+          onAbrirResposta: (id) => onAbrirResposta?.(id),
+          onIrParaAnalises: () => setAba("analises"),
+        });
   const linkVivo =
     detalhe.link !== null &&
     (detalhe.status === "ativa" || detalhe.status === "pausada");
@@ -550,16 +560,8 @@ function ResultadosInterno({
       </div>
 
       <div role="tabpanel" className="pesquisas__resultados">
-        {detalhe.modelo === "disc" && !(aba === "geral" && semRespostas) ? (
-          <ResultadosDisc
-            detalhe={detalhe}
-            aba={aba}
-            {...(servico.perfilComportamental
-              ? { carregar: servico.perfilComportamental }
-              : {})}
-            onAbrirResposta={(id) => onAbrirResposta?.(id)}
-            onIrParaAnalises={() => setAba("analises")}
-          />
+        {abasProprias ? (
+          abasProprias
         ) : aba === "geral" ? (
           semRespostas ? (
             <section

@@ -13,6 +13,7 @@ import type { Modelo, Secao } from "../pesquisas.types";
 import { calcularClima } from "./clima/calculo";
 import { ESTRUTURA_CLIMA } from "./clima/definicao";
 import { conferirEstruturaFixa } from "./comum";
+import { ESTRUTURA_DISC } from "./disc/definicao-disc";
 import { calcularPulsoClima } from "./pulso_clima/calculo";
 import { ESTRUTURA_PULSO_CLIMA } from "./pulso_clima/definicao";
 import { calcularTad, individualDaTad } from "./tad/calculo";
@@ -41,6 +42,8 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     calcular: calcularTad,
     individual: individualDaTad,
   },
+  // O resultado do DISC tem rota própria (`/perfil-comportamental`).
+  disc: { modelo: "disc", estrutura: ESTRUTURA_DISC },
 };
 
 /** Metodologia fixa: os erros da estrutura (vazio quando confere). */

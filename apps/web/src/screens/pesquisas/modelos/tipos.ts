@@ -84,8 +84,7 @@ export interface PerguntaDoModelo {
    * fator de cada frase.
    */
   readonly opcoes?: readonly (
-    | string
-    | { readonly texto: string; readonly fator: FatorDisc }
+    string | { readonly texto: string; readonly fator: FatorDisc }
   )[];
   readonly config?: Omit<ConfigPergunta, "opcoes">;
   /** Só aparece para quem marcou a opção (índice, ou "sim"/"nao"). */

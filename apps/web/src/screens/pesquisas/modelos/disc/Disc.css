@@ -538,110 +538,6 @@
   gap: var(--space-sm);
 }
 
-/* Página "Sobre o modelo" */
-.disc-sobre__faixa {
-  display: grid;
-  gap: var(--space-lg);
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-  background: var(--surface-neutral);
-}
-
-.disc-sobre__sobretitulo {
-  margin: 0;
-  font-size: var(--text-caption);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-action);
-}
-
-.disc-sobre__itens {
-  display: grid;
-  gap: var(--space-sm);
-  margin: var(--space-sm) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.disc-sobre__itens li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-xs);
-}
-
-.disc-sobre__visto {
-  color: var(--color-action);
-  font-weight: 700;
-}
-
-.disc-sobre__janela {
-  display: grid;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  border: 1px solid var(--divisor-cor);
-  border-radius: var(--radius-md);
-  background: var(--surface-canvas);
-}
-
-.disc-sobre__bolinhas {
-  display: flex;
-  gap: var(--space-xxs);
-  align-items: center;
-  font-size: var(--text-caption);
-  color: var(--color-ink-muted);
-}
-
-.disc-sobre__bolinhas span[aria-hidden] {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--hairline);
-}
-
-.disc-sobre__colunas {
-  display: grid;
-  gap: var(--space-lg);
-  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
-  align-items: start;
-}
-
-.disc-sobre__ficha {
-  display: grid;
-  margin: 0;
-}
-
-.disc-sobre__ficha > div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  padding: var(--space-xs) 0;
-  border-top: 1px solid var(--divisor-cor);
-}
-
-.disc-sobre__ficha dt {
-  color: var(--color-ink-muted);
-}
-
-.disc-sobre__ficha dd {
-  margin: 0;
-  font-weight: 600;
-  text-align: right;
-}
-
-.disc-sobre__fator {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-sm);
-  padding: var(--space-md) 0;
-  border-top: 1px solid var(--divisor-cor);
-}
-
-.disc-sobre__fator p {
-  margin: 0;
-}
-
 /* Resultado público */
 .disc-publico {
   display: grid;
@@ -721,9 +617,7 @@
 }
 
 @media (max-width: 720px) {
-  .disc__mapa-colunas,
-  .disc-sobre__faixa,
-  .disc-sobre__colunas {
+  .disc__mapa-colunas {
     grid-template-columns: 1fr;
   }
 

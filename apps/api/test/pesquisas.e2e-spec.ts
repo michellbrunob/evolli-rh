@@ -2403,6 +2403,7 @@ describe("T216 — Pesquisas (e2e)", () => {
           descricao: null,
           perguntas: Array.from({ length: 28 }, (_, i) => ({
             id: `b${i + 1}`,
+            chave: `disc_${String(i + 1).padStart(2, "0")}`,
             tipo: "escolha_forcada",
             texto: "Qual frase combina mais com você?",
             rotulo: null,
@@ -2437,7 +2438,9 @@ describe("T216 — Pesquisas (e2e)", () => {
       const r1 = await post("/v1/pesquisas", rhA)
         .send(corpo({ modelo: "disc", secoes: faltando }))
         .expect(422);
-      expect(r1.body.erros).toEqual([{ campo: "secoes", motivo: "limite" }]);
+      expect(r1.body.erros).toEqual([
+        { campo: "secoes", motivo: "estrutura_do_modelo" },
+      ]);
 
       const fatorRepetido = blocosDisc();
       fatorRepetido[0]!.perguntas[0]!.config.opcoes[3]!.fator = "D";

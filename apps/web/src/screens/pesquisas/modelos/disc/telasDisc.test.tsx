@@ -16,27 +16,14 @@ import {
   ResponderPesquisa,
   montarPreviaPublica,
 } from "../../../publico/ResponderPesquisa";
+import { AssistenteDoModelo } from "../../AssistenteDoModelo";
 import { DETALHE, servicoFalso } from "../../dadosDeTeste";
 import { secoesDoModelo } from "../../modelosDePesquisa";
 import { BLOCOS_DISC } from "./blocos";
-import { MODELO_DISC } from "./definicao";
+import { PERFIL_COMPORTAMENTAL as MODELO_DISC } from "./catalogo";
 import { ResultadoIndividualDisc } from "./ResultadoIndividualDisc";
 import { ResultadosDisc } from "./ResultadosDisc";
 import { resultadoDeTeste } from "./resultadoDeTeste";
-import { SobreODisc } from "./SobreODisc";
-
-// O catálogo com o DISC (a galeria liga o modelo no registro comum).
-vi.mock("../../modelosDePesquisa", async (importar) => {
-  const real = await importar<typeof import("../../modelosDePesquisa")>();
-  const { MODELO_DISC: disc } = await import("./definicao");
-  return {
-    ...real,
-    modeloDaGaleria: (id: string) =>
-      id === "disc" ? disc : real.modeloDaGaleria(id),
-  };
-});
-
-const { AssistenteDoModelo } = await import("../../AssistenteDoModelo");
 
 const DETALHE_DISC = { ...DETALHE, modelo: "disc" as const };
 
@@ -522,33 +509,5 @@ describe("T216 — DISC: perfil individual", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Esta resposta não tem perfil para mostrar.",
     );
-  });
-});
-
-describe("T216 — DISC: sobre o modelo", () => {
-  it("os 4 fatores, a ficha e a gaveta com os 28 blocos", () => {
-    const usar = vi.fn();
-    render(<SobreODisc onVoltar={vi.fn()} onUsar={usar} />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Perfil comportamental (DISC)28 blocos",
-    );
-    const fatores = screen.getByRole("region", {
-      name: "Os 4 fatores do DISC",
-    });
-    for (const nome of [
-      "Dominância",
-      "Influência",
-      "Estabilidade",
-      "Conformidade",
-    ])
-      expect(within(fatores).getByText(nome)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Criar pesquisa →" }));
-    expect(usar).toHaveBeenCalledWith("disc");
-    fireEvent.click(screen.getByRole("button", { name: "Ver os 28 blocos" }));
-    const gaveta = screen.getByRole("dialog");
-    expect(within(gaveta).getByText("Bloco 28")).toBeInTheDocument();
-    expect(
-      within(gaveta).getByText(BLOCOS_DISC[27]!.frases[2]),
-    ).toBeInTheDocument();
   });
 });

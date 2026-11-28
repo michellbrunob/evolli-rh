@@ -13,6 +13,53 @@ import type {
 import { ResultadoClimaVisao } from "./clima/ResultadoClima";
 import { ResultadoPulsoClima } from "./pulso_clima/ResultadoPulsoClima";
 import { PainelTad, ResultadoTadVisao } from "./tad/ResultadoTad";
+import { ResultadoIndividualDisc } from "./disc/ResultadoIndividualDisc";
+import { ResultadosDisc, type AbaDisc } from "./disc/ResultadosDisc";
+import type { CarregarPerfil } from "./disc/tiposDisc";
+
+/**
+ * Modelos com tela própria em todas as abas (o resultado vem de uma rota
+ * própria, não de `ResultadosPesquisa.modelo`): Perfil comportamental
+ * (DISC). `null` quando o modelo usa as abas comuns.
+ */
+export function abasDoModelo(x: {
+  readonly detalhe: PesquisaDetalhe;
+  readonly aba: AbaDisc;
+  readonly carregarPerfil?: CarregarPerfil | undefined;
+  readonly onAbrirResposta: (respostaId: string) => void;
+  readonly onIrParaAnalises: () => void;
+}): ReactNode | null {
+  if (x.detalhe.modelo !== "disc") return null;
+  return (
+    <ResultadosDisc
+      detalhe={x.detalhe}
+      aba={x.aba}
+      {...(x.carregarPerfil ? { carregar: x.carregarPerfil } : {})}
+      onAbrirResposta={x.onAbrirResposta}
+      onIrParaAnalises={x.onIrParaAnalises}
+    />
+  );
+}
+
+/** A página do resultado individual própria do modelo (DISC), ou `null`. */
+export function paginaIndividualDoModelo(x: {
+  readonly pesquisa: PesquisaDetalhe;
+  readonly respostaId: string;
+  readonly carregarPerfil?: CarregarPerfil | undefined;
+  readonly onVoltar: () => void;
+  readonly onIr?: ((respostaId: string) => void) | undefined;
+}): ReactNode | null {
+  if (x.pesquisa.modelo !== "disc") return null;
+  return (
+    <ResultadoIndividualDisc
+      pesquisa={x.pesquisa}
+      respostaId={x.respostaId}
+      {...(x.carregarPerfil ? { carregar: x.carregarPerfil } : {})}
+      onVoltar={x.onVoltar}
+      onIr={x.onIr}
+    />
+  );
+}
 
 /** A Visão geral própria do modelo, ou `null` (usa a visão por pergunta). */
 export function visaoGeralDoModelo(

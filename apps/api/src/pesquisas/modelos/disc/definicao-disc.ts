@@ -8,6 +8,7 @@
  * limiares da classificação, as 13 áreas do mapa de talentos e a relação
  * entre os fatores na compatibilidade do time.
  */
+import type { EstruturaFixa } from "../tipos";
 
 export const FATORES = ["D", "I", "S", "C"] as const;
 export type Fator = (typeof FATORES)[number];
@@ -17,6 +18,24 @@ export const TIPO_DO_BLOCO = "escolha_forcada" as const;
 
 export const NUMERO_DE_BLOCOS = 28;
 export const FRASES_POR_BLOCO = 4;
+
+/** O item fixo de cada bloco (`Pergunta.chave`): `disc_01` a `disc_28`. */
+export const chaveDoBloco = (indice: number) =>
+  `disc_${String(indice + 1).padStart(2, "0")}`;
+
+/**
+ * Metodologia fixa (registro `modelos/indice.ts`): os 28 blocos, uma vez
+ * cada, obrigatórios. A configuração de cada bloco (4 frases, um fator em
+ * cada) já é conferida pelo tipo `escolha_forcada`.
+ */
+export const ESTRUTURA_DISC: EstruturaFixa = {
+  itens: Array.from({ length: NUMERO_DE_BLOCOS }, (_, i) => ({
+    chave: chaveDoBloco(i),
+    tipo: TIPO_DO_BLOCO,
+    obrigatoria: true,
+  })),
+  opcionais: [],
+};
 
 /** Limiares da classificação do perfil (sobre os percentuais ordenados). */
 export const LIMIARES = {
