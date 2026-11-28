@@ -487,39 +487,42 @@ function ResultadosInterno({
               Editar
             </Button>
           ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="evolli-button evolli-button--secondary"
-              aria-label="Exportar"
-              disabled={semRespostas}
-            >
-              <IconeBaixarArquivo tamanho={16} />
-              Exportar
-              <IconeAbrir tamanho={12} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="pesquisas__menu">
-              <DropdownMenuItem onSelect={() => void exportar("xlsx")}>
-                <IconePlanilha tamanho={16} />
-                <span className="pesquisas__menu-opcao">
-                  <strong>Excel (.xlsx)</strong>
-                  <span className="pesquisas__suave">
-                    {individuais
-                      ? "Todas as respostas e os resultados"
-                      : "Os resultados por pergunta"}
+          {/* T216 — avaliação e onboarding exportam pela tela própria. */}
+          {proprio ? null : (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="evolli-button evolli-button--secondary"
+                aria-label="Exportar"
+                disabled={semRespostas}
+              >
+                <IconeBaixarArquivo tamanho={16} />
+                Exportar
+                <IconeAbrir tamanho={12} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="pesquisas__menu">
+                <DropdownMenuItem onSelect={() => void exportar("xlsx")}>
+                  <IconePlanilha tamanho={16} />
+                  <span className="pesquisas__menu-opcao">
+                    <strong>Excel (.xlsx)</strong>
+                    <span className="pesquisas__suave">
+                      {individuais
+                        ? "Todas as respostas e os resultados"
+                        : "Os resultados por pergunta"}
+                    </span>
                   </span>
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void exportar("pdf")}>
-                <IconeDocumento tamanho={16} />
-                <span className="pesquisas__menu-opcao">
-                  <strong>PDF</strong>
-                  <span className="pesquisas__suave">
-                    Relatório dos resultados
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportar("pdf")}>
+                  <IconeDocumento tamanho={16} />
+                  <span className="pesquisas__menu-opcao">
+                    <strong>PDF</strong>
+                    <span className="pesquisas__suave">
+                      Relatório dos resultados
+                    </span>
                   </span>
-                </span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {linkVivo ? (
             <Button
               disabled={detalhe.status === "pausada"}
@@ -579,30 +582,32 @@ function ResultadosInterno({
         publicada
       />
 
-      {/* T216 — avaliação e onboarding: resultados próprios. */}
-      {proprio ? <ResultadosProprios detalhe={detalhe} hoje={hoje} /> : null}
-      <div
-        role="tablist"
-        aria-label="Resultados"
-        className="pesquisas__abas"
-        hidden={proprio}
-      >
-        {abas.map((a) => (
-          <button
-            key={a.valor}
-            type="button"
-            role="tab"
-            className="evolli-aba"
-            aria-selected={aba === a.valor}
-            onClick={() => setAba(a.valor)}
-          >
-            {a.rotulo}
-          </button>
-        ))}
-      </div>
+      {/* T216 — avaliação e onboarding: só os resultados próprios; as abas e
+          o painel comuns nem são desenhados. */}
+      {proprio ? null : (
+        <div role="tablist" aria-label="Resultados" className="pesquisas__abas">
+          {abas.map((a) => (
+            <button
+              key={a.valor}
+              type="button"
+              role="tab"
+              className="evolli-aba"
+              aria-selected={aba === a.valor}
+              onClick={() => setAba(a.valor)}
+            >
+              {a.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div role="tabpanel" className="pesquisas__resultados" hidden={proprio}>
-        {abasProprias ? (
+      <div
+        role={proprio ? undefined : "tabpanel"}
+        className={proprio ? undefined : "pesquisas__resultados"}
+      >
+        {proprio ? (
+          <ResultadosProprios detalhe={detalhe} hoje={hoje} />
+        ) : abasProprias ? (
           abasProprias
         ) : aba === "geral" ? (
           semRespostas ? (
