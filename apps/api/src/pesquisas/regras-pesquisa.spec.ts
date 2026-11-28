@@ -3,6 +3,8 @@ import {
   formatarEncerramento,
   lerEncerramento,
   identificavelPeloLink,
+  MINUTOS_POR_MODELO,
+  minutosDaPesquisa,
   minutosEstimados,
   motivoIndisponivel,
   mudaEncerramentoTravado,
@@ -174,5 +176,39 @@ describe("T216 — identificavelPeloLink", () => {
     expect(
       identificavelPeloLink("anonima", { cpf: null, dataNascimento: null }),
     ).toBe(true);
+  });
+});
+
+describe("T216 — tempo estimado por modelo (decisão da proprietária)", () => {
+  it("o mapa único: os minutos fixos de cada modelo", () => {
+    expect(MINUTOS_POR_MODELO).toEqual({
+      pulso: 2,
+      clima: 15,
+      copsoq: 15,
+      disc: 8,
+      isfb: 6,
+      onboarding: 5,
+    });
+  });
+
+  it("modelo do mapa: o número dele, com qualquer quantidade de perguntas", () => {
+    expect(minutosDaPesquisa("pulso", 5)).toBe(2);
+    // O RH acrescentou ou tirou perguntas: o número continua o do mapa.
+    expect(minutosDaPesquisa("pulso", 30)).toBe(2);
+    expect(minutosDaPesquisa("clima", 62)).toBe(15);
+    expect(minutosDaPesquisa("clima", 10)).toBe(15);
+    expect(minutosDaPesquisa("copsoq", 76)).toBe(15);
+    expect(minutosDaPesquisa("disc", 28)).toBe(8);
+    expect(minutosDaPesquisa("isfb", 18)).toBe(6);
+    expect(minutosDaPesquisa("onboarding", 3)).toBe(5);
+  });
+
+  it("os demais seguem a regra de 0,3 minuto por pergunta", () => {
+    expect(minutosDaPesquisa("enps", 30)).toBe(9);
+    expect(minutosDaPesquisa("pulso_clima", 34)).toBe(10);
+    expect(minutosDaPesquisa("tad", 21)).toBe(6);
+    expect(minutosDaPesquisa("personalizada", 5)).toBe(3);
+    expect(minutosDaPesquisa("personalizada", 76)).toBe(23);
+    expect(minutosDaPesquisa("avaliacao90", 12)).toBe(4);
   });
 });

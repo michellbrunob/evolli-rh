@@ -1,5 +1,6 @@
 import type {
   Identificacao,
+  Modelo,
   MotivoIndisponivel,
   StatusPesquisa,
 } from "./pesquisas.types";
@@ -138,10 +139,33 @@ export function motivoIndisponivel(
 
 /**
  * 0,3 minuto por pergunta, arredondado ao minuto mais próximo; no mínimo
- * 3 minutos. A mesma regra da tela (todos os modelos).
+ * 3 minutos. A mesma regra da tela, para os modelos fora do mapa abaixo.
  */
 export function minutosEstimados(totalPerguntas: number): number {
   return Math.max(3, Math.round(totalPerguntas * 0.3));
+}
+
+/**
+ * Os minutos fixos de cada modelo (decisão da proprietária). O mapa único:
+ * a tela tem o espelho em `tempoEstimado.ts`, e um teste da tela garante
+ * que os dois são iguais. Vale mesmo quando o RH acrescenta ou tira
+ * perguntas (Pulso, Clima).
+ */
+export const MINUTOS_POR_MODELO: Readonly<Partial<Record<Modelo, number>>> = {
+  pulso: 2,
+  clima: 15,
+  copsoq: 15,
+  disc: 8,
+  isfb: 6,
+  onboarding: 5,
+};
+
+/** O tempo estimado da pesquisa: o do mapa ou, fora dele, a regra. */
+export function minutosDaPesquisa(
+  modelo: Modelo,
+  totalPerguntas: number,
+): number {
+  return MINUTOS_POR_MODELO[modelo] ?? minutosEstimados(totalPerguntas);
 }
 
 /** Identificada e confidencial validam a pessoa (CPF + nascimento). */

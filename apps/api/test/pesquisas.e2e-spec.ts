@@ -835,7 +835,8 @@ describe("T216 — Pesquisas (e2e)", () => {
         modelo: "pulso",
         identificacao: "identificada",
         totalPerguntas: 5,
-        minutosEstimados: 3,
+        // O Pulso tem os minutos fixos do modelo (2), não a regra.
+        minutosEstimados: 2,
         secoes: estrutura(),
         grupos: [],
       });

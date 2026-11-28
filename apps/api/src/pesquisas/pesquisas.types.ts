@@ -420,7 +420,7 @@ export interface PesquisaPublica {
   modelo: Modelo;
   identificacao: Identificacao;
   totalPerguntas: number;
-  /** 20 s por pergunta, arredondado ao minuto mais próximo; mínimo 1. */
+  /** Os minutos do modelo ou a regra (`minutosDaPesquisa`). */
   minutosEstimados: number;
   secoes: Secao[];
   /** Anônima com separação: o que escolher antes das perguntas. */

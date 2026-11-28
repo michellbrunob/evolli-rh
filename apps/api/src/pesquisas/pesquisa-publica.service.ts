@@ -28,7 +28,7 @@ import {
 import {
   cpfNormalizado,
   exigeIdentificacao,
-  minutosEstimados,
+  minutosDaPesquisa,
   motivoIndisponivel,
   primeiroNome,
 } from "./regras-pesquisa";
@@ -112,7 +112,7 @@ export class PesquisaPublicaService {
       modelo: p.modelo,
       identificacao: p.identificacao,
       totalPerguntas: total,
-      minutosEstimados: minutosEstimados(total),
+      minutosEstimados: minutosDaPesquisa(p.modelo, total),
       secoes,
       grupos,
     };
