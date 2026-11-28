@@ -323,7 +323,7 @@ describe("T216 — Pesquisas (e2e)", () => {
     return {
       nome: "Pesquisa de clima sintética",
       boasVindas: "Leva poucos minutos.",
-      modelo: "clima",
+      modelo: "pulso",
       identificacao: "identificada",
       secoes: estrutura(),
       participantes: { todos: false, colaboradorIds: [] as string[] },
@@ -824,7 +824,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         empresa: "Empresa PESA",
         nome: "Pesquisa de clima sintética",
         boasVindas: "Leva poucos minutos.",
-        modelo: "clima",
+        modelo: "pulso",
         identificacao: "identificada",
         totalPerguntas: 5,
         minutosEstimados: 2,
@@ -1079,7 +1079,7 @@ describe("T216 — Pesquisas (e2e)", () => {
           respostaId: primeira!.id,
           pesquisaId: id,
           nome: "Pesquisa de clima sintética",
-          modelo: "clima",
+          modelo: "pulso",
           respondidaEm: expect.any(String),
           secoes: estrutura(),
           valores: RESPOSTAS_BOAS,
@@ -2084,6 +2084,104 @@ describe("T216 — Pesquisas (e2e)", () => {
       await post("/v1/pesquisas", rhA)
         .send(corpo({ minimoPorGrupo: 2 }))
         .expect(400);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  describe("modelos com cálculo próprio (metodologia fixa)", () => {
+    /** As 21 afirmações da TAD (escala de 1 a 7), na ordem. */
+    function estruturaTad(maximo = 7) {
+      return [
+        {
+          id: "s-tad",
+          titulo: null,
+          descricao: null,
+          perguntas: Array.from({ length: 21 }, (_, i) => {
+            const chave = `tad_${String(i + 1).padStart(2, "0")}`;
+            return {
+              id: `q-${chave}`,
+              chave,
+              tipo: "escala",
+              texto: `Afirmação ${i + 1}`,
+              descricao: null,
+              obrigatoria: true,
+              config: { minimo: 1, maximo },
+              condicao: null,
+            };
+          }),
+        },
+      ];
+    }
+
+    it("TAD: a estrutura é conferida; o resultado do time e da pessoa saem da API", async () => {
+      // Pergunta livre num modelo fixo: 422 estrutura_do_modelo.
+      const livre = await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "tad" }))
+        .expect(422);
+      expect(livre.body.erros).toEqual([
+        { campo: "secoes", motivo: "estrutura_do_modelo" },
+      ]);
+      // Escala errada: 422 também.
+      await post("/v1/pesquisas", rhA)
+        .send(corpo({ modelo: "tad", secoes: estruturaTad(5) }))
+        .expect(422);
+      // A estrutura do modelo: 201, com a chave de cada item guardada.
+      const criada = await post("/v1/pesquisas", rhA)
+        .send(
+          corpo({
+            modelo: "tad",
+            identificacao: "anonima",
+            secoes: estruturaTad(),
+          }),
+        )
+        .expect(201);
+      expect(criada.body.secoes[0].perguntas[2]).toMatchObject({
+        id: "q-tad_03",
+        chave: "tad_03",
+      });
+      const pub = await post(`/v1/pesquisas/${criada.body.id}/publicar`, rhA)
+        .send()
+        .expect(200);
+      const token = (pub.body.link as string).replace("#/p/", "");
+      // Tudo 7: invertidas viram 1 → 4,43 · 4,00 · 4,75 e geral 4,39.
+      await agent()
+        .post(publico(token, "/respostas"))
+        .send({
+          respostas: Array.from({ length: 21 }, (_, i) => ({
+            perguntaId: `q-tad_${String(i + 1).padStart(2, "0")}`,
+            valor: 7,
+          })),
+        })
+        .expect(201);
+      const res = await get(
+        `/v1/pesquisas/${criada.body.id}/resultados`,
+        rhA,
+      ).expect(200);
+      expect(res.body.modelo).toMatchObject({
+        modelo: "tad",
+        respondentes: 1,
+        geral: 4.39,
+        nivel: "moderado",
+      });
+      expect(
+        res.body.modelo.pilares.map((p: { score: number }) => p.score),
+      ).toEqual([4.43, 4, 4.75]);
+      const lista = await get(
+        `/v1/pesquisas/${criada.body.id}/respostas`,
+        rhA,
+      ).expect(200);
+      const uma = await get(
+        `/v1/pesquisas/${criada.body.id}/respostas/${lista.body[0].id}`,
+        rhA,
+      ).expect(200);
+      expect(uma.body.modelo).toMatchObject({ modelo: "tad", geral: 4.39 });
+      // Modelo sem cálculo próprio: `modelo` nulo.
+      const pulso = await post("/v1/pesquisas", rhA).send(corpo()).expect(201);
+      const resPulso = await get(
+        `/v1/pesquisas/${pulso.body.id}/resultados`,
+        rhA,
+      ).expect(200);
+      expect(resPulso.body.modelo).toBeNull();
     });
   });
 

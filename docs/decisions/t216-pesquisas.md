@@ -530,3 +530,171 @@ Segunda revisão (27/11/2026):
   lista: `{ total: number; departamentos: { departamentoId: string | null; departamento: string |
 null; quantidade: number }[] }` (por departamento da lotação vigente; `null` = sem departamento; a
   soma é o total).
+
+## Modelos da galeria completa e cálculo próprio (frente M1, 27/11/2026)
+
+Decisões:
+
+- **Galeria de 12 modelos** em 4 categorias (Clima e engajamento 6 · Saúde e NR-1 2 · Desempenho 2 ·
+  Outros 2): Pesquisa Pulso, Pulso e Clima, Pesquisa de Clima, eNPS, Pesquisa de Onboarding, Motivação
+  (TAD), Riscos psicossociais (NR-1), Saúde financeira, Avaliação 90°, Avaliação 180°, Perfil
+  comportamental (DISC) e Personalizada. Quadro "Precisa cumprir a NR-1?" (o botão filtra os 2 modelos de
+  Saúde e some). Selos: Novo, NR-1, Complementa NR-1 (e "Recomendado para começar" só na página
+  inicial). Ícones Bulk do sistema por modelo e por fato do card; tons em `tokens.css`
+  (`--modelo-<tom>` e `--modelo-<tom>-fundo`).
+- **Registro na tela:** `apps/web/src/screens/pesquisas/modelos/indice.ts` (ordem dos cards), com um
+  catálogo por modelo em `modelos/<id>/catalogo.ts` (card, gaveta, assistente e a página "Sobre o
+  modelo"). Os modelos das outras frentes (riscos psicossociais, saúde financeira, 90°, 180° e DISC) já
+  têm card, gaveta (grupos e quantidades) e página; a frente de cada um preenche `secoes` no próprio
+  catálogo. Telas de resultado: `modelos/resultados.tsx`; abas da planilha: `modelos/exportacao.ts`.
+- **Registro na API:** `apps/api/src/pesquisas/modelos/indice.ts` (`MODELOS_REGISTRADOS`): metodologia
+  fixa conferida ao gravar, cálculo agregado e individual. Uma entrada por modelo.
+- **Metodologia fixa** (Pulso e Clima, Pesquisa de Clima, TAD): o assistente mostra as perguntas em
+  acordeões (por dimensão; a TAD por pilar) sem editar; a API recusa estrutura fora do modelo.
+- **Textos próprios:** os enunciados são do Evolli e medem o mesmo ponto de cada item (mesma chave,
+  ordem e grupo); a empresa pode trocar os textos depois. O marcador `{empresa}` vira o nome da empresa
+  para quem responde (sem nome, e no painel, "nossa empresa").
+- **Pulso:** 5 afirmações de 1 a 10, eNPS e comentário curto opcional; de 1 a 15 perguntas.
+- **Pulso e Clima:** 22 afirmações de 1 a 5 em 8 dimensões, LNPS e eNPS (0 a 10) e um comentário
+  opcional por dimensão e por recomendação. Score 0–100 por afirmação (`(média − 1) ÷ 4 × 100`), por
+  dimensão (média das afirmações) e geral (média das 22); faixas crítico < 50 · atenção 50–69 ·
+  saudável 70–84 · forte ≥ 85; eNPS e LNPS com crítico < 0 · em ajuste 0–29 · bom 30–69 · excelente ≥ 70.
+- **Pesquisa de Clima:** 60 afirmações (5 dimensões × 3 subdimensões × 4) e 2 abertas; % favorável
+  (4–5), neutro e desfavorável por dimensão e subdimensão, com a faixa pelo % favorável.
+- **eNPS:** a principal (0 a 10), 5 complementares de 1 a 5 e 2 abertas; as zonas do eNPS de sempre.
+- **Motivação (TAD):** 21 afirmações de 1 a 7 (os 7 pontos com rótulo), 9 invertidas (`8 − resposta`);
+  pilar = média dos itens; geral = média dos 3 pilares; time = média das pessoas; alto ≥ 5,5 · moderado
+  3,5 a 5,49 · baixo < 3,5. A pessoa tem o próprio resultado (resultado individual).
+- **Onboarding:** catálogo das 17 perguntas em 8 blocos (escalas de 4 pontos); o envio automático
+  30/60/90 e o resultado por rodada ficam com a frente do Onboarding.
+- **Personalizada:** 6 modelos prontos (Onboarding · 30 dias, Experiência · 90 dias, Avaliação 180°,
+  Satisfação com benefícios, Avaliação de treinamento, Entrevista de desligamento) e 13 tipos de
+  pergunta. Os formatos com gestor aparecem no card; responder pelo gestor depende do acesso do gestor.
+- **Exportação:** a planilha ganha, logo depois do Resumo, a aba do modelo ("Dimensões" no Pulso e
+  Clima e no Clima; "Pilares" na TAD).
+
+Contrato (acréscimos):
+
+```ts
+type TipoPergunta = /* … */ "concordancia_4" | "satisfacao_4"; // 1 a 4, sem meio-termo (3 e 4 favoráveis)
+interface Pergunta {
+  /* … */ chave?: string | null; // item do modelo (formato dos ids, até 40)
+}
+interface ConfigPergunta {
+  /* … */
+  lnps?: boolean; // nota_0_10: recomendação da liderança (nunca junto com enps)
+  rotuloMinimo?: string | null; // também na nota_0_10
+  rotuloMaximo?: string | null;
+  rotulos?: string[] | null; // escala: um rótulo por ponto (máximo − mínimo + 1)
+}
+// Teto de perguntas: 100 (a Pesquisa de Clima tem 62).
+// POST/PUT /pesquisas num modelo de metodologia fixa com estrutura fora do modelo:
+//   422 { campo: "secoes", motivo: "estrutura_do_modelo" }
+interface IndicadoresPesquisa {
+  /* … */ lnps?: IndicadorNps | null; // só com pergunta de LNPS; o LNPS fica fora da média geral
+}
+interface ResultadosPesquisa {
+  /* … */ modelo?: ResultadoDoModelo | null; // null sem respostas visíveis ou sem cálculo próprio
+}
+interface RespostaDetalhe {
+  /* … */ modelo?: ResultadoIndividualDoModelo | null;
+}
+
+type FaixaDeScore = "critico" | "atencao" | "saudavel" | "forte";
+type FaixaDeRecomendacao = "critico" | "em_ajuste" | "bom" | "excelente";
+interface RecomendacaoDoModelo {
+  perguntaId: string | null;
+  respostas: number;
+  promotores: number;
+  neutros: number;
+  detratores: number;
+  indice: number | null;
+  faixa: FaixaDeRecomendacao | null;
+  distribuicao: { valor: number; quantidade: number }[]; // 0 a 10
+}
+interface AfirmacaoDoModelo {
+  chave: string;
+  perguntaId: string;
+  dimensao: string;
+  subdimensao: string | null;
+  respostas: number;
+  media: number | null; // 1 a 5
+  score: number | null; // 0 a 100
+  favoravel: number | null; // %
+  neutro: number | null;
+  desfavoravel: number | null;
+}
+interface DimensaoDoModelo {
+  chave: string;
+  rotulo: string;
+  afirmacoes: number;
+  respostas: number;
+  score: number | null;
+  faixa: FaixaDeScore | null; // pelo score (Pulso e Clima) ou pelo % favorável (Clima)
+  favoravel: number | null;
+  neutro: number | null;
+  desfavoravel: number | null;
+  comentarios: number;
+  subdimensoes?: DimensaoDoModelo[]; // Clima
+}
+type NivelTad = "alto" | "moderado" | "baixo";
+interface PilarTad {
+  chave: string;
+  rotulo: string;
+  perguntas: number;
+  score: number | null; // 1 a 7
+  nivel: NivelTad | null;
+}
+type ResultadoDoModelo =
+  | {
+      modelo: "pulso_clima";
+      score: number | null;
+      faixa: FaixaDeScore | null;
+      favoravel: number | null;
+      neutro: number | null;
+      desfavoravel: number | null;
+      dimensoes: DimensaoDoModelo[];
+      afirmacoes: AfirmacaoDoModelo[];
+      enps: RecomendacaoDoModelo;
+      lnps: RecomendacaoDoModelo;
+      comentarios: {
+        dimensao: string;
+        perguntaId: string;
+        quantidade: number;
+      }[];
+    }
+  | {
+      modelo: "clima";
+      favoravel: number | null;
+      neutro: number | null;
+      desfavoravel: number | null;
+      score: number | null;
+      faixa: FaixaDeScore | null;
+      dimensoes: DimensaoDoModelo[];
+      afirmacoes: AfirmacaoDoModelo[];
+    }
+  | {
+      modelo: "tad";
+      respondentes: number;
+      geral: number | null;
+      nivel: NivelTad | null;
+      pilares: PilarTad[];
+      niveis: Record<NivelTad, number>;
+    };
+type ResultadoIndividualDoModelo = {
+  modelo: "tad";
+  geral: number | null;
+  nivel: NivelTad | null;
+  pilares: PilarTad[];
+};
+```
+
+Chaves dos itens: Pulso `pulso_*`; Pulso e Clima `pc_ae_01` a `pc_bem_02`, `pc_lnps_01`, `pc_enps_01`
+e `__comentario_<dimensão|lnps|enps>__`; Clima `clima_01` a `clima_60` e `clima_aberta_01/02`; eNPS
+`enps_*`; Onboarding `q1` a `q17`; TAD `tad_01` a `tad_21`.
+
+Pendências desta frente: na página pública do Pulso e Clima, a abertura de cada dimensão e o
+comentário depois da nota seguem como perguntas comuns (uma por tela); a trilha da página "Sobre o
+modelo" mostra "Pesquisas / {tema}" (o nível "Nova pesquisa" do meio depende de a trilha aceitar dois
+níveis declarados); os comentários do Pulso e Clima ficam na Visão geral (sem aba própria) para não
+mexer nas rotas compartilhadas.
