@@ -108,7 +108,7 @@
   align-items: center;
   justify-content: center;
   min-width: 1.25rem;
-  color: #fff;
+  color: var(--color-on-action);
   font-size: var(--text-caption);
   font-weight: var(--weight-strong);
   line-height: 1;
@@ -174,7 +174,7 @@
 
 .nr1__bolha {
   fill-opacity: 0.85;
-  stroke: var(--surface-card, #fff);
+  stroke: var(--surface-canvas);
   stroke-width: 1;
 }
 
@@ -223,7 +223,12 @@
   width: 3rem;
   height: 0.625rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, #3db46d, #f2b23e, #e5484d);
+  background: linear-gradient(
+    90deg,
+    var(--faixa-forte),
+    var(--faixa-atencao),
+    var(--faixa-critico)
+  );
 }
 
 .nr1__legenda-empresa {
