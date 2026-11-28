@@ -1605,3 +1605,63 @@ Contrato novo:
 // ParticipanteDaPesquisa: centroCusto?: string | null; unidade?: string | null
 ```
 
+## 4ª revisão — recorte C: NR-1, saúde financeira, DISC, avaliação e onboarding (28/11/2026)
+
+- **Conformidade NR-1, etapa 2 (decisão de paridade):** "Elaborar o plano de
+  ação" conclui sozinha quando há resultado (`respostas > 0`): a biblioteca
+  de estratégias é fixa, então o plano sugerido existe desde a 1ª resposta
+  (anônima com a 1ª resposta: 2/7, próxima "comunicar"). As medidas que o RH
+  registra não mudam a etapa. Contrato do `GET|PUT …/modelo/acompanhamento`
+  sem mudança de forma; muda só o valor de `concluida` da etapa `plano`.
+- **Conformidade (tela):** uma etapa por vez — lista das 7 etapas e o
+  detalhe da escolhida (sem escolha, a próxima pendente), com "Etapa N de 7",
+  "O que fazer N de M" (itens marcados) e "Etapa anterior/Próxima etapa".
+- **Plano:** "estratégias sugeridas" = 3 por dimensão com nível, inclusive
+  as preventivas do nível baixo (87 com as 29), o mesmo número no contador
+  da aba Plano, no cartão "Plano de ação" da Visão geral (com "N medidas no
+  plano") e na lista (`estrategiasSugeridas`). O PDF do plano segue com as
+  sugestões de crítico, alto e médio.
+- **Visão geral:** "Principais achados" por regra, sem IA
+  (`principaisAchadosNr1`): o maior risco (1ª das prioridades com gente em
+  risco, com o %), o ponto mais forte (maior % favorável; empate pela ordem
+  do catálogo) e os comportamentos ofensivos (contagem oculta = "menos de
+  N"). Cada tipo de comportamento ofensivo mostra "N pessoas (x%)" (% sobre
+  quem respondeu o bloco; nada com sigilo). Perfil por domínio com o 1º
+  domínio aberto; os 5 indicadores de saúde numa linha a partir de 1280 px.
+  Matriz: com até 4 dimensões na célula, todas aparecem ("+N" só a partir de
+  5); os chips usam `DimensaoNr1.rotuloCurto` (rótulos curtos do Evolli, até
+  20 caracteres; o nome inteiro no título).
+- **Por grupo:** "onde está o risco" pelo % em risco e, no empate, pela ordem
+  do catálogo (`DIMENSOES_NR1`). Mapa de calor e "% do time em risco" do
+  grupo pela média dos % já arredondados de cada dimensão, arredondada ao
+  inteiro (`mediaArredondada`). Ranking em tabela: #, grupo (com "N
+  respostas"), precisam de ação ("N de 29"), % do time em risco e barra
+  empilhada por nível com os números. Exigências × recursos: pressão na
+  vertical, apoio na horizontal, escala pelos dados com folga de 0,25 e o
+  meio (3) sempre dentro (`escalaDoEixo`), bolha pela quantidade de
+  respostas (`raioDaBolha`), cor pelo % em risco (verde → âmbar →
+  vermelho) e legenda.
+- **Assistente da NR-1:** na anônima, "Separar respostas por" nasce com
+  Departamento ligado (`ModeloDaGaleria.separarPorPadrao`); desligado, aviso
+  de que a aba Por grupo e o inventário por área ficam sem recorte (ou só
+  com o outro campo). A escolha obrigatória na página pública é da frente
+  geral.
+- **Evidências:** envio e remoção renovam o token CSRF e repetem UMA vez no
+  403 `csrf_invalido`; as falhas usam as mensagens comuns de gravação
+  (`mensagemDaFalha`).
+- **Saúde financeira:** resumo do assistente "15 perguntas do índice + 3 de
+  autopercepção"; blocos das perguntas fixas com "Obrigatória"/"Opcional"
+  (`ModeloDaGaleria.obrigatoriedadeNosBlocos`); base financeira "N de 14
+  possíveis" (inteiro); "Por renda da casa" só com as faixas que têm
+  respostas.
+- **DISC:** sob o título do "Perfil do time", "Intensidade alta" (puro ou
+  acentuado), "moderada" (moderado) ou "baixa" (equilibrado).
+- **Avaliação 90°/180°:** tempo pela mesma regra nos e-mails e na página
+  pública — 4 minutos por pessoa avaliada × a quantidade
+  (`textoDoTempoDaAvaliacao`); os e-mails dizem que a pessoa entra com o CPF
+  e a data de nascimento.
+- **Onboarding:** no e-mail Padrão, "Conteúdo do padrão" com remetente,
+  assunto, título e mensagem em somente leitura, além da prévia.
+- **Seed de demonstração:** o gestor sintético (`DEMO-A-0001`) nasce com CPF
+  fictício válido e data de nascimento, para testar o link da avaliação
+  (bancos semeados do zero; o seed não reescreve quem já existe).
