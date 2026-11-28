@@ -34,6 +34,7 @@ import {
   useComplementoDaTrilha,
 } from "../../app/trilhaComplementar";
 import { EditarPesquisa } from "./EditarPesquisa";
+import { AssistenteDePesquisa } from "./AssistenteDePesquisa";
 import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
@@ -640,6 +641,114 @@ describe('B15 — gaveta "Ver perguntas"', () => {
     );
     expect(css).not.toMatch(
       /\.pesquisas__janela header p\s*\{[^}]*white-space:\s*normal/,
+    );
+  });
+});
+
+describe("B18 — personalizada, etapa Perguntas", () => {
+  async function irParaPerguntas() {
+    const servico = servicoFalso();
+    render(
+      <AssistenteDePesquisa
+        servico={servico}
+        modelo="personalizada"
+        hoje="2026-11-27"
+        onSair={vi.fn()}
+        onVerResultados={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Nome"), {
+      target: { value: "Pesquisa de teste" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Próximo: Perguntas" }));
+    await screen.findByRole("heading", { name: /Etapa 2 de 5/ });
+    return servico;
+  }
+
+  function adicionarTexto(texto: string) {
+    fireEvent.click(
+      screen.getByRole("button", { name: "Adicionar pergunta na seção 1" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("group", { name: "Tipo da nova pergunta" }),
+      ).getByRole("button", { name: /^Texto curto/ }),
+    );
+    fireEvent.change(screen.getAllByLabelText("Texto da pergunta").at(-1)!, {
+      target: { value: texto },
+    });
+  }
+
+  it("resumo 'N perguntas · N seções · cerca de N min' e 'Adicionar seção' na mesma linha", async () => {
+    await irParaPerguntas();
+    adicionarTexto("Qual seu setor?");
+    const resumo = document.querySelector(".pesquisas__editor-resumo")!;
+    expect(resumo).toHaveTextContent(
+      "1 pergunta · 1 seção · cerca de 1 minuto",
+    );
+    expect(
+      within(resumo as HTMLElement).getByRole("button", {
+        name: "Adicionar seção",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("nome e descrição da seção ficam recolhidos até clicar", async () => {
+    await irParaPerguntas();
+    expect(screen.queryByLabelText("Nome da seção 1")).toBeNull();
+    expect(screen.queryByLabelText("Descrição da seção 1")).toBeNull();
+    const nome = screen.getByRole("button", {
+      name: "Editar nome da seção 1",
+    });
+    expect(nome).toHaveTextContent("Sem nome");
+    fireEvent.click(nome);
+    fireEvent.change(screen.getByLabelText("Nome da seção 1"), {
+      target: { value: "Integração" },
+    });
+    expect(screen.getByLabelText("Descrição da seção 1")).toBeInTheDocument();
+  });
+
+  it("rodapé com 'N perguntas · N obrigatórias' e 'Próximo: Participantes', sem a barra de %", async () => {
+    await irParaPerguntas();
+    adicionarTexto("Qual seu setor?");
+    const rodape = document.querySelector(".cadastro-etapas__rodape")!;
+    expect(rodape.querySelector("progress")).toBeNull();
+    expect(rodape).not.toHaveTextContent("% concluído");
+    expect(rodape).toHaveTextContent("1 pergunta · 1 obrigatória");
+    expect(
+      within(rodape as HTMLElement).getByRole("button", {
+        name: "Próximo: Participantes",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("o tipo vem de uma lista suspensa agrupada, com um ícone próprio por tipo; Esc fecha", async () => {
+    await irParaPerguntas();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Adicionar pergunta na seção 1" }),
+    );
+    const lista = screen.getByRole("group", { name: "Tipo da nova pergunta" });
+    expect(lista).toHaveClass("pesquisas__tipos--suspensa");
+    const icones = within(lista)
+      .getAllByRole("button")
+      .map((b) => b.querySelector("svg")!.innerHTML);
+    expect(icones).toHaveLength(11);
+    expect(new Set(icones).size).toBe(11);
+    fireEvent.keyDown(lista, { key: "Escape" });
+    expect(
+      screen.queryByRole("group", { name: "Tipo da nova pergunta" }),
+    ).toBeNull();
+  });
+
+  it("'Salvar rascunho' fica no topo, ao lado de 'Pré-visualizar'", async () => {
+    const servico = await irParaPerguntas();
+    const salvar = screen.getByRole("button", { name: "Salvar rascunho" });
+    const previa = screen.getByRole("button", { name: "Pré-visualizar" });
+    expect(salvar.parentElement).toBe(previa.parentElement);
+    const antes = servico.alterarPesquisa.mock.calls.length;
+    fireEvent.click(salvar);
+    await waitFor(() =>
+      expect(servico.alterarPesquisa.mock.calls.length).toBeGreaterThan(antes),
     );
   });
 });

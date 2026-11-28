@@ -82,6 +82,14 @@ export interface CadastroEmEtapasProps {
   readonly idBotaoPrincipal?: string;
   /** Trava só o botão principal (ex.: dados ainda carregando). */
   readonly principalDesabilitado?: boolean;
+  /**
+   * T216 — no lugar da barra de progresso, um resumo da etapa ao lado do
+   * botão principal ("3 perguntas · 2 obrigatórias"); `null` só tira a barra.
+   * Sem a prop, a barra de "% concluído" continua.
+   */
+  readonly resumoDoRodape?: ReactNode;
+  /** T216 — o rótulo do botão de avançar ("Próximo: Participantes"). */
+  readonly rotuloDoProximo?: string;
   readonly children?: ReactNode;
 }
 
@@ -110,6 +118,8 @@ export function CadastroEmEtapas({
   rotuloDoFormulario,
   idBotaoPrincipal,
   principalDesabilitado = false,
+  resumoDoRodape,
+  rotuloDoProximo,
   children,
 }: CadastroEmEtapasProps) {
   const base = useId();
@@ -273,18 +283,26 @@ export function CadastroEmEtapas({
         </div>
 
         <div className="cadastro-etapas__rodape">
-          <div className="cadastro-etapas__progresso">
-            <progress
-              className="cadastro-etapas__progresso-barra"
-              max={100}
-              value={progresso}
-              aria-labelledby={idProgresso}
-            />
-            <p id={idProgresso} className="cadastro-etapas__progresso-texto">
-              {progresso}% concluído
-            </p>
-          </div>
-          <div className="cadastro-etapas__rodape-acoes">
+          {resumoDoRodape === undefined ? (
+            <div className="cadastro-etapas__progresso">
+              <progress
+                className="cadastro-etapas__progresso-barra"
+                max={100}
+                value={progresso}
+                aria-labelledby={idProgresso}
+              />
+              <p id={idProgresso} className="cadastro-etapas__progresso-texto">
+                {progresso}% concluído
+              </p>
+            </div>
+          ) : null}
+          <div
+            className={
+              resumoDoRodape === undefined
+                ? "cadastro-etapas__rodape-acoes"
+                : "cadastro-etapas__rodape-acoes cadastro-etapas__rodape-acoes--com-resumo"
+            }
+          >
             {atual === 0 ? (
               <Button
                 type="button"
@@ -304,6 +322,11 @@ export function CadastroEmEtapas({
                 Voltar
               </Button>
             )}
+            {resumoDoRodape ? (
+              <span className="cadastro-etapas__rodape-resumo">
+                {resumoDoRodape}
+              </span>
+            ) : null}
             <Button
               type="submit"
               variant="primary"
@@ -316,6 +339,8 @@ export function CadastroEmEtapas({
             >
               {ultima ? (
                 rotuloConcluir
+              ) : rotuloDoProximo ? (
+                rotuloDoProximo
               ) : (
                 <>
                   Próxima etapa

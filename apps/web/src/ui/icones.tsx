@@ -98,6 +98,14 @@ import {
   TrendUp,
   TrendDown,
   Category,
+  Text,
+  TextalignLeft,
+  RecordCircle,
+  LikeDislike,
+  Slider,
+  Speedometer,
+  Smileys,
+  Hashtag,
 } from "iconsax-react";
 
 export interface IconeProps {
@@ -261,3 +269,13 @@ export const IconeEmAlta = decorativo(TrendUp, "Linear");
 export const IconeEmBaixa = decorativo(TrendDown, "Linear");
 /** T216 — as seções de uma pesquisa personalizada. */
 export const IconeSecoes = decorativo(Category, "Bulk");
+/** T216 — um ícone próprio para cada tipo de pergunta. */
+export const IconeTextoCurto = decorativo(Text, "Bulk");
+export const IconeParagrafo = decorativo(TextalignLeft, "Bulk");
+export const IconeEscolhaUnica = decorativo(RecordCircle, "Bulk");
+export const IconeMultiplaEscolha = decorativo(TickSquare, "Bulk");
+export const IconeSimNao = decorativo(LikeDislike, "Bulk");
+export const IconeEscala = decorativo(Slider, "Bulk");
+export const IconeNota = decorativo(Speedometer, "Bulk");
+export const IconeConcordancia = decorativo(Smileys, "Bulk");
+export const IconeNumero = decorativo(Hashtag, "Bulk");

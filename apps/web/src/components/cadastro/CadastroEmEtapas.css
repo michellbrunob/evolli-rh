@@ -339,6 +339,28 @@ button.cadastro-etapas__etapa-passo:focus-visible {
   min-width: 0;
 }
 
+/* T216 — com o resumo da etapa no lugar da barra: "Voltar" à esquerda; o
+   resumo e o botão principal à direita. */
+.cadastro-etapas__rodape-acoes--com-resumo {
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+.cadastro-etapas__rodape-acoes--com-resumo > :first-child {
+  margin-right: auto;
+}
+
+.cadastro-etapas__rodape-resumo {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.cadastro-etapas__rodape-resumo strong {
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
 @media (max-width: 640px) {
   .cadastro-etapas__rodape {
     display: grid;

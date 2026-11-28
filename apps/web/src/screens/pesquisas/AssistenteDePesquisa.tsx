@@ -594,13 +594,24 @@ function AssistenteDePesquisaInterno({
         rotuloVoltar="Voltar para Pesquisas"
         onVoltarDaPagina={() => (pendente ? setSair(true) : onSair())}
         acaoDoCabecalho={
-          <Button
-            variant="secondary"
-            disabled={salvando || !estado.nome.trim()}
-            onClick={() => void previsualizar()}
-          >
-            Pré-visualizar
-          </Button>
+          <div className="pesquisas__acoes-topo">
+            <Button
+              variant="secondary"
+              disabled={salvando || !estado.nome.trim()}
+              onClick={() => void previsualizar()}
+            >
+              Pré-visualizar
+            </Button>
+            {rascunho ? (
+              <Button
+                variant="secondary"
+                disabled={salvando || !estado.nome.trim()}
+                onClick={() => void salvarRascunho()}
+              >
+                Salvar rascunho
+              </Button>
+            ) : null}
+          </div>
         }
         etapas={etapasVisiveis}
         atual={atual}
@@ -608,6 +619,19 @@ function AssistenteDePesquisaInterno({
         onIrParaEtapa={irPara}
         onSubmit={(e) => void aoEnviar(e)}
         rotuloConcluir={rascunho ? "Publicar pesquisa" : "Salvar alterações"}
+        rotuloDoProximo={`Próximo: ${etapasVisiveis[atual + 1]?.titulo ?? ""}`}
+        resumoDoRodape={
+          etapaReal === 1 ? (
+            <>
+              <strong>{plural(todas.length, "pergunta", "perguntas")}</strong>
+              {` · ${plural(
+                todas.filter((p) => p.obrigatoria).length,
+                "obrigatória",
+                "obrigatórias",
+              )}`}
+            </>
+          ) : null
+        }
         ocupado={salvando}
         paineis={chaves.map((c) => [etapa1, etapa2, etapa3, etapa4, etapa5][c])}
         idDoTituloDaEtapa={idTituloDaEtapa}

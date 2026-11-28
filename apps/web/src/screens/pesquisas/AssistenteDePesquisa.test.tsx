@@ -28,7 +28,7 @@ const prazoDaApi = (dia: string, hora: string) => `${dia}T${hora}`;
 const HOJE = "2026-11-27";
 
 const avancar = () =>
-  fireEvent.click(screen.getByRole("button", { name: /Próxima etapa/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Próximo: / }));
 
 const ultimaEntrada = (fn: {
   readonly mock: { readonly calls: readonly (readonly unknown[])[] };

@@ -4,7 +4,14 @@
  * obrigatória; duplicar, mover, excluir; arrastar para reordenar; lógica
  * condicional por opção de uma pergunta anterior).
  */
-import { useId, useState, type DragEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import type {
   ConfigPergunta,
   Pergunta,
@@ -16,20 +23,27 @@ import { plural } from "../../format/plural";
 import { Dialog, IconButton, ListaDeEscolha } from "../../ui";
 import {
   IconeArrastar,
-  IconeCopiar,
   IconeCalendario,
-  IconeComentario,
+  IconeConcordancia,
+  IconeCopiar,
   IconeDescer,
-  IconeDocumento,
+  IconeEscala,
+  IconeEscolhaUnica,
   IconeEstrela,
   IconeMais,
+  IconeMultiplaEscolha,
+  IconeNota,
+  IconeNumero,
+  IconeParagrafo,
   IconeRemover,
-  IconeStatus,
+  IconeSecoes,
+  IconeSimNao,
   IconeSubir,
-  IconeSucesso,
-  IconeTempo,
+  IconeTextoCurto,
+  type IconeDoEcossistema,
 } from "../../ui/icones";
 import { useAvisar } from "./avisos";
+import { minutosEstimados, textoDoTempoEstimado } from "./tempoEstimado";
 import {
   adicionarPergunta,
   adicionarSecao,
@@ -80,18 +94,19 @@ const GRUPOS_DE_TIPO: readonly {
   { titulo: "Outros", tipos: ["data", "numero"] },
 ];
 
-const ICONE_DO_TIPO: Readonly<Record<TipoPergunta, typeof IconeStatus>> = {
-  texto_curto: IconeComentario,
-  paragrafo: IconeDocumento,
-  escolha_unica: IconeSucesso,
-  multipla_escolha: IconeSucesso,
-  sim_nao: IconeSucesso,
-  escala: IconeStatus,
-  nota_0_10: IconeStatus,
-  concordancia: IconeStatus,
+/** Um ícone próprio para cada tipo (na lista suspensa). */
+const ICONE_DO_TIPO: Readonly<Record<TipoPergunta, IconeDoEcossistema>> = {
+  texto_curto: IconeTextoCurto,
+  paragrafo: IconeParagrafo,
+  escolha_unica: IconeEscolhaUnica,
+  multipla_escolha: IconeMultiplaEscolha,
+  sim_nao: IconeSimNao,
+  escala: IconeEscala,
+  nota_0_10: IconeNota,
+  concordancia: IconeConcordancia,
   estrelas: IconeEstrela,
   data: IconeCalendario,
-  numero: IconeTempo,
+  numero: IconeNumero,
 };
 
 const SEMPRE = "__sempre__";
@@ -100,6 +115,48 @@ const SEPARADOR = "::";
 /** Número digitado → número, ou `undefined` quando vazio. */
 const numeroDe = (v: string): number | undefined =>
   v.trim() === "" ? undefined : Number(v);
+
+/**
+ * A lista suspensa dos tipos, agrupada (Texto, Escolha, Escala, Outros):
+ * fecha com Esc e com clique fora; o foco vai para o primeiro tipo.
+ */
+function ListaDeTipos({
+  onFechar,
+  children,
+}: {
+  readonly onFechar: () => void;
+  readonly children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    function fora(e: MouseEvent) {
+      const alvo = e.target as HTMLElement | null;
+      if (!ref.current || !alvo || ref.current.contains(alvo)) return;
+      // O gatilho alterna a lista sozinho.
+      if (alvo.closest?.(".pesquisas__nova-pergunta")) return;
+      onFechar();
+    }
+    document.addEventListener("mousedown", fora);
+    return () => document.removeEventListener("mousedown", fora);
+  }, [onFechar]);
+  return (
+    <div
+      ref={ref}
+      className="pesquisas__tipos pesquisas__tipos--agrupados pesquisas__tipos--suspensa"
+      role="group"
+      aria-label="Tipo da nova pergunta"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onFechar();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function EditorDePerguntas({
   secoes,
@@ -116,6 +173,8 @@ export function EditorDePerguntas({
   const [escolhendo, setEscolhendo] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<Secao | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
+  // A seção com o nome e a descrição abertos (recolhidos até clicar).
+  const [secaoAberta, setSecaoAberta] = useState<string | null>(null);
 
   const todas = perguntasEmOrdem(secoes);
   const total = todas.length;
@@ -138,11 +197,39 @@ export function EditorDePerguntas({
     setArrastando(null);
   }
 
+  function novaSecao() {
+    const novas = adicionarSecao(secoes);
+    onMudar(novas);
+    // A seção nova abre com o nome para preencher.
+    setSecaoAberta(novas.at(-1)?.id ?? null);
+  }
+
+  const fecharComTecla = (e: { key: string; preventDefault: () => void }) => {
+    if (e.key === "Escape" || e.key === "Enter") {
+      e.preventDefault();
+      setSecaoAberta(null);
+    }
+  };
+
   return (
     <div className="pesquisas__etapa">
-      <p className="pesquisas__suave">
-        {`${plural(total, "pergunta", "perguntas")} de até ${LIMITES.perguntas}`}
-      </p>
+      <div className="pesquisas__editor-resumo">
+        <p className="pesquisas__suave">
+          {[
+            plural(total, "pergunta", "perguntas"),
+            plural(secoes.length, "seção", "seções"),
+            textoDoTempoEstimado(minutosEstimados(total)),
+          ].join(" · ")}
+        </p>
+        <Button
+          variant="secondary"
+          disabled={secoes.length >= LIMITES.secoes}
+          onClick={novaSecao}
+        >
+          <IconeSecoes tamanho={16} />
+          Adicionar seção
+        </Button>
+      </div>
       {erros?.perguntas ? (
         <p className="pesquisas__erro" role="alert">
           {erros.perguntas}
@@ -158,30 +245,60 @@ export function EditorDePerguntas({
             aria-label={`Seção ${n}`}
           >
             <div className="pesquisas__secao-cabecalho">
-              <div className="pesquisas__secao-campos">
-                <input
-                  className="pesquisas__campo"
-                  aria-label={`Nome da seção ${n}`}
-                  placeholder={`Seção ${n} (nome opcional)`}
-                  value={s.titulo ?? ""}
-                  onChange={(e) =>
-                    onMudar(
-                      alterarSecao(secoes, s.id, { titulo: e.target.value }),
-                    )
-                  }
-                />
-                <input
-                  className="pesquisas__campo"
-                  aria-label={`Descrição da seção ${n}`}
-                  placeholder="Descrição (opcional)"
-                  value={s.descricao ?? ""}
-                  onChange={(e) =>
-                    onMudar(
-                      alterarSecao(secoes, s.id, { descricao: e.target.value }),
-                    )
-                  }
-                />
-              </div>
+              <span className="pesquisas__secao-selo">{`Seção ${n}`}</span>
+              {secaoAberta === s.id ? (
+                <div className="pesquisas__secao-campos">
+                  <input
+                    className="pesquisas__campo"
+                    aria-label={`Nome da seção ${n}`}
+                    placeholder="Nome da seção (opcional)"
+                    value={s.titulo ?? ""}
+                    // Aberta agora, a seção leva o foco ao nome.
+                    autoFocus
+                    onChange={(e) =>
+                      onMudar(
+                        alterarSecao(secoes, s.id, { titulo: e.target.value }),
+                      )
+                    }
+                    onKeyDown={fecharComTecla}
+                  />
+                  <input
+                    className="pesquisas__campo"
+                    aria-label={`Descrição da seção ${n}`}
+                    placeholder="Descrição (opcional)"
+                    value={s.descricao ?? ""}
+                    onChange={(e) =>
+                      onMudar(
+                        alterarSecao(secoes, s.id, {
+                          descricao: e.target.value,
+                        }),
+                      )
+                    }
+                    onKeyDown={fecharComTecla}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="pesquisas__secao-nome"
+                  aria-label={`Editar nome da seção ${n}`}
+                  onClick={() => setSecaoAberta(s.id)}
+                >
+                  <span
+                    className={
+                      s.titulo?.trim() ? "pesquisas__forte" : "pesquisas__suave"
+                    }
+                  >
+                    {s.titulo?.trim() || "Sem nome"}
+                  </span>
+                  {s.descricao?.trim() ? (
+                    <span className="pesquisas__suave">{s.descricao}</span>
+                  ) : null}
+                </button>
+              )}
+              <span className="pesquisas__suave pesquisas__secao-contagem">
+                {plural(s.perguntas.length, "pergunta", "perguntas")}
+              </span>
               <div className="pesquisas__botoes-icone">
                 <IconButton
                   label={`Subir seção ${n}`}
@@ -342,72 +459,66 @@ export function EditorDePerguntas({
               </ol>
             )}
 
-            {escolhendo === s.id ? (
-              <div
-                className="pesquisas__tipos pesquisas__tipos--agrupados"
-                role="group"
-                aria-label="Tipo da nova pergunta"
-              >
-                {GRUPOS_DE_TIPO.map((g) => (
-                  <div key={g.titulo} className="pesquisas__tipos-grupo">
-                    <p className="pesquisas__menu-titulo" aria-hidden="true">
-                      {g.titulo}
-                    </p>
-                    {g.tipos.map((valor) => {
-                      const t = TIPOS_DE_PERGUNTA.find(
-                        (x) => x.valor === valor,
-                      )!;
-                      const Icone = ICONE_DO_TIPO[valor];
-                      return (
-                        <button
-                          key={valor}
-                          type="button"
-                          className="pesquisas__tipo"
-                          onClick={() => adicionar(s.id, valor)}
-                        >
-                          <span
-                            className="pesquisas__tipo-icone"
-                            aria-hidden="true"
-                          >
-                            <Icone tamanho={16} />
-                          </span>
-                          <span className="pesquisas__tipo-textos">
-                            <span className="pesquisas__forte">{t.rotulo}</span>
-                            <span className="pesquisas__suave">{t.texto}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <div className="pesquisas__acoes">
-              <Button
-                variant="secondary"
+            <div className="pesquisas__nova-pergunta">
+              <button
+                type="button"
+                className="pesquisas__acao-texto pesquisas__acao-texto--primaria pesquisas__com-icone"
                 aria-label={`Adicionar pergunta na seção ${n}`}
                 aria-expanded={escolhendo === s.id}
                 disabled={noLimite}
                 onClick={() => setEscolhendo(escolhendo === s.id ? null : s.id)}
               >
-                <IconeMais tamanho={16} />
-                Adicionar pergunta
-              </Button>
+                <IconeMais tamanho={14} />
+                Nova pergunta nesta seção
+              </button>
+              {escolhendo === s.id ? (
+                <ListaDeTipos onFechar={() => setEscolhendo(null)}>
+                  {GRUPOS_DE_TIPO.map((g) => (
+                    <div key={g.titulo} className="pesquisas__tipos-grupo">
+                      <p className="pesquisas__menu-titulo" aria-hidden="true">
+                        {g.titulo}
+                      </p>
+                      {g.tipos.map((valor) => {
+                        const t = TIPOS_DE_PERGUNTA.find(
+                          (x) => x.valor === valor,
+                        )!;
+                        const Icone = ICONE_DO_TIPO[valor];
+                        return (
+                          <button
+                            key={valor}
+                            type="button"
+                            className="pesquisas__tipo"
+                            onClick={() => adicionar(s.id, valor)}
+                          >
+                            <span
+                              className="pesquisas__tipo-icone"
+                              aria-hidden="true"
+                            >
+                              <Icone tamanho={16} />
+                            </span>
+                            <span className="pesquisas__tipo-textos">
+                              <span className="pesquisas__forte">
+                                {t.rotulo}
+                              </span>
+                              <span className="pesquisas__suave">
+                                {t.texto}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </ListaDeTipos>
+              ) : null}
             </div>
           </section>
         );
       })}
 
-      <div className="pesquisas__acoes">
-        <Button
-          variant="secondary"
-          disabled={secoes.length >= LIMITES.secoes}
-          onClick={() => onMudar(adicionarSecao(secoes))}
-        >
-          <IconeMais tamanho={16} />
-          Adicionar seção
-        </Button>
-      </div>
+      <p className="pesquisas__suave pesquisas__editor-dica">
+        Arraste pela alça para mudar a ordem das perguntas.
+      </p>
 
       <Dialog
         aberto={confirmar !== null}

@@ -525,22 +525,159 @@ textarea.pesquisas__campo {
 .pesquisas__secao {
   display: grid;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: 0 0 var(--space-sm);
+  overflow: visible;
   border: 1px solid var(--divisor-cor);
   border-radius: var(--radius-md);
   background: var(--surface-canvas);
 }
 
+.pesquisas__secao > :not(.pesquisas__secao-cabecalho) {
+  margin-inline: var(--space-md);
+}
+
+/* Cabeçalho da seção: o selo "Seção N", o nome (recolhido até clicar), a
+   contagem e os botões; numa faixa cinza. */
 .pesquisas__secao-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface-pearl);
+}
+
+.pesquisas__secao-selo {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 2px var(--space-xs);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-pill);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-medium);
+}
+
+.pesquisas__secao-nome {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-xs);
-  align-items: start;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.pesquisas__secao-nome:hover {
+  border-color: var(--divisor-cor);
+  background: var(--surface-canvas);
+}
+
+.pesquisas__secao-nome > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pesquisas__secao-contagem {
+  flex: 0 0 auto;
+  font-size: var(--text-caption);
 }
 
 .pesquisas__secao-campos {
   display: grid;
+  flex: 1 1 auto;
   gap: var(--space-xs);
+  min-width: 0;
+}
+
+/* Resumo da etapa ("3 perguntas · 1 seção · cerca de 1 minuto") e
+   "Adicionar seção" na mesma linha. */
+.pesquisas__editor-resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.pesquisas__editor-resumo p {
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.pesquisas__editor-dica {
+  margin: 0;
+  font-size: 0.78125rem;
+}
+
+/* "+ Nova pergunta nesta seção" e a lista suspensa dos tipos. */
+.pesquisas__nova-pergunta {
+  position: relative;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.pesquisas__tipos--suspensa {
+  position: absolute;
+  top: calc(100% + var(--space-xxs));
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 20rem;
+  max-height: 28rem;
+  padding: var(--space-xxs);
+  overflow-y: auto;
+  border: 1px solid var(--divisor-cor);
+  border-style: solid;
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  box-shadow: var(--sombra-flutuante);
+}
+
+.pesquisas__tipos--suspensa .pesquisas__tipos-grupo + .pesquisas__tipos-grupo {
+  margin-top: var(--space-xxs);
+  padding-top: var(--space-xxs);
+  border-top: 1px solid var(--divisor-cor);
+}
+
+.pesquisas__tipos--suspensa .pesquisas__menu-titulo {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: var(--weight-regular);
+  font-size: 0.75rem;
+}
+
+.pesquisas__tipos--suspensa .pesquisas__tipo {
+  width: 100%;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
+  border: 0;
+  text-align: left;
+}
+
+.pesquisas__tipos--suspensa .pesquisas__tipo:hover,
+.pesquisas__tipos--suspensa .pesquisas__tipo:focus-visible {
+  background: var(--surface-neutral);
+}
+
+.pesquisas__tipos--suspensa .pesquisas__tipo-icone {
+  color: var(--color-ink-muted);
+}
+
+.pesquisas__tipos--suspensa .pesquisas__tipo-textos .pesquisas__suave {
+  font-size: 0.75rem;
 }
 
 .pesquisas__botoes-icone {
