@@ -319,7 +319,7 @@ interface PesquisaPublica {
   modelo: Modelo; // a personalizada mostra uma seção por vez
   identificacao: Identificacao;
   totalPerguntas: number;
-  minutosEstimados: number; // 0,3 min por pergunta, arredondado; mínimo 3 (regra única, revisão 3)
+  minutosEstimados: number; // minutos fixos do modelo (MINUTOS_POR_MODELO) ou 0,3 min por pergunta, arredondado; mínimo 3
   secoes: Secao[];
 }
 type AberturaPublica =
@@ -1665,3 +1665,26 @@ Contrato novo:
 - **Seed de demonstração:** o gestor sintético (`DEMO-A-0001`) nasce com CPF
   fictício válido e data de nascimento, para testar o link da avaliação
   (bancos semeados do zero; o seed não reescreve quem já existe).
+
+## Tempo estimado por modelo (28/11/2026)
+
+Decisão da proprietária: o tempo estimado passa a seguir números fixos por modelo.
+
+- **Mapa único:** `MINUTOS_POR_MODELO` em `apps/api/src/pesquisas/regras-pesquisa.ts`, com o espelho
+  exato em `apps/web/src/screens/pesquisas/tempoEstimado.ts` (um teste da tela lê o código da API e
+  exige os dois iguais): Pulso 2, Clima 15, Riscos psicossociais (NR-1) 15, Perfil comportamental
+  (DISC) 8, Saúde financeira 6 e Onboarding 5 minutos.
+- **`minutosDaPesquisa(modelo, totalPerguntas)`** (API e tela): o número do mapa quando o modelo está
+  nele; fora dele (eNPS, Pulso e Clima, Motivação (TAD), Personalizada) e sem modelo, a regra
+  `max(3, round(n × 0,3))` (`minutosEstimados`).
+- **Vale em todo lugar:** abertura da página pública (`minutosEstimados` do contrato) e o texto que
+  ela mostra, prévia da página pública, Sobre ("Como a pessoa responde"), textos dos catálogos
+  (`tempoParaResponder`, `minutosCurtos` e `tempoNoTexto` recebem o id do modelo), assistente do
+  DISC, resumo e pré-visualização do editor (recebem o modelo), e contagem/e-mails/textos do
+  Onboarding (`minutosDoOnboarding`).
+- **Paridade com perguntas alteradas:** quando o RH acrescenta ou tira perguntas de um modelo do mapa
+  (Pulso, Clima), o tempo continua o número do mapa — não recalcula pela quantidade.
+- **Sem mudança:** os modelos prontos da Personalizada mantêm o tempo do card (2, 3, 2, 1, 2 e 2 min,
+  `ModeloDaGaleria.minutos`); Avaliação 90°/180° mantém 4 minutos por pessoa avaliada.
+- **Nenhum minuto à mão nos catálogos:** os números moram só no mapa; o teste que recusa "N min" ou
+  "N minutos" escritos no código dos catálogos continua valendo.
