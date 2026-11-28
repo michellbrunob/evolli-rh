@@ -78,7 +78,8 @@ describe("T216 — questionário do onboarding", () => {
     expect(textoDaContagem(c)).toBe(
       "17 perguntas · 8 blocos · 14 obrigatórias · cerca de 5 minutos",
     );
-    expect(minutosDoOnboarding(3)).toBe(3);
+    // Os minutos do modelo (mapa único), com qualquer quantidade.
+    expect(minutosDoOnboarding(3)).toBe(5);
   });
 
   it("tipos: concordância e satisfação de 4 pontos (com os 4 rótulos), escolhas, nota e textos", () => {

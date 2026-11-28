@@ -41,7 +41,7 @@ export const PULSO: ModeloDaGaleria = {
     "Mede em poucos minutos permanência, clareza, apoio da gestão, reconhecimento e orgulho, com o eNPS. Feita para repetir todo mês.",
   nomeBase: "Pulso",
   get boasVindas() {
-    return `São poucas perguntas e leva ${tempoNoTexto(perguntasParaOTempo(PULSO.secoes, PULSO.comentarioFinal))}. Responda pensando nas últimas semanas.`;
+    return `São poucas perguntas e leva ${tempoNoTexto("pulso", perguntasParaOTempo(PULSO.secoes, PULSO.comentarioFinal))}. Responda pensando nas últimas semanas.`;
   },
   secoes: [
     {

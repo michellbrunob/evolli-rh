@@ -1,14 +1,41 @@
 /**
- * T216 — tempo estimado de uma pesquisa, numa regra só para a tela do RH
- * (pré-visualização, galeria, assistente) e para a página pública de
- * resposta, e para o texto de todos os modelos: 0,3 minuto por pergunta,
- * arredondado, no mínimo 3 minutos (a mesma do Onboarding). Nenhum
- * catálogo escreve os minutos à mão: o texto sai daqui.
+ * T216 — tempo estimado de uma pesquisa, o mesmo na tela do RH
+ * (pré-visualização, galeria, assistente, resumo), na página pública de
+ * resposta e no texto de todos os modelos. Os modelos do mapa têm minutos
+ * fixos (decisão da proprietária), mesmo quando o RH acrescenta ou tira
+ * perguntas; os demais seguem a regra: 0,3 minuto por pergunta,
+ * arredondado, no mínimo 3 minutos. Nenhum catálogo escreve os minutos à
+ * mão: o texto sai daqui.
  */
 import { plural } from "../../format/plural";
 
+/** A regra dos modelos fora do mapa. */
 export function minutosEstimados(totalDePerguntas: number): number {
   return Math.max(3, Math.round(totalDePerguntas * 0.3));
+}
+
+/**
+ * Os minutos fixos de cada modelo: espelho exato do mapa da API
+ * (`regras-pesquisa.ts`), conferido por teste.
+ */
+export const MINUTOS_POR_MODELO: Readonly<Record<string, number>> = {
+  pulso: 2,
+  clima: 15,
+  copsoq: 15,
+  disc: 8,
+  isfb: 6,
+  onboarding: 5,
+};
+
+/** O tempo da pesquisa: o do mapa ou, fora dele (e sem modelo), a regra. */
+export function minutosDaPesquisa(
+  modelo: string | null | undefined,
+  totalDePerguntas: number,
+): number {
+  return (
+    (modelo ? MINUTOS_POR_MODELO[modelo] : undefined) ??
+    minutosEstimados(totalDePerguntas)
+  );
 }
 
 /** "cerca de 3 minutos" (ou "menos de 1 minuto" sem perguntas). */
@@ -37,6 +64,7 @@ export function perguntasParaOTempo(
 
 /** Os minutos de um modelo da galeria, contados como na página pública. */
 export function minutosDoModelo(m: {
+  readonly id: string;
   readonly secoes: readonly SecaoParaOTempo[];
   readonly comentarioFinal?: string | null;
   readonly grupos?: readonly { readonly quantidade: number }[];
@@ -45,21 +73,27 @@ export function minutosDoModelo(m: {
     m.secoes.length === 0 && m.grupos
       ? m.grupos.reduce((t, g) => t + g.quantidade, 0)
       : perguntasParaOTempo(m.secoes, m.comentarioFinal);
-  return minutosEstimados(n);
+  return minutosDaPesquisa(m.id, n);
 }
 
-/** "Cerca de 19 minutos" (de N perguntas) para o texto do catálogo. */
-export function tempoParaResponder(totalDePerguntas: number): string {
-  const t = textoDoTempoEstimado(minutosEstimados(totalDePerguntas));
+/** "Cerca de 19 minutos" (do modelo, de N perguntas) para o catálogo. */
+export function tempoParaResponder(
+  modelo: string,
+  totalDePerguntas: number,
+): string {
+  const t = tempoNoTexto(modelo, totalDePerguntas);
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-/** "19 min" (de N perguntas) para os números do catálogo. */
-export function minutosCurtos(totalDePerguntas: number): string {
-  return `${minutosEstimados(totalDePerguntas)} min`;
+/** "19 min" (do modelo, de N perguntas) para os números do catálogo. */
+export function minutosCurtos(
+  modelo: string,
+  totalDePerguntas: number,
+): string {
+  return `${minutosDaPesquisa(modelo, totalDePerguntas)} min`;
 }
 
-/** "cerca de 19 minutos" (de N perguntas) para o meio de uma frase. */
-export function tempoNoTexto(totalDePerguntas: number): string {
-  return textoDoTempoEstimado(minutosEstimados(totalDePerguntas));
+/** "cerca de 19 minutos" (do modelo, de N perguntas) no meio de uma frase. */
+export function tempoNoTexto(modelo: string, totalDePerguntas: number): string {
+  return textoDoTempoEstimado(minutosDaPesquisa(modelo, totalDePerguntas));
 }

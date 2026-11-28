@@ -182,7 +182,7 @@ export const ENPS: ModeloDaGaleria = {
       "Uma nota de 0 a 10 diz quanto as pessoas indicariam a empresa como lugar para trabalhar. As complementares e as abertas explicam a nota.",
     get metadados() {
       return [
-        `${tempoParaResponder(perguntasParaOTempo(ENPS.secoes))} para responder`,
+        `${tempoParaResponder("enps", perguntasParaOTempo(ENPS.secoes))} para responder`,
         "Identificada, CPF confidencial ou anônima",
         "eNPS de −100 a 100",
       ];

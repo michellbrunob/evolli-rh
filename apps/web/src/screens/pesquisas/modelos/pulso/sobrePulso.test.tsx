@@ -54,7 +54,7 @@ describe("Sobre o modelo — Pulso", () => {
   it("como a pessoa responde: a prévia funciona — nota, cor da faixa e Próxima", () => {
     montar();
     const como = screen.getByRole("region", { name: "Como a pessoa responde" });
-    expect(como).toHaveTextContent("cerca de 3 minutos");
+    expect(como).toHaveTextContent("cerca de 2 minutos");
     expect(como).toHaveTextContent("Pergunta 1 de 7");
     expect(
       within(como).getByRole("progressbar", { name: "Progresso da prévia" }),

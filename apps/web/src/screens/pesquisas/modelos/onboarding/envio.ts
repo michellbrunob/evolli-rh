@@ -10,7 +10,7 @@
 import type { Pergunta, Secao } from "../../../../api/pesquisasClient";
 import type { StatusVariant } from "../../../../components";
 import { secoesDoModelo } from "../../modelosDePesquisa";
-import { minutosEstimados } from "../../tempoEstimado";
+import { minutosDaPesquisa } from "../../tempoEstimado";
 import { novoId } from "../../textosDasPesquisas";
 import { ONBOARDING, ROTULOS_DAS_INTENCOES } from "./catalogo";
 
@@ -130,9 +130,9 @@ export function perguntaDaChave(
   return null;
 }
 
-/** A regra única do tempo estimado (`tempoEstimado.ts`). */
+/** Os minutos do Onboarding no mapa único (`tempoEstimado.ts`). */
 export function minutosDoOnboarding(perguntas: number): number {
-  return minutosEstimados(perguntas);
+  return minutosDaPesquisa("onboarding", perguntas);
 }
 
 export type Faixa = "critico" | "atencao" | "saudavel" | "forte";

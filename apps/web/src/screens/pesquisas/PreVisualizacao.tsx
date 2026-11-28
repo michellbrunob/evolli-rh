@@ -11,23 +11,26 @@ import {
   rotulosDosPontos,
   opcoesDaCondicao,
 } from "./textosDasPesquisas";
-import { minutosEstimados } from "./tempoEstimado";
+import { minutosDaPesquisa, minutosEstimados } from "./tempoEstimado";
 
-// A mesma regra da página pública de resposta (`tempoEstimado.ts`).
+// O mesmo tempo da página pública de resposta (`tempoEstimado.ts`).
 export { minutosEstimados };
 
 export function PreVisualizacao({
+  modelo,
   nome,
   boasVindas,
   secoes,
 }: {
+  /** O modelo da pesquisa (os do mapa têm minutos fixos). */
+  readonly modelo?: string;
   readonly nome: string;
   readonly boasVindas: string;
   readonly secoes: readonly Secao[];
 }) {
   const todas = perguntasEmOrdem(secoes);
   const numero = new Map(todas.map((p, i) => [p.id, i + 1]));
-  const minutos = minutosEstimados(todas.length);
+  const minutos = minutosDaPesquisa(modelo, todas.length);
   return (
     <div className="pesquisas__previa">
       <div>

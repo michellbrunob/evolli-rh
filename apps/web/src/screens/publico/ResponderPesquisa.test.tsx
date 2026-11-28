@@ -1199,13 +1199,27 @@ describe("T216 — revisão lado a lado", () => {
     expect(document.title).toBe("Antes");
   });
 
-  it("o tempo estimado segue a regra única, não o número da API", async () => {
+  it("fora do mapa, o tempo estimado segue a regra, não o número da API", async () => {
     await abrir(
       criarCliente(
         pesquisaDeTeste("anonima", { totalPerguntas: 30, minutosEstimados: 2 }),
       ),
     );
     expect(screen.getByText("cerca de 9 minutos")).toBeInTheDocument();
+  });
+
+  it("modelo com minutos fixos (Pulso): o número do modelo, mesmo com mais perguntas", async () => {
+    await abrir(
+      criarCliente(
+        pesquisaDeTeste("anonima", {
+          modelo: "pulso",
+          totalPerguntas: 30,
+          minutosEstimados: 9,
+        }),
+      ),
+    );
+    expect(screen.getByText("cerca de 2 minutos")).toBeInTheDocument();
+    expect(screen.queryByText("cerca de 9 minutos")).not.toBeInTheDocument();
   });
 
   it("Continuar fica desabilitado até CPF e data estarem completos", async () => {
@@ -1378,10 +1392,11 @@ describe("T216 — pré-visualização do RH", () => {
     });
   }
 
-  it("monta a estrutura com a contagem e o tempo da regra única", () => {
+  it("monta a estrutura com a contagem e o tempo do modelo", () => {
     const p = previa();
     expect(p.totalPerguntas).toBe(11);
-    expect(p.minutosEstimados).toBe(3);
+    // Pulso: os minutos fixos do modelo (a regra daria 3).
+    expect(p.minutosEstimados).toBe(2);
     expect(p.modelo).toBe("pulso");
     expect(p).not.toHaveProperty("grupos");
   });

@@ -435,6 +435,7 @@ function AssistenteDePesquisaInterno({
         mudar.
       </p>
       <PreVisualizacao
+        modelo={estado.modelo}
         nome={estado.nome}
         boasVindas=""
         secoes={estado.secoes}
@@ -442,6 +443,7 @@ function AssistenteDePesquisaInterno({
     </div>
   ) : (
     <EditorDePerguntas
+      modelo={estado.modelo}
       secoes={estado.secoes}
       onMudar={(secoes) => mudar({ secoes })}
       erros={etapaReal === 1 ? erros : null}

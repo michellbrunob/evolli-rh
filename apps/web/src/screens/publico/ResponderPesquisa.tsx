@@ -71,7 +71,7 @@ import {
   dataDigitadaParaIso,
   mascararDataDigitada,
 } from "../../format/dataDigitada";
-import { minutosEstimados } from "../pesquisas/tempoEstimado";
+import { minutosDaPesquisa } from "../pesquisas/tempoEstimado";
 import { CampoDaPergunta } from "./CampoDaPergunta";
 import { perfilDasEscolhas } from "../pesquisas/modelos/disc/perfilLocal";
 import { ResultadoPublicoDisc } from "../pesquisas/modelos/disc/ResultadoPublicoDisc";
@@ -135,7 +135,8 @@ export function comNomeDaEmpresa(p: PesquisaPublica): PesquisaPublica {
 
 /**
  * A estrutura que a página pública recebe, montada a partir do rascunho do
- * RH (sem API): conta as perguntas e usa o mesmo tempo estimado da prévia.
+ * RH (sem API): conta as perguntas e usa o mesmo tempo estimado da prévia
+ * (o do modelo ou a regra, `tempoEstimado.ts`).
  */
 export function montarPreviaPublica(dados: DadosDaPrevia): PesquisaPublica {
   const total = dados.secoes.reduce((n, s) => n + s.perguntas.length, 0);
@@ -146,7 +147,7 @@ export function montarPreviaPublica(dados: DadosDaPrevia): PesquisaPublica {
     boasVindas: dados.boasVindas,
     identificacao: dados.identificacao,
     totalPerguntas: total,
-    minutosEstimados: minutosEstimados(total),
+    minutosEstimados: minutosDaPesquisa(dados.modelo, total),
     secoes: dados.secoes,
   };
   return dados.grupos ? { ...base, grupos: dados.grupos } : base;
@@ -836,7 +837,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
             <li>
               <IconeRelogio tamanho={16} />
               <span>
-                {`cerca de ${plural(minutosEstimados(p.totalPerguntas), "minuto", "minutos")}`}
+                {`cerca de ${plural(minutosDaPesquisa(p.modelo, p.totalPerguntas), "minuto", "minutos")}`}
               </span>
             </li>
             <li>

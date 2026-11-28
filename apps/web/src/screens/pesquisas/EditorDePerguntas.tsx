@@ -47,7 +47,7 @@ import {
   type IconeDoEcossistema,
 } from "../../ui/icones";
 import { useAvisar } from "./avisos";
-import { minutosEstimados, textoDoTempoEstimado } from "./tempoEstimado";
+import { minutosDaPesquisa, textoDoTempoEstimado } from "./tempoEstimado";
 import {
   adicionarPergunta,
   adicionarSecao,
@@ -239,10 +239,13 @@ function ListaDeTipos({
 }
 
 export function EditorDePerguntas({
+  modelo,
   secoes,
   onMudar,
   erros,
 }: {
+  /** O modelo da pesquisa (o tempo estimado do resumo). */
+  readonly modelo?: string;
   readonly secoes: readonly Secao[];
   readonly onMudar: (secoes: Secao[]) => void;
   /** Erros a mostrar (só depois de tentar avançar). */
@@ -298,7 +301,7 @@ export function EditorDePerguntas({
           {[
             plural(total, "pergunta", "perguntas"),
             plural(secoes.length, "seção", "seções"),
-            textoDoTempoEstimado(minutosEstimados(total)),
+            textoDoTempoEstimado(minutosDaPesquisa(modelo, total)),
           ].join(" · ")}
         </p>
         <Button

@@ -73,7 +73,7 @@ import {
 import { seloDoTipoDaPergunta } from "./modelos/selos";
 import { textoParaOPainel } from "./modelos/empresa";
 import { CartaoDosBlocos } from "./modelos/disc/CartaoDosBlocos";
-import { minutosEstimados } from "./tempoEstimado";
+import { minutosDaPesquisa } from "./tempoEstimado";
 import { lembrarRascunho } from "./rascunhosLocais";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { TelaDeGerada } from "./TelaDeGerada";
@@ -468,7 +468,7 @@ function AssistenteDoModeloInterno({
         </h1>
         <p className="pesquisas__subtitulo">
           {m.modelo === "disc"
-            ? `${principais.length} blocos · cerca de ${minutosEstimados(principais.length)} minutos para responder.`
+            ? `${principais.length} blocos · cerca de ${minutosDaPesquisa("disc", principais.length)} minutos para responder.`
             : m.descricao}
         </p>
       </div>

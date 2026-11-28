@@ -9,7 +9,7 @@
  */
 import type { ModeloDaGaleria, PerguntaDoModelo } from "../tipos";
 import {
-  minutosEstimados,
+  minutosDaPesquisa,
   perguntasParaOTempo,
   tempoParaResponder,
 } from "../../tempoEstimado";
@@ -228,7 +228,7 @@ export const ONBOARDING: ModeloDaGaleria = {
       "Acompanha a chegada de cada pessoa aos 30 e aos 60 dias de casa. A pesquisa sai sozinha na data de cada uma, e as rodadas são comparadas.",
     get metadados() {
       return [
-        `${tempoParaResponder(perguntasParaOTempo(ONBOARDING.secoes))} para responder`,
+        `${tempoParaResponder("onboarding", perguntasParaOTempo(ONBOARDING.secoes))} para responder`,
         "CPF confidencial",
         "Média por bloco, de 0 a 100, em cada rodada",
       ];
@@ -240,7 +240,10 @@ export const ONBOARDING: ModeloDaGaleria = {
         { valor: "17", rotulo: "perguntas em 8 blocos" },
         {
           valor: String(
-            minutosEstimados(perguntasParaOTempo(ONBOARDING.secoes)),
+            minutosDaPesquisa(
+              "onboarding",
+              perguntasParaOTempo(ONBOARDING.secoes),
+            ),
           ),
           rotulo: "minutos para responder",
         },
@@ -357,7 +360,13 @@ export const ONBOARDING: ModeloDaGaleria = {
     get ficha(): readonly (readonly [string, string])[] {
       return [
         ["Perguntas", "17 em 8 blocos"],
-        ["Tempo", tempoParaResponder(perguntasParaOTempo(ONBOARDING.secoes))],
+        [
+          "Tempo",
+          tempoParaResponder(
+            "onboarding",
+            perguntasParaOTempo(ONBOARDING.secoes),
+          ),
+        ],
         ["Escalas", "4 pontos, sem meio-termo"],
         ["Recomendação", "De 0 a 10"],
         ["Identificação", "CPF confidencial"],

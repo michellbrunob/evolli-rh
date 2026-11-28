@@ -17,6 +17,8 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { PesquisaDetalhe } from "../../api/pesquisasClient";
 import { DETALHE, servicoFalso } from "./dadosDeTeste";
+import { EditorDePerguntas } from "./EditorDePerguntas";
+import { PreVisualizacao } from "./PreVisualizacao";
 import { EditarPesquisa } from "./EditarPesquisa";
 import {
   diasDepois,
@@ -31,7 +33,11 @@ import {
   rotaDePesquisasDoFragmento,
   type RotaDePesquisas,
 } from "./rotasDePesquisas";
-import { minutosEstimados, textoDoTempoEstimado } from "./tempoEstimado";
+import {
+  minutosDaPesquisa,
+  minutosEstimados,
+  textoDoTempoEstimado,
+} from "./tempoEstimado";
 
 /**
  * O prazo como a API recebe: dia e hora de Brasília, sem fuso no texto
@@ -160,9 +166,13 @@ describe("Pré-visualização", () => {
     expect(servico.alterarPesquisa).not.toHaveBeenCalled();
   });
 
-  it("a pesquisa da prévia usa a mesma regra de tempo da página pública", () => {
+  it("a pesquisa da prévia usa o mesmo tempo da página pública (o do modelo)", () => {
     const p = pesquisaPublicaDaPrevia(DETALHE, "Empresa Alfa", null);
-    expect(p.minutosEstimados).toBe(minutosEstimados(p.totalPerguntas));
+    // Clima: os minutos fixos do modelo, não a regra pelas perguntas.
+    expect(p.minutosEstimados).toBe(15);
+    expect(p.minutosEstimados).toBe(
+      minutosDaPesquisa("clima", p.totalPerguntas),
+    );
     expect(p.empresa).toBe("Empresa Alfa");
   });
 });
@@ -233,6 +243,39 @@ describe("Tempo estimado", () => {
       3, 3, 3, 3, 3, 4, 6,
     ]);
     expect(textoDoTempoEstimado(1)).toBe("cerca de 1 minuto");
+  });
+
+  it("resumo do editor e pré-visualização: o tempo do modelo (mapa) ou a regra", () => {
+    const secoes = DETALHE.secoes;
+    const n = secoes.reduce((t, s) => t + s.perguntas.length, 0);
+    const { unmount } = render(
+      <EditorDePerguntas
+        modelo="clima"
+        secoes={secoes}
+        onMudar={() => undefined}
+        erros={null}
+      />,
+    );
+    expect(
+      document.querySelector(".pesquisas__editor-resumo"),
+    ).toHaveTextContent("cerca de 15 minutos");
+    unmount();
+    const previa = render(
+      <PreVisualizacao modelo="pulso" nome="P" boasVindas="" secoes={secoes} />,
+    );
+    expect(previa.container).toHaveTextContent("cerca de 2 minutos");
+    previa.unmount();
+    render(
+      <PreVisualizacao
+        modelo="personalizada"
+        nome="P"
+        boasVindas=""
+        secoes={secoes}
+      />,
+    );
+    expect(document.body).toHaveTextContent(
+      `cerca de ${minutosEstimados(n)} minutos`,
+    );
   });
 });
 
