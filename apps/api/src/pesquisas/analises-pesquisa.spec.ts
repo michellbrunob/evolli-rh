@@ -3,6 +3,7 @@ import {
   mediaDasRespostas,
   mediaGeralVisivel,
   montarAnalises,
+  montarEvolucao,
   type RespostaDaAnalise,
 } from "./analises-pesquisa";
 import type { Pergunta, Secao, TipoPergunta } from "./pesquisas.types";
@@ -151,6 +152,62 @@ describe("T216 — montarAnalises", () => {
       mediaGeralVisivel(secoes, respostas.slice(0, 2), 3, true),
     ).toBeNull();
     expect(mediaGeralVisivel(secoes, respostas.slice(0, 2), 3, false)).toBe(9);
+  });
+});
+
+describe("T216 — montarEvolucao", () => {
+  const pesquisa = (id: string, status: string, identificacao = "anonima") => ({
+    id,
+    nome: `Pesquisa ${id}`,
+    status,
+    publicadaEm: new Date(`2026-0${id.slice(1)}-01T12:00:00Z`),
+    secoes,
+    identificacao,
+    minimoPorGrupo: 3,
+  });
+  const valoresDe = (pesquisaId: string, lista = respostas) =>
+    lista.map((x) => ({ pesquisaId, valores: x.valores }));
+
+  it("pesquisa cancelada fica fora da evolução", () => {
+    const pontos = montarEvolucao(
+      [
+        pesquisa("p1", "finalizada"),
+        pesquisa("p2", "cancelada"),
+        pesquisa("p3", "ativa"),
+      ],
+      [...valoresDe("p1"), ...valoresDe("p2"), ...valoresDe("p3")],
+    );
+    expect(pontos.map((x) => x.pesquisaId)).toEqual(["p1", "p3"]);
+  });
+
+  it("sem média visível (confidencial abaixo do mínimo) ou sem resposta: fora", () => {
+    const pontos = montarEvolucao(
+      [
+        pesquisa("p1", "finalizada", "confidencial"),
+        pesquisa("p2", "pausada"),
+        pesquisa("p3", "ativa"),
+      ],
+      [...valoresDe("p1", respostas.slice(0, 2)), ...valoresDe("p3")],
+    );
+    expect(pontos).toEqual([
+      {
+        pesquisaId: "p3",
+        nome: "Pesquisa p3",
+        publicadaEm: "2026-03-01T12:00:00.000Z",
+        mediaGeral: 6.5,
+      },
+    ]);
+  });
+
+  it("mantém a ordem recebida e a média de cada pesquisa", () => {
+    const pontos = montarEvolucao(
+      [pesquisa("p2", "finalizada"), pesquisa("p1", "finalizada")],
+      [...valoresDe("p1", respostas.slice(0, 2)), ...valoresDe("p2")],
+    );
+    expect(pontos.map((x) => [x.pesquisaId, x.mediaGeral])).toEqual([
+      ["p2", 6.5],
+      ["p1", 9],
+    ]);
   });
 });
 

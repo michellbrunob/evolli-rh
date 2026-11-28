@@ -57,6 +57,49 @@ export function mediaGeralVisivel(
   return mediaGeralDe(secoes, respostas);
 }
 
+export interface PesquisaDaEvolucao {
+  id: string;
+  nome: string;
+  status: string;
+  publicadaEm: Date | null;
+  secoes: unknown;
+  identificacao: string;
+  minimoPorGrupo: number;
+}
+
+/**
+ * A evolução entre pesquisas do mesmo modelo, na ordem recebida: uma entrada
+ * por pesquisa com média geral visível. Cancelada nunca conta; sem resposta
+ * ou sem média (confidencial abaixo do mínimo) fica fora.
+ */
+export function montarEvolucao(
+  pesquisas: readonly PesquisaDaEvolucao[],
+  respostas: readonly { pesquisaId: string; valores: unknown }[],
+): AnalisesPesquisa["evolucao"] {
+  const pontos: AnalisesPesquisa["evolucao"] = [];
+  for (const m of pesquisas) {
+    if (m.status === "cancelada" || m.publicadaEm === null) continue;
+    const dela = respostas.filter((v) => v.pesquisaId === m.id);
+    const mediaGeral = mediaGeralVisivel(
+      m.secoes as Secao[],
+      dela.map((v) => ({
+        valores: v.valores as ValorRespondido[],
+        grupos: {},
+      })),
+      m.minimoPorGrupo,
+      m.identificacao === "confidencial",
+    );
+    if (mediaGeral === null) continue;
+    pontos.push({
+      pesquisaId: m.id,
+      nome: m.nome,
+      publicadaEm: m.publicadaEm.toISOString(),
+      mediaGeral,
+    });
+  }
+  return pontos;
+}
+
 /**
  * Média (0–10) de várias respostas, cada uma na sua própria estrutura: a
  * média de cada resposta nas perguntas de escala e, delas, a média. Sem

@@ -27,8 +27,8 @@ import {
 import {
   compararComOTime,
   mediaDasRespostas,
-  mediaGeralVisivel,
   montarAnalises,
+  montarEvolucao,
 } from "./analises-pesquisa";
 import {
   ativosDaEmpresa,
@@ -1170,6 +1170,7 @@ export class PesquisasService {
       select: {
         id: true,
         nome: true,
+        status: true,
         publicadaEm: true,
         secoes: true,
         identificacao: true,
@@ -1180,38 +1181,24 @@ export class PesquisasService {
       where: { pesquisaId: { in: mesmas.map((m) => m.id) } },
       select: { pesquisaId: true, valores: true },
     });
-    const comRespostas = new Set(valoresDe.map((v) => v.pesquisaId));
-    const evolucao = mesmas
-      .filter((m) => comRespostas.has(m.id))
-      .map((m) => ({
-        pesquisaId: m.id,
-        nome: m.nome,
-        publicadaEm: m.publicadaEm!.toISOString(),
-        mediaGeral: mediaGeralVisivel(
-          m.secoes as unknown as Secao[],
-          valoresDe
-            .filter((v) => v.pesquisaId === m.id)
-            .map((v) => ({
-              valores: v.valores as unknown as ValorRespondido[],
-              grupos: {},
-            })),
-          m.minimoPorGrupo,
-          m.identificacao === "confidencial",
-        ),
-        // eNPS: o índice de cada pesquisa (a mesma regra do mínimo).
-        ...(p.modelo === "enps"
-          ? {
-              enps: enpsVisivel(
-                m.secoes as unknown as Secao[],
-                valoresDe
-                  .filter((v) => v.pesquisaId === m.id)
-                  .map((v) => v.valores as unknown as ValorRespondido[]),
-                m.minimoPorGrupo,
-                m.identificacao === "confidencial",
-              ),
-            }
-          : {}),
-      }));
+    const porId = new Map(mesmas.map((m) => [m.id, m]));
+    const evolucao = montarEvolucao(mesmas, valoresDe).map((e) => {
+      const m = porId.get(e.pesquisaId)!;
+      // eNPS: o índice de cada pesquisa (a mesma regra do mínimo).
+      return p.modelo === "enps"
+        ? {
+            ...e,
+            enps: enpsVisivel(
+              m.secoes as unknown as Secao[],
+              valoresDe
+                .filter((v) => v.pesquisaId === m.id)
+                .map((v) => v.valores as unknown as ValorRespondido[]),
+              m.minimoPorGrupo,
+              m.identificacao === "confidencial",
+            ),
+          }
+        : e;
+    });
 
     return montarAnalises({
       campo,
