@@ -160,6 +160,9 @@ export interface ParticipanteDaPesquisa {
   colaboradorId: string;
   nome: string;
   departamento: string | null;
+  /** Centro de custo e unidade da lotação vigente (API ampliada). */
+  centroCusto?: string | null;
+  unidade?: string | null;
   /** `null` na anônima; na confidencial, só `true`/`false`. */
   respondeu: boolean | null;
   /**
@@ -426,27 +429,40 @@ export interface PesquisaDaFicha {
 
 type Metodo = "GET" | "POST" | "PUT" | "DELETE";
 
+/**
+ * Um pedido à API. Escrita com 403 `csrf_invalido` (outra aba renovou o
+ * token desta sessão): o pedido não foi aplicado, então descarta o token,
+ * renova e repete UMA vez — como a troca de empresa e o perfil.
+ */
 export async function pedir<T>(
   rota: string,
   metodo: Metodo,
   corpo?: unknown,
 ): Promise<T> {
   const escrita = metodo !== "GET";
-  const res = await fetch(`/v1${rota}`, {
-    method: metodo,
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      ...(corpo !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(escrita
-        ? { "x-csrf-token": getCsrfToken() ?? (await refreshCsrfToken()) }
-        : {}),
-    },
-    ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}),
-  });
+  const enviar = async () =>
+    fetch(`/v1${rota}`, {
+      method: metodo,
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        ...(corpo !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(escrita
+          ? { "x-csrf-token": getCsrfToken() ?? (await refreshCsrfToken()) }
+          : {}),
+      },
+      ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}),
+    });
+  let res = await enviar();
+  if (escrita) {
+    await descartarTokenSeDesatualizado(res);
+    if (res.status === 403 && getCsrfToken() === null) {
+      res = await enviar();
+      await descartarTokenSeDesatualizado(res);
+    }
+  }
   if (res.status === 401) clearCsrfToken();
-  if (escrita) await descartarTokenSeDesatualizado(res);
   if (!res.ok) {
     const erro: unknown = await res.json().catch(() => ({}));
     throw new ApiError(res.status, "Erro na requisição.", erro);
