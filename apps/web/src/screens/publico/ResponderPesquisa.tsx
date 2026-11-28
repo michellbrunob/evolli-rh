@@ -71,6 +71,9 @@ import { minutosEstimados } from "../pesquisas/tempoEstimado";
 import { CampoDaPergunta } from "./CampoDaPergunta";
 import { perfilDasEscolhas } from "../pesquisas/modelos/disc/perfilLocal";
 import { ResultadoPublicoDisc } from "../pesquisas/modelos/disc/ResultadoPublicoDisc";
+import { rodadaDaPesquisaPublica } from "../../app/rotaPublica";
+import { ehAvaliacao } from "../pesquisas/modelos/avaliacao/catalogo";
+import { ResponderAvaliacao } from "../pesquisas/modelos/avaliacao/ResponderAvaliacao";
 import {
   cpfValido,
   erroDaPergunta,
@@ -164,7 +167,9 @@ type Etapa =
   | { readonly tipo: "identificacao" }
   | { readonly tipo: "tela"; readonly id: string }
   | { readonly tipo: "ja-respondeu" }
-  | { readonly tipo: "enviado" };
+  | { readonly tipo: "enviado" }
+  // T216 — Avaliação 90°/180°: depois da identificação, quem a pessoa avalia.
+  | { readonly tipo: "avaliacao" };
 
 /** Uma tela de resposta: uma pergunta, ou uma seção inteira. */
 interface Tela {
@@ -477,6 +482,10 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
   function aposIdentificar(passe: string, nome: string) {
     passeRef.current = passe;
     setPrimeiroNome(nome);
+    if (!previa && pesquisa?.modelo && ehAvaliacao(pesquisa.modelo)) {
+      setEtapa({ tipo: "avaliacao" });
+      return;
+    }
     setCpf("");
     setNascimento("");
     setAvisoIdent(null);
@@ -558,6 +567,12 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
         -readonly [K in keyof EnvioDeRespostas]: EnvioDeRespostas[K];
       } = { respostas: montarRespostas(secoes, respostas) };
       if (passeRef.current !== null) envio.passe = passeRef.current;
+      // T216 — onboarding: a resposta vai com a rodada do convite.
+      if (pesquisa.modelo === "onboarding") {
+        envio.onboarding = {
+          rodada: rodadaDaPesquisaPublica(window.location.hash),
+        };
+      }
       if (gruposDaPesquisa.length) {
         const escolhidos: Partial<Record<CampoGrupo, string | null>> = {};
         for (const g of gruposDaPesquisa) {
@@ -1055,6 +1070,16 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
       );
       break;
     }
+
+    case "avaliacao":
+      conteudo = (
+        <ResponderAvaliacao
+          token={token}
+          passe={passeRef.current ?? ""}
+          primeiroNome={primeiroNome}
+        />
+      );
+      break;
 
     case "ja-respondeu":
       conteudo = (

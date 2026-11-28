@@ -61,6 +61,10 @@ import {
 } from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
 import { baixarArquivo } from "../dashboard/exportacao";
+import {
+  ResultadosProprios,
+  ehModeloComTelaPropria,
+} from "./modelos/integracao";
 import { TIPO_MIME_XLSX } from "../pessoas/importacao/planilhaXlsx";
 import { seloDoTipo } from "./AssistenteDoModelo";
 import {
@@ -351,6 +355,7 @@ function ResultadosInterno({
     (detalhe.status === "ativa" || detalhe.status === "pausada");
   const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
   const participantes = detalhe.participantesTotal ?? detalhe.participantes;
+  const proprio = ehModeloComTelaPropria(detalhe.modelo);
   const abas: { valor: Aba; rotulo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral" },
     {
@@ -544,7 +549,14 @@ function ResultadosInterno({
         publicada
       />
 
-      <div role="tablist" aria-label="Resultados" className="pesquisas__abas">
+      {/* T216 — avaliação e onboarding: resultados próprios. */}
+      {proprio ? <ResultadosProprios detalhe={detalhe} hoje={hoje} /> : null}
+      <div
+        role="tablist"
+        aria-label="Resultados"
+        className="pesquisas__abas"
+        hidden={proprio}
+      >
         {abas.map((a) => (
           <button
             key={a.valor}
@@ -559,7 +571,7 @@ function ResultadosInterno({
         ))}
       </div>
 
-      <div role="tabpanel" className="pesquisas__resultados">
+      <div role="tabpanel" className="pesquisas__resultados" hidden={proprio}>
         {abasProprias ? (
           abasProprias
         ) : aba === "geral" ? (

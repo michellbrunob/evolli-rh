@@ -223,7 +223,16 @@ function pendentes(extra: Partial<Pendentes> = {}): Pendentes {
 
 function montarResposta(
   p = pendentes(),
-  responder = vi.fn(async () => ({ ok: true as const, restantes: 0 })),
+  responder = vi.fn(
+    async (
+      _token: string,
+      _parId: string,
+      _corpo: {
+        passe: string;
+        respostas: { perguntaId: string; valor: number }[];
+      },
+    ) => ({ ok: true as const, restantes: 0 }),
+  ),
 ) {
   const cliente = { pendentes: vi.fn(async () => p), responder };
   render(

@@ -21,8 +21,10 @@ export function AvaliacoesDaFicha({
   const [itens, setItens] = useState<AvaliacaoDaFicha[] | null>(null);
   useEffect(() => {
     let vivo = true;
-    carregar(colaboradorId)
-      .then((d) => vivo && setItens(d))
+    // Resolve mesmo quando o carregador não devolve promessa (cliente simulado).
+    Promise.resolve()
+      .then(() => carregar(colaboradorId))
+      .then((d) => vivo && setItens(Array.isArray(d) ? d : []))
       .catch(() => vivo && setItens([]));
     return () => {
       vivo = false;

@@ -40,7 +40,10 @@ function montar(
   };
   const cliente = {
     organograma: vi.fn(async () => organograma),
-    salvar: vi.fn(async () => avaliacaoDetalheFalsa()),
+    salvar: vi.fn(
+      async (_id: string, _corpo: { config: Record<string, unknown> }) =>
+        avaliacaoDetalheFalsa(),
+    ),
   };
   const onAcompanhar = vi.fn();
   render(

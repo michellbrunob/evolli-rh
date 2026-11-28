@@ -26,6 +26,7 @@ import {
   dataDoInstante,
 } from "../../../pesquisas/textosDasPesquisas";
 import "../../../pesquisas/Pesquisas.css";
+import { AvaliacoesDaFicha } from "../../../pesquisas/modelos/avaliacao/AvaliacoesDaFicha";
 
 export type CarregarPesquisasDaFicha = (
   colaboradorId: string,
@@ -195,6 +196,8 @@ export function AbaPesquisas({
           ))}
         </ul>
       )}
+      {/* T216 — as Avaliações 90°/180° sobre a pessoa (só com alguma). */}
+      <AvaliacoesDaFicha colaboradorId={colaboradorId} />
     </section>
   );
 }

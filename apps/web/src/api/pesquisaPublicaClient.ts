@@ -163,6 +163,8 @@ export interface EnvioDeRespostas {
   /** Escolha de cada grupo; `null` = prefere não informar. */
   readonly grupos?: Partial<Record<CampoGrupo, string | null>>;
   readonly respostas: readonly RespostaDaPergunta[];
+  /** T216 — onboarding: vai para a rota da rodada (`null` = a do convite). */
+  readonly onboarding?: { readonly rodada: number | null };
 }
 
 export interface ErroDeCampo {
@@ -308,8 +310,13 @@ export function criarClientePesquisaPublica(
       if (envio.passe !== undefined) corpo.passe = envio.passe;
       if (envio.grupos !== undefined) corpo.grupos = envio.grupos;
       const res = await buscar(
-        rota(token, "/respostas"),
-        opcoes("POST", corpo),
+        rota(token, envio.onboarding ? "/onboarding/respostas" : "/respostas"),
+        opcoes(
+          "POST",
+          envio.onboarding?.rodada != null
+            ? { ...corpo, rodada: envio.onboarding.rodada }
+            : corpo,
+        ),
       );
       if (!res.ok) throw await erroDe(res);
     },

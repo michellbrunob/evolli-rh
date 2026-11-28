@@ -107,6 +107,10 @@ import {
   podeEditarPesquisa,
 } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
+import {
+  AssistenteProprio,
+  ehModeloComTelaPropria,
+} from "./modelos/integracao";
 import "./Pesquisas.css";
 
 export { PESQUISAS_TITULO_ID };
@@ -229,6 +233,8 @@ function Modulo({
   // Modelo pronto: retoma o rascunho dele, se houver.
   useEffect(() => {
     if (modeloAtual === null || semEmpresa) return;
+    // T216 — avaliação e onboarding têm assistente próprio.
+    if (ehModeloComTelaPropria(modeloAtual)) return;
     let vivo = true;
     Promise.resolve(
       servico.listarPesquisas({
@@ -328,6 +334,16 @@ function Modulo({
       onEditarGerada={(d) => irPara({ tela: "editar", id: d.id })}
     />
   );
+  const assistenteProprio = (modelo: string) => (
+    <AssistenteProprio
+      key="assistente-proprio"
+      modelo={modelo}
+      servico={servico}
+      hoje={hoje}
+      onVoltar={() => irPara({ tela: "nova" })}
+      onAbrirResultados={(id) => abrirResultados(id)}
+    />
+  );
   const assistenteAberto = (x: {
     roteiro?: string | undefined;
     inicial?: ReturnType<typeof estadoDaCopia> | undefined;
@@ -367,6 +383,8 @@ function Modulo({
 
   switch (atual.tela) {
     case "modelo":
+      if (ehModeloComTelaPropria(atual.modelo))
+        return assistenteProprio(atual.modelo);
       return conferido === atual.modelo
         ? assistenteDoModelo(atual.modelo)
         : carregando("Abrindo o modelo…");
@@ -392,6 +410,8 @@ function Modulo({
                   irPara({ tela: "editar", id: d.id }, { substituir: true })
                 }
               />
+            ) : ehModeloComTelaPropria(d.modelo) ? (
+              assistenteProprio(d.modelo)
             ) : ehModeloPronto(d.modelo) ? (
               assistenteDoModelo(d.modelo, d)
             ) : (
