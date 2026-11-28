@@ -173,7 +173,7 @@ describe("T216 — eNPS: assistente", () => {
     return servico;
   }
 
-  it("a principal não sai; as outras saem; a nota explica por quê", () => {
+  it("a principal não sai nem se edita (somente leitura); as outras saem; a nota explica por quê", () => {
     montar();
     expect(screen.getByLabelText("Nome da pesquisa")).toHaveValue(
       "eNPS – 4º trimestre 2026",
@@ -182,7 +182,11 @@ describe("T216 — eNPS: assistente", () => {
       screen.queryByRole("button", { name: "Excluir pergunta 1" }),
     ).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Editar pergunta 1" }),
+      screen.queryByRole("button", { name: "Editar pergunta 1" }),
+    ).toBeNull();
+    expect(screen.queryByDisplayValue(/\{empresa\}/)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Editar pergunta 2" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Excluir pergunta 2" }),

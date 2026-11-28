@@ -913,7 +913,8 @@ function EtapaConfigurar({
                     >
                       {seloDoTipo(p)}
                     </span>
-                    {travado || editando?.id === p.id ? null : (
+                    {/* A fixa (principal do eNPS) é somente leitura. */}
+                    {travado || editando?.id === p.id || fixa(p) ? null : (
                       <span className="pesquisas__linha-acoes">
                         <IconButton
                           label={`Editar pergunta ${i + 1}`}
@@ -923,23 +924,21 @@ function EtapaConfigurar({
                             setEditando({ id: p.id, texto: p.texto })
                           }
                         />
-                        {fixa(p) ? null : (
-                          <IconButton
-                            label={`Excluir pergunta ${i + 1}`}
-                            icon={<IconeRemover tamanho={14} />}
-                            variant="subtle"
-                            onClick={() => {
-                              const antes = estado.secoes;
-                              onMudar({ secoes: excluirPergunta(antes, p.id) });
-                              avisar("Pergunta excluída.", {
-                                acao: {
-                                  rotulo: "Desfazer",
-                                  onClick: () => onMudar({ secoes: antes }),
-                                },
-                              });
-                            }}
-                          />
-                        )}
+                        <IconButton
+                          label={`Excluir pergunta ${i + 1}`}
+                          icon={<IconeRemover tamanho={14} />}
+                          variant="subtle"
+                          onClick={() => {
+                            const antes = estado.secoes;
+                            onMudar({ secoes: excluirPergunta(antes, p.id) });
+                            avisar("Pergunta excluída.", {
+                              acao: {
+                                rotulo: "Desfazer",
+                                onClick: () => onMudar({ secoes: antes }),
+                              },
+                            });
+                          }}
+                        />
                       </span>
                     )}
                   </div>
