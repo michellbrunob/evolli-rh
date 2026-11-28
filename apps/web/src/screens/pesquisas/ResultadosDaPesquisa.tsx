@@ -22,6 +22,7 @@ import type {
   ResultadoPergunta,
   ResultadosPesquisa,
 } from "../../api/pesquisasClient";
+import type { ServicoDosModelos } from "../../api/modelosDePesquisaClient";
 import { Button } from "../../components";
 import {
   diaCivilDeHoje,
@@ -84,6 +85,13 @@ import { nomeDaExportacao, planilhaDosResultados } from "./exportarResultados";
 import { enderecoDaRota } from "./rotasDePesquisas";
 import { planilhaDisc } from "./modelos/disc/exportarDisc";
 import { perfilComportamental } from "./modelos/disc/tiposDisc";
+import { enderecoDaRota, type AbaDosResultados } from "./rotasDePesquisas";
+import {
+  ABAS_DO_MODELO,
+  PainelDoModelo,
+  temTelasProprias,
+} from "./modelos/registro";
+import { planilhaDoModelo } from "./modelos/exportacao";
 import {
   BarraEmpilhada,
   BarrasPorNota,
@@ -120,7 +128,7 @@ import {
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import "./Pesquisas.css";
 
-type Aba = "geral" | "analises" | "respostas";
+type Aba = AbaDosResultados;
 
 const COR_DA_FAIXA = {
   baixa: "var(--status-danger-ink)",
@@ -177,8 +185,11 @@ function ResultadosInterno({
   onSobreOModelo,
   onAbrirResposta,
   onTrocarAba,
+  servicoDosModelos,
 }: {
   readonly servico: ServicoDePesquisas;
+  /** Resultados dos modelos com metodologia própria (testes: um falso). */
+  readonly servicoDosModelos?: ServicoDosModelos;
   readonly pesquisaId: string;
   /** RH e DP: mudam status, editam, exportam respostas e as leem. */
   readonly podeEditar: boolean;
@@ -279,13 +290,19 @@ function ResultadosInterno({
         pesquisaId,
         carregado.lista,
       );
+      const propria = await planilhaDoModelo(
+        carregado,
+        completas,
+        servicoDosModelos,
+      );
       baixarArquivo(
-        planilhaDosResultados(
-          carregado.rel,
-          carregado.detalhe,
-          carregado.geral,
-          completas,
-        ),
+        propria ??
+          planilhaDosResultados(
+            carregado.rel,
+            carregado.detalhe,
+            carregado.geral,
+            completas,
+          ),
         nomeDaExportacao(detalhe.nome, "xlsx"),
         TIPO_MIME_XLSX,
       );
@@ -356,19 +373,25 @@ function ResultadosInterno({
   const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
   const participantes = detalhe.participantesTotal ?? detalhe.participantes;
   const proprio = ehModeloComTelaPropria(detalhe.modelo);
+  const proprias = ABAS_DO_MODELO[detalhe.modelo];
   const abas: { valor: Aba; rotulo: ReactNode }[] = [
-    { valor: "geral", rotulo: "Visão geral" },
-    {
-      valor: "analises",
-      rotulo: (
-        <>
-          Análises{" "}
-          <span className="pesquisas__selo pesquisas__selo--destaque">
-            Novo
-          </span>
-        </>
-      ),
-    },
+    ...(proprias ?? []),
+    ...(proprias ? [] : [{ valor: "geral" as const, rotulo: "Visão geral" }]),
+    ...(proprias
+      ? []
+      : [
+          {
+            valor: "analises" as const,
+            rotulo: (
+              <>
+                Análises{" "}
+                <span className="pesquisas__selo pesquisas__selo--destaque">
+                  Novo
+                </span>
+              </>
+            ),
+          },
+        ]),
     ...(individuais
       ? [
           {
@@ -610,11 +633,27 @@ function ResultadosInterno({
                 )}
               </div>
             </section>
+          ) : temTelasProprias(detalhe.modelo) ? (
+            <PainelDoModelo
+              detalhe={detalhe}
+              aba="geral"
+              podeEditar={podeEditar}
+              {...(servicoDosModelos ? { servico: servicoDosModelos } : {})}
+              onTrocarAba={setAba}
+            />
           ) : (
             (visaoGeralDoModelo(detalhe, geral) ?? (
               <VisaoGeral servico={servico} detalhe={detalhe} geral={geral} />
             ))
           )
+        ) : temTelasProprias(detalhe.modelo) && aba !== "respostas" ? (
+          <PainelDoModelo
+            detalhe={detalhe}
+            aba={aba}
+            podeEditar={podeEditar}
+            {...(servicoDosModelos ? { servico: servicoDosModelos } : {})}
+            onTrocarAba={setAba}
+          />
         ) : aba === "analises" ? (
           <Analises servico={servico} detalhe={detalhe} geral={geral} />
         ) : (

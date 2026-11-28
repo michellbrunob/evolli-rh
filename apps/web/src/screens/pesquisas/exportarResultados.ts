@@ -130,6 +130,12 @@ export function textoDoValor(p: Pergunta, valor: unknown): string {
       return plural(Number(valor), "estrela", "estrelas");
     case "data":
       return formatarDiaCivil(String(valor));
+    case "escala": {
+      // Questionários fixos: o rótulo do ponto marcado.
+      const r = p.config.rotulos?.[Number(valor) - (p.config.minimo ?? 1)];
+      if (r) return r;
+      return typeof valor === "number" ? numero(valor) : String(valor);
+    }
     default:
       return typeof valor === "number" ? numero(valor) : String(valor);
   }

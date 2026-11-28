@@ -51,6 +51,7 @@ import {
 } from "./indicadores";
 import { modeloDaGaleria } from "./modelosDePesquisa";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
+import { RelatorioDoModelo, temRelatorioProprio } from "./modelos/relatorio";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
 import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
@@ -943,6 +944,9 @@ export function RelatorioDaPesquisa({
         hoje={hoje}
       />
     );
+  // Modelos com metodologia própria: o relatório deles (modelos/relatorio).
+  if (temRelatorioProprio(dados.detalhe.modelo))
+    return <RelatorioDoModelo carregado={dados} imprimir={imprimir} />;
   return (
     <Impressao
       titulo={nomeDoArquivo([dados.rel.nome, "resultados"], "pdf").replace(
