@@ -3791,3 +3791,44 @@ body:has(.pesquisas__rodape) .aviso-flutuante {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- T216 — revisão 3: lista, fluxo e ações ---- */
+
+/* Lista: colunas com largura fixa (o estado vazio não muda as larguras). */
+.pesquisas__tabela--colunas-fixas {
+  table-layout: fixed;
+}
+
+.pesquisas__coluna-pesquisa {
+  width: auto;
+}
+
+.pesquisas__coluna-participacao {
+  width: 13rem;
+}
+
+.pesquisas__coluna-criada {
+  width: 8.5rem;
+}
+
+.pesquisas__coluna-status {
+  width: 8.5rem;
+}
+
+.pesquisas__coluna-acoes {
+  width: 4rem;
+}
+
+.pesquisas__tabela td.pesquisas__vazio-da-tabela {
+  padding: var(--space-lg) var(--space-md);
+  cursor: default;
+}
+
+.pesquisas__vazio-da-tabela .evolli-empty-state {
+  border: 0;
+  background: transparent;
+}
+
+.pesquisas__tabela--clicavel tbody tr:hover td.pesquisas__vazio-da-tabela {
+  background: transparent;
+}

@@ -238,6 +238,115 @@ describe("R3-A-29 — o aviso não cobre o rodapé de uma gaveta", () => {
   });
 });
 
+const ANONIMA: PesquisaResumo = {
+  ...RESUMO,
+  id: "p-2",
+  nome: "Pulso anônimo",
+  modelo: "pulso",
+  identificacao: "anonima",
+  status: "pausada",
+  participantes: null,
+  respostas: 3,
+  criadaEm: "2026-11-10T13:00:00Z",
+};
+
+describe("R3-A-07 e R3-A-08 — contadores e estado vazio da lista", () => {
+  const comLista = (itens: PesquisaResumo[]) =>
+    servicoFalso({
+      listarPesquisas: vi.fn(() => Promise.resolve(lista(itens))),
+    });
+  const contagens = () =>
+    within(screen.getByRole("group", { name: "Status" }))
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+
+  it("as pílulas contam só o que a busca encontra; sem resultado, todas zeram", async () => {
+    render(
+      <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
+    );
+    await screen.findByRole("table", { name: "Pesquisas" });
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Buscar pesquisa" }),
+      {
+        target: { value: "pulso" },
+      },
+    );
+    expect(contagens()).toEqual([
+      "Todas1",
+      "Ativas0",
+      "Pausadas1",
+      "Finalizadas0",
+      "Canceladas0",
+    ]);
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Buscar pesquisa" }),
+      {
+        target: { value: "zzz" },
+      },
+    );
+    expect(contagens()).toEqual([
+      "Todas0",
+      "Ativas0",
+      "Pausadas0",
+      "Finalizadas0",
+      "Canceladas0",
+    ]);
+  });
+
+  it("sem resultado: ícone, título, ajuda e 'Limpar filtros' que devolve tudo", async () => {
+    render(
+      <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
+    );
+    const tabela = await screen.findByRole("table", { name: "Pesquisas" });
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Buscar pesquisa" }),
+      {
+        target: { value: "zzz" },
+      },
+    );
+    const vazio = within(tabela).getByRole("heading", {
+      name: "Nenhuma pesquisa encontrada",
+    });
+    const caixa = vazio.closest(".evolli-empty-state")!;
+    expect(caixa.querySelector(".evolli-empty-state__icon svg")).not.toBeNull();
+    expect(caixa).toHaveTextContent(
+      "Tente outra busca ou limpe os filtros para ver todas as pesquisas.",
+    );
+    fireEvent.click(
+      within(tabela).getByRole("button", { name: "Limpar filtros" }),
+    );
+    expect(
+      screen.getByRole("searchbox", { name: "Buscar pesquisa" }),
+    ).toHaveValue("");
+    expect(within(tabela).getAllByRole("row")).toHaveLength(3);
+  });
+
+  it("pílula sem pesquisas também usa o estado vazio; colunas com largura fixa", async () => {
+    render(
+      <PesquisasModulo servico={comLista([RESUMO, ANONIMA])} podeEditar />,
+    );
+    const tabela = await screen.findByRole("table", { name: "Pesquisas" });
+    fireEvent.click(screen.getByRole("button", { name: /Finalizadas/ }));
+    expect(
+      within(tabela).getByRole("heading", {
+        name: "Nenhuma pesquisa encontrada",
+      }),
+    ).toBeInTheDocument();
+    expect(tabela).toHaveClass("pesquisas__tabela--colunas-fixas");
+    expect(tabela.querySelectorAll("colgroup col")).toHaveLength(5);
+    fireEvent.click(
+      within(tabela).getByRole("button", { name: "Limpar filtros" }),
+    );
+    expect(screen.getByRole("button", { name: /Todas/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(css("Pesquisas.css")).toMatch(
+      /\.pesquisas__tabela--colunas-fixas \{[^}]*table-layout: fixed/,
+    );
+  });
+});
+
 function LeitorDaTrilha() {
   const c = useComplementoDaTrilha();
   return (

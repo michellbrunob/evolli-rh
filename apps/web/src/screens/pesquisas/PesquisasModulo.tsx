@@ -32,7 +32,7 @@ import type {
   StatusPesquisa,
 } from "../../api/pesquisasClient";
 import { useTrilhaComplementar } from "../../app/trilhaComplementar";
-import { Button, StatusBadge } from "../../components";
+import { Button, EmptyState, StatusBadge } from "../../components";
 import { diaCivilDeHoje } from "../../format/data";
 import { plural } from "../../format/plural";
 import {
@@ -45,6 +45,7 @@ import {
 } from "../../ui";
 import {
   IconeAbrir,
+  IconeBuscar,
   IconeCopiar,
   IconeEditar,
   IconeFiltrar,
@@ -711,12 +712,17 @@ const STATUS_DA_LISTA: readonly { valor: FiltroDeStatus; rotulo: string }[] = [
   { valor: "cancelada", rotulo: "Canceladas" },
 ];
 
-const VAZIO_DO_FILTRO: Readonly<Record<FiltroDeStatus, string>> = {
-  todas: "Nenhuma pesquisa encontrada com esses filtros.",
-  ativa: "Nenhuma pesquisa ativa.",
-  pausada: "Nenhuma pesquisa pausada.",
-  finalizada: "Nenhuma pesquisa finalizada.",
-  cancelada: "Nenhuma pesquisa cancelada.",
+/** O texto de ajuda do estado vazio quando só a pílula de status filtra. */
+const VAZIO_DO_STATUS: Readonly<Record<FiltroDeStatus, string>> = {
+  todas: "Limpe os filtros para ver todas as pesquisas.",
+  ativa:
+    "Não há pesquisas ativas agora. Limpe os filtros para ver todas as pesquisas.",
+  pausada:
+    "Não há pesquisas pausadas agora. Limpe os filtros para ver todas as pesquisas.",
+  finalizada:
+    "Não há pesquisas finalizadas agora. Limpe os filtros para ver todas as pesquisas.",
+  cancelada:
+    "Não há pesquisas canceladas agora. Limpe os filtros para ver todas as pesquisas.",
 };
 
 const PASSOS = [
@@ -804,19 +810,28 @@ function ListaDePesquisas({
     };
   }, [servico, versao]);
 
-  const contagem = (s: FiltroDeStatus) =>
-    (itens ?? []).filter((p) => s === "todas" || p.status === s).length;
   const modelosPresentes = useMemo(
     () => [...new Set((itens ?? []).map((p) => p.modelo))],
     [itens],
   );
-
-  const visiveis = useMemo(() => {
+  /** O que a busca e o tipo deixam; as pílulas contam a partir daqui. */
+  const encontradas = useMemo(() => {
     const termo = semAcento(busca.trim());
     return (itens ?? [])
-      .filter((p) => status === "todas" || p.status === status)
       .filter((p) => tipos.length === 0 || tipos.includes(p.modelo))
-      .filter((p) => !termo || semAcento(p.nome).includes(termo))
+      .filter((p) => !termo || semAcento(p.nome).includes(termo));
+  }, [itens, tipos, busca]);
+  const contagem = (s: FiltroDeStatus) =>
+    encontradas.filter((p) => s === "todas" || p.status === s).length;
+  const limparFiltros = () => {
+    setStatus("todas");
+    setBusca("");
+    setTipos([]);
+  };
+
+  const visiveis = useMemo(() => {
+    return encontradas
+      .filter((p) => status === "todas" || p.status === status)
       .sort((a, b) =>
         crescente
           ? a.criadaEm.localeCompare(b.criadaEm)
@@ -985,9 +1000,17 @@ function ListaDePesquisas({
           </div>
           <div className="pesquisas__tabela-caixa">
             <table
-              className="pesquisas__tabela pesquisas__tabela--clicavel"
+              className="pesquisas__tabela pesquisas__tabela--clicavel pesquisas__tabela--colunas-fixas"
               aria-label="Pesquisas"
             >
+              {/* Larguras fixas: filtrar (ou o estado vazio) não as muda. */}
+              <colgroup>
+                <col className="pesquisas__coluna-pesquisa" />
+                <col className="pesquisas__coluna-participacao" />
+                <col className="pesquisas__coluna-criada" />
+                <col className="pesquisas__coluna-status" />
+                <col className="pesquisas__coluna-acoes" />
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col">Pesquisa</th>
@@ -1024,10 +1047,22 @@ function ListaDePesquisas({
               <tbody>
                 {visiveis.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="pesquisas__suave">
-                      {busca || tipos.length > 0
-                        ? VAZIO_DO_FILTRO.todas
-                        : VAZIO_DO_FILTRO[status]}
+                    <td colSpan={5} className="pesquisas__vazio-da-tabela">
+                      <EmptyState
+                        headingLevel={2}
+                        icon={<IconeBuscar tamanho={20} />}
+                        title="Nenhuma pesquisa encontrada"
+                        description={
+                          busca.trim() || tipos.length > 0
+                            ? "Tente outra busca ou limpe os filtros para ver todas as pesquisas."
+                            : VAZIO_DO_STATUS[status]
+                        }
+                        action={
+                          <Button variant="secondary" onClick={limparFiltros}>
+                            Limpar filtros
+                          </Button>
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (
