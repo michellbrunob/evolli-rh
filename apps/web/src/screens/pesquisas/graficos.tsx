@@ -61,6 +61,8 @@ export function Rosca({
 
 export interface ParteDaBarra {
   readonly rotulo: string;
+  /** Rótulo curto na legenda ("prom."); o nome acessível usa o inteiro. */
+  readonly curto?: string;
   readonly valor: number;
   readonly cor: string;
 }
@@ -109,7 +111,9 @@ export function BarraEmpilhada({
                 className="pesquisas__ponto"
                 style={{ background: p.cor }}
               />
-              {legendaSoRotulo ? p.rotulo : `${pct(p.valor)}% ${p.rotulo}`}
+              {legendaSoRotulo
+                ? (p.curto ?? p.rotulo)
+                : `${pct(p.valor)}% ${p.curto ?? p.rotulo}`}
             </li>
           ))}
         </ul>

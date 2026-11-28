@@ -145,7 +145,8 @@ describe("B8 — comentários e rodapés dos cartões", () => {
   it("a pergunta citada fica embaixo do título; o contador, à parte", async () => {
     montarResultados();
     const cartao = await screen.findByRole("region", {
-      name: "5. Comentários",
+      // Pergunta de texto: sem número.
+      name: "Comentários",
     });
     const titulo = within(cartao).getByRole("heading", {
       name: "Comentários livres",

@@ -917,6 +917,7 @@ function VisaoGeral({
                   partes={[
                     {
                       rotulo: "promotores",
+                      curto: "prom.",
                       valor: enps.promotores,
                       cor: "var(--turno-verde)",
                     },
@@ -927,6 +928,7 @@ function VisaoGeral({
                     },
                     {
                       rotulo: "detratores",
+                      curto: "detr.",
                       valor: enps.detratores,
                       cor: "var(--status-danger-ink)",
                     },
@@ -1042,10 +1044,10 @@ function VisaoGeral({
             </span>
           </div>
         ) : (
-          todas.map((p, i) => (
+          numerarSemTexto(todas).map(({ pergunta: p, numero }) => (
             <CartaoDaPergunta
               key={p.id}
-              numero={i + 1}
+              numero={numero}
               pergunta={p}
               resultado={porId.get(p.id)}
               identificada={detalhe.identificacao === "identificada"}
@@ -1056,6 +1058,23 @@ function VisaoGeral({
     </>
   );
 }
+
+/**
+ * A numeração dos cartões: as perguntas de texto (comentários) não levam
+ * número e não contam; as demais seguem 1, 2, 3…
+ */
+function numerarSemTexto(
+  perguntas: readonly Pergunta[],
+): { pergunta: Pergunta; numero: number | null }[] {
+  let n = 0;
+  return perguntas.map((pergunta) => ({
+    pergunta,
+    numero: ehDeTexto(pergunta) ? null : (n += 1),
+  }));
+}
+
+const ehDeTexto = (p: Pergunta) =>
+  p.tipo === "paragrafo" || p.tipo === "texto_curto";
 
 /** Os extremos da régua dos indicadores (as médias vão de 1 a 10). */
 const PONTAS_DA_REGUA = ["1", "10"] as const;
@@ -1148,15 +1167,16 @@ function CartaoDaPergunta({
   resultado: r,
   identificada,
 }: {
-  readonly numero: number;
+  /** Sem número: pergunta de texto. */
+  readonly numero: number | null;
   readonly pergunta: Pergunta;
   readonly resultado: ResultadoPergunta | undefined;
   readonly identificada: boolean;
 }) {
-  const nome = `${numero}. ${p.texto}`;
+  const nome = numero === null ? p.texto : `${numero}. ${p.texto}`;
 
-  // Comentários livres (texto).
-  if (p.tipo === "paragrafo" || p.tipo === "texto_curto") {
+  // Comentários livres (texto), sem número.
+  if (numero === null || ehDeTexto(p)) {
     const textos = r && "textos" in r ? r.textos : [];
     return (
       <section className="pesquisas__cartao-pergunta" aria-label={nome}>
@@ -1329,11 +1349,16 @@ function CartaoDaPergunta({
                   valor: faixas.baixa,
                   cor: COR_DA_FAIXA.baixa,
                 },
-                {
-                  rotulo: intervalo(baixaAte + 1, altaDesde - 1),
-                  valor: faixas.media,
-                  cor: COR_DA_FAIXA.media,
-                },
+                // Escala de 4 pontos: sem meio-termo, só duas faixas.
+                ...(altaDesde - baixaAte > 1
+                  ? [
+                      {
+                        rotulo: intervalo(baixaAte + 1, altaDesde - 1),
+                        valor: faixas.media,
+                        cor: COR_DA_FAIXA.media,
+                      },
+                    ]
+                  : []),
                 {
                   rotulo: intervalo(altaDesde, e.maximo),
                   valor: faixas.alta,
@@ -1483,7 +1508,7 @@ function Analises({
               <h2 className="pesquisas__cartao-secao-titulo">
                 {`Média por ${campo ? rotuloDoCampo(campo) : "grupo"}`}
               </h2>
-              <p className="pesquisas__suave">Médias na escala de 0 a 10</p>
+              <p className="pesquisas__suave">Médias na escala de 1 a 10</p>
             </div>
             {recortes.length > 1 ? (
               <Pilulas
@@ -1537,10 +1562,18 @@ function Analises({
                     {dados.linhas.map((l) => (
                       <tr key={l.grupoId ?? "todos"}>
                         <th scope="row">
-                          {l.grupoId === null ? "Toda a empresa" : l.nome}
-                          {l.visivel ? (
-                            <span className="pesquisas__suave">{` (${plural(l.respostas, "resposta", "respostas")})`}</span>
-                          ) : null}
+                          <span className="pesquisas__pessoa-textos">
+                            <span>
+                              {l.grupoId === null ? "Toda a empresa" : l.nome}
+                            </span>
+                            {/* O vizinho oculto para proteger um grupo menor
+                              não mostra nem a contagem. */}
+                            {l.oculto !== "protege_grupo_menor" ? (
+                              <span className="pesquisas__suave">
+                                {plural(l.respostas, "resposta", "respostas")}
+                              </span>
+                            ) : null}
+                          </span>
                         </th>
                         {l.visivel ? (
                           [l.media, ...l.medias].map((v, i) => (

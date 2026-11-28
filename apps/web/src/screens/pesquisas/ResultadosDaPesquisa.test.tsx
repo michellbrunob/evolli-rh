@@ -284,7 +284,8 @@ describe("Resultados — Visão geral", () => {
   it("comentários livres sem autor fora da identificada; com autor na identificada", async () => {
     montar();
     const cartao = await screen.findByRole("region", {
-      name: "5. Comentários",
+      // Pergunta de texto: sem número.
+      name: "Comentários",
     });
     expect(cartao).toHaveTextContent("Comentários livres");
     expect(cartao).toHaveTextContent("2 comentários");
@@ -295,7 +296,8 @@ describe("Resultados — Visão geral", () => {
   it("na identificada, o comentário mostra quem escreveu", async () => {
     montar(comIdentificacao("identificada"));
     const cartao = await screen.findByRole("region", {
-      name: "5. Comentários",
+      // Pergunta de texto: sem número.
+      name: "Comentários",
     });
     expect(cartao).toHaveTextContent("Pessoa Exemplo");
   });
@@ -433,7 +435,7 @@ describe("Resultados — Análises e Respostas", () => {
     const [cabeca, empresa, operacoes, financeiro] =
       within(mapa).getAllByRole("row");
     expect(cabeca).toHaveTextContent("Prioridades");
-    expect(empresa).toHaveTextContent("Toda a empresa (8 respostas)8,58,5");
+    expect(empresa).toHaveTextContent("Toda a empresa8 respostas8,58,5");
     expect(within(operacoes!).getAllByRole("cell")[0]).toHaveAttribute(
       "data-faixa",
       "baixa",
