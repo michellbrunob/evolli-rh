@@ -695,3 +695,20 @@ describe("T216 — resultados do onboarding", () => {
     expect(texto).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
   });
 });
+
+describe("T216 — anônima sem lembrete (provas extras)", () => {
+  it("o que vai para a API na anônima nunca leva lembrete, em nenhum modo", () => {
+    for (const modo of ["agora", "agendar", "automatizar"] as const) {
+      expect(configParaEnviar({ ...CONFIG_PADRAO, modo, lembreteDias: 5 }, "anonima").lembreteDias).toBeNull();
+    }
+    expect(configParaEnviar({ ...CONFIG_PADRAO, lembreteDias: 5 }, "confidencial").lembreteDias).toBe(5);
+  });
+
+  it("o assistente grava a anônima sem lembrete", async () => {
+    const { cliente } = montarAssistente();
+    fireEvent.click(screen.getByRole("radio", { name: /Anônima/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Próximo: Perguntas/ }));
+    await waitFor(() => expect(cliente.salvar).toHaveBeenCalled());
+    expect(cliente.salvar.mock.calls[0]![1].lembreteDias).toBeNull();
+  });
+});

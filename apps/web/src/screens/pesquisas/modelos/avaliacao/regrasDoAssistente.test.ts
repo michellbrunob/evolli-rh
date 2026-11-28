@@ -125,3 +125,9 @@ describe("T216 — regras do assistente da avaliação", () => {
     expect(textoDosLembretes(["no_dia"])).toBe("lembrete no dia");
   });
 });
+
+describe("T216 — ninguém entra no próprio time (prova extra)", () => {
+  it("o gestor nunca é candidato ao próprio time, mesmo sem time nenhum", () => {
+    expect(candidatosAoTime([GESTORA, DORA], [], GESTORA.id).map((p) => p.id)).toEqual([DORA.id]);
+  });
+});

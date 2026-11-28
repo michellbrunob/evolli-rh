@@ -457,3 +457,45 @@ describe("T216 — situação dos convites", () => {
     ).toBe(20_000);
   });
 });
+
+describe("T216 — convites já criados e dias úteis (provas extras)", () => {
+  const hoje = "2026-11-27";
+
+  it("rodada já criada não volta; a outra ainda vem", () => {
+    const r = planejarEnvios({
+      config: config({ soDiasUteis: false }),
+      inicio: "2026-11-20",
+      hoje,
+      pessoas: [pessoa(1, "2026-10-28")],
+      existentes: new Set([`${ID(1)}:30`]),
+    });
+    expect(r).toEqual([{ colaboradorId: ID(1), rodada: 60, dataPrevista: "2026-12-27" }]);
+  });
+
+  it("atrasado já convidado não recebe de novo no primeiro envio", () => {
+    const r = planejarEnvios({
+      config: config({ soDiasUteis: false, incluirAtrasados: true, rodadas: [30] }),
+      inicio: hoje,
+      hoje,
+      pessoas: [pessoa(1, "2026-10-10")],
+      existentes: new Set([`${ID(1)}:30`]),
+    });
+    expect(r).toEqual([]);
+  });
+
+  it("só em dias úteis: a data da rodada no sábado vai para segunda", () => {
+    const r = planejarEnvios({
+      config: config({ rodadas: [30] }),
+      inicio: "2026-11-20",
+      hoje,
+      pessoas: [pessoa(1, "2026-10-29")],
+      existentes: new Set(),
+    });
+    expect(r).toEqual([{ colaboradorId: ID(1), rodada: 30, dataPrevista: "2026-11-30" }]);
+  });
+
+  it("feriado local também empurra a data da rodada", () => {
+    expect(dataDaRodada("2026-10-27", 30, true, new Set(["2026-11-26"]))).toBe("2026-11-27");
+    expect(dataDaRodada("2026-10-27", 30, false, new Set(["2026-11-26"]))).toBe("2026-11-26");
+  });
+});

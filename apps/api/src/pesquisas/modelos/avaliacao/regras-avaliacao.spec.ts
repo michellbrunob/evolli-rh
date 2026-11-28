@@ -322,3 +322,20 @@ describe("T216 — lembretes da avaliação", () => {
     ).toEqual([]);
   });
 });
+
+describe("T216 — 180° sem CPF (provas extras)", () => {
+  const ativos = new Set(["g1", "a", "semcpf", "outro"]);
+  const ident = new Set(["g1", "a", "outro"]);
+
+  it("quem não tem CPF não entra pelo link (não é participante)", () => {
+    const r = planejarPares("avaliacao180", [{ gestorId: "g1", avaliadoIds: ["semcpf"] }], ativos, ident);
+    expect(r.pares).toEqual([{ avaliadorId: "g1", avaliadoId: "semcpf", papel: "gestor" }]);
+    expect(participantesDosPares(r.pares)).toEqual(["g1"]);
+  });
+
+  it("conta as autoavaliações só de quem tem CPF", () => {
+    const r = planejarPares("avaliacao180", [{ gestorId: "g1", avaliadoIds: ["a", "semcpf", "outro"] }], ativos, ident);
+    expect(r.pares.filter((p) => p.papel === "autoavaliacao").map((p) => p.avaliadoId)).toEqual(["a", "outro"]);
+    expect(r.pares).toHaveLength(5);
+  });
+});
