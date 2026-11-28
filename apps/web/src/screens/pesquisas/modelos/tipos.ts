@@ -260,6 +260,8 @@ export interface ModeloDaGaleria {
   readonly fatos: readonly FatoDoModelo[];
   /** Personalizada: quem responde ("Cada pessoa responde"). */
   readonly formato?: string;
+  /** Personalizada: o tempo de resposta do modelo pronto, em minutos. */
+  readonly minutos?: number;
   /** O que se mede, em uma frase. */
   readonly sobre: string;
   /** Selo curto da página "Sobre o modelo" (página genérica). */

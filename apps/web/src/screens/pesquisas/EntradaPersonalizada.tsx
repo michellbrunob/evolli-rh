@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import type { PesquisaResumo } from "../../api/pesquisasClient";
 import { Button } from "../../components";
 import { formatarInstante } from "../../format/data";
-import { plural } from "../../format/plural";
 import { IconButton, Sheet } from "../../ui";
 import {
   IconeCopiar,
@@ -20,15 +19,18 @@ import {
 } from "../../ui/icones";
 import { CampoDeBusca, IconeDoModelo, Pilulas } from "./componentes";
 import { estadoDaCopia, type EstadoDaPesquisa } from "./estadoDaPesquisa";
-import { filtrarModelos, GavetaDoModelo, semAcento } from "./GaleriaDeModelos";
+import { filtrarModelos, semAcento } from "./GaleriaDeModelos";
 import {
   CATEGORIAS_PERSONALIZADAS,
   ROTEIROS_PERSONALIZADOS,
-  totalDePerguntas,
   type CategoriaPersonalizada,
   type ModeloDaGaleria,
 } from "./modelosDePesquisa";
-import { minutosEstimados } from "./PreVisualizacao";
+import {
+  formatoDe,
+  GavetaDoSubmodelo,
+  resumoDoSubmodelo,
+} from "./modelos/personalizada/GavetaDoSubmodelo";
 import { memoriaDoRascunho } from "./rascunhosLocais";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { dataDoInstante } from "./textosDasPesquisas";
@@ -39,7 +41,6 @@ export function EntradaPersonalizada({
   aviso,
   onVoltar,
   onComecar,
-  onSobre,
   onCopiar,
   onContinuar,
 }: {
@@ -56,7 +57,6 @@ export function EntradaPersonalizada({
     inicial?: EstadoDaPesquisa;
     base?: Awaited<ReturnType<ServicoDePesquisas["obterPesquisa"]>>;
   }) => void;
-  readonly onSobre: (id: string) => void;
 }) {
   const [categoria, setCategoria] = useState<"todas" | CategoriaPersonalizada>(
     "todas",
@@ -198,7 +198,6 @@ export function EntradaPersonalizada({
       ) : (
         <div className="pesquisas__cartoes">
           {visiveis.map((m) => {
-            const n = totalDePerguntas(m);
             return (
               <article
                 key={m.id}
@@ -211,11 +210,11 @@ export function EntradaPersonalizada({
                 <ul className="pesquisas__destaques">
                   <li>
                     <IconeDocumento tamanho={14} />
-                    {`${plural(n, "pergunta", "perguntas")} · ${plural(minutosEstimados(n), "min", "min")}`}
+                    {resumoDoSubmodelo(m)}
                   </li>
                   <li>
                     <IconeEquipe tamanho={14} />
-                    Cada pessoa responde
+                    {formatoDe(m)}
                   </li>
                 </ul>
                 <div className="pesquisas__cartao-rodape">
@@ -243,16 +242,12 @@ export function EntradaPersonalizada({
         </div>
       )}
 
-      <GavetaDoModelo
+      <GavetaDoSubmodelo
         modelo={aberto}
         onFechar={() => setAberto(null)}
         onUsar={(id) => {
           setAberto(null);
           onComecar({ roteiro: id });
-        }}
-        onSobre={(id) => {
-          setAberto(null);
-          onSobre(id);
         }}
       />
 

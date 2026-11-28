@@ -438,7 +438,6 @@ function Modulo({
           }
           onCopiar={(id) => irPara({ tela: "copia", id })}
           onContinuar={(id) => irPara({ tela: "rascunho", id })}
-          onSobre={(id) => irPara({ tela: "sobre", modelo: id })}
         />
       );
     case "sobre":

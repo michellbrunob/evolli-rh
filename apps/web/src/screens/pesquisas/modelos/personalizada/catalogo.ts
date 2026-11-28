@@ -56,7 +56,8 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     categoria: "integracao",
     formato: "Cada pessoa responde",
     descricao: "Como foram a chegada, o time e a liderança no primeiro mês.",
-    fatos: [{ icone: "perguntas", texto: "8 perguntas · 3 min" }],
+    fatos: [{ icone: "perguntas", texto: "8 perguntas · 2 min" }],
+    minutos: 2,
     ritmo: "Integração",
     frequencia: "30 dias após a admissão",
     sobre:
@@ -141,7 +142,8 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     formato: "Gestor avalia o time",
     descricao:
       "Perto do fim do contrato de experiência: entregas, comportamento e a decisão.",
-    fatos: [{ icone: "perguntas", texto: "10 perguntas · 4 min" }],
+    fatos: [{ icone: "perguntas", texto: "10 perguntas · 3 min" }],
+    minutos: 3,
     ritmo: "Desempenho",
     frequencia: "Perto do fim da experiência",
     sobre:
@@ -205,7 +207,8 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     formato: "Gestor e autoavaliação (180°)",
     descricao:
       "Gestor e pessoa avaliam entregas e comportamento, com espaço para exemplos.",
-    fatos: [{ icone: "perguntas", texto: "8 perguntas · 4 min" }],
+    fatos: [{ icone: "perguntas", texto: "8 perguntas · 2 min" }],
+    minutos: 2,
     ritmo: "Desempenho",
     frequencia: "Semestral ou anual",
     sobre: "As mesmas perguntas para o gestor e para a pessoa, lado a lado.",
@@ -249,7 +252,8 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     formato: "Cada pessoa responde",
     descricao:
       "Quais benefícios as pessoas usam, quais pesam para ficar e o que falta.",
-    fatos: [{ icone: "perguntas", texto: "6 perguntas · 2 min" }],
+    fatos: [{ icone: "perguntas", texto: "6 perguntas · 1 min" }],
+    minutos: 1,
     ritmo: "Satisfação",
     frequencia: "Antes de renovar contratos",
     sobre:
@@ -257,7 +261,7 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     nomeBase: "Benefícios",
     secoes: [
       {
-        titulo: null,
+        titulo: "O que você usa",
         perguntas: [
           {
             tipo: "multipla_escolha",
@@ -280,6 +284,11 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
             texto: "No geral, como você avalia os benefícios?",
           },
           c("Sei como usar cada benefício.", "Sabe usar"),
+        ],
+      },
+      {
+        titulo: "O que mudaria",
+        perguntas: [
           {
             tipo: "escolha_unica",
             rotulo: "Benefício desejado",
@@ -323,6 +332,7 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     descricao:
       "Até 7 dias depois: conteúdo, instrutor e o quanto ajudou na prática.",
     fatos: [{ icone: "perguntas", texto: "7 perguntas · 2 min" }],
+    minutos: 2,
     ritmo: "Satisfação",
     frequencia: "Até 7 dias depois",
     sobre:
@@ -330,7 +340,7 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     nomeBase: "Treinamento",
     secoes: [
       {
-        titulo: null,
+        titulo: "O treinamento",
         perguntas: [
           {
             tipo: "estrelas",
@@ -354,6 +364,11 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
             },
           },
           c("A carga horária foi adequada.", "Carga horária"),
+        ],
+      },
+      {
+        titulo: "Para melhorar",
+        perguntas: [
           {
             tipo: "sim_nao",
             rotulo: "Recomendaria",
@@ -384,7 +399,8 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     formato: "Cada pessoa responde",
     descricao:
       "Na última semana: o motivo da saída e o que a empresa pode aprender.",
-    fatos: [{ icone: "perguntas", texto: "8 perguntas · 3 min" }],
+    fatos: [{ icone: "perguntas", texto: "8 perguntas · 2 min" }],
+    minutos: 2,
     ritmo: "Desligamento",
     frequencia: "Na última semana",
     sobre:
@@ -392,7 +408,7 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     nomeBase: "Desligamento",
     secoes: [
       {
-        titulo: null,
+        titulo: "Sua saída",
         perguntas: [
           {
             tipo: "escolha_unica",
@@ -421,6 +437,11 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
             texto: "O que poderia ter feito você ficar?",
             condicao: { ref: "ficaria", opcao: "sim" },
           },
+        ],
+      },
+      {
+        titulo: "Sua experiência",
+        perguntas: [
           c("Eu me senti valorizado.", "Valorizado"),
           c("Meu gestor me ajudou a crescer.", "Crescimento"),
           c("Eu tinha as ferramentas de que precisava.", "Ferramentas"),
