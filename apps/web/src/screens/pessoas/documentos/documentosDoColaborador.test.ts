@@ -7,9 +7,14 @@ import {
   conferirArquivoEscolhido,
   conferirNomeDeOutros,
   estadoDaApi,
+  ordenarPorEnvio,
+  podeVerNoNavegador,
   principaisEnviados,
+  quemEnviou,
+  resumoDosDocumentos,
   rotuloDoDocumento,
   tamanhoLegivel,
+  tipoDoArquivo,
 } from "./documentosDoColaborador";
 
 /** T213 — regras do navegador para os documentos do colaborador. */
@@ -62,33 +67,137 @@ describe("conferirArquivoEscolhido (T213)", () => {
     ["foto.JPG", "image/jpeg"],
     ["foto.jpeg", "image/jpeg"],
     ["scan.png", "image/png"],
+    ["contrato.doc", "application/msword"],
+    [
+      "contrato.docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+    ["foto.webp", "image/webp"],
+    ["contrato.DOCX", ""],
   ])("%s: aceito", (nome, tipo) => {
     expect(conferirArquivoEscolhido(arquivo(nome, tipo))).toBeNull();
   });
 
   it.each([
-    [
-      "contrato.docx",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ],
     ["foto.heic", "image/heic"],
+    ["planilha.xlsx", "application/vnd.ms-excel"],
     ["sem-extensao", "application/pdf"],
     ["falso.pdf", "image/png"],
+    ["falso.docx", "application/pdf"],
   ])("%s: recusado pelo formato", (nome, tipo) => {
-    expect(conferirArquivoEscolhido(arquivo(nome, tipo))).toMatch(
-      /PDF, JPG ou PNG/,
+    expect(conferirArquivoEscolhido(arquivo(nome, tipo))).toBe(
+      "Envie o arquivo em PDF, DOC, DOCX, JPG, PNG ou WebP.",
     );
   });
 
-  it("vazio e acima de 10 MB: recusados", () => {
+  it("vazio: recusado", () => {
     expect(
       conferirArquivoEscolhido(arquivo("a.pdf", "application/pdf", 0)),
     ).toMatch(/vazio/);
+  });
+
+  it("T217 — acima de 10 MB: diz o tamanho do arquivo, o limite e o que fazer", () => {
     expect(
       conferirArquivoEscolhido(
-        arquivo("a.pdf", "application/pdf", 10 * 1024 * 1024 + 1),
+        arquivo("a.pdf", "application/pdf", 12.4 * 1024 * 1024),
       ),
-    ).toMatch(/10 MB/);
+    ).toBe(
+      "Este arquivo tem 12,4 MB e o limite é 10 MB. Diminua o tamanho ou converta para PDF antes de enviar.",
+    );
+    expect(
+      conferirArquivoEscolhido(
+        arquivo("a.png", "image/png", 10 * 1024 * 1024 + 1),
+      ),
+    ).toMatch(/^Este arquivo tem 10 MB e o limite é 10 MB\./);
+    expect(
+      conferirArquivoEscolhido(
+        arquivo("a.pdf", "application/pdf", 10 * 1024 * 1024),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("tipoDoArquivo (T217)", () => {
+  it("usa o tipo do navegador; sem ele, o da extensão", () => {
+    expect(tipoDoArquivo(arquivo("a.pdf", "application/pdf"))).toBe(
+      "application/pdf",
+    );
+    expect(tipoDoArquivo(arquivo("a.docx", ""))).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(tipoDoArquivo(arquivo("a.DOC", ""))).toBe("application/msword");
+    expect(tipoDoArquivo(arquivo("a.webp", ""))).toBe("image/webp");
+    expect(tipoDoArquivo(arquivo("sem", ""))).toBe("");
+  });
+});
+
+describe("podeVerNoNavegador (T217)", () => {
+  it("PDF e imagens abrem no navegador; DOC e DOCX só baixam", () => {
+    expect(podeVerNoNavegador("pdf")).toBe(true);
+    expect(podeVerNoNavegador("jpg")).toBe(true);
+    expect(podeVerNoNavegador("png")).toBe(true);
+    expect(podeVerNoNavegador("webp")).toBe(true);
+    expect(podeVerNoNavegador("doc")).toBe(false);
+    expect(podeVerNoNavegador("docx")).toBe(false);
+  });
+});
+
+describe("quemEnviou (T217)", () => {
+  it("nome e papel entre parênteses; sem nome, só o papel; sem autor, travessão", () => {
+    expect(quemEnviou({ nome: "Ana Souza", papel: "rh" })).toBe(
+      "Ana Souza (RH)",
+    );
+    expect(quemEnviou({ nome: "Bruno Lima", papel: "dp" })).toBe(
+      "Bruno Lima (DP)",
+    );
+    expect(quemEnviou({ nome: null, papel: "dp" })).toBe("DP");
+    expect(quemEnviou({ nome: "Carla", papel: "papel_novo" })).toBe(
+      "Carla (papel_novo)",
+    );
+    expect(quemEnviou(null)).toBe("—");
+  });
+});
+
+const doc = (enviadoEm: string, id = enviadoEm) => ({ id, enviadoEm });
+
+describe("ordenarPorEnvio (T217)", () => {
+  it("do envio mais recente para o mais antigo, sem mudar a lista original", () => {
+    const lista = [
+      doc("2026-11-20T10:00:00.000Z", "a"),
+      doc("2026-11-28T09:00:00.000Z", "b"),
+      doc("2026-11-25T23:30:00.000Z", "c"),
+    ];
+    expect(ordenarPorEnvio(lista).map((d) => d.id)).toEqual(["b", "c", "a"]);
+    expect(lista.map((d) => d.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("empate: mantém a ordem recebida", () => {
+    const lista = [
+      doc("2026-11-28T09:00:00.000Z", "x"),
+      doc("2026-11-28T09:00:00.000Z", "y"),
+      doc("2026-11-28T09:00:00.000Z", "z"),
+    ];
+    expect(ordenarPorEnvio(lista).map((d) => d.id)).toEqual(["x", "y", "z"]);
+  });
+});
+
+describe("resumoDosDocumentos (T217)", () => {
+  it("sem arquivos: frase própria", () => {
+    expect(resumoDosDocumentos([])).toBe("Nada enviado ainda");
+  });
+
+  it("plural pela quantidade e o dia do último envio (fuso de Brasília)", () => {
+    expect(resumoDosDocumentos([doc("2026-11-28T13:00:00.000Z")])).toBe(
+      "1 arquivo · último envio em 28/11/2026",
+    );
+    expect(
+      resumoDosDocumentos([
+        doc("2026-11-20T10:00:00.000Z"),
+        // 01:30 em UTC ainda é dia 25 em Brasília.
+        doc("2026-11-26T01:30:00.000Z"),
+        doc("2026-11-21T10:00:00.000Z"),
+      ]),
+    ).toBe("3 arquivos · último envio em 25/11/2026");
   });
 });
 

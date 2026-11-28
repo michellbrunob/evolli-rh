@@ -31,6 +31,7 @@ import {
   type ColaboradorApi,
   type VinculoApi,
   buscarColaborador,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
 } from "../../../api/colaboradoresClient";
 import {
@@ -96,7 +97,7 @@ import { rotaDoDestino } from "../../../app/rotasDoShell";
 import { AbaBeneficios } from "./beneficios/AbaBeneficios";
 import { AbaPesquisas } from "./pesquisas/AbaPesquisas";
 import { primeiroNome } from "../tratamento";
-import { ArquivosDoColaborador } from "../documentos/ArquivosDoColaborador";
+import { TabelaDeDocumentosDaFicha } from "../documentos/TabelaDeDocumentosDaFicha";
 import { useLotacaoVigente } from "./useLotacaoVigente";
 import { AbaSalarios } from "./salarios/AbaSalarios";
 import { AbaFeriasEAusencias } from "./ferias/AbaFeriasEAusencias";
@@ -151,7 +152,11 @@ export type AbaDaFichaDeReferencia =
 
 /** Seções da página "Editar colaborador" que os cartões abrem. */
 export type SecaoDeEdicaoDaFicha =
-  "dados-basicos" | "dados-profissionais" | "endereco";
+  | "dados-basicos"
+  | "dados-profissionais"
+  | "endereco"
+  // T217 — "Enviar documento" da aba Documentos.
+  | "documentos";
 
 const ROTULO_DA_ABA: Readonly<Record<AbaDaFichaDeReferencia, string>> = {
   dados: "Dados do colaborador",
@@ -403,6 +408,26 @@ export function FichaDoColaborador({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // T217 — o contador da aba Documentos: lido com a ficha (aparece antes de
+  // a aba ser aberta) e atualizado pela própria aba a cada carga. Sem acesso
+  // à lista, ou sem arquivos, a aba fica sem contador. Aberta já na aba
+  // Documentos, quem conta é a própria aba (uma leitura só).
+  const [quantosDocumentos, setQuantosDocumentos] = useState(0);
+  const naAbaDocumentos = useRef(aba === "documentos");
+  naAbaDocumentos.current = aba === "documentos";
+  useEffect(() => {
+    if (!dados || naAbaDocumentos.current) return undefined;
+    let vivo = true;
+    listarDocumentosDoColaborador(colaboradorId)
+      .then((lista) => {
+        if (vivo) setQuantosDocumentos(lista.length);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [colaboradorId, dados]);
 
   // T215 — a escala vigente definida na aba Escala vale no cabeçalho; sem
   // ela (ou sem acesso a ela), fica a escala do contrato. Relida quando a aba
@@ -994,6 +1019,14 @@ export function FichaDoColaborador({
               >
                 <Icone />
                 {ROTULO_DA_ABA[a]}
+                {a === "documentos" && quantosDocumentos ? (
+                  <span className="ficha-ref__aba-contagem">
+                    {quantosDocumentos}
+                    <span className="ev:sr-only">
+                      {quantosDocumentos === 1 ? " arquivo" : " arquivos"}
+                    </span>
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -1208,9 +1241,15 @@ export function FichaDoColaborador({
             // Os arquivos só são lidos com o colaborador confirmado na
             // empresa ativa (fora dela, a ficha diz "não encontrado").
             dados ? (
-              <ArquivosDoColaborador
+              // T217 — a tabela do que foi enviado; o envio fica na edição.
+              // Desligado continua editável (decisão da proprietária).
+              <TabelaDeDocumentosDaFicha
                 colaboradorId={colaboradorId}
                 podeOperar={podeEditar}
+                onContagem={setQuantosDocumentos}
+                {...(onEditar
+                  ? { onEnviar: () => onEditar("documentos") }
+                  : {})}
               />
             ) : null
           ) : (

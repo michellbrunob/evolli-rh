@@ -36,10 +36,11 @@ const NA_FICHA = "Escolha outro arquivo na ficha do colaborador.";
 
 /** Recusas definitivas, pelo código do servidor. */
 const RECUSAS: Readonly<Record<string, string>> = {
-  documento_formato_invalido: `O arquivo não é um PDF, JPG ou PNG válido. ${NA_FICHA}`,
+  documento_formato_invalido: `O conteúdo do arquivo não corresponde a um PDF, DOC, DOCX, JPG, PNG ou WebP. ${NA_FICHA}`,
+  documento_com_macro: `Documentos do Word com macro não são aceitos. Salve sem macro ou em PDF. ${NA_FICHA}`,
   documento_arquivo_malformado: `O arquivo está corrompido ou incompleto. ${NA_FICHA}`,
   documento_arquivo_vazio: `O arquivo está vazio. ${NA_FICHA}`,
-  documento_arquivo_grande_demais: `O arquivo passa de 10 MB. ${NA_FICHA}`,
+  documento_arquivo_grande_demais: `O arquivo passa de 10 MB. Diminua o tamanho ou converta para PDF. ${NA_FICHA}`,
   documento_limite_categoria:
     "Este documento já tem 5 arquivos. Remova um na ficha antes de enviar outro.",
   documento_limite_colaborador:

@@ -3650,7 +3650,7 @@ describe("T195 — revisão e conclusão", () => {
     await ateARevisao();
     expect(tituloDaEtapa()).toHaveTextContent(/Documentos$/);
     const principais = screen
-      .getByRole("heading", { level: 3, name: "Documentos obrigatórios" })
+      .getByRole("heading", { level: 3, name: "Documentos principais" })
       .closest("section")!;
     for (const nome of [
       "RG",
@@ -3666,7 +3666,7 @@ describe("T195 — revisão e conclusão", () => {
       ).toBeInTheDocument();
     }
     expect(within(principais).getAllByText("Pendente")).toHaveLength(5);
-    expect(principais).toHaveTextContent("0 de 5 enviados.");
+    expect(principais).toHaveTextContent("0 de 5 anexados.");
     expect(
       screen.getByRole("heading", { level: 3, name: "Outros documentos" }),
     ).toBeInTheDocument();
@@ -5801,23 +5801,21 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
     expect(
       within(linha).getByRole("button", { name: "Mais ações: RG" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 de 5 enviados.")).toBeInTheDocument();
+    expect(screen.getByText("1 de 5 anexados.")).toBeInTheDocument();
     expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
   });
 
-  it("arquivo fora de PDF, JPG ou PNG é recusado ali mesmo e a linha segue Pendente", async () => {
+  it("arquivo fora dos formatos aceitos é recusado ali mesmo e a linha segue Pendente", async () => {
     montar();
     await aguardarEmpresa();
     await ateARevisao();
     escolherDocumento(
       "CPF",
-      new File(["x"], "cpf.docx", {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      }),
+      new File(["x"], "cpf.heic", { type: "image/heic" }),
     );
     const linha = linhaDe("CPF");
     expect(within(linha).getByRole("alert")).toHaveTextContent(
-      "Use um arquivo PDF, JPG ou PNG.",
+      "Envie o arquivo em PDF, DOC, DOCX, JPG, PNG ou WebP.",
     );
     expect(linha).toHaveTextContent("Pendente");
   });
@@ -5834,7 +5832,7 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
       await screen.findByRole("menuitem", { name: "Remover arquivo" }),
     );
     await waitFor(() => expect(linhaDe("RG")).toHaveTextContent("Pendente"));
-    expect(screen.getByText("0 de 5 enviados.")).toBeInTheDocument();
+    expect(screen.getByText("0 de 5 anexados.")).toBeInTheDocument();
   });
 
   it("proteção de saída: arquivo escolhido conta como edição pendente", async () => {
@@ -5928,7 +5926,7 @@ describe("T213 — documentos da etapa 4 e envio depois do cadastro", () => {
     [
       "formato",
       recusa(422, { codigo: "documento_formato_invalido" }),
-      /não é um PDF, JPG ou PNG válido/,
+      /não corresponde a um PDF, DOC, DOCX, JPG, PNG ou WebP/,
     ],
     [
       "conteúdo corrompido",

@@ -19,13 +19,18 @@ describe("falhaDoEnvio (T213)", () => {
     [
       "formato",
       erro(422, "documento_formato_invalido"),
-      /PDF, JPG ou PNG válido/,
+      /não corresponde a um PDF, DOC, DOCX, JPG, PNG ou WebP/,
+    ],
+    [
+      "macro (T217)",
+      erro(422, "documento_com_macro"),
+      /com macro não são aceitos/,
     ],
     ["malformado", erro(422, "documento_arquivo_malformado"), /corrompido/],
     ["vazio", erro(422, "documento_arquivo_vazio"), /vazio/],
     ["tamanho (código)", erro(422, "documento_arquivo_grande_demais"), /10 MB/],
     ["tamanho (413)", erro(413), /10 MB/],
-    ["tipo de corpo (415)", erro(415), /PDF, JPG ou PNG/],
+    ["tipo de corpo (415)", erro(415), /PDF, DOC, DOCX, JPG, PNG ou WebP/],
     [
       "limite da categoria",
       erro(422, "documento_limite_categoria"),

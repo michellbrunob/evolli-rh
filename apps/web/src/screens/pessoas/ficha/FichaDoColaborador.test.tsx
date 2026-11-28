@@ -17,6 +17,7 @@ import { pesquisasDoColaborador } from "../../../api/pesquisasClient";
 import { FichaDoColaborador } from "./FichaDoColaborador";
 import {
   buscarColaborador,
+  listarDocumentosDoColaborador,
   listarVinculosDoColaborador,
 } from "../../../api/colaboradoresClient";
 import {
@@ -49,6 +50,7 @@ vi.mock("../../../api/colaboradoresClient", async () => {
     ...actual,
     buscarColaborador: vi.fn(),
     listarVinculosDoColaborador: vi.fn(),
+    listarDocumentosDoColaborador: vi.fn(),
   };
 });
 vi.mock("../../../api/edicaoColaboradorClient", async () => {
@@ -217,6 +219,9 @@ function prepararServidor({
 }
 
 beforeEach(() => {
+  vi.mocked(listarDocumentosDoColaborador).mockRejectedValue(
+    new Error("sem documentos neste teste"),
+  );
   vi.clearAllMocks();
   prepararServidor();
 });
@@ -787,5 +792,82 @@ describe("T216 — ficha: aba Pesquisas", () => {
       ),
     ).toBeInTheDocument();
     expect(pesquisasDoColaborador).not.toHaveBeenCalled();
+  });
+});
+
+describe("T217 — ficha: aba Documentos", () => {
+  const documento = (id: string, enviadoEm: string) => ({
+    id,
+    categoria: "rg" as const,
+    nome: null,
+    nomeArquivo: `${id}.pdf`,
+    enviadoPor: { nome: "Ana Souza", papel: "rh" },
+    estado: "aprovado" as const,
+    formato: "pdf" as const,
+    tamanhoBytes: 1024,
+    versao: 1,
+    enviadoEm,
+    verificadoEm: enviadoEm,
+  });
+
+  it("a aba mostra o contador de arquivos, mesmo antes de ser aberta", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      documento("a", "2026-11-20T10:00:00.000Z"),
+      documento("b", "2026-11-21T10:00:00.000Z"),
+    ]);
+    montar();
+    const aba = await screen.findByRole("tab", { name: /Documentos/ });
+    await waitFor(() => expect(aba).toHaveTextContent("Documentos2 arquivos"));
+    expect(within(aba).getByText("2")).toHaveClass("ficha-ref__aba-contagem");
+  });
+
+  it("sem arquivos (ou sem acesso à lista): sem contador", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([]);
+    montar();
+    const aba = await screen.findByRole("tab", { name: /Documentos/ });
+    await waitFor(() =>
+      expect(listarDocumentosDoColaborador).toHaveBeenCalled(),
+    );
+    expect(aba.textContent).toBe("Documentos");
+  });
+
+  it("a aba é a tabela do que foi enviado; Enviar documento abre a edição na seção Documentos", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      documento("a", "2026-11-20T10:00:00.000Z"),
+    ]);
+    const { onEditar } = montar({ aba: "documentos" });
+    expect(
+      await screen.findByRole("table", { name: "Documentos enviados" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("a.pdf")).toBeInTheDocument();
+    expect(screen.queryByText(/de 5 anexados/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Enviar documento" }));
+    expect(onEditar).toHaveBeenCalledWith("documentos");
+  });
+
+  it("colaborador desligado: documentos continuam editáveis", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      documento("a", "2026-11-20T10:00:00.000Z"),
+    ]);
+    const vinculos = await listarVinculosDoColaborador(ID);
+    vi.mocked(listarVinculosDoColaborador).mockResolvedValue(
+      vinculos.map((v) => ({
+        ...v,
+        situacao: "encerrado",
+        dataDesligamento: "2026-10-31",
+      })) as never,
+    );
+    montar({ aba: "documentos" });
+    expect(await screen.findByText("Desligado")).toBeInTheDocument();
+    await screen.findByText("a.pdf");
+    expect(
+      screen.getByRole("button", { name: "Enviar documento" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Baixar RG" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mais ações: RG" }),
+    ).toBeInTheDocument();
   });
 });

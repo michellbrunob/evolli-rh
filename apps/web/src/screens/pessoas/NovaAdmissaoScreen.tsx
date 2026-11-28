@@ -361,7 +361,7 @@ const DESCRICOES_DAS_ETAPAS = [
   "Informações pessoais e de contato do novo colaborador.",
   "Cargo, contrato e remuneração do novo colaborador.",
   "Residência usada em correspondências e no eSocial.",
-  "Opcional. Os arquivos são enviados ao concluir o cadastro.",
+  "Etapa opcional: os arquivos escolhidos sobem quando o cadastro for concluído.",
 ] as const;
 
 type IndiceEtapa = 0 | 1 | 2 | 3;

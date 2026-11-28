@@ -105,7 +105,7 @@ export function EtapaDocumentos({
     focarNaLinha(id);
   }
 
-  /** A linha de um Outro saiu: o foco vai ao campo "Novo documento". */
+  /** A linha de um Outro saiu: o foco vai ao campo "Nome do documento". */
   const focarNoNovo = () =>
     focar(() => document.getElementById(`${prefixo}-novo`));
 
@@ -240,10 +240,10 @@ export function EtapaDocumentos({
         aria-labelledby={`${prefixo}-principais`}
       >
         <h3 className="documentos__titulo" id={`${prefixo}-principais`}>
-          Documentos obrigatórios
+          Documentos principais
         </h3>
         <p className="documentos__texto" role="status">
-          {escolhidos} de {principais.length} enviados.
+          {escolhidos} de {principais.length} anexados.
         </p>
         <ul className="documentos__lista">{principais.map(linha)}</ul>
       </section>
@@ -256,7 +256,7 @@ export function EtapaDocumentos({
           Outros documentos
         </h3>
         <p className="documentos__texto">
-          Contratos, laudos, atestados e demais arquivos.
+          Contratos, termos assinados e qualquer outro arquivo da pessoa.
         </p>
         {outros.length > 0 ? (
           <ul className="documentos__lista">{outros.map(linha)}</ul>
@@ -264,10 +264,10 @@ export function EtapaDocumentos({
         <div className="documentos__novo">
           <div className="documentos__identificacao">
             <label className="documentos__nome" htmlFor={`${prefixo}-novo`}>
-              Novo documento
+              Nome do documento
             </label>
             <span className="documentos__detalhe" id={`${prefixo}-novo-ajuda`}>
-              Dê um nome e envie o arquivo.
+              Escreva como ele aparece na lista e escolha o arquivo.
             </span>
           </div>
           <Input
@@ -275,7 +275,7 @@ export function EtapaDocumentos({
             type="text"
             value={novoNome}
             maxLength={NOME_DE_OUTROS_MAXIMO}
-            placeholder="Ex.: Atestado médico"
+            placeholder="Ex.: Contrato de experiência"
             aria-describedby={`${prefixo}-novo-ajuda${erroDoNome ? ` ${prefixo}-novo-erro` : ""}`}
             aria-invalid={erroDoNome ? true : undefined}
             onChange={(e) => {

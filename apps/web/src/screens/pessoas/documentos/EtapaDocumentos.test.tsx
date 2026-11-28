@@ -91,7 +91,7 @@ describe("EtapaDocumentos (T213) — foco depois de cada ação (teclado)", () =
     render(<Etapa />);
     escolher("RG", new File(["x"], "rg.heic", { type: "image/heic" }));
     expect(within(linhaDe("RG")).getByRole("alert")).toHaveTextContent(
-      "Use um arquivo PDF, JPG ou PNG.",
+      "Envie o arquivo em PDF, DOC, DOCX, JPG, PNG ou WebP.",
     );
     await waitFor(() =>
       expect(
@@ -161,9 +161,9 @@ describe("EtapaDocumentos (T213) — foco depois de cada ação (teclado)", () =
     );
   });
 
-  it("tirar um Outro da lista: a linha sai e o foco vai ao campo Novo documento", async () => {
+  it("tirar um Outro da lista: a linha sai e o foco vai ao campo Nome do documento", async () => {
     render(<Etapa />);
-    fireEvent.change(screen.getByLabelText("Novo documento"), {
+    fireEvent.change(screen.getByLabelText("Nome do documento"), {
       target: { value: "Contrato sintético" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
@@ -174,7 +174,7 @@ describe("EtapaDocumentos (T213) — foco depois de cada ação (teclado)", () =
     );
     expect(screen.queryByText("Contrato sintético")).toBeNull();
     await waitFor(() =>
-      expect(screen.getByLabelText("Novo documento")).toHaveFocus(),
+      expect(screen.getByLabelText("Nome do documento")).toHaveFocus(),
     );
   });
 });

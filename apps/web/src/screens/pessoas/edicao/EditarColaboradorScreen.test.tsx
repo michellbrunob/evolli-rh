@@ -551,7 +551,7 @@ describe("T215 — Editar colaborador: como a referência (2026-11-26)", () => {
     const documentos = () => screen.getByRole("link", { name: "Documentos" });
     await waitFor(() =>
       expect(documentos()).toHaveAccessibleDescription(
-        "Documentos obrigatórios pendentes",
+        "Documentos principais pendentes",
       ),
     );
     expect(
@@ -576,7 +576,7 @@ describe("T215 — Editar colaborador: como a referência (2026-11-26)", () => {
       expect(listarDocumentosDoColaborador).toHaveBeenCalledTimes(2),
     );
     expect(documentos()).not.toHaveAccessibleDescription(
-      "Documentos obrigatórios pendentes",
+      "Documentos principais pendentes",
     );
     expect(
       documentos().querySelector(".editar-colaborador__pendencia"),

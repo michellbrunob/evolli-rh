@@ -2,7 +2,12 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { FormActions } from "../../../components";
 import { formatarDiaCivil } from "../../../format/data";
 import { Button, Dialog, Input } from "../../../ui";
-import { IconeEnviarArquivo, IconeMais, IconeVer } from "../../../ui/icones";
+import {
+  IconeBaixarArquivo,
+  IconeEnviarArquivo,
+  IconeMais,
+  IconeVer,
+} from "../../../ui/icones";
 import {
   enviarDocumentoDoColaborador,
   listarDocumentosDoColaborador,
@@ -21,6 +26,7 @@ import {
   conferirArquivoEscolhido,
   conferirNomeDeOutros,
   novaChaveDeEnvio,
+  podeVerNoNavegador,
   principaisEnviados,
   rotuloDoDocumento,
   tamanhoLegivel,
@@ -93,7 +99,7 @@ export function ArquivosDoColaborador({
   /**
    * Depois de remover: o "Enviar arquivo" da categoria, se ela voltou a
    * Pendente; senão o próximo arquivo da mesma categoria; em "Outros", o
-   * campo Novo documento.
+   * campo Nome do documento.
    */
   const depoisDeRemover =
     (categoria: CategoriaDocumentoColaborador) => (): HTMLElement | null =>
@@ -231,28 +237,21 @@ export function ArquivosDoColaborador({
   const linhaDoDocumento = (documento: DocumentoColaboradorApi) => {
     const nome = rotuloDoDocumento(documento.categoria, documento.nome);
     const aprovado = documento.estado === "aprovado";
+    // T217 — Baixar fica na linha (fora do "⋯"), com o nome original.
+    const baixar = () =>
+      void executar(documento, async () => {
+        const { blob, nome: neutro } = await obterArquivoDoDocumento(
+          colaboradorId,
+          documento.id,
+        );
+        baixarArquivo(
+          blob,
+          documento.nomeArquivo ?? neutro,
+          blob.type || "application/octet-stream",
+        );
+      });
     const acoes: AcaoDoMenu[] = podeOperar
       ? [
-          ...(aprovado
-            ? [
-                {
-                  id: "baixar",
-                  rotulo: "Baixar",
-                  aoEscolher: () =>
-                    void executar(documento, async () => {
-                      const { blob, nome } = await obterArquivoDoDocumento(
-                        colaboradorId,
-                        documento.id,
-                      );
-                      baixarArquivo(
-                        blob,
-                        nome,
-                        blob.type || "application/octet-stream",
-                      );
-                    }),
-                },
-              ]
-            : []),
           {
             id: "trocar",
             rotulo: "Trocar arquivo",
@@ -285,8 +284,17 @@ export function ArquivosDoColaborador({
         nome={nome}
         estado={
           <ArquivoDaLinha
-            nome={`${documento.formato.toUpperCase()} · ${dataCurta(documento.enviadoEm)}`}
-            tamanho={tamanhoLegivel(documento.tamanhoBytes)}
+            // T217 — o nome original e o dia do envio; sem nome (envio
+            // anterior), o formato, o dia e o tamanho.
+            nome={
+              documento.nomeArquivo ??
+              `${documento.formato.toUpperCase()} · ${dataCurta(documento.enviadoEm)}`
+            }
+            tamanho={
+              documento.nomeArquivo
+                ? `Enviado em ${dataCurta(documento.enviadoEm)}`
+                : tamanhoLegivel(documento.tamanhoBytes)
+            }
             estado={
               ocupado === documento.id ? (
                 <EstadoDoDocumento estado="em_verificacao" rotulo="Enviando…" />
@@ -300,7 +308,7 @@ export function ArquivosDoColaborador({
         acoes={
           podeOperar ? (
             <>
-              {aprovado ? (
+              {aprovado && podeVerNoNavegador(documento.formato) ? (
                 <button
                   type="button"
                   className="documentos__botao-icone"
@@ -313,6 +321,16 @@ export function ArquivosDoColaborador({
                   }
                 >
                   <IconeVer />
+                </button>
+              ) : null}
+              {aprovado ? (
+                <button
+                  type="button"
+                  className="documentos__botao-icone"
+                  aria-label={`Baixar o arquivo de ${nome}`}
+                  onClick={baixar}
+                >
+                  <IconeBaixarArquivo />
                 </button>
               ) : null}
               <MenuDoArquivo nome={nome} acoes={acoes} />
@@ -368,12 +386,12 @@ export function ArquivosDoColaborador({
     >
       <div className="documentos__secao">
         <h3 className="documentos__titulo" id={`${prefixo}-titulo`}>
-          Documentos obrigatórios
+          Documentos principais
         </h3>
         {documentos ? (
           <p className="documentos__texto">
             {principaisEnviados(documentos)} de {CATEGORIAS_PRINCIPAIS.length}{" "}
-            enviados.
+            anexados.
           </p>
         ) : null}
         <p className="documentos__texto" role="status" aria-live="polite">
@@ -416,7 +434,7 @@ export function ArquivosDoColaborador({
           <div className="documentos__secao">
             <h3 className="documentos__titulo">Outros documentos</h3>
             <p className="documentos__texto">
-              Contratos, laudos, atestados e demais arquivos.
+              Contratos, termos assinados e qualquer outro arquivo da pessoa.
             </p>
             {outros.length > 0 ? (
               <ul className="documentos__lista" aria-label="Outros documentos">
@@ -430,13 +448,13 @@ export function ArquivosDoColaborador({
                     className="documentos__nome"
                     htmlFor={`${prefixo}-novo`}
                   >
-                    Novo documento
+                    Nome do documento
                   </label>
                   <span
                     className="documentos__detalhe"
                     id={`${prefixo}-novo-ajuda`}
                   >
-                    Dê um nome e envie o arquivo.
+                    Escreva como ele aparece na lista e escolha o arquivo.
                   </span>
                 </div>
                 <Input
@@ -444,7 +462,7 @@ export function ArquivosDoColaborador({
                   type="text"
                   value={novoNome}
                   maxLength={NOME_DE_OUTROS_MAXIMO}
-                  placeholder="Ex.: Atestado médico"
+                  placeholder="Ex.: Contrato de experiência"
                   aria-describedby={`${prefixo}-novo-ajuda`}
                   aria-invalid={
                     erroDoNome || erros["outros-novo"] ? true : undefined
@@ -498,8 +516,8 @@ export function ArquivosDoColaborador({
 
       <Dialog
         aberto={removendo !== null}
-        titulo="Remover documento?"
-        descricao="Ele sai da lista e não pode mais ser visto nem baixado por aqui."
+        titulo="Remover este arquivo da ficha?"
+        descricao="Ele deixa de aparecer na lista, mas continua guardado com segurança."
         onFechar={() => setRemovendo(null)}
         rodape={
           <FormActions>
@@ -533,7 +551,9 @@ export function ArquivosDoColaborador({
       >
         <p className="documentos__texto">
           {removendo
-            ? rotuloDoDocumento(removendo.categoria, removendo.nome)
+            ? `${rotuloDoDocumento(removendo.categoria, removendo.nome)}${
+                removendo.nomeArquivo ? ` (${removendo.nomeArquivo})` : ""
+              }`
             : null}
         </p>
       </Dialog>

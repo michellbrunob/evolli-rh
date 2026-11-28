@@ -729,6 +729,28 @@ function extensaoDoArquivo(nome: string): string {
   return ponto === -1 ? "" : nome.slice(ponto + 1).toLowerCase();
 }
 
+/** T217 — tipo de cada extensão aceita nos documentos do colaborador. */
+const TIPO_DA_EXTENSAO: Readonly<Record<string, string>> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+/**
+ * T217 — o tipo declarado no envio: o do navegador ou, quando ele não
+ * informa (comum com DOC e DOCX), o da extensão. O servidor confere o
+ * conteúdo de qualquer forma.
+ */
+export function tipoDoArquivo(arquivo: File): string {
+  return (
+    arquivo.type || (TIPO_DA_EXTENSAO[extensaoDoArquivo(arquivo.name)] ?? "")
+  );
+}
+
 /**
  * T209 — envia ou substitui a foto do colaborador
  * (`PUT /v1/colaboradores/:id/foto`). O corpo é o arquivo como veio; o tipo
@@ -761,8 +783,9 @@ export async function enviarFotoColaborador(
 
 // ---------------------------------------------------------------------------
 // T213 — documentos do colaborador com arquivo (ADR 0021). O navegador nunca
-// fala com o armazenamento: envio e download passam pela API autenticada. O
-// nome original do arquivo NUNCA é enviado — só a extensão e o tipo.
+// fala com o armazenamento: envio e download passam pela API autenticada.
+// T217: o nome original vai num cabeçalho, só para exibição (o servidor o
+// saneia); a conferência continua pela extensão, pelo tipo e pelo conteúdo.
 
 export type CategoriaDocumentoColaborador =
   | "rg"
@@ -775,13 +798,27 @@ export type CategoriaDocumentoColaborador =
 export type EstadoDocumentoColaborador =
   "em_verificacao" | "aprovado" | "reprovado";
 
+/** T217 — formatos aceitos (DOC, DOCX e WebP desde a T217). */
+export type FormatoDocumentoColaborador =
+  "pdf" | "jpg" | "png" | "doc" | "docx" | "webp";
+
+/** T217 — quem enviou a versão atual: nome de exibição (ou nulo) e papel. */
+export interface EnviadoPorDocumentoApi {
+  readonly nome: string | null;
+  readonly papel: string;
+}
+
 export interface DocumentoColaboradorApi {
   readonly id: string;
   readonly categoria: CategoriaDocumentoColaborador;
   /** Nome curto de "outros" (nunca para o `master_tecnico`). */
   readonly nome: string | null;
+  /** T217 — nome original do arquivo (nunca para o `master_tecnico`). */
+  readonly nomeArquivo?: string | null;
+  /** T217 — autor da versão atual. */
+  readonly enviadoPor?: EnviadoPorDocumentoApi | null;
   readonly estado: EstadoDocumentoColaborador;
-  readonly formato: "pdf" | "jpg" | "png";
+  readonly formato: FormatoDocumentoColaborador;
   readonly tamanhoBytes: number;
   readonly versao: number;
   readonly enviadoEm: string;
@@ -810,8 +847,9 @@ async function enviarBinario(
       headers: {
         "Content-Type": "application/octet-stream",
         "x-csrf-token": await getCsrf(),
-        "x-evolli-documento-tipo": arquivo.type,
+        "x-evolli-documento-tipo": tipoDoArquivo(arquivo),
         "x-evolli-documento-extensao": extensaoDoArquivo(arquivo.name),
+        "x-evolli-documento-arquivo": encodeURIComponent(arquivo.name),
         ...cabecalhos,
       },
       body: arquivo,

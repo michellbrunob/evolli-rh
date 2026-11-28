@@ -1,7 +1,13 @@
 import type {
   CategoriaDocumentoColaborador,
+  EnviadoPorDocumentoApi,
   EstadoDocumentoColaborador,
+  FormatoDocumentoColaborador,
 } from "../../../api/colaboradoresClient";
+export { tipoDoArquivo } from "../../../api/colaboradoresClient";
+import { ROTULO_PAPEL } from "../../../api/usersClient";
+import { formatarInstante } from "../../../format/data";
+import { plural } from "../../../format/plural";
 
 /**
  * T213 — documentos do colaborador (ADR 0021): o que a tela sabe antes de
@@ -82,32 +88,64 @@ export const LIMITE_DO_ARQUIVO_BYTES = 10 * 1024 * 1024;
 export const LIMITE_DE_OUTROS = 5;
 export const NOME_DE_OUTROS_MAXIMO = 60;
 
-/** O que o campo de arquivo oferece. */
-export const ACEITA_NO_CAMPO =
-  ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+const TIPO_DOCX =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** O que o campo de arquivo oferece (T217: também DOC, DOCX e WebP). */
+export const ACEITA_NO_CAMPO = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  "application/pdf",
+  "application/msword",
+  TIPO_DOCX,
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+].join(",");
 
 const FORMATOS: Readonly<Record<string, string>> = {
   pdf: "application/pdf",
+  doc: "application/msword",
+  docx: TIPO_DOCX,
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   png: "image/png",
+  webp: "image/webp",
 };
+
+const extensaoDe = (nome: string) => {
+  const ponto = nome.lastIndexOf(".");
+  return ponto === -1 ? "" : nome.slice(ponto + 1).toLowerCase();
+};
+
+/** T217 — PDF e imagens abrem numa aba nova; DOC e DOCX só são baixados. */
+export function podeVerNoNavegador(
+  formato: FormatoDocumentoColaborador,
+): boolean {
+  return formato !== "doc" && formato !== "docx";
+}
 
 /** Erro de orientação do arquivo escolhido, ou `null` se pode seguir. */
 export function conferirArquivoEscolhido(arquivo: File): string | null {
-  const ponto = arquivo.name.lastIndexOf(".");
-  const extensao =
-    ponto === -1 ? "" : arquivo.name.slice(ponto + 1).toLowerCase();
-  const esperado = FORMATOS[extensao];
+  const esperado = FORMATOS[extensaoDe(arquivo.name)];
   if (!esperado || (arquivo.type !== "" && arquivo.type !== esperado)) {
-    return "Use um arquivo PDF, JPG ou PNG.";
+    return FORMATOS_ACEITOS;
   }
   if (arquivo.size === 0) return "O arquivo está vazio.";
   if (arquivo.size > LIMITE_DO_ARQUIVO_BYTES) {
-    return "O arquivo passa de 10 MB.";
+    return `Este arquivo tem ${tamanhoLegivel(arquivo.size)} e o limite é 10 MB. Diminua o tamanho ou converta para PDF antes de enviar.`;
   }
   return null;
 }
+
+/** T217 — a orientação de formato, a mesma do navegador e do servidor. */
+export const FORMATOS_ACEITOS =
+  "Envie o arquivo em PDF, DOC, DOCX, JPG, PNG ou WebP.";
 
 /** Erro do nome de um "outro documento", ou `null`. */
 export function conferirNomeDeOutros(
@@ -140,4 +178,43 @@ export function tamanhoLegivel(bytes: number): string {
 /** Chave de idempotência de um envio (uma por arquivo escolhido). */
 export function novaChaveDeEnvio(): string {
   return crypto.randomUUID();
+}
+
+/** T217 — "Nome (Papel)"; sem nome de exibição, só o papel; sem autor, "—". */
+export function quemEnviou(
+  enviadoPor: EnviadoPorDocumentoApi | null | undefined,
+): string {
+  if (!enviadoPor) return "—";
+  const papel = ROTULO_PAPEL[enviadoPor.papel] ?? enviadoPor.papel;
+  return enviadoPor.nome ? `${enviadoPor.nome} (${papel})` : papel;
+}
+
+/** T217 — do envio mais recente para o mais antigo (empate: ordem recebida). */
+export function ordenarPorEnvio<T extends { readonly enviadoEm: string }>(
+  documentos: readonly T[],
+): T[] {
+  return documentos
+    .map((documento, posicao) => ({ documento, posicao }))
+    .sort(
+      (a, b) =>
+        Date.parse(b.documento.enviadoEm) - Date.parse(a.documento.enviadoEm) ||
+        a.posicao - b.posicao,
+    )
+    .map(({ documento }) => documento);
+}
+
+/** T217 — o dia de um instante no fuso de negócio ("dd/mm/aaaa"). */
+export const diaDoEnvio = (iso: string) =>
+  formatarInstante(iso).split(" às ")[0] ?? "";
+
+/**
+ * T217 — a linha de resumo da aba: "N arquivos · último envio em
+ * dd/mm/aaaa" (plural pela quantidade); sem arquivos, uma frase curta.
+ */
+export function resumoDosDocumentos(
+  documentos: readonly { readonly enviadoEm: string }[],
+): string {
+  const [ultimo] = ordenarPorEnvio(documentos);
+  if (!ultimo) return "Nada enviado ainda";
+  return `${plural(documentos.length, "arquivo", "arquivos")} · último envio em ${diaDoEnvio(ultimo.enviadoEm)}`;
 }

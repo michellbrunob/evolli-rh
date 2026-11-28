@@ -1107,7 +1107,7 @@ export function EditarColaboradorScreen({
             ))}
           </ul>
           <span id={id("docs-pendentes")} className="sr-only">
-            Documentos obrigatórios pendentes
+            Documentos principais pendentes
           </span>
         </nav>
 
@@ -1634,7 +1634,7 @@ function descricaoDaSecao(secao: SecaoDaEdicao, nome: string): string {
     case "dependentes":
       return "Pessoas vinculadas para IRRF, plano de saúde e benefícios.";
     case "documentos":
-      return "Arquivos de quem colabora · até 10 MB por arquivo.";
+      return "Arquivos desta pessoa: PDF, DOC, DOCX, JPG, PNG ou WebP, com até 10 MB cada.";
     case "dados-bancarios":
       return "Contas usadas para pagamento de salário e reembolsos.";
     case "formacao-academica":

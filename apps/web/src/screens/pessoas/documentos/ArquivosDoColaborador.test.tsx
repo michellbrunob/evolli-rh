@@ -105,7 +105,7 @@ afterEach(() => {
 });
 
 describe("ArquivosDoColaborador (T215) — textos da referência", () => {
-  it("Documentos obrigatórios com a contagem; Outros com a explicação", async () => {
+  it("Documentos principais com a contagem; Outros com a explicação", async () => {
     const onDocumentos = vi.fn();
     render(
       <ArquivosDoColaborador
@@ -116,22 +116,26 @@ describe("ArquivosDoColaborador (T215) — textos da referência", () => {
     );
     await screen.findByText("Contrato sintético");
     expect(
-      screen.getByRole("heading", { name: "Documentos obrigatórios" }),
+      screen.getByRole("heading", { name: "Documentos principais" }),
     ).toBeInTheDocument();
     // RG e CPF contam; a certidão reprovada não.
-    expect(screen.getByText("2 de 5 enviados.")).toBeInTheDocument();
+    expect(screen.getByText("2 de 5 anexados.")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Outros documentos" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Contratos, laudos, atestados e demais arquivos."),
+      screen.getByText(
+        "Contratos, termos assinados e qualquer outro arquivo da pessoa.",
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Dê um nome e envie o arquivo."),
+      screen.getByText(
+        "Escreva como ele aparece na lista e escolha o arquivo.",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Novo documento")).toHaveAttribute(
+    expect(screen.getByLabelText("Nome do documento")).toHaveAttribute(
       "placeholder",
-      "Ex.: Atestado médico",
+      "Ex.: Contrato de experiência",
     );
     expect(screen.queryByText("Arquivos do colaborador")).toBeNull();
     expect(onDocumentos).toHaveBeenLastCalledWith(LISTA);
@@ -187,7 +191,7 @@ describe("ArquivosDoColaborador (T213) — permissões", () => {
     await screen.findByText("Contrato sintético");
     expect(screen.queryAllByRole("button")).toEqual([]);
     expect(screen.queryByLabelText("Arquivo do documento")).toBeNull();
-    expect(screen.queryByLabelText("Novo documento")).toBeNull();
+    expect(screen.queryByLabelText("Nome do documento")).toBeNull();
     expect(linhaDe("RG")).toHaveTextContent("Aprovado");
   });
 
@@ -214,7 +218,7 @@ describe("ArquivosDoColaborador (T213) — permissões", () => {
     let itens = (await screen.findAllByRole("menuitem")).map(
       (i) => i.textContent,
     );
-    expect(itens).toEqual(["Baixar", "Trocar arquivo", "Remover"]);
+    expect(itens).toEqual(["Trocar arquivo", "Remover"]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
 
     abrirMenu(
@@ -255,10 +259,12 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
         "d-rg",
       ),
     );
-    abrirMenu(
-      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    // T217 — Baixar fica na linha, fora do "⋯".
+    fireEvent.click(
+      within(linhaDe("RG")).getByRole("button", {
+        name: "Baixar o arquivo de RG",
+      }),
     );
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Baixar" }));
     await waitFor(() =>
       expect(obterArquivoDoDocumento).toHaveBeenCalledWith(COLABORADOR, "d-rg"),
     );
@@ -286,10 +292,11 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
     });
     montar();
     await screen.findByText("Contrato sintético");
-    abrirMenu(
-      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    fireEvent.click(
+      within(linhaDe("RG")).getByRole("button", {
+        name: "Baixar o arquivo de RG",
+      }),
     );
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Baixar" }));
     await waitFor(() => expect(cliques).toHaveLength(1));
     // No clique, o link está no documento (Firefox e Safari exigem) e o
     // endereço ainda vale.
@@ -352,7 +359,7 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
     });
     expect(
       within(linhaDe("Carteira de Trabalho")).getByRole("alert"),
-    ).toHaveTextContent("Use um arquivo PDF, JPG ou PNG.");
+    ).toHaveTextContent("Envie o arquivo em PDF, DOC, DOCX, JPG, PNG ou WebP.");
     expect(enviarDocumentoDoColaborador).not.toHaveBeenCalled();
   });
 
@@ -441,7 +448,9 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
         within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
       );
       fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
-      return screen.findByRole("dialog", { name: "Remover documento?" });
+      return screen.findByRole("dialog", {
+        name: "Remover este arquivo da ficha?",
+      });
     };
     let dialogo = await pedirRemocao();
     fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
@@ -461,7 +470,7 @@ describe("ArquivosDoColaborador (T213) — ações", () => {
   it("Outros documentos: nome obrigatório e sem repetir, antes de escolher o arquivo", async () => {
     montar();
     await screen.findByText("Contrato sintético");
-    const campo = screen.getByLabelText("Novo documento");
+    const campo = screen.getByLabelText("Nome do documento");
     const adicionar = screen.getByRole("button", { name: "Adicionar" });
     expect(adicionar).toBeDisabled();
     fireEvent.change(campo, { target: { value: "contrato sintético" } });
@@ -569,7 +578,7 @@ describe("ArquivosDoColaborador (T213) — foco depois de cada ação (teclado)"
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
     const dialogo = await screen.findByRole("dialog", {
-      name: "Remover documento?",
+      name: "Remover este arquivo da ficha?",
     });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Remover" }));
     await waitFor(() =>
@@ -581,7 +590,7 @@ describe("ArquivosDoColaborador (T213) — foco depois de cada ação (teclado)"
     );
   });
 
-  it("remover um Outro: a linha sai e o foco vai ao campo Novo documento", async () => {
+  it("remover um Outro: a linha sai e o foco vai ao campo Nome do documento", async () => {
     vi.mocked(removerDocumentoDoColaborador).mockResolvedValue(undefined);
     vi.mocked(listarDocumentosDoColaborador)
       .mockResolvedValueOnce(LISTA)
@@ -595,11 +604,11 @@ describe("ArquivosDoColaborador (T213) — foco depois de cada ação (teclado)"
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
     const dialogo = await screen.findByRole("dialog", {
-      name: "Remover documento?",
+      name: "Remover este arquivo da ficha?",
     });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Remover" }));
     await waitFor(() =>
-      expect(screen.getByLabelText("Novo documento")).toHaveFocus(),
+      expect(screen.getByLabelText("Nome do documento")).toHaveFocus(),
     );
   });
 });
@@ -625,5 +634,86 @@ describe("ArquivosDoColaborador (T213) — CSS (375 px e movimento)", () => {
 
   it("o topo da lista tem o mesmo respiro das seções das outras etapas", () => {
     expect(css).toMatch(/\.documentos \{[^}]*padding-top: var\(--space-lg\)/);
+  });
+});
+
+describe("ArquivosDoColaborador (T217) — nome original e formatos", () => {
+  it("mostra o nome original e o dia do envio; Baixar só no aprovado, fora do menu", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      { ...doc("d-rg", "rg", "aprovado"), nomeArquivo: "rg-frente.pdf" },
+      { ...doc("d-cpf", "cpf", "em_verificacao"), nomeArquivo: "cpf.png" },
+    ]);
+    montar();
+    expect(await screen.findByText("rg-frente.pdf")).toBeInTheDocument();
+    expect(
+      within(linhaDe("RG")).getByText("Enviado em 19/11/2026"),
+    ).toBeInTheDocument();
+    expect(
+      within(linhaDe("CPF")).queryByRole("button", { name: /Baixar/ }),
+    ).toBeNull();
+  });
+
+  it("Baixar salva com o nome original quando há", async () => {
+    const blob = new Blob(["%PDF"], { type: "application/pdf" });
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      { ...doc("d-rg", "rg", "aprovado"), nomeArquivo: "rg-frente.pdf" },
+    ]);
+    vi.mocked(obterArquivoDoDocumento).mockResolvedValue({
+      blob,
+      nome: "rg-2026-11-19.pdf",
+    });
+    const url = urlTemporaria();
+    const nomes: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      nomes.push(this.download);
+    });
+    montar();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Baixar o arquivo de RG" }),
+    );
+    await waitFor(() => expect(nomes).toEqual(["rg-frente.pdf"]));
+    url.restaurar();
+  });
+
+  it("DOCX aprovado: só baixa (sem Ver no navegador)", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      {
+        ...doc("d-outro", "outros", "aprovado", "Contrato sintético"),
+        formato: "docx",
+        nomeArquivo: "contrato.docx",
+      },
+    ]);
+    montar();
+    await screen.findByText("contrato.docx");
+    const linha = linhaDe("Contrato sintético");
+    expect(
+      within(linha).queryByRole("button", { name: /Ver o arquivo/ }),
+    ).toBeNull();
+    expect(
+      within(linha).getByRole("button", {
+        name: "Baixar o arquivo de Contrato sintético",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("Remover: a confirmação cita o tipo e o arquivo e diz que ele continua guardado", async () => {
+    vi.mocked(listarDocumentosDoColaborador).mockResolvedValue([
+      { ...doc("d-rg", "rg", "aprovado"), nomeArquivo: "rg-frente.pdf" },
+    ]);
+    montar();
+    await screen.findByText("rg-frente.pdf");
+    abrirMenu(
+      within(linhaDe("RG")).getByRole("button", { name: "Mais ações: RG" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remover" }));
+    const janela = await screen.findByRole("dialog", {
+      name: "Remover este arquivo da ficha?",
+    });
+    expect(janela).toHaveTextContent("RG (rg-frente.pdf)");
+    expect(janela).toHaveTextContent(
+      "Ele deixa de aparecer na lista, mas continua guardado com segurança.",
+    );
   });
 });

@@ -1,0 +1,361 @@
+/* T217 — aba Documentos da ficha: cabeçalho com resumo e a tabela do que foi
+   enviado. Só tokens. Em telas estreitas cada linha vira um cartão (sem
+   rolagem horizontal); transições só sem movimento reduzido. */
+
+.tabela-documentos {
+  display: grid;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+/* Título e resumo à esquerda, "Enviar documento" à direita. */
+.tabela-documentos__cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.tabela-documentos__textos {
+  display: grid;
+  flex: 1 1 16rem;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.tabela-documentos__titulo {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+}
+
+.tabela-documentos__titulo:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.tabela-documentos__resumo {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* A caixa da tabela: borda fina e cantos arredondados. */
+.tabela-documentos__caixa {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.tabela-documentos__tabela {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Proporções da referência: documento largo, duas colunas de texto iguais
+   e as ações com largura fixa. */
+.tabela-documentos__col-documento {
+  width: 46%;
+}
+
+.tabela-documentos__col-texto {
+  width: 27%;
+}
+
+.tabela-documentos__col-acoes {
+  width: 9.5rem;
+}
+
+.tabela-documentos__cabecalho {
+  height: 2.75rem;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-neutral);
+}
+
+.tabela-documentos__cabecalho th {
+  padding: 0 var(--space-sm);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink-muted);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabela-documentos__cabecalho th:first-child {
+  padding-left: calc(var(--space-md) + 3px);
+}
+
+.tabela-documentos__linha {
+  height: 4.25rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tabela-documentos__linha:last-child {
+  border-bottom: 0;
+}
+
+.tabela-documentos__celula {
+  padding: 0 var(--space-sm);
+  font-size: var(--text-body);
+  color: var(--color-ink-muted);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.tabela-documentos__celula--documento {
+  padding-left: calc(var(--space-md) + 3px);
+}
+
+.tabela-documentos__celula--documento,
+.tabela-documentos__celula--documento > * {
+  min-width: 0;
+}
+
+/* Ícone na caixinha + rótulo e nome do arquivo, lado a lado. */
+.tabela-documentos__celula--documento {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 4.25rem;
+  box-sizing: border-box;
+}
+
+.tabela-documentos__icone {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--botao-icone);
+  height: var(--botao-icone);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+}
+
+.tabela-documentos__identificacao {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tabela-documentos__tipo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.tabela-documentos__tipo strong {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.tabela-documentos__arquivo {
+  overflow: hidden;
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Só aparece no cartão das telas estreitas. */
+.tabela-documentos__rotulo-movel {
+  display: none;
+}
+
+.tabela-documentos__celula--acoes {
+  padding-right: calc(var(--space-md) + 3px);
+}
+
+.tabela-documentos__acoes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xxs);
+}
+
+/* Ver, Baixar e "⋯": botões só de ícone, com o nome do tipo para o leitor. */
+.tabela-documentos__botao,
+.tabela-documentos .documentos__botao-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--botao-icone);
+  min-height: var(--botao-icone);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-botao);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.tabela-documentos__botao:hover,
+.tabela-documentos .documentos__botao-icone:hover {
+  background: var(--surface-neutral);
+  color: var(--color-ink);
+}
+
+.tabela-documentos__botao:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+/* Toque: o alvo mínimo de 44 px. */
+@media (pointer: coarse) {
+  .tabela-documentos__botao,
+  .tabela-documentos .documentos__botao-icone {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+}
+
+/* Estado vazio dentro da tabela, abaixo do cabeçalho das colunas. */
+.tabela-documentos__vazio {
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+}
+
+.tabela-documentos__vazio-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+.tabela-documentos__vazio-titulo {
+  margin: 0 0 var(--space-xxs);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-ink);
+}
+
+.tabela-documentos__vazio-texto {
+  max-width: 26rem;
+  margin: 0 auto var(--space-md);
+  font-size: var(--text-caption);
+  color: var(--color-ink-muted);
+}
+
+/* Esqueleto da carga: as mesmas linhas, com blocos pulsando. */
+.tabela-documentos__esqueleto {
+  display: inline-block;
+  width: 60%;
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.tabela-documentos__esqueleto--icone {
+  flex: none;
+  width: var(--botao-icone);
+  height: var(--botao-icone);
+  border-radius: var(--radius-sm);
+}
+
+.tabela-documentos__esqueleto--largo {
+  width: 40%;
+}
+
+.tabela-documentos__falha {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.tabela-documentos__erro {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--status-danger-ink);
+}
+
+/* Remover: o botão de perigo cheio, como nas demais confirmações da ficha. */
+.tabela-documentos__perigo.tabela-documentos__perigo {
+  border-color: var(--status-danger-ink);
+  background: var(--status-danger-ink);
+  color: var(--color-on-action);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tabela-documentos__linha {
+    transition: background-color var(--movimento-curto) ease-out;
+  }
+
+  .tabela-documentos__esqueleto {
+    animation: ev-pulso var(--movimento-pulso) ease-in-out infinite;
+  }
+}
+
+.tabela-documentos__linha:hover {
+  background: var(--surface-neutral);
+}
+
+/* Telas estreitas: cada documento vira um cartão empilhado. */
+@media (max-width: 40rem) {
+  .tabela-documentos__tabela,
+  .tabela-documentos__tabela tbody,
+  .tabela-documentos__tabela tr,
+  .tabela-documentos__tabela td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tabela-documentos__tabela thead,
+  .tabela-documentos__tabela colgroup {
+    display: none;
+  }
+
+  .tabela-documentos__linha {
+    position: relative;
+    height: auto;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .tabela-documentos__celula,
+  .tabela-documentos__celula--documento,
+  .tabela-documentos__celula--acoes {
+    height: auto;
+    padding: var(--space-xxs) 0;
+  }
+
+  .tabela-documentos__celula--documento {
+    padding-right: 7.5rem;
+  }
+
+  .tabela-documentos__celula--texto {
+    padding-left: calc(var(--botao-icone) + 10px);
+    font-size: var(--text-caption);
+  }
+
+  .tabela-documentos__rotulo-movel {
+    display: inline;
+    margin-right: var(--space-xxs);
+    color: var(--color-ink-subtle);
+  }
+
+  .tabela-documentos__rotulo-movel::after {
+    content: ":";
+  }
+
+  .tabela-documentos__celula--acoes {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    width: auto;
+  }
+}
