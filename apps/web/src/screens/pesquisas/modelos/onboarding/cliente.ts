@@ -3,7 +3,7 @@
  * público, ativação, convites e resultado por rodada). Criar, editar
  * perguntas, status e excluir são as rotas da pesquisa.
  */
-import type { CampoGrupo } from "../../../../api/pesquisasClient";
+import type { CampoGrupo, Secao } from "../../../../api/pesquisasClient";
 import { pedir } from "../../../../api/pesquisasClient";
 import type { Faixa, RodadaAutomatica } from "./envio";
 
@@ -213,6 +213,13 @@ export const clienteDoOnboarding = {
       publico,
       soDiasUteis,
     }),
+  /** Publicado: muda as perguntas (as já respondidas viram nova versão). */
+  alterarPerguntas: (pesquisaId: string, secoes: readonly Secao[]) =>
+    pedir<{ secoes: Secao[]; novasVersoes: number }>(
+      `/pesquisas/${id(pesquisaId)}/onboarding/perguntas`,
+      "PUT",
+      { secoes },
+    ),
   ativar: (pesquisaId: string) =>
     pedir<OnboardingDetalhe>(
       `/pesquisas/${id(pesquisaId)}/onboarding/ativar`,

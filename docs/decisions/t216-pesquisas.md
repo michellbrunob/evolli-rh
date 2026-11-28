@@ -897,6 +897,63 @@ por `modelos/resultados.tsx` (resultados inteiros, no lugar das abas) e pela rot
 
 ````
 
+### Avaliação e Onboarding — revisão 3 (28/11/2026)
+
+- **Rascunho ao abrir**: os dois assistentes gravam o rascunho assim que abrem e a rota passa a
+  `#/pesquisas/<id>/rascunho` (sem recarregar); `#/pesquisas/nova/<modelo>` retoma o rascunho do mesmo
+  modelo, como os demais. Cada etapa regrava o mesmo rascunho — na avaliação, também a configuração e
+  os times (`PUT …/avaliacao`, com `prazoAutoavaliacao: null` até concluir); no onboarding, a
+  configuração do envio (`PUT …/onboarding`). Reaberto, o assistente lê `GET …/avaliacao` ou
+  `GET …/onboarding` e volta na etapa em que a pessoa parou (memória local do navegador).
+- **Resultados**: nos modelos com tela própria, as abas, o painel e o "Exportar" comuns não são
+  desenhados; só os da tela própria.
+- **Relatório em PDF** próprio pela rota `#/pesquisas/<id>/relatorio` (páginas A4, no padrão dos
+  relatórios do módulo): avaliação (capa com nota, nível, competências e grupos; resultado do time,
+  mapa de talentos, pessoas, calibração e recortes e, na 180°, gestor × autoavaliação) e onboarding
+  (índice por rodada, o que mudou, vontade de ficar, peso dos blocos, jornada, contatos e comentários).
+  "Exportar PDF" abre essa rota em outra aba (antes imprimia a tela).
+- **Onboarding**: "Escolher pessoas" mostra a lista de todos os ativos mesmo sem ninguém marcado (a
+  prévia vazia não vai para a API); e-mail com o nome da empresa ativa ("na {empresa}", ou "na
+  empresa" sem nome), "Ver como" uma pessoa do público, abas "Texto" e "Logo e cores" no personalizado
+  (cor principal e de fundo claro; o texto do botão fica branco ou preto pelo contraste; o envio do
+  logo entra com o envio de e-mail e, até lá, o convite mostra a sigla da empresa), "Teste antes de
+  enviar" com "Abrir prévia" e "Enviar teste para mim" preparado e desligado até o envio de e-mail;
+  "Completar cadastro" no aviso de quem não tem e-mail; as rodadas de 60/90 dias dizem o marco
+  ("N pessoas chegam aos 60 dias de casa nos próximos 30 dias"). Resultados: "Ver por" (departamento,
+  unidade e centro de custo, fora da anônima; mínimo de 3 por rodada), a jornada de cada pessoa na
+  identificada e o fluxo da intenção de ficar num diagrama.
+- **Avaliação**: prévia dos e-mails com o gestor de exemplo, a empresa, a saudação e o botão; na 180°,
+  também a prévia do e-mail da pessoa avaliada.
+- **Perguntas do onboarding publicado** (ativo ou pausado): aba "Perguntas" nos resultados (RH e
+  DP). Depois da primeira resposta, a pergunta respondida que muda (texto, tipo, opções,
+  obrigatoriedade ou condição) ganha um id novo — as respostas dadas continuam ligadas à versão em
+  que foram respondidas; a sem resposta muda no lugar; incluir e excluir é livre; condições que
+  apontam para a pergunta passam à nova versão (`modelos/onboarding/versao-das-perguntas.ts`).
+- Pendente: recortes por cargo e por gestor no onboarding (a resposta da confidencial não guarda
+  cargo nem gestor — exige coluna nova).
+
+Contrato (acréscimos):
+
+```ts
+// ConfigOnboarding.email
+corPrincipal: string | null; // "#rrggbb"; só no personalizado
+corFundo: string | null; // "#rrggbb", luminância ≥ 0,8; só no personalizado
+// PUT /pesquisas/:id/onboarding/perguntas { secoes } → 200 { secoes, novasVersoes }
+// (409 finalizada; 422 estrutura inválida ou sem pergunta)
+// GET /pesquisas/:id/onboarding/envios
+jornadas:
+  | {
+      colaboradorId: string;
+      nome: string;
+      admissao: string | null; // AAAA-MM-DD (vazio para quem saiu)
+      cargo: string | null;
+      unidade: string | null;
+      rodadas: { rodada: number; dataPrevista: string; situacao: SituacaoDoEnvio }[];
+      respondidas: number;
+    }[]
+  | null; // só na identificada
+```
+
 ## Modelos com metodologia própria: Riscos psicossociais (NR-1) e Saúde financeira (27/11/2026)
 
 Os dois modelos seguem o registro da frente M1: API em `modelos/<id>/` (definição, cálculo puro com

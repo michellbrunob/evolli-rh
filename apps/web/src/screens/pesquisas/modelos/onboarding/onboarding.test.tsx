@@ -1269,3 +1269,69 @@ describe("T216 — relatório em PDF do onboarding (R3)", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("T216 — perguntas do onboarding publicado (nova versão)", () => {
+  const montar = (podeEditar: boolean, respostas = 7) => {
+    const cliente = {
+      resultados: vi.fn(async () => resultados({ respostas })),
+      envios: vi.fn(async () => envios()),
+      pular: vi.fn(async () => undefined),
+      alterarPerguntas: vi.fn(async (_id: string, s: readonly unknown[]) => ({
+        secoes: s as ReturnType<typeof secoesDoOnboarding>,
+        novasVersoes: 1,
+      })),
+    };
+    render(
+      <ResultadosDoOnboarding
+        pesquisaId="onb-1"
+        nome="Onboarding"
+        secoes={SECOES}
+        cliente={cliente}
+        hoje={HOJE}
+        podeEditar={podeEditar}
+      />,
+    );
+    return cliente;
+  };
+
+  it("com respostas: avisa da nova versão, edita e salva", async () => {
+    const cliente = montar(true);
+    fireEvent.click(await screen.findByRole("tab", { name: "Perguntas" }));
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "mudar uma pergunta cria uma nova versão",
+    );
+    const salvar = screen.getByRole("button", { name: "Salvar perguntas" });
+    expect(salvar).toBeDisabled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    const editor = screen.getByRole("group", { name: "Editar pergunta" });
+    fireEvent.change(within(editor).getByLabelText("Texto da pergunta"), {
+      target: { value: "A integração me ajudou." },
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Salvar" }));
+    expect(salvar).toBeEnabled();
+    fireEvent.click(salvar);
+    await waitFor(() => expect(cliente.alterarPerguntas).toHaveBeenCalled());
+    const [id, secoes] = cliente.alterarPerguntas.mock.calls[0]!;
+    expect(id).toBe("onb-1");
+    expect((secoes as typeof SECOES)[0]!.perguntas[0]!.texto).toBe(
+      "A integração me ajudou.",
+    );
+    expect(
+      await screen.findByText("Perguntas salvas · 1 nova versão criada."),
+    ).toBeInTheDocument();
+  });
+
+  it("sem respostas, o aviso é outro; sem permissão, não há a aba", async () => {
+    montar(true, 0);
+    fireEvent.click(await screen.findByRole("tab", { name: "Perguntas" }));
+    expect(screen.getByRole("note")).toHaveTextContent("Ainda sem respostas");
+  });
+
+  it("sem permissão (ou finalizada), não há a aba Perguntas", async () => {
+    montar(false);
+    await screen.findByRole("tab", { name: /Envios/ });
+    expect(
+      screen.queryByRole("tab", { name: "Perguntas" }),
+    ).not.toBeInTheDocument();
+  });
+});

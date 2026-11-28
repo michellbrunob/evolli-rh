@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   ConflictException,
   ForbiddenException,
@@ -20,7 +20,7 @@ import {
   hojeEmSaoPaulo,
   somarDias,
 } from "../../../pessoas/ausencias/calculo-ausencias";
-import { totalDePerguntas } from "../../estrutura-pesquisa";
+import { conferirSecoes, totalDePerguntas } from "../../estrutura-pesquisa";
 import {
   CAMPOS_GRUPO,
   type CampoGrupo,
@@ -61,6 +61,8 @@ import {
   type RespostaDoOnboarding,
 } from "./calculo-onboarding";
 import { ProcessadorDePesquisas } from "../processador-de-pesquisas";
+import { errosDaEstruturaDoModelo } from "../indice";
+import { novaVersaoDasPerguntas } from "./versao-das-perguntas";
 
 /**
  * T216 — Onboarding com envio automático: a configuração do envio (RH), a
@@ -252,6 +254,66 @@ export class OnboardingService {
       ),
       pessoas: lista,
     };
+  }
+
+  /**
+   * Altera as perguntas do onboarding já publicado (ativo ou pausado). A
+   * pergunta já respondida que mudou vira uma nova versão (id novo): as
+   * respostas dadas continuam ligadas à versão em que foram respondidas.
+   */
+  async alterarPerguntas(
+    id: string,
+    dto: { secoes?: unknown },
+    ctx: PessoasAuditContext,
+  ): Promise<{ secoes: Secao[]; novasVersoes: number }> {
+    const empresaId = this.empresa(ctx, "escrita");
+    return this.prisma.$transaction(async (tx) => {
+      const p = await this.linha(tx, id, empresaId, ctx);
+      if (!podeEditar(statusEfetivo(p.status, p.encerraEm, new Date()))) {
+        throw new ConflictException();
+      }
+      const e = conferirSecoes(dto.secoes);
+      const erros = e.erros.length
+        ? e.erros
+        : errosDaEstruturaDoModelo("onboarding", e.secoes);
+      if (!erros.length && totalDePerguntas(e.secoes) === 0) {
+        erros.push({ campo: "secoes", motivo: "obrigatorio" });
+      }
+      if (erros.length) throw new CamposRecusadosException(erros);
+      const respostas = await tx.pesquisaResposta.findMany({
+        where: { pesquisaId: id },
+        select: { valores: true },
+      });
+      const respondidas = new Set(
+        respostas.flatMap((r) =>
+          (r.valores as unknown as { perguntaId: string }[]).map(
+            (v) => v.perguntaId,
+          ),
+        ),
+      );
+      const v = novaVersaoDasPerguntas(
+        p.secoes as unknown as Secao[],
+        e.secoes,
+        respondidas,
+        randomUUID,
+      );
+      await tx.pesquisa.update({
+        where: { id },
+        data: { secoes: v.secoes as unknown as Prisma.InputJsonValue },
+      });
+      await this.auditoria.registrarMutacao(
+        tx,
+        ctx,
+        "pesquisas_pesquisa_alterada",
+        "pesquisa",
+        id,
+        empresaId,
+      );
+      return {
+        secoes: v.secoes,
+        novasVersoes: Object.keys(v.versoes).length,
+      };
+    });
   }
 
   /** Grava a configuração do envio (rascunho, ativa ou pausada). */

@@ -93,9 +93,12 @@ export function AssistenteProprio({
 export function ResultadosProprios({
   detalhe,
   hoje,
+  podeEditar = false,
 }: {
   readonly detalhe: PesquisaDetalhe;
   readonly hoje: string;
+  /** RH/DP: o onboarding publicado edita as perguntas (nova versão). */
+  readonly podeEditar?: boolean;
 }) {
   if (ehAvaliacao(detalhe.modelo)) {
     return (
@@ -114,6 +117,10 @@ export function ResultadosProprios({
       secoes={detalhe.secoes}
       cliente={clienteDoOnboarding}
       hoje={hoje}
+      podeEditar={
+        podeEditar &&
+        (detalhe.status === "ativa" || detalhe.status === "pausada")
+      }
     />
   );
 }

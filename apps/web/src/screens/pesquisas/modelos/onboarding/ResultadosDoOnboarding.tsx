@@ -36,9 +36,10 @@ import type {
 import { nomeDaPlanilha, planilhaDoOnboarding } from "./exportacaoDoOnboarding";
 import { formatarDiaCivil } from "../../../../format/data";
 import { ROTULO_DA_SITUACAO } from "./regrasDoOnboarding";
+import { EtapaPerguntas } from "./AssistenteDoOnboarding";
 import "../AvaliacaoOnboarding.css";
 
-type Aba = "geral" | "envios";
+type Aba = "geral" | "envios" | "perguntas";
 
 /** Os recortes que a API sabe fazer (lotação gravada no envio). */
 const CAMPOS_DO_RECORTE: readonly { campo: CampoGrupo; rotulo: string }[] = [
@@ -61,10 +62,11 @@ const TOM_DA_SITUACAO: Readonly<
 export function ResultadosDoOnboarding({
   pesquisaId,
   nome,
-  secoes,
+  secoes: secoesIniciais,
   cliente,
   hoje,
   abaInicial = "geral",
+  podeEditar = false,
 }: {
   readonly pesquisaId: string;
   readonly nome: string;
@@ -72,10 +74,14 @@ export function ResultadosDoOnboarding({
   readonly cliente: Pick<
     ClienteDoOnboarding,
     "resultados" | "envios" | "pular"
-  >;
+  > &
+    Partial<Pick<ClienteDoOnboarding, "alterarPerguntas">>;
   readonly hoje: string;
   readonly abaInicial?: Aba;
+  /** RH/DP com a pesquisa ativa ou pausada: edita as perguntas. */
+  readonly podeEditar?: boolean;
 }) {
+  const [secoes, setSecoes] = useState<readonly Secao[]>(secoesIniciais);
   const [r, setR] = useState<Resultados | null>(null);
   const [envios, setEnvios] = useState<EnviosDoOnboarding | null>(null);
   const [falha, setFalha] = useState(false);
@@ -170,6 +176,17 @@ export function ResultadosDoOnboarding({
         >
           {`Envios (${envios.itens.length})`}
         </button>
+        {podeEditar && cliente.alterarPerguntas ? (
+          <button
+            type="button"
+            role="tab"
+            className="evolli-aba"
+            aria-selected={aba === "perguntas"}
+            onClick={() => setAba("perguntas")}
+          >
+            Perguntas
+          </button>
+        ) : null}
       </div>
       <div role="tabpanel" className="pesquisas__resultados">
         {aba === "geral" && r.identificacao !== "anonima" ? (
@@ -182,6 +199,16 @@ export function ResultadosDoOnboarding({
             envios={envios}
             hoje={hoje}
             onEnvios={() => setAba("envios")}
+          />
+        ) : aba === "perguntas" && cliente.alterarPerguntas ? (
+          <EditarPerguntas
+            secoes={secoes}
+            temRespostas={r.respostas > 0}
+            salvar={(novas) => cliente.alterarPerguntas!(pesquisaId, novas)}
+            onSalvas={(novas) => {
+              setSecoes(novas);
+              setRecarga((n) => n + 1);
+            }}
           />
         ) : (
           <Envios
@@ -987,5 +1014,88 @@ export function DiagramaDoFluxo({
         </g>
       ))}
     </svg>
+  );
+}
+
+/**
+ * Publicado: as perguntas continuam editáveis. Depois da primeira
+ * resposta, mudar uma pergunta cria uma nova versão; as respostas já dadas
+ * continuam ligadas à versão em que foram respondidas.
+ */
+function EditarPerguntas({
+  secoes,
+  temRespostas,
+  salvar,
+  onSalvas,
+}: {
+  readonly secoes: readonly Secao[];
+  readonly temRespostas: boolean;
+  readonly salvar: (
+    s: readonly Secao[],
+  ) => Promise<{ secoes: Secao[]; novasVersoes: number }>;
+  readonly onSalvas: (s: Secao[]) => void;
+}) {
+  const [rascunho, setRascunho] = useState<Secao[]>(() => [...secoes]);
+  const [gravando, setGravando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [falha, setFalha] = useState<string | null>(null);
+  const mudou = JSON.stringify(rascunho) !== JSON.stringify(secoes);
+  return (
+    <>
+      <p className="avaliacao__aviso avaliacao__aviso--info" role="note">
+        {temRespostas
+          ? "Esta pesquisa já tem respostas: mudar uma pergunta cria uma nova versão. As respostas já dadas continuam ligadas à versão em que foram respondidas."
+          : "Ainda sem respostas: as mudanças valem para todos os próximos convites."}
+      </p>
+      <EtapaPerguntas
+        secoes={rascunho}
+        onMudar={(s) => {
+          setRascunho(s);
+          setAviso(null);
+        }}
+      />
+      {falha ? (
+        <p className="pesquisas__erro" role="alert">
+          {falha}
+        </p>
+      ) : null}
+      {aviso ? (
+        <p className="pesquisas__nota" role="status">
+          {aviso}
+        </p>
+      ) : null}
+      <div className="pesquisas__acoes">
+        <Button
+          variant="secondary"
+          disabled={!mudou || gravando}
+          onClick={() => setRascunho([...secoes])}
+        >
+          Desfazer
+        </Button>
+        <Button
+          disabled={!mudou || gravando}
+          onClick={async () => {
+            setGravando(true);
+            setFalha(null);
+            try {
+              const r = await salvar(rascunho);
+              setRascunho(r.secoes);
+              onSalvas(r.secoes);
+              setAviso(
+                r.novasVersoes
+                  ? `Perguntas salvas · ${plural(r.novasVersoes, "nova versão criada", "novas versões criadas")}.`
+                  : "Perguntas salvas.",
+              );
+            } catch {
+              setFalha("Não foi possível salvar as perguntas. Tente de novo.");
+            } finally {
+              setGravando(false);
+            }
+          }}
+        >
+          Salvar perguntas
+        </Button>
+      </div>
+    </>
   );
 }

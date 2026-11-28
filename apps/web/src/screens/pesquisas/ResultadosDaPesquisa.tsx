@@ -606,7 +606,11 @@ function ResultadosInterno({
         className={proprio ? undefined : "pesquisas__resultados"}
       >
         {proprio ? (
-          <ResultadosProprios detalhe={detalhe} hoje={hoje} />
+          <ResultadosProprios
+            detalhe={detalhe}
+            hoje={hoje}
+            podeEditar={podeEditar}
+          />
         ) : abasProprias ? (
           abasProprias
         ) : aba === "geral" ? (

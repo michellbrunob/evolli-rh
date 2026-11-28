@@ -27,6 +27,7 @@ import {
   AvaliacaoDto,
   OnboardingDto,
   PasseDto,
+  PerguntasDoOnboardingDto,
   PublicoDoOnboardingDto,
   RespostaDaAvaliacaoDto,
   RespostaDoOnboardingDto,
@@ -153,6 +154,22 @@ export class ModelosDePesquisasController {
     @Req() req: Request,
   ) {
     return this.onboarding.salvar(id, dto, ctx(actor, req));
+  }
+
+  @Put(":pesquisaId/onboarding/perguntas")
+  @UseGuards(CsrfGuard, AuthorizationGuard)
+  @RequirePermission("pesquisa", "alter")
+  @Header("Cache-Control", "no-store")
+  @ApiOperation({
+    summary: "Onboarding: altera as perguntas (nova versão se já respondidas)",
+  })
+  alterarPerguntasDoOnboarding(
+    @Param("pesquisaId", ParseUUIDPipe) id: string,
+    @Body() dto: PerguntasDoOnboardingDto,
+    @CurrentUser() actor: AccessUser,
+    @Req() req: Request,
+  ) {
+    return this.onboarding.alterarPerguntas(id, dto, ctx(actor, req));
   }
 
   @Post(":pesquisaId/onboarding/ativar")

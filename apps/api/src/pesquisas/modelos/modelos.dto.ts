@@ -48,6 +48,13 @@ export class OnboardingDto {
   config!: Record<string, unknown>;
 }
 
+/** As perguntas do onboarding publicado (conferidas no serviço). */
+export class PerguntasDoOnboardingDto {
+  @IsArray()
+  @ArrayMaxSize(20)
+  secoes!: unknown[];
+}
+
 export class PublicoDoOnboardingDto {
   @IsOptional()
   @IsObject()

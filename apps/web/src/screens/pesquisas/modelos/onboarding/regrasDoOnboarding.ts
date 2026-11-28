@@ -152,6 +152,8 @@ export const CORES_PRINCIPAIS: readonly { cor: string; nome: string }[] = [
   { cor: "#be123c", nome: "Vinho" },
   { cor: "#111827", nome: "Grafite" },
 ];
+/** O fundo padrão do convite (branco): gravado como "sem cor". */
+export const FUNDO_PADRAO = "#ffffff";
 export const CORES_DE_FUNDO: readonly { cor: string; nome: string }[] = [
   { cor: "#ffffff", nome: "Branco" },
   { cor: "#f7f9fc", nome: "Gelo" },

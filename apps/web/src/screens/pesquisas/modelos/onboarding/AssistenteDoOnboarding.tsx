@@ -55,6 +55,7 @@ import {
   CONFIG_PADRAO,
   CORES_DE_FUNDO,
   CORES_PRINCIPAIS,
+  FUNDO_PADRAO,
   configParaEnviar,
   contarPerguntas,
   corDoTextoSobre,
@@ -890,7 +891,7 @@ function EtapaConfigurar({
   );
 }
 
-function EtapaPerguntas({
+export function EtapaPerguntas({
   secoes,
   onMudar,
 }: {
@@ -1659,7 +1660,7 @@ function EtapaEmail({
                 <input
                   value={hex}
                   maxLength={7}
-                  placeholder="#1f6feb"
+                  placeholder="#RRGGBB"
                   aria-invalid={hex && !corValida(hex) ? true : undefined}
                   onChange={(x) => {
                     const v = x.target.value.trim();
@@ -1688,10 +1689,10 @@ function EtapaEmail({
                   <input
                     type="radio"
                     name={`${ids}-fundo`}
-                    checked={(e.corFundo ?? "#ffffff") === c.cor}
+                    checked={(e.corFundo ?? FUNDO_PADRAO) === c.cor}
                     onChange={() =>
                       mudarEmail({
-                        corFundo: c.cor === "#ffffff" ? null : c.cor,
+                        corFundo: c.cor === FUNDO_PADRAO ? null : c.cor,
                       })
                     }
                   />
