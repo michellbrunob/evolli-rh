@@ -8,6 +8,7 @@
 import {
   paginaIndividualDoModelo,
   resultadoIndividualDoModelo,
+  contagemIndividualDoModelo,
   visaoIndividualDoModelo,
 } from "./modelos/resultados";
 import { useEffect, useState } from "react";
@@ -433,7 +434,9 @@ export function PaginaDaResposta({
           onClick={() => setAba("respostas")}
         >
           Respostas{" "}
-          <span className="pesquisas__contagem">{r.valores.length}</span>
+          <span className="pesquisas__contagem">
+            {contagemIndividualDoModelo(r) ?? r.valores.length}
+          </span>
         </button>
       </div>
 
@@ -444,7 +447,7 @@ export function PaginaDaResposta({
           valores={r.valores}
         />
       ) : visaoIndividualDoModelo(r, secoes) ? (
-        visaoIndividualDoModelo(r, secoes)
+        visaoIndividualDoModelo(r, secoes, () => setAba("respostas"))
       ) : (
         <>
           {resultadoIndividualDoModelo(r)}

@@ -4,7 +4,8 @@
  * visão geral do resultado individual — o índice da resposta no medidor,
  * a diferença para o time em pontos percentuais, as notas favoráveis,
  * neutras e desfavoráveis, cada dimensão (resposta × time), onde a resposta
- * mais difere do time, a distribuição das notas 1 a 5 e as abertas.
+ * difere do time (mais positivo e mais negativo), a distribuição das notas
+ * 1 a 5 e as abertas.
  */
 import type {
   PesquisaDetalhe,
@@ -19,7 +20,6 @@ import { IconeAvancar } from "../../../../ui/icones";
 import { Esqueleto } from "../../../../ui/movimento";
 import { Avatar, iniciaisDe } from "../../componentes";
 import { Rosca } from "../../graficos";
-import { umaCasa } from "../../textosDasPesquisas";
 import { textoParaOPainel } from "../empresa";
 import { DIMENSOES_CLIMA, PREFIXO_DAS_ABERTAS } from "./catalogo";
 import {
@@ -158,42 +158,61 @@ export function ListaDeRespostasClima({
   );
 }
 
-/** As afirmações em que a nota mais se afasta da média do time. */
-export function ondeDifere(
+type AfirmacaoDaResposta = ResultadoIndividualClima["afirmacoes"][number];
+
+/**
+ * Onde a resposta difere do time, comparando a nota (favorável 4 e 5,
+ * neutra 3, desfavorável 1 e 2) com o % favorável do time na mesma
+ * afirmação. Mais positivo: favorável aqui e menos da metade do time
+ * favorável. Mais negativo: desfavorável aqui e metade ou mais do time
+ * favorável. Neutra nunca entra. Da maior distância para a menor (empate
+ * pela ordem da pesquisa).
+ */
+export function diferencasDoTime(
   p: ResultadoIndividualClima,
   quantas = 5,
-): ResultadoIndividualClima["afirmacoes"] {
-  return p.afirmacoes
+): {
+  readonly maisPositivas: AfirmacaoDaResposta[];
+  readonly maisNegativas: AfirmacaoDaResposta[];
+} {
+  const comNota = p.afirmacoes
     .map((a, i) => ({ a, i }))
-    .filter((x) => x.a.nota !== null && x.a.mediaTime !== null)
-    .sort(
-      (x, y) =>
-        Math.abs(y.a.nota! - y.a.mediaTime!) -
-          Math.abs(x.a.nota! - x.a.mediaTime!) || x.i - y.i,
-    )
-    .filter((x) => x.a.nota !== x.a.mediaTime)
+    .filter((x) => x.a.nota !== null && x.a.favoravelTime !== null);
+  const maisPositivas = comNota
+    .filter((x) => x.a.nota! >= 4 && x.a.favoravelTime! < 50)
+    .sort((x, y) => x.a.favoravelTime! - y.a.favoravelTime! || x.i - y.i)
     .slice(0, quantas)
     .map((x) => x.a);
+  const maisNegativas = comNota
+    .filter((x) => x.a.nota! <= 2 && x.a.favoravelTime! >= 50)
+    .sort((x, y) => y.a.favoravelTime! - x.a.favoravelTime! || x.i - y.i)
+    .slice(0, quantas)
+    .map((x) => x.a);
+  return { maisPositivas, maisNegativas };
 }
 
-const comSinal = (n: number) =>
-  `${n > 0 ? "+" : n < 0 ? "−" : ""}${umaCasa(Math.abs(n))}`;
+/** "Favorável (nota 5)", "Neutra (nota 3)", "Desfavorável (nota 1)". */
+const tomDaNota = (nota: number) =>
+  `${nota >= 4 ? "Favorável" : nota === 3 ? "Neutra" : "Desfavorável"} (nota ${nota})`;
 
 /** A visão geral do resultado individual do Clima. */
 export function VisaoIndividualClima({
   resposta,
   p,
   secoes,
+  onVerRespostas,
 }: {
   readonly resposta: RespostaDetalhe;
   readonly p: ResultadoIndividualClima;
   readonly secoes: readonly Secao[];
+  /** "Ver todas as respostas" (a aba Respostas do individual). */
+  readonly onVerRespostas?: (() => void) | undefined;
 }) {
   const todas = secoes.flatMap((s) => s.perguntas);
   const textoDe = new Map(todas.map((x) => [x.id, textoParaOPainel(x.texto)]));
   const valor = new Map(resposta.valores.map((v) => [v.perguntaId, v.valor]));
   const abertas = todas.filter((x) => x.chave?.startsWith(PREFIXO_DAS_ABERTAS));
-  const difere = ondeDifere(p);
+  const { maisPositivas, maisNegativas } = diferencasDoTime(p);
   const totalDaPessoa = p.distribuicao.resposta.reduce((a, b) => a + b, 0);
   const pctDaPessoa = (n: number) =>
     totalDaPessoa > 0 ? Math.round((n / totalDaPessoa) * 100) : 0;
@@ -263,31 +282,84 @@ export function VisaoIndividualClima({
         </ol>
       </section>
 
-      {difere.length > 0 ? (
-        <section className="modelo-cartao" aria-labelledby="clima-difere">
+      <section className="modelo-cartao" aria-labelledby="clima-difere">
+        <div className="modelo-secao-cabeca">
           <h2 id="clima-difere">Onde esta resposta difere do time</h2>
-          <ol className="clima-lista" aria-label="Maiores diferenças">
-            {difere.map((a) => (
-              <li key={a.chave}>
-                <span className="clima-afirmacao">
-                  <span>{textoDe.get(a.perguntaId) ?? a.chave}</span>
-                  <span className="clima-afirmacao__dimensao">
-                    <span
-                      className="modelo-bolinha"
-                      style={{ background: corDaDimensao(a.dimensao) }}
-                      aria-hidden="true"
-                    />
-                    {`${rotuloDe(a.dimensao)} · média do time ${umaCasa(a.mediaTime!)}`}
-                  </span>
-                </span>
-                <span className="clima-numero">
-                  {`Nota ${a.nota} · ${comSinal(a.nota! - a.mediaTime!)}`}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
+          {onVerRespostas ? (
+            <button
+              type="button"
+              className="modelos__link"
+              onClick={onVerRespostas}
+            >
+              Ver todas as respostas
+            </button>
+          ) : null}
+        </div>
+        <p className="pesquisas__suave">
+          A nota desta resposta comparada com o % favorável do time na mesma
+          afirmação.
+        </p>
+        <div className="clima-caixas">
+          <div>
+            <h3 className="modelo-cartao__titulo">Mais positivo que o time</h3>
+            {maisPositivas.length === 0 ? (
+              <p className="pesquisas__suave">
+                Nenhuma afirmação em que esta resposta fique acima do time.
+              </p>
+            ) : (
+              <ol className="clima-lista" aria-label="Mais positivo que o time">
+                {maisPositivas.map((a) => (
+                  <li key={a.chave}>
+                    <span className="clima-afirmacao">
+                      <span>{textoDe.get(a.perguntaId) ?? a.chave}</span>
+                      <span className="clima-afirmacao__dimensao">
+                        <span
+                          className="modelo-bolinha"
+                          style={{ background: corDaDimensao(a.dimensao) }}
+                          aria-hidden="true"
+                        />
+                        {rotuloDe(a.dimensao)}
+                      </span>
+                    </span>
+                    <span className="clima-numero">
+                      {`${tomDaNota(a.nota!)} · time: ${a.favoravelTime}% favorável`}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          <div>
+            <h3 className="modelo-cartao__titulo">Mais negativo que o time</h3>
+            {maisNegativas.length === 0 ? (
+              <p className="pesquisas__suave">
+                Nenhuma afirmação em que esta resposta fique abaixo do time.
+              </p>
+            ) : (
+              <ol className="clima-lista" aria-label="Mais negativo que o time">
+                {maisNegativas.map((a) => (
+                  <li key={a.chave}>
+                    <span className="clima-afirmacao">
+                      <span>{textoDe.get(a.perguntaId) ?? a.chave}</span>
+                      <span className="clima-afirmacao__dimensao">
+                        <span
+                          className="modelo-bolinha"
+                          style={{ background: corDaDimensao(a.dimensao) }}
+                          aria-hidden="true"
+                        />
+                        {rotuloDe(a.dimensao)}
+                      </span>
+                    </span>
+                    <span className="clima-numero">
+                      {`${tomDaNota(a.nota!)} · time: ${a.favoravelTime}% favorável`}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="modelo-cartao" aria-labelledby="clima-distribuicao">
         <h2 id="clima-distribuicao">Distribuição das notas</h2>

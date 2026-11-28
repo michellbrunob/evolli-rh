@@ -250,6 +250,8 @@ export function listaDeRespostasDoModelo(x: {
 export function visaoIndividualDoModelo(
   resposta: RespostaDetalhe,
   secoes: readonly Secao[],
+  /** "Ver todas as respostas" (a aba Respostas do individual). */
+  onVerRespostas?: () => void,
 ): ReactNode | null {
   const r = resposta.modelo;
   if (r?.modelo === "tad") return <IndividualTad r={r} />;
@@ -257,7 +259,27 @@ export function visaoIndividualDoModelo(
   if (r?.modelo === "enps")
     return <IndividualEnps p={r} resposta={resposta} secoes={secoes} />;
   if (r?.modelo !== "clima") return null;
-  return <VisaoIndividualClima resposta={resposta} p={r} secoes={secoes} />;
+  return (
+    <VisaoIndividualClima
+      resposta={resposta}
+      p={r}
+      secoes={secoes}
+      onVerRespostas={onVerRespostas}
+    />
+  );
+}
+
+/**
+ * A contagem da aba Respostas do resultado individual, quando o modelo
+ * conta diferente (Clima: só as afirmações; as abertas ficam à parte), ou
+ * `null` (todas as respostas).
+ */
+export function contagemIndividualDoModelo(
+  resposta: RespostaDetalhe,
+): number | null {
+  return resposta.modelo?.modelo === "clima"
+    ? resposta.modelo.afirmacoes.length
+    : null;
 }
 
 /**

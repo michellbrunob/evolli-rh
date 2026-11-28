@@ -1516,3 +1516,8 @@ Regras:
   todas empatam), "abaixo da faixa Boa" e a afirmação mais baixa (`leituraDasDimensoes`); Destaques com
   "Ver todas as afirmações"; "Resultado por afirmação" abre com o menor favorável primeiro; abertas no
   bloco comum, com "Ver temas em Análises".
+- **Clima individual — onde difere do time:** `diferencasDoTime` compara a nota da resposta com o %
+  favorável do time na afirmação: "Mais positivo que o time" (favorável aqui, time abaixo de 50%) e
+  "Mais negativo que o time" (desfavorável aqui, time a partir de 50%); neutra nunca entra; até 5 em
+  cada, da maior distância; vazios explicados; "Ver todas as respostas" abre a aba Respostas do
+  individual, que no Clima conta só as afirmações (`contagemIndividualDoModelo`; as abertas à parte).

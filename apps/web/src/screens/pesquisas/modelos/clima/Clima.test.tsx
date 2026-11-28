@@ -31,6 +31,7 @@ import { GarantirAvisos } from "../../avisos";
 import { modeloDaGaleria } from "../../modelosDePesquisa";
 import {
   analisesDoModelo,
+  contagemIndividualDoModelo,
   listaDeRespostasDoModelo,
   visaoGeralDoModelo,
   visaoIndividualDoModelo,
@@ -53,7 +54,7 @@ import { conclusoesDoClima, DocumentoClima } from "./RelatorioClima";
 import {
   departamentoDaResposta,
   diferencaDoTime,
-  ondeDifere,
+  diferencasDoTime,
 } from "./RespostasClima";
 
 const DIMS = [
@@ -617,7 +618,7 @@ describe("T216 — Clima: Respostas e resultado individual", () => {
         dimensao: dimensaoDaChave(x.chave)!,
         nota: (i % 5) + 1,
         mediaTime: Math.round(((5 + 3 + (i % 5) + 1) / 3) * 100) / 100,
-        favoravelTime: 33,
+        favoravelTime: i % 2 === 0 ? 33 : 67,
       })),
       distribuicao: { resposta: [12, 12, 12, 12, 12], time: [7, 7, 40, 7, 40] },
     };
@@ -629,7 +630,8 @@ describe("T216 — Clima: Respostas e resultado individual", () => {
       ],
       modelo: p,
     };
-    render(<>{visaoIndividualDoModelo(resposta, d.secoes)}</>);
+    const onVerRespostas = vi.fn();
+    render(<>{visaoIndividualDoModelo(resposta, d.secoes, onVerRespostas)}</>);
     expect(
       screen.getByRole("img", { name: "Índice desta resposta: 40%, Crítica" }),
     ).toBeInTheDocument();
@@ -642,19 +644,111 @@ describe("T216 — Clima: Respostas e resultado individual", () => {
         screen.getByRole("list", { name: "Dimensões da resposta" }),
       ).getAllByRole("listitem")[4],
     ).toHaveTextContent("Time 50% · −17 p.p.");
-    const difere = within(
-      screen.getByRole("list", { name: "Maiores diferenças" }),
+    // Favorável aqui, mas menos da metade do time favorável; e o contrário.
+    const positivas = within(
+      screen.getByRole("list", { name: "Mais positivo que o time" }),
     ).getAllByRole("listitem");
-    expect(difere).toHaveLength(5);
-    expect(difere[0]).toHaveTextContent("Nota 1 · −2,0");
+    expect(positivas).toHaveLength(5);
+    expect(positivas[0]).toHaveTextContent(afirmacoes[4]!.texto);
+    expect(positivas[0]).toHaveTextContent(
+      "Favorável (nota 5) · time: 33% favorável",
+    );
+    const negativas = within(
+      screen.getByRole("list", { name: "Mais negativo que o time" }),
+    ).getAllByRole("listitem");
+    expect(negativas).toHaveLength(5);
+    expect(negativas[0]).toHaveTextContent(afirmacoes[1]!.texto);
+    expect(negativas[0]).toHaveTextContent(
+      "Desfavorável (nota 2) · time: 67% favorável",
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todas as respostas" }),
+    );
+    expect(onVerRespostas).toHaveBeenCalledTimes(1);
     expect(
       screen.getByLabelText("Nota 3: 12 respostas (20%), time 40%"),
     ).toBeInTheDocument();
     expect(screen.getByText("Manter o café")).toBeInTheDocument();
     expect(screen.getByText("Sem resposta.")).toBeInTheDocument();
     expect(screen.queryByText(/Média geral/)).toBeNull();
-    expect(ondeDifere(p, 2).map((a) => a.nota)).toEqual([1, 1]);
+    const { maisPositivas, maisNegativas } = diferencasDoTime(p, 50);
+    expect(maisPositivas.map((a) => a.nota)).toEqual(
+      expect.arrayContaining([4, 5]),
+    );
+    expect(maisPositivas.every((a) => a.favoravelTime! < 50)).toBe(true);
+    expect(maisNegativas.every((a) => a.nota! <= 2)).toBe(true);
+    expect(maisNegativas.every((a) => a.favoravelTime! >= 50)).toBe(true);
+    // Neutra (3) nunca entra.
+    expect([...maisPositivas, ...maisNegativas].some((a) => a.nota === 3)).toBe(
+      false,
+    );
+    // Em ordem da maior distância: a resposta favorável com o time mais
+    // baixo vem primeiro.
+    const comTimes = {
+      ...p,
+      afirmacoes: p.afirmacoes.map((a, i) =>
+        i === 9 ? { ...a, favoravelTime: 10 } : a,
+      ),
+    };
+    expect(diferencasDoTime(comTimes).maisPositivas[0]!.chave).toBe(
+      p.afirmacoes[9]!.chave,
+    );
     expect(visaoIndividualDoModelo(RESPOSTA_DETALHE, d.secoes)).toBeNull();
+  });
+});
+
+describe("R4-B-07 — Clima individual: vazios e contagem", () => {
+  it("sem diferença para nenhum dos lados: os dois vazios explicados", () => {
+    const d = detalheDoClima();
+    const afirmacoes = perguntasEmOrdem(d.secoes).filter(
+      (p) => p.tipo === "concordancia",
+    );
+    const p: ResultadoIndividualClima = {
+      modelo: "clima",
+      indice: 0,
+      faixa: "critica",
+      favoraveis: 0,
+      neutras: 60,
+      desfavoraveis: 0,
+      time: { indice: 50, faixa: "atencao" },
+      dimensoes: [],
+      afirmacoes: afirmacoes.map((x) => ({
+        chave: x.chave!,
+        perguntaId: x.id,
+        dimensao: dimensaoDaChave(x.chave)!,
+        nota: 3,
+        mediaTime: 3,
+        favoravelTime: 50,
+      })),
+      distribuicao: { resposta: [0, 0, 60, 0, 0], time: null },
+    };
+    render(
+      <>
+        {visaoIndividualDoModelo(
+          { ...RESPOSTA_DETALHE, valores: [], modelo: p },
+          d.secoes,
+        )}
+      </>,
+    );
+    expect(
+      screen.getByText(
+        "Nenhuma afirmação em que esta resposta fique acima do time.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Nenhuma afirmação em que esta resposta fique abaixo do time.",
+      ),
+    ).toBeInTheDocument();
+    // Sem o atalho, sem o botão.
+    expect(
+      screen.queryByRole("button", { name: "Ver todas as respostas" }),
+    ).toBeNull();
+    // A aba Respostas do individual conta as afirmações (as abertas à parte).
+    expect(contagemIndividualDoModelo({ ...RESPOSTA_DETALHE, modelo: p })).toBe(
+      60,
+    );
+    expect(contagemIndividualDoModelo(RESPOSTA_DETALHE)).toBeNull();
   });
 });
 
