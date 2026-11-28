@@ -5,7 +5,6 @@
  * as complementares (distribuição 0–6 · 7–8 · 9–10 e média, da maior para
  * a menor) e as respostas abertas. SVG e CSS, com nome acessível.
  */
-import { useState } from "react";
 import type {
   ComplementarDoEnps,
   PesquisaDetalhe,
@@ -13,15 +12,17 @@ import type {
   ResultadosPesquisa,
 } from "../../../../api/pesquisasClient";
 import { plural } from "../../../../format/plural";
-import { Button } from "../../../../components";
 import { perguntasEmOrdem } from "../../estadoDaPesquisa";
 import { textoParaOPainel } from "../empresa";
+import { RespostasAbertas } from "../RespostasAbertas";
 import {
   FRASE_DA_ZONA,
   GRUPOS_DO_ENPS,
+  LEGENDA_DA_MEDIA,
   TITULO_DA_ZONA,
   ZONAS_DO_ENPS,
   comSinal,
+  grupoDaMedia,
   pctDe,
   umaCasaBr,
   zonaDoEnps,
@@ -157,12 +158,14 @@ export function VisaoGeralEnps({
   detalhe,
   geral,
   r,
+  onIrParaAnalises,
 }: {
   readonly detalhe: PesquisaDetalhe;
   readonly geral: ResultadosPesquisa;
   readonly r: ResultadoDoEnps;
+  /** "Ver temas em Análises". */
+  readonly onIrParaAnalises?: () => void;
 }) {
-  const [todasAsAbertas, setTodasAsAbertas] = useState(false);
   const perguntas = perguntasEmOrdem(detalhe.secoes);
   const porId = new Map(perguntas.map((p) => [p.id, p]));
   const rotuloDe = (id: string) => {
@@ -172,18 +175,12 @@ export function VisaoGeralEnps({
   const textoDe = (id: string) => textoParaOPainel(porId.get(id)?.texto ?? "");
   const identificada = detalhe.identificacao === "identificada";
 
-  // As abertas: na identificada, as mais recentes primeiro; nas demais, a
-  // ordem alfabética do servidor (a de chegada ligaria o texto à pessoa).
+  // Um bloco por pergunta aberta (a ordem fica com `RespostasAbertas`).
   const abertas = geral.perguntas.flatMap((x) =>
     "textos" in x
-      ? (identificada ? [...x.textos].reverse() : x.textos).map((t) => ({
-          perguntaId: x.perguntaId,
-          texto: t.texto,
-          autor: identificada ? t.autor : null,
-        }))
+      ? [{ id: x.perguntaId, titulo: textoDe(x.perguntaId), textos: x.textos }]
       : [],
   );
-  const visiveis = todasAsAbertas ? abertas : abertas.slice(0, 3);
   const comMedia = r.complementares.filter((c) => c.media !== null);
   const menor = comMedia.at(-1);
   const pP = pctDe(r.promotores, r.respostas);
@@ -315,22 +312,44 @@ export function VisaoGeralEnps({
                     </td>
                     <td>
                       {c.respostas > 0 ? (
-                        <DistribuicaoDaComplementar
-                          c={c}
-                          rotulo={rotuloDe(c.perguntaId)}
-                        />
+                        <span className="enps-distribuicao-celula">
+                          <DistribuicaoDaComplementar
+                            c={c}
+                            rotulo={rotuloDe(c.perguntaId)}
+                          />
+                          <span className="pesquisas__suave">
+                            {`${c.detratores} · ${c.neutros} · ${plural(c.promotores, "pessoa", "pessoas")}`}
+                          </span>
+                        </span>
                       ) : (
                         "—"
                       )}
                     </td>
                     <td className="pesquisas__numero">
-                      {c.media === null ? "—" : umaCasaBr(c.media)}
+                      {c.media === null ? (
+                        "—"
+                      ) : (
+                        <span
+                          className="enps-media"
+                          data-grupo={grupoDaMedia(c.media)}
+                        >
+                          {umaCasaBr(c.media)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <ul className="enps-legenda" aria-label="Cores da média">
+            {LEGENDA_DA_MEDIA.map((l) => (
+              <li key={l.grupo} data-grupo={l.grupo}>
+                <span aria-hidden="true" />
+                {l.texto}
+              </li>
+            ))}
+          </ul>
           {menor && comMedia.length > 1 ? (
             <p>
               <strong>{rotuloDe(menor.perguntaId)}</strong>
@@ -340,41 +359,11 @@ export function VisaoGeralEnps({
         </section>
       ) : null}
 
-      <section className="modelo-cartao" aria-label="Respostas abertas">
-        <h2 className="modelo-cartao__titulo">
-          {`Respostas abertas · ${abertas.length}`}
-        </h2>
-        {abertas.length === 0 ? (
-          <p className="pesquisas__suave">Nenhuma resposta aberta ainda.</p>
-        ) : (
-          <>
-            <ul className="enps-abertas">
-              {visiveis.map((a, i) => (
-                <li key={`${a.perguntaId}-${i}`}>
-                  <span className="pesquisas__suave">
-                    {rotuloDe(a.perguntaId)}
-                  </span>
-                  <blockquote>{a.texto}</blockquote>
-                  {a.autor ? (
-                    <span className="pesquisas__suave">{a.autor}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-            {abertas.length > 3 ? (
-              <Button
-                variant="secondary"
-                aria-expanded={todasAsAbertas}
-                onClick={() => setTodasAsAbertas((v) => !v)}
-              >
-                {todasAsAbertas
-                  ? "Mostrar menos"
-                  : `Ver as ${abertas.length} respostas`}
-              </Button>
-            ) : null}
-          </>
-        )}
-      </section>
+      <RespostasAbertas
+        blocos={abertas}
+        identificada={identificada}
+        onVerTemas={onIrParaAnalises}
+      />
     </div>
   );
 }

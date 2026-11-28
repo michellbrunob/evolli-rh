@@ -321,3 +321,21 @@
 .enps-diferenca[data-sinal="menos"] {
   color: var(--status-danger-ink);
 }
+
+/* Complementares: a contagem sob a barra e a média no selo do grupo. */
+.enps-distribuicao-celula {
+  display: grid;
+  gap: 2px;
+}
+
+.enps-media {
+  display: inline-block;
+  min-width: 2.5rem;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--grupo-fundo);
+  color: var(--grupo-tinta);
+  font-weight: var(--weight-strong);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

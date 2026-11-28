@@ -44,6 +44,7 @@ import {
   trimestreDe,
 } from "./catalogo";
 import { DocumentoEnps } from "./RelatorioEnps";
+import { grupoDaMedia } from "./textos";
 
 const detalhe: PesquisaDetalhe = {
   ...DETALHE,
@@ -316,15 +317,114 @@ describe("T216 — eNPS: Visão geral", () => {
     );
   });
 
-  it("respostas abertas: 3 e o botão para ver todas", () => {
+  it("respostas abertas: um bloco por pergunta, lado a lado, com a contagem e as 3 primeiras", () => {
     render(<>{visaoGeralDoModelo(detalhe, geral)}</>);
     const abertas = screen.getByRole("region", { name: "Respostas abertas" });
-    expect(abertas).toHaveTextContent("Respostas abertas · 5");
-    expect(within(abertas).getAllByRole("listitem")).toHaveLength(3);
-    fireEvent.click(
-      within(abertas).getByRole("button", { name: "Ver as 5 respostas" }),
+    const blocos = within(abertas).getAllByRole("group");
+    expect(blocos.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "O que você mais gosta em trabalhar aqui?",
+      "O que você melhoraria aqui?",
+    ]);
+    expect(blocos[0]).toHaveTextContent("3 respostas");
+    expect(blocos[1]).toHaveTextContent("2 respostas");
+    // Fora da identificada: a ordem do servidor (alfabética), sem data.
+    expect(
+      within(blocos[0]!)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual(["Ambiente", "Benefícios", "Colegas"]);
+    expect(
+      within(abertas).queryByRole("button", { name: /Ver as/ }),
+    ).toBeNull();
+  });
+
+  it("respostas abertas: identificada mostra as mais recentes primeiro e 'Ver as N respostas' abre o bloco", () => {
+    const textos = ["1ª", "2ª", "3ª", "4ª", "5ª"].map((texto) => ({
+      texto,
+      autor: `Pessoa ${texto}`,
+    }));
+    const comCinco: ResultadosPesquisa = {
+      ...geral,
+      perguntas: [
+        {
+          ...geral.perguntas[0]!,
+          textos,
+        } as ResultadosPesquisa["perguntas"][number],
+        geral.perguntas[1]!,
+      ],
+    };
+    render(
+      <>
+        {visaoGeralDoModelo(
+          { ...detalhe, identificacao: "identificada" },
+          comCinco,
+        )}
+      </>,
     );
-    expect(within(abertas).getAllByRole("listitem")).toHaveLength(5);
+    const bloco = screen.getByRole("group", {
+      name: "O que você mais gosta em trabalhar aqui?",
+    });
+    expect(bloco).toHaveTextContent("5 respostas");
+    const itens = () =>
+      within(bloco)
+        .getAllByRole("listitem")
+        .map((l) => l.querySelector("blockquote")!.textContent);
+    expect(itens()).toEqual(["5ª", "4ª", "3ª"]);
+    fireEvent.click(
+      within(bloco).getByRole("button", { name: "Ver as 5 respostas" }),
+    );
+    expect(itens()).toEqual(["5ª", "4ª", "3ª", "2ª", "1ª"]);
+    expect(bloco).toHaveTextContent("Pessoa 5ª");
+  });
+
+  it("respostas abertas: o atalho 'Ver temas em Análises' troca de aba", () => {
+    const onTrocarAba = vi.fn();
+    render(<>{visaoGeralDoModelo(detalhe, geral, onTrocarAba)}</>);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver temas em Análises" }),
+    );
+    expect(onTrocarAba).toHaveBeenCalledWith("analises");
+  });
+
+  it("complementares: a contagem de cada grupo sob a barra, a média no selo do grupo e a legenda", () => {
+    render(<>{visaoGeralDoModelo(detalhe, geral)}</>);
+    const tabela = screen.getByRole("table", {
+      name: "Perguntas complementares",
+    });
+    const linhas = within(tabela)
+      .getAllByRole("row")
+      .slice(1) as HTMLTableRowElement[];
+    expect(linhas[0]!.cells[1]).toHaveTextContent("1 · 1 · 2 pessoas");
+    expect(linhas[4]!.cells[1]).toHaveTextContent("3 · 1 · 0 pessoas");
+    const selos = linhas.map((l) =>
+      l.cells[2]!.querySelector("[data-grupo]")!.getAttribute("data-grupo"),
+    );
+    expect(selos).toEqual([
+      "neutro",
+      "neutro",
+      "detrator",
+      "detrator",
+      "detrator",
+    ]);
+    const legenda = screen.getByRole("list", { name: "Cores da média" });
+    expect(
+      within(legenda)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([
+      "9 ou mais: promotores",
+      "7 a 8,9: neutros",
+      "Até 6,9: detratores",
+    ]);
+  });
+
+  it("o grupo da média: 9 ou mais, de 7 a 8,9 e abaixo de 7", () => {
+    expect(grupoDaMedia(9)).toBe("promotor");
+    expect(grupoDaMedia(10)).toBe("promotor");
+    expect(grupoDaMedia(8.9)).toBe("neutro");
+    expect(grupoDaMedia(7)).toBe("neutro");
+    expect(grupoDaMedia(6.9)).toBe("detrator");
+    expect(grupoDaMedia(0)).toBe("detrator");
   });
 
   it("sem notas na principal: aviso no lugar do medidor", () => {

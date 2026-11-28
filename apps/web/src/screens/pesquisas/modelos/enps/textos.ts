@@ -80,6 +80,20 @@ export const GRUPOS_DO_ENPS: readonly {
 export const grupoDaNota = (nota: number): GrupoDoEnps =>
   nota >= 9 ? "promotor" : nota >= 7 ? "neutro" : "detrator";
 
+/** A cor da média de uma complementar: 9 ou mais, 7 a 8,9, abaixo de 7. */
+export const grupoDaMedia = (media: number): GrupoDoEnps =>
+  media >= 9 ? "promotor" : media >= 7 ? "neutro" : "detrator";
+
+/** A legenda das cores da média (da maior para a menor). */
+export const LEGENDA_DA_MEDIA: readonly {
+  readonly grupo: GrupoDoEnps;
+  readonly texto: string;
+}[] = [
+  { grupo: "promotor", texto: "9 ou mais: promotores" },
+  { grupo: "neutro", texto: "7 a 8,9: neutros" },
+  { grupo: "detrator", texto: "Até 6,9: detratores" },
+];
+
 /** O que a nota da pessoa quer dizer. */
 export const FRASE_DO_GRUPO: Readonly<Record<GrupoDoEnps, string>> = {
   promotor: "Recomendaria a empresa: está entre quem a indica com entusiasmo.",

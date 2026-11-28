@@ -135,7 +135,16 @@ export function visaoGeralDoModelo(
         />
       );
     case "enps":
-      return <VisaoGeralEnps detalhe={detalhe} geral={geral} r={r} />;
+      return (
+        <VisaoGeralEnps
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaAnalises: () => onTrocarAba("analises") }
+            : {})}
+        />
+      );
     default:
       return null;
   }

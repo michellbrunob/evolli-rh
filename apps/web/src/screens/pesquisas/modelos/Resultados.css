@@ -486,3 +486,50 @@
   gap: var(--space-sm);
   justify-items: start;
 }
+
+/* Respostas abertas da Visão geral: um bloco por pergunta, lado a lado. */
+.respostas-abertas__blocos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-md);
+}
+
+.respostas-abertas__bloco {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.respostas-abertas__titulo {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+}
+
+.respostas-abertas__bloco > p {
+  margin: 0;
+}
+
+.respostas-abertas__lista {
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.respostas-abertas__lista li {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--color-action);
+}
+
+.respostas-abertas__lista blockquote {
+  margin: 0;
+}
