@@ -273,6 +273,13 @@ function Bloco({ b }: { readonly b: BlocoDoSobre }) {
           {b.rodape ? <p className="pesquisas__suave">{b.rodape}</p> : null}
         </section>
       );
+    case "componente":
+      return (
+        <section className="sobre__bloco" aria-label={b.titulo}>
+          <h2 className="sobre__bloco-titulo">{b.titulo}</h2>
+          <b.Componente />
+        </section>
+      );
     default:
       return (
         <section className="sobre__bloco" aria-label={b.titulo}>
@@ -439,13 +446,18 @@ export function PaginaDoModelo({
       ) : null}
 
       {p.conteudo.length > 0 || p.ficha || p.escalas || p.regua ? (
-        <div className="sobre__colunas">
+        <div
+          className="sobre__colunas"
+          {...(p.ficha || p.escalas || p.regua
+            ? {}
+            : { "data-sem-lateral": "" })}
+        >
           <div className="sobre__conteudo">
             {p.conteudo.map((b) => (
               <Bloco key={b.titulo} b={b} />
             ))}
           </div>
-          <Lateral p={p} />
+          {p.ficha || p.escalas || p.regua ? <Lateral p={p} /> : null}
         </div>
       ) : null}
 

@@ -5,10 +5,12 @@
  * a página "Sobre o modelo". Cada modelo mora em `modelos/<id>/catalogo.ts`
  * e entra na galeria pelo registro `modelos/indice.ts`.
  */
+import type { ComponentType } from "react";
 import type {
   ConfigPergunta,
   FatorDisc,
   ModeloPesquisa,
+  Pergunta,
   TipoPergunta,
 } from "../../../api/pesquisasClient";
 
@@ -205,6 +207,12 @@ export type BlocoDoSobre =
       readonly tipo: "texto";
       readonly titulo: string;
       readonly paragrafos: readonly string[];
+    }
+  | {
+      /** Um desenho próprio do modelo (cartões, réguas, fórmula). */
+      readonly tipo: "componente";
+      readonly titulo: string;
+      readonly Componente: ComponentType;
     };
 
 export interface PaginaSobre {
@@ -305,6 +313,21 @@ export interface ModeloDaGaleria {
     readonly cor: string;
     readonly chaves: readonly string[];
   }[];
+  /**
+   * Itens fixos (pela `chave`): ficam sem "Excluir" e sem arrastar no
+   * assistente (a principal do eNPS).
+   */
+  readonly chavesFixas?: readonly string[];
+  /**
+   * Os tipos que "Adicionar pergunta" oferece (padrão: só a
+   * `perguntaPadrao`).
+   */
+  readonly tiposParaAdicionar?: readonly {
+    readonly rotulo: string;
+    readonly pergunta: PerguntaPadrao;
+  }[];
+  /** O resumo das perguntas na etapa Enviar (padrão: "N · tipos"). */
+  readonly resumoDasPerguntas?: (perguntas: readonly Pergunta[]) => string;
   /** O nome sugerido da pesquisa (padrão: "<nomeBase> – <Mês> <ano>"). */
   readonly nomeDaPesquisa?: (hoje: string) => string;
   readonly pagina?: PaginaSobre;

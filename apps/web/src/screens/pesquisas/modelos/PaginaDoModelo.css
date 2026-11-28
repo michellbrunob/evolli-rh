@@ -218,6 +218,10 @@
   align-items: start;
 }
 
+.sobre__colunas[data-sem-lateral] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 760px) {
   .sobre__recebe,
   .sobre__colunas {

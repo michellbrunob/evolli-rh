@@ -561,6 +561,8 @@ function EtapaConfigurar({
   const avisar = useAvisar();
   const [adicionando, setAdicionando] = useState(false);
   const [rascunhoDaPergunta, setRascunhoDaPergunta] = useState("");
+  // O tipo da pergunta nova, quando o modelo oferece mais de um (eNPS).
+  const [tipoNovo, setTipoNovo] = useState(0);
   const [editando, setEditando] = useState<{
     id: string;
     texto: string;
@@ -575,16 +577,21 @@ function EtapaConfigurar({
   const idNome = `${ids}-nome`;
   const idDescricao = `${ids}-descricao`;
 
+  const fixa = (p: Pergunta) =>
+    typeof p.chave === "string" && (m.chavesFixas ?? []).includes(p.chave);
+
   function adicionar() {
     const texto = rascunhoDaPergunta.trim();
     if (!texto) return;
+    const padrao =
+      m.tiposParaAdicionar?.[tipoNovo]?.pergunta ?? m.perguntaPadrao;
     const nova: Pergunta = {
       id: novoId(),
-      tipo: m.perguntaPadrao.tipo,
+      tipo: padrao.tipo,
       texto,
       descricao: null,
       obrigatoria: true,
-      config: { ...m.perguntaPadrao.config },
+      config: { ...padrao.config },
       condicao: null,
       rotulo: null,
     };
@@ -788,7 +795,7 @@ function EtapaConfigurar({
                   key={p.id}
                   className="pesquisas__linha-pergunta"
                   aria-label={`Pergunta ${i + 1}`}
-                  draggable={!travado}
+                  draggable={!travado && !fixa(p)}
                   {...(arrastando === p.id ? { "data-arrastando": "" } : {})}
                   {...(erro ? { "data-invalida": "" } : {})}
                   onDragStart={() => setArrastando(p.id)}
@@ -889,21 +896,23 @@ function EtapaConfigurar({
                             setEditando({ id: p.id, texto: p.texto })
                           }
                         />
-                        <IconButton
-                          label={`Excluir pergunta ${i + 1}`}
-                          icon={<IconeRemover tamanho={14} />}
-                          variant="subtle"
-                          onClick={() => {
-                            const antes = estado.secoes;
-                            onMudar({ secoes: excluirPergunta(antes, p.id) });
-                            avisar("Pergunta excluída.", {
-                              acao: {
-                                rotulo: "Desfazer",
-                                onClick: () => onMudar({ secoes: antes }),
-                              },
-                            });
-                          }}
-                        />
+                        {fixa(p) ? null : (
+                          <IconButton
+                            label={`Excluir pergunta ${i + 1}`}
+                            icon={<IconeRemover tamanho={14} />}
+                            variant="subtle"
+                            onClick={() => {
+                              const antes = estado.secoes;
+                              onMudar({ secoes: excluirPergunta(antes, p.id) });
+                              avisar("Pergunta excluída.", {
+                                acao: {
+                                  rotulo: "Desfazer",
+                                  onClick: () => onMudar({ secoes: antes }),
+                                },
+                              });
+                            }}
+                          />
+                        )}
                       </span>
                     )}
                   </div>
@@ -914,6 +923,25 @@ function EtapaConfigurar({
           </ol>
           {adicionando ? (
             <div className="pesquisas__caixa-inline pesquisas__caixa-inline--nova">
+              {m.tiposParaAdicionar ? (
+                <div
+                  className="pesquisas__pilulas"
+                  role="radiogroup"
+                  aria-label="Tipo da nova pergunta"
+                >
+                  {m.tiposParaAdicionar.map((t, i) => (
+                    <label key={t.rotulo} className="pesquisas__escolha">
+                      <input
+                        type="radio"
+                        name={`${ids}-tipo-novo`}
+                        checked={tipoNovo === i}
+                        onChange={() => setTipoNovo(i)}
+                      />
+                      {t.rotulo}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
               <textarea
                 className="pesquisas__campo"
                 aria-label="Nova pergunta"
@@ -949,7 +977,12 @@ function EtapaConfigurar({
               <span className="pesquisas__selo">Sempre opcional · fixa</span>
             </div>
           ) : null}
-          {temEnps ? (
+          {temEnps && m.chavesFixas?.length ? (
+            <p className="pesquisas__nota">
+              A pergunta principal é fixa: é ela que calcula o eNPS (promotores
+              menos detratores).
+            </p>
+          ) : temEnps ? (
             <p className="pesquisas__nota">
               A pergunta de eNPS pode sair. Se ficar, os resultados mostram
               promotores, neutros e detratores.
@@ -1018,7 +1051,9 @@ function EtapaEnviar({
                 ? `${principais.length} blocos de frases do DISC`
                 : estado.modelo === "clima"
                   ? resumoDasPerguntasDoClima(principais)
-                  : `${principais.length} · ${tipos.join(" + ")}`}
+                  : (modeloDaGaleria(estado.modelo).resumoDasPerguntas?.(
+                      principais,
+                    ) ?? `${principais.length} · ${tipos.join(" + ")}`)}
             </dd>
           </div>
           <div>
