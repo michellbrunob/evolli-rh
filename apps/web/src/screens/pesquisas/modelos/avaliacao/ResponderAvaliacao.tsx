@@ -17,6 +17,7 @@ import {
   competencia,
   exigeComentario,
   nota1,
+  textoDoTempoDaAvaliacao,
   type Competencia,
 } from "./catalogo";
 import {
@@ -142,7 +143,7 @@ export function ResponderAvaliacao({
       <p className="pesquisa-publica__texto">
         {pendentes === 0
           ? "Tudo enviado. Obrigado!"
-          : `${plural(pendentes, "avaliação pendente", "avaliações pendentes")}. Leva cerca de 4 minutos cada e dá para parar e continuar depois.`}
+          : `${plural(pendentes, "avaliação pendente", "avaliações pendentes")}. Leva ${textoDoTempoDaAvaliacao(pendentes)} e dá para parar e continuar depois.`}
       </p>
       {auto ? (
         <section

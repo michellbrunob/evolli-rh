@@ -1,6 +1,8 @@
 /** T216 — regras puras do assistente da avaliação. */
 import { describe, expect, it } from "vitest";
 import {
+  MINUTOS_POR_AVALIACAO,
+  textoDoTempoDaAvaliacao,
   exigeComentario,
   nivelDaNota,
   nomePadrao,
@@ -131,5 +133,18 @@ describe("T216 — ninguém entra no próprio time (prova extra)", () => {
     expect(
       candidatosAoTime([GESTORA, DORA], [], GESTORA.id).map((p) => p.id),
     ).toEqual([DORA.id]);
+  });
+});
+
+describe("tempo da avaliação (e-mails e página pública)", () => {
+  it("por pessoa avaliada × quantidade", () => {
+    expect(MINUTOS_POR_AVALIACAO).toBe(4);
+    expect(textoDoTempoDaAvaliacao(1)).toBe("cerca de 4 minutos");
+    expect(textoDoTempoDaAvaliacao(3)).toBe(
+      "cerca de 12 minutos (4 por pessoa avaliada)",
+    );
+    expect(textoDoTempoDaAvaliacao(0)).toBe(
+      "cerca de 4 minutos por pessoa avaliada",
+    );
   });
 });

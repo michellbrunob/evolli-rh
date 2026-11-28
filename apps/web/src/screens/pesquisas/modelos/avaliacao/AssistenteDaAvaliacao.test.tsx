@@ -387,7 +387,13 @@ describe("T216 — assistente da Avaliação 90°", () => {
       "A Empresa Alfa abriu a Avaliação 90° – Ciclo 2026.2. Você vai avaliar 2 pessoas do seu time em 8 competências.",
     );
     expect(previa).toHaveTextContent("Começar a avaliar");
-    expect(previa).toHaveTextContent("Você entra com o seu CPF.");
+    // Tempo pela mesma regra da página pública: por pessoa × quantidade.
+    expect(previa).toHaveTextContent(
+      "São cerca de 8 minutos (4 por pessoa avaliada)",
+    );
+    expect(previa).toHaveTextContent(
+      "Você entra com o seu CPF e a sua data de nascimento.",
+    );
     expect(
       screen.queryByRole("group", {
         name: "Prévia do e-mail da pessoa avaliada",
@@ -480,6 +486,10 @@ describe("T216 — assistente da Avaliação 180°", () => {
     );
     expect(pessoa).toHaveTextContent("Oi, Ana.");
     expect(pessoa).toHaveTextContent("Começar a autoavaliação");
+    expect(pessoa).toHaveTextContent("São cerca de 4 minutos");
+    expect(pessoa).toHaveTextContent(
+      "Você entra com o seu CPF e a sua data de nascimento.",
+    );
     // Autoavaliação antes: a pessoa vê o prazo dela.
     fireEvent.click(
       screen.getByRole("button", { name: "Autoavaliação termina antes" }),

@@ -267,6 +267,12 @@ describe("T216 — avaliação pelo link", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Seu time · 2 pessoas")).toBeInTheDocument();
     expect(screen.getByText("Enviada")).toBeInTheDocument();
+    // 1 pendente × 4 minutos: a mesma regra dos e-mails.
+    expect(
+      screen.getByText(
+        "1 avaliação pendente. Leva cerca de 4 minutos e dá para parar e continuar depois.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Avaliar Ana Teste" }));
     expect(screen.getByText("1 de 24 · Comunicação")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Próximo →" })).toBeDisabled();

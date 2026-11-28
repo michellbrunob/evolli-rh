@@ -35,6 +35,7 @@ import {
   REGRAS_DE_COMENTARIOS,
   nomePadrao,
   secoesDaAvaliacao,
+  textoDoTempoDaAvaliacao,
   type ModeloDeAvaliacao,
   type RegraDeComentarios,
 } from "./catalogo";
@@ -1527,7 +1528,7 @@ function PreviaDoEmailDoGestor({
       </p>
       <p>{exemplo ? `Oi, ${primeiroNome(exemplo.gestor)}.` : "Oi, [nome]."}</p>
       <p>
-        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você vai avaliar ${pessoas} do seu time em 8 competências${e180 ? ", e cada uma também responde à própria autoavaliação" : ""}. São cerca de 4 minutos por pessoa e dá para pausar e voltar depois.`}
+        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você vai avaliar ${pessoas} do seu time em 8 competências${e180 ? ", e cada uma também responde à própria autoavaliação" : ""}. São ${textoDoTempoDaAvaliacao(exemplo?.pessoas ?? 0)} e dá para pausar e voltar depois.`}
       </p>
       {e180 && veAutoavaliacao ? (
         <p>
@@ -1538,7 +1539,9 @@ function PreviaDoEmailDoGestor({
       <p>
         <span className="avaliacao__previa-botao">Começar a avaliar</span>
       </p>
-      <p className="pesquisas__suave">Você entra com o seu CPF.</p>
+      <p className="pesquisas__suave">
+        Você entra com o seu CPF e a sua data de nascimento.
+      </p>
     </div>
   );
 }
@@ -1570,12 +1573,14 @@ function PreviaDoEmailDaPessoa({
       </p>
       <p>{pessoa ? `Oi, ${primeiroNome(pessoa)}.` : "Oi, [nome]."}</p>
       <p>
-        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você responde às mesmas afirmações que o seu gestor, agora sobre você. São cerca de 4 minutos e dá para pausar e voltar depois.`}
+        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você responde às mesmas afirmações que o seu gestor, agora sobre você. São ${textoDoTempoDaAvaliacao(1)} e dá para pausar e voltar depois.`}
       </p>
       <p>
         <span className="avaliacao__previa-botao">Começar a autoavaliação</span>
       </p>
-      <p className="pesquisas__suave">Você entra com o seu CPF.</p>
+      <p className="pesquisas__suave">
+        Você entra com o seu CPF e a sua data de nascimento.
+      </p>
     </div>
   );
 }

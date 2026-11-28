@@ -24,6 +24,23 @@ export function ehAvaliacao(
 
 export type Eixo = "entrega" | "pessoas";
 
+/**
+ * Tempo da avaliação: 4 minutos por pessoa avaliada (as 24 afirmações de
+ * uma pessoa), vezes a quantidade. A MESMA regra nos e-mails do assistente
+ * e na página pública.
+ */
+export const MINUTOS_POR_AVALIACAO = 4;
+
+/** "cerca de 12 minutos (4 por pessoa avaliada)"; sem quantidade, por pessoa. */
+export function textoDoTempoDaAvaliacao(pessoas: number): string {
+  if (pessoas <= 0)
+    return `cerca de ${MINUTOS_POR_AVALIACAO} minutos por pessoa avaliada`;
+  const total = `cerca de ${MINUTOS_POR_AVALIACAO * pessoas} minutos`;
+  return pessoas === 1
+    ? total
+    : `${total} (${MINUTOS_POR_AVALIACAO} por pessoa avaliada)`;
+}
+
 export const COMPETENCIAS = [
   "comunicacao",
   "trabalho_equipe",
