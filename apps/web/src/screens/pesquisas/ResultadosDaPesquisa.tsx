@@ -23,6 +23,7 @@ import type {
   ResultadosPesquisa,
 } from "../../api/pesquisasClient";
 import type { ServicoDosModelos } from "../../api/modelosDePesquisaClient";
+import { useTrilhaComplementar } from "../../app/trilhaComplementar";
 import { Button } from "../../components";
 import {
   diaCivilDeHoje,
@@ -222,6 +223,9 @@ function ResultadosInterno({
   const [duplicar, setDuplicar] = useState(false);
   const [convidados, setConvidados] = useState(false);
   const [respostas, setRespostas] = useState<RespostaResumo[] | null>(null);
+
+  // A trilha: "Pesquisas / <nome da pesquisa>" ("Pesquisas" volta à lista).
+  useTrilhaComplementar(detalhe ? detalhe.nome : "Resultados", onVoltar);
 
   useEffect(() => setAbaLocal(abaInicial), [abaInicial]);
   const setAba = (a: Aba) => {

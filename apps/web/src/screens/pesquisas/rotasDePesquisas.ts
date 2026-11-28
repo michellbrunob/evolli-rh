@@ -205,3 +205,52 @@ export function rotuloDaTrilha(rota: RotaDePesquisas): string | null {
       return "Relatório em PDF";
   }
 }
+
+/** Um nível da trilha depois de "Pesquisas" (o último é a página atual). */
+export interface NivelDaTrilhaDePesquisas {
+  readonly rotulo: string;
+  readonly onSelecionar?: () => void;
+}
+
+/** O nome do modelo na trilha ("Pesquisa Pulso", "Pesquisa personalizada"). */
+function nomeNaTrilha(modelo: string): string {
+  const m = modeloDaGaleria(modelo);
+  return m.modelo === "personalizada" ? "Pesquisa personalizada" : m.nome;
+}
+
+/**
+ * T216 — os níveis da trilha de cada tela, depois de "Pesquisas" (que volta
+ * à lista): "Nova pesquisa / <modelo>" no sobre o modelo e nos assistentes,
+ * "Nova pesquisa / Pesquisa personalizada" na personalizada. `undefined`:
+ * a própria página declara (resultados: o nome da pesquisa; resposta).
+ */
+export function niveisDaTrilha(
+  rota: RotaDePesquisas,
+  x: {
+    /** O modelo do rascunho aberto, quando já conhecido. */
+    readonly modeloDoRascunho?: string | null;
+    readonly onNova: () => void;
+  },
+): readonly NivelDaTrilhaDePesquisas[] | null | undefined {
+  const nova = { rotulo: "Nova pesquisa", onSelecionar: x.onNova };
+  switch (rota.tela) {
+    case "resultados":
+    case "resposta":
+      return undefined;
+    case "modelo":
+    case "sobre":
+      return [nova, { rotulo: nomeNaTrilha(rota.modelo) }];
+    case "personalizada":
+    case "aberta":
+    case "copia":
+      return [nova, { rotulo: "Pesquisa personalizada" }];
+    case "rascunho":
+      return x.modeloDoRascunho
+        ? [nova, { rotulo: nomeNaTrilha(x.modeloDoRascunho) }]
+        : [{ rotulo: "Nova pesquisa" }];
+    default: {
+      const rotulo = rotuloDaTrilha(rota);
+      return rotulo === null ? null : [{ rotulo }];
+    }
+  }
+}

@@ -25,6 +25,7 @@ import {
   useComplementoDaTrilha,
 } from "../../app/trilhaComplementar";
 import { AssistenteDoModelo } from "./AssistenteDoModelo";
+import { EditarPesquisa } from "./EditarPesquisa";
 import {
   DETALHE,
   RESPOSTA_DETALHE,
@@ -49,6 +50,88 @@ const css = (arquivo: string) =>
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+const RASCUNHO: PesquisaDetalhe = {
+  ...DETALHE,
+  id: "p-r",
+  nome: "Pulso retomado",
+  modelo: "pulso",
+  status: "rascunho",
+  identificacao: "anonima",
+  participantes: null,
+  temRespostas: false,
+  link: null,
+};
+
+describe("R3-A-02 — publicar um rascunho retomado", () => {
+  it("mostra 'Pesquisa criada e ativa' mesmo se a pesquisa for relida", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() => Promise.resolve(RASCUNHO)),
+    });
+    const onNavegar = vi.fn();
+    const rota: RotaDePesquisas = { tela: "rascunho", id: "p-r" };
+    const { rerender } = render(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={rota}
+        onNavegar={onNavegar}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /Próximo/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Gerar pesquisa/ }),
+    );
+    await screen.findByRole("region", { name: "Pesquisa criada e ativa" });
+    // O shell recria o serviço (ou a tela é relida): agora a pesquisa está
+    // ativa. A tela final continua, sem pular para Editar.
+    const relido = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({ ...RASCUNHO, status: "ativa" as const }),
+      ),
+    });
+    rerender(
+      <PesquisasModulo
+        servico={relido}
+        podeEditar
+        rota={{ tela: "rascunho", id: "p-r" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(
+      screen.getByRole("region", { name: "Pesquisa criada e ativa" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copiar link" })).toBeEnabled();
+    expect(onNavegar).not.toHaveBeenCalledWith(
+      expect.objectContaining({ tela: "editar" }),
+      expect.anything(),
+    );
+  });
+
+  it("aberta pela rota uma pesquisa já publicada, segue para Editar", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({ ...RASCUNHO, status: "ativa" as const }),
+      ),
+    });
+    const onNavegar = vi.fn();
+    render(
+      <PesquisasModulo
+        servico={servico}
+        podeEditar
+        rota={{ tela: "rascunho", id: "p-r" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    await waitFor(() =>
+      expect(onNavegar).toHaveBeenCalledWith(
+        { tela: "editar", id: "p-r" },
+        { substituir: true },
+      ),
+    );
+  });
 });
 
 describe("R3-A-04 — aviso de erro com tom de erro", () => {
@@ -152,5 +235,132 @@ describe("R3-A-29 — o aviso não cobre o rodapé de uma gaveta", () => {
     expect(css("../../ui/AvisoFlutuante.css")).toMatch(
       /body:has\(\.ev-janela__rodape\) \.aviso-flutuante \{[^}]*bottom: calc\(var\(--altura-rodape-pagina\)/,
     );
+  });
+});
+
+function LeitorDaTrilha() {
+  const c = useComplementoDaTrilha();
+  return (
+    <nav aria-label="Trilha">
+      <button type="button" onClick={c?.onVoltar}>
+        Pesquisas
+      </button>
+      {c?.niveis.map((n, i) =>
+        n.onSelecionar && i < c.niveis.length - 1 ? (
+          <button key={i} type="button" onClick={n.onSelecionar}>
+            {n.rotulo}
+          </button>
+        ) : (
+          <span key={i} aria-current="page">
+            {n.rotulo}
+          </span>
+        ),
+      )}
+    </nav>
+  );
+}
+
+describe("R3-A-09 — trilha com vários níveis", () => {
+  function montarNaRota(rota: RotaDePesquisas, extra = {}) {
+    const onNavegar = vi.fn();
+    const servico = servicoFalso(extra);
+    render(
+      <ProvedorDeTrilhaComplementar>
+        <PesquisasModulo
+          servico={servico}
+          podeEditar
+          rota={rota}
+          onNavegar={onNavegar}
+        />
+        <LeitorDaTrilha />
+      </ProvedorDeTrilhaComplementar>,
+    );
+    return {
+      onNavegar,
+      trilha: screen.getByRole("navigation", { name: "Trilha" }),
+    };
+  }
+  const textos = (trilha: HTMLElement) =>
+    [...trilha.children].map((n) => n.textContent);
+
+  it("sobre o modelo: Pesquisas / Nova pesquisa / o modelo", async () => {
+    const { trilha, onNavegar } = montarNaRota({
+      tela: "sobre",
+      modelo: "pulso",
+    });
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual([
+        "Pesquisas",
+        "Nova pesquisa",
+        "Pesquisa Pulso",
+      ]),
+    );
+    fireEvent.click(
+      within(trilha).getByRole("button", { name: "Nova pesquisa" }),
+    );
+    expect(onNavegar).toHaveBeenLastCalledWith({ tela: "nova" }, undefined);
+  });
+
+  it("assistente do modelo: Pesquisas / Nova pesquisa / o modelo", async () => {
+    const { trilha } = montarNaRota({ tela: "modelo", modelo: "enps" });
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual(["Pesquisas", "Nova pesquisa", "eNPS"]),
+    );
+  });
+
+  it("rascunho retomado: o modelo do rascunho", async () => {
+    const { trilha } = montarNaRota(
+      { tela: "rascunho", id: "p-r" },
+      { obterPesquisa: vi.fn(() => Promise.resolve(RASCUNHO)) },
+    );
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual([
+        "Pesquisas",
+        "Nova pesquisa",
+        "Pesquisa Pulso",
+      ]),
+    );
+  });
+
+  it("rascunho de uma personalizada: Pesquisa personalizada", async () => {
+    const { trilha } = montarNaRota(
+      { tela: "rascunho", id: "p-r" },
+      {
+        obterPesquisa: vi.fn(() =>
+          Promise.resolve({ ...RASCUNHO, modelo: "personalizada" as const }),
+        ),
+      },
+    );
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual([
+        "Pesquisas",
+        "Nova pesquisa",
+        "Pesquisa personalizada",
+      ]),
+    );
+  });
+
+  it("personalizada (página e assistente): Pesquisas / Nova pesquisa / Pesquisa personalizada", async () => {
+    const { trilha } = montarNaRota({ tela: "aberta", roteiro: "branco" });
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual([
+        "Pesquisas",
+        "Nova pesquisa",
+        "Pesquisa personalizada",
+      ]),
+    );
+  });
+
+  it("resultados: o nome da pesquisa; 'Pesquisas' volta à lista", async () => {
+    const { trilha, onNavegar } = montarNaRota({
+      tela: "resultados",
+      id: "p-1",
+      aba: "geral",
+    });
+    await waitFor(() =>
+      expect(textos(trilha)).toEqual(["Pesquisas", DETALHE.nome]),
+    );
+    fireEvent.click(within(trilha).getByRole("button", { name: "Pesquisas" }));
+    expect(onNavegar).toHaveBeenLastCalledWith({ tela: "lista" }, undefined);
   });
 });

@@ -91,7 +91,7 @@ import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
 import {
   ROTA_DA_LISTA,
-  rotuloDaTrilha,
+  niveisDaTrilha,
   type RotaDePesquisas,
 } from "./rotasDePesquisas";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
@@ -197,23 +197,33 @@ function Modulo({
     [onNavegar],
   );
 
+  /** O modelo do rascunho aberto (o último nível da trilha). */
+  const [modeloDoRascunho, setModeloDoRascunho] = useState<{
+    id: string;
+    modelo: string;
+  } | null>(null);
   const voltarNaTrilha = useCallback(() => {
-    switch (atual.tela) {
-      case "resposta":
-      case "editar":
-        irPara({ tela: "resultados", id: atual.id, aba: "geral" });
-        break;
-      case "aberta":
-      case "copia":
-        irPara({ tela: "personalizada" });
-        break;
-      default:
-        irPara(ROTA_DA_LISTA);
-    }
+    // "Pesquisas" volta à lista; no Editar (um nível só), aos resultados.
+    if (atual.tela === "editar")
+      irPara({ tela: "resultados", id: atual.id, aba: "geral" });
+    else irPara(ROTA_DA_LISTA);
   }, [atual, irPara]);
-  // O resultado individual declara a própria trilha (pesquisa › resposta).
+  // Resultados e resultado individual declaram a própria trilha (o nome da
+  // pesquisa, a resposta).
   useTrilhaComplementar(
-    atual.tela === "resposta" ? undefined : rotuloDaTrilha(atual),
+    niveisDaTrilha(atual, {
+      modeloDoRascunho:
+        atual.tela === "rascunho"
+          ? abertoRef.current?.id === atual.id
+            ? abertoRef.current.tipo === "modelo"
+              ? abertoRef.current.modelo
+              : "personalizada"
+            : modeloDoRascunho?.id === atual.id
+              ? modeloDoRascunho.modelo
+              : null
+          : null,
+      onNova: () => irPara({ tela: "nova" }),
+    }),
     voltarNaTrilha,
   );
 
@@ -406,6 +416,9 @@ function Modulo({
           key={`rascunho-${atual.id}`}
           servico={servico}
           id={atual.id}
+          onCarregada={(d) =>
+            setModeloDoRascunho({ id: d.id, modelo: d.modelo })
+          }
           render={(d) =>
             d.status !== "rascunho" ? (
               <Redirecionar
@@ -641,26 +654,38 @@ function Redirecionar({ para }: { readonly para: () => void }) {
   return null;
 }
 
-/** Carrega a pesquisa e entrega ao `render`. */
+/**
+ * Carrega a pesquisa e entrega ao `render`. Vale a primeira leitura: uma
+ * releitura (serviço recriado, efeito refeito) não troca a tela aberta — o
+ * rascunho publicado agora continua na tela final, sem pular para Editar.
+ */
 function CarregarPesquisa({
   servico,
   id,
   render,
+  onCarregada,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly id: string;
   readonly render: (d: PesquisaDetalhe) => React.ReactNode;
+  readonly onCarregada?: (d: PesquisaDetalhe) => void;
 }) {
   const [d, setD] = useState<PesquisaDetalhe | null>(null);
   const [falhou, setFalhou] = useState(false);
+  const primeiraRef = useRef<PesquisaDetalhe | null>(null);
+  const carregadaRef = useRef(onCarregada);
+  carregadaRef.current = onCarregada;
   useEffect(() => {
     let vivo = true;
     Promise.resolve(servico.obterPesquisa(id))
       .then((x) => {
-        if (vivo) setD(x);
+        if (!vivo || primeiraRef.current) return;
+        primeiraRef.current = x;
+        setD(x);
+        carregadaRef.current?.(x);
       })
       .catch(() => {
-        if (vivo) setFalhou(true);
+        if (vivo && !primeiraRef.current) setFalhou(true);
       });
     return () => {
       vivo = false;
