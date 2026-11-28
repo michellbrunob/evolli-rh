@@ -53,6 +53,7 @@ import { modeloDaGaleria } from "./modelosDePesquisa";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
+import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
 import "./RelatorioImprimivel.css";
 
 const COR_DA_FAIXA: Readonly<Record<Faixa, string>> = {
@@ -167,7 +168,7 @@ function BarraDaMedia({
   );
 }
 
-function RodapeDaCapa({
+export function RodapeDaCapa({
   itens,
 }: {
   readonly itens: readonly (readonly [string, string])[];
@@ -184,7 +185,7 @@ function RodapeDaCapa({
   );
 }
 
-function Pagina({
+export function Pagina({
   children,
   capa = false,
   cabecalho,
@@ -224,7 +225,7 @@ function Pagina({
   );
 }
 
-function Secao({
+export function Secao({
   numero,
   titulo,
   children,
@@ -860,7 +861,7 @@ export function DocumentoDaResposta({
 }
 
 /** Põe o documento direto no `body` (a impressão esconde o resto). */
-function Impressao({
+export function Impressao({
   titulo,
   imprimir,
   children,
@@ -894,7 +895,7 @@ function Impressao({
   );
 }
 
-function Carregando({ falhou }: { readonly falhou: boolean }) {
+export function Carregando({ falhou }: { readonly falhou: boolean }) {
   return falhou ? (
     <p className="pesquisas__erro" role="alert">
       Não foi possível montar o relatório.
@@ -932,6 +933,16 @@ export function RelatorioDaPesquisa({
     };
   }, [servico, pesquisaId, hoje]);
   if (!dados) return <Carregando falhou={falhou} />;
+  if (dados.detalhe.modelo === "disc")
+    return (
+      <DocumentoDisc
+        servico={servico}
+        detalhe={dados.detalhe}
+        empresa={dados.empresa}
+        imprimir={imprimir}
+        hoje={hoje}
+      />
+    );
   return (
     <Impressao
       titulo={nomeDoArquivo([dados.rel.nome, "resultados"], "pdf").replace(
@@ -986,6 +997,17 @@ export function RelatorioDaResposta({
     };
   }, [servico, pesquisaId, respostaId]);
   if (!dados) return <Carregando falhou={falhou} />;
+  if (dados.detalhe.modelo === "disc")
+    return (
+      <DocumentoDisc
+        servico={servico}
+        detalhe={dados.detalhe}
+        empresa={dados.empresa}
+        imprimir={imprimir}
+        hoje={hoje}
+        respostaId={respostaId}
+      />
+    );
   const titulo =
     dados.detalhe.identificacao === "identificada" && dados.resposta.nome
       ? dados.resposta.nome

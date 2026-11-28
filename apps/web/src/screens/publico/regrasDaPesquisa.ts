@@ -258,12 +258,15 @@ export function frasesEmbaralhadas<T>(
   perguntaId: string,
   frases: readonly T[],
 ): T[] {
-  let semente = 0;
-  for (const c of perguntaId) semente = (semente * 31 + c.charCodeAt(0)) >>> 0;
+  // FNV-1a do id como semente; a escolha usa os bits altos do gerador.
+  let semente = 2166136261;
+  for (const c of perguntaId) {
+    semente = Math.imul(semente ^ c.charCodeAt(0), 16777619) >>> 0;
+  }
   const saida = [...frases];
   for (let i = saida.length - 1; i > 0; i -= 1) {
-    semente = (semente * 1103515245 + 12345) >>> 0;
-    const j = semente % (i + 1);
+    semente = (Math.imul(semente, 1103515245) + 12345) >>> 0;
+    const j = (semente >>> 16) % (i + 1);
     [saida[i], saida[j]] = [saida[j]!, saida[i]!];
   }
   return saida;
