@@ -4,6 +4,7 @@ import {
   suprimirGrupos,
   faixaDoValor,
   mediaDaResposta,
+  mesDeBrasilia,
   montarResultados,
   type RespostaParaCalculo,
   resultadoDasPerguntas,
@@ -858,5 +859,70 @@ describe("T216 — escalas de 4 pontos, LNPS e o resultado do modelo", () => {
       montarResultados({ ...entrada, modelo: "tad", minimoNaVisaoGeral: true })
         .modelo,
     ).toBeNull();
+  });
+
+  it("mês de Brasília: 00h30 UTC do dia 1º ainda é o mês anterior", () => {
+    expect(mesDeBrasilia(new Date("2026-11-01T02:59:00Z"))).toBe("2026-10");
+    expect(mesDeBrasilia(new Date("2026-11-01T03:00:00Z"))).toBe("2026-11");
+    expect(mesDeBrasilia(new Date("2026-12-31T23:00:00Z"))).toBe("2026-12");
+  });
+
+  it("montarResultados: comentários do modelo com o mês e o departamento só do grupo visível", () => {
+    const secoes: Secao[] = [
+      {
+        id: "s",
+        titulo: null,
+        descricao: null,
+        perguntas: [
+          { ...p("c", "concordancia"), chave: "pc_ae_01" },
+          {
+            ...p("t", "paragrafo"),
+            chave: "__comentario_alinhamento_estrategia__",
+          },
+        ],
+      },
+    ];
+    const uma = (dep: string, texto: string, quando: string) => ({
+      valores: [
+        { perguntaId: "c", valor: 4 },
+        { perguntaId: "t", valor: texto },
+      ],
+      autor: null,
+      grupos: { departamento: dep },
+      respondidaEm: new Date(quando),
+    });
+    const res = montarResultados({
+      pesquisaId: "x",
+      secoes,
+      modelo: "pulso_clima",
+      respostas: [
+        uma("d1", "Bom", "2026-10-10T12:00:00Z"),
+        uma("d1", "Ok", "2026-11-02T12:00:00Z"),
+        uma("d1", "Claro", "2026-11-03T12:00:00Z"),
+        uma("d2", "Sozinho", "2026-11-04T12:00:00Z"),
+        // Sem grupo: com o grupo oculto, o que não aparece tem duas partes
+        // (sem supressão secundária de Vendas).
+        { ...uma("", "Sem grupo", "2026-09-01T12:00:00Z"), grupos: {} },
+      ],
+      participantes: null,
+      nomesDosGrupos: new Map([
+        ["d1", "Vendas"],
+        ["d2", "Jurídico"],
+      ]),
+      minimoPorGrupo: 3,
+      filtro: null,
+      recortes: ["departamento"],
+      identificada: false,
+      minimoNaVisaoGeral: false,
+    });
+    const m = res.modelo;
+    if (m?.modelo !== "pulso_clima") throw new Error("sem modelo");
+    expect(m.comentarios[0]!.textos).toEqual([
+      { texto: "Claro", mes: "2026-11", departamento: "Vendas" },
+      { texto: "Ok", mes: "2026-11", departamento: "Vendas" },
+      { texto: "Sozinho", mes: "2026-11", departamento: null },
+      { texto: "Bom", mes: "2026-10", departamento: "Vendas" },
+      { texto: "Sem grupo", mes: "2026-09", departamento: null },
+    ]);
   });
 });

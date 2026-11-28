@@ -33,6 +33,13 @@ export interface RespostaParaCalculo {
   autor: string | null;
   /** O grupo de cada campo (lotação, gravado no envio ou escolhido). */
   grupos: GruposDaResposta;
+  /** T216 — quando chegou (o mês dos comentários dos modelos). */
+  respondidaEm?: Date;
+}
+
+/** O mês (`AAAA-MM`) de um instante, no horário de Brasília (UTC−3). */
+export function mesDeBrasilia(instante: Date): string {
+  return new Date(instante.getTime() - 3 * 3_600_000).toISOString().slice(0, 7);
 }
 
 /** Duas casas, sem `-0`. */
@@ -513,6 +520,12 @@ export function montarResultados(e: EntradaDosResultados): ResultadosPesquisa {
           e.secoes,
           filtradas.map((r) => ({
             valores: new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
+            // O mês e o departamento visível (comentários do Pulso e Clima).
+            mes: r.respondidaEm ? mesDeBrasilia(r.respondidaEm) : null,
+            departamento:
+              (grupos.departamento ?? []).find(
+                (g) => g.visivel && g.id === r.grupos.departamento,
+              )?.nome ?? null,
           })),
           // Contagens sensíveis (ex.: comportamentos ofensivos da NR-1) só
           // aparecem inteiras para quem vê o autor (identificada).

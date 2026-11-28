@@ -1260,32 +1260,27 @@ export class PesquisasService {
           ? { campo, grupo: null, oculto: g.oculto }
           : { campo, grupo: g.nome, oculto: null };
       });
-    const lista = respostas.map((r, i) => ({
-      ...r,
-      resumo: {
-        id: r.id,
-        numero: i + 1,
-        colaboradorId: r.colaboradorId,
-        nome: r.autor,
-        departamento: r.departamento,
-        respondidaEm: r.respondidaEm.toISOString(),
-        media: mediaDaResposta(
-          secoes,
-          new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
-        ),
-        grupos: gruposDe(r),
-        ...resumoDoModeloDa(p.modelo, secoes, r),
-        // eNPS: a nota principal e o grupo (a coluna da lista).
-        ...(p.modelo === "enps"
-          ? {
-              enps: notaPrincipalDoEnps(
-                secoes,
-                new Map(r.valores.map((v) => [v.perguntaId, v.valor])),
-              ),
-            }
-          : {}),
-      },
-    }));
+    const lista = respostas.map((r, i) => {
+      const valores = new Map(r.valores.map((v) => [v.perguntaId, v.valor]));
+      return {
+        ...r,
+        resumo: {
+          id: r.id,
+          numero: i + 1,
+          colaboradorId: r.colaboradorId,
+          nome: r.autor,
+          departamento: r.departamento,
+          respondidaEm: r.respondidaEm.toISOString(),
+          media: mediaDaResposta(secoes, valores),
+          grupos: gruposDe(r),
+          ...resumoDoModeloDa(p.modelo, secoes, r),
+          // eNPS: a nota principal e o grupo (a coluna da lista).
+          ...(p.modelo === "enps"
+            ? { enps: notaPrincipalDoEnps(secoes, valores) }
+            : {}),
+        },
+      };
+    });
     // Exibição: da mais recente para a mais antiga; o número continua sendo
     // a ordem de chegada (#1 = a primeira).
     lista.reverse();

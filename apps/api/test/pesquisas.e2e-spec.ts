@@ -2204,6 +2204,16 @@ describe("T216 — Pesquisas (e2e)", () => {
         rhA,
       ).expect(200);
       expect(uma.body.modelo).toMatchObject({ modelo: "tad", geral: 4.39 });
+      // O time ao lado da pessoa e o número da resposta na régua da TAD.
+      expect(uma.body.modelo.time).toEqual({
+        geral: 4.39,
+        pilares: [4.43, 4, 4.75],
+      });
+      expect(lista.body[0].resumoDoModelo).toEqual({
+        modelo: "tad",
+        valor: 4.39,
+        nivel: "moderado",
+      });
       // Modelo sem cálculo próprio: `modelo` nulo.
       const pulso = await post("/v1/pesquisas", rhA).send(corpo()).expect(201);
       const resPulso = await get(

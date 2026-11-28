@@ -19,9 +19,13 @@ import { conferirEstruturaDoClima } from "./clima/definicao";
 import { conferirEstruturaFixa } from "./comum";
 import { ESTRUTURA_DISC } from "./disc/definicao-disc";
 import { ESTRUTURA_DA_AVALIACAO } from "./avaliacao/definicao";
-import { calcularPulsoClima } from "./pulso_clima/calculo";
+import {
+  calcularPulsoClima,
+  indicadorDoPulsoClima,
+  individualDoPulsoClima,
+} from "./pulso_clima/calculo";
 import { ESTRUTURA_PULSO_CLIMA } from "./pulso_clima/definicao";
-import { calcularTad, individualDaTad } from "./tad/calculo";
+import { calcularTad, indicadorDaTad, individualDaTad } from "./tad/calculo";
 import { calcularNr1DoModelo, individualNr1DoModelo } from "./copsoq/calculo";
 import { ESTRUTURA_NR1 } from "./copsoq/definicao";
 import { calcularIsfbDoModelo, individualIsfbDoModelo } from "./isfb/calculo";
@@ -43,6 +47,8 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     modelo: "pulso_clima",
     estrutura: ESTRUTURA_PULSO_CLIMA,
     calcular: calcularPulsoClima,
+    individual: individualDoPulsoClima,
+    resumoDaResposta: indicadorDoPulsoClima,
   },
   // Clima: perguntas editáveis (a API confere só chave e tipo).
   clima: {
@@ -61,6 +67,7 @@ export const MODELOS_REGISTRADOS: Partial<Record<Modelo, ModeloRegistrado>> = {
     estrutura: ESTRUTURA_TAD,
     calcular: calcularTad,
     individual: individualDaTad,
+    resumoDaResposta: indicadorDaTad,
   },
   // O resultado do DISC tem rota própria (`/perfil-comportamental`).
   disc: { modelo: "disc", estrutura: ESTRUTURA_DISC },

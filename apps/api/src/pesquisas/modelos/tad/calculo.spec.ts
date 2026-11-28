@@ -1,9 +1,15 @@
 import type { Pergunta, Secao } from "../../pesquisas.types";
 import {
   errosDaEstruturaDoModelo,
+  resumoDaRespostaDoModelo,
   resultadoIndividualDoModelo,
 } from "../indice";
-import { calcularTad, individualDaTad, nivelDaTad } from "./calculo";
+import {
+  calcularTad,
+  indicadorDaTad,
+  individualDaTad,
+  nivelDaTad,
+} from "./calculo";
 import { ITENS_TAD, PILARES_TAD, ROTULOS_TAD } from "./definicao";
 
 /** T216 — Motivação (TAD): pilares, itens invertidos, níveis e o time. */
@@ -131,6 +137,46 @@ describe("T216 — Motivação (TAD)", () => {
     ).toBe(7);
     expect(
       resultadoIndividualDoModelo("pulso", estrutura(), valores(7, 1)),
+    ).toBeNull();
+  });
+
+  it("o individual traz o time (média das pessoas) só quando o recebe", () => {
+    const time = [
+      { valores: valores(7, 7) },
+      { valores: valores(4, 4) },
+      { valores: valores(7, 1) },
+    ];
+    const r = individualDaTad(estrutura(), valores(7, 1), time)!;
+    expect(r.geral).toBe(7);
+    expect(r.time).toEqual({ geral: 5.13, pilares: [5.14, 5, 5.25] });
+    expect(individualDaTad(estrutura(), valores(7, 1))!.time).toBeNull();
+    expect(individualDaTad(estrutura(), new Map(), time)).toBeNull();
+    expect(
+      resultadoIndividualDoModelo("tad", estrutura(), valores(7, 7), time),
+    ).toMatchObject({ geral: 4.39, time: { geral: 5.13 } });
+  });
+
+  it("indicador da aba Respostas: o score geral com o nível", () => {
+    expect(indicadorDaTad(estrutura(), valores(7, 7))).toEqual({
+      modelo: "tad",
+      valor: 4.39,
+      nivel: "moderado",
+    });
+    expect(indicadorDaTad(estrutura(), valores(7, 1))).toEqual({
+      modelo: "tad",
+      valor: 7,
+      nivel: "alto",
+    });
+    expect(indicadorDaTad(estrutura(), new Map())).toEqual({
+      modelo: "tad",
+      valor: null,
+      nivel: null,
+    });
+    expect(resumoDaRespostaDoModelo("tad", estrutura(), valores(1, 7))).toEqual(
+      { modelo: "tad", valor: 1, nivel: "baixo" },
+    );
+    expect(
+      resumoDaRespostaDoModelo("pulso", estrutura(), valores(1, 7)),
     ).toBeNull();
   });
 });

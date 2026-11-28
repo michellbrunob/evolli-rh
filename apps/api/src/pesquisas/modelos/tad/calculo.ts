@@ -4,12 +4,14 @@
  * Por pessoa: item invertido vale `8 − resposta`; o pilar é a média dos
  * itens dele (duas casas) e o score geral é a média dos 3 pilares (não dos
  * 21 itens). O time é a média dos scores de cada pessoa (geral e por
- * pilar). Níveis: alto 5,5–7,0 · moderado 3,5–5,4 · baixo 1,0–3,4. Funções
- * puras.
+ * pilar). Níveis: alto 5,5–7,0 · moderado 3,5–5,4 · baixo 1,0–3,4. O
+ * resultado da pessoa vem com o time ao lado, e o indicador da aba Respostas
+ * é o score geral dela com o nível. Funções puras.
  */
 import type { Secao } from "../../pesquisas.types";
 import { duasCasas, media, perguntasPorChave } from "../comum";
 import type {
+  ResumoDaRespostaTad,
   NivelTad,
   PilarTad,
   RespostaDoModelo,
@@ -42,7 +44,7 @@ function pontos(valor: unknown, invertido: boolean): number | null {
 function individualComItens(
   itens: ReturnType<typeof itensPresentes>,
   valores: ReadonlyMap<string, unknown>,
-): ResultadoIndividualTad | null {
+): Omit<ResultadoIndividualTad, "time"> | null {
   const pilares: PilarTad[] = PILARES_TAD.map((pilar) => {
     const doPilar = itens.filter((i) => i.pilar === pilar.chave);
     const notas = doPilar
@@ -66,12 +68,37 @@ function individualComItens(
   return { modelo: "tad", geral, nivel: nivelDaTad(geral), pilares };
 }
 
-/** O resultado de uma pessoa; `null` sem nenhuma afirmação respondida. */
+/**
+ * O resultado de uma pessoa; `null` sem nenhuma afirmação respondida. Com o
+ * time, a média dele (geral e por pilar) vai junto, para comparar.
+ */
 export function individualDaTad(
   secoes: readonly Secao[],
   valores: ReadonlyMap<string, unknown>,
+  respostas?: readonly RespostaDoModelo[],
 ): ResultadoIndividualTad | null {
-  return individualComItens(itensPresentes(secoes), valores);
+  const pessoa = individualComItens(itensPresentes(secoes), valores);
+  if (!pessoa) return null;
+  const time = respostas ? calcularTad(secoes, respostas) : null;
+  return {
+    ...pessoa,
+    time: time
+      ? { geral: time.geral, pilares: time.pilares.map((p) => p.score) }
+      : null,
+  };
+}
+
+/** O score geral da resposta (1 a 7) com o nível, para a aba Respostas. */
+export function indicadorDaTad(
+  secoes: readonly Secao[],
+  valores: ReadonlyMap<string, unknown>,
+): ResumoDaRespostaTad {
+  const pessoa = individualComItens(itensPresentes(secoes), valores);
+  return {
+    modelo: "tad",
+    valor: pessoa?.geral ?? null,
+    nivel: pessoa?.nivel ?? null,
+  };
 }
 
 export function calcularTad(
@@ -81,7 +108,7 @@ export function calcularTad(
   const itens = itensPresentes(secoes);
   const pessoas = respostas
     .map((r) => individualComItens(itens, r.valores))
-    .filter((x): x is ResultadoIndividualTad => x !== null);
+    .filter((x): x is Omit<ResultadoIndividualTad, "time"> => x !== null);
   const niveis: Record<NivelTad, number> = {
     alto: 0,
     moderado: 0,

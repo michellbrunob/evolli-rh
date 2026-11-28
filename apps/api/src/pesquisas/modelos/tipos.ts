@@ -75,12 +75,25 @@ export interface DimensaoDoModelo {
   subdimensoes?: DimensaoDoModelo[];
 }
 
+/**
+ * Um comentário escrito: o texto, o mês da resposta (`AAAA-MM`, horário de
+ * Brasília) e o departamento só quando o grupo dele aparece (mínimo por
+ * grupo); fora disso, `null`.
+ */
+export interface TextoDoComentario {
+  texto: string;
+  mes: string | null;
+  departamento: string | null;
+}
+
 /** O comentário de uma dimensão (ou da recomendação), para a tela agrupar. */
 export interface ComentarioDoModelo {
   /** A dimensão, `lnps` ou `enps`. */
   dimensao: string;
   perguntaId: string;
   quantidade: number;
+  /** Do mês mais recente para o mais antigo; no mesmo mês, alfabética. */
+  textos: TextoDoComentario[];
 }
 
 export interface ResultadoPulsoClima {
@@ -108,6 +121,39 @@ export interface DimensaoClima extends Omit<
 > {
   faixa: FaixaClima | null;
   subdimensoes?: DimensaoClima[];
+}
+
+/** Uma dimensão na resposta de uma pessoa, ao lado do time. */
+export interface DimensaoDaResposta {
+  chave: string;
+  rotulo: string;
+  /** Score 0–100 da resposta (média das afirmações respondidas). */
+  score: number | null;
+  faixa: FaixaDeScore | null;
+  /** Score 0–100 do time na dimensão. */
+  scoreTime: number | null;
+}
+
+/** O resultado de uma pessoa no Pulso e Clima, comparado com o time. */
+export interface ResultadoIndividualPulsoClima {
+  modelo: "pulso_clima";
+  /** Média dos scores das afirmações respondidas (0–100, inteiro). */
+  score: number | null;
+  faixa: FaixaDeScore | null;
+  /** Score geral do time (0–100). */
+  scoreTime: number | null;
+  /** Quantas afirmações a pessoa marcou em 4–5, 3 e 1–2. */
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number;
+  dimensoes: DimensaoDaResposta[];
+  /** De 1 a 5: quantas a pessoa marcou e o % do time em cada nota. */
+  distribuicao: { valor: number; resposta: number; time: number }[];
+  /** A nota (0–10) da pessoa e o índice do time (−100 a 100). */
+  enps: { nota: number | null; indiceTime: number | null };
+  lnps: { nota: number | null; indiceTime: number | null };
+  /** Os comentários da pessoa, por dimensão (ou `lnps`/`enps`). */
+  comentarios: { dimensao: string; texto: string }[];
 }
 
 export interface ResultadoClima {
@@ -195,6 +241,11 @@ export interface ResultadoIndividualTad {
   geral: number | null;
   nivel: NivelTad | null;
   pilares: PilarTad[];
+  /**
+   * O time, para comparar (média das pessoas, geral e por pilar na ordem
+   * de `pilares`); `null` quando o cálculo não recebe o time.
+   */
+  time: { geral: number | null; pilares: (number | null)[] } | null;
 }
 
 /** Acrescente aqui o resultado de cada modelo com cálculo próprio. */
@@ -211,10 +262,28 @@ export type ResultadoIndividualDoModelo =
   | IndividualNr1DoModelo
   | IndividualIsfbDoModelo
   | ResultadoIndividualClima
-  | ResultadoIndividualEnps;
+  | ResultadoIndividualEnps
+  | ResultadoIndividualPulsoClima;
+
+/**
+ * O número de cada resposta na aba Respostas, na régua do modelo: o score
+ * geral da TAD (1 a 7, com o nível) ou o do Pulso e Clima (0–100, com a
+ * faixa).
+ */
+export type ResumoDaRespostaTad = {
+  modelo: "tad";
+  valor: number | null;
+  nivel: NivelTad | null;
+};
+export type ResumoDaRespostaPulsoClima = {
+  modelo: "pulso_clima";
+  valor: number | null;
+  faixa: FaixaDeScore | null;
+};
 
 /** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
-export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;
+export type ResumoDaRespostaDoModelo =
+  ResumoDaRespostaClima | ResumoDaRespostaTad | ResumoDaRespostaPulsoClima;
 
 /**
  * O que o cálculo do modelo pode precisar além das respostas: o sigilo das
@@ -229,6 +298,10 @@ export interface ContextoDoModelo {
 /** Uma resposta já conferida, para o cálculo do modelo. */
 export interface RespostaDoModelo {
   valores: ReadonlyMap<string, unknown>;
+  /** O mês da resposta (`AAAA-MM`), quando o cálculo mostra comentários. */
+  mes?: string | null;
+  /** O departamento, só quando o grupo dele aparece (mínimo por grupo). */
+  departamento?: string | null;
 }
 
 /**
