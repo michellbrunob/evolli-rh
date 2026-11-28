@@ -18,7 +18,14 @@ export const CONFIG_PADRAO: ConfigOnboarding = {
   soDiasUteis: true,
   incluirAtrasados: false,
   publico: { tipo: "todos" },
-  email: { modelo: "padrao", assunto: null, titulo: null, mensagem: null },
+  email: {
+    modelo: "padrao",
+    assunto: null,
+    titulo: null,
+    mensagem: null,
+    corPrincipal: null,
+    corFundo: null,
+  },
 };
 
 export function somarDias(dia: string, n: number): string {
@@ -135,3 +142,64 @@ export const ROTULO_DA_SITUACAO = {
   respondido: "Respondeu",
   pulado: "Pulado",
 } as const;
+
+/** As cores prontas do e-mail personalizado (a principal e o fundo claro). */
+export const CORES_PRINCIPAIS: readonly { cor: string; nome: string }[] = [
+  { cor: "#1f6feb", nome: "Azul" },
+  { cor: "#0f766e", nome: "Verde-petróleo" },
+  { cor: "#7c3aed", nome: "Roxo" },
+  { cor: "#c2410c", nome: "Laranja" },
+  { cor: "#be123c", nome: "Vinho" },
+  { cor: "#111827", nome: "Grafite" },
+];
+export const CORES_DE_FUNDO: readonly { cor: string; nome: string }[] = [
+  { cor: "#ffffff", nome: "Branco" },
+  { cor: "#f7f9fc", nome: "Gelo" },
+  { cor: "#f5f3ff", nome: "Lavanda" },
+  { cor: "#fff7ed", nome: "Areia" },
+];
+
+export const corValida = (v: string): boolean => /^#[0-9a-f]{6}$/i.test(v);
+
+/** Luminância relativa (WCAG) de `#rrggbb`, de 0 a 1 (a mesma regra da API). */
+export function luminancia(hex: string): number {
+  const canal = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+}
+
+/** O fundo do e-mail precisa ser claro (o texto do corpo é escuro). */
+export const fundoClaro = (hex: string): boolean =>
+  corValida(hex) && luminancia(hex) >= 0.8;
+
+/** Texto do botão: branco ou preto, o que der mais contraste. */
+export function corDoTextoSobre(hex: string): "#ffffff" | "#000000" {
+  const l = luminancia(hex);
+  return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#ffffff" : "#000000";
+}
+
+/**
+ * Quantas pessoas recebem cada rodada no próximo mês: a de 30 dias conta
+ * quem faz 30 dias de casa; as outras dizem o marco que a pessoa atinge.
+ */
+export function textoDasProximas(rodada: number, pessoas: number): string {
+  return rodada === 30
+    ? `${plural(pessoas, "pessoa", "pessoas")} nos próximos 30 dias`
+    : `${plural(pessoas, "pessoa chega", "pessoas chegam")} aos ${rodada} dias de casa nos próximos 30 dias`;
+}
+
+/** "Ana" de "Ana Souza" (a saudação do e-mail). */
+export const primeiroNome = (nome: string): string =>
+  nome.trim().split(/\s+/)[0] ?? nome;
+
+/** A sigla da empresa no topo do convite ("EA" de "Empresa Alfa"). */
+export function siglaDaEmpresa(empresa: string | null | undefined): string {
+  const partes = (empresa ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "RH";
+  return partes
+    .slice(0, 2)
+    .map((p) => p[0]!.toLocaleUpperCase("pt-BR"))
+    .join("");
+}

@@ -4,6 +4,7 @@
  * resultados na página da pesquisa). As telas compartilhadas só perguntam
  * `ehModeloComTelaPropria` e montam estes componentes.
  */
+import { useEffect, useState } from "react";
 import type {
   ModeloPesquisa,
   PesquisaDetalhe,
@@ -27,7 +28,9 @@ export function ehModeloComTelaPropria(
 export function AssistenteProprio({
   modelo,
   servico,
+  base,
   hoje,
+  onRascunhoCriado,
   onVoltar,
   onAbrirResultados,
 }: {
@@ -35,30 +38,53 @@ export function AssistenteProprio({
   readonly servico: Pick<
     ServicoDePesquisas,
     "criarPesquisa" | "alterarPesquisa" | "publicarPesquisa"
-  >;
+  > &
+    Partial<Pick<ServicoDePesquisas, "empresaAtiva">>;
+  /** O rascunho retomado (`<id>/rascunho`). */
+  readonly base?: PesquisaDetalhe;
   readonly hoje: string;
+  /** O rascunho foi gravado pela primeira vez (a rota passa a `<id>/rascunho`). */
+  readonly onRascunhoCriado?: (id: string) => void;
   readonly onVoltar: () => void;
   readonly onAbrirResultados: (pesquisaId: string) => void;
 }) {
+  // O nome da empresa ativa vai para a prévia dos e-mails.
+  const [empresa, setEmpresa] = useState<string | null>(null);
+  useEffect(() => {
+    if (!servico.empresaAtiva) return;
+    let vivo = true;
+    Promise.resolve(servico.empresaAtiva())
+      .then((e) => {
+        if (vivo) setEmpresa(e?.nome ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [servico]);
+  const comuns = {
+    servico,
+    ...(base ? { base } : {}),
+    empresa,
+    hoje,
+    ...(onRascunhoCriado ? { onRascunhoCriado } : {}),
+    onVoltar,
+  };
   if (ehAvaliacao(modelo)) {
     return (
       <AssistenteDaAvaliacao
+        {...comuns}
         modelo={modelo}
-        servico={servico}
         cliente={clienteDaAvaliacao}
-        hoje={hoje}
-        onVoltar={onVoltar}
         onAcompanhar={onAbrirResultados}
       />
     );
   }
   return (
     <AssistenteDoOnboarding
-      servico={servico}
+      {...comuns}
       cliente={clienteDoOnboarding}
       listarGrupos={listarGruposDoPublico}
-      hoje={hoje}
-      onVoltar={onVoltar}
       onVerEnvios={onAbrirResultados}
     />
   );

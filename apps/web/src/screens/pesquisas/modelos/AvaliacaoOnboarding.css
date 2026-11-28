@@ -170,6 +170,15 @@
   border-radius: var(--radius-md);
   background: var(--surface-pearl);
 }
+/* O botão do convite, só desenhado (a prévia não é clicável). */
+.avaliacao__previa-botao {
+  display: inline-block;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-botao);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-weight: 600;
+}
 
 .avaliacao__resumo {
   margin: 0;
@@ -579,4 +588,97 @@
   .pesquisas__abas {
     display: none;
   }
+}
+
+/* T216 — e-mail do onboarding: sigla, cores, "Ver como" e o teste. */
+.onboarding__ver-como {
+  max-width: 320px;
+}
+.onboarding__sigla {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-weight: 700;
+  line-height: 1;
+}
+.onboarding__logo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.onboarding__logo > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.onboarding__cores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.onboarding__cores > .pesquisas__rotulo,
+.onboarding__cores > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.onboarding__amostra {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+.onboarding__amostra input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.onboarding__amostra > span:first-of-type {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-botao);
+  border: var(--borda-espessura) solid var(--borda-card);
+}
+.onboarding__amostra input:checked + span {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+.onboarding__amostra input:focus-visible + span {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+.onboarding__invisivel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.onboarding__teste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.onboarding__teste > p {
+  margin: 0;
+}
+
+/* T216 — relatórios em PDF da Avaliação e do Onboarding. */
+.relatorio__capa-nota {
+  margin: var(--space-xs) 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.avaliacao__barra-relatorio {
+  background: var(--color-action);
 }

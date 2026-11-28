@@ -37,6 +37,10 @@ export interface ConfigOnboarding {
     assunto: string | null;
     titulo: string | null;
     mensagem: string | null;
+    /** Personalizado: a cor principal (`#rrggbb`); sem ela, a do Evolli. */
+    corPrincipal?: string | null;
+    /** Personalizado: a cor de fundo, sempre clara (`#rrggbb`). */
+    corFundo?: string | null;
   };
 }
 
@@ -99,9 +103,22 @@ export interface EnvioDoOnboarding {
   lembreteEm: string | null;
 }
 
+/** Identificada: o cadastro e os convites de cada pessoa, por rodada. */
+export interface JornadaDoOnboarding {
+  colaboradorId: string;
+  nome: string;
+  admissao: string | null;
+  cargo: string | null;
+  unidade: string | null;
+  rodadas: { rodada: number; dataPrevista: string; situacao: string }[];
+  respondidas: number;
+}
+
 export interface EnviosDoOnboarding {
   identificacao: "identificada" | "confidencial" | "anonima";
   horario: string;
+  /** Só na identificada; `null` nas outras. */
+  jornadas?: JornadaDoOnboarding[] | null;
   itens: EnvioDoOnboarding[];
 }
 

@@ -1,7 +1,9 @@
 /**
  * T216 — Onboarding: o questionário (17 em 8 blocos), as regras da tela,
  * o assistente de 5 etapas (envio automático, perguntas, público, e-mail e
- * ativação), os resultados por rodada, os envios e a planilha.
+ * ativação), os resultados por rodada, os envios e a planilha; o rascunho
+ * gravado ao abrir e retomado, a lista para escolher pessoas, o e-mail com
+ * a empresa ativa, "Ver como", logo e cores e o teste antes de enviar.
  */
 import {
   fireEvent,
@@ -10,9 +12,10 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PesquisaDetalhe } from "../../../../api/pesquisasClient";
-import { AssistenteDoOnboarding } from "./AssistenteDoOnboarding";
+import { lembrarRascunho, memoriaDoRascunho } from "../../rascunhosLocais";
+import { AssistenteDoOnboarding, naEmpresa } from "./AssistenteDoOnboarding";
 import {
   HORARIOS,
   TOTAL_DE_PERGUNTAS,
@@ -34,14 +37,20 @@ import {
   CONFIG_PADRAO,
   configParaEnviar,
   contarPerguntas,
+  corDoTextoSobre,
   errosDaConfiguracao,
+  fundoClaro,
   resumoDoEnvio,
+  siglaDaEmpresa,
   textoDaContagem,
+  textoDasProximas,
   textoDoBotaoFinal,
 } from "./regrasDoOnboarding";
 import { ResultadosDoOnboarding } from "./ResultadosDoOnboarding";
 
 const HOJE = "2026-11-27";
+
+afterEach(() => localStorage.clear());
 
 describe("T216 — questionário do onboarding", () => {
   it("17 perguntas em 8 blocos, 14 obrigatórias, cerca de 5 minutos", () => {
@@ -211,10 +220,16 @@ function onboardingDetalhe(): OnboardingDetalhe {
   };
 }
 
-function montarAssistente() {
+function montarAssistente(
+  extra: {
+    base?: PesquisaDetalhe;
+    gravada?: ConfigOnboarding;
+    empresa?: string | null;
+  } = {},
+) {
   const servico = {
     criarPesquisa: vi.fn(async (_e: unknown) => detalhe()),
-    alterarPesquisa: vi.fn(async (_id: string, _e: unknown) => detalhe()),
+    alterarPesquisa: vi.fn(async (id: string, _e: unknown) => detalhe({ id })),
   };
   const cliente = {
     salvar: vi.fn(async (_id: string, _c: ConfigOnboarding) =>
@@ -222,6 +237,10 @@ function montarAssistente() {
     ),
     ativar: vi.fn(async (_id: string) => onboardingDetalhe()),
     previaDoPublico: vi.fn(async (p: Publico, _u: boolean) => previa(p)),
+    obter: vi.fn(async (_id: string) => ({
+      ...onboardingDetalhe(),
+      config: extra.gravada ?? CONFIG_PADRAO,
+    })),
   };
   const listarGrupos = vi.fn(async () => ({
     departamento: [
@@ -232,18 +251,25 @@ function montarAssistente() {
     centroCusto: [],
   }));
   const onVerEnvios = vi.fn();
+  const onRascunhoCriado = vi.fn();
+  const onAbrirPrevia = vi.fn();
   render(
     <AssistenteDoOnboarding
       servico={servico}
       cliente={cliente}
       listarGrupos={listarGrupos}
-      empresa="Empresa Sintética"
+      {...(extra.base ? { base: extra.base } : {})}
+      empresa={
+        extra.empresa === undefined ? "Empresa Sintética" : extra.empresa
+      }
       hoje={HOJE}
+      onRascunhoCriado={onRascunhoCriado}
+      onAbrirPrevia={onAbrirPrevia}
       onVoltar={() => {}}
       onVerEnvios={onVerEnvios}
     />,
   );
-  return { servico, cliente, onVerEnvios };
+  return { servico, cliente, onVerEnvios, onRascunhoCriado, onAbrirPrevia };
 }
 
 const proximo = (r: RegExp) =>
@@ -298,7 +324,9 @@ describe("T216 — assistente do onboarding", () => {
     expect(
       await screen.findByText("Escolha pelo menos uma rodada."),
     ).toBeInTheDocument();
-    expect(servico.criarPesquisa).not.toHaveBeenCalled();
+    // O rascunho nasceu ao abrir; com erro, não é regravado.
+    await waitFor(() => expect(servico.criarPesquisa).toHaveBeenCalledTimes(1));
+    expect(servico.alterarPesquisa).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("radio", { name: /Anônima/ }));
     expect(screen.getByLabelText("Lembrete")).toBeDisabled();
     expect(screen.getByText("Na anônima não há lembrete.")).toBeInTheDocument();
@@ -711,10 +739,307 @@ describe("T216 — anônima sem lembrete (provas extras)", () => {
   });
 
   it("o assistente grava a anônima sem lembrete", async () => {
-    const { cliente } = montarAssistente();
+    const { cliente, servico } = montarAssistente();
     fireEvent.click(screen.getByRole("radio", { name: /Anônima/ }));
     fireEvent.click(screen.getByRole("button", { name: /Próximo: Perguntas/ }));
-    await waitFor(() => expect(cliente.salvar).toHaveBeenCalled());
-    expect(cliente.salvar.mock.calls[0]![1].lembreteDias).toBeNull();
+    await waitFor(() => expect(servico.alterarPesquisa).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(cliente.salvar.mock.calls.at(-1)![1].lembreteDias).toBeNull(),
+    );
+  });
+});
+
+describe("T216 — rascunho do onboarding (R3)", () => {
+  it("grava ao abrir; cada etapa regrava o mesmo rascunho e guarda onde parou", async () => {
+    const { servico, cliente, onRascunhoCriado } = montarAssistente();
+    await waitFor(() => expect(onRascunhoCriado).toHaveBeenCalledWith("onb-1"));
+    expect(servico.criarPesquisa).toHaveBeenCalledTimes(1);
+    expect(cliente.salvar).toHaveBeenCalledWith(
+      "onb-1",
+      expect.objectContaining({ modo: "automatizar" }),
+    );
+    expect(await screen.findByText(/Rascunho salvo às/)).toBeInTheDocument();
+    expect(memoriaDoRascunho("onb-1")?.etapa).toBe(1);
+    proximo(/Próximo: Perguntas/);
+    await screen.findByText(/17 perguntas · 8 blocos/);
+    expect(servico.alterarPesquisa).toHaveBeenCalledWith(
+      "onb-1",
+      expect.anything(),
+    );
+    expect(memoriaDoRascunho("onb-1")?.etapa).toBe(2);
+    expect(servico.criarPesquisa).toHaveBeenCalledTimes(1);
+    expect(onRascunhoCriado).toHaveBeenCalledTimes(1);
+  });
+
+  it("reabre o rascunho na etapa em que parou, com o que foi gravado", async () => {
+    lembrarRascunho("onb-9", {
+      etapa: 4,
+      totalDeEtapas: 5,
+      salvoEm: "2026-11-27T15:00:00.000Z",
+    });
+    const { servico, cliente, onRascunhoCriado } = montarAssistente({
+      base: detalhe({
+        id: "onb-9",
+        nome: "Onboarding retomado",
+        identificacao: "identificada",
+        boasVindas: "Bem-vinda!",
+        secoes: secoesDoOnboarding(),
+      }),
+      gravada: {
+        ...CONFIG_PADRAO,
+        email: {
+          modelo: "personalizado",
+          assunto: "Assunto gravado",
+          titulo: "Título gravado",
+          mensagem: "Mensagem gravada.",
+          corPrincipal: "#7c3aed",
+          corFundo: null,
+        },
+      },
+    });
+    expect(
+      await screen.findByRole("radio", { name: /Personalizado/ }),
+    ).toBeChecked();
+    expect(cliente.obter).toHaveBeenCalledWith("onb-9");
+    expect(screen.getByLabelText("Prévia do e-mail")).toHaveTextContent(
+      "Assunto: Assunto gravado",
+    );
+    proximo(/Próximo: Enviar/);
+    expect(await screen.findByText("Revisar e enviar")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Onboarding retomado · Identificada/),
+    ).toBeInTheDocument();
+    expect(servico.alterarPesquisa).toHaveBeenCalledWith(
+      "onb-9",
+      expect.objectContaining({
+        nome: "Onboarding retomado",
+        boasVindas: "Bem-vinda!",
+        identificacao: "identificada",
+      }),
+    );
+    expect(cliente.salvar).toHaveBeenLastCalledWith(
+      "onb-9",
+      expect.objectContaining({
+        email: expect.objectContaining({ corPrincipal: "#7c3aed" }),
+      }),
+    );
+    expect(servico.criarPesquisa).not.toHaveBeenCalled();
+    expect(onRascunhoCriado).not.toHaveBeenCalled();
+  });
+});
+
+describe("T216 — escolher pessoas sem ninguém marcado (R3)", () => {
+  it("a lista aparece e dá para marcar; a prévia vazia não vai para a API", async () => {
+    const { cliente } = montarAssistente();
+    proximo(/Próximo: Perguntas/);
+    await screen.findByText(/17 perguntas · 8 blocos/);
+    proximo(/Próximo: Quem recebe/);
+    fireEvent.click(
+      await screen.findByRole("radio", { name: /Escolher pessoas/ }),
+    );
+    expect(
+      await screen.findByRole("checkbox", { name: "Escolher Ana Teste" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Escolher Bia Sem Email" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("0 pessoas no público")).toBeInTheDocument();
+    for (const [publico] of cliente.previaDoPublico.mock.calls) {
+      expect(
+        publico.tipo === "pessoas" && publico.colaboradorIds.length === 0,
+      ).toBe(false);
+    }
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Escolher Ana Teste" }),
+    );
+    await waitFor(() =>
+      expect(cliente.previaDoPublico).toHaveBeenLastCalledWith(
+        { tipo: "pessoas", colaboradorIds: ["c1"] },
+        true,
+      ),
+    );
+    expect(await screen.findByText("1 pessoa no público")).toBeInTheDocument();
+  });
+
+  it("rascunho reaberto com pessoas escolhidas: a lista vem de todos os ativos", async () => {
+    lembrarRascunho("onb-9", {
+      etapa: 3,
+      totalDeEtapas: 5,
+      salvoEm: "2026-11-27T15:00:00.000Z",
+    });
+    const { cliente } = montarAssistente({
+      base: detalhe({ id: "onb-9", secoes: secoesDoOnboarding() }),
+      gravada: {
+        ...CONFIG_PADRAO,
+        publico: { tipo: "pessoas", colaboradorIds: ["c2"] },
+      },
+    });
+    expect(
+      await screen.findByRole("checkbox", { name: "Escolher Bia Sem Email" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Escolher Ana Teste" }),
+    ).not.toBeChecked();
+    expect(cliente.previaDoPublico).toHaveBeenCalledWith(
+      { tipo: "todos" },
+      true,
+    );
+  });
+});
+
+describe("T216 — e-mail e envio do onboarding (R3)", () => {
+  async function irAoEmail(extra: Parameters<typeof montarAssistente>[0] = {}) {
+    const m = montarAssistente(extra);
+    proximo(/Próximo: Perguntas/);
+    await screen.findByText(/17 perguntas · 8 blocos/);
+    proximo(/Próximo: Quem recebe/);
+    await screen.findByRole("radio", { name: /Escolher pessoas/ });
+    proximo(/Próximo: E-mail/);
+    await screen.findByRole("radio", { name: /Personalizado/ });
+    return m;
+  }
+
+  it("rodadas de 60 e 90 dias dizem o marco que a pessoa atinge", async () => {
+    montarAssistente();
+    expect(
+      await screen.findByText(
+        "1 pessoa chega aos 60 dias de casa nos próximos 30 dias",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "0 pessoas chegam aos 90 dias de casa nos próximos 30 dias",
+      ),
+    ).toBeInTheDocument();
+    expect(textoDasProximas(30, 1)).toBe("1 pessoa nos próximos 30 dias");
+    expect(textoDasProximas(90, 2)).toBe(
+      "2 pessoas chegam aos 90 dias de casa nos próximos 30 dias",
+    );
+  });
+
+  it("sem e-mail no cadastro: o atalho para completar o cadastro", async () => {
+    montarAssistente();
+    proximo(/Próximo: Perguntas/);
+    await screen.findByText(/17 perguntas · 8 blocos/);
+    proximo(/Próximo: Quem recebe/);
+    const link = await screen.findByRole("link", {
+      name: "Completar cadastro",
+    });
+    expect(link).toHaveAttribute("href", "#/pessoas/colaboradores");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("prévia com a empresa ativa, para quem e 'Ver como'; teste preparado e desligado", async () => {
+    await irAoEmail();
+    const previa = screen.getByRole("group", { name: "Prévia do e-mail" });
+    expect(previa).toHaveTextContent("De: Empresa Sintética");
+    expect(previa).toHaveTextContent("Para: Ana Teste");
+    expect(previa).toHaveTextContent(
+      "Assunto: Como estão seus primeiros dias na Empresa Sintética?",
+    );
+    expect(previa).toHaveTextContent("Olá, Ana,");
+    expect(
+      within(previa).getByLabelText("Sigla de Empresa Sintética"),
+    ).toHaveTextContent("ES");
+    fireEvent.change(screen.getByLabelText("Ver como"), {
+      target: { value: "c2" },
+    });
+    expect(previa).toHaveTextContent("Para: Bia Sem Email");
+    expect(previa).toHaveTextContent("Olá, Bia,");
+    const teste = screen.getByRole("button", { name: "Enviar teste para mim" });
+    expect(teste).toBeDisabled();
+    expect(teste).toHaveAccessibleDescription(
+      /O envio de e-mail entra na próxima etapa do Evolli/,
+    );
+    expect(screen.getByText(/remetente Empresa Sintética/)).toBeInTheDocument();
+  });
+
+  it("sem o nome da empresa: textos neutros, nunca 'na a empresa'", async () => {
+    await irAoEmail({ empresa: null });
+    const previa = screen.getByRole("group", { name: "Prévia do e-mail" });
+    expect(previa).toHaveTextContent("De: Empresa");
+    expect(previa).toHaveTextContent(
+      "Assunto: Como estão seus primeiros dias na empresa?",
+    );
+    expect(previa).not.toHaveTextContent("na a empresa");
+    expect(naEmpresa("Alfa")).toBe("na Alfa");
+    expect(naEmpresa("  ")).toBe("na empresa");
+    expect(naEmpresa(null)).toBe("na empresa");
+  });
+
+  it("personalizado: abas Texto e Logo e cores; a cor vai para a prévia e para a API", async () => {
+    const { cliente } = await irAoEmail();
+    fireEvent.click(screen.getByRole("radio", { name: /Personalizado/ }));
+    expect(screen.getByRole("tab", { name: "Texto" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.change(screen.getByLabelText("Assunto"), {
+      target: { value: "Assunto" },
+    });
+    fireEvent.change(screen.getByLabelText("Título"), {
+      target: { value: "Título" },
+    });
+    fireEvent.change(screen.getByLabelText("Mensagem"), {
+      target: { value: "Mensagem." },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Logo e cores" }));
+    expect(screen.queryByLabelText("Assunto")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar logo" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: "Roxo" }));
+    const botao = within(
+      screen.getByRole("group", { name: "Prévia do e-mail" }),
+    ).getByText("Responder pesquisa →");
+    expect(botao).toHaveStyle({ background: "#7c3aed", color: "#ffffff" });
+    fireEvent.change(screen.getByLabelText("Código da cor"), {
+      target: { value: "#12" },
+    });
+    expect(screen.getByText("Use o formato #RRGGBB.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Código da cor"), {
+      target: { value: "#FFD60A" },
+    });
+    expect(botao).toHaveStyle({ color: "#000000" });
+    fireEvent.click(screen.getByRole("radio", { name: "Areia" }));
+    expect(screen.getByRole("group", { name: "Prévia do e-mail" })).toHaveStyle(
+      {
+        background: "#fff7ed",
+      },
+    );
+    proximo(/Próximo: Enviar/);
+    await screen.findByText("Revisar e enviar");
+    expect(cliente.salvar.mock.calls.at(-1)![1].email).toMatchObject({
+      modelo: "personalizado",
+      corPrincipal: "#ffd60a",
+      corFundo: "#fff7ed",
+    });
+  });
+
+  it("teste antes de enviar: abre a prévia do rascunho; o envio de teste fica desligado", async () => {
+    const { onAbrirPrevia } = await irAoEmail();
+    proximo(/Próximo: Enviar/);
+    const cartao = await screen.findByRole("region", {
+      name: "Teste antes de enviar",
+    });
+    fireEvent.click(
+      within(cartao).getByRole("button", { name: "Abrir prévia" }),
+    );
+    expect(onAbrirPrevia).toHaveBeenCalledWith("onb-1");
+    expect(
+      within(cartao).getByRole("button", { name: "Enviar teste para mim" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Remetente Empresa Sintética · Padrão/),
+    ).toBeInTheDocument();
+  });
+
+  it("cores: contraste do texto, fundo só claro e a sigla da empresa", () => {
+    expect(corDoTextoSobre("#111827")).toBe("#ffffff");
+    expect(corDoTextoSobre("#ffd60a")).toBe("#000000");
+    expect(fundoClaro("#fff7ed")).toBe(true);
+    expect(fundoClaro("#808080")).toBe(false);
+    expect(fundoClaro("#fff")).toBe(false);
+    expect(siglaDaEmpresa("Empresa Sintética Ltda")).toBe("ES");
+    expect(siglaDaEmpresa("alfa")).toBe("A");
+    expect(siglaDaEmpresa(null)).toBe("RH");
   });
 });

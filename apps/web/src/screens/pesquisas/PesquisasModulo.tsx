@@ -119,6 +119,7 @@ const TAMANHO_DA_LISTA = 100;
 
 type AssistenteAberto =
   | { readonly id?: string; readonly tipo: "modelo"; readonly modelo: string }
+  | { readonly id?: string; readonly tipo: "proprio"; readonly modelo: string }
   | {
       readonly id?: string;
       readonly tipo: "aberta";
@@ -233,8 +234,6 @@ function Modulo({
   // Modelo pronto: retoma o rascunho dele, se houver.
   useEffect(() => {
     if (modeloAtual === null || semEmpresa) return;
-    // T216 — avaliação e onboarding têm assistente próprio.
-    if (ehModeloComTelaPropria(modeloAtual)) return;
     let vivo = true;
     Promise.resolve(
       servico.listarPesquisas({
@@ -334,11 +333,13 @@ function Modulo({
       onEditarGerada={(d) => irPara({ tela: "editar", id: d.id })}
     />
   );
-  const assistenteProprio = (modelo: string) => (
+  const assistenteProprio = (modelo: string, base?: PesquisaDetalhe) => (
     <AssistenteProprio
       key="assistente-proprio"
       modelo={modelo}
       servico={servico}
+      {...(base ? { base } : {})}
+      onRascunhoCriado={aoCriarRascunho({ tipo: "proprio", modelo })}
       hoje={hoje}
       onVoltar={() => irPara({ tela: "nova" })}
       onAbrirResultados={(id) => abrirResultados(id)}
@@ -383,20 +384,22 @@ function Modulo({
 
   switch (atual.tela) {
     case "modelo":
-      if (ehModeloComTelaPropria(atual.modelo))
-        return assistenteProprio(atual.modelo);
-      return conferido === atual.modelo
-        ? assistenteDoModelo(atual.modelo)
-        : carregando("Abrindo o modelo…");
+      // T216 — avaliação e onboarding: assistente próprio (mesma retomada).
+      if (conferido !== atual.modelo) return carregando("Abrindo o modelo…");
+      return ehModeloComTelaPropria(atual.modelo)
+        ? assistenteProprio(atual.modelo)
+        : assistenteDoModelo(atual.modelo);
     case "rascunho":
       if (jaAberto?.id === atual.id) {
         // O assistente aberto acabou de criar este rascunho: continua o mesmo.
         return jaAberto.tipo === "modelo"
           ? assistenteDoModelo(jaAberto.modelo)
-          : assistenteAberto({
-              roteiro: jaAberto.roteiro,
-              inicial: jaAberto.inicial,
-            });
+          : jaAberto.tipo === "proprio"
+            ? assistenteProprio(jaAberto.modelo)
+            : assistenteAberto({
+                roteiro: jaAberto.roteiro,
+                inicial: jaAberto.inicial,
+              });
       }
       return (
         <CarregarPesquisa
@@ -411,7 +414,7 @@ function Modulo({
                 }
               />
             ) : ehModeloComTelaPropria(d.modelo) ? (
-              assistenteProprio(d.modelo)
+              assistenteProprio(d.modelo, d)
             ) : ehModeloPronto(d.modelo) ? (
               assistenteDoModelo(d.modelo, d)
             ) : (

@@ -4,11 +4,13 @@
  * quê) → Gestores e times (pelo organograma da liderança, ou à mão) →
  * Prazo e envio (prazos, lembretes, como os gestores recebem e o resumo).
  *
- * O rascunho é gravado ao sair da 1ª etapa; ao concluir, a avaliação grava
- * os times e a configuração e é publicada. O Evolli ainda não envia e-mail:
- * os convites ficam "aguardando e-mail" e o RH manda o link.
+ * O rascunho é gravado assim que o assistente abre (a rota passa a
+ * `<id>/rascunho`) e a cada etapa, com os times e a configuração; ao
+ * reabrir, o assistente volta com tudo e na etapa em que a pessoa parou. Ao
+ * concluir, a avaliação grava o prazo e é publicada. O Evolli ainda não
+ * envia e-mail: os convites ficam "aguardando e-mail" e o RH manda o link.
  */
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { PesquisaDetalhe } from "../../../../api/pesquisasClient";
 import { Button } from "../../../../components";
 import { diaMesComZero } from "../../../../format/data";
@@ -25,6 +27,7 @@ import {
 } from "../../componentes";
 import type { ServicoDePesquisas } from "../../servicoDePesquisas";
 import { CampoDoLink } from "../../TelaDeGerada";
+import { lembrarRascunho, memoriaDoRascunho } from "../../rascunhosLocais";
 import { PESQUISAS_TITULO_ID } from "../../tituloDasPesquisas";
 import {
   CATALOGO,
@@ -36,7 +39,9 @@ import {
   type RegraDeComentarios,
 } from "./catalogo";
 import type {
+  AvaliacaoDetalhe,
   ClienteDaAvaliacao,
+  ConfigAvaliacao,
   Lembrete,
   Organograma,
   PessoaResumida,
@@ -84,27 +89,65 @@ export type ServicoDoAssistente = Pick<
 interface Props {
   readonly modelo: ModeloDeAvaliacao;
   readonly servico: ServicoDoAssistente;
-  readonly cliente: Pick<ClienteDaAvaliacao, "organograma" | "salvar">;
+  readonly cliente: Pick<ClienteDaAvaliacao, "organograma" | "salvar"> &
+    Partial<Pick<ClienteDaAvaliacao, "obter">>;
+  /** O rascunho retomado (`<id>/rascunho`). */
+  readonly base?: PesquisaDetalhe;
+  /** O nome da empresa ativa (prévia do e-mail). */
+  readonly empresa?: string | null;
   readonly hoje: string;
   readonly agora?: () => Date;
+  /** O rascunho foi gravado pela primeira vez (a rota passa a apontar para ele). */
+  readonly onRascunhoCriado?: (id: string) => void;
   readonly onVoltar: () => void;
   readonly onAcompanhar: (pesquisaId: string) => void;
+}
+
+/** A etapa em que a pessoa parou neste navegador (0 sem memória). */
+function etapaGuardada(base: PesquisaDetalhe | undefined, total: number) {
+  const m = base ? memoriaDoRascunho(base.id) : null;
+  return m ? Math.min(Math.max(m.etapa - 1, 0), total - 1) : 0;
+}
+
+/** Os times gravados no rascunho, como o assistente os mostra. */
+function timesGravados(det: AvaliacaoDetalhe): TimeNoAssistente[] {
+  const resumo = (p: PessoaResumida): PessoaResumida => ({
+    id: p.id,
+    nome: p.nome,
+    cargo: p.cargo,
+    departamento: p.departamento,
+    identificavel: p.identificavel,
+    temEmail: p.temEmail,
+  });
+  return det.times.map((t) => ({
+    gestor: resumo(t.gestor),
+    pessoas: t.pessoas.map(resumo),
+    incluido: true,
+  }));
 }
 
 export function AssistenteDaAvaliacao({
   modelo,
   servico,
   cliente,
+  base,
+  empresa = null,
   hoje,
   agora = () => new Date(),
+  onRascunhoCriado,
   onVoltar,
   onAcompanhar,
 }: Props) {
   const ids = useId();
   const e180 = modelo === "avaliacao180";
   const etapas = ETAPAS[modelo];
-  const [etapa, setEtapa] = useState(0);
-  const [rascunho, setRascunho] = useState<PesquisaDetalhe | null>(null);
+  const [etapa, setEtapa] = useState(() => etapaGuardada(base, etapas.length));
+  /** O rascunho gravado, lido na hora (a criação ao abrir é assíncrona). */
+  const rascunhoRef = useRef<PesquisaDetalhe | null>(base ?? null);
+  /** A criação do rascunho ao abrir, para não criar outro em paralelo. */
+  const criacaoRef = useRef<Promise<unknown> | null>(null);
+  /** Os times restaurados do rascunho: o organograma não os sobrescreve. */
+  const restauradosRef = useRef<TimeNoAssistente[] | null>(null);
   const [salvoAs, setSalvoAs] = useState<string | null>(null);
   const [gerada, setGerada] = useState<{
     pesquisa: PesquisaDetalhe;
@@ -116,8 +159,12 @@ export function AssistenteDaAvaliacao({
   const [gravando, setGravando] = useState(false);
 
   // 1. Configurar
-  const [nome, setNome] = useState(() => nomePadrao(modelo, hoje));
-  const [mensagem, setMensagem] = useState(MENSAGEM_PADRAO[modelo]);
+  const [nome, setNome] = useState(
+    () => base?.nome ?? nomePadrao(modelo, hoje),
+  );
+  const [mensagem, setMensagem] = useState(() =>
+    base ? (base.boasVindas ?? "") : MENSAGEM_PADRAO[modelo],
+  );
   const [comentarios, setComentarios] =
     useState<RegraDeComentarios>("extremos");
   const [visibilidade, setVisibilidade] = useState<
@@ -162,7 +209,7 @@ export function AssistenteDaAvaliacao({
       .then((o) => {
         if (!vivo) return;
         setOrg(o);
-        setTimesOrg(timesDoOrganograma(o));
+        setTimesOrg(restauradosRef.current ?? timesDoOrganograma(o));
       })
       .catch(() => vivo && setFalhaOrg(true));
     return () => {
@@ -170,9 +217,69 @@ export function AssistenteDaAvaliacao({
     };
   }, [cliente]);
 
+  // Rascunho retomado: a configuração e os times gravados.
+  const baseId = base?.id ?? null;
+  useEffect(() => {
+    if (baseId === null || !cliente.obter) return;
+    let vivo = true;
+    cliente
+      .obter(baseId)
+      .then((det) => {
+        if (!vivo) return;
+        const c = det.config;
+        setComentarios(c.comentarios);
+        setLiberar(c.liberarNoPortal);
+        setVisibilidade(c.visibilidade);
+        setEnvio(c.envio);
+        if (c.lembretes.length) setLembretes(c.lembretes);
+        setLembrar(c.lembretes.length > 0);
+        const gravados = timesGravados(det);
+        if (gravados.length) {
+          restauradosRef.current = gravados;
+          setModo("organograma");
+          setTimesOrg(gravados);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Uma leitura por rascunho.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseId]);
+
+  // Modelo novo: o rascunho é gravado assim que o assistente abre.
+  useEffect(() => {
+    if (base || criacaoRef.current) return;
+    criacaoRef.current = servico
+      .criarPesquisa(entradaDaPesquisa(null))
+      .then((d) => {
+        rascunhoRef.current = d;
+        setSalvoAs(hora());
+        guardarEtapa(d.id, 0);
+        onRascunhoCriado?.(d.id);
+      })
+      .catch(() =>
+        setFalha("Não foi possível salvar o rascunho. Tente de novo."),
+      );
+    // Só ao abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const times = modo === "organograma" ? timesOrg : timesManuais;
   const setTimes = modo === "organograma" ? setTimesOrg : setTimesManuais;
   const contagem = useMemo(() => contar(modelo, times), [modelo, times]);
+  /** O exemplo da prévia do e-mail: o 1º gestor incluído e uma pessoa. */
+  const exemploDoEmail = useMemo(() => {
+    const t = times.find((x) => x.incluido && x.pessoas.length > 0);
+    return t
+      ? {
+          gestor: t.gestor.nome,
+          pessoas: t.pessoas.length,
+          pessoa: t.pessoas.find((p) => p.identificavel)?.nome ?? null,
+        }
+      : null;
+  }, [times]);
   const gestoresSemCpf = useMemo(
     () =>
       new Set(
@@ -206,18 +313,55 @@ export function AssistenteDaAvaliacao({
     };
   }
 
+  /** O navegador lembra a etapa em que a pessoa parou. */
+  function guardarEtapa(id: string, etapaAtual: number) {
+    lembrarRascunho(id, {
+      etapa: etapaAtual + 1,
+      totalDeEtapas: etapas.length,
+      salvoEm: agora().toISOString(),
+    });
+  }
+
+  function configDaAvaliacao(
+    prazoAutoavaliacao: string | null,
+  ): Partial<ConfigAvaliacao> {
+    return {
+      comentarios,
+      liberarNoPortal: liberar,
+      ...(e180 ? { visibilidade } : {}),
+      prazoAutoavaliacao,
+      lembretes: lembrar ? lembretes : [],
+      envio,
+    };
+  }
+
+  /** Grava o rascunho: nome e mensagem, a configuração e os times. */
   async function gravarRascunho(): Promise<PesquisaDetalhe | null> {
     try {
-      const d = rascunho
-        ? await servico.alterarPesquisa(rascunho.id, entradaDaPesquisa(null))
+      if (criacaoRef.current) await criacaoRef.current;
+      const atual = rascunhoRef.current;
+      const d = atual
+        ? await servico.alterarPesquisa(atual.id, entradaDaPesquisa(null))
         : await servico.criarPesquisa(entradaDaPesquisa(null));
-      setRascunho(d);
+      rascunhoRef.current = d;
+      await cliente.salvar(d.id, {
+        config: configDaAvaliacao(null),
+        times: timesParaEnviar(times),
+      });
       setSalvoAs(hora());
+      if (!atual) onRascunhoCriado?.(d.id);
       return d;
     } catch {
       setFalha("Não foi possível salvar o rascunho. Tente de novo.");
       return null;
     }
+  }
+
+  async function irParaEtapa(proxima: number) {
+    const d = await gravarRascunho();
+    if (!d) return;
+    guardarEtapa(d.id, proxima);
+    setEtapa(proxima);
   }
 
   async function avancar() {
@@ -226,8 +370,7 @@ export function AssistenteDaAvaliacao({
       const e = erroDoNome(nome);
       setErroNome(e);
       if (e) return;
-      if (!(await gravarRascunho())) return;
-      setEtapa(1);
+      await irParaEtapa(1);
       return;
     }
     if (etapa === 1) {
@@ -240,7 +383,7 @@ export function AssistenteDaAvaliacao({
         return;
       }
       setErroTimes(null);
-      setEtapa(2);
+      await irParaEtapa(2);
       return;
     }
     await criar();
@@ -258,26 +401,20 @@ export function AssistenteDaAvaliacao({
     setGravando(true);
     setFalha(null);
     try {
-      const base = rascunho ?? (await gravarRascunho());
-      if (!base) return;
+      if (criacaoRef.current) await criacaoRef.current;
+      const gravado = rascunhoRef.current ?? (await gravarRascunho());
+      if (!gravado) return;
       await servico.alterarPesquisa(
-        base.id,
+        gravado.id,
         entradaDaPesquisa(`${prazoDia}T${prazoHora}`),
       );
-      const lembretesFinais = lembrar ? lembretes : [];
-      const det = await cliente.salvar(base.id, {
-        config: {
-          comentarios,
-          liberarNoPortal: liberar,
-          ...(e180 ? { visibilidade } : {}),
-          prazoAutoavaliacao:
-            e180 && autoAntes ? `${autoDia}T${autoHora}` : null,
-          lembretes: lembretesFinais,
-          envio,
-        },
+      const det = await cliente.salvar(gravado.id, {
+        config: configDaAvaliacao(
+          e180 && autoAntes ? `${autoDia}T${autoHora}` : null,
+        ),
         times: timesParaEnviar(times),
       });
-      const publicada = await servico.publicarPesquisa(base.id);
+      const publicada = await servico.publicarPesquisa(gravado.id);
       setGerada({
         pesquisa: publicada,
         gestores: det.totais.gestores,
@@ -608,6 +745,8 @@ export function AssistenteDaAvaliacao({
           onLembretes={setLembretes}
           envio={envio}
           onEnvio={setEnvio}
+          empresa={empresa}
+          exemplo={exemploDoEmail}
           erros={errosPrazo}
           onEditar={setEtapa}
         />
@@ -1051,6 +1190,12 @@ function EtapaPrazo(p: {
   readonly onLembretes: (l: Lembrete[]) => void;
   readonly envio: "email" | "link";
   readonly onEnvio: (e: "email" | "link") => void;
+  readonly empresa: string | null;
+  readonly exemplo: {
+    gestor: string;
+    pessoas: number;
+    pessoa: string | null;
+  } | null;
   readonly erros: { prazo?: string | null; auto?: string | null };
   readonly onEditar: (etapa: number) => void;
 }) {
@@ -1244,19 +1389,22 @@ function EtapaPrazo(p: {
               O envio por e-mail entra na próxima etapa do Evolli. Até lá, os
               convites ficam aguardando e-mail e você envia o link.
             </p>
-            <div
-              className="avaliacao__previa-email"
-              aria-label="Prévia do e-mail"
-            >
-              <p className="pesquisas__suave">Prévia do e-mail</p>
-              <p>
-                <strong>{`Avalie o seu time até ${diaMesComZero(p.prazoDia)}`}</strong>
-              </p>
-              <p>
-                {`Você vai avaliar as pessoas do seu time em 8 competências. Leva cerca de 4 minutos por pessoa e dá para parar e continuar depois.${p.e180 ? " Cada pessoa também faz a própria autoavaliação." : ""}`}
-              </p>
-              <p className="pesquisas__suave">Você vai entrar com o seu CPF.</p>
-            </div>
+            <PreviaDoEmailDoGestor
+              e180={p.e180}
+              nome={p.nome}
+              empresa={p.empresa}
+              prazo={diaMesComZero(p.prazoDia)}
+              exemplo={p.exemplo}
+              veAutoavaliacao={p.visibilidade === "depois_do_gestor"}
+            />
+            {p.e180 ? (
+              <PreviaDoEmailDaPessoa
+                nome={p.nome}
+                empresa={p.empresa}
+                prazo={diaMesComZero(p.autoAntes ? p.autoDia : p.prazoDia)}
+                pessoa={p.exemplo?.pessoa ?? null}
+              />
+            ) : null}
           </>
         ) : null}
       </CartaoDeSecao>
@@ -1331,5 +1479,103 @@ function EtapaPrazo(p: {
         </dl>
       </CartaoDeSecao>
     </>
+  );
+}
+
+/** "Ana" de "Ana Teste" (a saudação do e-mail). */
+const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? nome;
+
+/** "A Empresa X" (ou "A empresa", sem o nome da empresa ativa). */
+const aEmpresa = (empresa: string | null) =>
+  empresa?.trim() ? `A ${empresa.trim()}` : "A empresa";
+
+/** A prévia do convite do gestor (quem recebe, assunto, corpo e botão). */
+function PreviaDoEmailDoGestor({
+  e180,
+  nome,
+  empresa,
+  prazo,
+  exemplo,
+  veAutoavaliacao,
+}: {
+  readonly e180: boolean;
+  readonly nome: string;
+  readonly empresa: string | null;
+  readonly prazo: string;
+  readonly exemplo: { gestor: string; pessoas: number } | null;
+  readonly veAutoavaliacao: boolean;
+}) {
+  const pessoas = exemplo
+    ? plural(exemplo.pessoas, "pessoa", "pessoas")
+    : "as pessoas";
+  return (
+    <div
+      className="avaliacao__previa-email"
+      role="group"
+      aria-label="Prévia do e-mail do gestor"
+    >
+      <p className="pesquisas__suave">
+        {`Prévia do e-mail · Para: ${exemplo?.gestor ?? "cada gestor"}`}
+      </p>
+      <p className="pesquisas__suave">{`De: ${empresa?.trim() || "Empresa"}`}</p>
+      <p>
+        <strong>
+          {e180
+            ? `Avaliação 180°: avalie o seu time até ${prazo}`
+            : `Avalie o seu time até ${prazo}`}
+        </strong>
+      </p>
+      <p>{exemplo ? `Oi, ${primeiroNome(exemplo.gestor)}.` : "Oi, [nome]."}</p>
+      <p>
+        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você vai avaliar ${pessoas} do seu time em 8 competências${e180 ? ", e cada uma também responde à própria autoavaliação" : ""}. São cerca de 4 minutos por pessoa e dá para pausar e voltar depois.`}
+      </p>
+      {e180 && veAutoavaliacao ? (
+        <p>
+          A autoavaliação de cada pessoa aparece para você depois que você
+          enviar a sua.
+        </p>
+      ) : null}
+      <p>
+        <span className="avaliacao__previa-botao">Começar a avaliar</span>
+      </p>
+      <p className="pesquisas__suave">Você entra com o seu CPF.</p>
+    </div>
+  );
+}
+
+/** 180°: a prévia do convite da pessoa avaliada (autoavaliação). */
+function PreviaDoEmailDaPessoa({
+  nome,
+  empresa,
+  prazo,
+  pessoa,
+}: {
+  readonly nome: string;
+  readonly empresa: string | null;
+  readonly prazo: string;
+  readonly pessoa: string | null;
+}) {
+  return (
+    <div
+      className="avaliacao__previa-email"
+      role="group"
+      aria-label="Prévia do e-mail da pessoa avaliada"
+    >
+      <p className="pesquisas__suave">
+        {`Prévia do e-mail · Para: ${pessoa ?? "cada pessoa avaliada"}`}
+      </p>
+      <p className="pesquisas__suave">{`De: ${empresa?.trim() || "Empresa"}`}</p>
+      <p>
+        <strong>{`Avaliação 180°: faça a sua autoavaliação até ${prazo}`}</strong>
+      </p>
+      <p>{pessoa ? `Oi, ${primeiroNome(pessoa)}.` : "Oi, [nome]."}</p>
+      <p>
+        {`${aEmpresa(empresa)} abriu a ${nome.trim() || "avaliação"}. Você responde às mesmas afirmações que o seu gestor, agora sobre você. São cerca de 4 minutos e dá para pausar e voltar depois.`}
+      </p>
+      <p>
+        <span className="avaliacao__previa-botao">Começar a autoavaliação</span>
+      </p>
+      <p className="pesquisas__suave">Você entra com o seu CPF.</p>
+    </div>
   );
 }

@@ -6,10 +6,12 @@
  * por grupo ou escolher pessoas) → E-mail (padrão ou personalizado, com a
  * prévia) → Enviar (revisão e ativação).
  *
- * O rascunho é gravado ao sair da 1ª etapa. O Evolli ainda não envia
- * e-mail: os convites ficam "aguardando e-mail" e o RH manda o link.
+ * O rascunho é gravado assim que o assistente abre (a rota passa a
+ * `<id>/rascunho`) e a cada etapa; ao reabrir, volta com tudo e na etapa em
+ * que a pessoa parou. O Evolli ainda não envia e-mail: os convites ficam
+ * "aguardando e-mail" e o RH manda o link ("Enviar teste" fica preparado).
  */
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   Identificacao,
   Pergunta,
@@ -23,6 +25,8 @@ import { IconeMais, IconeRemover, IconeVoltar } from "../../../../ui/icones";
 import { BarraDeEtapas, CampoDeBusca, CartaoDeSecao } from "../../componentes";
 import type { ServicoDePesquisas } from "../../servicoDePesquisas";
 import { CampoDoLink } from "../../TelaDeGerada";
+import { lembrarRascunho, memoriaDoRascunho } from "../../rascunhosLocais";
+import { enderecoDaPrevia } from "../../rotasDePesquisas";
 import { IDENTIFICACOES, novoId } from "../../textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "../../tituloDasPesquisas";
 import {
@@ -42,18 +46,27 @@ import type {
   ClienteDoOnboarding,
   ConfigOnboarding,
   OnboardingDetalhe,
+  PessoaDoPublico,
   PreviaDoPublico,
   Publico,
 } from "./cliente";
 import { ROTULO_DO_CAMPO, type GruposDoPublico } from "./gruposDoPublico";
 import {
   CONFIG_PADRAO,
+  CORES_DE_FUNDO,
+  CORES_PRINCIPAIS,
   configParaEnviar,
   contarPerguntas,
+  corDoTextoSobre,
+  corValida,
   errosDaConfiguracao,
+  fundoClaro,
+  primeiroNome,
   resumoDoEnvio,
+  siglaDaEmpresa,
   somarDias,
   textoDaContagem,
+  textoDasProximas,
   textoDoBotaoFinal,
   textoDoPrazoELembrete,
 } from "./regrasDoOnboarding";
@@ -77,38 +90,89 @@ interface Props {
   readonly cliente: Pick<
     ClienteDoOnboarding,
     "salvar" | "ativar" | "previaDoPublico"
-  >;
+  > &
+    Partial<Pick<ClienteDoOnboarding, "obter">>;
   readonly listarGrupos: () => Promise<GruposDoPublico>;
-  readonly empresa?: string;
+  /** O rascunho retomado (`<id>/rascunho`). */
+  readonly base?: PesquisaDetalhe;
+  /** O nome da empresa ativa (remetente e textos do e-mail). */
+  readonly empresa?: string | null;
   readonly hoje: string;
   readonly agora?: () => Date;
+  /** O rascunho foi gravado pela primeira vez (a rota passa a apontar para ele). */
+  readonly onRascunhoCriado?: (id: string) => void;
+  /** "Abrir prévia": a pesquisa como a pessoa vê (outra aba). */
+  readonly onAbrirPrevia?: (pesquisaId: string) => void;
   readonly onVoltar: () => void;
   readonly onVerEnvios: (pesquisaId: string) => void;
 }
+
+/** O público ainda sem ninguém escolhido (a API recusa a prévia vazia). */
+function publicoIncompleto(p: Publico): boolean {
+  return (
+    (p.tipo === "pessoas" && p.colaboradorIds.length === 0) ||
+    (p.tipo === "grupo" && p.condicoes.some((c) => c.valores.length === 0))
+  );
+}
+
+const PREVIA_VAZIA: PreviaDoPublico = {
+  total: 0,
+  semEmail: 0,
+  proximas: { 30: 0, 60: 0, 90: 0 },
+  pessoas: [],
+};
+
+/** "na Empresa X" (ou "na empresa", sem o nome da empresa ativa). */
+export function naEmpresa(empresa: string | null | undefined): string {
+  const nome = empresa?.trim();
+  return nome ? `na ${nome}` : "na empresa";
+}
+
+const abrirEmOutraAba = (id: string) => {
+  window.open(enderecoDaPrevia(id), "_blank", "noopener");
+};
 
 export function AssistenteDoOnboarding({
   servico,
   cliente,
   listarGrupos,
-  empresa = "a empresa",
+  base,
+  empresa = null,
   hoje,
   agora = () => new Date(),
+  onRascunhoCriado,
+  onAbrirPrevia = abrirEmOutraAba,
   onVoltar,
   onVerEnvios,
 }: Props) {
   const ids = useId();
-  const [etapa, setEtapa] = useState(0);
-  const [rascunho, setRascunho] = useState<PesquisaDetalhe | null>(null);
+  const [etapa, setEtapa] = useState(() => {
+    const m = base ? memoriaDoRascunho(base.id) : null;
+    return m ? Math.min(Math.max(m.etapa - 1, 0), ETAPAS.length - 1) : 0;
+  });
+  const [rascunho, setRascunho] = useState<PesquisaDetalhe | null>(
+    base ?? null,
+  );
+  /** O rascunho gravado, lido na hora (a criação ao abrir é assíncrona). */
+  const rascunhoRef = useRef<PesquisaDetalhe | null>(base ?? null);
+  const criacaoRef = useRef<Promise<unknown> | null>(null);
   const [salvoAs, setSalvoAs] = useState<string | null>(null);
-  const [nome, setNome] = useState("Onboarding · 30 e 60 dias");
-  const [descricao, setDescricao] = useState("");
-  const [identificacao, setIdentificacao] =
-    useState<Identificacao>("confidencial");
+  const [nome, setNome] = useState(
+    () => base?.nome ?? "Onboarding · 30 e 60 dias",
+  );
+  const [descricao, setDescricao] = useState(() => base?.boasVindas ?? "");
+  const [identificacao, setIdentificacao] = useState<Identificacao>(
+    () => base?.identificacao ?? "confidencial",
+  );
   const [config, setConfig] = useState<ConfigOnboarding>(() => ({
     ...CONFIG_PADRAO,
     agendadoPara: somarDias(hoje, 1),
   }));
-  const [secoes, setSecoes] = useState<Secao[]>(() => secoesDoOnboarding());
+  const [secoes, setSecoes] = useState<Secao[]>(() =>
+    base && base.secoes.length ? base.secoes : secoesDoOnboarding(),
+  );
+  /** Todas as pessoas ativas (para marcar), independente da escolha. */
+  const [todas, setTodas] = useState<readonly PessoaDoPublico[] | null>(null);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [falha, setFalha] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
@@ -122,16 +186,84 @@ export function AssistenteDoOnboarding({
   const contagem = contarPerguntas(secoes);
 
   // A prévia do público acompanha a escolha (e os "próximos 30 dias").
+  // Sem ninguém escolhido ainda, a prévia é vazia (sem pedir à API).
   useEffect(() => {
+    if (publicoIncompleto(config.publico)) {
+      setPrevia(PREVIA_VAZIA);
+      return;
+    }
     let vivo = true;
+    const todos = config.publico.tipo === "todos";
     cliente
       .previaDoPublico(config.publico, config.soDiasUteis)
-      .then((p) => vivo && setPrevia(p))
+      .then((p) => {
+        if (!vivo) return;
+        setPrevia(p);
+        if (todos) setTodas(p.pessoas);
+      })
       .catch(() => vivo && setPrevia(null));
     return () => {
       vivo = false;
     };
   }, [cliente, config.publico, config.soDiasUteis]);
+
+  // A lista para marcar as pessoas vem de todos os ativos, sempre.
+  const precisaDaLista = todas === null && config.publico.tipo !== "todos";
+  useEffect(() => {
+    if (!precisaDaLista) return;
+    let vivo = true;
+    cliente
+      .previaDoPublico({ tipo: "todos" }, config.soDiasUteis)
+      .then((p) => vivo && setTodas(p.pessoas))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Uma vez: quem está ativo não muda com a escolha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente, precisaDaLista]);
+
+  // Rascunho retomado: a configuração do envio gravada.
+  const baseId = base?.id ?? null;
+  useEffect(() => {
+    if (baseId === null || !cliente.obter) return;
+    let vivo = true;
+    cliente
+      .obter(baseId)
+      .then((d) => {
+        if (vivo)
+          setConfig((c) => ({
+            ...d.config,
+            agendadoPara: d.config.agendadoPara ?? c.agendadoPara,
+          }));
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Uma leitura por rascunho.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseId]);
+
+  // Modelo novo: o rascunho é gravado assim que o assistente abre.
+  useEffect(() => {
+    if (base || criacaoRef.current) return;
+    criacaoRef.current = servico
+      .criarPesquisa(entrada())
+      .then(async (d) => {
+        rascunhoRef.current = d;
+        setRascunho(d);
+        await cliente.salvar(d.id, configParaEnviar(config, identificacao));
+        setSalvoAs(hora());
+        guardarEtapa(d.id, 0);
+        onRascunhoCriado?.(d.id);
+      })
+      .catch(() =>
+        setFalha("Não foi possível salvar o rascunho. Tente de novo."),
+      );
+    // Só ao abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (etapa !== 2 || grupos) return;
@@ -162,14 +294,27 @@ export function AssistenteDoOnboarding({
     minimoPorGrupo: 3,
   });
 
+  /** O navegador lembra a etapa em que a pessoa parou. */
+  function guardarEtapa(id: string, etapaAtual: number) {
+    lembrarRascunho(id, {
+      etapa: etapaAtual + 1,
+      totalDeEtapas: ETAPAS.length,
+      salvoEm: agora().toISOString(),
+    });
+  }
+
   async function gravar(): Promise<PesquisaDetalhe | null> {
     try {
-      const d = rascunho
-        ? await servico.alterarPesquisa(rascunho.id, entrada())
+      if (criacaoRef.current) await criacaoRef.current;
+      const atual = rascunhoRef.current;
+      const d = atual
+        ? await servico.alterarPesquisa(atual.id, entrada())
         : await servico.criarPesquisa(entrada());
+      rascunhoRef.current = d;
       setRascunho(d);
       await cliente.salvar(d.id, configParaEnviar(config, identificacao));
       setSalvoAs(hora());
+      if (!atual) onRascunhoCriado?.(d.id);
       return d;
     } catch {
       setFalha("Não foi possível salvar o rascunho. Tente de novo.");
@@ -183,7 +328,6 @@ export function AssistenteDoOnboarding({
       const e = errosDaConfiguracao(nome, config, hoje);
       setErros(e);
       if (Object.keys(e).length) return;
-      if (!(await gravar())) return;
     }
     if (etapa === 1 && contagem.perguntas === 0) {
       setFalha("Inclua pelo menos uma pergunta.");
@@ -215,7 +359,9 @@ export function AssistenteDoOnboarding({
       }
     }
     if (etapa < ETAPAS.length - 1) {
-      if (etapa > 0 && !(await gravar())) return;
+      const d = await gravar();
+      if (!d) return;
+      guardarEtapa(d.id, etapa + 1);
       setEtapa(etapa + 1);
       return;
     }
@@ -341,6 +487,7 @@ export function AssistenteDoOnboarding({
           publico={config.publico}
           onPublico={(publico) => mudar({ publico })}
           previa={previa}
+          todas={todas ?? previa?.pessoas ?? []}
           grupos={grupos}
         />
       ) : etapa === 3 ? (
@@ -352,6 +499,7 @@ export function AssistenteDoOnboarding({
           anonima={anonima}
           perguntas={contagem.perguntas}
           minutos={contagem.minutos}
+          pessoas={(previa?.pessoas ?? []).filter((p) => p.noPublico)}
         />
       ) : (
         <EtapaEnviar
@@ -362,7 +510,11 @@ export function AssistenteDoOnboarding({
           perguntas={contagem.perguntas}
           blocos={contagem.blocos}
           previa={previa}
+          empresa={empresa}
           onEditar={setEtapa}
+          onAbrirPrevia={
+            rascunho ? () => onAbrirPrevia(rascunho.id) : undefined
+          }
         />
       )}
 
@@ -388,7 +540,7 @@ export function AssistenteDoOnboarding({
           {etapa === 2 && previa
             ? `${plural(previa.total, "pessoa", "pessoas")} no público`
             : etapa === 3
-              ? `${config.email.modelo === "padrao" ? "E-mail padrão" : "E-mail personalizado"} · remetente ${empresa}`
+              ? `${config.email.modelo === "padrao" ? "E-mail padrão" : "E-mail personalizado"} · remetente ${empresa?.trim() || "a empresa ativa"}`
               : resumoDoEnvio(config)}
         </span>
         <Button disabled={gravando} onClick={() => void avancar()}>
@@ -618,7 +770,7 @@ function EtapaConfigurar({
                   <span className="pesquisas__suave">{r.texto}</span>
                   {proximas ? (
                     <span className="pesquisas__suave">
-                      {`${plural(proximas[r.valor], "pessoa", "pessoas")} nos próximos 30 dias`}
+                      {textoDasProximas(r.valor, proximas[r.valor])}
                     </span>
                   ) : null}
                 </label>
@@ -990,12 +1142,15 @@ function EtapaPublico({
   publico,
   onPublico,
   previa,
+  todas,
   grupos,
 }: {
   readonly ids: string;
   readonly publico: Publico;
   readonly onPublico: (p: Publico) => void;
   readonly previa: PreviaDoPublico | null;
+  /** Todas as pessoas ativas (a lista para marcar). */
+  readonly todas: readonly PessoaDoPublico[];
   readonly grupos: GruposDoPublico | null;
 }) {
   const [filtro, setFiltro] = useState<"todos" | "sim" | "nao" | "sem_email">(
@@ -1006,7 +1161,7 @@ function EtapaPublico({
     publico.tipo === "pessoas" ? publico.colaboradorIds : [],
   );
   const termo = busca.trim().toLocaleLowerCase("pt-BR");
-  const pessoas = (previa?.pessoas ?? []).filter((p) => {
+  const pessoas = todas.filter((p) => {
     if (termo && !p.nome.toLocaleLowerCase("pt-BR").includes(termo))
       return false;
     if (filtro === "sim") return escolhidos.has(p.colaboradorId);
@@ -1029,7 +1184,7 @@ function EtapaPublico({
             [
               "todos",
               "Todos",
-              `Todos os colaboradores ativos${previa ? `: ${plural(previa.pessoas.length, "pessoa", "pessoas")}` : ""}.`,
+              `Todos os colaboradores ativos${todas.length ? `: ${plural(todas.length, "pessoa", "pessoas")}` : ""}.`,
             ],
             [
               "grupo",
@@ -1255,7 +1410,14 @@ function EtapaPublico({
           <strong>{`${plural(previa.total, "colaborador está", "colaboradores estão")} no público hoje`}</strong>
           {previa.semEmail ? (
             <p className="avaliacao__aviso avaliacao__aviso--atencao">
-              {`${plural(previa.semEmail, "pessoa não tem", "pessoas não têm")} e-mail cadastrado e não recebe${previa.semEmail === 1 ? "" : "m"} o convite.`}
+              {`${plural(previa.semEmail, "pessoa não tem", "pessoas não têm")} e-mail cadastrado e não recebe${previa.semEmail === 1 ? "" : "m"} o convite. `}
+              <a
+                href="#/pessoas/colaboradores"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Completar cadastro
+              </a>
             </p>
           ) : null}
         </div>
@@ -1263,6 +1425,10 @@ function EtapaPublico({
     </CartaoDeSecao>
   );
 }
+
+/** O aviso do "Enviar teste" enquanto o envio de e-mail não está ligado. */
+const MOTIVO_DO_TESTE =
+  "O envio de e-mail entra na próxima etapa do Evolli. Até lá, use a prévia para ver o convite e a pesquisa.";
 
 function EtapaEmail({
   ids,
@@ -1272,21 +1438,32 @@ function EtapaEmail({
   anonima,
   perguntas,
   minutos,
+  pessoas,
 }: {
   readonly ids: string;
   readonly config: ConfigOnboarding;
   readonly mudar: (m: Partial<ConfigOnboarding>) => void;
-  readonly empresa: string;
+  readonly empresa: string | null;
   readonly anonima: boolean;
   readonly perguntas: number;
   readonly minutos: number;
+  /** Quem está no público hoje (o "Ver como"). */
+  readonly pessoas: readonly PessoaDoPublico[];
 }) {
   const e = config.email;
   const personalizado = e.modelo === "personalizado";
+  const [aba, setAba] = useState<"texto" | "aparencia">("texto");
+  const [verComo, setVerComo] = useState<string | null>(null);
+  const [hex, setHex] = useState(e.corPrincipal ?? "");
+  const exemplo =
+    pessoas.find((p) => p.colaboradorId === verComo) ?? pessoas[0] ?? null;
+  const nomeDaEmpresa = empresa?.trim() || null;
+  const corPrincipal = personalizado ? (e.corPrincipal ?? null) : null;
+  const corFundo = personalizado ? (e.corFundo ?? null) : null;
   const assunto =
     personalizado && e.assunto
       ? e.assunto
-      : `Como estão seus primeiros dias na ${empresa}?`;
+      : `Como estão seus primeiros dias ${naEmpresa(empresa)}?`;
   const titulo =
     personalizado && e.titulo ? e.titulo : "Como estão seus primeiros dias?";
   const mensagem =
@@ -1301,18 +1478,67 @@ function EtapaEmail({
         titulo="Prévia do convite"
         descricao="Assim o e-mail chega para a pessoa."
       >
-        <div className="avaliacao__previa-email" aria-label="Prévia do e-mail">
-          <p className="pesquisas__suave">{`De: ${empresa}`}</p>
+        {pessoas.length ? (
+          <label className="pesquisas__campo onboarding__ver-como">
+            <span className="pesquisas__rotulo">Ver como</span>
+            <select
+              value={exemplo?.colaboradorId ?? ""}
+              onChange={(x) => setVerComo(x.target.value)}
+            >
+              {pessoas.map((p) => (
+                <option key={p.colaboradorId} value={p.colaboradorId}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <div
+          className="avaliacao__previa-email onboarding__convite"
+          role="group"
+          aria-label="Prévia do e-mail"
+          style={corFundo ? { background: corFundo } : undefined}
+        >
+          <p className="pesquisas__suave">{`De: ${nomeDaEmpresa ?? "Empresa"}`}</p>
+          <p className="pesquisas__suave">{`Para: ${exemplo?.nome ?? "[nome]"}`}</p>
           <p className="pesquisas__suave">{`Assunto: ${assunto}`}</p>
+          <span
+            className="onboarding__sigla"
+            aria-label={`Sigla de ${nomeDaEmpresa ?? "empresa"}`}
+            style={
+              corPrincipal
+                ? {
+                    background: corPrincipal,
+                    color: corDoTextoSobre(corPrincipal),
+                  }
+                : undefined
+            }
+          >
+            {siglaDaEmpresa(nomeDaEmpresa)}
+          </span>
           <p>
             <strong>{titulo}</strong>
           </p>
-          <p>Olá, [nome],</p>
+          <p>
+            {exemplo ? `Olá, ${primeiroNome(exemplo.nome)},` : "Olá, [nome],"}
+          </p>
           {mensagem.split(/\n\s*\n/).map((par, i) => (
             <p key={i}>{par}</p>
           ))}
           <p>
-            <strong>Responder pesquisa →</strong>
+            <span
+              className="avaliacao__previa-botao"
+              style={
+                corPrincipal
+                  ? {
+                      background: corPrincipal,
+                      color: corDoTextoSobre(corPrincipal),
+                    }
+                  : undefined
+              }
+            >
+              Responder pesquisa →
+            </span>
           </p>
           <p className="pesquisas__suave">
             {anonima
@@ -1324,6 +1550,7 @@ function EtapaEmail({
           O envio por e-mail entra na próxima etapa do Evolli. Até lá, os
           convites ficam aguardando e-mail.
         </p>
+        <BotaoDeTeste ids={ids} />
       </CartaoDeSecao>
       <CartaoDeSecao titulo="Modelo do e-mail">
         <div
@@ -1362,7 +1589,124 @@ function EtapaEmail({
           </label>
         </div>
         {personalizado ? (
-          <div className="pesquisas__campos">
+          <div
+            role="tablist"
+            aria-label="E-mail personalizado"
+            className="pesquisas__abas"
+          >
+            <button
+              type="button"
+              role="tab"
+              className="evolli-aba"
+              aria-selected={aba === "texto"}
+              onClick={() => setAba("texto")}
+            >
+              Texto
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="evolli-aba"
+              aria-selected={aba === "aparencia"}
+              onClick={() => setAba("aparencia")}
+            >
+              Logo e cores
+            </button>
+          </div>
+        ) : null}
+        {personalizado && aba === "aparencia" ? (
+          <div className="pesquisas__campos" role="tabpanel">
+            <div className="onboarding__logo">
+              <span className="pesquisas__rotulo">Logo</span>
+              <span className="onboarding__sigla" aria-hidden="true">
+                {siglaDaEmpresa(nomeDaEmpresa)}
+              </span>
+              <Button
+                variant="secondary"
+                disabled
+                aria-describedby={`${ids}-logo-motivo`}
+              >
+                Enviar logo
+              </Button>
+              <p id={`${ids}-logo-motivo`} className="pesquisas__suave">
+                O logo entra junto com o envio de e-mail. Até lá, o convite
+                mostra a sigla da empresa.
+              </p>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Cor principal"
+              className="onboarding__cores"
+            >
+              <span className="pesquisas__rotulo">Cor principal</span>
+              {CORES_PRINCIPAIS.map((c) => (
+                <label key={c.cor} className="onboarding__amostra">
+                  <input
+                    type="radio"
+                    name={`${ids}-cor`}
+                    checked={e.corPrincipal === c.cor}
+                    onChange={() => {
+                      setHex(c.cor);
+                      mudarEmail({ corPrincipal: c.cor });
+                    }}
+                  />
+                  <span style={{ background: c.cor }} aria-hidden="true" />
+                  <span className="onboarding__invisivel">{c.nome}</span>
+                </label>
+              ))}
+              <label className="pesquisas__campo">
+                <span className="pesquisas__rotulo">Código da cor</span>
+                <input
+                  value={hex}
+                  maxLength={7}
+                  placeholder="#1f6feb"
+                  aria-invalid={hex && !corValida(hex) ? true : undefined}
+                  onChange={(x) => {
+                    const v = x.target.value.trim();
+                    setHex(v);
+                    if (corValida(v))
+                      mudarEmail({ corPrincipal: v.toLowerCase() });
+                    else if (!v) mudarEmail({ corPrincipal: null });
+                  }}
+                />
+              </label>
+              {hex && !corValida(hex) ? (
+                <p className="pesquisas__erro">Use o formato #RRGGBB.</p>
+              ) : null}
+              <p className="pesquisas__suave">
+                O texto do botão fica branco ou preto, o que der mais contraste.
+              </p>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Cor do fundo"
+              className="onboarding__cores"
+            >
+              <span className="pesquisas__rotulo">Cor do fundo</span>
+              {CORES_DE_FUNDO.filter((c) => fundoClaro(c.cor)).map((c) => (
+                <label key={c.cor} className="onboarding__amostra">
+                  <input
+                    type="radio"
+                    name={`${ids}-fundo`}
+                    checked={(e.corFundo ?? "#ffffff") === c.cor}
+                    onChange={() =>
+                      mudarEmail({
+                        corFundo: c.cor === "#ffffff" ? null : c.cor,
+                      })
+                    }
+                  />
+                  <span style={{ background: c.cor }} aria-hidden="true" />
+                  <span className="onboarding__invisivel">{c.nome}</span>
+                </label>
+              ))}
+              <p className="pesquisas__suave">
+                Só cores claras, para o texto continuar legível.
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {personalizado && aba === "texto" ? (
+          <div className="pesquisas__campos" role="tabpanel">
             <label className="pesquisas__campo">
               <span className="pesquisas__rotulo">Assunto</span>
               <input
@@ -1400,6 +1744,24 @@ function EtapaEmail({
   );
 }
 
+/** "Enviar teste para mim": preparado, desligado até o envio de e-mail. */
+function BotaoDeTeste({ ids }: { readonly ids: string }) {
+  return (
+    <div className="onboarding__teste">
+      <Button
+        variant="secondary"
+        disabled
+        aria-describedby={`${ids}-teste-motivo`}
+      >
+        Enviar teste para mim
+      </Button>
+      <p id={`${ids}-teste-motivo`} className="pesquisas__suave">
+        {MOTIVO_DO_TESTE}
+      </p>
+    </div>
+  );
+}
+
 function EtapaEnviar({
   nome,
   identificacao,
@@ -1408,7 +1770,9 @@ function EtapaEnviar({
   perguntas,
   blocos,
   previa,
+  empresa,
   onEditar,
+  onAbrirPrevia,
 }: {
   readonly nome: string;
   readonly identificacao: Identificacao;
@@ -1417,8 +1781,12 @@ function EtapaEnviar({
   readonly perguntas: number;
   readonly blocos: number;
   readonly previa: PreviaDoPublico | null;
+  readonly empresa: string | null;
   readonly onEditar: (etapa: number) => void;
+  /** Sem rascunho gravado ainda, a prévia não abre. */
+  readonly onAbrirPrevia: (() => void) | undefined;
 }) {
+  const ids = useId();
   const ident = IDENTIFICACOES.find((i) => i.valor === identificacao)!;
   const regra =
     config.publico.tipo === "todos"
@@ -1510,7 +1878,7 @@ function EtapaEnviar({
           <div>
             <dt>E-mail</dt>
             <dd>
-              {config.email.modelo === "padrao" ? "Padrão" : "Personalizado"}
+              {`Remetente ${empresa?.trim() || "a empresa ativa"} · ${config.email.modelo === "padrao" ? "Padrão" : "Personalizado"}`}
             </dd>
             <button
               type="button"
@@ -1521,6 +1889,21 @@ function EtapaEnviar({
             </button>
           </div>
         </dl>
+      </CartaoDeSecao>
+      <CartaoDeSecao
+        titulo="Teste antes de enviar"
+        descricao="Receba o e-mail e veja a pesquisa como a pessoa vê. Nada entra nos resultados."
+      >
+        <div className="pesquisas__acoes">
+          <Button
+            variant="secondary"
+            disabled={!onAbrirPrevia}
+            onClick={() => onAbrirPrevia?.()}
+          >
+            Abrir prévia
+          </Button>
+        </div>
+        <BotaoDeTeste ids={ids} />
       </CartaoDeSecao>
     </>
   );
