@@ -122,7 +122,7 @@ export const ETAPAS_DA_CONFORMIDADE: readonly EtapaDaConformidade[] = [
     id: "plano",
     titulo: "Elaborar o plano de ação",
     texto:
-      "Conclui sozinha quando o plano de ação tem a primeira medida registrada.",
+      "Conclui sozinha quando há resultado: as estratégias sugeridas nascem com a primeira resposta. Revise-as e registre as medidas da empresa na aba Plano de ação.",
     itens: [],
   },
   {

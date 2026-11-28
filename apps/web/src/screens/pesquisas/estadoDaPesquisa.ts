@@ -106,7 +106,7 @@ export function estadoDoModelo(
     encerraEm: null,
     encerraHora: HORA_PADRAO,
     minimoPorGrupo: 3,
-    separarPor: [],
+    separarPor: [...(m.separarPorPadrao ?? [])],
     comentarioId: m.comentarioFinal ? comentarioDe(secoes) : null,
     temRespostas: false,
     responderam: [],

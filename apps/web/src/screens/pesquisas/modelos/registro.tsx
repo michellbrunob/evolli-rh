@@ -17,6 +17,7 @@ import {
   SERVICO_DOS_MODELOS,
   type GrupoDoModelo,
   type ResultadoDoPainel,
+  type ResultadoNr1,
   type ServicoDosModelos,
 } from "../../../api/modelosDePesquisaClient";
 import type { AbaDosResultados } from "../rotasDePesquisas";
@@ -32,6 +33,7 @@ import {
   baixarPacoteDaConformidade,
   baixarPdfDoPlano,
 } from "./copsoq/exportarNr1";
+import { estrategiasSugeridas } from "./copsoq/medidasSugeridas";
 import {
   PorGrupoNr1,
   VisaoGeralNr1,
@@ -60,29 +62,38 @@ export const ABAS_DO_MODELO: Partial<
 export const temTelasProprias = (modelo: ModeloPesquisa): boolean =>
   ABAS_DO_MODELO[modelo] !== undefined;
 
-/** O contador da aba da NR-1: medidas no plano ou "N/7" etapas. */
+/**
+ * O contador da aba da NR-1: as estratégias sugeridas no Plano (87 com as
+ * 29 dimensões) ou "N/7" etapas na Conformidade.
+ */
 function ContadorNr1({
   pesquisaId,
   tipo,
+  resultado,
 }: {
   readonly pesquisaId: string;
   readonly tipo: "plano" | "conformidade";
+  readonly resultado: ResultadoNr1 | null;
 }) {
   const a = useAcompanhamentoLembrado(pesquisaId);
+  if (tipo === "plano")
+    return resultado ? (
+      <span className="pesquisas__contagem">
+        {estrategiasSugeridas(resultado)}
+      </span>
+    ) : null;
   if (!a) return null;
-  return (
-    <span className="pesquisas__contagem">
-      {tipo === "plano" ? a.plano.length : `${a.concluidas}/7`}
-    </span>
-  );
+  return <span className="pesquisas__contagem">{`${a.concluidas}/7`}</span>;
 }
 
 /**
  * As abas próprias do modelo na pesquisa; na NR-1, com o contador de
- * medidas no Plano de ação e o andamento da Conformidade ("1/7").
+ * estratégias sugeridas no Plano de ação e o andamento da Conformidade
+ * ("1/7").
  */
 export function abasDoModeloDaPesquisa(
   detalhe: PesquisaDetalhe,
+  geral?: ResultadosPesquisa | null,
 ): readonly { valor: AbaDoModelo; rotulo: ReactNode }[] | undefined {
   const abas = ABAS_DO_MODELO[detalhe.modelo];
   if (!abas || detalhe.modelo !== "copsoq") return abas;
@@ -92,7 +103,14 @@ export function abasDoModeloDaPesquisa(
           valor: a.valor,
           rotulo: (
             <>
-              {a.rotulo} <ContadorNr1 pesquisaId={detalhe.id} tipo={a.valor} />
+              {a.rotulo}{" "}
+              <ContadorNr1
+                pesquisaId={detalhe.id}
+                tipo={a.valor}
+                resultado={
+                  geral?.modelo?.modelo === "copsoq" ? geral.modelo : null
+                }
+              />
             </>
           ),
         }

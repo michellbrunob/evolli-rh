@@ -111,6 +111,8 @@ export const RISCOS_PSICOSSOCIAIS: ModeloDaGaleria = {
   limite: 76,
   minimo: 76,
   fixo: true,
+  // Na anônima, o inventário por área precisa do departamento.
+  separarPorPadrao: ["departamento"],
   legendaDaEscala: [
     "5 escalas de resposta",
     "Frequência · Intensidade · Concordância · Satisfação · Saúde (do melhor para o pior)",

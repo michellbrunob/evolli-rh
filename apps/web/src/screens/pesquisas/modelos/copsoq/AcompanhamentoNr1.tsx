@@ -40,11 +40,13 @@ import {
 } from "../../../../format/data";
 import { plural } from "../../../../format/plural";
 import { CartaoDeSecao } from "../../componentes";
+import { mensagemDaFalha } from "../../falhasDaGravacao";
 import { novoId } from "../../textosDasPesquisas";
 import { SeloDoNivel } from "../ui";
 import { DIMENSOES_NR1, dimensaoNr1 } from "./definicao";
 import {
   dimensaoCombina,
+  estrategiasSugeridas,
   medidaDaSugestao,
   prazoPeloNivel,
   sugestaoCombina,
@@ -174,7 +176,7 @@ export function useAcompanhamentoNr1(
       setFalha(
         status === 422
           ? "Revise os campos: algum ficou vazio ou longo demais."
-          : "Não foi possível salvar. Tente de novo.",
+          : mensagemDaFalha(erro, "salvar"),
       );
       return false;
     } finally {
@@ -273,12 +275,9 @@ export function PlanoDeAcaoNr1({
     (s) => textoCombina(dim.rotulo, busca) || sugestaoCombina(s, busca),
   );
   const noPlano = new Set(daDimensao.map((m) => m.titulo.trim()));
-  const totalDeSugestoes = r.prioridades
-    .filter((id) => {
-      const n = porId.get(id)?.nivel;
-      return n === "critico" || n === "alto" || n === "medio";
-    })
-    .reduce((t, id) => t + sugestoesDa(id).length, 0);
+  // As 3 de cada dimensão com nível, inclusive as preventivas do baixo:
+  // o mesmo número da lista à esquerda, da aba e da Visão geral.
+  const totalDeSugestoes = estrategiasSugeridas(r);
 
   return (
     <div className="modelos">
@@ -309,7 +308,7 @@ export function PlanoDeAcaoNr1({
             <strong className="modelos__mini-valor">{plano.length}</strong>
           </div>
           <div className="modelos__mini">
-            <span className="modelos__mini-titulo">Medidas sugeridas</span>
+            <span className="modelos__mini-titulo">Estratégias sugeridas</span>
             <strong className="modelos__mini-valor">{totalDeSugestoes}</strong>
           </div>
           <div className="modelos__mini">
@@ -375,7 +374,7 @@ export function PlanoDeAcaoNr1({
                         >
                           <span>{dimensaoNr1(id).rotulo}</span>
                           <span className="pesquisas__suave">
-                            {`${plural(qtd, "medida", "medidas")} · ${plural(sugestoesDa(id).length, "sugestão", "sugestões")}`}
+                            {`${plural(qtd, "medida", "medidas")} · ${plural(sugestoesDa(id).length, "estratégia", "estratégias")}`}
                           </span>
                         </button>
                       </li>
@@ -408,11 +407,11 @@ export function PlanoDeAcaoNr1({
           </ol>
 
           <h4 className="modelos__grupo-titulo">
-            {`Medidas sugeridas · ${sugestoes.length}`}
+            {`Estratégias sugeridas · ${sugestoes.length}`}
           </h4>
           <ul
             className="nr1__sugestoes"
-            aria-label={`Medidas sugeridas para ${dim.rotulo}`}
+            aria-label={`Estratégias sugeridas para ${dim.rotulo}`}
           >
             {sugestoes.map((s) => {
               const ja = noPlano.has(s.titulo);
@@ -715,7 +714,8 @@ export function mensagemDoEnvio(erro: unknown): string {
     return `Cada etapa aceita até ${EVIDENCIAS_POR_ETAPA} arquivos.`;
   if (e?.status === 503)
     return "A verificação do arquivo está indisponível agora. Tente de novo em alguns minutos.";
-  return "Não foi possível enviar o arquivo. Tente de novo.";
+  // Sessão, página desatualizada, permissão, 5xx e conexão: os textos comuns.
+  return mensagemDaFalha(erro, "enviar o arquivo");
 }
 
 /** Os arquivos de evidência de uma etapa: lista, envio, download e remoção. */
@@ -788,8 +788,8 @@ function ArquivosDaEtapa({
       a.atualizarGravado(
         await s.removerEvidenciaNr1(a.pesquisaId, etapa, x.id),
       );
-    } catch {
-      setErro(`${x.nome}: não foi possível remover.`);
+    } catch (e) {
+      setErro(`${x.nome}: ${mensagemDaFalha(e, "remover o arquivo")}`);
     }
   }
 
@@ -897,6 +897,8 @@ export function ConformidadeNr1({
   const ids = useId();
   const [baixando, setBaixando] = useState(false);
   const [falhaDoPacote, setFalhaDoPacote] = useState<string | null>(null);
+  /** Uma etapa por vez: a escolhida ou, sem escolha, a próxima pendente. */
+  const [escolhida, setEscolhida] = useState<EtapaNr1 | null>(null);
   if (!a.gravado || !a.rascunho) {
     return (
       <p className="pesquisas__suave">
@@ -921,6 +923,19 @@ export function ConformidadeNr1({
         : x,
     );
   const proxima = ETAPAS_DA_CONFORMIDADE.find((e) => e.id === g.proxima);
+  const atual: EtapaNr1 =
+    escolhida ?? g.proxima ?? ETAPAS_DA_CONFORMIDADE.at(-1)!.id;
+  const situacaoDaEtapa = (
+    e: { concluida: boolean; concluidaEm: string | null },
+    id: EtapaNr1,
+  ) =>
+    e.concluida
+      ? e.concluidaEm
+        ? `Concluída em ${formatarInstante(e.concluidaEm).slice(0, 10)}`
+        : "Concluída"
+      : id === "revisar" && g.revisarEm
+        ? `Prevista para ${formatarDiaCivil(`${g.revisarEm}-01`).slice(3)}`
+        : "Pendente";
 
   return (
     <div className="modelos">
@@ -968,128 +983,170 @@ export function ConformidadeNr1({
             {a.falha}
           </p>
         ) : null}
-        <ol className="modelos__lista-dimensoes">
+        <ol
+          className="modelos__lista-dimensoes nr1__etapas"
+          aria-label="Etapas da conformidade"
+        >
           {ETAPAS_DA_CONFORMIDADE.map((def, i) => {
             const e = g.etapas.find((x) => x.id === def.id)!;
-            const r = etapaDoRascunho(def.id);
-            const arquivos = e.arquivos ?? [];
-            const marcouAlgo = r
-              ? r.itens.some(Boolean) ||
-                Boolean(r.evidencias?.trim()) ||
-                arquivos.length > 0
-              : false;
             return (
-              <li
-                key={def.id}
-                className="modelos__etapa"
-                {...(e.concluida ? { "data-concluida": "" } : {})}
-              >
-                <span className="modelos__etapa-numero" aria-hidden="true">
-                  {e.concluida ? "✓" : i + 1}
-                </span>
-                <div>
-                  <div className="modelos__cartao-topo">
-                    <strong>{def.titulo}</strong>
-                    <span
-                      className={`pesquisas__selo${e.concluida ? " pesquisas__selo--sucesso" : ""}`}
-                    >
-                      {e.concluida
-                        ? e.concluidaEm
-                          ? `Concluída em ${formatarInstante(e.concluidaEm).slice(0, 10)}`
-                          : "Concluída"
-                        : def.id === "revisar" && g.revisarEm
-                          ? `Prevista para ${formatarDiaCivil(`${g.revisarEm}-01`).slice(3)}`
-                          : "Pendente"}
-                    </span>
-                  </div>
-                  <p className="pesquisas__suave">{def.texto}</p>
-                  {e.automatica ? (
-                    <Button
-                      variant="subtle"
-                      onClick={
-                        def.id === "mapear" ? onVerResultados : onVerPlano
-                      }
-                    >
-                      {def.id === "mapear"
-                        ? "Ver resultados da pesquisa"
-                        : "Ver plano de ação"}
-                    </Button>
-                  ) : r ? (
-                    <>
-                      <ul className="modelos__checklist">
-                        {def.itens.map((t, j) => (
-                          <li key={t}>
-                            <label>
-                              <input
-                                type="checkbox"
-                                checked={r.itens[j] ?? false}
-                                disabled={!podeEditar}
-                                onChange={(ev) =>
-                                  mudarEtapa(def.id, {
-                                    itens: r.itens.map((v, k) =>
-                                      k === j ? ev.target.checked : v,
-                                    ),
-                                  })
-                                }
-                              />
-                              {t}
-                            </label>
-                          </li>
-                        ))}
-                      </ul>
-                      <label
-                        className="modelos__campo"
-                        htmlFor={`${ids}-${def.id}`}
-                      >
-                        {`Evidências guardadas (${def.evidencias ?? "documentos"}): o que e onde`}
-                        <textarea
-                          id={`${ids}-${def.id}`}
-                          className="pesquisas__campo"
-                          maxLength={2000}
-                          disabled={!podeEditar}
-                          value={r.evidencias ?? ""}
-                          onChange={(ev) =>
-                            mudarEtapa(def.id, {
-                              evidencias: ev.target.value.trim()
-                                ? ev.target.value
-                                : null,
-                            })
-                          }
-                        />
-                      </label>
-                      <ArquivosDaEtapa
-                        etapa={def.id}
-                        arquivos={arquivos}
-                        acompanhamento={a}
-                        podeEditar={podeEditar}
-                      />
-                      {podeEditar ? (
-                        <div className="modelos__acoes">
-                          <Button
-                            variant={r.concluida ? "secondary" : "primary"}
-                            disabled={
-                              a.salvando || (!r.concluida && !marcouAlgo)
-                            }
-                            onClick={() => {
-                              const etapas = rascunho.etapas.map((x) =>
-                                x.id === def.id
-                                  ? { ...x, concluida: !r.concluida }
-                                  : x,
-                              );
-                              void a.salvar({ ...rascunho, etapas });
-                            }}
-                          >
-                            {r.concluida ? "Reabrir etapa" : "Concluir etapa"}
-                          </Button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-                </div>
+              <li key={def.id}>
+                <button
+                  type="button"
+                  className="modelos__etapa nr1__etapa-botao"
+                  aria-current={def.id === atual ? "step" : undefined}
+                  {...(e.concluida ? { "data-concluida": "" } : {})}
+                  onClick={() => setEscolhida(def.id)}
+                >
+                  <span className="modelos__etapa-numero" aria-hidden="true">
+                    {e.concluida ? "✓" : i + 1}
+                  </span>
+                  <strong>{def.titulo}</strong>
+                  <span
+                    className={`pesquisas__selo${e.concluida ? " pesquisas__selo--sucesso" : ""}`}
+                  >
+                    {situacaoDaEtapa(e, def.id)}
+                  </span>
+                </button>
               </li>
             );
           })}
         </ol>
+        {(() => {
+          const i = ETAPAS_DA_CONFORMIDADE.findIndex((x) => x.id === atual);
+          const def = ETAPAS_DA_CONFORMIDADE[i]!;
+          const e = g.etapas.find((x) => x.id === def.id)!;
+          const r = etapaDoRascunho(def.id);
+          const arquivos = e.arquivos ?? [];
+          const marcados = r ? r.itens.filter(Boolean).length : 0;
+          const marcouAlgo = r
+            ? marcados > 0 ||
+              Boolean(r.evidencias?.trim()) ||
+              arquivos.length > 0
+            : false;
+          return (
+            <section
+              className="modelos__cartao nr1__etapa-detalhe"
+              aria-label={def.titulo}
+              {...(e.concluida ? { "data-concluida": "" } : {})}
+            >
+              <span className="modelos__rotulo">{`Etapa ${i + 1} de ${ETAPAS_DA_CONFORMIDADE.length}`}</span>
+              <div className="modelos__cartao-topo">
+                <h3>{def.titulo}</h3>
+                <span
+                  className={`pesquisas__selo${e.concluida ? " pesquisas__selo--sucesso" : ""}`}
+                >
+                  {situacaoDaEtapa(e, def.id)}
+                </span>
+              </div>
+              <p className="pesquisas__suave">{def.texto}</p>
+              {e.automatica ? (
+                <div>
+                  <Button
+                    variant="subtle"
+                    onClick={def.id === "mapear" ? onVerResultados : onVerPlano}
+                  >
+                    {def.id === "mapear"
+                      ? "Ver resultados da pesquisa"
+                      : "Ver plano de ação"}
+                  </Button>
+                </div>
+              ) : r ? (
+                <>
+                  <p className="nr1__o-que-fazer">
+                    <span className="modelos__rotulo">O que fazer</span>
+                    <span className="pesquisas__contagem">{`${marcados} de ${def.itens.length}`}</span>
+                  </p>
+                  <ul className="modelos__checklist">
+                    {def.itens.map((t, j) => (
+                      <li key={t}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={r.itens[j] ?? false}
+                            disabled={!podeEditar}
+                            onChange={(ev) =>
+                              mudarEtapa(def.id, {
+                                itens: r.itens.map((v, k) =>
+                                  k === j ? ev.target.checked : v,
+                                ),
+                              })
+                            }
+                          />
+                          {t}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  <label
+                    className="modelos__campo"
+                    htmlFor={`${ids}-${def.id}`}
+                  >
+                    {`Evidências guardadas (${def.evidencias ?? "documentos"}): o que e onde`}
+                    <textarea
+                      id={`${ids}-${def.id}`}
+                      className="pesquisas__campo"
+                      maxLength={2000}
+                      disabled={!podeEditar}
+                      value={r.evidencias ?? ""}
+                      onChange={(ev) =>
+                        mudarEtapa(def.id, {
+                          evidencias: ev.target.value.trim()
+                            ? ev.target.value
+                            : null,
+                        })
+                      }
+                    />
+                  </label>
+                  <ArquivosDaEtapa
+                    etapa={def.id}
+                    arquivos={arquivos}
+                    acompanhamento={a}
+                    podeEditar={podeEditar}
+                  />
+                  {podeEditar ? (
+                    <div className="modelos__acoes">
+                      <Button
+                        variant={r.concluida ? "secondary" : "primary"}
+                        disabled={a.salvando || (!r.concluida && !marcouAlgo)}
+                        onClick={() => {
+                          const etapas = rascunho.etapas.map((x) =>
+                            x.id === def.id
+                              ? { ...x, concluida: !r.concluida }
+                              : x,
+                          );
+                          void a.salvar({ ...rascunho, etapas });
+                        }}
+                      >
+                        {r.concluida ? "Reabrir etapa" : "Concluir etapa"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+              <div className="modelos__acoes nr1__etapa-navegacao">
+                <Button
+                  variant="secondary"
+                  disabled={i === 0}
+                  onClick={() =>
+                    setEscolhida(ETAPAS_DA_CONFORMIDADE[i - 1]!.id)
+                  }
+                >
+                  Etapa anterior
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={i === ETAPAS_DA_CONFORMIDADE.length - 1}
+                  onClick={() =>
+                    setEscolhida(ETAPAS_DA_CONFORMIDADE[i + 1]!.id)
+                  }
+                >
+                  Próxima etapa
+                </Button>
+              </div>
+            </section>
+          );
+        })()}
       </CartaoDeSecao>
 
       <CartaoDeSecao

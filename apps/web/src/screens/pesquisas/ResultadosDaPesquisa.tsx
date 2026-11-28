@@ -392,7 +392,7 @@ function ResultadosInterno({
   const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
   const participantes = detalhe.participantesTotal ?? detalhe.participantes;
   const proprio = ehModeloComTelaPropria(detalhe.modelo);
-  const proprias = abasDoModeloDaPesquisa(detalhe);
+  const proprias = abasDoModeloDaPesquisa(detalhe, geral);
   const abas: { valor: Aba; rotulo: ReactNode }[] = [
     ...(proprias ?? []),
     ...(proprias ? [] : [{ valor: "geral" as const, rotulo: "Visão geral" }]),

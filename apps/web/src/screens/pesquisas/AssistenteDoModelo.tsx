@@ -38,6 +38,7 @@ import { usePublicarComConfirmacao } from "./confirmarPublicacao";
 import { CartaoDeEncerramento } from "./CartaoDeEncerramento";
 import { enderecoDaPrevia } from "./rotasDePesquisas";
 import { SepararRespostasPor } from "./SepararRespostasPor";
+import { AvisoDoRecorteNr1 } from "./modelos/copsoq/AvisoDoRecorteNr1";
 import {
   AvisoDaSaudeFinanceira,
   InterruptorDaAutopercepcao,
@@ -803,6 +804,9 @@ function EtapaConfigurar({
           travado={publicada}
           onMudar={(separarPor) => onMudar({ separarPor })}
         />
+      ) : null}
+      {estado.identificacao === "anonima" && estado.modelo === "copsoq" ? (
+        <AvisoDoRecorteNr1 separarPor={estado.separarPor} />
       ) : null}
 
       {erroDasFixas ? (

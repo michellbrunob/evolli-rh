@@ -11,6 +11,7 @@ import type {
   ControleNr1,
   MedidaDoPlano,
   NivelNr1,
+  ResultadoNr1,
 } from "../../../../api/modelosDePesquisaClient";
 import { DIMENSOES_NR1 } from "./definicao";
 
@@ -1109,6 +1110,19 @@ export function sugestoesDa(dimensaoId: string): MedidaSugerida[] {
       ORDEM_DO_CONTROLE[a.controle] - ORDEM_DO_CONTROLE[b.controle] ||
       a.prazoDias - b.prazoDias,
   );
+}
+
+/**
+ * Quantas estratégias a aba Plano sugere: as 3 de cada dimensão com nível
+ * (todos os níveis, inclusive as preventivas do baixo) — 87 com as 29.
+ * O mesmo número no contador da aba, no cartão da Visão geral e na lista.
+ */
+export function estrategiasSugeridas(
+  r: Pick<ResultadoNr1, "dimensoes">,
+): number {
+  return r.dimensoes
+    .filter((d) => d.nivel !== null)
+    .reduce((t, d) => t + sugestoesDa(d.id).length, 0);
 }
 
 /** Texto sem acento e em minúsculas, para a busca. */

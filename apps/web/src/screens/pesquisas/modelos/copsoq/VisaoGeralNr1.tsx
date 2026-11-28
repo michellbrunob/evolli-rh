@@ -40,11 +40,13 @@ import {
   pessoasOuSigilo,
 } from "../ui";
 import {
+  DIMENSOES_NR1,
   DOMINIOS_NR1,
   TIPOS_DE_OFENSA,
   dimensaoNr1,
   dominioNr1,
 } from "./definicao";
+import { estrategiasSugeridas } from "./medidasSugeridas";
 import {
   ETAPAS_DA_CONFORMIDADE,
   FAIXA,
@@ -137,7 +139,9 @@ export function MatrizNr1({
             const ids = r.matriz[linha]?.[col] ?? [];
             const chave = `${linha}-${col}`;
             const aberta = abertas.includes(chave);
-            const visiveis = aberta ? ids : ids.slice(0, limite);
+            // Até limite + 1 cabem todas: "+1 dimensão" esconderia só uma.
+            const cabem = ids.length <= limite + 1;
+            const visiveis = aberta || cabem ? ids : ids.slice(0, limite);
             return (
               <span
                 key={col}
@@ -155,7 +159,7 @@ export function MatrizNr1({
                       title={dimensaoNr1(id).rotulo}
                       onClick={() => onEscolher(id)}
                     >
-                      {dimensaoNr1(id).rotulo}
+                      {dimensaoNr1(id).rotuloCurto}
                     </button>
                   ) : (
                     <span
@@ -163,11 +167,11 @@ export function MatrizNr1({
                       className="modelos__chip"
                       title={dimensaoNr1(id).rotulo}
                     >
-                      {dimensaoNr1(id).rotulo}
+                      {dimensaoNr1(id).rotuloCurto}
                     </span>
                   ),
                 )}
-                {ids.length > limite ? (
+                {!cabem ? (
                   onEscolher ? (
                     <button
                       type="button"
@@ -305,6 +309,44 @@ function CartaoDaDimensao({
       ) : null}
     </div>
   );
+}
+
+/**
+ * "Principais achados": 3 frases por regra (sem IA), no molde da leitura
+ * automática da saúde financeira — o maior risco (com o % em risco), o ponto
+ * mais forte (com o % favorável) e os comportamentos ofensivos (respeitando
+ * o sigilo: contagem oculta vira "menos de N").
+ */
+export function principaisAchadosNr1(
+  r: ResultadoNr1,
+  minimo: number,
+): [string, string, string] {
+  const porId = new Map(r.dimensoes.map((d) => [d.id, d]));
+  const maior = r.prioridades
+    .map((id) => porId.get(id))
+    .find((d) => d && d.nivel !== null && d.percentuais.risco > 0);
+  const risco = maior
+    ? `${dimensaoNr1(maior.id).rotulo} é o maior risco: ${porcento(maior.percentuais.risco)} do time está na faixa de risco (nível ${NIVEL[maior.nivel!].rotulo.toLowerCase()}).`
+    : "Nenhuma dimensão tem pessoas na faixa de risco.";
+  // O ponto forte: o maior % favorável; no empate, a ordem do catálogo.
+  const forte = DIMENSOES_NR1.map((x) => porId.get(x.id))
+    .filter((d) => d !== undefined && d.nivel !== null)
+    .reduce<DimensaoNr1Resultado | null>(
+      (m, d) =>
+        d!.percentuais.favoravel > (m?.percentuais.favoravel ?? 0) ? d! : m,
+      null,
+    );
+  const pontoForte = forte
+    ? `${dimensaoNr1(forte.id).rotulo} é o ponto mais forte: ${porcento(forte.percentuais.favoravel)} do time está na faixa favorável.`
+    : "Nenhuma dimensão tem pessoas na faixa favorável ainda.";
+  const o = r.ofensivos;
+  const ofensivos =
+    o.relataram === null
+      ? `Menos de ${plural(minimo, "pessoa", "pessoas")} relataram algum comportamento ofensivo nos últimos 12 meses: mesmo poucos relatos pedem acolhimento e apuração.`
+      : o.relataram > 0
+        ? `${plural(o.relataram, "pessoa", "pessoas")}${o.percentual !== null ? ` (${porcento(o.percentual)})` : ""} ${o.relataram === 1 ? "relatou" : "relataram"} algum comportamento ofensivo nos últimos 12 meses: acolha, apure cada caso e reforce o canal de denúncia.`
+        : "Ninguém relatou comportamento ofensivo nos últimos 12 meses; mantenha o canal de denúncia ativo.";
+  return [risco, pontoForte, ofensivos];
 }
 
 export function VisaoGeralNr1({
@@ -451,6 +493,17 @@ export function VisaoGeralNr1({
         </div>
       </CartaoDeSecao>
 
+      <CartaoDeSecao
+        titulo="Principais achados"
+        descricao="Leitura automática dos resultados, por regra: o maior risco, o ponto mais forte e os comportamentos ofensivos."
+      >
+        <ul className="nr1__achados">
+          {principaisAchadosNr1(r, minimo).map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      </CartaoDeSecao>
+
       <div className="modelos__grade">
         <MiniCartao
           titulo="Participação"
@@ -472,21 +525,30 @@ export function VisaoGeralNr1({
         />
         <MiniCartao
           titulo="Plano de ação"
-          valor={
-            acompanhamento
-              ? plural(acompanhamento.plano.length, "medida", "medidas")
-              : "—"
-          }
+          valor={plural(
+            estrategiasSugeridas(r),
+            "estratégia sugerida",
+            "estratégias sugeridas",
+          )}
           texto={
-            onIrPara ? (
-              <button
-                type="button"
-                className="modelos__link"
-                onClick={() => onIrPara("plano")}
-              >
-                Abrir o plano de ação
-              </button>
-            ) : undefined
+            <>
+              {acompanhamento
+                ? plural(
+                    acompanhamento.plano.length,
+                    "medida no plano",
+                    "medidas no plano",
+                  )
+                : null}
+              {onIrPara ? (
+                <button
+                  type="button"
+                  className="modelos__link nr1__link-bloco"
+                  onClick={() => onIrPara("plano")}
+                >
+                  Abrir o plano de ação
+                </button>
+              ) : null}
+            </>
           }
         />
         <MiniCartao
@@ -618,10 +680,15 @@ export function VisaoGeralNr1({
         descricao="As 29 dimensões agrupadas em 8 temas."
       >
         <div className="modelos__acordeoes">
-          {DOMINIOS_NR1.map((dom) => {
+          {DOMINIOS_NR1.map((dom, i) => {
             const resumo = r.dominios.find((x) => x.id === dom.id);
             return (
-              <details key={dom.id} className="modelos__acordeao">
+              <details
+                key={dom.id}
+                className="modelos__acordeao"
+                // O 1º domínio já vem aberto.
+                open={i === 0 ? true : undefined}
+              >
                 <summary className="modelos__acordeao-cabeca">
                   <span
                     className="modelos__ponto"
@@ -688,7 +755,7 @@ export function SaudeNr1({ r }: { readonly r: ResultadoNr1 }) {
       titulo="Saúde e bem-estar"
       descricao="% de pessoas na faixa de risco em cada indicador."
     >
-      <div className="modelos__grade">
+      <div className="modelos__grade nr1__saude">
         {r.saude.map((s) => {
           const dim = porId.get(s.id);
           const titulo = ROTULO_DO_INDICADOR[s.id]?.titulo ?? s.id;
@@ -869,7 +936,11 @@ export function OfensivosNr1({
               <div className="modelos__cartao-topo">
                 <strong>{t.rotulo}</strong>
                 <span className="pesquisas__suave">
-                  {pessoasOuSigilo(relataram, minimo)}
+                  {`${pessoasOuSigilo(relataram, minimo)}${
+                    relataram !== null && o.pessoas > 0
+                      ? ` (${porcento((relataram * 100) / o.pessoas)})`
+                      : ""
+                  }`}
                 </span>
               </div>
               {comBarra ? (
@@ -942,6 +1013,9 @@ export function quadranteDe(
   return comRecursos ? "baixa_tensao" : "passivo";
 }
 
+/** A posição de cada dimensão no catálogo (`DIMENSOES_NR1`). */
+const ORDEM = new Map(DIMENSOES_NR1.map((d, i) => [d.id, i]));
+
 /** As N dimensões com mais gente em risco no grupo, comparadas com a empresa. */
 export function ondeEstaORisco(
   grupo: NonNullable<GrupoDoModelo["nr1"]>,
@@ -951,25 +1025,44 @@ export function ondeEstaORisco(
   const daEmpresa = new Map(
     empresa.dimensoes.map((d) => [d.id, d.percentuais.risco]),
   );
-  return grupo.dimensoes
-    .filter((d) => d.nivel !== null)
-    .map((d) => {
-      const e = daEmpresa.get(d.id) ?? 0;
-      return {
-        id: d.id,
-        grupo: d.percentualEmRisco,
-        empresa: e,
-        diferenca: Math.round((d.percentualEmRisco - e) * 10) / 10,
-        nivel: d.nivel,
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.grupo - a.grupo ||
-        b.diferenca - a.diferenca ||
-        dimensaoNr1(a.id).rotulo.localeCompare(dimensaoNr1(b.id).rotulo),
-    )
-    .slice(0, n);
+  return (
+    grupo.dimensoes
+      .filter((d) => d.nivel !== null)
+      .map((d) => {
+        const e = daEmpresa.get(d.id) ?? 0;
+        return {
+          id: d.id,
+          grupo: d.percentualEmRisco,
+          empresa: e,
+          diferenca: Math.round((d.percentualEmRisco - e) * 10) / 10,
+          nivel: d.nivel,
+        };
+      })
+      // % em risco; no empate, a ordem do catálogo (nunca o nome).
+      .sort((a, b) => b.grupo - a.grupo || ORDEM.get(a.id)! - ORDEM.get(b.id)!)
+      .slice(0, n)
+  );
+}
+
+/**
+ * % em risco de um conjunto de dimensões: a média dos % JÁ ARREDONDADOS de
+ * cada uma (o que a tela mostra), arredondada ao inteiro. Sem dados: null.
+ */
+export function mediaArredondada(
+  dimensoes: readonly { percentualEmRisco: number }[],
+): number | null {
+  if (!dimensoes.length) return null;
+  return Math.round(
+    dimensoes.reduce((t, d) => t + Math.round(d.percentualEmRisco), 0) /
+      dimensoes.length,
+  );
+}
+
+/** % do time em risco no grupo: a média das dimensões com nível. */
+export function percentualEmRiscoDoGrupo(
+  dimensoes: readonly { percentualEmRisco: number; nivel: NivelNr1 | null }[],
+): number {
+  return mediaArredondada(dimensoes.filter((d) => d.nivel !== null)) ?? 0;
 }
 
 /** % em risco por domínio: a média das dimensões com dados. */
@@ -985,24 +1078,15 @@ export function riscoPorDominio(
     const lista = dimensoes.filter(
       (d) => d.nivel !== null && dimensaoNr1(d.id).dominio === dom.id,
     );
-    saida[dom.id] = lista.length
-      ? Math.round(
-          (lista.reduce((t, d) => t + d.percentualEmRisco, 0) / lista.length) *
-            10,
-        ) / 10
-      : null;
+    saida[dom.id] = mediaArredondada(lista);
   }
   return saida;
 }
 
 /** Os grupos visíveis em ordem de risco: precisam de ação, depois % médio. */
 export function rankingDosGrupos(grupos: readonly GrupoDoModelo[]) {
-  const media = (g: GrupoDoModelo) => {
-    const ds = (g.nr1?.dimensoes ?? []).filter((d) => d.nivel !== null);
-    return ds.length
-      ? ds.reduce((t, d) => t + d.percentualEmRisco, 0) / ds.length
-      : 0;
-  };
+  const media = (g: GrupoDoModelo) =>
+    percentualEmRiscoDoGrupo(g.nr1?.dimensoes ?? []);
   return grupos
     .filter((g) => g.visivel && g.nr1)
     .sort(
@@ -1160,38 +1244,58 @@ export function PorGrupoNr1({
             titulo={`Ranking por ${rotuloDoCampo}`}
             descricao="Grupos em ordem de risco: dimensões que precisam de ação e % médio em risco. Escolha um grupo para ver onde está o risco."
           >
-            <ol className="nr1__ranking-grupos">
-              {ranking.map((g, i) => (
-                <li key={g.id}>
-                  <button
-                    type="button"
-                    className="nr1__grupo"
-                    aria-pressed={grupo?.id === g.id}
-                    onClick={() => {
-                      setEscolhido(g.id);
-                      rolarAte(detalheRef.current);
-                    }}
-                  >
-                    <span className="modelos__num">{i + 1}</span>
-                    <strong>{g.nome}</strong>
-                    <span className="pesquisas__suave">
-                      {`${g.nr1!.precisamDeAcao} de 29 precisam de ação`}
-                    </span>
-                    <Quadradinhos
-                      cores={NIVEIS.flatMap((n) =>
-                        Array.from(
-                          { length: g.nr1!.niveis[n] },
-                          () => NIVEL[n].cor,
-                        ),
-                      )}
-                      rotulo={NIVEIS.map(
-                        (n) => `${NIVEL[n].rotulo}: ${g.nr1!.niveis[n]}`,
-                      ).join(", ")}
-                    />
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <div className="modelos__tabela-rolagem">
+              <table className="modelos__tabela nr1__ranking-grupos">
+                <thead>
+                  <tr>
+                    <th className="modelos__num">#</th>
+                    <th>Grupo</th>
+                    <th className="modelos__num">Precisam de ação</th>
+                    <th className="modelos__num">% do time em risco</th>
+                    <th>Dimensões por nível</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranking.map((g, i) => (
+                    <tr
+                      key={g.id}
+                      className="nr1__linha-clicavel"
+                      {...(grupo?.id === g.id ? { "data-escolhido": "" } : {})}
+                      onClick={() => {
+                        setEscolhido(g.id);
+                        rolarAte(detalheRef.current);
+                      }}
+                    >
+                      <td className="modelos__num">{i + 1}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="modelos__link nr1__link-forte"
+                          aria-pressed={grupo?.id === g.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEscolhido(g.id);
+                            rolarAte(detalheRef.current);
+                          }}
+                        >
+                          {g.nome}
+                        </button>
+                        <span className="modelos__rotulo">
+                          {plural(g.respostas, "resposta", "respostas")}
+                        </span>
+                      </td>
+                      <td className="modelos__num">{`${g.nr1!.precisamDeAcao} de 29`}</td>
+                      <td className="modelos__num">
+                        {porcento(percentualEmRiscoDoGrupo(g.nr1!.dimensoes))}
+                      </td>
+                      <td className="modelos__celula-barra">
+                        <BarraDosNiveis niveis={g.nr1!.niveis} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CartaoDeSecao>
 
           {grupo ? (
@@ -1205,6 +1309,7 @@ export function PorGrupoNr1({
           <ExigenciasERecursos
             grupos={ranking}
             empresa={empresa}
+            respostasDaEmpresa={resultado.respostas}
             rotuloDoCampo={rotuloDoCampo}
           />
         </>
@@ -1354,128 +1459,309 @@ function MapaDeCalorNr1({
   );
 }
 
-/** Exigências (pressão) × recursos, com os quatro quadrantes. */
+/** As dimensões por nível do grupo: barra empilhada com os números. */
+export function BarraDosNiveis({
+  niveis,
+}: {
+  readonly niveis: Readonly<Record<NivelNr1, number>>;
+}) {
+  const total = NIVEIS.reduce((t, n) => t + niveis[n], 0);
+  return (
+    <span
+      className="nr1__barra-niveis"
+      role="img"
+      aria-label={`Dimensões por nível: ${NIVEIS.map((n) => `${NIVEL[n].rotulo} ${niveis[n]}`).join(", ")}`}
+    >
+      {NIVEIS.map((n) =>
+        niveis[n] > 0 ? (
+          <span
+            key={n}
+            className={`nr1__barra-nivel nr1__barra-nivel--${n}`}
+            style={{
+              width: `${(niveis[n] * 100) / (total || 1)}%`,
+              background: NIVEL[n].cor,
+            }}
+            aria-hidden="true"
+          >
+            {niveis[n]}
+          </span>
+        ) : null,
+      )}
+    </span>
+  );
+}
+
+/**
+ * O intervalo do eixo pelos dados, com folga de 0,25 e o meio da escala (3,
+ * que divide os quadrantes) sempre dentro; no mínimo 1 ponto de largura,
+ * dentro de 1 a 5, em passos de 0,25.
+ */
+export function escalaDoEixo(valores: readonly number[]): [number, number] {
+  const todos = [...valores, 3];
+  let lo = Math.floor((Math.min(...todos) - 0.25) * 4) / 4;
+  let hi = Math.ceil((Math.max(...todos) + 0.25) * 4) / 4;
+  if (hi - lo < 1) {
+    const falta = (1 - (hi - lo)) / 2;
+    lo -= falta;
+    hi += falta;
+  }
+  return [Math.max(1, lo), Math.min(5, hi)];
+}
+
+/** O raio da bolha pela quantidade de respostas (área proporcional). */
+export function raioDaBolha(respostas: number, maior: number): number {
+  return 5 + 9 * Math.sqrt(Math.max(0, respostas) / Math.max(1, maior));
+}
+
+const hexParaRgb = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+/** A cor da bolha pelo % em risco: verde (0%), âmbar (50%), vermelho (100%). */
+export function corDoRisco(percentual: number): string {
+  const p = Math.min(100, Math.max(0, percentual)) / 100;
+  const [de, para, t] =
+    p <= 0.5
+      ? [FAIXA.favoravel.cor, FAIXA.intermediario.cor, p * 2]
+      : [FAIXA.intermediario.cor, FAIXA.risco.cor, (p - 0.5) * 2];
+  const a = hexParaRgb(de);
+  const b = hexParaRgb(para);
+  return `#${a
+    .map((x, i) =>
+      Math.round(x + (b[i]! - x) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** Os valores do eixo em passos de 0,5. */
+function marcasDoEixo([lo, hi]: readonly [number, number]): number[] {
+  const marcas: number[] = [];
+  for (let v = Math.ceil(lo * 2) / 2; v <= hi + 1e-9; v += 0.5) marcas.push(v);
+  return marcas;
+}
+
+/**
+ * Exigências × recursos: pressão (exigências) na vertical, apoio (recursos)
+ * na horizontal, escala ajustada aos dados; tamanho da bolha = respostas e
+ * cor = % do time em risco; o meio da escala divide os quatro quadrantes.
+ */
 function ExigenciasERecursos({
   grupos,
   empresa,
+  respostasDaEmpresa,
   rotuloDoCampo,
 }: {
   readonly grupos: readonly GrupoDoModelo[];
   readonly empresa: ResultadoNr1;
+  readonly respostasDaEmpresa: number;
   readonly rotuloDoCampo: string;
 }) {
-  const L = 340;
-  const A = 260;
-  const m = { e: 44, d: 16, t: 16, b: 36 };
-  const x = (v: number) => m.e + ((v - 1) / 4) * (L - m.e - m.d);
-  const y = (v: number) => A - m.b - ((v - 1) / 4) * (A - m.t - m.b);
+  const L = 380;
+  const A = 300;
+  const m = { e: 52, d: 18, t: 18, b: 44 };
   const pontos = [
     {
       id: "empresa",
       nome: "Toda a empresa",
       pressao: empresa.pressao,
       recursos: empresa.recursos,
+      respostas: respostasDaEmpresa,
+      risco: percentualEmRiscoDoGrupo(empresaComoDimensoes(empresa)),
     },
     ...grupos.map((g) => ({
       id: g.id,
       nome: g.nome,
       pressao: g.nr1!.pressao,
       recursos: g.nr1!.recursos,
+      respostas: g.respostas,
+      risco: percentualEmRiscoDoGrupo(g.nr1!.dimensoes),
     })),
-  ].filter((p) => p.pressao !== null && p.recursos !== null);
+  ].filter(
+    (p): p is typeof p & { pressao: number; recursos: number } =>
+      p.pressao !== null && p.recursos !== null,
+  );
+  const ex = escalaDoEixo(pontos.map((p) => p.recursos));
+  const ey = escalaDoEixo(pontos.map((p) => p.pressao));
+  const x = (v: number) =>
+    m.e + ((v - ex[0]) / (ex[1] - ex[0])) * (L - m.e - m.d);
+  const y = (v: number) =>
+    A - m.b - ((v - ey[0]) / (ey[1] - ey[0])) * (A - m.t - m.b);
+  const maior = Math.max(1, ...pontos.map((p) => p.respostas));
+  const meioX = x(Math.min(ex[1], Math.max(ex[0], 3)));
+  const meioY = y(Math.min(ey[1], Math.max(ey[0], 3)));
   return (
     <CartaoDeSecao
       titulo="Exigências × recursos"
-      descricao="Cada ponto é um grupo: à direita, mais exigências; acima, mais recursos (1 a 5; o meio da escala divide os quadrantes)."
+      descricao="Cada bolha é um grupo: mais acima, mais pressão (exigências); mais à direita, mais apoio (recursos). O meio da escala (3) divide os quadrantes."
     >
       <svg
         className="nr1__dispersao"
         viewBox={`0 0 ${L} ${A}`}
         role="img"
-        aria-label={`Exigências por recursos: ${pontos
+        aria-label={`Pressão por apoio: ${pontos
           .map(
             (p) =>
-              `${p.nome}, ${QUADRANTES[quadranteDe(p.pressao, p.recursos)!].rotulo}`,
+              `${p.nome}, ${QUADRANTES[quadranteDe(p.pressao, p.recursos)!].rotulo}, ${plural(p.respostas, "resposta", "respostas")}, ${porcento(p.risco)} em risco`,
           )
           .join("; ")}`}
       >
         <rect
-          x={x(3)}
-          y={y(3)}
-          width={x(5) - x(3)}
-          height={y(1) - y(3)}
+          x={x(ex[0])}
+          y={y(ey[1])}
+          width={meioX - x(ex[0])}
+          height={meioY - y(ey[1])}
           className="nr1__quadrante-alerta"
         />
-        <line x1={x(3)} y1={y(5)} x2={x(3)} y2={y(1)} className="nr1__eixo" />
-        <line x1={x(1)} y1={y(3)} x2={x(5)} y2={y(3)} className="nr1__eixo" />
-        <line x1={x(1)} y1={y(1)} x2={x(5)} y2={y(1)} className="nr1__eixo" />
-        <line x1={x(1)} y1={y(1)} x2={x(1)} y2={y(5)} className="nr1__eixo" />
+        {marcasDoEixo(ex).map((v) => (
+          <text
+            key={`x${v}`}
+            x={x(v)}
+            y={A - m.b + 14}
+            textAnchor="middle"
+            className="nr1__marca-eixo"
+          >
+            {decimal(v)}
+          </text>
+        ))}
+        {marcasDoEixo(ey).map((v) => (
+          <text
+            key={`y${v}`}
+            x={m.e - 6}
+            y={y(v) + 3}
+            textAnchor="end"
+            className="nr1__marca-eixo"
+          >
+            {decimal(v)}
+          </text>
+        ))}
+        <line
+          x1={meioX}
+          y1={y(ey[1])}
+          x2={meioX}
+          y2={y(ey[0])}
+          className="nr1__eixo"
+        />
+        <line
+          x1={x(ex[0])}
+          y1={meioY}
+          x2={x(ex[1])}
+          y2={meioY}
+          className="nr1__eixo"
+        />
+        <line
+          x1={x(ex[0])}
+          y1={y(ey[0])}
+          x2={x(ex[1])}
+          y2={y(ey[0])}
+          className="nr1__eixo"
+        />
+        <line
+          x1={x(ex[0])}
+          y1={y(ey[0])}
+          x2={x(ex[0])}
+          y2={y(ey[1])}
+          className="nr1__eixo"
+        />
         <text
-          x={x(4.95)}
-          y={y(1.12)}
-          textAnchor="end"
+          x={x(ex[0]) + 4}
+          y={y(ey[1]) + 12}
           className="nr1__rotulo-quadrante"
         >
           Alta tensão
         </text>
         <text
-          x={x(4.95)}
-          y={y(4.85)}
+          x={x(ex[1]) - 4}
+          y={y(ey[1]) + 12}
           textAnchor="end"
           className="nr1__rotulo-quadrante"
         >
           Trabalho ativo
         </text>
-        <text x={x(1.05)} y={y(1.12)} className="nr1__rotulo-quadrante">
+        <text
+          x={x(ex[0]) + 4}
+          y={y(ey[0]) - 6}
+          className="nr1__rotulo-quadrante"
+        >
           Passivo
         </text>
-        <text x={x(1.05)} y={y(4.85)} className="nr1__rotulo-quadrante">
+        <text
+          x={x(ex[1]) - 4}
+          y={y(ey[0]) - 6}
+          textAnchor="end"
+          className="nr1__rotulo-quadrante"
+        >
           Baixa tensão
         </text>
         <text
-          x={(x(1) + x(5)) / 2}
+          x={(x(ex[0]) + x(ex[1])) / 2}
           y={A - 8}
           textAnchor="middle"
           className="nr1__rotulo-eixo"
         >
-          Exigências (pressão) →
+          Apoio (recursos) →
         </text>
         <text
-          x={12}
-          y={(y(1) + y(5)) / 2}
+          x={14}
+          y={(y(ey[0]) + y(ey[1])) / 2}
           textAnchor="middle"
-          transform={`rotate(-90 12 ${(y(1) + y(5)) / 2})`}
+          transform={`rotate(-90 14 ${(y(ey[0]) + y(ey[1])) / 2})`}
           className="nr1__rotulo-eixo"
         >
-          Recursos →
+          Pressão (exigências) →
         </text>
-        {pontos.map((p) => (
-          <g key={p.id}>
-            <circle
-              cx={x(p.pressao!)}
-              cy={y(p.recursos!)}
-              r={p.id === "empresa" ? 6 : 5}
-              className={
-                p.id === "empresa" ? "nr1__ponto-empresa" : "nr1__ponto"
-              }
-            />
-            <text
-              x={x(p.pressao!) + 8}
-              y={y(p.recursos!) + 4}
-              className="nr1__rotulo-ponto"
-            >
-              {p.nome.length > 16 ? `${p.nome.slice(0, 15)}…` : p.nome}
-            </text>
-          </g>
-        ))}
+        {pontos.map((p) => {
+          const r = raioDaBolha(p.respostas, maior);
+          return (
+            <g key={p.id} data-grupo={p.nome}>
+              <circle
+                cx={x(p.recursos)}
+                cy={y(p.pressao)}
+                r={r}
+                fill={corDoRisco(p.risco)}
+                className={
+                  p.id === "empresa"
+                    ? "nr1__bolha nr1__bolha-empresa"
+                    : "nr1__bolha"
+                }
+              />
+              <text
+                x={x(p.recursos) + r + 3}
+                y={y(p.pressao) + 4}
+                className="nr1__rotulo-ponto"
+              >
+                {p.nome.length > 16 ? `${p.nome.slice(0, 15)}…` : p.nome}
+              </text>
+            </g>
+          );
+        })}
       </svg>
+      <ul className="nr1__legenda-bolhas" aria-label="Legenda do gráfico">
+        <li>
+          <span className="nr1__legenda-tamanho" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+          Tamanho da bolha: respostas
+        </li>
+        <li>
+          <span className="nr1__legenda-cor" aria-hidden="true" />
+          Cor: % do time em risco (de 0% a 100%)
+        </li>
+        <li>
+          <span className="nr1__legenda-empresa" aria-hidden="true" />
+          Contorno escuro: toda a empresa
+        </li>
+      </ul>
       <div className="modelos__tabela-rolagem">
         <table className="modelos__tabela">
           <thead>
             <tr>
               <th>{`${rotuloDoCampo.charAt(0).toUpperCase()}${rotuloDoCampo.slice(1)}`}</th>
-              <th className="modelos__num">Exigências</th>
-              <th className="modelos__num">Recursos</th>
+              <th className="modelos__num">Respostas</th>
+              <th className="modelos__num">Pressão</th>
+              <th className="modelos__num">Apoio</th>
+              <th className="modelos__num">% em risco</th>
               <th>Quadrante</th>
             </tr>
           </thead>
@@ -1485,8 +1771,10 @@ function ExigenciasERecursos({
               return (
                 <tr key={p.id}>
                   <td>{p.nome}</td>
+                  <td className="modelos__num">{p.respostas}</td>
                   <td className="modelos__num">{decimal(p.pressao, 2)}</td>
                   <td className="modelos__num">{decimal(p.recursos, 2)}</td>
+                  <td className="modelos__num">{porcento(p.risco)}</td>
                   <td>
                     <strong>{QUADRANTES[q].rotulo}</strong>
                     <span className="modelos__rotulo">

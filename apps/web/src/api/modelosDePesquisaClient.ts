@@ -26,6 +26,7 @@ import { ApiError } from "./colaboradoresClient";
 import {
   clearCsrfToken,
   descartarTokenSeDesatualizado,
+  getCsrfToken,
   tokenCsrfParaGravacao,
 } from "./csrfClient";
 
@@ -164,6 +165,26 @@ function extensaoDe(nome: string): string {
   return ponto < 0 ? "" : nome.slice(ponto + 1).toLowerCase();
 }
 
+/**
+ * Uma gravação com o token CSRF da aba. Num 403 `csrf_invalido` (outra aba
+ * renovou o token desta sessão), o token local é descartado, renovado e o
+ * MESMO pedido sai UMA vez de novo — a recusa vem antes de gravar, então
+ * repetir é seguro. O 403 de permissão e o 401 não repetem.
+ */
+async function gravarComToken(
+  enviar: (token: string) => Promise<Response>,
+): Promise<Response> {
+  let res = await enviar(await tokenCsrfParaGravacao());
+  if (res.status === 401) clearCsrfToken();
+  await descartarTokenSeDesatualizado(res);
+  if (res.status === 403 && getCsrfToken() === null) {
+    res = await enviar(await tokenCsrfParaGravacao());
+    if (res.status === 401) clearCsrfToken();
+    await descartarTokenSeDesatualizado(res);
+  }
+  return res;
+}
+
 async function falha(res: Response): Promise<never> {
   const erro: unknown = await res.json().catch(() => ({}));
   throw new ApiError(res.status, "Erro na requisição.", erro);
@@ -175,22 +196,22 @@ export async function enviarEvidenciaNr1(
   etapa: EtapaNr1,
   arquivo: File,
 ): Promise<AcompanhamentoNr1> {
-  const res = await fetch(rotaDaEvidencia(pesquisaId, etapa), {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/octet-stream",
-      "x-csrf-token": await tokenCsrfParaGravacao(),
-      "x-evolli-evidencia-tipo": arquivo.type || "application/octet-stream",
-      "x-evolli-evidencia-extensao": extensaoDe(arquivo.name),
-      "x-evolli-evidencia-nome": encodeURIComponent(arquivo.name),
-    },
-    body: arquivo,
-  });
-  if (res.status === 401) clearCsrfToken();
-  await descartarTokenSeDesatualizado(res);
+  const res = await gravarComToken((token) =>
+    fetch(rotaDaEvidencia(pesquisaId, etapa), {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/octet-stream",
+        "x-csrf-token": token,
+        "x-evolli-evidencia-tipo": arquivo.type || "application/octet-stream",
+        "x-evolli-evidencia-extensao": extensaoDe(arquivo.name),
+        "x-evolli-evidencia-nome": encodeURIComponent(arquivo.name),
+      },
+      body: arquivo,
+    }),
+  );
   if (!res.ok) return falha(res);
   return res.json() as Promise<AcompanhamentoNr1>;
 }
@@ -217,17 +238,17 @@ export async function removerEvidenciaNr1(
   etapa: EtapaNr1,
   arquivoId: string,
 ): Promise<AcompanhamentoNr1> {
-  const res = await fetch(rotaDaEvidencia(pesquisaId, etapa, arquivoId), {
-    method: "DELETE",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "x-csrf-token": await tokenCsrfParaGravacao(),
-    },
-  });
-  if (res.status === 401) clearCsrfToken();
-  await descartarTokenSeDesatualizado(res);
+  const res = await gravarComToken((token) =>
+    fetch(rotaDaEvidencia(pesquisaId, etapa, arquivoId), {
+      method: "DELETE",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "x-csrf-token": token,
+      },
+    }),
+  );
   if (!res.ok) return falha(res);
   return res.json() as Promise<AcompanhamentoNr1>;
 }

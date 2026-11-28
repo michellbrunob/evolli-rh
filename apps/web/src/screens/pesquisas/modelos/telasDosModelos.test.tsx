@@ -445,7 +445,8 @@ describe("resultados da NR-1", () => {
     ).toBeInTheDocument();
     const matriz = screen.getByRole("table", { name: /Matriz de risco/ });
     expect(
-      within(matriz).getAllByText("Exigências Quantitativas").length,
+      // Os chips da matriz usam o rótulo curto (o nome inteiro no título).
+      within(matriz).getAllByTitle("Exigências Quantitativas").length,
     ).toBeGreaterThan(0);
     expect(
       screen.getByText("1 de 3 em risco alto ou crítico"),
@@ -472,7 +473,7 @@ describe("resultados da NR-1", () => {
       />,
     );
     expect(await screen.findByText("1 de 7 etapas")).toBeInTheDocument();
-    expect(screen.getByText("0 medidas")).toBeInTheDocument();
+    expect(screen.getByText("0 medidas no plano")).toBeInTheDocument();
   });
 
   it("sem o resultado do modelo, a visão geral do registro não aparece", () => {
@@ -553,9 +554,15 @@ describe("resultados da NR-1", () => {
     expect(
       await screen.findByRole("img", { name: "1 de 7 etapas concluídas" }),
     ).toBeInTheDocument();
-    const comunicar = screen
-      .getByText("Comunicar os resultados às pessoas")
-      .closest("li")!;
+    // Uma etapa por vez: escolhe "Comunicar" na lista das etapas.
+    fireEvent.click(
+      within(
+        screen.getByRole("list", { name: "Etapas da conformidade" }),
+      ).getByRole("button", { name: /Comunicar os resultados/ }),
+    );
+    const comunicar = screen.getByRole("region", {
+      name: "Comunicar os resultados às pessoas",
+    });
     const concluir = within(comunicar).getByRole("button", {
       name: "Concluir etapa",
     });

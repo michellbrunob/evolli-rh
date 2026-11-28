@@ -129,11 +129,46 @@ export type TipoDeDimensao = "risco" | "protecao";
 export interface DimensaoNr1 {
   readonly id: string;
   readonly rotulo: string;
+  /** Rótulo curto, para os chips da matriz (até 20 caracteres). */
+  readonly rotuloCurto: string;
   readonly dominio: string;
   readonly tipo: TipoDeDimensao;
   /** O que a dimensão observa, em uma frase. */
   readonly definicao: string;
 }
+
+/** Os rótulos curtos do Evolli (chips da matriz de risco). */
+const ROTULO_CURTO: Readonly<Record<string, string>> = {
+  exigencias_quantitativas: "Volume de trabalho",
+  ritmo_trabalho: "Ritmo de trabalho",
+  exigencias_cognitivas: "Exig. cognitivas",
+  exigencias_emocionais: "Exig. emocionais",
+  influencia_trabalho: "Influência",
+  possibilidades_desenvolvimento: "Desenvolvimento",
+  significado_trabalho: "Sentido do trabalho",
+  compromisso_local_trabalho: "Compromisso",
+  previsibilidade: "Previsibilidade",
+  reconhecimento: "Reconhecimento",
+  transparencia_papel: "Clareza do papel",
+  conflitos_papeis: "Conflito de papéis",
+  qualidade_lideranca: "Liderança",
+  apoio_social_superiores: "Apoio da liderança",
+  apoio_social_colegas: "Apoio dos colegas",
+  inseguranca_laboral: "Insegurança",
+  satisfacao_laboral: "Satisfação",
+  conflito_trabalho_familia: "Trabalho × família",
+  confianca_vertical: "Confiança na direção",
+  confianca_horizontal: "Confiança na equipe",
+  justica_respeito: "Justiça e respeito",
+  comunidade_social: "Convívio",
+  autoeficacia: "Autoeficácia",
+  saude_geral: "Saúde geral",
+  stress: "Stress",
+  burnout: "Burnout",
+  problemas_dormir: "Sono",
+  sintomas_depressivos: "Sint. depressivos",
+  comportamentos_ofensivos: "Comp. ofensivos",
+};
 
 const d = (
   id: string,
@@ -141,7 +176,14 @@ const d = (
   dominio: string,
   tipo: TipoDeDimensao,
   definicao: string,
-): DimensaoNr1 => ({ id, rotulo, dominio, tipo, definicao });
+): DimensaoNr1 => ({
+  id,
+  rotulo,
+  rotuloCurto: ROTULO_CURTO[id] ?? rotulo,
+  dominio,
+  tipo,
+  definicao,
+});
 
 export const DIMENSOES_NR1: readonly DimensaoNr1[] = [
   d(

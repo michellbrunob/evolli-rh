@@ -27,12 +27,14 @@ import type {
   ResultadosPesquisa,
 } from "../../../../api/pesquisasClient";
 import { CampoDaPergunta } from "../../../publico/CampoDaPergunta";
+import { AssistenteDoModelo } from "../../AssistenteDoModelo";
+import { estadoDoModelo } from "../../estadoDaPesquisa";
 import { DETALHE, RESULTADOS, servicoFalso } from "../../dadosDeTeste";
 import { modeloDaGaleria, secoesDoModelo } from "../../modelosDePesquisa";
 import { ResultadosDaPesquisa } from "../../ResultadosDaPesquisa";
 import { abasDoModelo } from "../exportacao";
 import { JanelaDeExemplo } from "../PaginaDoModelo";
-import { PainelDoModelo, VisaoGeralNr1DoRegistro } from "../registro";
+import { PainelDoModelo, VisaoGeralNr1DoRegistro, painelDe } from "../registro";
 import { mensagemDoEnvio } from "./AcompanhamentoNr1";
 import { RISCOS_PSICOSSOCIAIS } from "./catalogo";
 import {
@@ -51,6 +53,7 @@ import {
 import {
   MEDIDAS_SUGERIDAS,
   dimensaoCombina,
+  estrategiasSugeridas,
   medidaDaSugestao,
   prazoPeloNivel,
   somarDias,
@@ -58,9 +61,14 @@ import {
 } from "./medidasSugeridas";
 import { NIVEL } from "./textos";
 import {
+  MatrizNr1,
+  PorGrupoNr1,
+  escalaDoEixo,
   frequenciasDoTipo,
   ondeEstaORisco,
+  principaisAchadosNr1,
   quadranteDe,
+  raioDaBolha,
   rankingDosGrupos,
   riscoPorDominio,
 } from "./VisaoGeralNr1";
@@ -349,7 +357,7 @@ describe("Visão geral: atalhos e navegação", () => {
     ).toBeInTheDocument();
     // Chip de uma dimensão em ação: vai para ela no carrossel.
     fireEvent.click(
-      within(matriz).getByRole("button", { name: "Ritmo de Trabalho" }),
+      within(matriz).getByRole("button", { name: "Ritmo de trabalho" }),
     );
     expect(
       screen.getByText("3 de 3 em risco alto ou crítico"),
@@ -449,7 +457,7 @@ describe("Visão geral: atalhos e navegação", () => {
       screen.getByRole("tab", { name: "Conformidade NR-1 1/7" }),
     ).toHaveAttribute("aria-selected", "true");
     expect(
-      screen.getByRole("tab", { name: "Plano de ação 0" }),
+      screen.getByRole("tab", { name: "Plano de ação 87" }),
     ).toBeInTheDocument();
   }, 20_000);
 });
@@ -490,7 +498,7 @@ describe("comportamentos ofensivos, saúde e cores", () => {
         "Oculto para proteger quem respondeu: Raramente, Às vezes.",
       ),
     ).toBeInTheDocument();
-    expect(within(cartoes[1]!).getByText("0 pessoas")).toBeInTheDocument();
+    expect(within(cartoes[1]!).getByText("0 pessoas (0%)")).toBeInTheDocument();
   });
 
   it("frequências do tipo separam visíveis e ocultas", () => {
@@ -796,7 +804,7 @@ describe("biblioteca de medidas sugeridas", () => {
       name: "Medidas de Exigências Quantitativas",
     });
     const lista = within(cartao).getByRole("list", {
-      name: "Medidas sugeridas para Exigências Quantitativas",
+      name: "Estratégias sugeridas para Exigências Quantitativas",
     });
     expect(
       within(lista)
@@ -989,6 +997,15 @@ describe("PDF do plano, conformidade e pacote .zip", () => {
   });
 });
 
+/** Abre a etapa na lista da conformidade e devolve o detalhe dela. */
+function abrirEtapa(titulo: string): HTMLElement {
+  const lista = screen.getByRole("list", { name: "Etapas da conformidade" });
+  fireEvent.click(
+    within(lista).getByRole("button", { name: new RegExp(titulo) }),
+  );
+  return screen.getByRole("region", { name: titulo });
+}
+
 describe("conformidade: arquivos de evidência e o pacote", () => {
   const ARQ = {
     id: "a1",
@@ -1027,9 +1044,7 @@ describe("conformidade: arquivos de evidência e o pacote", () => {
       />,
     );
     await screen.findByRole("img", { name: "1 de 7 etapas concluídas" });
-    const comunicar = screen
-      .getByText("Comunicar os resultados às pessoas")
-      .closest("li")!;
+    const comunicar = abrirEtapa("Comunicar os resultados às pessoas");
     const concluir = within(comunicar).getByRole("button", {
       name: "Concluir etapa",
     });
@@ -1097,9 +1112,9 @@ describe("conformidade: arquivos de evidência e o pacote", () => {
       />,
     );
     await screen.findByRole("img", { name: "1 de 7 etapas concluídas" });
-    const validar = screen
-      .getByText("Validar com o profissional de SST e levar ao PGR")
-      .closest("li")!;
+    const validar = abrirEtapa(
+      "Validar com o profissional de SST e levar ao PGR",
+    );
     const grande = new File(["x"], "grande.pdf", { type: "application/pdf" });
     Object.defineProperty(grande, "size", { value: 21 * 1024 * 1024 });
     fireEvent.change(
@@ -1151,7 +1166,9 @@ describe("conformidade: arquivos de evidência e o pacote", () => {
         })}
       />,
     );
-    expect(await screen.findByText("Ata da reunião.pdf")).toBeInTheDocument();
+    await screen.findByRole("img", { name: "1 de 7 etapas concluídas" });
+    abrirEtapa("Comunicar os resultados às pessoas");
+    expect(screen.getByText("Ata da reunião.pdf")).toBeInTheDocument();
     expect(
       screen.queryByLabelText("Escolher arquivos de evidência"),
     ).toBeNull();
@@ -1299,5 +1316,501 @@ describe("página 'Sobre o modelo'", () => {
       NIVEL.medio.acao,
       NIVEL.baixo.acao,
     ]);
+  });
+});
+
+describe("4ª revisão: Por grupo", () => {
+  it("onde está o risco: % em risco e, no empate, a ordem do catálogo", () => {
+    // Empatados em 50%: a diferença para a empresa não desempata mais.
+    const g = grupo("g1", "Comercial", 3, 3, {
+      ritmo_trabalho: 50,
+      exigencias_quantitativas: 50,
+      burnout: 50,
+    });
+    const linhas = ondeEstaORisco(g.nr1!, MODELO);
+    expect(linhas.slice(0, 3).map((l) => l.id)).toEqual([
+      "exigencias_quantitativas",
+      "ritmo_trabalho",
+      "burnout",
+    ]);
+    // Sem ninguém em risco: as 6 primeiras do catálogo.
+    const zerado = grupo("g2", "Financeiro", 3, 3, {});
+    expect(ondeEstaORisco(zerado.nr1!, MODELO).map((l) => l.id)).toEqual(
+      DIMENSOES_NR1.slice(0, 6).map((d) => d.id),
+    );
+  });
+
+  it("mapa de calor: média dos % já arredondados de cada dimensão", () => {
+    const g = grupo("g1", "Comercial", 3, 3, {
+      previsibilidade: 33.4,
+      reconhecimento: 33.4,
+      influencia_trabalho: 33.5,
+      significado_trabalho: 33.5,
+    });
+    const dom = riscoPorDominio(g.nr1!.dimensoes);
+    // (33 + 33) / 7 = 9,4 → 9%.
+    expect(dom.relacoes_sociais_lideranca).toBe(9);
+    // (34 + 34) / 4 = 17%.
+    expect(dom.organizacao_conteudo).toBe(17);
+    expect(Number.isInteger(dom.exigencias_laborais)).toBe(true);
+  });
+
+  it("ranking: cabeçalhos, respostas sob o nome, % do time em risco e a barra por nível com os números", () => {
+    const g1 = grupo(
+      "g1",
+      "Comercial",
+      3.6,
+      2.5,
+      { ritmo_trabalho: 100, burnout: 75, stress: 50 },
+      3,
+    );
+    const g2 = { ...grupo("g2", "Financeiro", 2.5, 3.5, {}, 0), respostas: 4 };
+    render(
+      <PorGrupoNr1
+        resultado={painelDe(nr1(), GERAL, "departamento", [g1, g2])}
+        campo="departamento"
+        onCampo={vi.fn()}
+      />,
+    );
+    const ranking = screen.getByRole("region", {
+      name: "Ranking por departamento",
+    });
+    expect(
+      within(ranking)
+        .getAllByRole("columnheader")
+        .map((c) => c.textContent),
+    ).toEqual([
+      "#",
+      "Grupo",
+      "Precisam de ação",
+      "% do time em risco",
+      "Dimensões por nível",
+    ]);
+    const linhas = within(ranking).getAllByRole("row").slice(1);
+    expect(linhas[0]).toHaveTextContent("Comercial");
+    expect(linhas[0]).toHaveTextContent("3 respostas");
+    expect(linhas[0]).toHaveTextContent("3 de 29");
+    // (100 + 75 + 50) / 29 = 7,8 → 8%.
+    expect(within(linhas[0]!).getByText("8%")).toBeInTheDocument();
+    const barra = within(linhas[0]!).getByRole("img", {
+      name: /Dimensões por nível/,
+    });
+    expect(barra.getAttribute("aria-label")).toBe(
+      "Dimensões por nível: Crítico 0, Alto 3, Médio 0, Baixo 26",
+    );
+    expect(barra).toHaveTextContent("3");
+    expect(barra).toHaveTextContent("26");
+    expect(linhas[1]).toHaveTextContent("4 respostas");
+    expect(within(linhas[1]!).getByText("0%")).toBeInTheDocument();
+    fireEvent.click(
+      within(linhas[1]!).getByRole("button", { name: "Financeiro" }),
+    );
+    expect(
+      screen.getByRole("region", { name: "Financeiro · onde está o risco" }),
+    ).toBeInTheDocument();
+  });
+
+  it("exigências × recursos: pressão na vertical, apoio na horizontal, escala pelos dados, bolha pelas respostas e cor pelo risco", () => {
+    expect(escalaDoEixo([3.6, 3.3])).toEqual([2.75, 4]);
+    expect(escalaDoEixo([1.1, 4.9])).toEqual([1, 5]);
+    expect(escalaDoEixo([])).toEqual([2.5, 3.5]);
+    expect(raioDaBolha(10, 10)).toBeGreaterThan(raioDaBolha(3, 10));
+    expect(raioDaBolha(0, 0)).toBeGreaterThan(0);
+    const g1 = {
+      ...grupo("g1", "Comercial", 3.8, 2.6, { burnout: 100 }),
+      respostas: 3,
+    };
+    const g2 = { ...grupo("g2", "Financeiro", 2.8, 3.4, {}), respostas: 9 };
+    render(
+      <PorGrupoNr1
+        resultado={painelDe(nr1(), GERAL, "departamento", [g1, g2])}
+        campo="departamento"
+        onCampo={vi.fn()}
+      />,
+    );
+    const secao = screen.getByRole("region", { name: "Exigências × recursos" });
+    const svg = within(secao).getByRole("img");
+    expect(svg).toHaveTextContent("Pressão (exigências)");
+    expect(svg).toHaveTextContent("Apoio (recursos)");
+    const bolha = (nome: string) =>
+      svg.querySelector(`[data-grupo="${nome}"] circle`)!;
+    const comercial = bolha("Comercial");
+    const financeiro = bolha("Financeiro");
+    // Mais pressão: mais acima (cy menor); mais apoio: mais à direita.
+    expect(Number(comercial.getAttribute("cy"))).toBeLessThan(
+      Number(financeiro.getAttribute("cy")),
+    );
+    expect(Number(comercial.getAttribute("cx"))).toBeLessThan(
+      Number(financeiro.getAttribute("cx")),
+    );
+    expect(Number(financeiro.getAttribute("r"))).toBeGreaterThan(
+      Number(comercial.getAttribute("r")),
+    );
+    expect(comercial.getAttribute("fill")).not.toBe(
+      financeiro.getAttribute("fill"),
+    );
+    // Alta tensão: muita pressão e pouco apoio, no canto de cima à esquerda.
+    expect(svg.getAttribute("aria-label")).toContain("Comercial, Alta tensão");
+    const legenda = within(secao).getByRole("list", {
+      name: "Legenda do gráfico",
+    });
+    expect(legenda).toHaveTextContent("Tamanho da bolha: respostas");
+    expect(legenda).toHaveTextContent("Cor: % do time em risco");
+  });
+});
+
+describe("4ª revisão: Visão geral", () => {
+  const comPontoForte: ResultadoNr1 = {
+    ...MODELO,
+    dimensoes: MODELO.dimensoes.map((d) =>
+      d.id === "autoeficacia" || d.id === "significado_trabalho"
+        ? {
+            ...d,
+            distribuicao: { risco: 0, intermediario: 1, favoravel: 3 },
+            percentuais: { risco: 0, intermediario: 25, favoravel: 75 },
+          }
+        : d,
+    ),
+  };
+
+  it("principais achados: maior risco, ponto forte e comportamentos ofensivos, por regra", () => {
+    expect(principaisAchadosNr1(comPontoForte, 3)).toEqual([
+      "Exigências Quantitativas é o maior risco: 75% do time está na faixa de risco (nível crítico).",
+      "Significado do Trabalho é o ponto mais forte: 75% do time está na faixa favorável.",
+      "5 pessoas (63%) relataram algum comportamento ofensivo nos últimos 12 meses: acolha, apure cada caso e reforce o canal de denúncia.",
+    ]);
+    const sigilo = principaisAchadosNr1(
+      {
+        ...MODELO,
+        ofensivos: { ...MODELO.ofensivos, relataram: null, percentual: null },
+      },
+      3,
+    );
+    expect(sigilo[2]).toBe(
+      "Menos de 3 pessoas relataram algum comportamento ofensivo nos últimos 12 meses: mesmo poucos relatos pedem acolhimento e apuração.",
+    );
+    expect(sigilo[1]).toBe(
+      "Nenhuma dimensão tem pessoas na faixa favorável ainda.",
+    );
+    const ninguem = principaisAchadosNr1(
+      {
+        ...MODELO,
+        dimensoes: MODELO.dimensoes.map((d) => ({
+          ...d,
+          percentuais: { ...d.percentuais, risco: 0 },
+        })),
+        ofensivos: { ...MODELO.ofensivos, relataram: 0, percentual: 0 },
+      },
+      3,
+    );
+    expect(ninguem[0]).toBe("Nenhuma dimensão tem pessoas na faixa de risco.");
+    expect(ninguem[2]).toBe(
+      "Ninguém relatou comportamento ofensivo nos últimos 12 meses; mantenha o canal de denúncia ativo.",
+    );
+  });
+
+  it("o bloco 'Principais achados' aparece na Visão geral com as 3 frases", () => {
+    render(
+      <VisaoGeralNr1DoRegistro
+        detalhe={nr1()}
+        geral={{ ...GERAL, modelo: comPontoForte }}
+        servicoDosModelos={servicoDosModelos()}
+      />,
+    );
+    const achados = screen.getByRole("region", { name: "Principais achados" });
+    expect(within(achados).getAllByRole("listitem")).toHaveLength(3);
+    expect(achados).toHaveTextContent(
+      "Exigências Quantitativas é o maior risco",
+    );
+  });
+
+  it("matriz: 4 dimensões na célula aparecem todas; '+N' só a partir de 5; chips com rótulo curto", () => {
+    const quatro: ResultadoNr1 = {
+      ...MODELO,
+      matriz: [
+        [[], [], [], []],
+        [[], [], [], []],
+        [[], [], [], []],
+        [
+          [
+            "apoio_social_colegas",
+            "comportamentos_ofensivos",
+            "previsibilidade",
+            "stress",
+          ],
+          [],
+          [],
+          [],
+        ],
+      ],
+    };
+    const { unmount } = render(<MatrizNr1 r={quatro} onEscolher={vi.fn()} />);
+    const matriz = screen.getByRole("table", { name: /Matriz de risco/ });
+    expect(within(matriz).queryByRole("button", { name: /^\+/ })).toBeNull();
+    const chip = within(matriz).getByRole("button", {
+      name: "Apoio dos colegas",
+    });
+    expect(chip).toHaveAttribute("title", "Apoio Social de Colegas");
+    expect(
+      within(matriz).getByRole("button", { name: "Comp. ofensivos" }),
+    ).toBeInTheDocument();
+    unmount();
+    render(<MatrizNr1 r={MODELO} onEscolher={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: "+2 dimensões" }),
+    ).toBeInTheDocument();
+    expect(
+      DIMENSOES_NR1.every(
+        (d) => d.rotuloCurto.length > 0 && d.rotuloCurto.length <= 20,
+      ),
+    ).toBe(true);
+    expect(new Set(DIMENSOES_NR1.map((d) => d.rotuloCurto)).size).toBe(29);
+  });
+
+  it("comportamentos ofensivos com o %; o 1º domínio abre sozinho; 5 cartões de saúde numa linha", () => {
+    const comSaude: ResultadoNr1 = {
+      ...MODELO,
+      saude: [
+        "burnout",
+        "stress",
+        "problemas_dormir",
+        "sintomas_depressivos",
+        "saude_geral",
+      ].map((id) => ({
+        id,
+        pessoasEmRisco: 1,
+        pessoas: 4,
+        percentualEmRisco: 25,
+        nivel: "medio" as const,
+      })),
+    };
+    render(
+      <VisaoGeralNr1DoRegistro
+        detalhe={nr1()}
+        geral={{ ...GERAL, modelo: comSaude }}
+        servicoDosModelos={servicoDosModelos()}
+      />,
+    );
+    const secao = screen.getByRole("region", {
+      name: "Comportamentos ofensivos",
+    });
+    const cartoes = within(secao).getAllByRole("listitem");
+    expect(
+      within(cartoes[0]!).getByText("5 pessoas (63%)"),
+    ).toBeInTheDocument();
+    expect(within(cartoes[1]!).getByText("0 pessoas (0%)")).toBeInTheDocument();
+    // Sigilo: sem número, sem %.
+    expect(
+      within(cartoes[2]!).getByText("menos de 3 pessoas"),
+    ).toBeInTheDocument();
+    const perfil = screen.getByRole("region", { name: "Perfil por domínio" });
+    const acordeoes = perfil.querySelectorAll("details");
+    expect(acordeoes[0]).toHaveAttribute("open");
+    expect(acordeoes[1]).not.toHaveAttribute("open");
+    const saude = screen.getByRole("region", { name: "Saúde e bem-estar" });
+    const grade = saude.querySelector(".nr1__saude")!;
+    expect(grade.children).toHaveLength(5);
+  });
+});
+
+describe("4ª revisão: plano e conformidade", () => {
+  it("87 estratégias (29 × 3, com as preventivas do nível baixo) no cartão, na aba e na lista", async () => {
+    expect(estrategiasSugeridas(MODELO)).toBe(87);
+    expect(
+      estrategiasSugeridas({
+        ...MODELO,
+        dimensoes: MODELO.dimensoes.map((d, i) =>
+          i < 2 ? { ...d, nivel: null } : d,
+        ),
+      }),
+    ).toBe(81);
+    const d = nr1();
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() => Promise.resolve(d)),
+          resultadosDaPesquisa: vi.fn(() => Promise.resolve(GERAL)),
+        })}
+        servicoDosModelos={servicoDosModelos()}
+        pesquisaId={d.id}
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    const tab = await screen.findByRole("tab", { name: "Plano de ação 87" });
+    const cartao = (
+      await screen.findByText("87 estratégias sugeridas")
+    ).closest(".modelos__mini")!;
+    expect(cartao).toHaveTextContent("Plano de ação");
+    fireEvent.click(tab);
+    const estrategias = (
+      await screen.findByText("Estratégias sugeridas")
+    ).closest(".modelos__mini")!;
+    expect(estrategias).toHaveTextContent("87");
+    const nav = screen.getByRole("navigation", { name: "Dimensões do plano" });
+    const soma = within(nav)
+      .getAllByRole("button")
+      .reduce(
+        (t, b) =>
+          t + Number(/(\d+) estratégias?/.exec(b.textContent ?? "")![1]),
+        0,
+      );
+    expect(soma).toBe(87);
+  }, 20_000);
+
+  it("o cartão do plano na Visão geral: estratégias e as medidas da empresa", async () => {
+    render(
+      <VisaoGeralNr1DoRegistro
+        detalhe={nr1()}
+        geral={GERAL}
+        servicoDosModelos={servicoDosModelos({
+          acompanhamentoNr1: vi.fn(() =>
+            Promise.resolve({
+              ...ACOMPANHAMENTO,
+              plano: [
+                {
+                  id: "m1",
+                  dimensaoId: "burnout",
+                  titulo: "Pausas",
+                  descricao: null,
+                  controle: "administrativo" as const,
+                  responsavel: null,
+                  prazo: null,
+                  indicador: null,
+                  situacao: "planejada" as const,
+                },
+              ],
+            }),
+          ),
+        })}
+      />,
+    );
+    const cartao = (await screen.findByText("1 medida no plano")).closest(
+      ".modelos__mini",
+    )!;
+    expect(cartao).toHaveTextContent("87 estratégias sugeridas");
+  });
+
+  it("uma etapa por vez, com 'O que fazer N de M'; abre na próxima", async () => {
+    render(
+      <PainelDoModelo
+        detalhe={nr1()}
+        geral={GERAL}
+        servico={servicoFalso()}
+        aba="conformidade"
+        podeEditar
+        servicoDosModelos={servicoDosModelos({
+          acompanhamentoNr1: vi.fn(() =>
+            Promise.resolve({
+              ...ACOMPANHAMENTO,
+              etapas: ACOMPANHAMENTO.etapas.map((e) =>
+                e.id === "plano"
+                  ? { ...e, concluida: true }
+                  : e.id === "comunicar"
+                    ? { ...e, itens: [true, false, false] }
+                    : e,
+              ),
+              concluidas: 2,
+              proxima: "comunicar" as const,
+            }),
+          ),
+        })}
+      />,
+    );
+    await screen.findByRole("img", { name: "2 de 7 etapas concluídas" });
+    const etapas = screen.getByRole("list", {
+      name: "Etapas da conformidade",
+    });
+    expect(within(etapas).getAllByRole("button")).toHaveLength(7);
+    expect(
+      screen.getAllByRole("button", { name: "Concluir etapa" }),
+    ).toHaveLength(1);
+    const atual = screen.getByRole("region", {
+      name: "Comunicar os resultados às pessoas",
+    });
+    expect(within(atual).getByText("O que fazer")).toBeInTheDocument();
+    expect(within(atual).getByText("1 de 3")).toBeInTheDocument();
+    expect(within(atual).getByText("Etapa 3 de 7")).toBeInTheDocument();
+    fireEvent.click(
+      within(etapas).getByRole("button", { name: /Treinar lideranças/ }),
+    );
+    const treinar = screen.getByRole("region", {
+      name: "Treinar lideranças, CIPA e time",
+    });
+    expect(within(treinar).getByText("0 de 3")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", {
+        name: "Comunicar os resultados às pessoas",
+      }),
+    ).toBeNull();
+    fireEvent.click(
+      within(treinar).getByRole("button", { name: "Etapa anterior" }),
+    );
+    expect(
+      screen.getByRole("region", {
+        name: "Validar com o profissional de SST e levar ao PGR",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(etapas).getByRole("button", { name: /Elaborar o plano/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Ver plano de ação" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Conclui sozinha quando há resultado/),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("4ª revisão: 'Separar respostas por' no assistente da NR-1", () => {
+  it("anônima: Departamento já ligado; desligar avisa que o Por grupo fica sem recorte", async () => {
+    expect(estadoDoModelo("copsoq", "2026-11-28").separarPor).toEqual([
+      "departamento",
+    ]);
+    expect(estadoDoModelo("pulso", "2026-11-28").separarPor).toEqual([]);
+    const servico = servicoFalso();
+    render(
+      <AssistenteDoModelo
+        servico={servico}
+        modeloId="copsoq"
+        hoje="2026-11-28"
+        agora={() => new Date(2026, 10, 28, 9, 0)}
+        atrasoDoRascunho={0}
+        onCancelar={vi.fn()}
+        onConcluir={vi.fn()}
+        onVerResultados={vi.fn()}
+        onEditarGerada={vi.fn()}
+      />,
+    );
+    const grupo = screen.getByRole("radiogroup", { name: "Identificação" });
+    fireEvent.click(within(grupo).getByRole("radio", { name: /Anônima/ }));
+    const separar = await screen.findByRole("list", {
+      name: "Separar respostas por",
+    });
+    const depto = within(separar).getByRole("switch", {
+      name: "Departamento",
+    });
+    expect(depto).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByText(/fica sem recorte/)).toBeNull();
+    fireEvent.click(depto);
+    expect(depto).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.getByRole("note", { name: "Sem recorte por departamento" }),
+    ).toHaveTextContent(
+      "Sem Departamento, a aba Por grupo e o inventário por área ficam sem recorte.",
+    );
+    // Com outro campo ligado, o aviso diz o que continua.
+    fireEvent.click(within(separar).getByRole("switch", { name: "Unidade" }));
+    expect(
+      screen.getByRole("note", { name: "Sem recorte por departamento" }),
+    ).toHaveTextContent(
+      "Sem Departamento, a aba Por grupo e o inventário por área ficam só com unidade.",
+    );
+    fireEvent.click(depto);
+    expect(
+      screen.queryByRole("note", { name: "Sem recorte por departamento" }),
+    ).toBeNull();
   });
 });
