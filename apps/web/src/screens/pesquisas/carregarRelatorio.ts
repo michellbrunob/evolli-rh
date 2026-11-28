@@ -13,6 +13,7 @@ import {
   montarRelatorio,
   type RelatorioDeResultados,
 } from "./dadosDoRelatorio";
+import { analisesParaOPainel, detalheParaOPainel } from "./modelos/empresa";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 
 export interface RelatorioCarregado {
@@ -29,11 +30,13 @@ export async function carregarRelatorio(
   pesquisaId: string,
   hoje: string,
 ): Promise<RelatorioCarregado> {
-  const [detalhe, geral, empresa] = await Promise.all([
+  const [gravada, geral, empresa] = await Promise.all([
     Promise.resolve(servico.obterPesquisa(pesquisaId)),
     Promise.resolve(servico.resultadosDaPesquisa(pesquisaId)),
     Promise.resolve(servico.empresaAtiva()).catch(() => null),
   ]);
+  // Planilha e PDF nunca levam o marcador `{empresa}` cru.
+  const detalhe = detalheParaOPainel(gravada);
   const lista =
     detalhe.identificacao === "confidencial"
       ? null
@@ -60,7 +63,7 @@ export async function carregarRelatorio(
       empresa: nomeDaEmpresa,
       hoje,
       respostas: lista,
-      analises: analises ?? null,
+      analises: analises ? analisesParaOPainel(analises) : null,
     }),
   };
 }

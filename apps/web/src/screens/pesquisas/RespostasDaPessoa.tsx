@@ -8,6 +8,7 @@ import type {
   ValorRespondido,
 } from "../../api/pesquisasClient";
 import { SEM_RESPOSTA, textoDoValor } from "./exportarResultados";
+import { textoParaOPainel } from "./modelos/empresa";
 import { ehDeEscala, escalaDe, faixaDaMedia10, mediaNa10 } from "./indicadores";
 import "./Pesquisas.css";
 
@@ -42,7 +43,7 @@ export function RespostasDaPessoa({
                     <span className="pesquisas__suave" aria-hidden="true">
                       {`${n}. `}
                     </span>
-                    {p.texto}
+                    {textoParaOPainel(p.texto)}
                   </dt>
                   <dd
                     {...(texto === SEM_RESPOSTA

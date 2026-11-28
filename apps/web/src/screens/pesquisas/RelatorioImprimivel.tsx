@@ -50,6 +50,7 @@ import {
   type Faixa,
 } from "./indicadores";
 import { modeloDaGaleria } from "./modelosDePesquisa";
+import { detalheParaOPainel } from "./modelos/empresa";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
 import { RelatorioDoModelo, temRelatorioProprio } from "./modelos/relatorio";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
@@ -991,7 +992,11 @@ export function RelatorioDaResposta({
         if (!vivo) return;
         // Na confidencial não há resultado individual.
         if (detalhe.identificacao === "confidencial") return setFalhou(true);
-        setDados({ detalhe, resposta, empresa: empresa?.nome ?? "" });
+        setDados({
+          detalhe: detalheParaOPainel(detalhe),
+          resposta,
+          empresa: empresa?.nome ?? "",
+        });
       })
       .catch(() => {
         if (vivo) setFalhou(true);

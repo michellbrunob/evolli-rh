@@ -75,6 +75,7 @@ import {
 } from "./acoesDaPesquisa";
 import { GarantirAvisos, useAvisar } from "./avisos";
 import { modeloDaGaleria } from "./modelosDePesquisa";
+import { analisesParaOPainel, detalheParaOPainel } from "./modelos/empresa";
 import { abasDoModelo, visaoGeralDoModelo } from "./modelos/resultados";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
@@ -202,7 +203,12 @@ function ResultadosInterno({
   readonly onTrocarAba?: (aba: Aba) => void;
 }) {
   const avisar = useAvisar();
-  const [detalhe, setDetalhe] = useState<PesquisaDetalhe | null>(null);
+  const [gravada, setDetalhe] = useState<PesquisaDetalhe | null>(null);
+  // O painel nunca mostra o marcador `{empresa}` cru (tela, planilha, PDF).
+  const detalhe = useMemo(
+    () => (gravada ? detalheParaOPainel(gravada) : null),
+    [gravada],
+  );
   const [geral, setGeral] = useState<ResultadosPesquisa | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
@@ -468,7 +474,10 @@ function ResultadosInterno({
             </DropdownMenuContent>
           </DropdownMenu>
           {podeEditar && podeEditarPesquisa(detalhe.status) ? (
-            <Button variant="secondary" onClick={() => onEditar(detalhe)}>
+            <Button
+              variant="secondary"
+              onClick={() => onEditar(gravada ?? detalhe)}
+            >
               <IconeEditar tamanho={16} />
               Editar
             </Button>
@@ -1414,7 +1423,7 @@ function Analises({
     setFalhou(false);
     Promise.resolve(servico.analisesDaPesquisa(detalhe.id, campo))
       .then((d) => {
-        if (vivo) setDados(d ?? null);
+        if (vivo) setDados(d ? analisesParaOPainel(d) : null);
       })
       .catch(() => {
         if (vivo) setFalhou(true);

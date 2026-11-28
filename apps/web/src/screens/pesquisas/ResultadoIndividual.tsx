@@ -37,6 +37,7 @@ import { Esqueleto } from "../../ui/movimento";
 import { Avatar, iniciaisDe } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { Regua } from "./graficos";
+import { detalheParaOPainel, secoesParaOPainel } from "./modelos/empresa";
 import { enderecoDaRota } from "./rotasDePesquisas";
 import {
   ROTULO_DA_FAIXA_DA_MEDIA,
@@ -98,7 +99,7 @@ export function ResultadoIndividual({
     let vivo = true;
     Promise.resolve(servico.obterPesquisa(pesquisaId))
       .then((d) => {
-        if (vivo) setPesquisa(d);
+        if (vivo) setPesquisa(detalheParaOPainel(d));
       })
       .catch(() => {
         if (vivo) setFalhou(true);
@@ -238,7 +239,7 @@ export function PaginaDaResposta({
 
   const identificada = identificacao === "identificada" && r.nome;
   const titulo = identificada ? r.nome! : `Resposta anônima #${r.numero}`;
-  const todas = perguntasEmOrdem(secoes);
+  const todas = perguntasEmOrdem(secoesParaOPainel(secoes));
   const porId = new Map(r.valores.map((v) => [v.perguntaId, v]));
   const textoDe = (id: string | undefined) =>
     todas.find((p) => p.id === id)?.texto ?? "";
