@@ -520,7 +520,7 @@ describe("Galeria de modelos", () => {
     expect(gaveta).toHaveTextContent("Relações Sociais e Liderança · 21");
   });
 
-  it("'Sobre o modelo' abre a página do modelo com o que você recebe e 'Criar pesquisa'", async () => {
+  it("'Sobre o modelo' abre a página do modelo com o conteúdo e 'Criar pesquisa'", async () => {
     await abrirGaleria();
     fireEvent.click(
       screen.getByRole("button", { name: "Ver perguntas de Pulso e Clima" }),
@@ -535,13 +535,16 @@ describe("Galeria de modelos", () => {
         name: /Pulso e Clima · Leitura completa do clima/,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("O que você recebe")).toBeInTheDocument();
+    // Pulso e Clima: números, as 10 dimensões e as duas réguas, sem a
+    // faixa "O que você recebe" e sem a ficha técnica.
+    expect(screen.queryByText("O que você recebe")).toBeNull();
     expect(
       screen.getByRole("region", { name: "As 10 dimensões" }),
     ).toHaveTextContent("Bem-estar e Segurança Psicossocial");
     expect(
-      screen.getByRole("region", { name: "Ficha técnica" }),
-    ).toBeInTheDocument();
+      screen.getByRole("region", { name: "Como o resultado é calculado" }),
+    ).toHaveTextContent("Em ajuste");
+    expect(screen.queryByRole("region", { name: "Ficha técnica" })).toBeNull();
     expect(
       screen.getByRole("button", { name: "Criar pesquisa" }),
     ).toBeInTheDocument();

@@ -188,23 +188,18 @@ describe("T216 — Pulso e Clima: visão geral", () => {
     ).toBeInTheDocument();
   });
 
-  it("detalhe por pergunta e comentários filtrados por dimensão", () => {
-    render(<>{visaoGeralDoModelo(detalhe, geral)}</>);
+  it("detalhe por pergunta: os comentários ficam na aba própria", () => {
+    const irPara: string[] = [];
+    render(
+      <>{visaoGeralDoModelo(detalhe, geral, (aba) => irPara.push(aba))}</>,
+    );
     expect(
-      screen.getByText("1 comentário sobre esta dimensão"),
+      screen.getByText(/1 comentário sobre esta dimensão/),
     ).toBeInTheDocument();
-    const lista = screen.getByRole("list", { name: "Comentários" });
-    expect(within(lista).getAllByRole("listitem")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: /^Liderança/ }));
-    expect(
-      within(screen.getByRole("list", { name: "Comentários" })).getAllByRole(
-        "listitem",
-      ),
-    ).toHaveLength(1);
-    expect(screen.getByText("“Gestor presente”")).toBeInTheDocument();
-    expect(screen.queryByText("“Bom lugar”")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /^eNPS · empresa/ }));
-    expect(screen.getByText("“Bom lugar”")).toBeInTheDocument();
+    // A Visão geral não lista mais os comentários.
+    expect(screen.queryByRole("list", { name: "Comentários" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ver em Comentários" }));
+    expect(irPara).toEqual(["comentarios"]);
   });
 
   it("sem resultado do modelo, a visão por pergunta continua", () => {

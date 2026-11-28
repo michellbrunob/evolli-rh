@@ -22,9 +22,12 @@
 
 import { modeloDaGaleria } from "./modelosDePesquisa";
 
-/** `plano` e `conformidade`: abas próprias da NR-1 (modelos/registro). */
+/**
+ * `plano` e `conformidade`: abas próprias da NR-1 (modelos/registro);
+ * `comentarios`: a do Pulso e Clima (modelos/resultados).
+ */
 export type AbaDosResultados =
-  "geral" | "analises" | "respostas" | "plano" | "conformidade";
+  "geral" | "analises" | "respostas" | "plano" | "conformidade" | "comentarios";
 
 export type RotaDePesquisas =
   | { readonly tela: "lista" }
@@ -65,6 +68,7 @@ const ABAS: readonly AbaDosResultados[] = [
   "respostas",
   "plano",
   "conformidade",
+  "comentarios",
 ];
 
 const parte = (t: string) => {

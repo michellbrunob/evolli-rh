@@ -50,6 +50,7 @@ import {
   mediaNa10,
 } from "./indicadores";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
+import { textoDaRegua } from "./modelos/RespostasNaRegua";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { umaCasa } from "./textosDasPesquisas";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
@@ -381,13 +382,15 @@ export function PaginaDaResposta({
                               : `Resposta #${x.numero}`}
                           </span>
                           <span className="pesquisas__suave">
-                            {x.resumoDoModelo?.modelo === "clima"
-                              ? x.resumoDoModelo.indice === null
-                                ? "—"
-                                : `Índice ${x.resumoDoModelo.indice}%`
-                              : x.media === null
-                                ? "—"
-                                : `Média ${umaCasa(x.media)}`}
+                            {textoDaRegua(x) !== null
+                              ? textoDaRegua(x)
+                              : x.resumoDoModelo?.modelo === "clima"
+                                ? x.resumoDoModelo.indice === null
+                                  ? "—"
+                                  : `Índice ${x.resumoDoModelo.indice}%`
+                                : x.media === null
+                                  ? "—"
+                                  : `Média ${umaCasa(x.media)}`}
                           </span>
                         </span>
                       </DropdownMenuItem>

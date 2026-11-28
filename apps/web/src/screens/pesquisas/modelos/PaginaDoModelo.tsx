@@ -202,7 +202,9 @@ function Bloco({ b }: { readonly b: BlocoDoSobre }) {
               ))}
             </ul>
           ) : null}
-          <ol className="sobre__grupos">
+          <ol
+            className={`sobre__grupos${b.estilo === "cartoes" ? " sobre__grupos--cartoes" : ""}`}
+          >
             {b.itens.map((g) => (
               <li key={g.titulo}>
                 {g.numero ? (
@@ -312,6 +314,47 @@ function Bloco({ b }: { readonly b: BlocoDoSobre }) {
         <section className="sobre__bloco" aria-label={b.titulo}>
           <h2 className="sobre__bloco-titulo">{b.titulo}</h2>
           <b.Componente />
+        </section>
+      );
+    case "reguas":
+      return (
+        <section className="sobre__bloco" aria-label={b.titulo}>
+          <h2 className="sobre__bloco-titulo">{b.titulo}</h2>
+          {(b.paragrafos ?? []).map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+          <div className="sobre__reguas">
+            {b.reguas.map((r) => (
+              <section
+                key={r.titulo}
+                className="sobre__cartao"
+                aria-label={r.titulo}
+              >
+                <h3 className="sobre__regua-titulo">{r.titulo}</h3>
+                {r.descricao ? (
+                  <p className="pesquisas__suave">{r.descricao}</p>
+                ) : null}
+                <span className="sobre__regua-barra" aria-hidden="true">
+                  {r.faixas.map((f) => (
+                    <span key={f.rotulo} style={{ background: cor(f.cor) }} />
+                  ))}
+                </span>
+                <ul className="sobre__regua">
+                  {r.faixas.map((f) => (
+                    <li key={f.rotulo}>
+                      <span
+                        className="sobre__regua-cor"
+                        style={{ background: cor(f.cor) }}
+                        aria-hidden="true"
+                      />
+                      <strong>{f.rotulo}</strong>
+                      <span className="pesquisas__suave">{f.intervalo}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         </section>
       );
     default:

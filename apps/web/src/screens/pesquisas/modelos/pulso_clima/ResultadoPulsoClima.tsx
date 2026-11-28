@@ -2,10 +2,10 @@
  * T216 — Visão geral do Pulso e Clima: 4 cartões (score geral 0–100 com a
  * régua, eNPS, LNPS e a dimensão mais crítica), o resultado por dimensão
  * (da mais baixa para a mais alta, com score e desfavorável/favorável), os
- * blocos do eNPS e do LNPS (régua, distribuição e grupos), o detalhe por
- * pergunta em acordeões e os comentários por dimensão.
+ * blocos do eNPS e do LNPS (régua, distribuição e grupos) e o detalhe por
+ * pergunta em acordeões, com o atalho "Ver em Comentários" (os comentários
+ * têm aba própria: `ComentariosPulsoClima`).
  */
-import { useState } from "react";
 import type {
   PesquisaDetalhe,
   ResultadoPulsoClima,
@@ -27,15 +27,11 @@ import {
   pct,
 } from "../resultadoComum";
 import { DIMENSOES_PULSO_CLIMA, corDaDimensao } from "./catalogo";
+import { pedirDimensaoDosComentarios } from "./ComentariosPulsoClima";
 
 const corDe = (chave: string) => {
   const i = DIMENSOES_PULSO_CLIMA.findIndex((d) => d.chave === chave);
   return i >= 0 ? `var(${corDaDimensao(i)})` : "var(--color-ink-subtle)";
-};
-
-const ROTULO_DO_GRUPO: Readonly<Record<string, string>> = {
-  lnps: "LNPS · liderança direta",
-  enps: "eNPS · empresa",
 };
 
 export function textosDoComentario(
@@ -48,12 +44,14 @@ export function textosDoComentario(
 
 export function ResultadoPulsoClima({
   detalhe,
-  geral,
   r,
+  onIrParaComentarios,
 }: {
   readonly detalhe: PesquisaDetalhe;
   readonly geral: ResultadosPesquisa;
   readonly r: ResultadoPulsoClima;
+  /** Abre a aba Comentários já filtrada na dimensão. */
+  readonly onIrParaComentarios?: (dimensao: string) => void;
 }) {
   const textoDe = new Map(
     detalhe.secoes.flatMap((s) =>
@@ -64,22 +62,6 @@ export function ResultadoPulsoClima({
     .filter((d) => d.score !== null)
     .sort((a, b) => a.score! - b.score!);
   const critica = ordenadas[0] ?? null;
-  const [filtro, setFiltro] = useState<string>("todas");
-  const comentarios = r.comentarios.flatMap((c) =>
-    textosDoComentario(geral, c.perguntaId).map((texto) => ({
-      dimensao: c.dimensao,
-      texto,
-    })),
-  );
-  const visiveis =
-    filtro === "todas"
-      ? comentarios
-      : comentarios.filter((c) => c.dimensao === filtro);
-  const rotuloDaDimensao = (chave: string) =>
-    r.dimensoes.find((d) => d.chave === chave)?.rotulo ??
-    ROTULO_DO_GRUPO[chave] ??
-    chave;
-
   return (
     <div className="modelo-resultado">
       <section className="modelo-indicadores" aria-label="Indicadores">
@@ -266,79 +248,26 @@ export function ResultadoPulsoClima({
               {d.comentarios > 0 ? (
                 <p className="pesquisas__suave modelo-detalhe__rodape">
                   {`${plural(d.comentarios, "comentário", "comentários")} sobre esta dimensão`}
+                  {onIrParaComentarios ? (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="pesquisas__acao-texto pesquisas__acao-texto--primaria"
+                        onClick={() => {
+                          pedirDimensaoDosComentarios(d.chave);
+                          onIrParaComentarios(d.chave);
+                        }}
+                      >
+                        Ver em Comentários
+                      </button>
+                    </>
+                  ) : null}
                 </p>
               ) : null}
             </details>
           );
         })}
-      </section>
-
-      <section className="modelo-cartao" aria-labelledby="pc-comentarios">
-        <div className="modelo-secao-cabeca">
-          <h2 id="pc-comentarios">
-            Comentários{" "}
-            <span className="pesquisas__contagem">{comentarios.length}</span>
-          </h2>
-        </div>
-        {detalhe.identificacao !== "identificada" ? (
-          <p className="pesquisas__suave">
-            Os comentários aparecem sem nome e em ordem alfabética, para ninguém
-            ser identificado.
-          </p>
-        ) : null}
-        <div className="modelo-comentarios">
-          <ul
-            className="modelo-filtro-dimensoes"
-            aria-label="Filtrar por dimensão"
-          >
-            <li>
-              <button
-                type="button"
-                aria-pressed={filtro === "todas"}
-                onClick={() => setFiltro("todas")}
-              >
-                Todas as dimensões
-                <span className="pesquisas__contagem">
-                  {comentarios.length}
-                </span>
-              </button>
-            </li>
-            {r.comentarios.map((c) => (
-              <li key={c.dimensao}>
-                <button
-                  type="button"
-                  aria-pressed={filtro === c.dimensao}
-                  onClick={() => setFiltro(c.dimensao)}
-                >
-                  <span
-                    className="modelo-bolinha"
-                    style={{ background: corDe(c.dimensao) }}
-                    aria-hidden="true"
-                  />
-                  {rotuloDaDimensao(c.dimensao)}
-                  <span className="pesquisas__contagem">{c.quantidade}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {visiveis.length === 0 ? (
-            <p className="pesquisas__suave">Nenhum comentário por aqui.</p>
-          ) : (
-            <ul className="modelo-lista-comentarios" aria-label="Comentários">
-              {visiveis.map((c, i) => (
-                <li
-                  key={`${c.dimensao}-${i}`}
-                  style={{ ["--comentario-cor" as string]: corDe(c.dimensao) }}
-                >
-                  <span className="pesquisas__suave">
-                    {rotuloDaDimensao(c.dimensao)}
-                  </span>
-                  <span>{`“${c.texto}”`}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </section>
     </div>
   );

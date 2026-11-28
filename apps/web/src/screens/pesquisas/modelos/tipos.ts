@@ -178,6 +178,8 @@ export type BlocoDoSobre =
       readonly tipo: "grupos";
       readonly titulo: string;
       readonly descricao?: string;
+      /** Cartões em grade (padrão: lista em linhas). */
+      readonly estilo?: "cartoes";
       readonly legenda?: readonly {
         readonly texto: string;
         readonly cor: string;
@@ -223,6 +225,21 @@ export type BlocoDoSobre =
       readonly tipo: "componente";
       readonly titulo: string;
       readonly Componente: ComponentType;
+    }
+  | {
+      /** Réguas de classificação lado a lado (ex.: score e eNPS). */
+      readonly tipo: "reguas";
+      readonly titulo: string;
+      readonly paragrafos?: readonly string[];
+      readonly reguas: readonly {
+        readonly titulo: string;
+        readonly descricao?: string;
+        readonly faixas: readonly {
+          readonly rotulo: string;
+          readonly intervalo: string;
+          readonly cor: string;
+        }[];
+      }[];
     };
 
 export interface PaginaSobre {

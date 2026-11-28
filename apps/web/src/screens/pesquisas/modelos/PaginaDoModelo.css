@@ -435,3 +435,44 @@
   font-weight: var(--weight-strong);
   line-height: 1;
 }
+
+/* Dimensões em cartões (grade). */
+.sobre__grupos--cartoes {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-sm);
+}
+
+.sobre__grupos--cartoes > li {
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+/* Réguas e quadros lado a lado. */
+.sobre__reguas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-md);
+}
+
+.sobre__regua-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--text-body);
+}
+
+.sobre__regua-barra {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.sobre__regua-barra > span {
+  flex: 1;
+}

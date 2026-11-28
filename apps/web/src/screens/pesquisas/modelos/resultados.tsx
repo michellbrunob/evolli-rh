@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from "react";
 import type {
+  ModeloPesquisa,
   PesquisaDetalhe,
   RespostaDetalhe,
   RespostaResumo,
@@ -18,13 +19,21 @@ import { temTelasDoClima } from "./clima/catalogo";
 import { AnalisesEnps } from "./enps/AnalisesEnps";
 import { IndividualEnps, RespostasEnps } from "./enps/RespostasEnps";
 import { VisaoGeralEnps } from "./enps/VisaoGeralEnps";
+import type { AbaDosResultados } from "../rotasDePesquisas";
+import { ComentariosPulsoClima } from "./pulso_clima/ComentariosPulsoClima";
+import { IndividualPulsoClima } from "./pulso_clima/IndividualPulsoClima";
+import { RespostasNaRegua, temRespostasNaRegua } from "./RespostasNaRegua";
 import { ResultadoClimaVisao } from "./clima/ResultadoClima";
 import {
   ListaDeRespostasClima,
   VisaoIndividualClima,
 } from "./clima/RespostasClima";
 import { ResultadoPulsoClima } from "./pulso_clima/ResultadoPulsoClima";
-import { PainelTad, ResultadoTadVisao } from "./tad/ResultadoTad";
+import {
+  IndividualTad,
+  PainelTad,
+  ResultadoTadVisao,
+} from "./tad/ResultadoTad";
 import { ResultadoIndividualDisc } from "./disc/ResultadoIndividualDisc";
 import { ResultadosDisc, type AbaDisc } from "./disc/ResultadosDisc";
 import type { CarregarPerfil } from "./disc/tiposDisc";
@@ -97,7 +106,16 @@ export function visaoGeralDoModelo(
   if (!r) return null;
   switch (r.modelo) {
     case "pulso_clima":
-      return <ResultadoPulsoClima detalhe={detalhe} geral={geral} r={r} />;
+      return (
+        <ResultadoPulsoClima
+          detalhe={detalhe}
+          geral={geral}
+          r={r}
+          {...(onTrocarAba
+            ? { onIrParaComentarios: () => onTrocarAba("comentarios") }
+            : {})}
+        />
+      );
     case "clima":
       return <ResultadoClimaVisao detalhe={detalhe} geral={geral} r={r} />;
     case "tad":
@@ -179,6 +197,15 @@ export function listaDeRespostasDoModelo(x: {
   readonly respostas: readonly RespostaResumo[] | null;
   readonly onAbrir: (id: string) => void;
 }): ReactNode | null {
+  // TAD e Pulso e Clima: o score na régua do modelo.
+  if (temRespostasNaRegua(x.detalhe.modelo))
+    return (
+      <RespostasNaRegua
+        detalhe={x.detalhe}
+        respostas={x.respostas}
+        onAbrir={x.onAbrir}
+      />
+    );
   if (x.detalhe.modelo === "enps")
     return (
       <RespostasEnps
@@ -198,16 +225,55 @@ export function listaDeRespostasDoModelo(x: {
 }
 
 /**
- * A visão geral própria do resultado individual (Clima, eNPS), no lugar dos
- * indicadores comuns (média de 0 a 10, recomendação), ou `null`.
+ * A visão geral própria do resultado individual (Clima, eNPS, TAD, Pulso e
+ * Clima), no lugar dos indicadores comuns (média de 0 a 10, recomendação),
+ * ou `null`.
  */
 export function visaoIndividualDoModelo(
   resposta: RespostaDetalhe,
   secoes: readonly Secao[],
 ): ReactNode | null {
   const r = resposta.modelo;
+  if (r?.modelo === "tad") return <IndividualTad r={r} />;
+  if (r?.modelo === "pulso_clima") return <IndividualPulsoClima p={r} />;
   if (r?.modelo === "enps")
     return <IndividualEnps p={r} resposta={resposta} secoes={secoes} />;
   if (r?.modelo !== "clima") return null;
   return <VisaoIndividualClima resposta={resposta} p={r} secoes={secoes} />;
+}
+
+/**
+ * As abas a mais do modelo, depois de Análises (Pulso e Clima: Comentários,
+ * com a contagem). Vazio nos demais.
+ */
+export function abasExtrasDoModelo(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa | null,
+): readonly { valor: AbaDosResultados; rotulo: string; contagem: number }[] {
+  if (detalhe.modelo !== "pulso_clima") return [];
+  const r = geral?.modelo?.modelo === "pulso_clima" ? geral.modelo : null;
+  return [
+    {
+      valor: "comentarios",
+      rotulo: "Comentários",
+      contagem: r ? r.comentarios.reduce((n, c) => n + c.quantidade, 0) : 0,
+    },
+  ];
+}
+
+/** O conteúdo de uma aba a mais do modelo, ou `null`. */
+export function abaExtraDoModelo(
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  aba: AbaDosResultados,
+): ReactNode | null {
+  if (aba !== "comentarios" || detalhe.modelo !== "pulso_clima") return null;
+  const r = geral.modelo?.modelo === "pulso_clima" ? geral.modelo : null;
+  if (!r)
+    return (
+      <div className="pesquisas__aba-vazia">
+        <strong>Ainda sem comentários.</strong>
+      </div>
+    );
+  return <ComentariosPulsoClima detalhe={detalhe} geral={geral} r={r} />;
 }

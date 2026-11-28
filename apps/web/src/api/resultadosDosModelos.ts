@@ -61,11 +61,23 @@ export interface DimensaoDoModelo {
 }
 
 /** O comentário de uma dimensão (ou da recomendação), para a tela agrupar. */
+/**
+ * Um comentário escrito: o texto, o mês (`AAAA-MM`) e o departamento só
+ * quando o grupo dele aparece (mínimo por grupo).
+ */
+export interface TextoDoComentario {
+  texto: string;
+  mes: string | null;
+  departamento: string | null;
+}
+
 export interface ComentarioDoModelo {
   /** A dimensão, `lnps` ou `enps`. */
   dimensao: string;
   perguntaId: string;
   quantidade: number;
+  /** Do mês mais recente para o mais antigo; no mesmo mês, alfabética. */
+  textos?: TextoDoComentario[];
 }
 
 export interface ResultadoPulsoClima {
@@ -176,6 +188,8 @@ export interface ResultadoIndividualTad {
   geral: number | null;
   nivel: NivelTad | null;
   pilares: PilarTad[];
+  /** O time (geral e por pilar, na ordem de `pilares`), para comparar. */
+  time?: { geral: number | null; pilares: (number | null)[] } | null;
 }
 
 // ---------------------------------------------------------------------
@@ -234,6 +248,33 @@ export interface ResultadoIndividualDoEnps {
   }[];
 }
 
+/** Uma dimensão na resposta de uma pessoa, ao lado do time. */
+export interface DimensaoDaResposta {
+  chave: string;
+  rotulo: string;
+  score: number | null;
+  faixa: FaixaDeScore | null;
+  scoreTime: number | null;
+}
+
+/** O resultado de uma pessoa no Pulso e Clima, comparado com o time. */
+export interface ResultadoIndividualPulsoClima {
+  modelo: "pulso_clima";
+  /** Score 0–100 da resposta. */
+  score: number | null;
+  faixa: FaixaDeScore | null;
+  scoreTime: number | null;
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number;
+  dimensoes: DimensaoDaResposta[];
+  /** De 1 a 5: quantas a pessoa marcou e o % do time em cada nota. */
+  distribuicao: { valor: number; resposta: number; time: number }[];
+  enps: { nota: number | null; indiceTime: number | null };
+  lnps: { nota: number | null; indiceTime: number | null };
+  comentarios: { dimensao: string; texto: string }[];
+}
+
 /** Acrescente aqui o resultado de cada modelo com cálculo próprio. */
 export type ResultadoDoModelo =
   | ResultadoPulsoClima
@@ -245,13 +286,20 @@ export type ResultadoDoModelo =
 
 export type ResultadoIndividualDoModelo =
   | ResultadoIndividualTad
+  | ResultadoIndividualPulsoClima
   | IndividualNr1
   | PessoaIsfb
   | ResultadoIndividualClima
   | ResultadoIndividualDoEnps;
 
-/** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
-export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;
+/**
+ * O resumo de uma resposta na lista; acrescente aqui o de cada modelo (TAD:
+ * score de 1 a 7 com o nível; Pulso e Clima: score 0–100 com a faixa).
+ */
+export type ResumoDaRespostaDoModelo =
+  | ResumoDaRespostaClima
+  | { modelo: "tad"; valor: number | null; nivel: NivelTad | null }
+  | { modelo: "pulso_clima"; valor: number | null; faixa: FaixaDeScore | null };
 
 /** Grupo oculto (mesmo motivo dos resultados). */
 type MotivoOcultoDoModelo = "minimo" | "protege_grupo_menor";

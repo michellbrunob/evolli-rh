@@ -230,6 +230,16 @@ export const TAD: ModeloDaGaleria = {
     },
     conteudo: [
       {
+        tipo: "texto",
+        titulo: "O que é a TAD?",
+        paragrafos: [
+          "A Teoria da Autodeterminação, proposta pelos psicólogos Edward Deci e Richard Ryan, estuda a motivação que vem de dentro: aquela em que a pessoa se envolve com o trabalho porque ele faz sentido, e não só por cobrança ou recompensa.",
+          "Segundo a teoria, essa motivação depende de 3 necessidades psicológicas básicas. Autonomia: sentir liberdade para decidir como fazer o próprio trabalho. Competência: sentir que evolui e dá conta do que faz. Relacionamento: sentir conexão e pertencimento com as pessoas ao redor.",
+          "O questionário segue a escala de satisfação das necessidades básicas no trabalho (Deci, Ryan, Gagné e colegas, 2001): 21 afirmações de 1 a 7, de “nada verdadeiro” a “totalmente verdadeiro”, 9 delas escritas ao contrário para evitar respostas no automático.",
+          "Leituras de referência: Deci e Ryan (2000), sobre a teoria; Van den Broeck e colegas (2010), sobre as necessidades no trabalho; Cordeiro, Paixão, Lens, Lacante e Luyckx (2016), sobre a versão em português.",
+        ],
+      },
+      {
         tipo: "grupos",
         titulo: "Os 3 pilares",
         itens: PILARES_TAD.map((p) => ({

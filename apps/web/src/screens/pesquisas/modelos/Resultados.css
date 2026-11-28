@@ -471,3 +471,11 @@
   padding: 0;
   list-style: none;
 }
+
+/* A coluna da aba Respostas na régua do modelo (TAD, Pulso e Clima). */
+.modelo-celula-indicador {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}

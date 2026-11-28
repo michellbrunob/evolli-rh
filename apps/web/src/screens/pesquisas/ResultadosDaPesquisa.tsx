@@ -86,7 +86,9 @@ import { FalhaAoCarregar, tipoDaFalha, type Falha } from "./falhaAoCarregar";
 import { modeloDaGaleria } from "./modelosDePesquisa";
 import { analisesParaOPainel, detalheParaOPainel } from "./modelos/empresa";
 import {
+  abaExtraDoModelo,
   abasDoModelo,
+  abasExtrasDoModelo,
   analisesDoModelo,
   listaDeRespostasDoModelo,
   visaoGeralDoModelo,
@@ -370,8 +372,12 @@ function ResultadosInterno({
       ? null
       : abasDoModelo({
           detalhe,
-          // As abas próprias da NR-1 (plano, conformidade) não existem no DISC.
-          aba: aba === "plano" || aba === "conformidade" ? "geral" : aba,
+          // As abas próprias da NR-1 (plano, conformidade) e a do Pulso e
+          // Clima (comentários) não existem no DISC.
+          aba:
+            aba === "plano" || aba === "conformidade" || aba === "comentarios"
+              ? "geral"
+              : aba,
           carregarPerfil: servico.perfilComportamental,
           onAbrirResposta: (id) => onAbrirResposta?.(id),
           onIrParaAnalises: () => setAba("analises"),
@@ -405,6 +411,15 @@ function ResultadosInterno({
             ),
           },
         ]),
+    // T216 — abas a mais do modelo (Pulso e Clima: Comentários).
+    ...abasExtrasDoModelo(detalhe, geral).map((a) => ({
+      valor: a.valor,
+      rotulo: (
+        <>
+          {a.rotulo} <span className="pesquisas__contagem">{a.contagem}</span>
+        </>
+      ),
+    })),
     ...(individuais
       ? [
           {
@@ -622,6 +637,8 @@ function ResultadosInterno({
           />
         ) : abasProprias ? (
           abasProprias
+        ) : abaExtraDoModelo(detalhe, geral, aba) ? (
+          abaExtraDoModelo(detalhe, geral, aba)
         ) : aba === "geral" ? (
           semRespostas ? (
             <section

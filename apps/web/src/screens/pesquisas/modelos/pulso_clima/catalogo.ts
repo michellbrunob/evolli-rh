@@ -314,71 +314,12 @@ export const PULSO_CLIMA: ModeloDaGaleria = {
       { valor: "2", rotulo: "recomendações: eNPS e LNPS" },
       { valor: "8", rotulo: "espaços para comentário" },
     ],
-    recebe: {
-      titulo: "O clima por dimensão, do ponto mais frágil ao mais forte",
-      itens: [
-        {
-          titulo: "Score de 0 a 100",
-          texto: "Geral e por dimensão, com a faixa de cada um.",
-        },
-        {
-          titulo: "eNPS e LNPS",
-          texto: "Empresa e liderança direta, com a distribuição das notas.",
-        },
-        {
-          titulo: "Comentários por dimensão",
-          texto: "O que as pessoas escreveram, agrupado por assunto.",
-        },
-      ],
-      exemplo: {
-        cabecalho: "Exemplo · 42 respostas",
-        destaque: {
-          valor: "71",
-          sufixo: "/100",
-          texto: "score geral · Saudável",
-          cor: "--faixa-saudavel",
-        },
-        barras: [
-          {
-            rotulo: "Reconhecimento",
-            valor: 48,
-            maximo: 100,
-            texto: "48",
-            cor: "--faixa-critico",
-          },
-          {
-            rotulo: "Desenvolvimento",
-            valor: 61,
-            maximo: 100,
-            texto: "61",
-            cor: "--faixa-atencao",
-          },
-          {
-            rotulo: "Condições",
-            valor: 74,
-            maximo: 100,
-            texto: "74",
-            cor: "--faixa-saudavel",
-          },
-          {
-            rotulo: "Ambiente",
-            valor: 88,
-            maximo: 100,
-            texto: "88",
-            cor: "--faixa-forte",
-          },
-        ],
-        cartoes: [
-          { titulo: "eNPS", valor: "+34", texto: "Bom" },
-          { titulo: "LNPS", valor: "+52", texto: "Bom" },
-        ],
-      },
-    },
     conteudo: [
       {
         tipo: "grupos",
         titulo: "As 10 dimensões",
         descricao: "8 de clima e 2 de recomendação.",
+        estilo: "cartoes",
         itens: [
           ...DIMENSOES_PULSO_CLIMA.map((d, i) => ({
             numero: String(i + 1).padStart(2, "0"),
@@ -404,58 +345,59 @@ export const PULSO_CLIMA: ModeloDaGaleria = {
         ],
       },
       {
-        tipo: "texto",
+        tipo: "reguas",
         titulo: "Como o resultado é calculado",
         paragrafos: [
-          "Score de 0 a 100: a média de 1 a 5 de cada afirmação vira um score de 0 a 100. O score da dimensão é a média das afirmações dela; o geral, a média das 22.",
-          "eNPS e LNPS de −100 a 100: o % de notas 9 e 10 menos o % de notas de 0 a 6.",
+          "Cada afirmação vai de 1 a 5, e a média dela vira um score de 0 a 100. O score da dimensão é a média das afirmações dela; o geral, a média das 22.",
+          "O eNPS e o LNPS vão de −100 a 100: o % de notas 9 e 10 menos o % de notas de 0 a 6.",
+        ],
+        reguas: [
+          {
+            titulo: "Score de 0 a 100",
+            descricao: "Geral e por dimensão.",
+            faixas: [
+              {
+                rotulo: "Crítico",
+                intervalo: "0 a 49",
+                cor: "--faixa-critico",
+              },
+              {
+                rotulo: "Atenção",
+                intervalo: "50 a 69",
+                cor: "--faixa-atencao",
+              },
+              {
+                rotulo: "Saudável",
+                intervalo: "70 a 84",
+                cor: "--faixa-saudavel",
+              },
+              { rotulo: "Forte", intervalo: "85 a 100", cor: "--faixa-forte" },
+            ],
+          },
+          {
+            titulo: "eNPS e LNPS de −100 a 100",
+            descricao: "Empresa e liderança direta.",
+            faixas: [
+              {
+                rotulo: "Crítico",
+                intervalo: "abaixo de 0",
+                cor: "--faixa-critico",
+              },
+              {
+                rotulo: "Em ajuste",
+                intervalo: "0 a 29",
+                cor: "--faixa-atencao",
+              },
+              { rotulo: "Bom", intervalo: "30 a 69", cor: "--faixa-saudavel" },
+              {
+                rotulo: "Excelente",
+                intervalo: "70 ou mais",
+                cor: "--faixa-forte",
+              },
+            ],
+          },
         ],
       },
     ],
-    ficha: [
-      ["Perguntas", "24, fixas"],
-      ["Tempo", "Cerca de 7 minutos"],
-      ["Identificação", "Identificada, CPF confidencial ou anônima"],
-      ["Comentários", "1 por dimensão e por recomendação"],
-      ["Recortes", "A partir de 3 respostas"],
-      ["Frequência", "Semestral"],
-    ],
-    escalas: [
-      {
-        titulo: "Concordância de 1 a 5",
-        texto:
-          "Discordo totalmente · Discordo · Neutro · Concordo · Concordo totalmente",
-      },
-      {
-        titulo: "Recomendação de 0 a 10",
-        texto: "Pouco provável → Muito provável",
-      },
-    ],
-    regua: {
-      titulo: "As faixas",
-      descricao: "Score de 0 a 100 · eNPS e LNPS de −100 a 100.",
-      faixas: [
-        {
-          rotulo: "Crítico",
-          intervalo: "0–49 · eNPS < 0",
-          cor: "--faixa-critico",
-        },
-        {
-          rotulo: "Atenção",
-          intervalo: "50–69 · eNPS 0–29",
-          cor: "--faixa-atencao",
-        },
-        {
-          rotulo: "Saudável",
-          intervalo: "70–84 · eNPS 30–69",
-          cor: "--faixa-saudavel",
-        },
-        {
-          rotulo: "Forte",
-          intervalo: "85–100 · eNPS 70+",
-          cor: "--faixa-forte",
-        },
-      ],
-    },
   },
 };

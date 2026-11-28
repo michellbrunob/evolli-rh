@@ -1,0 +1,234 @@
+/* T216 — Pulso e Clima: resposta individual e aba Comentários. Só tokens. */
+
+.pc-contagem {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-contagem li {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-xs);
+  border-top: 3px solid var(--lado-cor);
+  border-radius: var(--radius-sm);
+  background: var(--surface-neutral);
+  text-align: center;
+  font-size: var(--text-caption);
+}
+
+.pc-contagem strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-celula-score {
+  display: grid;
+  grid-template-columns: minmax(4rem, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.pc-duas-colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-md);
+}
+
+.pc-diferencas {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-diferencas li {
+  display: grid;
+  gap: 2px;
+}
+
+.pc-distribuicao {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-distribuicao li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.pc-distribuicao__nota {
+  font-weight: var(--weight-strong);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-distribuicao__barras {
+  display: grid;
+  gap: 2px;
+}
+
+.pc-distribuicao__barras > span {
+  display: block;
+  height: 8px;
+  min-width: 2px;
+  border-radius: var(--radius-pill);
+}
+
+[data-serie="resposta"] {
+  background: var(--color-action);
+}
+
+[data-serie="time"] {
+  background: var(--color-ink-subtle);
+}
+
+.pc-distribuicao__valores {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.pc-filtro__nome {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  text-align: left;
+}
+
+.pc-comentarios {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-comentario {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--comentario-cor, var(--hairline));
+  border-radius: var(--radius-sm);
+}
+
+.pc-comentario__cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.pc-comentario__score {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-comentario p {
+  margin: 0;
+}
+
+.pc-comentario__rodape {
+  font-size: var(--text-caption);
+}
+
+/* Página pública: abertura da dimensão, selo e o comentário da nota. */
+.pc-trilha {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  list-style: none;
+}
+
+.pc-trilha li {
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.pc-trilha li[aria-current="step"] {
+  border-color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 10%, transparent);
+  color: var(--color-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pc-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: color-mix(
+    in srgb,
+    var(--selo-cor, var(--color-action)) 14%,
+    transparent
+  );
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.pc-selo::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--selo-cor, var(--color-action));
+}
+
+.pc-abertura {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  text-align: center;
+}
+
+.pc-comentario-da-nota {
+  display: grid;
+  gap: var(--space-xxs);
+  margin-top: var(--space-md);
+}
+
+.pc-comentario-da-nota textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.pc-comentario-da-nota__contador {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

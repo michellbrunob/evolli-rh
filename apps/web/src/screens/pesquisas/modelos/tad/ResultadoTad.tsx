@@ -2,7 +2,7 @@
  * T216 — Motivação (TAD): o resultado do time (score geral de 1 a 7 com o
  * nível, os 3 pilares com barra e o mapa das necessidades em radar, e
  * quantas pessoas em cada nível) e o resultado de uma pessoa (o mesmo
- * desenho, sem a contagem).
+ * desenho, sem a contagem, com a comparação de cada pilar com o time).
  */
 import type {
   PilarTad,
@@ -20,7 +20,7 @@ import {
 } from "../resultadoComum";
 import { PILARES_TAD } from "./catalogo";
 
-const FRASE_DO_NIVEL = {
+export const FRASE_DO_NIVEL = {
   alto: "Necessidade bem satisfeita.",
   moderado: "Satisfação parcial: vale acompanhar.",
   baixo: "Necessidade frustrada: pede ação.",
@@ -143,6 +143,70 @@ export function ResultadoTadVisao({ r }: { readonly r: ResultadoTad }) {
           moderado de 3,5 a 5,4 · baixo de 1,0 a 3,4.
         </p>
       </section>
+    </div>
+  );
+}
+
+/** "+0,61" / "−1,20" / "0,00" (duas casas). */
+export function diferencaTad(valor: number, time: number): string {
+  const d = Math.round((valor - time) * 100) / 100;
+  if (d === 0) return "0,00";
+  return `${d > 0 ? "+" : "−"}${duasCasas(Math.abs(d))}`;
+}
+
+/**
+ * O resultado de uma resposta na régua da TAD: o score geral, os pilares e
+ * o radar, e cada pilar ao lado do time.
+ */
+export function IndividualTad({ r }: { readonly r: ResultadoIndividualTad }) {
+  const time = r.time ?? null;
+  const linhas = [
+    { rotulo: "Score geral", valor: r.geral, doTime: time?.geral ?? null },
+    ...r.pilares.map((p, i) => ({
+      rotulo: p.rotulo,
+      valor: p.score,
+      doTime: time?.pilares[i] ?? null,
+    })),
+  ];
+  return (
+    <div className="modelo-resultado">
+      <PainelTad r={r} titulo="Score geral de motivação" />
+      {time ? (
+        <section className="modelo-cartao" aria-labelledby="tad-comparacao">
+          <h2 id="tad-comparacao">Comparação com o time</h2>
+          <p className="pesquisas__suave">
+            De 1 a 7. O time é a média dos scores de cada pessoa.
+          </p>
+          <table className="modelo-tabela" aria-label="Comparação com o time">
+            <thead>
+              <tr>
+                <th scope="col">Necessidade</th>
+                <th scope="col">Resposta</th>
+                <th scope="col">Time</th>
+                <th scope="col">Diferença</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((l) => (
+                <tr key={l.rotulo}>
+                  <td>{l.rotulo}</td>
+                  <td className="modelo-numero">
+                    {l.valor === null ? "—" : duasCasas(l.valor)}
+                  </td>
+                  <td className="modelo-numero">
+                    {l.doTime === null ? "—" : duasCasas(l.doTime)}
+                  </td>
+                  <td className="modelo-numero">
+                    {l.valor === null || l.doTime === null
+                      ? "—"
+                      : diferencaTad(l.valor, l.doTime)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
     </div>
   );
 }
