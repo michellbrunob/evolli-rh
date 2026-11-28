@@ -1224,3 +1224,59 @@ null` (número). Os tipos do cliente dizem `number | null`; `null` e ausente val
 - **Falha ao gravar:** página desatualizada (403 `csrf_invalido`), sessão expirada (401 ou renovação
   recusada), sem permissão (403), 409, 422 e 5xx têm mensagem própria; "verifique a conexão" só sem
   resposta do servidor.
+
+### NR-1 — 3ª revisão (28/11/2026)
+
+- **Escala de saúde (`Q64`):** passa a gravar 5 = "Excelente" (rótulos do pior ao melhor) e a aparecer
+  de 5 a 1 com `config.decrescente: true` (novo campo da escala com rótulos, aceito pela API). Dados já
+  gravados: nada é migrado; a pesquisa cujo 1º rótulo do `Q64` é "Excelente" (orientação antiga, 1 =
+  Excelente) continua espelhada no cálculo (`saudeLegadaDe`). A planilha mostra o valor com o rótulo da
+  própria pesquisa ("1 · Excelente" nas antigas, "5 · Excelente" nas novas).
+- **Rótulos das pontas:** escala com rótulos em fileira e `rotuloMinimo`/`rotuloMaximo` mostra as
+  pontas acima dos botões (invertidas quando `decrescente`). Vale para todo modelo com esses campos.
+- **Comportamentos ofensivos:** além do sigilo por célula, se só uma frequência do tipo ficar oculta e
+  o total aparecer, a menor contagem positiva visível também vira `null` (sigilo complementar, para não
+  sair por subtração). Tela, planilha e relatório mostram "oculto"/"menos de N" — nunca zero. Ordem
+  dos tipos: assédio, ameaça, conduta sexual, violência.
+- **Plano de ação:** biblioteca própria do Evolli (`web/.../copsoq/medidasSugeridas.ts`, sem IA): 3
+  medidas por dimensão (87), com controle da NR-1, prazo sugerido (encurtado pelo nível), opções A e B,
+  referência e indicador; "Adicionar ao plano" copia para uma `MedidaDoPlano` editável. Busca por
+  dimensão ou medida (sem acento). "Baixar PDF" e o pacote são gerados no navegador
+  (`arquivos/pdfSimples` e o .zip sem compressão já existentes; nenhuma dependência nova).
+- **Evidências (arquivos):**
+
+```ts
+// POST   /pesquisas/:id/modelo/acompanhamento/evidencias/:etapa   (CSRF, pesquisa.alter; RH e DP)
+//   corpo application/octet-stream (até 20 MB); cabeçalhos x-evolli-evidencia-tipo,
+//   x-evolli-evidencia-extensao e x-evolli-evidencia-nome (encodeURIComponent).
+//   PDF, JPG, PNG, WEBP ou PPTX (sem macro); até 10 por etapa (comunicar…revisar).
+//   422 evidencia_arquivo_vazio | _grande_demais | _formato_invalido | _arquivo_malformado |
+//       evidencia_com_macro | evidencia_reprovada_antivirus; etapas.<id> limite | nao_se_aplica.
+//   503 evidencia_verificacao_indisponivel | evidencia_armazenamento_indisponivel. 404 etapa ou modelo.
+// GET    …/evidencias/:etapa/:arquivoId   download privado (RH e DP; o master técnico não lê)
+// DELETE …/evidencias/:etapa/:arquivoId   tira da etapa e apaga o objeto (CSRF, pesquisa.alter)
+// Resposta de POST/DELETE: o acompanhamento (como o GET). Cada etapa ganha:
+type ArquivoDaEtapa = {
+  id;
+  nome;
+  formato: "pdf" | "jpg" | "png" | "webp" | "pptx";
+  tamanhoBytes;
+  enviadoEm;
+}; // chave do objeto e hash ficam só no banco
+```
+
+Armazenamento e antivírus: os mesmos dos documentos do colaborador (R2 privado + ClamAV, ADR 0021),
+sem configuração nova; o registro fica em `pesquisa.acompanhamento` (sem migration), gravado com a
+linha da pesquisa travada (`FOR UPDATE`). O PUT do acompanhamento não altera os arquivos e aceita
+concluir a etapa só com arquivo. Envio e remoção auditados como `pesquisas_pesquisa_alterada`.
+
+- **"Baixar tudo (.zip)":** `01-plano-de-acao.pdf`, `02-conformidade.pdf`, `03-respostas.xlsx` e
+  `evidencias/NN-etapa/arquivo`. O relatório completo da NR-1 continua no "Exportar › PDF" (impressão do
+  navegador) e não entra no pacote.
+- **Telas:** Visão geral com "Como o nível é definido", "Ver todas", chips e "+N" da matriz clicáveis,
+  "Ver o plano de ação desta dimensão", linhas do ranking clicáveis e atalhos para Plano e Conformidade;
+  contadores nas abas (medidas; "N/7"). Por grupo com ranking clicável, "onde está o risco" (6
+  dimensões, grupo × empresa), mapa de calor por domínio e exigências × recursos (quadrantes pelo meio
+  da escala); falha ao carregar um grupo aparece como erro, não como sigilo. Selos: crítico vermelho,
+  alto laranja, médio âmbar, baixo verde. Página "Sobre" com os mesmos nomes de dimensão e de ação dos
+  resultados e o exemplo com 29 quadradinhos e a mini matriz.
