@@ -42,6 +42,7 @@ function montar(
     base?: PesquisaDetalhe;
     gravada?: AvaliacaoDetalhe;
     empresa?: string;
+    organogramaDepois?: boolean;
   } = {},
 ) {
   const servico = {
@@ -56,7 +57,11 @@ function montar(
     ),
   };
   const cliente = {
-    organograma: vi.fn(async () => organograma),
+    organograma: vi.fn(async () => {
+      // Organograma lento: chega depois do rascunho gravado.
+      if (extra.organogramaDepois) await new Promise((r) => setTimeout(r, 30));
+      return organograma;
+    }),
     salvar: vi.fn(
       async (_id: string, _corpo: { config: Record<string, unknown> }) =>
         avaliacaoDetalheFalsa(),
@@ -493,5 +498,34 @@ describe("T216 — assistente da Avaliação 180°", () => {
     expect(
       await screen.findByRole("group", { name: "Prévia do e-mail do gestor" }),
     ).not.toHaveTextContent("aparece para você depois");
+  });
+});
+
+describe("T216 — rascunho da avaliação com o organograma lento", () => {
+  it("os times gravados não são trocados pelo organograma que chega depois", async () => {
+    const gravada = avaliacaoDetalheFalsa();
+    const { cliente } = montar("avaliacao90", organogramaFalso(), {
+      base: detalheFalso({ id: "pesq-9" }),
+      organogramaDepois: true,
+      gravada: {
+        ...gravada,
+        modelo: "avaliacao90",
+        times: [
+          {
+            gestor: GESTORA,
+            pessoas: [{ ...ANA, gestorRespondeu: false, autoavaliacao: null }],
+          },
+        ],
+      },
+    });
+    proximo(/Próximo: Gestores e times/);
+    expect(
+      await screen.findByText("1 gestor · 1 pessoa", { selector: "strong" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(cliente.organograma).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 60));
+    expect(
+      screen.getByText("1 gestor · 1 pessoa", { selector: "strong" }),
+    ).toBeInTheDocument();
   });
 });
