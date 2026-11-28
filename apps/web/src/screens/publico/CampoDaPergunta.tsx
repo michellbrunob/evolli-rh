@@ -114,6 +114,8 @@ interface OpcaoDoGrupo {
   readonly rotulo: ReactNode;
   /** Complemento só para o leitor de tela (ex.: "3 estrelas"). */
   readonly complemento?: string;
+  /** Posição no degradê da escala (0 a 100), quando há degradê. */
+  readonly tom?: number;
 }
 
 /** Grupo de botões rádio (escala, nota, estrelas, sim/não, escolha única). */
@@ -126,6 +128,7 @@ function GrupoDeRadios({
   aoMarcar,
   disposicao,
   extremos,
+  degrade = false,
 }: {
   readonly base: string;
   readonly descritores: string | undefined;
@@ -135,6 +138,8 @@ function GrupoDeRadios({
   readonly aoMarcar: (valor: string) => void;
   readonly disposicao: "linha" | "lista" | "estrelas";
   readonly extremos?: readonly [string, string] | null;
+  /** Os botões em degradê de cor, da primeira à última opção. */
+  readonly degrade?: boolean;
 }) {
   const valorMarcado = marcado === null ? null : Number(marcado);
   const descricao = [descritores, extremos ? `${base}-extremos` : null]
@@ -156,7 +161,7 @@ function GrupoDeRadios({
         </p>
       ) : null}
       <div
-        className={`pesquisa-opcoes pesquisa-opcoes--${disposicao}`}
+        className={`pesquisa-opcoes pesquisa-opcoes--${disposicao}${degrade ? " pesquisa-opcoes--degrade" : ""}`}
         style={
           disposicao === "linha"
             ? ({
@@ -179,6 +184,9 @@ function GrupoDeRadios({
           return (
             <label
               key={o.valor}
+              {...(o.tom !== undefined
+                ? { style: { "--tom": `${o.tom}%` } as CSSProperties }
+                : {})}
               className={[
                 "pesquisa-opcao",
                 marcado === o.valor ? "pesquisa-opcao--marcada" : null,
@@ -398,17 +406,24 @@ export function CampoDaPergunta({
       break;
 
     case "concordancia":
+      // 5 quadrados lado a lado (número e rótulo), as pontas em cima.
       controle = (
         <GrupoDeRadios
           base={base}
           descritores={descritores}
           erro={erro}
-          disposicao="lista"
+          disposicao="linha"
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
+          extremos={[CONCORDANCIA[0]!, CONCORDANCIA[4]!]}
           opcoes={CONCORDANCIA.map((rotulo, i) => ({
             valor: String(i + 1),
-            rotulo,
+            rotulo: (
+              <span className="pesquisa-opcao__ponto">
+                <strong aria-hidden="true">{i + 1}</strong>
+                <span>{rotulo}</span>
+              </span>
+            ),
           }))}
         />
       );
@@ -445,6 +460,8 @@ export function CampoDaPergunta({
           : null;
       // Só os rótulos, em lista (saúde financeira: "Nada" a "Totalmente").
       const soRotulos = rotulos !== null && config.somenteRotulos === true;
+      // Os 7 pontos com rótulo (TAD): botões em degradê de cor.
+      const degrade = rotulos !== null && !soRotulos && rotulos.length === 7;
       const extremos: readonly [string, string] =
         config.rotuloMinimo || config.rotuloMaximo
           ? [config.rotuloMinimo || "Mínimo", config.rotuloMaximo || "Máximo"]
@@ -462,8 +479,12 @@ export function CampoDaPergunta({
           marcado={typeof valor === "number" ? String(valor) : null}
           aoMarcar={(v) => aoMudar(Number(v))}
           extremos={rotulos ? null : extremos}
+          degrade={degrade}
           opcoes={intervalo(de, ate).map((n) => ({
             valor: String(n),
+            ...(degrade
+              ? { tom: Math.round(((n - de) / (ate - de)) * 100) }
+              : {}),
             rotulo: soRotulos ? (
               rotulos[n - de]!
             ) : rotulos ? (

@@ -591,3 +591,34 @@ textarea.pesquisa-campo {
   font-weight: var(--weight-regular, 400);
   line-height: 1.2;
 }
+
+/* T216 — escala de 7 pontos com rótulos (TAD): os botões em degradê, do
+   tom de alerta (1) ao de sucesso (7); marcado, o botão fica cheio. */
+.pesquisa-opcoes--degrade .pesquisa-opcao {
+  --cor-do-ponto: color-mix(
+    in srgb,
+    var(--status-success-ink) var(--tom, 50%),
+    var(--status-danger-ink)
+  );
+  border-color: var(--cor-do-ponto);
+  background: color-mix(
+    in srgb,
+    var(--cor-do-ponto) 10%,
+    var(--surface-canvas)
+  );
+}
+
+.pesquisa-opcoes--degrade .pesquisa-opcao:hover {
+  background: color-mix(
+    in srgb,
+    var(--cor-do-ponto) 20%,
+    var(--surface-canvas)
+  );
+}
+
+.pesquisa-opcoes--degrade .pesquisa-opcao--marcada,
+.pesquisa-opcoes--degrade .pesquisa-opcao--marcada:hover {
+  border-color: var(--cor-do-ponto);
+  background: var(--cor-do-ponto);
+  color: var(--color-on-action);
+}
