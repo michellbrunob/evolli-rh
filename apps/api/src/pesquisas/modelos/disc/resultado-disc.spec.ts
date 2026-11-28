@@ -135,6 +135,32 @@ describe("T216 — DISC: montarResultadoDisc", () => {
     expect(r.totalDePessoas).toBe(1);
   });
 
+  it("sem permissão e com recorte visível: ainda nenhuma pessoa", () => {
+    const g = { grupos: { departamento: "g1" } };
+    const r = montarResultadoDisc(
+      entrada([resposta(I17, g), resposta(S18, g), resposta(DC, g)], {
+        comPessoas: false,
+        recortes: ["departamento"],
+        filtro: { campo: "departamento", grupoId: "g1" },
+      }),
+    );
+    expect(r.filtro.visivel).toBe(true);
+    expect(r.totalDePessoas).toBe(3);
+    expect(r.pessoas).toEqual([]);
+  });
+
+  it("confidencial com o mínimo: o time aparece, as pessoas não", () => {
+    const r = montarResultadoDisc(
+      entrada([resposta(I17), resposta(S18), resposta(DC)], {
+        minimoNaVisaoGeral: true,
+        comPessoas: false,
+      }),
+    );
+    expect(r.perfil).not.toBeNull();
+    expect(r.pontos).toHaveLength(3);
+    expect(r.pessoas).toHaveLength(0);
+  });
+
   it("anônima: as pessoas sem nome nem departamento", () => {
     const r = montarResultadoDisc(
       entrada([resposta(I17, { departamento: "Comercial" })]),

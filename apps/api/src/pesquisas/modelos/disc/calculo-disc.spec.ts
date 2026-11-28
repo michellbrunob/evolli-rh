@@ -128,6 +128,30 @@ describe("T216 — DISC: classificação do perfil", () => {
     expect(classificar(p(50, 36, 10, 4)).tipo).toBe("bi");
   });
 
+  it("mono com 15 pontos exatos de distância (acentuado)", () => {
+    expect(classificar(p(50, 35, 10, 5))).toMatchObject({
+      tipo: "mono",
+      intensidade: "acentuado",
+    });
+  });
+
+  it("mono com 15 pontos exatos de distância (puro)", () => {
+    expect(classificar(p(5, 10, 60, 45))).toMatchObject({
+      tipo: "mono",
+      codigo: "S",
+      intensidade: "puro",
+    });
+  });
+
+  it("mono no limite: 45% e 15 à frente", () => {
+    expect(classificar(p(45, 30, 15, 10))).toEqual({
+      tipo: "mono",
+      fatores: ["D"],
+      codigo: "D",
+      intensidade: "moderado",
+    });
+  });
+
   it("bi: 1º − 2º < 15 e 2º − 3º ≥ 10; acentuado com o 1º ≥ 40", () => {
     expect(classificar(p(50, 0, 0, 50))).toEqual({
       tipo: "bi",
@@ -253,6 +277,20 @@ describe("T216 — DISC: diversidade, lacunas e compatibilidade", () => {
     expect(lacunasDe(p(2, 4, 2, 2))).toEqual([]);
     expect(lacunasDe(p(1, 4, 2, 3))).toEqual(["D"]);
     expect(lacunasDe(p(0, 0, 0, 0))).toEqual([]);
+  });
+
+  it("lacuna: 1 de 5 pessoas (20%) não conta", () => {
+    expect(lacunasDe(p(1, 1, 1, 2))).toEqual([]);
+  });
+
+  it("lacuna no resumo do time: 20% exatos ficam de fora", () => {
+    const perfis = [
+      ...Array.from({ length: 2 }, () => perfilDe(p(28, 0, 0, 0))),
+      ...Array.from({ length: 2 }, () => perfilDe(p(0, 28, 0, 0))),
+      ...Array.from({ length: 2 }, () => perfilDe(p(0, 0, 28, 0))),
+      ...Array.from({ length: 4 }, () => perfilDe(p(0, 0, 0, 28))),
+    ];
+    expect(resumoDoTime(perfis).lacunas).toEqual([]);
   });
 
   it("relações e o tipo do par", () => {

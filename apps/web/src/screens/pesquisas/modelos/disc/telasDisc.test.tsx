@@ -151,6 +151,41 @@ describe("T216 — DISC: resposta pelo link (prévia)", () => {
     expect(espiao).not.toHaveBeenCalled();
   });
 
+  it("empate 14 D × 14 C: o predominante é Dominância", () => {
+    render(
+      <ResponderPesquisa
+        previa={montarPreviaPublica({
+          empresa: "E",
+          nome: "DISC",
+          boasVindas: null,
+          identificacao: "anonima",
+          modelo: "disc",
+          secoes: secoesDoModelo(MODELO_DISC),
+        })}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Começar a pré-visualização" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Iniciar/ }));
+    [...`${"C".repeat(14)}${"D".repeat(14)}`].forEach((f, i) => {
+      const grupo = screen.getByRole("radiogroup");
+      fireEvent.click(
+        within(grupo).getByRole("radio", {
+          name: BLOCOS_DISC[i]!.frases["DISC".indexOf(f)]!,
+        }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: i === 27 ? /Enviar respostas/ : /Próximo/,
+        }),
+      );
+    });
+    expect(
+      screen.getByText("Perfil predominante: Dominância"),
+    ).toBeInTheDocument();
+  });
+
   it("a ordem das frases muda entre blocos", () => {
     render(
       <ResponderPesquisa
@@ -332,6 +367,43 @@ describe("T216 — DISC: resultados", () => {
       screen.getByRole("button", { name: "Resposta anônima #2" }),
     );
     expect(abrir).toHaveBeenCalledWith("r2");
+  });
+
+  it("identificada: o nome, da mais recente para a mais antiga", async () => {
+    const r = resultadoDeTeste();
+    const nomes = ["Ana Sintética", "Bia Sintética", "Caio Sintético"];
+    render(
+      <ResultadosDisc
+        detalhe={{ ...DETALHE_DISC, identificacao: "identificada" }}
+        aba="respostas"
+        carregar={carregar({
+          ...r,
+          pessoas: r.pessoas.map((p, i) => ({ ...p, nome: nomes[i]! })),
+        })}
+      />,
+    );
+    const linhas = (await screen.findAllByRole("row")).slice(1);
+    expect(
+      linhas.map((l) => within(l).getAllByRole("cell")[0]!.textContent),
+    ).toEqual(["Caio Sintético", "Bia Sintética", "Ana Sintética"]);
+  });
+
+  it("a primeira linha é a resposta mais recente (#3, D/C)", async () => {
+    render(
+      <ResultadosDisc
+        detalhe={{ ...DETALHE_DISC, identificacao: "anonima" }}
+        aba="respostas"
+        carregar={carregar()}
+      />,
+    );
+    const primeira = (await screen.findAllByRole("row"))[1]!;
+    const celulas = within(primeira).getAllByRole("cell");
+    expect(celulas.slice(2, 6).map((c) => c.textContent)).toEqual([
+      "50%",
+      "0%",
+      "0%",
+      "50%",
+    ]);
   });
 
   it("confidencial: sem respostas individuais", async () => {

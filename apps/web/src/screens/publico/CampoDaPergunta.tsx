@@ -1,7 +1,8 @@
 /**
  * T216 — uma pergunta por tela, na página pública: o texto em destaque (o
  * título da tela, que recebe o foco a cada troca) e o controle próprio de
- * cada um dos 11 tipos, ligado a esse título por `aria-labelledby`.
+ * cada um dos 11 tipos (e o bloco de frases do DISC), ligado a esse título
+ * por `aria-labelledby`.
  *
  * Escalas, notas, estrelas, sim/não e escolha única são `input type="radio"`
  * nativos num `role="radiogroup"` (o teclado do navegador vale: Tab entra no

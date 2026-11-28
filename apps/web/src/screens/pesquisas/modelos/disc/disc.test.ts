@@ -253,3 +253,52 @@ describe("T216 — DISC: planilha", () => {
     expect(abas.Participantes).toHaveLength(4);
   });
 });
+
+describe("T216 — DISC: mais provas do navegador", () => {
+  const secoes = secoesDoModelo(MODELO_DISC);
+  const perguntas = secoes.flatMap((s) => s.perguntas);
+  const escolher = (fatores: string) =>
+    Object.fromEntries(
+      [...fatores].map((f, i) => [
+        perguntas[i]!.id,
+        perguntas[i]!.config.opcoes!.find((o) => o.fator === f)!.id,
+      ]),
+    );
+
+  it("empate entre I e S: I vem antes", () => {
+    expect(perfilDasEscolhas(secoes, escolher("SSII"))!.predominante).toBe("I");
+  });
+
+  it("empate entre S e C: S vem antes", () => {
+    expect(perfilDasEscolhas(secoes, escolher("CCSS"))!.predominante).toBe("S");
+  });
+
+  it("envio dos 28 blocos: todos no formato { opcao } com a frase certa", () => {
+    const escolhas = escolher("DISC".repeat(7));
+    const envio = montarRespostas(secoes, escolhas);
+    expect(envio).toHaveLength(28);
+    for (const r of envio) {
+      expect(r.valor).toEqual({ opcao: escolhas[r.perguntaId] });
+    }
+  });
+
+  it("envio: bloco sem resposta fica de fora; os outros vão como { opcao }", () => {
+    const escolhas = escolher("CS");
+    const envio = montarRespostas(secoes, {
+      ...escolhas,
+      [perguntas[2]!.id]: "",
+    });
+    expect(envio.map((r) => r.valor)).toEqual([
+      { opcao: escolhas[perguntas[0]!.id] },
+      { opcao: escolhas[perguntas[1]!.id] },
+    ]);
+  });
+
+  it("o embaralhamento muda a ordem de ao menos um dos primeiros blocos", () => {
+    const mudou = perguntas.slice(0, 6).some((p) => {
+      const ids = p.config.opcoes!.map((o) => o.id);
+      return frasesEmbaralhadas(p.id, ids).join() !== ids.join();
+    });
+    expect(mudou).toBe(true);
+  });
+});

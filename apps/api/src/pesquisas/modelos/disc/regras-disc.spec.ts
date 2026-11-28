@@ -81,6 +81,23 @@ describe("T216 — DISC: configuração do bloco", () => {
     for (const c of casos) expect(conferirConfigDoBloco(c)).toBeNull();
   });
 
+  it("fator repetido é recusado, mesmo com 4 frases", () => {
+    const base = frases();
+    expect(
+      conferirConfigDoBloco({
+        opcoes: [base[0], base[1], { ...base[2], fator: "I" }, base[3]],
+      }),
+    ).toBeNull();
+  });
+
+  it("na estrutura comum: bloco com dois D é inválido", () => {
+    const opcoes = frases("b1");
+    opcoes[1] = { ...opcoes[1]!, fator: "D" };
+    expect(
+      conferirSecoes(secoesDe([bloco("b1", { config: { opcoes } })])).erros,
+    ).toEqual([{ campo: "b1", motivo: "invalido" }]);
+  });
+
   it("na estrutura comum: o bloco vale e não abre condição", () => {
     const ok = conferirSecoes(secoesDe([bloco("b1")]));
     expect(ok.erros).toEqual([]);
