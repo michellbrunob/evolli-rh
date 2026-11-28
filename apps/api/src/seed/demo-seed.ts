@@ -521,6 +521,18 @@ function camposObrigatoriosDaAdmissao(matricula: unknown) {
   };
 }
 
+/**
+ * T216 — o perfil pessoal do gestor sintético (`DEMO-A-0001`): o link da
+ * Avaliação 90°/180° pede CPF e data de nascimento. CPF SINTÉTICO, com os
+ * dígitos verificadores certos e claramente fictício (zeros à esquerda);
+ * único na empresa, só ele tem. Vale para bancos semeados do zero: o seed é
+ * idempotente pelo efeito e não reescreve quem já existe.
+ */
+export const PERFIL_DO_GESTOR_DEMO = {
+  dataNascimento: "1990-01-15",
+  cpf: "00000000191",
+} as const;
+
 async function garantirColaborador(
   ctx: Contexto,
   rh: Sessao,
@@ -1067,6 +1079,8 @@ export async function semearDemonstracao(
       cargoId: analista.id,
       departamentoId: operacoes.id,
       unidadeOrganizacionalId: matriz.id,
+      // T216 — o gestor entra no link da Avaliação com CPF e nascimento.
+      perfilPessoal: { ...PERFIL_DO_GESTOR_DEMO },
     });
 
     const colabDois = await garantirColaborador(ctx, rhAlfa, doisVinculos, {
