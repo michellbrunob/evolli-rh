@@ -217,9 +217,9 @@ function Modulo({
       modeloDoRascunho:
         atual.tela === "rascunho"
           ? abertoRef.current?.id === atual.id
-            ? abertoRef.current.tipo === "modelo"
-              ? abertoRef.current.modelo
-              : "personalizada"
+            ? abertoRef.current.tipo === "aberta"
+              ? "personalizada"
+              : abertoRef.current.modelo
             : modeloDoRascunho?.id === atual.id
               ? modeloDoRascunho.modelo
               : null
