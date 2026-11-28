@@ -684,7 +684,7 @@ describe("B18 — personalizada, etapa Perguntas", () => {
     adicionarTexto("Qual seu setor?");
     const resumo = document.querySelector(".pesquisas__editor-resumo")!;
     expect(resumo).toHaveTextContent(
-      "1 pergunta · 1 seção · cerca de 1 minuto",
+      "1 pergunta · 1 seção · cerca de 3 minutos",
     );
     expect(
       within(resumo as HTMLElement).getByRole("button", {

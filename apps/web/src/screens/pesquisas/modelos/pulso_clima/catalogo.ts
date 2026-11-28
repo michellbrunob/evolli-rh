@@ -302,7 +302,7 @@ export const PULSO_CLIMA: ModeloDaGaleria = {
     texto:
       "8 dimensões de clima em 22 afirmações de 1 a 5, mais o eNPS (empresa) e o LNPS (liderança direta). Mostra onde o clima está forte e onde pede ação, com os comentários de cada dimensão.",
     metadados: [
-      "Cerca de 6 minutos para responder",
+      "Cerca de 7 minutos para responder",
       "Identificada, CPF confidencial ou anônima",
       "Score por dimensão, eNPS e LNPS",
     ],
@@ -414,7 +414,7 @@ export const PULSO_CLIMA: ModeloDaGaleria = {
     ],
     ficha: [
       ["Perguntas", "24, fixas"],
-      ["Tempo", "Cerca de 6 minutos"],
+      ["Tempo", "Cerca de 7 minutos"],
       ["Identificação", "Identificada, CPF confidencial ou anônima"],
       ["Comentários", "1 por dimensão e por recomendação"],
       ["Recortes", "A partir de 3 respostas"],

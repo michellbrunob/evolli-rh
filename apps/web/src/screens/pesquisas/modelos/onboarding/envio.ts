@@ -10,6 +10,7 @@
 import type { Pergunta, Secao } from "../../../../api/pesquisasClient";
 import type { StatusVariant } from "../../../../components";
 import { secoesDoModelo } from "../../modelosDePesquisa";
+import { minutosEstimados } from "../../tempoEstimado";
 import { novoId } from "../../textosDasPesquisas";
 import { ONBOARDING, ROTULOS_DAS_INTENCOES } from "./catalogo";
 
@@ -129,9 +130,9 @@ export function perguntaDaChave(
   return null;
 }
 
-/** "max(3, round(n × 0,3))" minutos. */
+/** A regra única do tempo estimado (`tempoEstimado.ts`). */
 export function minutosDoOnboarding(perguntas: number): number {
-  return Math.max(3, Math.round(perguntas * 0.3));
+  return minutosEstimados(perguntas);
 }
 
 export type Faixa = "critico" | "atencao" | "saudavel" | "forte";

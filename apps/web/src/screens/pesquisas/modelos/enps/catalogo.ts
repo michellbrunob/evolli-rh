@@ -180,7 +180,7 @@ export const ENPS: ModeloDaGaleria = {
     texto:
       "Uma nota de 0 a 10 diz quanto as pessoas indicariam a empresa como lugar para trabalhar. As complementares e as abertas explicam a nota.",
     metadados: [
-      "Cerca de 2 minutos para responder",
+      "Cerca de 3 minutos para responder",
       "Identificada, CPF confidencial ou anônima",
       "eNPS de −100 a 100",
     ],

@@ -318,7 +318,7 @@ interface PesquisaPublica {
   modelo: Modelo; // a personalizada mostra uma seção por vez
   identificacao: Identificacao;
   totalPerguntas: number;
-  minutosEstimados: number; // 20 s por pergunta, arredondado ao minuto mais próximo; mínimo 1
+  minutosEstimados: number; // 0,3 min por pergunta, arredondado; mínimo 3 (regra única, revisão 3)
   secoes: Secao[];
 }
 type AberturaPublica =
@@ -1195,3 +1195,32 @@ O painel aplica a mesma regra em `listarGrupos` (assistente, "Separar respostas 
 **Não aplicável:** incluir campos personalizados de seleção dos Colaboradores em "Separar
 respostas por" — o Evolli ainda não tem campos personalizados (a seção "Campos extras" da ficha é
 só o estado vazio, sem servidor).
+
+## Revisão 3 — saúde financeira, DISC e ajustes transversais (28/11/2026)
+
+- **Configuração com `null`:** a API devolve `maximo: null` (múltipla escolha) e `minimo`/`maximo:
+null` (número). Os tipos do cliente dizem `number | null`; `null` e ausente valem "sem limite" na
+  validação do assistente, na resposta pública e no texto de ajuda. O assistente de modelo fixo
+  mostra um aviso geral quando uma pergunta tem erro.
+- **Saúde financeira:** a Q13 (produtos) é obrigatória no assistente; a estrutura do servidor aceita
+  também a opcional dos rascunhos antigos (ausente = 0 produtos). Resultado imediato na página
+  pública, calculado no navegador com a regra da API (nada é gravado): nota em anel, faixa, diferença
+  para a média do Brasil, barras por dimensão com a linha da média e cartões com a faixa de cada
+  dimensão (cortes próprios); "Salvar em PDF" pela impressão. Nos cartões de dimensão do painel o
+  selo mostra só a faixa. Análises: "Benefícios da empresa × necessidades do time" lê
+  `GET /v1/beneficios` (permissão `beneficio:read`; só benefícios `ativo`): antecipação salarial
+  (categoria `antecipacao`), educação financeira (nome com "financeir"), previdência (nome com
+  "previd"), alimentação (`alimentacao` ou `multibeneficios`), plano de saúde (`saude`) e seguro de
+  vida (`seguro_vida`), cada um com o dado do time; 403 mostra "sem acesso ao módulo". Visão geral
+  com "Ver análises do time ›" (`visaoGeralDoModelo(detalhe, geral, onIrPara?)`).
+- **DISC:** time equilibrado (tri) com frase própria (`resumoDoTime`); "Como o time funciona" com
+  um ponto de cada fator principal em rodízio (`chipsDoTime`); diversidade cita só o fator ausente
+  de menor presença na composição (`fatorMaisAusente`), na tela e no PDF.
+- **Tempo estimado (regra única):** `max(3, round(n × 0,3))` minutos — página pública, API
+  (`minutosEstimados`), assistentes, Onboarding e o texto de todos os catálogos (um teste confere
+  que o número escrito em cada modelo é o da regra). Avaliações seguem "por pessoa".
+- **"Separar por" na anônima:** sem pré-seleção; a pessoa escolhe um grupo ou "Prefiro não
+  informar" (que vai como `null`) antes de iniciar.
+- **Falha ao gravar:** página desatualizada (403 `csrf_invalido`), sessão expirada (401 ou renovação
+  recusada), sem permissão (403), 409, 422 e 5xx têm mensagem própria; "verifique a conexão" só sem
+  resposta do servidor.

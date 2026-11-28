@@ -835,7 +835,7 @@ describe("T216 — Pesquisas (e2e)", () => {
         modelo: "pulso",
         identificacao: "identificada",
         totalPerguntas: 5,
-        minutosEstimados: 2,
+        minutosEstimados: 3,
         secoes: estrutura(),
         grupos: [],
       });

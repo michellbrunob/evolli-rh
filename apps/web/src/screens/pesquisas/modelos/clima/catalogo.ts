@@ -347,7 +347,7 @@ export const CLIMA: ModeloDaGaleria = {
     texto:
       "60 afirmações de 1 a 5 em 5 dimensões, mais 2 perguntas abertas. Mostra o índice do time (o % de respostas favoráveis), cada dimensão e onde o clima pede atenção.",
     metadados: [
-      "Cerca de 15 minutos para responder",
+      "Cerca de 19 minutos para responder",
       "Identificada, CPF confidencial ou anônima",
       "Índice do time de 0% a 100%",
     ],

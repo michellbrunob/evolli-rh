@@ -187,8 +187,11 @@ export const MENSAGEM_NAO_ENCONTRADO =
 export const MENSAGEM_MUITAS_TENTATIVAS =
   "Muitas tentativas. Tente de novo em alguns minutos.";
 
-/** Valor do "Prefiro não informar" na escolha de grupo (vai como `null`). */
-const NAO_INFORMAR = "";
+/**
+ * Valor do "Prefiro não informar" na escolha de grupo (vai como `null`).
+ * Sem pré-seleção: vazio é "ainda não escolheu" e barra o início.
+ */
+const NAO_INFORMAR = "nao_informar";
 
 const INDISPONIVEL: Record<
   MotivoIndisponivel,
@@ -343,6 +346,8 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     lerGrupos(ler("sessao", chave(token, "grupos"))),
   );
   const [erros, setErros] = useState<Record<string, string>>({});
+  /** Tentou começar sem escolher algum grupo. */
+  const [faltaGrupo, setFaltaGrupo] = useState(false);
   const [alerta, setAlerta] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -468,8 +473,18 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     setEtapa({ tipo: "tela", id });
   }
 
+  /** O grupo foi escolhido: uma opção da lista ou "Prefiro não informar". */
+  const grupoEscolhido = (g: GrupoPublico) => {
+    const v = grupos[g.campo];
+    return v === NAO_INFORMAR || g.opcoes.some((o) => o.id === v);
+  };
+
   function iniciar() {
     if (!pesquisa) return;
+    if (!gruposDaPesquisa.every(grupoEscolhido)) {
+      setFaltaGrupo(true);
+      return;
+    }
     if (pesquisa.identificacao !== "anonima" && passeRef.current === null) {
       setErroIdent(null);
       setAvisoIdent(null);
@@ -798,6 +813,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
             <div className="pesquisa-grupos">
               {gruposDaPesquisa.map((g) => {
                 const idRotulo = `grupo-${g.campo}-rotulo`;
+                const semEscolha = faltaGrupo && !grupoEscolhido(g);
                 return (
                   <div key={g.campo} className="pesquisa-grupos__campo">
                     <span
@@ -809,9 +825,14 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                     <ListaDeEscolha
                       id={`grupo-${g.campo}`}
                       aria-labelledby={idRotulo}
-                      aria-describedby="grupos-nota"
-                      vazio="Prefiro não informar"
-                      valor={grupos[g.campo] ?? NAO_INFORMAR}
+                      aria-describedby={
+                        semEscolha
+                          ? `grupo-${g.campo}-erro grupos-nota`
+                          : "grupos-nota"
+                      }
+                      {...(semEscolha ? { "aria-invalid": true } : {})}
+                      vazio="Escolha uma opção"
+                      valor={grupos[g.campo] ?? ""}
                       onMudar={(v) =>
                         setGrupos((atual) => ({ ...atual, [g.campo]: v }))
                       }
@@ -823,6 +844,14 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                         })),
                       ]}
                     />
+                    {semEscolha ? (
+                      <p
+                        id={`grupo-${g.campo}-erro`}
+                        className="pesquisa-publica__erro"
+                      >
+                        Escolha uma opção ou “Prefiro não informar”.
+                      </p>
+                    ) : null}
                   </div>
                 );
               })}

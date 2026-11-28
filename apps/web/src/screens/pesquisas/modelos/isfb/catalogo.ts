@@ -26,7 +26,7 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
     "15 perguntas viram uma nota de 0 a 100, com 3 perguntas opcionais de autopercepção.",
   nomeBase: "Saúde financeira",
   boasVindas:
-    "Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva cerca de 6 minutos.",
+    "Algumas perguntas sobre a sua vida financeira. Não existe resposta certa ou errada, e leva cerca de 5 minutos.",
   secoes: SECOES_ISFB,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "escala", config: { minimo: 0, maximo: 4 } },
@@ -39,7 +39,7 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
     texto:
       "15 perguntas viram uma nota de 0 a 100 por pessoa, que dá para comparar com a média do país. As 3 de autopercepção são opcionais.",
     metadados: [
-      "De 5 a 8 minutos para responder",
+      "Cerca de 5 minutos para responder",
       "Identificada, CPF confidencial ou anônima",
       "Score de 0 a 100 e perfis do time",
     ],
@@ -138,7 +138,7 @@ export const SAUDE_FINANCEIRA: ModeloDaGaleria = {
     ],
     ficha: [
       ["Perguntas", "15 + 3 opcionais"],
-      ["Tempo", "De 5 a 8 minutos"],
+      ["Tempo", "Cerca de 5 minutos"],
       ["Resultado", "Score de 0 a 100 por pessoa"],
       ["Frequência", "Semestral"],
     ],

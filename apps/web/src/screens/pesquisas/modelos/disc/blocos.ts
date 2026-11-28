@@ -6,9 +6,6 @@
  * mantendo o fator de cada frase.
  */
 
-/** Tempo de resposta anunciado (≈ 17 s por bloco). */
-export const MINUTOS_DO_DISC = 8;
-
 /** O item fixo do bloco (`Pergunta.chave`): `disc_01` a `disc_28`. */
 export const chaveDoBloco = (indice: number) =>
   `disc_${String(indice + 1).padStart(2, "0")}`;

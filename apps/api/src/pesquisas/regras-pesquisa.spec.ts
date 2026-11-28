@@ -117,14 +117,14 @@ describe("T216 — página pública", () => {
   });
 
   it("tempo estimado, primeiro nome e CPF", () => {
-    // 20 s por pergunta, arredondado ao minuto mais próximo; no mínimo 1.
-    expect(minutosEstimados(0)).toBe(1);
-    expect(minutosEstimados(1)).toBe(1);
-    expect(minutosEstimados(4)).toBe(1);
-    expect(minutosEstimados(5)).toBe(2);
-    expect(minutosEstimados(8)).toBe(3);
-    expect(minutosEstimados(11)).toBe(4);
-    expect(minutosEstimados(30)).toBe(10);
+    // 0,3 minuto por pergunta, arredondado; no mínimo 3.
+    expect(minutosEstimados(0)).toBe(3);
+    expect(minutosEstimados(5)).toBe(3);
+    expect(minutosEstimados(12)).toBe(4);
+    expect(minutosEstimados(17)).toBe(5);
+    expect(minutosEstimados(28)).toBe(8);
+    expect(minutosEstimados(30)).toBe(9);
+    expect(minutosEstimados(76)).toBe(23);
     expect(primeiroNome("  Pessoa  Sintética Um ")).toBe("Pessoa");
     expect(cpfNormalizado("123.456.789-09")).toBe("12345678909");
     expect(cpfNormalizado("1234567890")).toBeNull();

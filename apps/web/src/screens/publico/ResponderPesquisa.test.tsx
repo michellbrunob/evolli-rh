@@ -252,7 +252,7 @@ describe("T216 — abertura", () => {
       within(meta)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["11 perguntas", "cerca de 4 minutos", "Anônima"]);
+    ).toEqual(["11 perguntas", "cerca de 3 minutos", "Anônima"]);
     expect(
       screen.getByRole("button", { name: "Iniciar pesquisa" }),
     ).toBeEnabled();
@@ -264,14 +264,14 @@ describe("T216 — abertura", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("concorda no singular: 1 pergunta, cerca de 1 minuto", async () => {
+  it("concorda no singular: 1 pergunta (tempo no mínimo da regra)", async () => {
     await abrir(
       criarCliente(
         pesquisaDeTeste("anonima", { totalPerguntas: 1, minutosEstimados: 1 }),
       ),
     );
     expect(screen.getByText("1 pergunta")).toBeInTheDocument();
-    expect(screen.getByText("cerca de 1 minuto")).toBeInTheDocument();
+    expect(screen.getByText("cerca de 3 minutos")).toBeInTheDocument();
   });
 
   it("mostra a identificação certa nos metadados", async () => {
@@ -329,21 +329,40 @@ describe("T216 — pesquisa indisponível", () => {
 });
 
 describe("T216 — separação por grupo (anônima)", () => {
-  it("escolhe os grupos antes de começar; o padrão é não informar", async () => {
+  it("escolhe os grupos antes de começar: sem pré-seleção, 'Prefiro não informar' é uma escolha", async () => {
     const cliente = criarCliente(
       pesquisaDeTeste("anonima", { grupos: GRUPOS }),
     );
     await abrir(cliente);
     const depto = screen.getByRole("combobox", { name: "Departamento" });
     const unidade = screen.getByRole("combobox", { name: "Unidade" });
-    expect(depto).toHaveTextContent("Prefiro não informar");
-    expect(unidade).toHaveTextContent("Prefiro não informar");
+    expect(depto).toHaveTextContent("Escolha uma opção");
+    expect(unidade).toHaveTextContent("Escolha uma opção");
     expect(depto).toHaveAccessibleDescription(
       expect.stringContaining("A resposta continua anônima."),
+    );
+    // Sem escolher, não começa.
+    iniciar();
+    expect(
+      screen.getByRole("button", { name: "Iniciar pesquisa" }),
+    ).toBeInTheDocument();
+    expect(depto).toHaveAttribute("aria-invalid", "true");
+    expect(unidade).toHaveAccessibleDescription(
+      expect.stringContaining("Escolha uma opção ou “Prefiro não informar”."),
     );
     fireEvent.click(depto);
     fireEvent.click(screen.getByRole("option", { name: "Operações" }));
     expect(depto).toHaveTextContent("Operações");
+    expect(depto).not.toHaveAttribute("aria-invalid");
+    iniciar();
+    expect(
+      screen.getByRole("button", { name: "Iniciar pesquisa" }),
+    ).toBeInTheDocument();
+    fireEvent.click(unidade);
+    fireEvent.click(
+      screen.getByRole("option", { name: "Prefiro não informar" }),
+    );
+    expect(unidade).toHaveTextContent("Prefiro não informar");
 
     iniciar();
     irAoFim();
@@ -1158,7 +1177,7 @@ describe("T216 — revisão lado a lado", () => {
         pesquisaDeTeste("anonima", { totalPerguntas: 30, minutosEstimados: 2 }),
       ),
     );
-    expect(screen.getByText("cerca de 10 minutos")).toBeInTheDocument();
+    expect(screen.getByText("cerca de 9 minutos")).toBeInTheDocument();
   });
 
   it("Continuar fica desabilitado até CPF e data estarem completos", async () => {
@@ -1334,7 +1353,7 @@ describe("T216 — pré-visualização do RH", () => {
   it("monta a estrutura com a contagem e o tempo da regra única", () => {
     const p = previa();
     expect(p.totalPerguntas).toBe(11);
-    expect(p.minutosEstimados).toBe(4);
+    expect(p.minutosEstimados).toBe(3);
     expect(p.modelo).toBe("pulso");
     expect(p).not.toHaveProperty("grupos");
   });

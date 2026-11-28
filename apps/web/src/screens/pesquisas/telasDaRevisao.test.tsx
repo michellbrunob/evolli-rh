@@ -228,10 +228,9 @@ describe("Encerramento automático", () => {
 });
 
 describe("Tempo estimado", () => {
-  it("uma regra só com a página pública: 20 segundos por pergunta, no mínimo 1", () => {
-    // Cerca de 20 segundos por pergunta, arredondado; no mínimo 1 minuto.
-    expect([0, 1, 3, 5, 9, 12].map(minutosEstimados)).toEqual([
-      1, 1, 1, 2, 3, 4,
+  it("uma regra só com a página pública: 0,3 minuto por pergunta, no mínimo 3", () => {
+    expect([0, 1, 3, 5, 9, 12, 20].map(minutosEstimados)).toEqual([
+      3, 3, 3, 3, 3, 4, 6,
     ]);
     expect(textoDoTempoEstimado(1)).toBe("cerca de 1 minuto");
   });
