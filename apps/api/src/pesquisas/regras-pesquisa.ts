@@ -66,9 +66,30 @@ export function statusEfetivo(
   return prazoVencido(status, encerraEm, agora) ? "finalizada" : status;
 }
 
-/** Só rascunho, ativa e pausada editam. */
+/**
+ * Rascunho, ativa, pausada e finalizada editam (a finalizada sem mudar o
+ * encerramento: ver `mudaEncerramentoTravado`); cancelada não.
+ */
 export function podeEditar(efetivo: StatusPesquisa): boolean {
-  return efetivo === "rascunho" || efetivo === "ativa" || efetivo === "pausada";
+  return (
+    efetivo === "rascunho" ||
+    efetivo === "ativa" ||
+    efetivo === "pausada" ||
+    efetivo === "finalizada"
+  );
+}
+
+/**
+ * A finalizada não volta: mudar (ou tirar) o encerramento dela reabriria o
+ * link de uma pesquisa encerrada pelo prazo. `true` quando a edição tenta.
+ */
+export function mudaEncerramentoTravado(
+  efetivo: StatusPesquisa,
+  atual: Date | null,
+  novo: Date | null,
+): boolean {
+  if (efetivo !== "finalizada") return false;
+  return (atual?.getTime() ?? null) !== (novo?.getTime() ?? null);
 }
 
 /**

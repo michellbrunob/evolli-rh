@@ -353,7 +353,15 @@ export function proximosStatus(atual: StatusPesquisa): StatusPesquisa[] {
   }
 }
 
-/** Só rascunho, ativa e pausada editam. */
+/**
+ * Rascunho, ativa, pausada e finalizada editam (a finalizada sem mudar o
+ * encerramento); cancelada não.
+ */
 export function podeEditarPesquisa(status: StatusPesquisa): boolean {
-  return status === "rascunho" || status === "ativa" || status === "pausada";
+  return (
+    status === "rascunho" ||
+    status === "ativa" ||
+    status === "pausada" ||
+    status === "finalizada"
+  );
 }

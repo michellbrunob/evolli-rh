@@ -2035,7 +2035,15 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect((await agent().get(publico(token)).expect(200)).body).toEqual({
         indisponivel: "encerrada",
       });
-      await put(`/v1/pesquisas/${id}`, rhA).send(corpo()).expect(409);
+      // Finalizada edita, mas tirar (ou mudar) o encerramento a reabriria.
+      const travado = await put(`/v1/pesquisas/${id}`, rhA)
+        .send(
+          corpo({ participantes: { todos: false, colaboradorIds: [a.id] } }),
+        )
+        .expect(422);
+      expect(travado.body.erros).toEqual([
+        { campo: "encerraEm", motivo: "nao_editavel" },
+      ]);
       await post(`/v1/pesquisas/${id}/status`, rhA)
         .send({ status: "pausada" })
         .expect(409);
@@ -2052,6 +2060,18 @@ describe("T216 — Pesquisas (e2e)", () => {
       expect((await agent().get(publico(token)).expect(200)).body).toEqual({
         indisponivel: "finalizada",
       });
+      await identificar(token, a).expect(410);
+      // A finalizada continua editável (nome), sem voltar a aceitar respostas.
+      const editada = await put(`/v1/pesquisas/${id}`, rhA)
+        .send(
+          corpo({
+            nome: "Finalizada renomeada",
+            participantes: { todos: false, colaboradorIds: [a.id] },
+          }),
+        )
+        .expect(200);
+      expect(editada.body.nome).toBe("Finalizada renomeada");
+      expect(editada.body.status).toBe("finalizada");
       await identificar(token, a).expect(410);
     });
 

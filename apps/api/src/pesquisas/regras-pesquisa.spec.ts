@@ -5,6 +5,7 @@ import {
   identificavelPeloLink,
   minutosEstimados,
   motivoIndisponivel,
+  mudaEncerramentoTravado,
   podeEditar,
   primeiroNome,
   statusEfetivo,
@@ -91,12 +92,27 @@ describe("T216 — transições", () => {
     }
   });
 
-  it("edita só rascunho, ativa e pausada", () => {
+  it("edita rascunho, ativa, pausada e finalizada; cancelada não", () => {
     expect(STATUS_PESQUISA.filter(podeEditar)).toEqual([
       "rascunho",
       "ativa",
       "pausada",
+      "finalizada",
     ]);
+  });
+
+  it("finalizada não muda o encerramento (não volta a aceitar respostas)", () => {
+    const antes = new Date("2026-11-20T23:59:00-03:00");
+    const igual = new Date("2026-11-20T23:59:00-03:00");
+    const depois = new Date("2026-12-20T23:59:00-03:00");
+    expect(mudaEncerramentoTravado("finalizada", antes, igual)).toBe(false);
+    expect(mudaEncerramentoTravado("finalizada", null, null)).toBe(false);
+    expect(mudaEncerramentoTravado("finalizada", antes, depois)).toBe(true);
+    expect(mudaEncerramentoTravado("finalizada", antes, null)).toBe(true);
+    expect(mudaEncerramentoTravado("finalizada", null, depois)).toBe(true);
+    // Fora da finalizada, o encerramento muda à vontade.
+    expect(mudaEncerramentoTravado("ativa", antes, depois)).toBe(false);
+    expect(mudaEncerramentoTravado("pausada", antes, null)).toBe(false);
   });
 });
 

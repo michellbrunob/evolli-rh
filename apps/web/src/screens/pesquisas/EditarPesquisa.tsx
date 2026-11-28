@@ -120,9 +120,13 @@ function FormularioDeEdicao({
   const [mostrarErros, setMostrarErros] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
   const pendente = JSON.stringify(entradaDoEstado(estado)) !== referencia;
-  const erros = mostrarErros
-    ? { ...validarSobre(estado), ...validarEnvio(estado, hoje) }
-    : null;
+  /** A finalizada edita, mas o encerramento fica (ela não volta). */
+  const finalizada = detalhe.status === "finalizada";
+  const validar = () => ({
+    ...validarSobre(estado),
+    ...(finalizada ? {} : validarEnvio(estado, hoje)),
+  });
+  const erros = mostrarErros ? validar() : null;
   const anonima = estado.identificacao === "anonima";
   const IconeId = ICONE_DA_IDENTIFICACAO[estado.identificacao];
 
@@ -135,10 +139,7 @@ function FormularioDeEdicao({
     setEstado((e) => ({ ...e, ...m }));
 
   async function salvar() {
-    const encontrados = {
-      ...validarSobre(estado),
-      ...validarEnvio(estado, hoje),
-    };
+    const encontrados = validar();
     if (Object.keys(encontrados).length > 0) {
       setMostrarErros(true);
       return;
@@ -219,14 +220,23 @@ function FormularioDeEdicao({
             </p>
           </CartaoDeSecao>
 
-          <CartaoDeEncerramento
-            compacto
-            data={estado.encerraEm}
-            hora={estado.encerraHora}
-            hoje={hoje}
-            erro={erros?.encerraEm}
-            onMudar={mudar}
-          />
+          {finalizada ? (
+            <CartaoDeSecao titulo="Encerramento">
+              <p className="pesquisas__suave">
+                Pesquisa finalizada: o encerramento não muda e o link não volta
+                a aceitar respostas.
+              </p>
+            </CartaoDeSecao>
+          ) : (
+            <CartaoDeEncerramento
+              compacto
+              data={estado.encerraEm}
+              hora={estado.encerraHora}
+              hoje={hoje}
+              erro={erros?.encerraEm}
+              onMudar={mudar}
+            />
+          )}
 
           {anonima ? (
             <SepararRespostasPor

@@ -473,3 +473,103 @@ describe("R3-A-09 — trilha com vários níveis", () => {
     expect(onNavegar).toHaveBeenLastCalledWith({ tela: "lista" }, undefined);
   });
 });
+
+describe("R3-A-25 — finalizada", () => {
+  const FINALIZADA: PesquisaResumo = { ...RESUMO, status: "finalizada" };
+
+  it("o menu da linha mantém Editar e mostra 'Copiar link' desabilitado", async () => {
+    render(
+      <PesquisasModulo
+        servico={servicoFalso({
+          listarPesquisas: vi.fn(() => Promise.resolve(lista([FINALIZADA]))),
+        })}
+        podeEditar
+      />,
+    );
+    await screen.findByRole("table", { name: "Pesquisas" });
+    abrirMenu(`Ações de ${RESUMO.nome}`);
+    expect(
+      await screen.findByRole("menuitem", { name: "Editar pesquisa" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Copiar link" }),
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("o cabeçalho dos resultados mantém Editar e 'Copiar link' desabilitado", async () => {
+    const onEditar = vi.fn();
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() =>
+            Promise.resolve({ ...DETALHE, status: "finalizada" as const }),
+          ),
+        })}
+        pesquisaId="p-1"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={onEditar}
+      />,
+    );
+    await screen.findByRole("region", { name: "Indicadores" });
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    expect(onEditar).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Copiar link" })).toBeDisabled();
+  });
+
+  it("editar a finalizada: o encerramento fica e o prazo vencido não trava salvar", async () => {
+    const servico = servicoFalso({
+      obterPesquisa: vi.fn(() =>
+        Promise.resolve({
+          ...DETALHE,
+          status: "finalizada" as const,
+          encerraEm: "2026-11-21T02:59:00.000Z",
+        }),
+      ),
+    });
+    const onSalvo = vi.fn();
+    render(
+      <EditarPesquisa
+        servico={servico}
+        pesquisaId="p-1"
+        hoje="2026-11-27"
+        onVoltar={vi.fn()}
+        onSalvo={onSalvo}
+      />,
+    );
+    const nome = await screen.findByLabelText("Nome da pesquisa");
+    expect(
+      screen.getByText(
+        "Pesquisa finalizada: o encerramento não muda e o link não volta a aceitar respostas.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Encerrar automaticamente" }),
+    ).toBeNull();
+    fireEvent.change(nome, { target: { value: "Clima renomeado" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(onSalvo).toHaveBeenCalled());
+    const [, entrada] = servico.alterarPesquisa.mock.calls.at(-1)!;
+    expect(entrada.nome).toBe("Clima renomeado");
+    expect(entrada.encerraEm).toBe("2026-11-20T23:59");
+  });
+
+  it("cancelada continua sem Editar", async () => {
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() =>
+            Promise.resolve({ ...DETALHE, status: "cancelada" as const }),
+          ),
+        })}
+        pesquisaId="p-1"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    await screen.findByRole("region", { name: "Indicadores" });
+    expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copiar link" })).toBeNull();
+  });
+});

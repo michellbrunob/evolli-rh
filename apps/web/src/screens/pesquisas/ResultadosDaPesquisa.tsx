@@ -378,9 +378,13 @@ function ResultadosInterno({
           onAbrirResposta: (id) => onAbrirResposta?.(id),
           onIrParaAnalises: () => setAba("analises"),
         });
+  // "Copiar link": ativa copia; pausada e finalizada mostram o botão
+  // desabilitado (a finalizada não volta a aceitar respostas).
   const linkVivo =
     detalhe.link !== null &&
-    (detalhe.status === "ativa" || detalhe.status === "pausada");
+    (detalhe.status === "ativa" ||
+      detalhe.status === "pausada" ||
+      detalhe.status === "finalizada");
   const criadaHoje = diaDoInstante(detalhe.criadaEm) === hoje;
   const participantes = detalhe.participantesTotal ?? detalhe.participantes;
   const proprio = ehModeloComTelaPropria(detalhe.modelo);
@@ -532,7 +536,7 @@ function ResultadosInterno({
           )}
           {linkVivo ? (
             <Button
-              disabled={detalhe.status === "pausada"}
+              disabled={detalhe.status !== "ativa"}
               onClick={() => void copiar()}
             >
               Copiar link
@@ -640,7 +644,7 @@ function ResultadosInterno({
               <div className="pesquisas__acoes">
                 {linkVivo ? (
                   <Button
-                    disabled={detalhe.status === "pausada"}
+                    disabled={detalhe.status !== "ativa"}
                     onClick={() => void copiar()}
                   >
                     Copiar link

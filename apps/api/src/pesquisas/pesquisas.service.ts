@@ -76,6 +76,7 @@ import {
   formatarEncerramento,
   identificavelPeloLink,
   lerEncerramento,
+  mudaEncerramentoTravado,
   podeEditar,
   statusEfetivo,
   transicaoValida,
@@ -665,7 +666,8 @@ export class PesquisasService {
     const empresaId = this.empresaDaSessao(ctx, "escrita");
     return this.prisma.$transaction(async (tx) => {
       const atual = await this.obterLinha(tx, id, empresaId, ctx);
-      if (!podeEditar(this.efetivo(atual))) throw new ConflictException();
+      const efetivo = this.efetivo(atual);
+      if (!podeEditar(efetivo)) throw new ConflictException();
       const publicada = atual.status !== "rascunho";
       if (publicada && dto.identificacao !== atual.identificacao) {
         throw new CamposRecusadosException([
@@ -673,6 +675,12 @@ export class PesquisasService {
         ]);
       }
       const e = this.conferirEntrada(dto, atual.encerraEm);
+      // A finalizada edita, mas o encerramento fica (ela não volta).
+      if (mudaEncerramentoTravado(efetivo, atual.encerraEm, e.encerraEm)) {
+        throw new CamposRecusadosException([
+          { campo: "encerraEm", motivo: "nao_editavel" },
+        ]);
+      }
       const temRespostas =
         (await tx.pesquisaResposta.count({ where: { pesquisaId: id } })) > 0;
       if (temRespostas) {
