@@ -53,7 +53,7 @@ describe("Sobre o modelo — Pulso", () => {
   it("como a pessoa responde: dá para marcar uma nota na prévia", () => {
     montar();
     const como = screen.getByRole("region", { name: "Como a pessoa responde" });
-    expect(como).toHaveTextContent("cerca de 2 minutos");
+    expect(como).toHaveTextContent("cerca de 3 minutos");
     expect(como).toHaveTextContent("Pergunta 1 de 7");
     const notas = within(como).getByRole("radiogroup", {
       name: "Prévia: escolha uma nota",

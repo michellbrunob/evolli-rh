@@ -59,7 +59,7 @@ describe("Personalizada — modelos prontos", () => {
     ).toHaveTextContent("Gestor avalia o time");
     expect(
       screen.getByRole("article", { name: "Avaliação 180°" }),
-    ).toHaveTextContent("Gestor e autoavaliação (180°)");
+    ).toHaveTextContent("Gestor e autoavaliação");
     expect(
       screen.getByRole("article", { name: "Entrevista de desligamento" }),
     ).toHaveTextContent("Cada pessoa responde");
