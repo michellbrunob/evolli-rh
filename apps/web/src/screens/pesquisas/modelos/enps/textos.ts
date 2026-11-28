@@ -95,9 +95,13 @@ export const comSinal = (n: number) =>
 export const umaCasaBr = (n: number) =>
   (Math.round(n * 10) / 10).toFixed(1).replace(".", ",");
 
-/** "+0,8" / "−5,3" / "0,0". */
+/**
+ * "+0,8" / "−4,2" / "−3" / "0": a diferença já vem com uma casa (o meio
+ * sobe no valor com sinal, a regra do resultado individual); inteiro sem
+ * casa.
+ */
 export const diferencaBr = (n: number) =>
-  `${n > 0 ? "+" : n < 0 ? "−" : ""}${umaCasaBr(Math.abs(n))}`;
+  `${n > 0 ? "+" : n < 0 ? "−" : ""}${Number.isInteger(n) ? String(Math.abs(n)) : umaCasaBr(Math.abs(n))}`;
 
 export const pctDe = (parte: number, total: number) =>
   total > 0 ? Math.round((parte / total) * 100) : 0;

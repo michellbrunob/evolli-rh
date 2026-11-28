@@ -433,6 +433,8 @@ describe("T216 — eNPS: resultado individual", () => {
         time: 6.8,
         diferenca: null,
       },
+      { perguntaId: id("enps_crescimento"), nota: 5, time: 8, diferenca: -3 },
+      { perguntaId: id("enps_reconhecimento"), nota: 9, time: 9, diferenca: 0 },
     ],
   };
   const resposta = {
@@ -460,6 +462,9 @@ describe("T216 — eNPS: resultado individual", () => {
       ["Satisfação geral", "8", "7,3", "+0,8"],
       ["Ambiente", "2", "7,8", "−5,3"],
       ["Liderança direta", "—", "6,8", "—"],
+      // Inteiro sem casa ("−3", nunca "−3,0"); igual ao time: "0".
+      ["Crescimento", "5", "8,0", "−3"],
+      ["Reconhecimento", "9", "9,0", "0"],
     ]);
     const abertas = screen.getByRole("region", { name: "Respostas abertas" });
     expect(abertas).toHaveTextContent("As pessoas");

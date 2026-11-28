@@ -1494,3 +1494,7 @@ Regras:
   funções (Pulso e Clima passa a 10 minutos, igual à página pública; Clima, 19 em todo lugar). Um teste
   lê o código dos catálogos e recusa qualquer "N min"/"N minutos" escrito; ficam de fora o tempo "por
   pessoa"/"por avaliação" das Avaliações e o `minutos` dos modelos prontos da Personalizada.
+- **eNPS individual:** a diferença de cada complementar (`individualDoEnps`) usa
+  `diferencaComUmaCasa` (o meio sobe no valor com sinal: −4,25 → −4,2; sem erro de ponto flutuante),
+  a mesma regra do resultado individual genérico; a tela mostra inteiro sem casa ("−3", "0").
+- **eNPS no assistente:** as `chavesFixas` (a principal) são somente leitura: sem "Editar" nem "Excluir".

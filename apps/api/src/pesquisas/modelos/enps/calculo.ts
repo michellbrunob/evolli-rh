@@ -95,6 +95,15 @@ function umaCasa(n: number): number {
   return (Math.sign(n) * Math.round(Math.abs(n) * 10)) / 10 || 0;
 }
 
+/**
+ * A diferença com uma casa, arredondando o meio para cima no valor com
+ * sinal (−4,25 vira −4,2; +2,25 vira +2,3), sem o erro do ponto flutuante:
+ * a mesma regra do resultado individual da tela.
+ */
+export function diferencaComUmaCasa(valor: number, referencia: number): number {
+  return Math.round(Number(((valor - referencia) * 10).toFixed(6))) / 10 || 0;
+}
+
 const notaValida = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 10;
 
@@ -246,7 +255,7 @@ export function individualDoEnps(
         perguntaId: p.id,
         nota: n,
         time: m === null ? null : umaCasa(m),
-        diferenca: n === null || m === null ? null : umaCasa(n - m),
+        diferenca: n === null || m === null ? null : diferencaComUmaCasa(n, m),
       };
     }),
   };

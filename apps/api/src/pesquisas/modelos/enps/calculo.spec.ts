@@ -6,6 +6,7 @@ import {
 } from "../indice";
 import {
   calcularEnps,
+  diferencaComUmaCasa,
   enpsVisivel,
   grupoDoEnps,
   individualDoEnps,
@@ -269,10 +270,22 @@ describe("T216 — eNPS", () => {
     });
   });
 
-  it("individual: diferença negativa com uma casa", () => {
+  it("individual: diferença negativa com uma casa, meio para cima no valor com sinal", () => {
     const r = individualDoEnps(estrutura(), CASO[2]!.valores, CASO)!;
-    // Satisfação: 2 − 7,25 = −5,25 → −5,3 (calculada com a média exata).
-    expect(r.complementares[0]).toMatchObject({ nota: 2, diferenca: -5.3 });
+    // Satisfação: 2 − 7,25 = −5,25 → −5,2 (calculada com a média exata; a
+    // mesma regra do resultado individual: o meio sobe).
+    expect(r.complementares[0]).toMatchObject({ nota: 2, diferenca: -5.2 });
+  });
+
+  it("diferença com uma casa: o meio sobe no valor com sinal, sem erro de ponto flutuante", () => {
+    expect(diferencaComUmaCasa(2, 6.25)).toBe(-4.2);
+    expect(diferencaComUmaCasa(9, 6.75)).toBe(2.3);
+    expect(diferencaComUmaCasa(3, 5.75)).toBe(-2.7);
+    expect(diferencaComUmaCasa(5, 8)).toBe(-3);
+    expect(diferencaComUmaCasa(7, 7)).toBe(0);
+    expect(Object.is(diferencaComUmaCasa(7, 7.04), -0)).toBe(false);
+    // 0,15 em ponto flutuante é 0,1499…: sem a correção, viraria 0,1.
+    expect(diferencaComUmaCasa(0.3, 0.15)).toBe(0.2);
   });
 
   it("evolução: o eNPS de cada pesquisa; confidencial abaixo do mínimo, null", () => {
