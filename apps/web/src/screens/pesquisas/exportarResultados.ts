@@ -8,6 +8,8 @@
  * identificada, numeradas na anônima e nunca na confidencial. Nada leva CPF.
  */
 import { abasDoModelo } from "./modelos/exportacao";
+import { abasDaPlanilhaClima } from "./modelos/clima/planilhaClima";
+import { temTelasDoClima } from "./modelos/clima/catalogo";
 import type {
   CampoGrupo,
   Identificacao,
@@ -269,6 +271,16 @@ export function planilhaDosResultados(
   geral: ResultadosPesquisa,
   respostas: readonly RespostaDetalhe[] | null,
 ): Uint8Array {
+  // T216 — Clima: a planilha própria do modelo, no lugar das abas genéricas.
+  if (temTelasDoClima(detalhe, geral))
+    return montarXlsx(
+      abasDaPlanilhaClima({
+        rel,
+        detalhe,
+        r: geral.modelo?.modelo === "clima" ? geral.modelo : null,
+        respostas,
+      }),
+    );
   const abas: AbaXlsx[] = [];
   const titulo = (linhas: CelulaXlsx[][], cabecalhos: number[]) => ({
     titulo: true,

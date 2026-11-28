@@ -53,6 +53,8 @@ import { modeloDaGaleria } from "./modelosDePesquisa";
 import { detalheParaOPainel } from "./modelos/empresa";
 import { RespostasDaPessoa } from "./RespostasDaPessoa";
 import { RelatorioDoModelo, temRelatorioProprio } from "./modelos/relatorio";
+import { RelatorioClima } from "./modelos/clima/RelatorioClima";
+import { temTelasDoClima } from "./modelos/clima/catalogo";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { percentual, textoDoOculto, umaCasa } from "./textosDasPesquisas";
 import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
@@ -944,6 +946,11 @@ export function RelatorioDaPesquisa({
         imprimir={imprimir}
         hoje={hoje}
       />
+    );
+  // Pesquisa de Clima: o relatório próprio (modelos/clima).
+  if (temTelasDoClima(dados.detalhe, dados.geral))
+    return (
+      <RelatorioClima carregado={dados} servico={servico} imprimir={imprimir} />
     );
   // Modelos com metodologia própria: o relatório deles (modelos/relatorio).
   if (temRelatorioProprio(dados.detalhe.modelo))

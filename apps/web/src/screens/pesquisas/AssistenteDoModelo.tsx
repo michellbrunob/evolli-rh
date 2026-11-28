@@ -64,6 +64,10 @@ import {
 import { EtapaColaboradores } from "./EtapaColaboradores";
 import { modeloDaGaleria, type ModeloDaGaleria } from "./modelosDePesquisa";
 import { PerguntasFixas } from "./modelos/PerguntasFixas";
+import {
+  PerguntasDoClima,
+  resumoDasPerguntasDoClima,
+} from "./modelos/clima/PerguntasDoClima";
 import { seloDoTipoDaPergunta } from "./modelos/selos";
 import { textoParaOPainel } from "./modelos/empresa";
 import { CartaoDosBlocos } from "./modelos/disc/CartaoDosBlocos";
@@ -709,6 +713,13 @@ function EtapaConfigurar({
 
       {m.modelo === "disc" ? (
         <CartaoDosBlocos blocos={principais} />
+      ) : m.modelo === "clima" ? (
+        <PerguntasDoClima
+          secoes={estado.secoes}
+          travado={travado}
+          erro={erros?.perguntas}
+          onMudar={(secoes) => onMudar({ secoes })}
+        />
       ) : m.fixo ? (
         <>
           <PerguntasFixas modelo={m} secoes={estado.secoes} />
@@ -1005,7 +1016,9 @@ function EtapaEnviar({
             <dd>
               {estado.modelo === "disc"
                 ? `${principais.length} blocos de frases do DISC`
-                : `${principais.length} · ${tipos.join(" + ")}`}
+                : estado.modelo === "clima"
+                  ? resumoDasPerguntasDoClima(principais)
+                  : `${principais.length} · ${tipos.join(" + ")}`}
             </dd>
           </div>
           <div>

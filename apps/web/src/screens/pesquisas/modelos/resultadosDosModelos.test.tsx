@@ -1,7 +1,7 @@
 /**
  * T216 — telas dos modelos com cálculo próprio: Pulso e Clima (cartões,
- * dimensões em ordem, eNPS/LNPS e comentários por dimensão), Clima
- * (favorável por dimensão e subdimensão), TAD (time e pessoa), as perguntas
+ * dimensões em ordem, eNPS/LNPS e comentários por dimensão), TAD (time e
+ * pessoa; o Clima tem os testes em `clima/Clima.test.tsx`), as perguntas
  * de metodologia fixa no assistente e o título do assistente.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -10,7 +10,6 @@ import type {
   DimensaoDoModelo,
   PesquisaDetalhe,
   RecomendacaoDoModelo,
-  ResultadoClima,
   ResultadoPulsoClima,
   ResultadoTad,
   ResultadosPesquisa,
@@ -211,66 +210,6 @@ describe("T216 — Pulso e Clima: visão geral", () => {
   it("sem resultado do modelo, a visão por pergunta continua", () => {
     expect(visaoGeralDoModelo(detalhe, { ...geral, modelo: null })).toBeNull();
     expect(visaoGeralDoModelo(detalhe, RESULTADOS)).toBeNull();
-  });
-});
-
-describe("T216 — Pesquisa de Clima: visão geral", () => {
-  const detalhe = detalheDo("clima");
-  const sub = (
-    chave: string,
-    rotulo: string,
-    favoravel: number,
-    faixa: DimensaoDoModelo["faixa"],
-  ) => dim(chave, rotulo, 70, faixa, { afirmacoes: 4, favoravel });
-  const r: ResultadoClima = {
-    modelo: "clima",
-    favoravel: 76,
-    neutro: 14,
-    desfavoravel: 10,
-    score: 72,
-    faixa: "saudavel",
-    dimensoes: [
-      dim("credibilidade", "Credibilidade", 80, "forte", {
-        afirmacoes: 12,
-        favoravel: 90,
-        subdimensoes: [
-          sub("comunicacao", "Comunicação", 95, "forte"),
-          sub("competencia", "Competência", 90, "forte"),
-          sub("integridade", "Integridade", 45, "critico"),
-        ],
-      }),
-      dim("respeito", "Respeito", 50, "atencao", {
-        afirmacoes: 12,
-        favoravel: 55,
-        subdimensoes: [],
-      }),
-    ],
-    afirmacoes: [],
-  };
-  const geral: ResultadosPesquisa = { ...RESULTADOS, perguntas: [], modelo: r };
-
-  it("favorável geral, mais forte, mais frágil e a ordem das dimensões", () => {
-    render(<>{visaoGeralDoModelo(detalhe, geral)}</>);
-    const ind = screen.getByRole("region", { name: "Indicadores" });
-    expect(ind).toHaveTextContent("Favorável no geral76%Saudável");
-    expect(ind).toHaveTextContent("Dimensão mais forte90%Credibilidade");
-    expect(ind).toHaveTextContent("Dimensão mais frágil55%Respeito");
-    const itens = within(
-      screen.getByRole("list", { name: "Dimensões" }),
-    ).getAllByRole("listitem");
-    expect(itens.map((li) => li.querySelector("strong")!.textContent)).toEqual([
-      "Respeito",
-      "Credibilidade",
-    ]);
-    expect(itens[1]).toHaveTextContent("12 afirmações · Forte");
-  });
-
-  it("subdimensões com a faixa de cada uma e as perguntas abertas", () => {
-    render(<>{visaoGeralDoModelo(detalhe, geral)}</>);
-    expect(
-      screen.getByRole("rowheader", { name: /Integridade/ }),
-    ).toHaveTextContent("Crítico");
-    expect(screen.getAllByText("Nenhuma resposta escrita.")).toHaveLength(2);
   });
 });
 

@@ -18,6 +18,7 @@ import {
 import type {
   ResultadoDoModelo,
   ResultadoIndividualDoModelo,
+  ResumoDaRespostaDoModelo,
 } from "./resultadosDosModelos";
 
 export type * from "./resultadosDosModelos";
@@ -362,6 +363,8 @@ export interface RespostaResumo {
     grupo: string | null;
     oculto: MotivoOculto | null;
   }[];
+  /** O resumo da resposta no modelo (ex.: o índice do Clima), se houver. */
+  resumoDoModelo?: ResumoDaRespostaDoModelo | null;
 }
 
 /** `GET /pesquisas/:id/respostas/:respostaId`. */

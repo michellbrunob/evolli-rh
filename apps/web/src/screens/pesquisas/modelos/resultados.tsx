@@ -8,9 +8,18 @@ import type { ReactNode } from "react";
 import type {
   PesquisaDetalhe,
   RespostaDetalhe,
+  RespostaResumo,
   ResultadosPesquisa,
+  Secao,
 } from "../../../api/pesquisasClient";
+import type { ServicoDePesquisas } from "../servicoDePesquisas";
+import { AnalisesClima } from "./clima/AnalisesClima";
+import { temTelasDoClima } from "./clima/catalogo";
 import { ResultadoClimaVisao } from "./clima/ResultadoClima";
+import {
+  ListaDeRespostasClima,
+  VisaoIndividualClima,
+} from "./clima/RespostasClima";
 import { ResultadoPulsoClima } from "./pulso_clima/ResultadoPulsoClima";
 import { PainelTad, ResultadoTadVisao } from "./tad/ResultadoTad";
 import { ResultadoIndividualDisc } from "./disc/ResultadoIndividualDisc";
@@ -109,4 +118,54 @@ export function resultadoIndividualDoModelo(
     default:
       return null;
   }
+}
+
+/** A aba Análises própria do modelo (Clima), ou `null` (usa a comum). */
+export function analisesDoModelo(x: {
+  readonly servico: ServicoDePesquisas;
+  readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  readonly respostas: readonly RespostaResumo[] | null;
+  readonly onDuplicar?: () => void;
+}): ReactNode | null {
+  if (!temTelasDoClima(x.detalhe, x.geral)) return null;
+  return (
+    <AnalisesClima
+      servico={x.servico}
+      detalhe={x.detalhe}
+      geral={x.geral}
+      respostas={x.respostas}
+      {...(x.onDuplicar ? { onDuplicar: x.onDuplicar } : {})}
+    />
+  );
+}
+
+/** A lista da aba Respostas própria do modelo (Clima), ou `null`. */
+export function listaDeRespostasDoModelo(x: {
+  readonly detalhe: PesquisaDetalhe;
+  readonly geral: ResultadosPesquisa;
+  readonly respostas: readonly RespostaResumo[] | null;
+  readonly onAbrir: (id: string) => void;
+}): ReactNode | null {
+  if (!temTelasDoClima(x.detalhe, x.geral)) return null;
+  return (
+    <ListaDeRespostasClima
+      detalhe={x.detalhe}
+      respostas={x.respostas}
+      onAbrir={x.onAbrir}
+    />
+  );
+}
+
+/**
+ * A visão geral própria do resultado individual (Clima), no lugar dos
+ * indicadores comuns (média de 0 a 10, recomendação), ou `null`.
+ */
+export function visaoIndividualDoModelo(
+  resposta: RespostaDetalhe,
+  secoes: readonly Secao[],
+): ReactNode | null {
+  const r = resposta.modelo;
+  if (r?.modelo !== "clima") return null;
+  return <VisaoIndividualClima resposta={resposta} p={r} secoes={secoes} />;
 }

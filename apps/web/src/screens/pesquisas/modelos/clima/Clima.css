@@ -1,0 +1,236 @@
+/* T216 — telas da Pesquisa de Clima (resultados, respostas e assistente). Só tokens. */
+
+.clima-topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 760px) {
+  .clima-topo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.clima-indice {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  text-align: center;
+}
+
+.clima-medidor {
+  width: min(100%, 18rem);
+  height: auto;
+}
+
+.clima-medidor__faixa {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.clima-medidor__trilho,
+.clima-medidor__arco {
+  fill: none;
+  stroke-width: 16;
+}
+
+.clima-medidor__trilho {
+  stroke: var(--surface-neutral);
+}
+
+.clima-medidor__arco {
+  stroke: var(--faixa-cor, var(--color-action));
+}
+
+.clima-medidor__marcador {
+  fill: var(--surface-canvas);
+  stroke: var(--color-ink);
+  stroke-width: 3;
+}
+
+.clima-medidor__marca {
+  fill: var(--color-ink-muted);
+  font-size: 8px;
+}
+
+.clima-medidor__valor {
+  fill: var(--color-ink);
+  font-size: 28px;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.clima-notas ul {
+  display: grid;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clima-notas li {
+  display: grid;
+  grid-template-columns: auto 1fr auto 3rem;
+  align-items: center;
+  gap: var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.clima-notas li > :last-child {
+  text-align: right;
+}
+
+.clima-notas__ponto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lado-cor);
+}
+
+.clima-aneis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clima-aneis > li {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xxs);
+  text-align: center;
+}
+
+.clima-aneis .pesquisas__rosca {
+  width: 6.5rem;
+}
+
+.clima-caixas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-md);
+}
+
+.clima-caixa {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-neutral);
+}
+
+.clima-caixa[data-tom="bom"] {
+  background: var(--faixa-saudavel-fundo);
+}
+
+.clima-caixa[data-tom="atencao"] {
+  background: var(--faixa-critico-fundo);
+}
+
+.clima-caixa p {
+  margin: 0;
+}
+
+.clima-lista {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clima-lista > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.clima-lista > li:last-child {
+  border-bottom: 0;
+}
+
+.clima-afirmacao {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.clima-afirmacao__dimensao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.clima-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.clima-numero {
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.clima-diferenca[data-sinal="acima"] {
+  color: var(--status-success-ink, var(--color-ink));
+}
+
+.clima-diferenca[data-sinal="abaixo"] {
+  color: var(--status-danger-ink);
+}
+
+.clima-distribuicao {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clima-distribuicao > li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.clima-distribuicao__barras {
+  display: grid;
+  gap: 3px;
+}
+
+.clima-distribuicao__barras > span {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.clima-distribuicao__barras > span[data-serie="time"] {
+  background: var(--borda-controle);
+}
+
+.clima-perguntas__nova {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.clima-perguntas__nova-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}

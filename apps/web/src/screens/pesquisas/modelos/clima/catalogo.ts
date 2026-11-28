@@ -1,8 +1,11 @@
 /**
  * T216 — Pesquisa de Clima: 60 afirmações de concordância (1 a 5) em 5
- * dimensões × 3 subdimensões × 4 afirmações, e 2 perguntas abertas.
- * Metodologia fixa (a API confere os itens pela chave).
+ * dimensões × 3 subdimensões × 4 afirmações, e 2 perguntas abertas
+ * (obrigatórias). As perguntas são editáveis: o RH muda o texto, remove e
+ * acrescenta afirmações (numa dimensão) ou perguntas de texto livre; a API
+ * confere só a chave e o tipo.
  */
+import { FAIXAS_CLIMA } from "./faixas";
 import type {
   ModeloDaGaleria,
   PerguntaDoModelo,
@@ -204,6 +207,76 @@ export const DIMENSOES_CLIMA = [
 
 const doisDigitos = (n: number) => String(n).padStart(2, "0");
 
+/** O grupo das perguntas abertas (as 2 do modelo e as de texto livre). */
+export const TITULO_DAS_ABERTAS = "Perguntas abertas";
+
+/** Prefixo da chave das perguntas abertas. */
+export const PREFIXO_DAS_ABERTAS = "clima_aberta_";
+
+const CHAVES_DAS_DIMENSOES: readonly string[] = DIMENSOES_CLIMA.map(
+  (d) => d.chave,
+);
+
+/**
+ * A dimensão de uma afirmação pela chave: `clima_01`…`clima_60` (12 por
+ * dimensão, na ordem) ou `clima_<dimensão>_<sufixo>` (acrescentada pelo
+ * RH); `null` nas abertas e fora do Clima.
+ */
+export function dimensaoDaChave(
+  chave: string | null | undefined,
+): string | null {
+  if (!chave || chave.startsWith(PREFIXO_DAS_ABERTAS)) return null;
+  const fixa = /^clima_(\d{2})$/.exec(chave);
+  if (fixa) {
+    const n = Number(fixa[1]);
+    return n >= 1 && n <= 60
+      ? DIMENSOES_CLIMA[Math.floor((n - 1) / 12)]!.chave
+      : null;
+  }
+  const nova = /^clima_([a-z]+)_[A-Za-z0-9-]+$/.exec(chave);
+  return nova && CHAVES_DAS_DIMENSOES.includes(nova[1]!) ? nova[1]! : null;
+}
+
+/**
+ * A pesquisa usa as telas e exportações próprias do Clima: o modelo é o
+ * Clima e a API mandou o resultado do modelo (`null` quando oculto).
+ */
+export function temTelasDoClima(
+  detalhe: { readonly modelo: string },
+  geral: { readonly modelo?: unknown },
+): boolean {
+  return detalhe.modelo === "clima" && geral.modelo !== undefined;
+}
+
+/** A chave de uma afirmação nova na dimensão (até 40 caracteres). */
+export function chaveNova(dimensao: string | null, id: string): string {
+  const sufixo = id.replace(/[^A-Za-z0-9-]/g, "").slice(0, 12) || "nova";
+  return dimensao
+    ? `clima_${dimensao}_${sufixo}`
+    : `${PREFIXO_DAS_ABERTAS}${sufixo}`;
+}
+
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/** "Pesquisa de Clima – Novembro 2026". */
+export function nomeDaPesquisaDeClima(hoje: string): string {
+  const [ano, mes] = hoje.split("-");
+  return `Pesquisa de Clima – ${MESES[Number(mes) - 1] ?? ""} ${ano}`;
+}
+
 const SECOES: SecaoDoModelo[] = [
   ...DIMENSOES_CLIMA.map((d, i): SecaoDoModelo => ({
     titulo: d.rotulo,
@@ -220,7 +293,7 @@ const SECOES: SecaoDoModelo[] = [
     ),
   })),
   {
-    titulo: "Para fechar",
+    titulo: TITULO_DAS_ABERTAS,
     cor: "--modelo-cinza",
     perguntas: [
       {
@@ -228,14 +301,12 @@ const SECOES: SecaoDoModelo[] = [
         tipo: "paragrafo",
         rotulo: "O que manter",
         texto: "O que a empresa faz hoje que funciona e deve continuar?",
-        obrigatoria: false,
       },
       {
         chave: "clima_aberta_02",
         tipo: "paragrafo",
         rotulo: "O que mudar",
         texto: "Se você pudesse mudar uma coisa primeiro, o que seria?",
-        obrigatoria: false,
       },
     ],
   },
@@ -257,16 +328,15 @@ export const CLIMA: ModeloDaGaleria = {
   ritmo: "Completa · anual",
   frequencia: "Anual",
   sobre:
-    "60 afirmações de 1 a 5 em 5 dimensões e 15 subdimensões, mais 2 perguntas abertas. O resultado é o % favorável de cada uma.",
+    "60 afirmações de 1 a 5 em 5 dimensões, mais 2 perguntas abertas. O resultado é o índice do time: o % de respostas favoráveis, no geral e em cada dimensão.",
   nomeBase: "Pesquisa de Clima",
   boasVindas:
     "Queremos entender como é trabalhar aqui hoje. Não existe resposta certa: vale a sua percepção.",
   secoes: SECOES,
   comentarioFinal: null,
   perguntaPadrao: { tipo: "concordancia", config: {} },
-  limite: 62,
-  minimo: 60,
-  fixo: true,
+  limite: 100,
+  nomeDaPesquisa: nomeDaPesquisaDeClima,
   legendaDaEscala: [
     "Escala de concordância de 1 a 5",
     "1 = Discordo totalmente · 5 = Concordo totalmente · 4 e 5 contam como favoráveis",
@@ -275,67 +345,57 @@ export const CLIMA: ModeloDaGaleria = {
     titulo: "Pesquisa de Clima · O retrato completo",
     selo: "62 perguntas",
     texto:
-      "60 afirmações de 1 a 5 em 5 dimensões e 15 subdimensões, mais 2 perguntas abertas. Mostra o % favorável de cada uma e onde o clima pede atenção.",
+      "60 afirmações de 1 a 5 em 5 dimensões, mais 2 perguntas abertas. Mostra o índice do time (o % de respostas favoráveis), cada dimensão e onde o clima pede atenção.",
     metadados: [
       "Cerca de 15 minutos para responder",
       "Identificada, CPF confidencial ou anônima",
-      "% favorável por dimensão e subdimensão",
+      "Índice do time de 0% a 100%",
     ],
     botaoVer: "Ver as 62 perguntas",
     botaoCriar: "Criar pesquisa",
-    recebe: {
-      titulo: "O clima por dimensão e subdimensão",
-      itens: [
-        {
-          titulo: "% favorável",
-          texto: "Quem concorda (4 e 5) em cada dimensão e subdimensão.",
-        },
-        {
-          titulo: "Pontos fortes e frágeis",
-          texto: "As afirmações com mais e menos concordância.",
-        },
-        {
-          titulo: "Perguntas abertas",
-          texto: "O que manter e o que mudar primeiro, nas palavras do time.",
-        },
-      ],
-      exemplo: {
-        cabecalho: "Exemplo · 58 respostas",
-        destaque: {
-          valor: "76%",
-          texto: "favorável no geral · Saudável",
-          cor: "--faixa-saudavel",
-        },
-        barras: DIMENSOES_CLIMA.map((d, i) => ({
-          rotulo: d.rotulo,
-          valor: [81, 77, 62, 86, 74][i]!,
-          maximo: 100,
-          texto: `${[81, 77, 62, 86, 74][i]}%`,
-          cor: d.cor,
-        })),
-      },
-    },
+    numeros: [
+      { valor: "5", rotulo: "dimensões" },
+      { valor: "60", rotulo: "afirmações de 1 a 5" },
+      { valor: "2", rotulo: "perguntas abertas" },
+      { valor: "15 min", rotulo: "para responder" },
+    ],
     conteudo: [
       {
         tipo: "grupos",
-        titulo: "5 dimensões, 15 subdimensões",
-        descricao: "4 afirmações em cada subdimensão.",
+        titulo: "As 5 dimensões",
+        descricao: "12 afirmações em cada uma.",
         itens: DIMENSOES_CLIMA.map((d, i) => ({
           numero: doisDigitos(i + 1),
           titulo: d.rotulo,
           subtitulo: d.texto,
-          quantidade: "12 afirmações",
+          quantidade: "12",
           cor: d.cor,
-          chips: d.subdimensoes.map((s) => ({ texto: s.rotulo, cor: d.cor })),
         })),
       },
-    ],
-    ficha: [
-      ["Perguntas", "60 afirmações e 2 abertas, fixas"],
-      ["Tempo", "Cerca de 15 minutos"],
-      ["Resultado", "% favorável e score de 0 a 100"],
-      ["Recortes", "A partir de 3 respostas"],
-      ["Frequência", "Anual"],
+      {
+        tipo: "passos",
+        titulo: "Como o resultado é calculado",
+        descricao:
+          "1 Discordo totalmente · 2 Discordo · 3 Neutro · 4 Concordo · 5 Concordo totalmente",
+        itens: [
+          {
+            rotulo: "1",
+            titulo: "Cada afirmação de 1 a 5",
+            texto: "A pessoa marca o quanto concorda com cada frase.",
+          },
+          {
+            rotulo: "2",
+            titulo: "4 e 5 são favoráveis",
+            texto: "3 é neutro; 1 e 2 são desfavoráveis.",
+          },
+          {
+            rotulo: "3",
+            titulo: "O índice é o % favorável",
+            texto:
+              "De todas as respostas às afirmações, quantas foram 4 ou 5 — no time e em cada dimensão.",
+          },
+        ],
+      },
     ],
     escalas: [
       {
@@ -345,17 +405,12 @@ export const CLIMA: ModeloDaGaleria = {
       },
     ],
     regua: {
-      titulo: "As faixas do % favorável",
-      faixas: [
-        {
-          rotulo: "Crítico",
-          intervalo: "abaixo de 50%",
-          cor: "--faixa-critico",
-        },
-        { rotulo: "Atenção", intervalo: "50% a 69%", cor: "--faixa-atencao" },
-        { rotulo: "Saudável", intervalo: "70% a 84%", cor: "--faixa-saudavel" },
-        { rotulo: "Forte", intervalo: "85% ou mais", cor: "--faixa-forte" },
-      ],
+      titulo: "As faixas do índice",
+      faixas: FAIXAS_CLIMA.map((f) => ({
+        rotulo: f.rotulo,
+        intervalo: f.intervalo,
+        cor: f.cor,
+      })),
     },
   },
 };

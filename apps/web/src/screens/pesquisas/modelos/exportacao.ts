@@ -1,10 +1,10 @@
 /**
  * T216 — as abas da planilha (.xlsx) próprias de cada modelo com cálculo:
  * Pulso e Clima ("Dimensões": score 0–100, classificação, respostas,
- * perguntas, o geral, o eNPS e o LNPS), Clima ("Dimensões" com as
- * subdimensões, % favorável, neutro e desfavorável) e TAD ("Pilares":
+ * perguntas, o geral, o eNPS e o LNPS) e TAD ("Pilares":
  * time, pilares e as pessoas por nível), NR-1 e saúde financeira
- * (`planilhasDosModelos.ts`). Entram logo depois do Resumo.
+ * (`planilhasDosModelos.ts`). Entram logo depois do Resumo. O Clima tem
+ * a planilha inteira própria (`clima/planilhaClima.ts`).
  */
 import type {
   DimensaoDoModelo,
@@ -125,39 +125,6 @@ export function abasDoModelo(
           larguras: [36, 14, 14, 11, 11, 11, 10, 13],
           titulo: true,
           linhasDeCabecalho: [3, 3 + r.dimensoes.length + 3],
-          linhas,
-        },
-      ];
-    }
-    case "clima": {
-      const linhas: CelulaXlsx[][] = [
-        ...cabecalho("Dimensões", empresa, nome),
-        colunas,
-        ...r.dimensoes.flatMap((d) => [
-          linhaDaDimensao(d),
-          ...(d.subdimensoes ?? []).map((s) => linhaDaDimensao(s, "   ")),
-        ]),
-        [
-          "Geral",
-          r.score ?? "—",
-          r.faixa ? ROTULO_DA_FAIXA[r.faixa] : "—",
-          "",
-          r.afirmacoes.length,
-          porcento(r.favoravel),
-          porcento(r.neutro),
-          porcento(r.desfavoravel),
-        ],
-        [],
-        [
-          "A classificação vem do % favorável (4 e 5): abaixo de 50% crítico, 50% a 69% atenção, 70% a 84% saudável, 85% ou mais forte.",
-        ],
-      ];
-      return [
-        {
-          nome: "Dimensões",
-          larguras: [36, 14, 14, 11, 11, 11, 10, 13],
-          titulo: true,
-          linhasDeCabecalho: [3],
           linhas,
         },
       ];

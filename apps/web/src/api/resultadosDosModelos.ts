@@ -83,18 +83,67 @@ export interface ResultadoPulsoClima {
   comentarios: ComentarioDoModelo[];
 }
 
+/** Faixas do % favorável do Clima: < 50 · 50–64 · 65–79 · ≥ 80. */
+export type FaixaClima = "critica" | "atencao" | "boa" | "excelente";
+
+/** Uma dimensão (ou subdimensão) do Clima, com a faixa do % favorável. */
+export interface DimensaoClima extends Omit<
+  DimensaoDoModelo,
+  "faixa" | "subdimensoes"
+> {
+  faixa: FaixaClima | null;
+  subdimensoes?: DimensaoClima[];
+}
+
 export interface ResultadoClima {
   modelo: "clima";
-  /** % favorável (4–5) sobre todas as respostas das 60 afirmações. */
+  /** O índice: % favorável (4–5) sobre todas as respostas das afirmações. */
   favoravel: number | null;
   neutro: number | null;
   desfavoravel: number | null;
+  /** Respostas das afirmações somadas (favoráveis, neutras, desfavoráveis). */
+  notas: { favoraveis: number; neutras: number; desfavoraveis: number };
   /** Média dos scores das afirmações (0–100, inteiro). */
   score: number | null;
   /** A faixa do % favorável. */
-  faixa: FaixaDeScore | null;
-  dimensoes: DimensaoDoModelo[];
+  faixa: FaixaClima | null;
+  dimensoes: DimensaoClima[];
   afirmacoes: AfirmacaoDoModelo[];
+}
+
+/** O índice de uma resposta na lista (aba Respostas). */
+export interface ResumoDaRespostaClima {
+  modelo: "clima";
+  indice: number | null;
+  faixa: FaixaClima | null;
+}
+
+/** O resultado de uma resposta do Clima, comparado com o time. */
+export interface ResultadoIndividualClima {
+  modelo: "clima";
+  indice: number | null;
+  faixa: FaixaClima | null;
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number;
+  time: { indice: number | null; faixa: FaixaClima | null } | null;
+  dimensoes: {
+    chave: string;
+    rotulo: string;
+    indice: number | null;
+    faixa: FaixaClima | null;
+    time: number | null;
+  }[];
+  afirmacoes: {
+    chave: string;
+    perguntaId: string;
+    dimensao: string;
+    nota: number | null;
+    mediaTime: number | null;
+    favoravelTime: number | null;
+  }[];
+  /** Quantas notas 1 a 5 a pessoa deu e o % do time em cada nota. */
+  distribuicao: { resposta: number[]; time: number[] | null };
 }
 
 export type NivelTad = "alto" | "moderado" | "baixo";
@@ -138,7 +187,13 @@ export type ResultadoDoModelo =
   | ResultadoIsfb;
 
 export type ResultadoIndividualDoModelo =
-  ResultadoIndividualTad | IndividualNr1 | PessoaIsfb;
+  | ResultadoIndividualTad
+  | IndividualNr1
+  | PessoaIsfb
+  | ResultadoIndividualClima;
+
+/** O resumo de uma resposta na lista; acrescente aqui o de cada modelo. */
+export type ResumoDaRespostaDoModelo = ResumoDaRespostaClima;
 
 /** Grupo oculto (mesmo motivo dos resultados). */
 type MotivoOcultoDoModelo = "minimo" | "protege_grupo_menor";

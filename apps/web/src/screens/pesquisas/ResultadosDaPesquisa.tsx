@@ -76,7 +76,12 @@ import {
 import { GarantirAvisos, useAvisar } from "./avisos";
 import { modeloDaGaleria } from "./modelosDePesquisa";
 import { analisesParaOPainel, detalheParaOPainel } from "./modelos/empresa";
-import { abasDoModelo, visaoGeralDoModelo } from "./modelos/resultados";
+import {
+  abasDoModelo,
+  analisesDoModelo,
+  listaDeRespostasDoModelo,
+  visaoGeralDoModelo,
+} from "./modelos/resultados";
 import { CAMPOS_DE_GRUPO } from "./SepararRespostasPor";
 import { AvisoNaoIdentificaveis } from "./AvisoNaoIdentificaveis";
 import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
@@ -651,13 +656,26 @@ function ResultadosInterno({
             onTrocarAba={setAba}
           />
         ) : aba === "analises" ? (
-          <Analises servico={servico} detalhe={detalhe} geral={geral} />
+          (analisesDoModelo({
+            servico,
+            detalhe,
+            geral,
+            respostas,
+            onDuplicar: () => setDuplicar(true),
+          }) ?? <Analises servico={servico} detalhe={detalhe} geral={geral} />)
         ) : (
-          <ListaDeRespostas
-            detalhe={detalhe}
-            respostas={respostas}
-            onAbrir={(id) => onAbrirResposta?.(id)}
-          />
+          (listaDeRespostasDoModelo({
+            detalhe,
+            geral,
+            respostas,
+            onAbrir: (id) => onAbrirResposta?.(id),
+          }) ?? (
+            <ListaDeRespostas
+              detalhe={detalhe}
+              respostas={respostas}
+              onAbrir={(id) => onAbrirResposta?.(id)}
+            />
+          ))
         )}
       </div>
 
