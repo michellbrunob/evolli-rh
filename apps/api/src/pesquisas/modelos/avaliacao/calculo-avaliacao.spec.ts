@@ -515,8 +515,11 @@ describe("T216 — metodologia fixa da avaliação (registro dos modelos)", () =
 });
 
 describe("T216 — fronteiras dos níveis e dos comentários (provas extras)", () => {
-  it("4,5 já é Excepcional (nota, avaliação e time)", () => {
+  it("4,5 já é Excepcional (a nota)", () => {
     expect(nivelDaNota(4.5)).toBe("excepcional");
+  });
+
+  it("4,5 já é Excepcional (a avaliação)", () => {
     // Competências alternando 4,67 e 4,33: média geral 4,5.
     const n = notaDaAvaliacao(
       porCompetencia(
@@ -535,6 +538,9 @@ describe("T216 — fronteiras dos níveis e dos comentários (provas extras)", (
     );
     expect(n.geral).toBe(4.5);
     expect(n.nivel).toBe("excepcional");
+  });
+
+  it("4,5 já é Excepcional (o time)", () => {
     const t = resumoDoTime([
       { avaliadoId: "a", avaliadorId: "g", notas: todas(4) },
       { avaliadoId: "b", avaliadorId: "g", notas: todas(5) },
@@ -542,9 +548,12 @@ describe("T216 — fronteiras dos níveis e dos comentários (provas extras)", (
     expect(t.nivel).toBe("excepcional");
   });
 
-  it("média 2,5 (ou que arredonda para 2,5) não exige comentário", () => {
+  it("média que arredonda para 2,5 não exige comentário", () => {
     expect(exigeComentario("extremos", 2.45)).toBe(false);
     expect(exigeComentario("extremos", 2.44)).toBe(true);
+  });
+
+  it("competência com média 2,5 não gera alerta", () => {
     const notas = { ...todas(3) } as Record<string, number>;
     notas.lid_1 = 2;
     notas.lid_2 = 3;
