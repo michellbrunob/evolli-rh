@@ -37,6 +37,7 @@ import {
 } from "../../ui/icones";
 import { Esqueleto } from "../../ui/movimento";
 import { Avatar, iniciaisDe } from "./componentes";
+import { FalhaAoCarregar, tipoDaFalha, type Falha } from "./falhaAoCarregar";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { Regua } from "./graficos";
 import { detalheParaOPainel, secoesParaOPainel } from "./modelos/empresa";
@@ -110,7 +111,8 @@ export function ResultadoIndividual({
   readonly onIr: (respostaId: string) => void;
 }) {
   const [pesquisa, setPesquisa] = useState<PesquisaDetalhe | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  const [falhou, setFalhou] = useState<Falha | null>(null);
+  const [versao, setVersao] = useState(0);
   const [tituloDaResposta, setTituloDaResposta] = useState<string | null>(null);
   useTrilhaComplementar(
     pesquisa
@@ -123,22 +125,32 @@ export function ResultadoIndividual({
   );
   useEffect(() => {
     let vivo = true;
+    setFalhou(null);
     Promise.resolve(servico.obterPesquisa(pesquisaId))
       .then((d) => {
         if (vivo) setPesquisa(detalheParaOPainel(d));
       })
-      .catch(() => {
-        if (vivo) setFalhou(true);
+      .catch((erro: unknown) => {
+        if (vivo) setFalhou(tipoDaFalha(erro));
       });
     return () => {
       vivo = false;
     };
-  }, [servico, pesquisaId]);
+  }, [servico, pesquisaId, versao]);
   if (falhou)
     return (
-      <p className="pesquisas__erro" role="alert">
-        Não foi possível carregar a pesquisa.
-      </p>
+      <FalhaAoCarregar
+        falha={falhou}
+        titulo="Resultado individual"
+        mensagem="Não foi possível carregar a pesquisa."
+        rotuloVoltar={
+          falhou === "nao-encontrada"
+            ? "Ver todas as pesquisas"
+            : "Voltar para os resultados"
+        }
+        onVoltar={falhou === "nao-encontrada" ? onLista : onVoltar}
+        onTentarDeNovo={() => setVersao((v) => v + 1)}
+      />
     );
   if (!pesquisa) return <Esqueleto rotulo="Carregando resposta…" linhas={5} />;
   const propria = paginaIndividualDoModelo({
@@ -197,6 +209,7 @@ export function PaginaDaResposta({
 }) {
   const [r, setR] = useState<RespostaDetalhe | null>(null);
   const [falhou, setFalhou] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   const [aba, setAba] = useState<"geral" | "respostas">("geral");
   const [todasAsRespostas, setTodasAsRespostas] = useState<
     readonly RespostaResumo[] | null
@@ -237,7 +250,7 @@ export function PaginaDaResposta({
     };
     // `carregar` muda a cada render do pai; a resposta é o que importa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [respostaId]);
+  }, [respostaId, tentativa]);
 
   const tituloCarregado = r
     ? identificacao === "identificada" && r.nome
@@ -253,12 +266,22 @@ export function PaginaDaResposta({
   if (falhou)
     return (
       <div className="pesquisas">
-        <p className="pesquisas__erro" role="alert">
-          Não foi possível carregar a resposta.
-        </p>
-        <Button variant="secondary" onClick={onVoltar}>
-          {rotuloVoltar}
-        </Button>
+        <div className="pesquisas__caixa-erro" role="alert">
+          <p className="pesquisas__erro">
+            Não foi possível carregar a resposta.
+          </p>
+          <div className="pesquisas__acoes">
+            <Button
+              variant="secondary"
+              onClick={() => setTentativa((t) => t + 1)}
+            >
+              Tentar novamente
+            </Button>
+            <Button variant="subtle" onClick={onVoltar}>
+              {rotuloVoltar}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   if (!r) return <Esqueleto rotulo="Carregando resposta…" linhas={5} />;

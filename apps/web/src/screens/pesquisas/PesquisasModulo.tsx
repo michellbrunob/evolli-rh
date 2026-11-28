@@ -88,6 +88,7 @@ const RelatorioDaResposta = lazy(() =>
   })),
 );
 import { esquecerRascunho } from "./rascunhosLocais";
+import { FalhaAoCarregar, tipoDaFalha, type Falha } from "./falhaAoCarregar";
 import { ResultadoIndividual } from "./ResultadoIndividual";
 import { ResultadosDaPesquisa } from "./ResultadosDaPesquisa";
 import {
@@ -420,6 +421,7 @@ function Modulo({
           onCarregada={(d) =>
             setModeloDoRascunho({ id: d.id, modelo: d.modelo })
           }
+          onVoltar={() => irPara(ROTA_DA_LISTA)}
           render={(d) =>
             d.status !== "rascunho" ? (
               <Redirecionar
@@ -665,14 +667,18 @@ function CarregarPesquisa({
   id,
   render,
   onCarregada,
+  onVoltar,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly id: string;
   readonly render: (d: PesquisaDetalhe) => React.ReactNode;
   readonly onCarregada?: (d: PesquisaDetalhe) => void;
+  /** "Ver todas as pesquisas" na falha. */
+  readonly onVoltar: () => void;
 }) {
   const [d, setD] = useState<PesquisaDetalhe | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  const [falhou, setFalhou] = useState<Falha | null>(null);
+  const [tentativa, setTentativa] = useState(0);
   const primeiraRef = useRef<PesquisaDetalhe | null>(null);
   const carregadaRef = useRef(onCarregada);
   carregadaRef.current = onCarregada;
@@ -685,18 +691,26 @@ function CarregarPesquisa({
         setD(x);
         carregadaRef.current?.(x);
       })
-      .catch(() => {
-        if (vivo && !primeiraRef.current) setFalhou(true);
+      .catch((erro: unknown) => {
+        if (vivo && !primeiraRef.current) setFalhou(tipoDaFalha(erro));
       });
     return () => {
       vivo = false;
     };
-  }, [servico, id]);
+  }, [servico, id, tentativa]);
   if (falhou)
     return (
-      <p className="pesquisas__erro" role="alert">
-        Não foi possível abrir a pesquisa.
-      </p>
+      <FalhaAoCarregar
+        falha={falhou}
+        titulo="Pesquisa"
+        mensagem="Não foi possível abrir a pesquisa."
+        rotuloVoltar="Ver todas as pesquisas"
+        onVoltar={onVoltar}
+        onTentarDeNovo={() => {
+          setFalhou(null);
+          setTentativa((t) => t + 1);
+        }}
+      />
     );
   if (!d) return <Esqueleto rotulo="Carregando a pesquisa…" linhas={5} />;
   return <>{render(d)}</>;
@@ -837,7 +851,7 @@ function ListaDePesquisas({
           ? a.criadaEm.localeCompare(b.criadaEm)
           : b.criadaEm.localeCompare(a.criadaEm),
       );
-  }, [itens, status, tipos, busca, crescente]);
+  }, [encontradas, status, crescente]);
 
   async function copiar(p: PesquisaResumo) {
     if (!p.link) return;

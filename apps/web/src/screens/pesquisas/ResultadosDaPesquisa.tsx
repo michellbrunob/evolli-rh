@@ -11,7 +11,14 @@
  *
  * Grupos abaixo do mínimo nunca mostram números.
  */
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   AnalisesPesquisa,
   CampoGrupo,
@@ -75,6 +82,7 @@ import {
   MenuDeStatus,
 } from "./acoesDaPesquisa";
 import { GarantirAvisos, useAvisar } from "./avisos";
+import { FalhaAoCarregar, tipoDaFalha, type Falha } from "./falhaAoCarregar";
 import { modeloDaGaleria } from "./modelosDePesquisa";
 import { analisesParaOPainel, detalheParaOPainel } from "./modelos/empresa";
 import {
@@ -216,7 +224,7 @@ function ResultadosInterno({
     [gravada],
   );
   const [geral, setGeral] = useState<ResultadosPesquisa | null>(null);
-  const [falhou, setFalhou] = useState(false);
+  const [falhou, setFalhou] = useState<Falha | null>(null);
   const [versao, setVersao] = useState(0);
   const [aba, setAbaLocal] = useState<Aba>(abaInicial);
   const [excluir, setExcluir] = useState(false);
@@ -225,7 +233,14 @@ function ResultadosInterno({
   const [respostas, setRespostas] = useState<RespostaResumo[] | null>(null);
 
   // A trilha: "Pesquisas / <nome da pesquisa>" ("Pesquisas" volta à lista).
-  useTrilhaComplementar(detalhe ? detalhe.nome : "Resultados", onVoltar);
+  useTrilhaComplementar(
+    detalhe
+      ? detalhe.nome
+      : falhou === "nao-encontrada"
+        ? "Pesquisa não encontrada"
+        : "Resultados",
+    onVoltar,
+  );
 
   useEffect(() => setAbaLocal(abaInicial), [abaInicial]);
   const setAba = (a: Aba) => {
@@ -235,7 +250,7 @@ function ResultadosInterno({
 
   useEffect(() => {
     let vivo = true;
-    setFalhou(false);
+    setFalhou(null);
     Promise.all([
       Promise.resolve(servico.obterPesquisa(pesquisaId)),
       Promise.resolve(servico.resultadosDaPesquisa(pesquisaId, null)),
@@ -245,8 +260,8 @@ function ResultadosInterno({
         setDetalhe(d);
         setGeral(r);
       })
-      .catch(() => {
-        if (vivo) setFalhou(true);
+      .catch((erro: unknown) => {
+        if (vivo) setFalhou(tipoDaFalha(erro));
       });
     return () => {
       vivo = false;
@@ -329,31 +344,14 @@ function ResultadosInterno({
 
   if (falhou) {
     return (
-      <div className="pesquisas">
-        <header className="pesquisas__cabecalho">
-          <IconButton
-            label="Voltar para Pesquisas"
-            icon={<IconeVoltar tamanho={18} />}
-            className="pesquisas__voltar"
-            onClick={() => onVoltar()}
-          />
-          <h1
-            id={PESQUISAS_TITULO_ID}
-            className="pesquisas__titulo"
-            tabIndex={-1}
-          >
-            Resultados
-          </h1>
-        </header>
-        <div className="pesquisas__caixa-erro" role="alert">
-          <p className="pesquisas__erro">
-            Não foi possível carregar os resultados.
-          </p>
-          <Button variant="secondary" onClick={() => setVersao((v) => v + 1)}>
-            Tentar novamente
-          </Button>
-        </div>
-      </div>
+      <FalhaAoCarregar
+        falha={falhou}
+        titulo="Resultados"
+        mensagem="Não foi possível carregar os resultados."
+        rotuloVoltar="Ver todas as pesquisas"
+        onVoltar={() => onVoltar()}
+        onTentarDeNovo={() => setVersao((v) => v + 1)}
+      />
     );
   }
   if (!detalhe || !geral) {
@@ -510,7 +508,7 @@ function ResultadosInterno({
                 Exportar
                 <IconeAbrir tamanho={12} />
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="pesquisas__menu">
+              <DropdownMenuContent className="pesquisas__menu pesquisas__menu--opcoes">
                 <DropdownMenuItem onSelect={() => void exportar("xlsx")}>
                   <IconePlanilha tamanho={16} />
                   <span className="pesquisas__menu-opcao">
@@ -844,28 +842,34 @@ function VisaoGeral({
   } | null>(null);
   const [atual, setAtual] = useState<ResultadosPesquisa>(geral);
   const [filtrando, setFiltrando] = useState(false);
+  /** O recorte pedido falhou: nada de números antigos sob o filtro novo. */
+  const [falhaDoFiltro, setFalhaDoFiltro] = useState(false);
+  /** Só a resposta do último pedido vale (as antigas chegam e são ignoradas). */
+  const pedidoRef = useRef(0);
 
   useEffect(() => setAtual(geral), [geral]);
 
   async function filtrar(campo: CampoGrupo, grupoId: string) {
     const novo = grupoId ? { campo, grupoId } : null;
+    const pedido = ++pedidoRef.current;
     setRecorte(novo);
+    setFalhaDoFiltro(false);
     // Sem recorte, volta ao resultado geral (já carregado).
-    if (!novo) return setAtual(geral);
+    if (!novo) {
+      setFiltrando(false);
+      return setAtual(geral);
+    }
     setFiltrando(true);
     try {
-      setAtual(
-        await servico.resultadosDaPesquisa(
-          detalhe.id,
-          novo
-            ? campo === "departamento" && !geral.recortes
-              ? novo.grupoId
-              : novo
-            : null,
-        ),
+      const r = await servico.resultadosDaPesquisa(
+        detalhe.id,
+        campo === "departamento" && !geral.recortes ? novo.grupoId : novo,
       );
+      if (pedido === pedidoRef.current) setAtual(r);
+    } catch {
+      if (pedido === pedidoRef.current) setFalhaDoFiltro(true);
     } finally {
-      setFiltrando(false);
+      if (pedido === pedidoRef.current) setFiltrando(false);
     }
   }
 
@@ -1025,6 +1029,7 @@ function VisaoGeral({
                     ]}
                     valor={recorte?.campo === campo ? recorte.grupoId : ""}
                     onMudar={(v) => void filtrar(campo, v)}
+                    direcao="abaixo"
                   />
                 </div>
               );
@@ -1033,7 +1038,27 @@ function VisaoGeral({
         ) : null}
       </div>
 
-      {recorte ? (
+      {recorte && falhaDoFiltro ? (
+        <div className="pesquisas__caixa-erro" role="alert">
+          <p className="pesquisas__erro">
+            Não foi possível carregar os resultados deste filtro.
+          </p>
+          <div className="pesquisas__acoes">
+            <Button
+              variant="secondary"
+              onClick={() => void filtrar(recorte.campo, recorte.grupoId)}
+            >
+              Tentar novamente
+            </Button>
+            <Button
+              variant="subtle"
+              onClick={() => void filtrar(recorte.campo, "")}
+            >
+              Limpar filtros
+            </Button>
+          </div>
+        </div>
+      ) : recorte ? (
         <p className="pesquisas__filtro-aplicado" role="status">
           {`Mostrando ${plural(atual.filtro.respostas ?? atual.respostas, "resposta", "respostas")} de ${geral.respostas}`}
           {" · "}
@@ -1051,7 +1076,7 @@ function VisaoGeral({
         className="pesquisas__resultados"
         {...(filtrando ? { "aria-busy": true, "data-carregando": "" } : {})}
       >
-        {!atual.filtro.visivel ? (
+        {recorte && falhaDoFiltro ? null : !atual.filtro.visivel ? (
           <PoucasRespostas
             minimo={detalhe.minimoPorGrupo}
             motivo={motivoDoRecorte(geral, recorte)}

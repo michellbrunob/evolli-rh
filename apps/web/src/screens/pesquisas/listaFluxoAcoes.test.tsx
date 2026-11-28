@@ -238,6 +238,152 @@ describe("R3-A-29 — o aviso não cobre o rodapé de uma gaveta", () => {
   });
 });
 
+describe("R3-A-06 — recorte que falha", () => {
+  function montarResultados(resultados: ReturnType<typeof vi.fn>) {
+    const servico = servicoFalso({ resultadosDaPesquisa: resultados as never });
+    render(
+      <ResultadosDaPesquisa
+        servico={servico}
+        pesquisaId="p-1"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    return servico;
+  }
+
+  it("mostra o erro com 'Tentar novamente' e nunca os números gerais sob o filtro", async () => {
+    let falhar = true;
+    const resultados = vi.fn((_id: string, recorte?: unknown) =>
+      recorte
+        ? falhar
+          ? Promise.reject(Object.assign(new Error("x"), { status: 500 }))
+          : Promise.resolve({ ...RESULTADOS, respostas: 6 })
+        : Promise.resolve(RESULTADOS),
+    );
+    montarResultados(resultados);
+    await screen.findByRole("region", { name: "Indicadores" });
+    fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
+    fireEvent.click(screen.getByRole("option", { name: "Operações" }));
+    const erro = await screen.findByRole("alert");
+    expect(erro).toHaveTextContent(
+      "Não foi possível carregar os resultados deste filtro.",
+    );
+    expect(screen.queryByText(/Mostrando/)).toBeNull();
+    expect(
+      document.querySelectorAll(".pesquisas__resultados .pesquisas__cartao")
+        .length,
+    ).toBe(0);
+    falhar = false;
+    fireEvent.click(
+      within(erro).getByRole("button", { name: "Tentar novamente" }),
+    );
+    expect(
+      await screen.findByText(/Mostrando 6 respostas de 8/),
+    ).toBeInTheDocument();
+    expect(resultados).toHaveBeenLastCalledWith("p-1", "d-1");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("uma resposta atrasada de um filtro antigo não substitui a do filtro atual", async () => {
+    let soltarAntigo: (v: unknown) => void = () => undefined;
+    const resultados = vi.fn((_id: string, recorte?: unknown) => {
+      if (recorte === "d-1")
+        return new Promise((r) => {
+          soltarAntigo = r;
+        });
+      if (recorte === "d-2")
+        return Promise.resolve({
+          ...RESULTADOS,
+          respostas: 2,
+          filtro: { departamentoId: "d-2", visivel: true },
+        });
+      return Promise.resolve(RESULTADOS);
+    });
+    montarResultados(resultados);
+    await screen.findByRole("region", { name: "Indicadores" });
+    fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
+    fireEvent.click(screen.getByRole("option", { name: "Operações" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Departamento" }));
+    fireEvent.click(screen.getByRole("option", { name: "Financeiro" }));
+    expect(
+      await screen.findByText(/Mostrando 2 respostas de 8/),
+    ).toBeInTheDocument();
+    soltarAntigo({ ...RESULTADOS, respostas: 6 });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByText(/Mostrando 2 respostas de 8/)).toBeInTheDocument();
+  });
+});
+
+describe("R3-A-27 — o seletor dos resultados", () => {
+  it("abre para baixo mesmo perto do pé da tela, e mais largo", async () => {
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso()}
+        pesquisaId="p-1"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    await screen.findByRole("region", { name: "Indicadores" });
+    const campo = screen.getByRole("combobox", { name: "Departamento" });
+    vi.spyOn(campo, "getBoundingClientRect").mockReturnValue({
+      top: window.innerHeight - 50,
+      bottom: window.innerHeight - 10,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 40,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    fireEvent.click(campo);
+    const listaAberta = screen.getByRole("listbox");
+    expect(listaAberta).not.toHaveClass("lista-escolha__lista--acima");
+    const regras = css("Pesquisas.css");
+    expect(regras).toMatch(
+      /\.pesquisas__secao-cabeca \.pesquisas__filtro-lista \.lista-escolha \{[^}]*min-width: 12rem/,
+    );
+    expect(regras).toMatch(
+      /\.pesquisas__secao-cabeca \.pesquisas__filtro-lista \.lista-escolha__lista \{[^}]*right: 0;[^}]*left: auto;[^}]*width: max-content/,
+    );
+  });
+});
+
+describe("R3-A-28 — menus de status e Exportar com respiro", () => {
+  it("os menus com duas linhas por item levam a classe de respiro", async () => {
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso()}
+        pesquisaId="p-1"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    await screen.findByRole("region", { name: "Indicadores" });
+    abrirMenu("Exportar");
+    expect(await screen.findByRole("menu")).toHaveClass(
+      "pesquisas__menu--opcoes",
+    );
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    abrirMenu(/Mudar status/);
+    expect(await screen.findByRole("menu")).toHaveClass(
+      "pesquisas__menu--opcoes",
+    );
+    expect(css("Pesquisas.css")).toMatch(
+      /\.pesquisas__menu--opcoes \[role="menuitem"\] \{[^}]*padding-block: var\(--space-xs\)/,
+    );
+    expect(css("Pesquisas.css")).toMatch(
+      /\.pesquisas__menu--opcoes \{[^}]*gap: var\(--space-xxs\)/,
+    );
+  });
+});
+
 const ANONIMA: PesquisaResumo = {
   ...RESUMO,
   id: "p-2",
@@ -571,5 +717,175 @@ describe("R3-A-25 — finalizada", () => {
     await screen.findByRole("region", { name: "Indicadores" });
     expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copiar link" })).toBeNull();
+  });
+});
+
+describe("R3-A-34 — rotas inválidas", () => {
+  it("pesquisa inexistente: 'Pesquisa não encontrada' com volta à lista", async () => {
+    const onVoltar = vi.fn();
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() =>
+            Promise.reject(Object.assign(new Error("x"), { status: 400 })),
+          ),
+        })}
+        pesquisaId="personalizada"
+        podeEditar
+        onVoltar={onVoltar}
+        onEditar={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Pesquisa não encontrada",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Não foi possível carregar/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Tentar novamente" }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todas as pesquisas" }),
+    );
+    expect(onVoltar).toHaveBeenCalled();
+  });
+
+  it("404 também é 'não encontrada'; outra falha oferece tentar de novo", async () => {
+    let status = 404;
+    const obter = vi.fn(() =>
+      Promise.reject(Object.assign(new Error("x"), { status })),
+    );
+    const { unmount } = render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({ obterPesquisa: obter })}
+        pesquisaId="p-x"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Pesquisa não encontrada" }),
+    ).toBeInTheDocument();
+    unmount();
+    status = 500;
+    render(
+      <ResultadosDaPesquisa
+        servico={servicoFalso({ obterPesquisa: obter })}
+        pesquisaId="p-x"
+        podeEditar
+        onVoltar={vi.fn()}
+        onEditar={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText("Não foi possível carregar os resultados."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Tentar novamente" }),
+    ).toBeInTheDocument();
+  });
+
+  it("rascunho com endereço inválido: 'não encontrada' com volta à lista", async () => {
+    const onNavegar = vi.fn();
+    render(
+      <PesquisasModulo
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() =>
+            Promise.reject(Object.assign(new Error("x"), { status: 400 })),
+          ),
+        })}
+        podeEditar
+        rota={{ tela: "rascunho", id: "qualquer" }}
+        onNavegar={onNavegar}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Pesquisa não encontrada" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver todas as pesquisas" }),
+    );
+    expect(onNavegar).toHaveBeenLastCalledWith({ tela: "lista" }, undefined);
+  });
+
+  it("resultado individual com falha: tentar de novo e voltar", async () => {
+    let falhar = true;
+    const obter = vi.fn(() =>
+      falhar
+        ? Promise.reject(Object.assign(new Error("x"), { status: 500 }))
+        : Promise.resolve(DETALHE),
+    );
+    const onVoltar = vi.fn();
+    render(
+      <ResultadoIndividual
+        servico={servicoFalso({ obterPesquisa: obter })}
+        pesquisaId="p-1"
+        respostaId="r-1"
+        onVoltar={onVoltar}
+        onLista={vi.fn()}
+        onIr={vi.fn()}
+      />,
+    );
+    const erro = await screen.findByRole("alert");
+    expect(erro).toHaveTextContent("Não foi possível carregar a pesquisa.");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar para os resultados" }),
+    );
+    expect(onVoltar).toHaveBeenCalled();
+    falhar = false;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() => expect(obter).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("resultado individual de pesquisa inexistente: 'não encontrada'", async () => {
+    render(
+      <ResultadoIndividual
+        servico={servicoFalso({
+          obterPesquisa: vi.fn(() =>
+            Promise.reject(Object.assign(new Error("x"), { status: 404 })),
+          ),
+        })}
+        pesquisaId="p-x"
+        respostaId="r-1"
+        onVoltar={vi.fn()}
+        onLista={vi.fn()}
+        onIr={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Pesquisa não encontrada" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Tentar novamente" }),
+    ).toBeNull();
+  });
+
+  it("a resposta que falha também oferece tentar de novo", async () => {
+    let falhar = true;
+    const carregar = vi.fn((_p: string, id: string) =>
+      falhar
+        ? Promise.reject(new Error("x"))
+        : Promise.resolve({ ...RESPOSTA_DETALHE, id }),
+    );
+    render(
+      <ResultadoIndividual
+        servico={servicoFalso({ respostaDaPesquisa: carregar })}
+        pesquisaId="p-1"
+        respostaId="r-1"
+        onVoltar={vi.fn()}
+        onLista={vi.fn()}
+        onIr={vi.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText("Não foi possível carregar a resposta."),
+    ).toBeInTheDocument();
+    falhar = false;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() => expect(carregar).toHaveBeenCalledTimes(2));
   });
 });

@@ -3832,3 +3832,31 @@ body:has(.pesquisas__rodape) .aviso-flutuante {
 .pesquisas__tabela--clicavel tbody tr:hover td.pesquisas__vazio-da-tabela {
   background: transparent;
 }
+
+/* Menus com título e descrição por item (Mudar status, Exportar): respiro
+   entre os itens e dentro deles. */
+.pesquisas__menu--opcoes {
+  gap: var(--space-xxs);
+}
+
+.pesquisas__menu--opcoes [role="menuitem"] {
+  padding-block: var(--space-xs);
+}
+
+/* Filtros dos resultados ("Departamento"): campo mais largo e a lista
+   alinhada à direita, na largura das opções, sem quebrar o texto nem criar
+   rolagem horizontal. */
+.pesquisas__secao-cabeca .pesquisas__filtro-lista .lista-escolha {
+  min-width: 12rem;
+}
+
+.pesquisas__secao-cabeca .pesquisas__filtro-lista .lista-escolha__lista {
+  right: 0;
+  left: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.pesquisas__secao-cabeca .pesquisas__filtro-lista .lista-escolha__opcao {
+  white-space: nowrap;
+}

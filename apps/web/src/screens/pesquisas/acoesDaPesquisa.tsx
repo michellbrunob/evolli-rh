@@ -133,7 +133,10 @@ export function MenuDeStatus({
           </span>
           <IconeAbrir tamanho={12} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="pesquisas__menu" align="start">
+        <DropdownMenuContent
+          className="pesquisas__menu pesquisas__menu--opcoes"
+          align="start"
+        >
           <p className="pesquisas__menu-titulo" aria-hidden="true">
             Mudar status
           </p>
