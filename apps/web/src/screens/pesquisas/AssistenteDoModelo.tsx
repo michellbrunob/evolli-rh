@@ -82,6 +82,7 @@ import {
   ROTULO_DA_IDENTIFICACAO,
   novoId,
 } from "./textosDasPesquisas";
+import { mensagemDaFalha } from "./falhasDaGravacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 
 const ETAPAS_COMPLETAS = [
@@ -352,13 +353,11 @@ function AssistenteDoModeloInterno({
       setCriadaAs(horaDe(agora()));
       setGerada(publicada);
     } catch (erro) {
-      const status = (erro as { status?: unknown } | null)?.status;
       setFalha(
-        status === 422
-          ? "Não foi possível gerar: o servidor recusou algum campo. Revise as etapas."
-          : publicadaAntes
-            ? "Não foi possível salvar as alterações. Tente de novo."
-            : "Não foi possível gerar a pesquisa. Verifique a conexão e tente de novo.",
+        mensagemDaFalha(
+          erro,
+          publicadaAntes ? "salvar as alterações" : "gerar a pesquisa",
+        ),
       );
     }
   }

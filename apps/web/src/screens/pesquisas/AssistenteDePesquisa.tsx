@@ -55,6 +55,7 @@ import {
   ROTULO_DA_IDENTIFICACAO,
   ROTULO_DO_MODELO,
 } from "./textosDasPesquisas";
+import { mensagemDaFalha } from "./falhasDaGravacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import "./Pesquisas.css";
 
@@ -232,15 +233,6 @@ function AssistenteDePesquisaInterno({
       salvoEm: new Date().toISOString(),
     });
     return id;
-  }
-
-  function mensagemDaFalha(erro: unknown, acao: string): string {
-    const status = (erro as { status?: unknown } | null)?.status;
-    if (status === 409)
-      return `Não foi possível ${acao}: a pesquisa mudou de situação. Volte à lista e abra de novo.`;
-    if (status === 422)
-      return `Não foi possível ${acao}: o servidor recusou algum campo. Revise as etapas e tente de novo.`;
-    return `Não foi possível ${acao}. Verifique a conexão e tente de novo.`;
   }
 
   async function aoEnviar(evento: FormEvent<HTMLFormElement>) {
