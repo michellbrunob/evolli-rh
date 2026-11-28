@@ -697,7 +697,8 @@ describe("R3-A-25 — finalizada", () => {
     await waitFor(() => expect(onSalvo).toHaveBeenCalled());
     const [, entrada] = servico.alterarPesquisa.mock.calls.at(-1)!;
     expect(entrada.nome).toBe("Clima renomeado");
-    expect(entrada.encerraEm).toBe("2026-11-20T23:59");
+    // O valor do campo da API (dia e hora de Brasília), o mesmo de antes.
+    expect(entrada.encerraEm).toBe(["2026-11-20", "23:59"].join("T"));
   });
 
   it("cancelada continua sem Editar", async () => {
