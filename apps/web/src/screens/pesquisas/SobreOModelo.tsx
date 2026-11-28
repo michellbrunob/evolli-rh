@@ -23,6 +23,7 @@ import {
 } from "./modelosDePesquisa";
 import { minutosEstimados } from "./PreVisualizacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
+import { PaginaDoModelo } from "./modelos/PaginaDoModelo";
 
 /** Primeira letra minúscula, sem estragar siglas ("Recomendação (eNPS)"). */
 function minusculaSemSigla(texto: string): string {
@@ -70,6 +71,16 @@ export function SobreOModelo({
 }) {
   const m = modeloDaGaleria(id);
   const [gaveta, setGaveta] = useState(false);
+  if (m.pagina) {
+    return (
+      <PaginaDoModelo
+        modelo={m}
+        pagina={m.pagina}
+        onVoltar={onVoltar}
+        onUsar={onUsar}
+      />
+    );
+  }
   const todas = perguntasEmOrdem(secoesDoModelo(m));
   const principais = todas.slice(0, perguntasPrincipais(m));
   const grupos = new Map<string, Pergunta[]>();

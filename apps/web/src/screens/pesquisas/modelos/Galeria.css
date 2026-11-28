@@ -1,0 +1,174 @@
+/* T216 — galeria de modelos: tons dos ícones, selos, o quadro da NR-1, o
+   card clicável e os grupos da gaveta. Só tokens. */
+
+.pesquisas__icone-modelo.pesquisas__icone-modelo[data-tom] {
+  border-radius: 13px;
+  background: var(--tom-fundo);
+  color: var(--tom-tinta);
+}
+.pesquisas__icone-modelo[data-tom="rosa"] {
+  --tom-fundo: var(--modelo-rosa-fundo);
+  --tom-tinta: var(--modelo-rosa);
+}
+.pesquisas__icone-modelo[data-tom="coral"] {
+  --tom-fundo: var(--modelo-coral-fundo);
+  --tom-tinta: var(--modelo-coral);
+}
+.pesquisas__icone-modelo[data-tom="azul"] {
+  --tom-fundo: var(--modelo-azul-fundo);
+  --tom-tinta: var(--modelo-azul);
+}
+.pesquisas__icone-modelo[data-tom="teal"] {
+  --tom-fundo: var(--modelo-teal-fundo);
+  --tom-tinta: var(--modelo-teal);
+}
+.pesquisas__icone-modelo[data-tom="verde"] {
+  --tom-fundo: var(--modelo-verde-fundo);
+  --tom-tinta: var(--modelo-verde);
+}
+.pesquisas__icone-modelo[data-tom="roxo"] {
+  --tom-fundo: var(--modelo-roxo-fundo);
+  --tom-tinta: var(--modelo-roxo);
+}
+.pesquisas__icone-modelo[data-tom="laranja"] {
+  --tom-fundo: var(--modelo-laranja-fundo);
+  --tom-tinta: var(--modelo-laranja);
+}
+.pesquisas__icone-modelo[data-tom="esmeralda"] {
+  --tom-fundo: var(--modelo-esmeralda-fundo);
+  --tom-tinta: var(--modelo-esmeralda);
+}
+.pesquisas__icone-modelo[data-tom="celeste"] {
+  --tom-fundo: var(--modelo-celeste-fundo);
+  --tom-tinta: var(--modelo-celeste);
+}
+.pesquisas__icone-modelo[data-tom="ambar"] {
+  --tom-fundo: var(--modelo-ambar-fundo);
+  --tom-tinta: var(--modelo-ambar);
+}
+.pesquisas__icone-modelo[data-tom="cinza"] {
+  --tom-fundo: var(--modelo-cinza-fundo);
+  --tom-tinta: var(--modelo-cinza);
+}
+
+.pesquisas__icone-modelo--sm[data-tom] {
+  border-radius: var(--radius-sm);
+}
+
+.galeria__selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-size: 0.71875rem;
+  font-weight: var(--weight-strong);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.galeria__selo[data-tom="rosa"] {
+  background: var(--selo-novo-fundo);
+  color: var(--selo-novo-tinta);
+}
+.galeria__selo[data-tom="verde"] {
+  background: var(--selo-nr1-fundo);
+  color: var(--selo-nr1-tinta);
+}
+.galeria__selo[data-tom="cinza"] {
+  background: var(--surface-neutral);
+  color: var(--color-ink-muted);
+}
+
+/* O quadro "Precisa cumprir a NR-1?". */
+.galeria__nr1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--quadro-nr1-borda);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--quadro-nr1-fundo);
+}
+.galeria__nr1-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 13px;
+  background: var(--surface-canvas);
+  color: var(--modelo-verde);
+}
+.galeria__nr1-textos {
+  display: grid;
+  flex: 1 1 18rem;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+.galeria__nr1-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: 1rem;
+  font-weight: var(--weight-strong);
+}
+
+/* O card inteiro é clicável; borda rosa no passar e no foco. */
+.galeria__cartao {
+  cursor: pointer;
+  border-color: var(--cartao-modelo-borda);
+}
+.galeria__cartao:hover,
+.galeria__cartao:focus-within {
+  border-color: var(--cartao-modelo-foco);
+}
+.galeria__fatos li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+/* A gaveta "Ver perguntas": um grupo por bloco, com a bolinha da cor. */
+.galeria__gaveta-grupo {
+  display: grid;
+  gap: var(--space-xs);
+}
+.galeria__bolinha {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-xs);
+  border-radius: var(--radius-pill);
+}
+.galeria__gaveta-resumo {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+
+/* A pílula "Passo X de 4": o passo atual é uma barrinha; os demais, pontos
+   cinza. A largura anima na troca. */
+.pesquisas .pesquisas__progresso-fluxo {
+  padding: 6px var(--space-sm);
+  border-color: var(--cartao-modelo-borda);
+  color: var(--color-ink);
+  font-weight: var(--weight-medium, 500);
+}
+.pesquisas .pesquisas__pontos {
+  gap: 5px;
+}
+.pesquisas .pesquisas__pontos > span,
+.pesquisas .pesquisas__pontos > span[data-feito] {
+  background: var(--borda-controle);
+  transition: width 300ms ease;
+}
+.pesquisas .pesquisas__pontos > span[data-atual] {
+  width: 16px;
+  background: var(--color-action);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pesquisas .pesquisas__pontos > span {
+    transition: none;
+  }
+}

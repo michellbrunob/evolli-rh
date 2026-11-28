@@ -106,7 +106,7 @@ describe("Lista de pesquisas", () => {
     const corDe = (linha: HTMLElement) =>
       (
         linha.querySelector(".pesquisas__icone-modelo") as HTMLElement
-      ).style.getPropertyValue("--cor-do-modelo");
+      ).getAttribute("data-tom");
     expect(corDe(pulso!)).not.toBe(corDe(clima!));
     // Status em pílula com ponto colorido (nada de selo com ícone).
     // A pílula de status do sistema (ponto + rótulo), na cor do status.
@@ -340,7 +340,7 @@ describe("Página inicial (sem pesquisas)", () => {
     ).toBeInTheDocument();
     const passos = screen.getByRole("list", { name: "Como funciona" });
     expect(within(passos).getAllByRole("listitem")).toHaveLength(3);
-    const pulso = screen.getByRole("article", { name: "Pulso" });
+    const pulso = screen.getByRole("article", { name: "Pesquisa Pulso" });
     expect(pulso).toHaveTextContent("Recomendado para começar");
     expect(screen.getByText(/Sem saber por onde começar/)).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
@@ -369,48 +369,69 @@ describe("Galeria de modelos", () => {
     ).toBeInTheDocument();
   }
 
-  it("é o passo 1 de 4; cada card mostra a quantidade do modelo", async () => {
+  it("é o passo 1 de 4; cada card mostra os fatos, o selo e o ícone no tom do modelo", async () => {
     await abrirGaleria();
-    expect(screen.getByText("Passo 1 de 4")).toBeInTheDocument();
+    const pilula = screen.getByLabelText("Passo 1 de 4");
+    expect(pilula).toHaveTextContent("Passo 1 de 4");
     expect(document.querySelectorAll(".pesquisas__pontos > span")).toHaveLength(
       4,
     );
-    expect(screen.getAllByRole("article")).toHaveLength(
-      MODELOS_DE_PESQUISA.length,
-    );
+    expect(
+      document.querySelectorAll(".pesquisas__pontos > span[data-atual]"),
+    ).toHaveLength(1);
+    expect(screen.getAllByRole("article")).toHaveLength(12);
     for (const m of MODELOS_DE_PESQUISA) {
-      const n = totalDePerguntas(m);
-      expect(screen.getByRole("article", { name: m.nome })).toHaveTextContent(
-        n === 0
-          ? "Você escolhe as perguntas"
-          : `${n} ${n === 1 ? "pergunta" : "perguntas"}`,
-      );
+      const card = screen.getByRole("article", { name: m.nome });
+      for (const f of m.fatos) expect(card).toHaveTextContent(f.texto);
+      expect(
+        card
+          .querySelector(".pesquisas__icone-modelo")!
+          .getAttribute("data-tom"),
+      ).toBe(m.tom);
     }
+    expect(
+      screen.getByRole("article", { name: "Pulso e Clima" }),
+    ).toHaveTextContent("Novo");
+    expect(
+      screen.getByRole("article", { name: "Riscos psicossociais (NR-1)" }),
+    ).toHaveTextContent("NR-1");
+    expect(
+      screen.getByRole("article", { name: "Saúde financeira" }),
+    ).toHaveTextContent("Complementa NR-1");
     // Fora da página inicial, sem o selo de recomendado.
     expect(
-      screen.getByRole("article", { name: "Pulso" }),
+      screen.getByRole("article", { name: "Pesquisa Pulso" }),
     ).not.toHaveTextContent("Recomendado para começar");
   });
 
-  it("pílulas com contador, seções por categoria e busca", async () => {
+  it("pílulas com contador, seções por categoria e busca sem acento", async () => {
     await abrirGaleria();
     const pilulas = screen.getByRole("group", { name: "Categoria" });
     expect(
       within(pilulas)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["Todos8", "Clima e engajamento4", "Outros4"]);
+    ).toEqual([
+      "Todos12",
+      "Clima e engajamento6",
+      "Saúde e NR-12",
+      "Desempenho2",
+      "Outros2",
+    ]);
     expect(
       screen.getByRole("heading", { name: "Clima e engajamento" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Comportamento e personalizada" }),
+    ).toBeInTheDocument();
     fireEvent.click(within(pilulas).getByRole("button", { name: /^Outros/ }));
-    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getAllByRole("article")).toHaveLength(2);
     expect(
       screen.queryByRole("heading", { name: "Clima e engajamento" }),
     ).toBeNull();
     fireEvent.click(within(pilulas).getByRole("button", { name: /^Todos/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar modelo" }), {
-      target: { value: "desligamento" },
+      target: { value: "  MOTIVACAO " },
     });
     expect(screen.getAllByRole("article")).toHaveLength(1);
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar modelo" }), {
@@ -419,23 +440,50 @@ describe("Galeria de modelos", () => {
     expect(screen.getByText("Nenhum modelo encontrado.")).toBeInTheDocument();
   });
 
-  it("a gaveta numera as perguntas e separa o comentário final", async () => {
+  it("o quadro da NR-1: o botão filtra os 2 modelos e some; o quadro fica", async () => {
+    await abrirGaleria();
+    const quadro = screen.getByRole("region", {
+      name: /Precisa cumprir a NR-1\?/,
+    });
+    expect(quadro).toHaveTextContent("Portaria MTE 1.419/2024");
+    fireEvent.click(
+      within(quadro).getByRole("button", { name: "Ver os 2 modelos →" }),
+    );
+    const pilulas = screen.getByRole("group", { name: "Categoria" });
+    expect(
+      within(pilulas).getByRole("button", { name: /^Saúde e NR-1/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen
+        .getAllByRole("article")
+        .map((a) => a.querySelector("h3")!.textContent),
+    ).toEqual(["Riscos psicossociais (NR-1)", "Saúde financeira"]);
+    expect(
+      within(quadro).queryByRole("button", { name: "Ver os 2 modelos →" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("region", { name: /Precisa cumprir a NR-1\?/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("a gaveta numera as perguntas por grupo e separa o comentário final", async () => {
     await abrirGaleria();
     fireEvent.click(
-      screen.getByRole("button", { name: "Ver perguntas de Pulso" }),
+      screen.getByRole("button", { name: "Ver perguntas de Pesquisa Pulso" }),
     );
-    const gaveta = await screen.findByRole("dialog", { name: "Pulso" });
+    const gaveta = await screen.findByRole("dialog", {
+      name: "Pesquisa Pulso",
+    });
     const m = modeloDaGaleria("pulso");
     const n = totalDePerguntas(m);
     expect(gaveta).toHaveTextContent(`${n} perguntas prontas`);
-    const principais = within(gaveta).getByRole("list", { name: "Perguntas" });
-    expect(within(principais).getAllByRole("listitem")).toHaveLength(n - 1);
-    expect(principais).toHaveTextContent("01");
+    expect(gaveta).toHaveTextContent("você pode ajustar antes de enviar");
     const comentario = within(gaveta).getByRole("list", {
-      name: "Comentário final",
+      name: "Comentário final (opcional)",
     });
     expect(comentario).toHaveTextContent(String(n).padStart(2, "0"));
-    expect(gaveta).toHaveTextContent("Comentário final (opcional)");
+    expect(gaveta).toHaveTextContent("nossa empresa");
+    expect(gaveta).not.toHaveTextContent("{empresa}");
     expect(
       within(gaveta).getByRole("button", { name: "Sobre o modelo" }),
     ).toBeInTheDocument();
@@ -444,24 +492,68 @@ describe("Galeria de modelos", () => {
     ).toBeInTheDocument();
   });
 
-  it("'Sobre o modelo' abre a página com as perguntas agrupadas e 'Criar pesquisa'", async () => {
+  it("gaveta do Pulso e Clima: um grupo por dimensão, sem os comentários", async () => {
     await abrirGaleria();
     fireEvent.click(
-      screen.getByRole("button", { name: "Ver perguntas de Clima" }),
+      screen.getByRole("button", { name: "Ver perguntas de Pulso e Clima" }),
     );
-    const gaveta = await screen.findByRole("dialog", { name: "Clima" });
+    const gaveta = await screen.findByRole("dialog", { name: "Pulso e Clima" });
+    expect(gaveta).toHaveTextContent("24 perguntas prontas");
+    expect(
+      within(gaveta).getByRole("list", { name: "Liderança" }).children,
+    ).toHaveLength(4);
+    expect(gaveta).toHaveTextContent("LNPS · Liderança direta · 1");
+    expect(gaveta).not.toHaveTextContent("Quer comentar");
+  });
+
+  it("gaveta de um modelo de outra frente: os grupos e as quantidades", async () => {
+    await abrirGaleria();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ver perguntas de Riscos psicossociais (NR-1)",
+      }),
+    );
+    const gaveta = await screen.findByRole("dialog", {
+      name: "Riscos psicossociais (NR-1)",
+    });
+    expect(gaveta).toHaveTextContent("76 perguntas prontas");
+    expect(gaveta).toHaveTextContent("Relações Sociais e Liderança · 21");
+  });
+
+  it("'Sobre o modelo' abre a página do modelo com o que você recebe e 'Criar pesquisa'", async () => {
+    await abrirGaleria();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ver perguntas de Pulso e Clima" }),
+    );
+    const gaveta = await screen.findByRole("dialog", { name: "Pulso e Clima" });
     fireEvent.click(
       within(gaveta).getByRole("button", { name: "Sobre o modelo" }),
     );
     expect(
-      await screen.findByRole("heading", { level: 1, name: /Clima/ }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: /Pulso e Clima · Leitura completa do clima/,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("O que você recebe")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "As 10 dimensões" }),
+    ).toHaveTextContent("Bem-estar e Segurança Psicossocial");
+    expect(
+      screen.getByRole("region", { name: "Ficha técnica" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "As perguntas" }),
-    ).toHaveTextContent("Concordância · 1 a 5");
-    expect(
-      screen.getByRole("button", { name: "Criar pesquisa →" }),
+      screen.getByRole("button", { name: "Criar pesquisa" }),
     ).toBeInTheDocument();
+  });
+
+  it("todos os modelos têm a página 'Sobre o modelo'", async () => {
+    for (const m of MODELOS_DE_PESQUISA.filter(
+      (x) => x.id !== "personalizada",
+    )) {
+      expect(m.pagina?.titulo).toBeTruthy();
+      expect(m.pagina?.botaoCriar).toMatch(/^Criar/);
+    }
   });
 
   it("usar o modelo abre o assistente de 3 etapas e grava o rascunho", async () => {

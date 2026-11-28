@@ -20,6 +20,8 @@
  *   #/pesquisas/<id>/respostas/<rid>/relatorio    PDF de uma resposta
  */
 
+import { modeloDaGaleria } from "./modelosDePesquisa";
+
 export type AbaDosResultados = "geral" | "analises" | "respostas";
 
 export type RotaDePesquisas =
@@ -178,7 +180,8 @@ export function rotuloDaTrilha(rota: RotaDePesquisas): string | null {
     case "rascunho":
       return "Nova pesquisa";
     case "sobre":
-      return "Sobre o modelo";
+      // O tema da página do modelo ("NR-1 · Riscos psicossociais").
+      return modeloDaGaleria(rota.modelo).pagina?.titulo ?? "Sobre o modelo";
     case "personalizada":
       return "Pesquisa personalizada";
     case "resultados":

@@ -71,9 +71,10 @@ export function nomeSugerido(nomeBase: string, hoje: string): string {
 function comentarioDe(secoes: readonly Secao[]): string | null {
   const ultima = perguntasEmOrdem(secoes).at(-1);
   return ultima &&
-    ultima.tipo === "paragrafo" &&
+    (ultima.tipo === "paragrafo" || ultima.tipo === "texto_curto") &&
     !ultima.obrigatoria &&
-    !ultima.condicao
+    !ultima.condicao &&
+    !ultima.chave
     ? ultima.id
     : null;
 }
@@ -87,7 +88,10 @@ export function estadoDoModelo(
   return {
     id: null,
     status: "rascunho",
-    nome: m.id === "personalizada" ? "" : nomeSugerido(m.nomeBase, hoje),
+    nome:
+      m.id === "personalizada"
+        ? ""
+        : (m.nomeDaPesquisa?.(hoje) ?? nomeSugerido(m.nomeBase, hoje)),
     boasVindas: m.boasVindas ?? "",
     modelo: m.modelo,
     identificacao: "identificada",
@@ -151,7 +155,10 @@ export function estadoDoDetalhe(d: PesquisaDetalhe): EstadoDaPesquisa {
     encerraHora: partesDoEncerramento(d.encerraEm)?.hora ?? HORA_PADRAO,
     minimoPorGrupo: d.minimoPorGrupo,
     separarPor: d.separarPor ?? [],
-    comentarioId: d.modelo !== "personalizada" ? comentarioDe(secoes) : null,
+    comentarioId:
+      d.modelo !== "personalizada" && modeloDaGaleria(d.modelo).comentarioFinal
+        ? comentarioDe(secoes)
+        : null,
     temRespostas: d.temRespostas,
     responderam: (d.participantesLista ?? [])
       .filter((p) => p.respondeu === true)

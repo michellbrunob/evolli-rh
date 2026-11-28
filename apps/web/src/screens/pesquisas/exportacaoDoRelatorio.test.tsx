@@ -279,7 +279,7 @@ describe("relatório em PDF (página imprimível)", () => {
     );
     expect(screen.getByText("Relatório de resultados")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Clima" }),
+      screen.getByRole("heading", { level: 1, name: "Pesquisa de Clima" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Empresa Alfa · 03/11 – 27/11/2026"),

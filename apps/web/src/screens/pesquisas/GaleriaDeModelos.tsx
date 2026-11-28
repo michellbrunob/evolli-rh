@@ -1,29 +1,39 @@
 /**
- * T216 — a galeria de modelos: pílulas de categoria com contador, busca,
- * uma seção por categoria (título, contador e frase) e os cards em duas
- * colunas (ícone colorido, selo, descrição, destaques, "Ver perguntas" e
- * "Usar modelo"). "Ver perguntas" abre a gaveta com as perguntas numeradas
- * e o comentário final à parte. A quantidade do card, da gaveta e do
- * assistente sai de `totalDePerguntas`.
+ * T216 — a galeria de modelos (passo 1 de 4): chips das 4 categorias com
+ * contador ("Todos 12"), busca sem acento, o quadro "Precisa cumprir a
+ * NR-1?" (o botão leva ao chip "Saúde e NR-1" e some), uma seção por
+ * categoria (título, contador e frase) e os cards em duas colunas (ícone no
+ * tom do modelo, selo, título, descrição, fatos com ícone, "Ver perguntas"
+ * e "Usar modelo →"). "Ver perguntas" abre a gaveta com as perguntas por
+ * grupo; o rodapé leva a "Sobre o modelo" e ao assistente.
  */
 import { useId, useState } from "react";
 import { Button } from "../../components";
 import { plural } from "../../format/plural";
 import { Sheet } from "../../ui";
-import { IconeDocumento, IconeStatus, IconeVer } from "../../ui/icones";
-import { CampoDeBusca, IconeDoModelo, Pilulas } from "./componentes";
+import { IconeEscudoNr1, IconeVer } from "../../ui/icones";
+import {
+  CampoDeBusca,
+  ICONE_DO_FATO,
+  IconeDoModelo,
+  Pilulas,
+} from "./componentes";
+import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import {
   CATEGORIAS_DE_MODELO,
   MODELOS_DE_PESQUISA,
-  perguntasPrincipais,
+  ehComentarioDeDimensao,
   secoesDoModelo,
   totalDePerguntas,
+  type CategoriaDoModelo,
   type ModeloDaGaleria,
+  type SeloDoModelo,
 } from "./modelosDePesquisa";
-import { perguntasEmOrdem } from "./estadoDaPesquisa";
+import { textoParaOPainel } from "./modelos/empresa";
+import "./modelos/Galeria.css";
 
 export const semAcento = (t: string) =>
-  t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export function quantidadeDoModelo(m: ModeloDaGaleria): string {
   const n = totalDePerguntas(m);
@@ -37,11 +47,31 @@ export function filtrarModelos<T extends ModeloDaGaleria>(
   modelos: readonly T[],
   busca: string,
 ): T[] {
-  const termo = semAcento(busca.trim());
+  const termo = semAcento(busca);
   return modelos.filter(
     (m) => !termo || semAcento(`${m.nome} ${m.descricao}`).includes(termo),
   );
 }
+
+const TEXTO_DO_SELO: Readonly<Record<SeloDoModelo, string>> = {
+  novo: "Novo",
+  nr1: "NR-1",
+  complementa_nr1: "Complementa NR-1",
+};
+
+/** O selo do card ("Novo" rosa; "NR-1" e "Complementa NR-1" verdes). */
+export function SeloDoModeloNoCard({ selo }: { readonly selo: SeloDoModelo }) {
+  return (
+    <span
+      className="galeria__selo"
+      data-tom={selo === "novo" ? "rosa" : "verde"}
+    >
+      {TEXTO_DO_SELO[selo]}
+    </span>
+  );
+}
+
+type Filtro = "todas" | CategoriaDoModelo;
 
 export function GaleriaDeModelos({
   onUsar,
@@ -53,16 +83,13 @@ export function GaleriaDeModelos({
   /** Página inicial: o modelo recomendado ganha selo e botão cheio. */
   readonly comRecomendacao?: boolean;
 }) {
-  const [categoria, setCategoria] = useState<
-    "todas" | keyof typeof CATEGORIAS_DE_MODELO
-  >("todas");
+  const [categoria, setCategoria] = useState<Filtro>("todas");
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState<ModeloDaGaleria | null>(null);
+  const [nr1Visto, setNr1Visto] = useState(false);
 
   const daBusca = filtrarModelos(MODELOS_DE_PESQUISA, busca);
-  const chaves = Object.keys(
-    CATEGORIAS_DE_MODELO,
-  ) as (keyof typeof CATEGORIAS_DE_MODELO)[];
+  const chaves = Object.keys(CATEGORIAS_DE_MODELO) as CategoriaDoModelo[];
   const grupos = chaves
     .filter((c) => categoria === "todas" || categoria === c)
     .map((c) => ({ c, modelos: daBusca.filter((m) => m.categoria === c) }))
@@ -92,6 +119,36 @@ export function GaleriaDeModelos({
         <CampoDeBusca rotulo="Buscar modelo" valor={busca} onMudar={setBusca} />
       </div>
 
+      <section className="galeria__nr1" aria-labelledby="galeria-nr1-titulo">
+        <span className="galeria__nr1-icone" aria-hidden="true">
+          <IconeEscudoNr1 tamanho={22} />
+        </span>
+        <div className="galeria__nr1-textos">
+          <h2 id="galeria-nr1-titulo" className="galeria__nr1-titulo">
+            Precisa cumprir a NR-1?
+            <span className="galeria__selo" data-tom="verde">
+              Portaria MTE 1.419/2024
+            </span>
+          </h2>
+          <p className="pesquisas__suave">
+            A NR-1 pede a avaliação dos riscos psicossociais no trabalho. O
+            modelo de Riscos psicossociais cobre os 8 domínios, e o de Saúde
+            financeira complementa com o bem-estar financeiro.
+          </p>
+        </div>
+        {nr1Visto ? null : (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCategoria("saude");
+              setNr1Visto(true);
+            }}
+          >
+            Ver os 2 modelos →
+          </Button>
+        )}
+      </section>
+
       {grupos.length === 0 ? (
         <div className="pesquisas__aba-vazia">
           <strong>Nenhum modelo encontrado.</strong>
@@ -108,19 +165,21 @@ export function GaleriaDeModelos({
           >
             <header className="pesquisas__categoria-cabeca">
               <h2 id={`categoria-${c}`} className="pesquisas__categoria-titulo">
-                {CATEGORIAS_DE_MODELO[c].nome}
+                {CATEGORIAS_DE_MODELO[c].titulo}
               </h2>
               <span className="pesquisas__contagem">{modelos.length}</span>
-              <span className="pesquisas__suave">
-                {CATEGORIAS_DE_MODELO[c].texto}
-              </span>
+              {CATEGORIAS_DE_MODELO[c].texto ? (
+                <span className="pesquisas__suave">
+                  {CATEGORIAS_DE_MODELO[c].texto}
+                </span>
+              ) : null}
             </header>
             <div className="pesquisas__cartoes">
               {modelos.map((m) => (
                 <CartaoDoModelo
                   key={m.id}
                   modelo={m}
-                  recomendado={comRecomendacao && m.selo === "recomendado"}
+                  recomendado={comRecomendacao && m.recomendado === true}
                   onVer={() => setAberto(m)}
                   onUsar={() => onUsar(m.id)}
                 />
@@ -146,6 +205,7 @@ export function GaleriaDeModelos({
   );
 }
 
+/** O card: todo ele leva ao assistente; "Ver perguntas" abre a gaveta. */
 export function CartaoDoModelo({
   modelo: m,
   recomendado,
@@ -158,10 +218,16 @@ export function CartaoDoModelo({
   readonly onUsar: () => void;
 }) {
   const id = useId();
+  const IconeFormato = ICONE_DO_FATO.duas_pessoas;
   return (
     <article
-      className="pesquisas__cartao"
+      className="pesquisas__cartao galeria__cartao"
       aria-labelledby={id}
+      onClick={(e) => {
+        // O card inteiro é clicável; os botões de dentro decidem sozinhos.
+        if ((e.target as HTMLElement).closest("button")) return;
+        onUsar();
+      }}
       {...(recomendado ? { "data-recomendado": "" } : {})}
     >
       <div className="pesquisas__cartao-topo">
@@ -171,25 +237,28 @@ export function CartaoDoModelo({
             <span className="pesquisas__ponto" aria-hidden="true" />
             Recomendado para começar
           </span>
-        ) : m.selo === "novo" ? (
-          <span className="pesquisas__selo pesquisas__selo--destaque">
-            Novo
-          </span>
+        ) : m.selo ? (
+          <SeloDoModeloNoCard selo={m.selo} />
         ) : null}
       </div>
       <h3 id={id}>{m.nome}</h3>
       <p className="pesquisas__cartao-descricao">{m.descricao}</p>
-      <ul className="pesquisas__destaques">
-        <li>
-          <IconeDocumento tamanho={14} />
-          {quantidadeDoModelo(m)}
-        </li>
-        {m.destaques.slice(0, 2).map((d) => (
-          <li key={d}>
-            <IconeStatus tamanho={14} />
-            {d}
+      <ul className="pesquisas__destaques galeria__fatos">
+        {m.fatos.map((f) => {
+          const Icone = ICONE_DO_FATO[f.icone];
+          return (
+            <li key={f.texto}>
+              <Icone tamanho={14} />
+              {f.texto}
+            </li>
+          );
+        })}
+        {m.formato ? (
+          <li>
+            <IconeFormato tamanho={14} />
+            {m.formato}
           </li>
-        ))}
+        ) : null}
       </ul>
       <div className="pesquisas__cartao-rodape">
         <button
@@ -220,7 +289,128 @@ export function CartaoDoModelo({
   );
 }
 
-/** A gaveta "Ver perguntas": perguntas numeradas e o comentário final à parte. */
+export interface GrupoDaGaveta {
+  readonly titulo: string | null;
+  readonly cor: string | undefined;
+  readonly perguntas: readonly { id: string; texto: string }[];
+  /** Sem as perguntas no catálogo: só a quantidade. */
+  readonly quantidade: number;
+}
+
+/** Os grupos da gaveta: agrupamento por chave, seções ou grupos resumidos. */
+export function gruposDaGaveta(m: ModeloDaGaleria): GrupoDaGaveta[] {
+  if (m.secoes.length === 0 && m.grupos) {
+    return m.grupos.map((g) => ({
+      titulo: g.titulo,
+      cor: g.cor,
+      perguntas: [],
+      quantidade: g.quantidade,
+    }));
+  }
+  const secoes = secoesDoModelo(m);
+  const todas = perguntasEmOrdem(secoes).filter(
+    (p) => !ehComentarioDeDimensao(p),
+  );
+  const comTexto = (ps: typeof todas) =>
+    ps.map((p) => ({ id: p.id, texto: textoParaOPainel(p.texto) }));
+  if (m.agrupamento) {
+    return m.agrupamento.map((g) => {
+      const ps = todas.filter((p) => p.chave && g.chaves.includes(p.chave));
+      return {
+        titulo: g.titulo,
+        cor: g.cor,
+        perguntas: comTexto(ps),
+        quantidade: ps.length,
+      };
+    });
+  }
+  const comentarioId =
+    m.comentarioFinal && todas.length > 0 ? todas.at(-1)!.id : null;
+  const grupos: GrupoDaGaveta[] = m.secoes.map((s, i) => {
+    const ps = secoes[i]!.perguntas.filter(
+      (p) => !ehComentarioDeDimensao(p) && p.id !== comentarioId,
+    );
+    return {
+      titulo: s.titulo,
+      cor: s.cor,
+      perguntas: comTexto(ps),
+      quantidade: ps.length,
+    };
+  });
+  if (m.comentarioFinal) {
+    grupos.push({
+      titulo: "Comentário final (opcional)",
+      cor: "--modelo-cinza",
+      perguntas: [{ id: "comentario", texto: m.comentarioFinal }],
+      quantidade: 1,
+    });
+  }
+  return grupos.filter((g) => g.quantidade > 0);
+}
+
+/** A lista numerada de perguntas por grupo (gaveta e página "Sobre"). */
+export function PerguntasPorGrupo({
+  grupos,
+}: {
+  readonly grupos: readonly GrupoDaGaveta[];
+}) {
+  const doisDigitos = (i: number) => String(i).padStart(2, "0");
+  let numero = 0;
+  return (
+    <div className="pesquisas__gaveta">
+      {grupos.map((g, i) => {
+        const inicio = numero + 1;
+        numero += g.perguntas.length;
+        return (
+          <section
+            key={`${g.titulo ?? "grupo"}-${i}`}
+            className="galeria__gaveta-grupo"
+            aria-label={g.titulo ?? "Perguntas"}
+          >
+            {g.titulo || grupos.length > 1 ? (
+              <p className="pesquisas__gaveta-grupo">
+                <span
+                  className="galeria__bolinha"
+                  style={{
+                    background: `var(${g.cor ?? "--color-ink-subtle"})`,
+                  }}
+                  aria-hidden="true"
+                />
+                {g.titulo ?? "Perguntas"}
+                <span className="pesquisas__suave">{` · ${g.quantidade}`}</span>
+              </p>
+            ) : null}
+            {g.perguntas.length > 0 ? (
+              <ol
+                className="pesquisas__lista-numerada"
+                start={inicio}
+                aria-label={g.titulo ?? "Perguntas"}
+              >
+                {g.perguntas.map((p, j) => (
+                  <li key={p.id}>
+                    <span
+                      className="pesquisas__numero-pergunta"
+                      aria-hidden="true"
+                    >
+                      {doisDigitos(inicio + j)}
+                    </span>
+                    <span>{p.texto}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="pesquisas__suave galeria__gaveta-resumo">
+                {plural(g.quantidade, "pergunta", "perguntas")}
+              </p>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A gaveta "Ver perguntas": perguntas numeradas por grupo. */
 export function GavetaDoModelo({
   modelo,
   onFechar,
@@ -234,10 +424,6 @@ export function GavetaDoModelo({
 }) {
   const m = modelo;
   const n = m ? totalDePerguntas(m) : 0;
-  const principais = m
-    ? perguntasEmOrdem(secoesDoModelo(m)).slice(0, perguntasPrincipais(m))
-    : [];
-  const doisDigitos = (i: number) => String(i).padStart(2, "0");
   return (
     <Sheet
       aberto={m !== null}
@@ -247,7 +433,7 @@ export function GavetaDoModelo({
         m
           ? n === 0
             ? "Você monta as perguntas do zero"
-            : `${plural(n, "pergunta pronta", "perguntas prontas")} · dá para ajustar antes de enviar`
+            : `${plural(n, "pergunta pronta", "perguntas prontas")} · você pode ajustar antes de enviar`
           : ""
       }
       icone={m ? <IconeDoModelo id={m.id} /> : undefined}
@@ -269,44 +455,7 @@ export function GavetaDoModelo({
         n === 0 ? (
           <p className="pesquisas__suave">{m.sobre}</p>
         ) : (
-          <div className="pesquisas__gaveta">
-            <ol className="pesquisas__lista-numerada" aria-label="Perguntas">
-              {principais.map((p, i) => (
-                <li key={p.id}>
-                  <span
-                    className="pesquisas__numero-pergunta"
-                    aria-hidden="true"
-                  >
-                    {doisDigitos(i + 1)}
-                  </span>
-                  <span>{p.texto}</span>
-                </li>
-              ))}
-            </ol>
-            {m.comentarioFinal ? (
-              <>
-                <p className="pesquisas__gaveta-grupo">
-                  Comentário final (opcional)
-                  <span className="pesquisas__suave"> · 1</span>
-                </p>
-                <ol
-                  className="pesquisas__lista-numerada"
-                  aria-label="Comentário final"
-                  start={principais.length + 1}
-                >
-                  <li>
-                    <span
-                      className="pesquisas__numero-pergunta"
-                      aria-hidden="true"
-                    >
-                      {doisDigitos(principais.length + 1)}
-                    </span>
-                    <span>{m.comentarioFinal}</span>
-                  </li>
-                </ol>
-              </>
-            ) : null}
-          </div>
+          <PerguntasPorGrupo grupos={gruposDaGaveta(m)} />
         )
       ) : null}
     </Sheet>

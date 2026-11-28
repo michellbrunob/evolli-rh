@@ -158,7 +158,11 @@ export function BarraSuperior({
                       {(item.destinoId || item.onSelecionar) && !ultimo ? (
                         <button
                           type="button"
-                          className="barra-superior__trilha-link"
+                          className={
+                            item.discreto
+                              ? "barra-superior__trilha-link barra-superior__trilha-link--discreto"
+                              : "barra-superior__trilha-link"
+                          }
                           onClick={() =>
                             item.onSelecionar
                               ? item.onSelecionar()

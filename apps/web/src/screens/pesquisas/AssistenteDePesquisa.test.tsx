@@ -136,7 +136,7 @@ describe("Assistente de pesquisa — perguntas", () => {
       screen.getByRole("button", { name: "Adicionar pergunta na seção 1" }),
     );
     const tipos = screen.getByRole("group", { name: "Tipo da nova pergunta" });
-    expect(within(tipos).getAllByRole("button")).toHaveLength(11);
+    expect(within(tipos).getAllByRole("button")).toHaveLength(13);
     expect(
       [...tipos.querySelectorAll(".pesquisas__menu-titulo")].map(
         (t) => t.textContent,
@@ -296,7 +296,7 @@ describe("Assistente de pesquisa — perguntas", () => {
     expect(new Set(perguntas.map((p) => p.id)).size).toBe(3);
   });
 
-  it("os 11 tipos aparecem para escolher", async () => {
+  it("os 13 tipos aparecem para escolher", async () => {
     montar();
     await irParaPerguntas();
     fireEvent.click(
@@ -306,7 +306,7 @@ describe("Assistente de pesquisa — perguntas", () => {
       within(
         screen.getByRole("group", { name: "Tipo da nova pergunta" }),
       ).getAllByRole("button"),
-    ).toHaveLength(11);
+    ).toHaveLength(13);
   });
 
   it("escala valida o fim entre 2 e 10", async () => {
@@ -433,7 +433,7 @@ describe("Assistente de pesquisa — participantes, prazo e publicação", () =>
     await screen.findByRole("heading", { name: /Etapa 5 de 5/ });
     const resumo = screen.getByRole("region", { name: "Resumo da pesquisa" });
     expect(resumo).toHaveTextContent("eNPS");
-    expect(resumo).toHaveTextContent("3 perguntas");
+    expect(resumo).toHaveTextContent("8 perguntas");
     expect(resumo).toHaveTextContent("15/12/2026");
     expect(resumo).toHaveTextContent("Identificada");
 

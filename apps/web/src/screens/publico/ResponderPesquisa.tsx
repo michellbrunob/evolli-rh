@@ -26,6 +26,7 @@
  * o foco é programático, para o leitor de tela); ao barrar o avanço, vai ao
  * primeiro campo com erro.
  */
+import { textoComEmpresa } from "../pesquisas/modelos/empresa";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import "../../app/tokens.css";
@@ -93,6 +94,23 @@ export interface DadosDaPrevia {
   readonly secoes: readonly Secao[];
   /** Anônima com separação: os campos e as opções a mostrar. */
   readonly grupos?: readonly GrupoPublico[];
+}
+
+/**
+ * T216 — os textos dos modelos trazem `{empresa}`: quem responde vê o nome
+ * da empresa (sem nome, "nossa empresa").
+ */
+export function comNomeDaEmpresa(p: PesquisaPublica): PesquisaPublica {
+  return {
+    ...p,
+    secoes: p.secoes.map((s) => ({
+      ...s,
+      perguntas: s.perguntas.map((q) => ({
+        ...q,
+        texto: textoComEmpresa(q.texto, p.empresa),
+      })),
+    })),
+  };
 }
 
 /**
@@ -301,7 +319,9 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
   const [etapa, setEtapa] = useState<Etapa>(() =>
     previa ? { tipo: "abertura" } : { tipo: "carregando" },
   );
-  const [pesquisa, setPesquisa] = useState<PesquisaPublica | null>(previa);
+  const [pesquisa, setPesquisa] = useState<PesquisaPublica | null>(() =>
+    previa ? comNomeDaEmpresa(previa) : null,
+  );
   const [tentativa, setTentativa] = useState(0);
   const [dialogoDaPrevia, setDialogoDaPrevia] = useState(previa !== null);
 
@@ -349,7 +369,7 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
           setEtapa({ tipo: "indisponivel", motivo: abertura.indisponivel });
           return;
         }
-        setPesquisa(abertura);
+        setPesquisa(comNomeDaEmpresa(abertura));
         setEtapa({ tipo: "abertura" });
       },
       () => {

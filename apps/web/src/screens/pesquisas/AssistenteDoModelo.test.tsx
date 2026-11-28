@@ -191,7 +191,7 @@ describe("Assistente do modelo — Configurar", () => {
         .perguntas;
       expect(perguntas.at(-2)!.texto).toBe("Consigo descansar nas folgas.");
       expect(perguntas.at(-2)!.tipo).toBe("escala");
-      expect(perguntas.at(-1)!.tipo).toBe("paragrafo");
+      expect(perguntas.at(-1)!.tipo).toBe("texto_curto");
     });
   });
 

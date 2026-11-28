@@ -33,52 +33,213 @@ import {
 } from "./indicadores";
 import {
   MODELOS_DE_PESQUISA,
+  ROTEIROS_PERSONALIZADOS,
   secoesDoModelo,
   totalDePerguntas,
 } from "./modelosDePesquisa";
 
 describe("modelos de pesquisa", () => {
-  it("são 8, com nomes únicos, e a contagem bate com as perguntas geradas", () => {
-    expect(MODELOS_DE_PESQUISA).toHaveLength(8);
-    expect(new Set(MODELOS_DE_PESQUISA.map((m) => m.modelo)).size).toBe(8);
-    for (const m of MODELOS_DE_PESQUISA) {
-      expect(perguntasEmOrdem(secoesDoModelo(m))).toHaveLength(
-        totalDePerguntas(m),
-      );
-    }
+  const TODOS = [...MODELOS_DE_PESQUISA, ...ROTEIROS_PERSONALIZADOS];
+
+  it("a galeria tem os 12 modelos, na ordem dos cards, em 4 categorias (6, 2, 2, 2)", () => {
+    expect(MODELOS_DE_PESQUISA.map((m) => m.id)).toEqual([
+      "pulso",
+      "pulso_clima",
+      "clima",
+      "enps",
+      "onboarding",
+      "tad",
+      "copsoq",
+      "isfb",
+      "avaliacao90",
+      "avaliacao180",
+      "disc",
+      "personalizada",
+    ]);
+    const conta = (c: string) =>
+      MODELOS_DE_PESQUISA.filter((m) => m.categoria === c).length;
+    expect([
+      conta("clima"),
+      conta("saude"),
+      conta("desempenho"),
+      conta("outros"),
+    ]).toEqual([6, 2, 2, 2]);
+    expect(new Set(MODELOS_DE_PESQUISA.map((m) => m.modelo)).size).toBe(12);
   });
 
-  it("juntos usam os 11 tipos de pergunta", () => {
+  it("selos e fatos dos cards", () => {
+    const m = (id: string) => MODELOS_DE_PESQUISA.find((x) => x.id === id)!;
+    expect(m("pulso_clima").selo).toBe("novo");
+    expect(m("onboarding").selo).toBe("novo");
+    expect(m("copsoq").selo).toBe("nr1");
+    expect(m("isfb").selo).toBe("complementa_nr1");
+    expect(m("pulso").selo).toBeUndefined();
+    expect(m("pulso").fatos.map((f) => f.texto)).toEqual([
+      "5 perguntas",
+      "Escala 1–10",
+    ]);
+    expect(m("pulso_clima").fatos.map((f) => f.texto)).toEqual([
+      "24 perguntas",
+      "8 dimensões",
+    ]);
+    expect(m("tad").fatos.map((f) => f.texto)).toEqual([
+      "21 perguntas",
+      "3 pilares",
+    ]);
+  });
+
+  it("a contagem do card bate com as perguntas geradas (sem os comentários por dimensão)", () => {
+    for (const m of TODOS.filter((x) => x.secoes.length > 0)) {
+      const geradas = perguntasEmOrdem(secoesDoModelo(m)).filter(
+        (p) => !p.chave?.startsWith("__comentario_"),
+      );
+      expect(geradas).toHaveLength(totalDePerguntas(m));
+    }
+    // Sem as perguntas no catálogo (outras frentes): a soma dos grupos.
+    const riscos = MODELOS_DE_PESQUISA.find((m) => m.id === "copsoq")!;
+    expect(totalDePerguntas(riscos)).toBe(76);
+    const financeira = MODELOS_DE_PESQUISA.find((m) => m.id === "isfb")!;
+    expect(totalDePerguntas(financeira)).toBe(18);
+  });
+
+  it("juntos usam os 13 tipos de pergunta", () => {
     const tipos = new Set(
-      MODELOS_DE_PESQUISA.flatMap((m) =>
+      TODOS.flatMap((m) =>
         perguntasEmOrdem(secoesDoModelo(m)).map((p) => p.tipo),
       ),
     );
-    expect(tipos.size).toBe(11);
+    for (const t of [
+      "concordancia_4",
+      "satisfacao_4",
+      "escala",
+      "nota_0_10",
+      "estrelas",
+      "sim_nao",
+      "multipla_escolha",
+      "escolha_unica",
+      "paragrafo",
+      "texto_curto",
+      "concordancia",
+    ]) {
+      expect(tipos.has(t as never)).toBe(true);
+    }
   });
 
   it("todo modelo com perguntas já passa na validação (condições incluídas)", () => {
-    for (const m of MODELOS_DE_PESQUISA.filter(
-      (x) => totalDePerguntas(x) > 0,
+    for (const m of TODOS.filter(
+      (x) => totalDePerguntas(x) > 0 && x.secoes.length > 0,
     )) {
-      const e = estadoDoModelo(m.modelo);
+      const e = estadoDoModelo(m.id);
       expect(validarPerguntas(e)).toEqual({});
     }
     const comCondicao = perguntasEmOrdem(
-      estadoDoModelo("onboarding").secoes,
+      estadoDoModelo("onboarding-30").secoes,
     ).filter((p) => p.condicao);
     expect(comCondicao).toHaveLength(1);
   });
 
-  it("o Pulso tem 6 afirmações de 1 a 10, o eNPS e um comentário", () => {
+  it("Pulso: 5 afirmações de 1 a 10, o eNPS e o comentário curto opcional", () => {
     const p = perguntasEmOrdem(estadoDoModelo("pulso").secoes);
     expect(
-      p.filter((x) => x.tipo === "escala" && x.config.maximo === 10),
-    ).toHaveLength(6);
+      p
+        .filter((x) => x.tipo === "escala" && x.config.maximo === 10)
+        .map((x) => x.chave),
+    ).toEqual([
+      "pulso_permanencia",
+      "pulso_clareza",
+      "pulso_apoio_gestao",
+      "pulso_reconhecimento",
+      "pulso_orgulho",
+    ]);
     expect(
       p.filter((x) => x.tipo === "nota_0_10" && x.config.enps),
     ).toHaveLength(1);
-    expect(p.at(-1)!.tipo).toBe("paragrafo");
+    expect(p.at(-1)).toMatchObject({ tipo: "texto_curto", obrigatoria: false });
+  });
+
+  it("Pulso e Clima: 22 afirmações em 8 dimensões, LNPS, eNPS e 10 comentários", () => {
+    const e = estadoDoModelo("pulso_clima");
+    const p = perguntasEmOrdem(e.secoes);
+    expect(p.filter((x) => x.tipo === "concordancia")).toHaveLength(22);
+    expect(
+      e.secoes
+        .slice(0, 8)
+        .map(
+          (s) => s.perguntas.filter((x) => x.tipo === "concordancia").length,
+        ),
+    ).toEqual([3, 4, 3, 2, 2, 3, 3, 2]);
+    expect(p.find((x) => x.chave === "pc_lnps_01")!.config).toMatchObject({
+      lnps: true,
+      enps: false,
+    });
+    expect(p.find((x) => x.chave === "pc_enps_01")!.config).toMatchObject({
+      enps: true,
+    });
+    const comentarios = p.filter((x) => x.chave?.startsWith("__comentario_"));
+    expect(comentarios).toHaveLength(10);
+    expect(
+      comentarios.every((x) => x.tipo === "paragrafo" && !x.obrigatoria),
+    ).toBe(true);
+    expect(e.nome).toMatch(/^Pulso e Clima – [12]º semestre \d{4}$/);
+  });
+
+  it("Clima: 60 afirmações numeradas e 2 abertas", () => {
+    const p = perguntasEmOrdem(estadoDoModelo("clima").secoes);
+    expect(p).toHaveLength(62);
+    expect(p[0]!.chave).toBe("clima_01");
+    expect(p[59]!.chave).toBe("clima_60");
+    expect(p.slice(60).map((x) => x.chave)).toEqual([
+      "clima_aberta_01",
+      "clima_aberta_02",
+    ]);
+  });
+
+  it("TAD: 21 afirmações de 1 a 7 com os 7 rótulos e os pilares 7, 6 e 8", () => {
+    const m = MODELOS_DE_PESQUISA.find((x) => x.id === "tad")!;
+    const p = perguntasEmOrdem(estadoDoModelo("tad").secoes);
+    expect(p).toHaveLength(21);
+    expect(
+      p.every(
+        (x) =>
+          x.tipo === "escala" &&
+          x.config.maximo === 7 &&
+          x.config.rotulos?.length === 7,
+      ),
+    ).toBe(true);
+    expect(m.agrupamento!.map((g) => g.chaves.length)).toEqual([7, 6, 8]);
+    expect(
+      m.secoes[0]!.perguntas.filter((x) => x.selo === "Invertida"),
+    ).toHaveLength(9);
+  });
+
+  it("Onboarding: 17 perguntas em 8 blocos, 14 obrigatórias", () => {
+    const e = estadoDoModelo("onboarding");
+    const p = perguntasEmOrdem(e.secoes);
+    expect(e.secoes).toHaveLength(8);
+    expect(p).toHaveLength(17);
+    expect(p.filter((x) => x.obrigatoria)).toHaveLength(14);
+    expect(p.filter((x) => x.tipo === "concordancia_4")).toHaveLength(10);
+    expect(p.find((x) => x.chave === "q7")!.tipo).toBe("satisfacao_4");
+  });
+
+  it("eNPS: 1 principal, 5 complementares e 2 abertas", () => {
+    const e = estadoDoModelo("enps");
+    expect(e.secoes.map((s) => s.perguntas.length)).toEqual([1, 5, 2]);
+  });
+
+  it("Personalizada: 6 modelos prontos (Integração 1, Desempenho 2, Satisfação 2, Desligamento 1)", () => {
+    const conta = (c: string) =>
+      ROTEIROS_PERSONALIZADOS.filter((m) => m.categoria === c).length;
+    expect(ROTEIROS_PERSONALIZADOS).toHaveLength(6);
+    expect([
+      conta("integracao"),
+      conta("desempenho"),
+      conta("satisfacao"),
+      conta("saida"),
+    ]).toEqual([1, 2, 2, 1]);
+    expect(ROTEIROS_PERSONALIZADOS.map((m) => totalDePerguntas(m))).toEqual([
+      8, 10, 8, 6, 7, 8,
+    ]);
   });
 
   it("ids novos a cada uso (dois usos não compartilham ids)", () => {
@@ -105,12 +266,12 @@ describe("operações e validação", () => {
   });
 
   it("duplicar a seção mantém a condição dentro da cópia", () => {
-    const e = estadoDoModelo("onboarding");
+    const e = estadoDoModelo("onboarding-30");
     const secao = e.secoes[0]!;
     const copia = duplicarSecao(e.secoes, secao.id)[1]!;
     const [, origem, dependente] = copia.perguntas;
     expect(dependente!.condicao!.perguntaId).toBe(origem!.id);
-    expect(copia.titulo).toBe("A chegada (cópia)");
+    expect(copia.titulo).toBe("Sua chegada (cópia)");
   });
 
   it("a entrada apara textos e manda participantes escolhidos", () => {

@@ -59,6 +59,9 @@ import {
 } from "./estadoDaPesquisa";
 import { EtapaColaboradores } from "./EtapaColaboradores";
 import { modeloDaGaleria, type ModeloDaGaleria } from "./modelosDePesquisa";
+import { PerguntasFixas } from "./modelos/PerguntasFixas";
+import { seloDoTipoDaPergunta } from "./modelos/selos";
+import { textoParaOPainel } from "./modelos/empresa";
 import { lembrarRascunho } from "./rascunhosLocais";
 import type { ServicoDePesquisas } from "./servicoDePesquisas";
 import { TelaDeGerada } from "./TelaDeGerada";
@@ -84,31 +87,13 @@ function minusculaSemSigla(texto: string): string {
 }
 
 /** Selo curto do tipo da pergunta ("Escala 1–10", "eNPS 0–10"). */
-export function seloDoTipo(p: Pergunta): string {
-  switch (p.tipo) {
-    case "escala":
-      return `Escala ${p.config.minimo ?? 1}–${p.config.maximo ?? 5}`;
-    case "nota_0_10":
-      return p.config.enps ? "eNPS 0–10" : "Nota 0–10";
-    case "concordancia":
-      return "Concordância 1–5";
-    case "estrelas":
-      return "Estrelas 1–5";
-    case "escolha_unica":
-      return "Escolha única";
-    case "multipla_escolha":
-      return "Múltipla escolha";
-    case "sim_nao":
-      return "Sim ou não";
-    case "paragrafo":
-      return "Texto livre";
-    case "texto_curto":
-      return "Texto curto";
-    case "data":
-      return "Data";
-    default:
-      return "Número";
-  }
+export const seloDoTipo = seloDoTipoDaPergunta;
+
+/** "Nova pesquisa Pulso", "Nova pesquisa de Clima", "Nova pesquisa Pulso e Clima". */
+export function tituloDoAssistente(m: ModeloDaGaleria): string {
+  return /^Pesquisa /.test(m.nome)
+    ? `Nova ${m.nome.charAt(0).toLowerCase()}${m.nome.slice(1)}`
+    : `Nova pesquisa ${m.nome}`;
 }
 
 /** A faixa que explica a escala das perguntas que o modelo adiciona. */
@@ -218,7 +203,7 @@ function AssistenteDoModeloInterno({
   const etapaDaApi = anonima && etapa === 1 ? 2 : etapa;
 
   useEdicaoEmAndamento(
-    publicadaAntes ? `Editar ${estado.nome}` : `Nova ${m.nome}`,
+    publicadaAntes ? `Editar ${estado.nome}` : tituloDoAssistente(m),
     {
       pendente: pendente && gerada === null,
       salvando: gravando,
@@ -400,7 +385,7 @@ function AssistenteDoModeloInterno({
         >
           {publicadaAntes && !gerada
             ? `Editar ${estado.nome}`
-            : `Nova pesquisa ${m.nome}`}
+            : tituloDoAssistente(m)}
         </h1>
         <p className="pesquisas__subtitulo">{m.descricao}</p>
       </div>
@@ -704,232 +689,239 @@ function EtapaConfigurar({
         />
       ) : null}
 
-      <CartaoDeSecao
-        titulo="Perguntas"
-        contador={`${principais.length} de ${m.limite}${comentario ? " · + comentário" : ""}`}
-        acao={
-          travado ? null : (
-            <Button
-              variant="secondary"
-              disabled={noLimite}
-              aria-expanded={adicionando}
-              onClick={() => setAdicionando(true)}
-            >
-              <IconeMais tamanho={16} />
-              Adicionar pergunta
-            </Button>
-          )
-        }
-      >
-        {travado ? (
-          <p className="pesquisas__nota">
-            Esta pesquisa já tem respostas: as perguntas não mudam mais.
-          </p>
-        ) : null}
-        {escala ? (
-          <div className="pesquisas__faixa-escala">
-            <div>
-              <strong>{escala.titulo}</strong>
-              <span className="pesquisas__suave">{escala.texto}</span>
-            </div>
-            <span
-              className="pesquisas__previa-escala pesquisas__previa-escala--mini"
-              aria-hidden="true"
-            >
-              {escala.valores.map((v) => (
-                <span key={v}>{v}</span>
-              ))}
-            </span>
-          </div>
-        ) : null}
-        {erros?.perguntas ? (
-          <p className="pesquisas__erro" role="alert">
-            {erros.perguntas}
-          </p>
-        ) : null}
-        <ol
-          className="pesquisas__linhas-perguntas"
-          aria-label="Perguntas da pesquisa"
-        >
-          {principais.map((p, i) => {
-            const n = String(i + 1).padStart(2, "0");
-            const erro = erros?.[`pergunta:${p.id}`];
-            const secao = tituloDaSecao.get(p.id);
-            return (
-              <li
-                key={p.id}
-                className="pesquisas__linha-pergunta"
-                aria-label={`Pergunta ${i + 1}`}
-                draggable={!travado}
-                {...(arrastando === p.id ? { "data-arrastando": "" } : {})}
-                {...(erro ? { "data-invalida": "" } : {})}
-                onDragStart={() => setArrastando(p.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (arrastando)
-                    onMudar({
-                      secoes: levarPerguntaPara(
-                        estado.secoes,
-                        arrastando,
-                        p.id,
-                      ),
-                    });
-                  setArrastando(null);
-                }}
-                onDragEnd={() => setArrastando(null)}
-              >
-                {secao ? (
-                  <p className="pesquisas__linha-secao">{secao}</p>
-                ) : null}
-                <div className="pesquisas__linha-corpo">
-                  <span className="pesquisas__pegador" aria-hidden="true">
-                    <IconeArrastar tamanho={14} />
-                  </span>
-                  <span
-                    className="pesquisas__numero-pergunta"
-                    aria-hidden="true"
-                  >
-                    {n}
-                  </span>
-                  {editando?.id === p.id ? (
-                    <div className="pesquisas__caixa-inline pesquisas__caixa-inline--linha">
-                      <input
-                        className="pesquisas__campo"
-                        aria-label={`Texto da pergunta ${i + 1}`}
-                        aria-describedby={`${ids}-dica-${p.id}`}
-                        maxLength={LIMITES.textoPergunta}
-                        value={editando.texto}
-                        // Abre com o texto selecionado, pronto para trocar.
-                        ref={(el) => {
-                          if (el && document.activeElement !== el) {
-                            el.focus();
-                            el.select();
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            salvarEdicao();
-                          } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setEditando(null);
-                          }
-                        }}
-                        onChange={(e) =>
-                          setEditando({ id: p.id, texto: e.target.value })
-                        }
-                      />
-                      <span
-                        id={`${ids}-dica-${p.id}`}
-                        className="pesquisas__suave"
-                      >
-                        {`Enter salva · Esc cancela · ${editando.texto.length}/${LIMITES.textoPergunta}`}
-                      </span>
-                      <IconButton
-                        label="Salvar a pergunta"
-                        icon={<IconeVisto tamanho={14} />}
-                        variant="subtle"
-                        disabled={!editando.texto.trim()}
-                        onClick={salvarEdicao}
-                      />
-                      <IconButton
-                        label="Cancelar a edição"
-                        icon={<IconeFechar tamanho={14} />}
-                        variant="subtle"
-                        onClick={() => setEditando(null)}
-                      />
-                    </div>
-                  ) : (
-                    <span className="pesquisas__linha-texto">
-                      {p.texto || "Pergunta sem texto"}
-                    </span>
-                  )}
-                  <span
-                    className={`pesquisas__selo${p.tipo === "nota_0_10" && p.config.enps ? " pesquisas__selo--destaque" : ""}`}
-                  >
-                    {seloDoTipo(p)}
-                  </span>
-                  {travado || editando?.id === p.id ? null : (
-                    <span className="pesquisas__linha-acoes">
-                      <IconButton
-                        label={`Editar pergunta ${i + 1}`}
-                        icon={<IconeEditar tamanho={14} />}
-                        variant="subtle"
-                        onClick={() =>
-                          setEditando({ id: p.id, texto: p.texto })
-                        }
-                      />
-                      <IconButton
-                        label={`Excluir pergunta ${i + 1}`}
-                        icon={<IconeRemover tamanho={14} />}
-                        variant="subtle"
-                        onClick={() => {
-                          const antes = estado.secoes;
-                          onMudar({ secoes: excluirPergunta(antes, p.id) });
-                          avisar("Pergunta excluída.", {
-                            acao: {
-                              rotulo: "Desfazer",
-                              onClick: () => onMudar({ secoes: antes }),
-                            },
-                          });
-                        }}
-                      />
-                    </span>
-                  )}
-                </div>
-                {erro ? <p className="pesquisas__erro">{erro}</p> : null}
-              </li>
-            );
-          })}
-        </ol>
-        {adicionando ? (
-          <div className="pesquisas__caixa-inline pesquisas__caixa-inline--nova">
-            <textarea
-              className="pesquisas__campo"
-              aria-label="Nova pergunta"
-              placeholder="Escreva a pergunta como quem responde vai ler"
-              maxLength={LIMITES.textoPergunta}
-              value={rascunhoDaPergunta}
-              onChange={(e) => setRascunhoDaPergunta(e.target.value)}
-            />
-            <div className="pesquisas__caixa-inline-rodape">
-              <span className="pesquisas__suave">{`${rascunhoDaPergunta.length}/${LIMITES.textoPergunta}`}</span>
+      {m.fixo ? (
+        <PerguntasFixas modelo={m} secoes={estado.secoes} />
+      ) : (
+        <CartaoDeSecao
+          titulo="Perguntas"
+          contador={`${principais.length} de ${m.limite}${comentario ? " · + comentário" : ""}`}
+          acao={
+            travado ? null : (
               <Button
-                variant="subtle"
-                onClick={() => {
-                  setAdicionando(false);
-                  setRascunhoDaPergunta("");
-                }}
+                variant="secondary"
+                disabled={noLimite}
+                aria-expanded={adicionando}
+                onClick={() => setAdicionando(true)}
               >
-                Cancelar
+                <IconeMais tamanho={16} />
+                Adicionar pergunta
               </Button>
-              <Button disabled={!rascunhoDaPergunta.trim()} onClick={adicionar}>
-                Adicionar
-              </Button>
+            )
+          }
+        >
+          {travado ? (
+            <p className="pesquisas__nota">
+              Esta pesquisa já tem respostas: as perguntas não mudam mais.
+            </p>
+          ) : null}
+          {escala ? (
+            <div className="pesquisas__faixa-escala">
+              <div>
+                <strong>{escala.titulo}</strong>
+                <span className="pesquisas__suave">{escala.texto}</span>
+              </div>
+              <span
+                className="pesquisas__previa-escala pesquisas__previa-escala--mini"
+                aria-hidden="true"
+              >
+                {escala.valores.map((v) => (
+                  <span key={v}>{v}</span>
+                ))}
+              </span>
             </div>
-          </div>
-        ) : null}
-        {comentario ? (
-          <div className="pesquisas__linha-comentario">
-            <IconeComentario tamanho={16} />
-            <span>{comentario.texto}</span>
-            <span className="pesquisas__selo">Sempre opcional · fixa</span>
-          </div>
-        ) : null}
-        {temEnps ? (
-          <p className="pesquisas__nota">
-            A pergunta de eNPS pode sair. Se ficar, os resultados mostram
-            promotores, neutros e detratores.
-          </p>
-        ) : null}
-        {comentario ? (
-          <p className="pesquisas__suave">
-            O comentário livre fica sempre por último e não entra nas médias.
-          </p>
-        ) : null}
-      </CartaoDeSecao>
+          ) : null}
+          {erros?.perguntas ? (
+            <p className="pesquisas__erro" role="alert">
+              {erros.perguntas}
+            </p>
+          ) : null}
+          <ol
+            className="pesquisas__linhas-perguntas"
+            aria-label="Perguntas da pesquisa"
+          >
+            {principais.map((p, i) => {
+              const n = String(i + 1).padStart(2, "0");
+              const erro = erros?.[`pergunta:${p.id}`];
+              const secao = tituloDaSecao.get(p.id);
+              return (
+                <li
+                  key={p.id}
+                  className="pesquisas__linha-pergunta"
+                  aria-label={`Pergunta ${i + 1}`}
+                  draggable={!travado}
+                  {...(arrastando === p.id ? { "data-arrastando": "" } : {})}
+                  {...(erro ? { "data-invalida": "" } : {})}
+                  onDragStart={() => setArrastando(p.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (arrastando)
+                      onMudar({
+                        secoes: levarPerguntaPara(
+                          estado.secoes,
+                          arrastando,
+                          p.id,
+                        ),
+                      });
+                    setArrastando(null);
+                  }}
+                  onDragEnd={() => setArrastando(null)}
+                >
+                  {secao ? (
+                    <p className="pesquisas__linha-secao">{secao}</p>
+                  ) : null}
+                  <div className="pesquisas__linha-corpo">
+                    <span className="pesquisas__pegador" aria-hidden="true">
+                      <IconeArrastar tamanho={14} />
+                    </span>
+                    <span
+                      className="pesquisas__numero-pergunta"
+                      aria-hidden="true"
+                    >
+                      {n}
+                    </span>
+                    {editando?.id === p.id ? (
+                      <div className="pesquisas__caixa-inline pesquisas__caixa-inline--linha">
+                        <input
+                          className="pesquisas__campo"
+                          aria-label={`Texto da pergunta ${i + 1}`}
+                          aria-describedby={`${ids}-dica-${p.id}`}
+                          maxLength={LIMITES.textoPergunta}
+                          value={editando.texto}
+                          // Abre com o texto selecionado, pronto para trocar.
+                          ref={(el) => {
+                            if (el && document.activeElement !== el) {
+                              el.focus();
+                              el.select();
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              salvarEdicao();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditando(null);
+                            }
+                          }}
+                          onChange={(e) =>
+                            setEditando({ id: p.id, texto: e.target.value })
+                          }
+                        />
+                        <span
+                          id={`${ids}-dica-${p.id}`}
+                          className="pesquisas__suave"
+                        >
+                          {`Enter salva · Esc cancela · ${editando.texto.length}/${LIMITES.textoPergunta}`}
+                        </span>
+                        <IconButton
+                          label="Salvar a pergunta"
+                          icon={<IconeVisto tamanho={14} />}
+                          variant="subtle"
+                          disabled={!editando.texto.trim()}
+                          onClick={salvarEdicao}
+                        />
+                        <IconButton
+                          label="Cancelar a edição"
+                          icon={<IconeFechar tamanho={14} />}
+                          variant="subtle"
+                          onClick={() => setEditando(null)}
+                        />
+                      </div>
+                    ) : (
+                      <span className="pesquisas__linha-texto">
+                        {textoParaOPainel(p.texto) || "Pergunta sem texto"}
+                      </span>
+                    )}
+                    <span
+                      className={`pesquisas__selo${p.tipo === "nota_0_10" && p.config.enps ? " pesquisas__selo--destaque" : ""}`}
+                    >
+                      {seloDoTipo(p)}
+                    </span>
+                    {travado || editando?.id === p.id ? null : (
+                      <span className="pesquisas__linha-acoes">
+                        <IconButton
+                          label={`Editar pergunta ${i + 1}`}
+                          icon={<IconeEditar tamanho={14} />}
+                          variant="subtle"
+                          onClick={() =>
+                            setEditando({ id: p.id, texto: p.texto })
+                          }
+                        />
+                        <IconButton
+                          label={`Excluir pergunta ${i + 1}`}
+                          icon={<IconeRemover tamanho={14} />}
+                          variant="subtle"
+                          onClick={() => {
+                            const antes = estado.secoes;
+                            onMudar({ secoes: excluirPergunta(antes, p.id) });
+                            avisar("Pergunta excluída.", {
+                              acao: {
+                                rotulo: "Desfazer",
+                                onClick: () => onMudar({ secoes: antes }),
+                              },
+                            });
+                          }}
+                        />
+                      </span>
+                    )}
+                  </div>
+                  {erro ? <p className="pesquisas__erro">{erro}</p> : null}
+                </li>
+              );
+            })}
+          </ol>
+          {adicionando ? (
+            <div className="pesquisas__caixa-inline pesquisas__caixa-inline--nova">
+              <textarea
+                className="pesquisas__campo"
+                aria-label="Nova pergunta"
+                placeholder="Escreva a pergunta como quem responde vai ler"
+                maxLength={LIMITES.textoPergunta}
+                value={rascunhoDaPergunta}
+                onChange={(e) => setRascunhoDaPergunta(e.target.value)}
+              />
+              <div className="pesquisas__caixa-inline-rodape">
+                <span className="pesquisas__suave">{`${rascunhoDaPergunta.length}/${LIMITES.textoPergunta}`}</span>
+                <Button
+                  variant="subtle"
+                  onClick={() => {
+                    setAdicionando(false);
+                    setRascunhoDaPergunta("");
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={!rascunhoDaPergunta.trim()}
+                  onClick={adicionar}
+                >
+                  Adicionar
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {comentario ? (
+            <div className="pesquisas__linha-comentario">
+              <IconeComentario tamanho={16} />
+              <span>{textoParaOPainel(comentario.texto)}</span>
+              <span className="pesquisas__selo">Sempre opcional · fixa</span>
+            </div>
+          ) : null}
+          {temEnps ? (
+            <p className="pesquisas__nota">
+              A pergunta de eNPS pode sair. Se ficar, os resultados mostram
+              promotores, neutros e detratores.
+            </p>
+          ) : null}
+          {comentario ? (
+            <p className="pesquisas__suave">
+              O comentário livre fica sempre por último e não entra nas médias.
+            </p>
+          ) : null}
+        </CartaoDeSecao>
+      )}
     </>
   );
 }

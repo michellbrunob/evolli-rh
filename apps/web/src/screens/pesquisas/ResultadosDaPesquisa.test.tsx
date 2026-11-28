@@ -202,7 +202,7 @@ describe("Resultados — cabeçalho e faixa", () => {
     abrirMenu("Mais ações");
     expect(
       (await screen.findAllByRole("menuitem")).map((m) => m.textContent),
-    ).toEqual(["Sobre o modelo Clima"]);
+    ).toEqual(["Sobre o modelo Pesquisa de Clima"]);
   });
 });
 

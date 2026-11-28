@@ -105,6 +105,18 @@
   cursor: pointer;
 }
 
+/* T216 — trilha discreta (Pesquisas): o link fica cinza, sem sublinhado, e
+   ganha a tinta forte no passar e no foco. */
+.barra-superior__trilha-link--discreto {
+  color: var(--color-ink-muted);
+  text-decoration: none;
+}
+
+.barra-superior__trilha-link--discreto:hover,
+.barra-superior__trilha-link--discreto:focus-visible {
+  color: var(--color-ink);
+}
+
 /* O controle da conta: avatar, nome e a seta do menu. */
 .barra-superior__conta {
   display: inline-flex;

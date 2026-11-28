@@ -217,7 +217,8 @@ export const LIMITES = {
   textoOpcao: 200,
   opcoesMinimo: 2,
   opcoesMaximo: 20,
-  perguntas: 60,
+  // A Pesquisa de Clima tem 62 (60 afirmações + 2 abertas); a API aceita até 100.
+  perguntas: 100,
   secoes: 20,
   minimoPorGrupoMenor: 3,
   minimoPorGrupoMaior: 10,

@@ -588,7 +588,10 @@ function ProgressoDoFluxo({
   readonly total: number;
 }) {
   return (
-    <span className="pesquisas__progresso-fluxo">
+    <span
+      className="pesquisas__progresso-fluxo"
+      aria-label={`Passo ${passo} de ${total}`}
+    >
       {`Passo ${passo} de ${total}`}
       <span className="pesquisas__pontos" aria-hidden="true">
         {Array.from({ length: total }, (_, i) => (

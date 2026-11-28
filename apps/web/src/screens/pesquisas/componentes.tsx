@@ -7,38 +7,67 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Identificacao } from "../../api/pesquisasClient";
 import {
-  IconeAdicionarPessoa,
   IconeBuscar,
   IconeCadeado,
-  IconeDesligar,
-  IconeEquipe,
-  IconeEstrela,
-  IconeFormacao,
-  IconeModelo,
+  IconeFatoAutomatico,
+  IconeFatoCompetencias,
+  IconeFatoDimensoes,
+  IconeFatoDuasPessoas,
+  IconeFatoEscala,
+  IconeFatoPerfis,
+  IconeFatoPerguntas,
+  IconeFatoPersonalizada,
+  IconeMaleta,
+  IconeModeloAvaliacao180,
+  IconeModeloAvaliacao90,
+  IconeModeloClima,
+  IconeModeloEnps,
+  IconeModeloMotivacao,
+  IconeModeloOnboarding,
+  IconeModeloPerfil,
+  IconeModeloPersonalizada,
+  IconeModeloPulso,
+  IconeModeloPulsoClima,
+  IconeModeloRiscos,
+  IconeModeloSaudeFinanceira,
   IconeOcultarSenha,
   IconePerfil,
-  IconePresente,
-  IconeStatus,
+  IconeTempo,
   type IconeDoEcossistema,
 } from "../../ui/icones";
 import { modeloDaGaleria } from "./modelosDePesquisa";
+import type { IconeDoFato, IconeDoModeloId } from "./modelos/tipos";
 
-const ICONE_DO_MODELO: Readonly<Record<string, IconeDoEcossistema>> = {
-  pulso: IconeStatus,
-  clima: IconeEquipe,
-  enps: IconeEstrela,
-  onboarding: IconeAdicionarPessoa,
-  desligamento: IconeDesligar,
-  beneficios: IconePresente,
-  treinamento: IconeFormacao,
-  personalizada: IconeModelo,
-  "integracao-semana": IconeAdicionarPessoa,
-  "satisfacao-espaco": IconeEquipe,
-  "satisfacao-evento": IconeEstrela,
-  "saida-curta": IconeDesligar,
+const ICONE_DO_MODELO: Readonly<Record<IconeDoModeloId, IconeDoEcossistema>> = {
+  pulso: IconeModeloPulso,
+  pulso_clima: IconeModeloPulsoClima,
+  clima: IconeModeloClima,
+  enps: IconeModeloEnps,
+  onboarding: IconeModeloOnboarding,
+  motivacao: IconeModeloMotivacao,
+  riscos: IconeModeloRiscos,
+  saude_financeira: IconeModeloSaudeFinanceira,
+  avaliacao90: IconeModeloAvaliacao90,
+  avaliacao180: IconeModeloAvaliacao180,
+  perfil: IconeModeloPerfil,
+  personalizada: IconeModeloPersonalizada,
+  maleta: IconeMaleta,
 };
 
-/** O ícone do modelo num quadrado arredondado, na cor do modelo. */
+export const ICONE_DO_FATO: Readonly<Record<IconeDoFato, IconeDoEcossistema>> =
+  {
+    perguntas: IconeFatoPerguntas,
+    escala: IconeFatoEscala,
+    dimensoes: IconeFatoDimensoes,
+    competencias: IconeFatoCompetencias,
+    automatico: IconeFatoAutomatico,
+    duas_pessoas: IconeFatoDuasPessoas,
+    perfis: IconeFatoPerfis,
+    personalizada: IconeFatoPersonalizada,
+    tempo: IconeTempo,
+  };
+
+/** O ícone do modelo num quadrado arredondado, no par fundo/tinta do tom. */
 export function IconeDoModelo({
   id,
   tamanho = "md",
@@ -47,11 +76,11 @@ export function IconeDoModelo({
   readonly tamanho?: "sm" | "md" | "lg";
 }) {
   const m = modeloDaGaleria(id);
-  const Icone = ICONE_DO_MODELO[m.id] ?? IconeModelo;
+  const Icone = ICONE_DO_MODELO[m.icone] ?? IconeModeloPersonalizada;
   return (
     <span
       className={`pesquisas__icone-modelo pesquisas__icone-modelo--${tamanho}`}
-      style={{ ["--cor-do-modelo" as string]: `var(${m.cor})` }}
+      data-tom={m.tom}
       aria-hidden="true"
     >
       <Icone tamanho={tamanho === "sm" ? 14 : tamanho === "lg" ? 22 : 18} />
