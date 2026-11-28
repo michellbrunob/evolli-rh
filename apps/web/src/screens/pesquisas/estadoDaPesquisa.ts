@@ -20,6 +20,7 @@ import {
 import {
   HORA_PADRAO,
   encerraEmParaApi,
+  erroDoEncerramento,
   partesDoEncerramento,
 } from "./encerramento";
 import { modeloDaGaleria, secoesDoModelo } from "./modelosDePesquisa";
@@ -201,6 +202,34 @@ export function entradaDoEstado(e: EstadoDaPesquisa): PesquisaEntrada {
       : null,
     minimoPorGrupo: e.minimoPorGrupo,
     ...(anonima ? { separarPor: [...e.separarPor] } : {}),
+  };
+}
+
+/**
+ * O corpo do rascunho: igual a `entradaDoEstado`, mas o prazo e o mínimo por
+ * grupo ainda inválidos (data passada, número fora de 3 a 10) vão com o último
+ * valor gravado — o resto continua salvando enquanto o campo mostra o erro.
+ * Publicar continua barrado pela validação da etapa.
+ */
+export function entradaDoRascunho(
+  e: EstadoDaPesquisa,
+  hoje: string,
+  gravado: Pick<PesquisaDetalhe, "encerraEm" | "minimoPorGrupo"> | null,
+): PesquisaEntrada {
+  const entrada = entradaDoEstado(e);
+  const erros = validarEnvio(e, hoje);
+  const prazoGravado = partesDoEncerramento(gravado?.encerraEm);
+  return {
+    ...entrada,
+    ...(erros.encerraEm
+      ? { encerraEm: prazoGravado ? encerraEmParaApi(prazoGravado) : null }
+      : {}),
+    ...(erros.minimoPorGrupo
+      ? {
+          minimoPorGrupo:
+            gravado?.minimoPorGrupo ?? LIMITES.minimoPorGrupoMenor,
+        }
+      : {}),
   };
 }
 
@@ -517,14 +546,8 @@ export function validarParticipantes(e: EstadoDaPesquisa): Erros {
 
 export function validarEnvio(e: EstadoDaPesquisa, hoje: string): Erros {
   const erros: Record<string, string> = {};
-  if (e.encerraEm !== null) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(e.encerraEm))
-      erros.encerraEm = "Informe a data de encerramento.";
-    else if (e.encerraEm < hoje)
-      erros.encerraEm = "A data de encerramento não pode ser anterior a hoje.";
-    else if (!/^\d{2}:\d{2}$/.test(e.encerraHora))
-      erros.encerraEm = "Informe a hora de encerramento.";
-  }
+  const prazo = erroDoEncerramento(e.encerraEm, e.encerraHora, hoje);
+  if (prazo) erros.encerraEm = prazo;
   const m = e.minimoPorGrupo;
   if (
     !Number.isInteger(m) ||

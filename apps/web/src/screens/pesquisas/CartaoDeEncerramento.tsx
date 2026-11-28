@@ -10,7 +10,12 @@
 import { useId } from "react";
 import { formatarDiaCivil } from "../../format/data";
 import { IconeCalendario, IconeLocal, IconeTempo } from "../../ui/icones";
-import { DIAS_PADRAO, HORA_PADRAO, diasDepois } from "./encerramento";
+import {
+  DIAS_PADRAO,
+  HORA_PADRAO,
+  diasDepois,
+  erroDoEncerramento,
+} from "./encerramento";
 
 export function CartaoDeEncerramento({
   data,
@@ -24,6 +29,7 @@ export function CartaoDeEncerramento({
   readonly data: string | null;
   readonly hora: string;
   readonly hoje: string;
+  /** O erro da validação da etapa; sem ele, o campo já avisa ao digitar. */
   readonly erro?: string | undefined;
   readonly compacto?: boolean;
   readonly onMudar: (m: {
@@ -33,6 +39,8 @@ export function CartaoDeEncerramento({
 }) {
   const ids = useId();
   const ligado = data !== null;
+  // A data passada aparece já no campo, sem esperar o avanço da etapa.
+  const aviso = erro ?? erroDoEncerramento(data, hora, hoje) ?? undefined;
   const titulo = compacto ? "Encerramento" : "Encerrar automaticamente";
   const frase = ligado
     ? data
@@ -92,7 +100,8 @@ export function CartaoDeEncerramento({
                 min={hoje}
                 className="pesquisas__campo"
                 value={data ?? ""}
-                aria-invalid={erro ? true : undefined}
+                aria-invalid={aviso ? true : undefined}
+                {...(aviso ? { "aria-describedby": `${ids}-erro` } : {})}
                 onChange={(e) =>
                   onMudar({ encerraEm: e.target.value, encerraHora: hora })
                 }
@@ -117,9 +126,9 @@ export function CartaoDeEncerramento({
             <IconeLocal tamanho={12} />
             Horário de Brasília
           </p>
-          {erro ? (
-            <p className="pesquisas__erro" role="alert">
-              {erro}
+          {aviso ? (
+            <p id={`${ids}-erro`} className="pesquisas__erro" role="alert">
+              {aviso}
             </p>
           ) : null}
         </div>

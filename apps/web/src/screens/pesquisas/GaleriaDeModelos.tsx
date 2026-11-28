@@ -374,7 +374,8 @@ export function PerguntasPorGrupo({
             className="galeria__gaveta-grupo"
             aria-label={g.titulo ?? "Perguntas"}
           >
-            {g.titulo || grupos.length > 1 ? (
+            {/* O primeiro grupo sem nome começa direto na lista. */}
+            {g.titulo || (i > 0 && grupos.length > 1) ? (
               <p className="pesquisas__gaveta-grupo">
                 <span
                   className="galeria__bolinha"

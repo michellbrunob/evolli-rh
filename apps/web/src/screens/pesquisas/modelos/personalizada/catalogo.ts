@@ -204,7 +204,7 @@ export const SUBMODELOS_PERSONALIZADA: readonly ModeloDaGaleria[] = [
     id: "avaliacao-180-personalizada",
     nome: "Avaliação 180°",
     categoria: "desempenho",
-    formato: "Gestor e autoavaliação (180°)",
+    formato: "Gestor e autoavaliação",
     descricao:
       "Gestor e pessoa avaliam entregas e comportamento, com espaço para exemplos.",
     fatos: [{ icone: "perguntas", texto: "8 perguntas · 2 min" }],

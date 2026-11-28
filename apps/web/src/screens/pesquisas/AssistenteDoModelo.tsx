@@ -50,6 +50,7 @@ import {
 } from "./componentes";
 import {
   entradaDoEstado,
+  entradaDoRascunho,
   estadoDoDetalhe,
   estadoDoModelo,
   excluirPergunta,
@@ -210,9 +211,19 @@ function AssistenteDoModeloInterno({
   /** O conteúdo cuja gravação automática falhou: só tenta de novo com outra mudança. */
   const falhouRef = useRef<string | null>(null);
   /** Funções vindas de fora, lidas na hora (o shell as recria a cada desenho). */
-  const externosRef = useRef({ servico, agora, onRascunhoCriado });
-  externosRef.current = { servico, agora, onRascunhoCriado };
-  const entrada = useMemo(() => entradaDoEstado(estado), [estado]);
+  const externosRef = useRef({
+    servico,
+    agora,
+    onRascunhoCriado,
+    hoje,
+    gravada,
+  });
+  externosRef.current = { servico, agora, onRascunhoCriado, hoje, gravada };
+  // Prazo ou mínimo ainda inválidos não barram o resto do rascunho.
+  const entrada = useMemo(
+    () => entradaDoRascunho(estado, hoje, gravada),
+    [estado, hoje, gravada],
+  );
   const serial = JSON.stringify(entrada);
   const pendente = serial !== referencia;
   const etapaDaApi = anonima && etapa === 1 ? 2 : etapa;
@@ -227,7 +238,11 @@ function AssistenteDoModeloInterno({
 
   /** Grava o rascunho (cria na primeira vez), em fila. */
   const gravar = useCallback((e: EstadoDaPesquisa): Promise<string | null> => {
-    const corpo = entradaDoEstado(e);
+    const corpo = entradaDoRascunho(
+      e,
+      externosRef.current.hoje,
+      externosRef.current.gravada,
+    );
     const texto = JSON.stringify(corpo);
     const passo = filaRef.current.then(async () => {
       if (!corpo.nome) return idRef.current;

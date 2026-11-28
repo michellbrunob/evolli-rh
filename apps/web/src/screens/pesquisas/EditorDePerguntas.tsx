@@ -7,8 +7,10 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type ReactNode,
 } from "react";
@@ -129,9 +131,38 @@ const SEPARADOR = "::";
 const numeroDe = (v: string): number | undefined =>
   v.trim() === "" ? undefined : Number(v);
 
+/** Altura máxima da lista suspensa dos tipos (28rem). */
+const ALTURA_DA_LISTA = 448;
+/** Folga entre a lista e o que a limita (rodapé fixo ou topo da tela). */
+const FOLGA_DA_LISTA = 8;
+
+/**
+ * Para onde a lista abre: para baixo quando cabe até o rodapé fixo do
+ * assistente (ou o fim da tela); senão, para o lado com mais espaço — e
+ * nunca atrás do rodapé. A altura fica limitada ao espaço que sobra.
+ */
+export function posicaoDaLista(
+  gatilho: { readonly top: number; readonly bottom: number },
+  limiteDeBaixo: number,
+  altura: number,
+): { readonly acima: boolean; readonly alturaMaxima: number } {
+  const abaixo = limiteDeBaixo - gatilho.bottom - FOLGA_DA_LISTA;
+  const acima = gatilho.top - FOLGA_DA_LISTA;
+  const precisa = Math.min(altura, ALTURA_DA_LISTA);
+  const paraCima = precisa > abaixo && acima > abaixo;
+  return {
+    acima: paraCima,
+    alturaMaxima: Math.max(
+      0,
+      Math.min(ALTURA_DA_LISTA, paraCima ? acima : abaixo),
+    ),
+  };
+}
+
 /**
  * A lista suspensa dos tipos, agrupada (Texto, Escolha, Escala, Outros):
- * fecha com Esc e com clique fora; o foco vai para o primeiro tipo.
+ * fecha com Esc e com clique fora; o foco vai para o primeiro tipo. Abre
+ * para cima quando o rodapé fixo do assistente cobriria a lista.
  */
 function ListaDeTipos({
   onFechar,
@@ -141,6 +172,24 @@ function ListaDeTipos({
   readonly children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [posicao, setPosicao] = useState<ReturnType<
+    typeof posicaoDaLista
+  > | null>(null);
+  useLayoutEffect(() => {
+    const lista = ref.current;
+    const gatilho = lista?.parentElement;
+    if (!lista || !gatilho) return;
+    const rodape = lista
+      .closest("form")
+      ?.querySelector<HTMLElement>(".cadastro-etapas__rodape");
+    const limite = rodape
+      ? rodape.getBoundingClientRect().top
+      : window.innerHeight;
+    const r = gatilho.getBoundingClientRect();
+    // Sem medidas (fora do navegador), fica como está: para baixo.
+    if (r.top === 0 && r.bottom === 0) return;
+    setPosicao(posicaoDaLista(r, limite, lista.scrollHeight));
+  }, []);
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
     function fora(e: MouseEvent) {
@@ -156,7 +205,14 @@ function ListaDeTipos({
   return (
     <div
       ref={ref}
-      className="pesquisas__tipos pesquisas__tipos--agrupados pesquisas__tipos--suspensa"
+      className={`pesquisas__tipos pesquisas__tipos--agrupados pesquisas__tipos--suspensa${posicao?.acima ? " pesquisas__tipos--acima" : ""}`}
+      {...(posicao
+        ? {
+            style: {
+              maxHeight: `${posicao.alturaMaxima}px`,
+            } satisfies CSSProperties,
+          }
+        : {})}
       role="group"
       aria-label="Tipo da nova pergunta"
       onKeyDown={(e) => {

@@ -23,7 +23,7 @@ import {
   SecaoDoCadastro,
 } from "../../components/cadastro/CadastroEmEtapas";
 import { useEdicaoEmAndamento } from "../../app/edicoesPendentes";
-import { formatarDiaCivil } from "../../format/data";
+import { formatarDiaCivil, formatarInstante } from "../../format/data";
 import { plural } from "../../format/plural";
 import { Dialog } from "../../ui";
 import { GarantirAvisos } from "./avisos";
@@ -35,11 +35,12 @@ import { enderecoDaPrevia } from "./rotasDePesquisas";
 import { SepararRespostasPor } from "./SepararRespostasPor";
 import { EditorDePerguntas } from "./EditorDePerguntas";
 import { EtapaColaboradores } from "./EtapaColaboradores";
-import { lembrarRascunho } from "./rascunhosLocais";
+import { lembrarRascunho, memoriaDoRascunho } from "./rascunhosLocais";
 import { CampoDoLink, TelaDeGerada } from "./TelaDeGerada";
 import { PreVisualizacao } from "./PreVisualizacao";
 import {
   entradaDoEstado,
+  entradaDoRascunho,
   estadoDoDetalhe,
   estadoDoModelo,
   perguntasEmOrdem,
@@ -137,13 +138,24 @@ function AssistenteDePesquisaInterno({
   const [referencia, setReferencia] = useState(() =>
     JSON.stringify(entradaDoEstado(estado)),
   );
-  const [atual, setAtual] = useState(0);
   const anonima = estado.identificacao === "anonima";
   /** Etapas que aparecem (na anônima, sem Participantes). */
   const chaves = anonima ? [0, 1, 3, 4] : [0, 1, 2, 3, 4];
+  /**
+   * Rascunho retomado: volta à etapa em que a pessoa parou (o que este
+   * navegador lembra); as etapas depois dela continuam por ver.
+   */
+  const [retomado] = useState(() =>
+    base && base.status === "rascunho" ? memoriaDoRascunho(base.id) : null,
+  );
+  const [atual, setAtual] = useState(() =>
+    retomado ? Math.min(Math.max(retomado.etapa - 1, 0), chaves.length - 1) : 0,
+  );
   const etapaReal = chaves[Math.min(atual, chaves.length - 1)]!;
   const etapasVisiveis = chaves.map((c) => ETAPAS[c]!);
-  const [alcancada, setAlcancada] = useState(base ? 4 : 0);
+  const [alcancada, setAlcancada] = useState(() =>
+    base && base.status !== "rascunho" ? 4 : atual,
+  );
   const [mostrarErros, setMostrarErros] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
@@ -189,9 +201,15 @@ function AssistenteDePesquisaInterno({
     );
   }
 
-  /** Grava o rascunho (cria na primeira vez). Devolve o id. */
-  async function gravar(): Promise<string> {
-    const entrada = entradaDoEstado(estado);
+  /**
+   * Grava o rascunho (cria na primeira vez) e lembra a etapa em que a pessoa
+   * fica (`etapa`, índice das etapas visíveis). Devolve o id. No rascunho, o
+   * prazo ou o mínimo ainda inválidos vão com o último valor gravado.
+   */
+  async function gravar(etapa: number = atual): Promise<string> {
+    const entrada = rascunho
+      ? entradaDoRascunho(estado, hoje, gravada)
+      : entradaDoEstado(estado);
     let id = estado.id;
     if (id === null) {
       const criada = await servico.criarPesquisa(entrada);
@@ -209,7 +227,7 @@ function AssistenteDePesquisaInterno({
       `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
     );
     lembrarRascunho(id, {
-      etapa: Math.min(atual + 2, chaves.length),
+      etapa: Math.min(etapa + 1, chaves.length),
       totalDeEtapas: chaves.length,
       salvoEm: new Date().toISOString(),
     });
@@ -242,7 +260,7 @@ function AssistenteDePesquisaInterno({
     setSalvando(true);
     try {
       if (!ultima) {
-        await gravar();
+        await gravar(atual + 1);
         irPara(atual + 1);
       } else if (rascunho) {
         let id: string;
@@ -284,7 +302,17 @@ function AssistenteDePesquisaInterno({
     setFalha(null);
     try {
       await gravar();
-      setAvisoRascunho("Rascunho salvo.");
+      // O prazo ou o mínimo com erro ficam de fora (vale o último gravado).
+      const pendentes = validarEtapa(estado, 3, hoje);
+      const fora = [
+        pendentes.encerraEm ? "o prazo" : null,
+        pendentes.minimoPorGrupo ? "o mínimo por grupo" : null,
+      ].filter(Boolean);
+      setAvisoRascunho(
+        fora.length === 0
+          ? "Rascunho salvo."
+          : `Rascunho salvo, menos ${fora.join(" e ")}: corrija na etapa Envio e prazo.`,
+      );
       depois?.();
     } catch (erro) {
       setFalha(mensagemDaFalha(erro, "salvar o rascunho"));
@@ -589,7 +617,9 @@ function AssistenteDePesquisaInterno({
             ? "A pesquisa está publicada: algumas mudanças têm limite."
             : salvoAs
               ? `${estado.nome.trim() || "Sem nome"} · rascunho salvo às ${salvoAs}`
-              : `Configure em ${chaves.length} etapas. O rascunho é gravado a cada etapa concluída.`
+              : retomado
+                ? `Parou na etapa ${Math.min(retomado.etapa, chaves.length)} de ${chaves.length} · salvo em ${formatarInstante(retomado.salvoEm)}`
+                : `Configure em ${chaves.length} etapas. O rascunho é gravado a cada etapa concluída.`
         }
         rotuloVoltar="Voltar para Pesquisas"
         onVoltarDaPagina={() => (pendente ? setSair(true) : onSair())}

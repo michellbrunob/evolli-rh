@@ -24,6 +24,24 @@ export function diasDepois(dia: string, dias: number): string {
   return `${ano}-${mes}-${diaDoMes}`;
 }
 
+/**
+ * O erro do prazo (data e hora de Brasília) ou `null` quando vale. Serve à
+ * validação da etapa e ao aviso do campo, que aparece já ao digitar.
+ */
+export function erroDoEncerramento(
+  data: string | null,
+  hora: string,
+  hoje: string,
+): string | null {
+  if (data === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data))
+    return "Informe a data de encerramento.";
+  if (data < hoje)
+    return "A data de encerramento não pode ser anterior a hoje.";
+  if (!/^\d{2}:\d{2}$/.test(hora)) return "Informe a hora de encerramento.";
+  return null;
+}
+
 /** O que vai para a API. */
 export function encerraEmParaApi(partes: PartesDoEncerramento): string {
   return `${partes.data}T${partes.hora}`;

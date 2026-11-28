@@ -645,6 +645,12 @@ textarea.pesquisas__campo {
   box-shadow: var(--sombra-flutuante);
 }
 
+/* Sem espaço até o rodapé fixo do assistente: a lista abre para cima. */
+.pesquisas__tipos--suspensa.pesquisas__tipos--acima {
+  top: auto;
+  bottom: calc(100% + var(--space-xxs));
+}
+
 .pesquisas__tipos--suspensa .pesquisas__tipos-grupo + .pesquisas__tipos-grupo {
   margin-top: var(--space-xxs);
   padding-top: var(--space-xxs);
@@ -1958,9 +1964,12 @@ textarea.pesquisas__campo {
   gap: 2px;
 }
 
+/* Sobre o fundo cinza da faixa, cada quadradinho com borda e fundo próprios. */
 .pesquisas__previa-escala--mini span {
   min-width: 1.25rem;
   height: 1.25rem;
+  border-color: var(--divisor-cor-forte);
+  background: var(--surface-canvas);
   font-size: 0.6875rem;
 }
 
