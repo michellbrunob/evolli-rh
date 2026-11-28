@@ -479,3 +479,10 @@
   gap: var(--space-xs);
   font-variant-numeric: tabular-nums;
 }
+
+/* Estado vazio com uma ação (ex.: ativar a segmentação). */
+.pesquisas__vazio-acao {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+}

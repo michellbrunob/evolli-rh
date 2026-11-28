@@ -175,6 +175,7 @@ export function analisesDoModelo(x: {
         detalhe={x.detalhe}
         geral={x.geral}
         r={r}
+        {...(x.onDuplicar ? { onDuplicar: x.onDuplicar } : {})}
       />
     );
   if (!temTelasDoClima(x.detalhe, x.geral)) return null;

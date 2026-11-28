@@ -583,6 +583,36 @@ describe("T216 — eNPS: Análises", () => {
     ).toBeNull();
   });
 
+  it("anônima sem recorte: agrupar por departamento e o botão de ativar a segmentação", async () => {
+    const onDuplicar = vi.fn();
+    render(
+      <>
+        {analisesDoModelo({
+          servico: servicoFalso({
+            evolucaoDaPesquisa: vi.fn(async () => ({ evolucao: [] })),
+          }),
+          detalhe: { ...detalhe, identificacao: "anonima", separarPor: [] },
+          geral: { ...geral, recortes: [], grupos: {} },
+          respostas: null,
+          onDuplicar,
+        })}
+      </>,
+    );
+    const agrupar = screen.getByRole("group", { name: "Agrupar por" });
+    expect(
+      within(agrupar).getByRole("button", { name: "Departamento" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByText("Sem departamento informado para agrupar as respostas."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ativar segmentação na próxima pesquisa",
+      }),
+    );
+    expect(onDuplicar).toHaveBeenCalledTimes(1);
+  });
+
   it("o que mais pesa na nota: só na identificada, do maior peso para o menor", async () => {
     montar("anonima");
     expect(

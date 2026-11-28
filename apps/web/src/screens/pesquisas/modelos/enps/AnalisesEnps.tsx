@@ -16,6 +16,7 @@ import type {
 import { plural } from "../../../../format/plural";
 import { IconeCadeado } from "../../../../ui/icones";
 import { Esqueleto } from "../../../../ui/movimento";
+import { Button } from "../../../../components";
 import { Pilulas } from "../../componentes";
 import { perguntasEmOrdem } from "../../estadoDaPesquisa";
 import { CAMPOS_DE_GRUPO } from "../../SepararRespostasPor";
@@ -117,11 +118,14 @@ export function AnalisesEnps({
   detalhe,
   geral,
   r,
+  onDuplicar,
 }: {
   readonly servico: ServicoDePesquisas;
   readonly detalhe: PesquisaDetalhe;
   readonly geral: ResultadosPesquisa;
   readonly r: ResultadoDoEnps;
+  /** "Ativar segmentação na próxima pesquisa" (duplicar a pesquisa). */
+  readonly onDuplicar?: () => void;
 }) {
   const recortes = recortesDoEnps(detalhe, geral);
   const [campo, setCampo] = useState<CampoGrupo | null>(recortes[0] ?? null);
@@ -213,23 +217,42 @@ export function AnalisesEnps({
               {`Grupos com menos de ${plural(detalhe.minimoPorGrupo, "resposta", "respostas")} ficam ocultos.`}
             </p>
           </div>
-          {recortes.length > 1 ? (
-            <Pilulas
-              rotulo="Agrupar por"
-              valor={campo ?? recortes[0]!}
-              onMudar={(c) => setCampo(c)}
-              opcoes={recortes.map((c) => ({
-                valor: c,
-                rotulo: CAMPOS_DE_GRUPO.find((x) => x.campo === c)?.rotulo ?? c,
-              }))}
-            />
-          ) : null}
+          {/* Mesmo sem recorte (anônima sem "separar por"), o seletor
+              mostra o departamento: o vazio explica e leva à segmentação. */}
+          <Pilulas
+            rotulo="Agrupar por"
+            valor={campo ?? "departamento"}
+            onMudar={(c) => {
+              if (recortes.includes(c)) setCampo(c);
+            }}
+            opcoes={(recortes.length > 0
+              ? recortes
+              : (["departamento"] as const)
+            ).map((c) => ({
+              valor: c,
+              rotulo: CAMPOS_DE_GRUPO.find((x) => x.campo === c)?.rotulo ?? c,
+            }))}
+          />
         </header>
         {recortes.length === 0 ? (
-          <p className="pesquisas__nota">
-            Esta pesquisa anônima não pediu para separar as respostas por grupo:
-            não há recortes para comparar.
-          </p>
+          <div className="pesquisas__vazio-acao">
+            <p className="pesquisas__suave">
+              Sem departamento informado para agrupar as respostas.
+            </p>
+            {onDuplicar ? (
+              <>
+                <p className="pesquisas__suave">
+                  Duplique a pesquisa e ligue “Separar respostas por” no
+                  assistente para comparar os grupos no próximo ciclo.
+                </p>
+                <div className="pesquisas__acoes">
+                  <Button variant="secondary" onClick={onDuplicar}>
+                    Ativar segmentação na próxima pesquisa
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : !grupos ? (
           <Esqueleto rotulo="Carregando os grupos…" linhas={3} />
         ) : grupos.length === 0 ? (

@@ -1498,3 +1498,6 @@ Regras:
   `diferencaComUmaCasa` (o meio sobe no valor com sinal: −4,25 → −4,2; sem erro de ponto flutuante),
   a mesma regra do resultado individual genérico; a tela mostra inteiro sem casa ("−3", "0").
 - **eNPS no assistente:** as `chavesFixas` (a principal) são somente leitura: sem "Editar" nem "Excluir".
+- **Análises do Clima e do eNPS:** o seletor "Agrupar por" aparece sempre (sem recorte, só
+  "Departamento"); no vazio de uma pesquisa sem "separar por", o botão "Ativar segmentação na próxima
+  pesquisa" abre a duplicação (a pessoa liga "Separar respostas por" no assistente da cópia).

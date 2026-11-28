@@ -23,6 +23,7 @@ import type { ServicoDePesquisas } from "../../servicoDePesquisas";
 import { DIMENSOES_CLIMA } from "./catalogo";
 import { FAIXAS_CLIMA } from "./faixas";
 import { SeloDaFaixaClima } from "./pecas";
+import "../Resultados.css";
 
 export interface GrupoDoClima {
   readonly id: string;
@@ -174,22 +175,42 @@ export function AnalisesClima({
               {`% favorável · grupos com menos de ${plural(detalhe.minimoPorGrupo, "resposta", "respostas")} ficam ocultos`}
             </p>
           </div>
-          {recortes.length > 0 && campo ? (
-            <Pilulas
-              rotulo="Agrupar por"
-              valor={campo}
-              onMudar={setCampo}
-              opcoes={recortes.map((c) => ({
-                valor: c,
-                rotulo: `Agrupar por ${rotuloDoCampo(c)}`,
-              }))}
-            />
-          ) : null}
+          {/* Mesmo sem recorte (anônima sem "separar por"), o seletor
+              mostra o departamento: o vazio explica e leva à segmentação. */}
+          <Pilulas
+            rotulo="Agrupar por"
+            valor={campo ?? "departamento"}
+            onMudar={(c) => {
+              if (recortes.includes(c)) setCampo(c);
+            }}
+            opcoes={(recortes.length > 0
+              ? recortes
+              : (["departamento"] as const)
+            ).map((c) => ({
+              valor: c,
+              rotulo: `Agrupar por ${rotuloDoCampo(c)}`,
+            }))}
+          />
         </div>
         {!campo || (grupos !== null && grupos.length === 0) ? (
-          <p className="pesquisas__suave">
-            {`Sem ${campo ? nomeDoCampo(campo) : "departamento"} informado para agrupar as respostas.`}
-          </p>
+          <div className="pesquisas__vazio-acao">
+            <p className="pesquisas__suave">
+              {`Sem ${campo ? nomeDoCampo(campo) : "departamento"} informado para agrupar as respostas.`}
+            </p>
+            {recortes.length === 0 && onDuplicar ? (
+              <>
+                <p className="pesquisas__suave">
+                  Duplique a pesquisa e ligue “Separar respostas por” no
+                  assistente para comparar os grupos no próximo ciclo.
+                </p>
+                <div className="pesquisas__acoes">
+                  <Button variant="secondary" onClick={onDuplicar}>
+                    Ativar segmentação na próxima pesquisa
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : grupos === null ? (
           <Esqueleto rotulo="Carregando grupos…" linhas={3} />
         ) : (

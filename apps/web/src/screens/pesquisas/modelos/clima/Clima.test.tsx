@@ -700,6 +700,70 @@ describe("T216 — Clima: Análises", () => {
   });
 });
 
+describe("R4-B-12 — Clima: agrupar por e segmentação", () => {
+  it("anônima sem recorte: o seletor de departamento aparece e o vazio leva a duplicar", async () => {
+    const d = detalheDoClima({ identificacao: "anonima" });
+    const geral = geralDo(d, { recortes: [] });
+    const servico = servicoFalso({
+      listarPesquisas: vi.fn(() => Promise.resolve(lista([]))),
+    });
+    const onDuplicar = vi.fn();
+    render(
+      <>
+        {analisesDoModelo({
+          servico,
+          detalhe: d,
+          geral,
+          respostas: null,
+          onDuplicar,
+        })}
+      </>,
+    );
+    const agrupar = await screen.findByRole("group", { name: "Agrupar por" });
+    expect(
+      within(agrupar).getByRole("button", { name: "Agrupar por Departamento" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByText("Sem departamento informado para agrupar as respostas."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ativar segmentação na próxima pesquisa",
+      }),
+    );
+    expect(onDuplicar).toHaveBeenCalledTimes(1);
+  });
+
+  it("com recorte, sem o botão de ativar a segmentação", async () => {
+    const d = detalheDoClima({ identificacao: "identificada" });
+    const geral = geralDo(d, {
+      recortes: ["departamento"],
+      grupos: { departamento: [] },
+    });
+    render(
+      <>
+        {analisesDoModelo({
+          servico: servicoFalso({
+            listarPesquisas: vi.fn(() => Promise.resolve(lista([]))),
+          }),
+          detalhe: d,
+          geral,
+          respostas: null,
+          onDuplicar: vi.fn(),
+        })}
+      </>,
+    );
+    expect(
+      await screen.findByRole("group", { name: "Agrupar por" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Ativar segmentação na próxima pesquisa",
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("T216 — Clima: planilha", () => {
   const d = detalheDoClima();
   const rel = montarRelatorio({
