@@ -10,7 +10,9 @@
  * Telas de resposta:
  * - modelos prontos (e API sem `modelo`): UMA PERGUNTA POR TELA, com
  *   "Pergunta N de M";
- * - Personalizada: UMA SEÇÃO POR VEZ, com "Seção N de M".
+ * - Personalizada: UMA SEÇÃO POR VEZ, com "Seção N de M";
+ * - Pulso e Clima: por dimensão (abertura, perguntas com o selo e o
+ *   comentário), contando só as perguntas (`modelos/pulso_clima`).
  * A contagem e a barra de progresso contam só o que está VISÍVEL — a pergunta
  * escondida pela condição não entra (e a seção sem pergunta visível some).
  * Uma pergunta por tela: "Próximo" fica desabilitado enquanto falta a
@@ -75,6 +77,15 @@ import { perfilDasEscolhas } from "../pesquisas/modelos/disc/perfilLocal";
 import { ResultadoPublicoDisc } from "../pesquisas/modelos/disc/ResultadoPublicoDisc";
 import { ResultadoPublicoIsfb } from "../pesquisas/modelos/isfb/ResultadoPublicoIsfb";
 import { resultadoIsfbDasRespostas } from "../pesquisas/modelos/isfb/resultadoLocal";
+import {
+  AberturaDaDimensao,
+  ComentarioDaNota,
+  SeloDaDimensao,
+  telasDoPulsoClima,
+  type TelaDoPulsoClima,
+} from "../pesquisas/modelos/pulso_clima/telasPublicas";
+import { resultadoLocalDaTad } from "../pesquisas/modelos/tad/resultadoLocal";
+import { ResultadoPublicoTad } from "../pesquisas/modelos/tad/ResultadoPublicoTad";
 import { rodadaDaPesquisaPublica } from "../../app/rotaPublica";
 import { ehAvaliacao } from "../pesquisas/modelos/avaliacao/catalogo";
 import { ResponderAvaliacao } from "../pesquisas/modelos/avaliacao/ResponderAvaliacao";
@@ -175,12 +186,18 @@ type Etapa =
   // T216 — Avaliação 90°/180°: depois da identificação, quem a pessoa avalia.
   | { readonly tipo: "avaliacao" };
 
-/** Uma tela de resposta: uma pergunta, ou uma seção inteira. */
-interface Tela {
-  readonly id: string;
-  readonly secao: Secao;
-  readonly perguntas: readonly PerguntaNaOrdem[];
-}
+/**
+ * Uma tela de resposta: uma pergunta, ou uma seção inteira; no Pulso e
+ * Clima, também a abertura da dimensão e o comentário junto da nota.
+ */
+type Tela =
+  | {
+      readonly id: string;
+      readonly secao: Secao;
+      readonly perguntas: readonly PerguntaNaOrdem[];
+      readonly doModelo?: undefined;
+    }
+  | (TelaDoPulsoClima & { readonly doModelo: "pulso_clima" });
 
 export const MENSAGEM_NAO_ENCONTRADO =
   "Não encontramos você nesta pesquisa. Confira o CPF e a data de nascimento.";
@@ -461,10 +478,16 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     () => perguntasEmOrdem(secoes, visiveis),
     [secoes, visiveis],
   );
-  const telas = useMemo(
-    () => montarTelas(ordemDasPerguntas, porSecao),
-    [ordemDasPerguntas, porSecao],
-  );
+  const modeloDaPesquisa = pesquisa?.modelo;
+  const telas = useMemo((): Tela[] => {
+    // T216 — Pulso e Clima: telas por dimensão.
+    if (modeloDaPesquisa === "pulso_clima")
+      return telasDoPulsoClima(ordemDasPerguntas).map((t) => ({
+        ...t,
+        doModelo: "pulso_clima" as const,
+      }));
+    return montarTelas(ordemDasPerguntas, porSecao);
+  }, [ordemDasPerguntas, porSecao, modeloDaPesquisa]);
 
   function irParaTela(id: string | undefined) {
     if (id === undefined) return;
@@ -638,8 +661,12 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
         for (const { campo } of erro.erros) {
           porPergunta[campo] = "Revise esta resposta.";
         }
-        const primeira = telas.find((t) =>
-          t.perguntas.some((o) => o.pergunta.id in porPergunta),
+        const primeira = telas.find(
+          (t) =>
+            t.perguntas.some((o) => o.pergunta.id in porPergunta) ||
+            (t.doModelo === "pulso_clima" &&
+              t.comentarioJunto !== undefined &&
+              t.comentarioJunto.pergunta.id in porPergunta),
         );
         if (primeira) setEtapa({ tipo: "tela", id: primeira.id });
         setErros(porPergunta);
@@ -1023,7 +1050,37 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
       const bloqueado = pendentes > 0 && !porSecao;
       const ultimaPergunta = ordemDasPerguntas.at(-1)?.pergunta.id;
       const rotulo = porSecao ? "Seção" : "Pergunta";
-      progresso = { posicao: posicao + 1, total, rotulo };
+      progresso =
+        atual.doModelo === "pulso_clima"
+          ? { ...atual.progresso, rotulo }
+          : { posicao: posicao + 1, total, rotulo };
+      if (atual.doModelo === "pulso_clima" && atual.abertura) {
+        conteudo = (
+          <form
+            ref={formularioRef}
+            noValidate
+            onSubmit={aoEnviarFormulario}
+            className="pesquisa-publica__formulario"
+          >
+            <AberturaDaDimensao tela={atual} titulo={(t) => titulo(t)} />
+            <div className="pesquisa-publica__navegacao">
+              <Button
+                variant="subtle"
+                onClick={anterior}
+                disabled={posicao === 0 || enviando}
+              >
+                <IconeVoltar tamanho={16} />
+                Anterior
+              </Button>
+              <Button type="submit" disabled={enviando}>
+                Próximo
+                <IconeAvancar tamanho={16} />
+              </Button>
+            </div>
+          </form>
+        );
+        break;
+      }
       const primeira = atual.perguntas[0]!;
       const saudacao =
         posicao === 0 && primeiroNome ? (
@@ -1041,15 +1098,28 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
           onKeyDown={aoTeclar}
           className="pesquisa-publica__formulario"
         >
-          <p className="pesquisa-contador">
-            {`${rotulo} ${posicao + 1} de ${total}`}
-            {!porSecao && atual.secao.titulo ? (
-              <span className="pesquisa-contador__secao">
-                {" "}
-                · {atual.secao.titulo}
-              </span>
-            ) : null}
-          </p>
+          {atual.doModelo === "pulso_clima" ? (
+            <p className="pesquisa-contador">
+              <SeloDaDimensao selo={atual.selo} />
+              {atual.contagem
+                ? ` Pergunta ${atual.contagem.posicao} de ${atual.contagem.total}`
+                : null}
+            </p>
+          ) : null}
+          {atual.doModelo === "pulso_clima" && atual.sobretitulo ? (
+            <p className="pesquisa-publica__legenda">{atual.sobretitulo}</p>
+          ) : null}
+          {atual.doModelo === undefined ? (
+            <p className="pesquisa-contador">
+              {`${rotulo} ${posicao + 1} de ${total}`}
+              {!porSecao && atual.secao.titulo ? (
+                <span className="pesquisa-contador__secao">
+                  {" "}
+                  · {atual.secao.titulo}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           {porSecao ? (
             <>
               {titulo(atual.secao.titulo ?? `Seção ${posicao + 1}`)}
@@ -1059,7 +1129,9 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                 </p>
               ) : null}
             </>
-          ) : primeira.primeiraDaSecao && atual.secao.descricao ? (
+          ) : primeira.primeiraDaSecao &&
+            atual.secao.descricao &&
+            atual.doModelo === undefined ? (
             <p className="pesquisa-publica__legenda">{atual.secao.descricao}</p>
           ) : null}
           {saudacao}
@@ -1089,6 +1161,15 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                 {...(porSecao ? {} : { tituloRef })}
               />
             ))}
+            {atual.doModelo === "pulso_clima" && atual.comentarioJunto ? (
+              <ComentarioDaNota
+                pergunta={atual.comentarioJunto.pergunta}
+                valor={respostas[atual.comentarioJunto.pergunta.id]}
+                aoMudar={(v) =>
+                  mudarResposta(atual.comentarioJunto!.pergunta.id, v)
+                }
+              />
+            ) : null}
           </div>
           {porSecao && pendentes > 0 ? (
             <p className="pesquisa-publica__legenda" aria-live="polite">
@@ -1155,6 +1236,24 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
         pesquisa?.modelo === "disc"
           ? perfilDasEscolhas(secoes, respostas)
           : null;
+      // Motivação (TAD): o resultado da própria pessoa.
+      const resultadoTad =
+        pesquisa?.modelo === "tad"
+          ? resultadoLocalDaTad(secoes, respostas)
+          : null;
+      if (resultadoTad) {
+        conteudo = (
+          <ResultadoPublicoTad
+            resultado={resultadoTad}
+            previa={previa !== null}
+            titulo={titulo(
+              "Respostas enviadas!",
+              "pesquisa-publica__titulo pesquisa-publica__titulo--grande",
+            )}
+          />
+        );
+        break;
+      }
       if (perfilDisc) {
         conteudo = (
           <ResultadoPublicoDisc
