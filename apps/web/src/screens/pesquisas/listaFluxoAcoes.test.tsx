@@ -632,14 +632,17 @@ describe("R3-A-25 — finalizada", () => {
         podeEditar
       />,
     );
-    await screen.findByRole("table", { name: "Pesquisas" });
+    // Espera a linha (e não só a tabela): a lista ainda pode redesenhar.
+    await screen.findByRole("button", { name: `Ações de ${RESUMO.nome}` });
     abrirMenu(`Ações de ${RESUMO.nome}`);
-    expect(
-      await screen.findByRole("menuitem", { name: "Editar pesquisa" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Copiar link" }),
-    ).toHaveAttribute("aria-disabled", "true");
+    await waitFor(() => {
+      expect(
+        screen.getByRole("menuitem", { name: "Editar pesquisa" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: "Copiar link" }),
+      ).toHaveAttribute("aria-disabled", "true");
+    });
   });
 
   it("o cabeçalho dos resultados mantém Editar e 'Copiar link' desabilitado", async () => {
