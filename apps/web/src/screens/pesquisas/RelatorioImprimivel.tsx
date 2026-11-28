@@ -61,6 +61,7 @@ import { DocumentoDisc } from "./modelos/disc/RelatorioDisc";
 import { RelatorioEnps } from "./modelos/enps/RelatorioEnps";
 import { ehModeloComTelaPropria } from "./modelos/integracao";
 import { RelatorioProprio } from "./modelos/relatorioProprio";
+import { cartoesIndividuaisDoModelo } from "./modelos/capaIndividual";
 import "./RelatorioImprimivel.css";
 
 const COR_DA_FAIXA: Readonly<Record<Faixa, string>> = {
@@ -760,82 +761,85 @@ export function DocumentoDaResposta({
         <p className="relatorio__capa-subtitulo">
           {`${identificada ? (r.departamento ?? "Sem departamento") : "Identidade oculta"} · respondeu em ${formatarInstante(r.respondidaEm)}`}
         </p>
-        <div className="relatorio__capa-cartoes">
-          <div className="relatorio__cartao relatorio__cartao--medidor">
-            <p className="relatorio__cartao-titulo">
-              Média das respostas
-              <span>{plural(escalas.length, "pergunta", "perguntas")}</span>
-            </p>
-            <Medidor
-              valor={ind.media}
-              rotulo={`Média da resposta ${ind.media === null ? "sem dados" : umaCasa(ind.media)} de 1 a 10`}
-            />
-            {comparado !== null ? (
-              <span
-                className="relatorio__selo"
-                data-faixa={comparado >= 0 ? "alta" : "baixa"}
+        {/* T216 — TAD e Pulso e Clima: os cartões na régua do modelo. */}
+        {cartoesIndividuaisDoModelo(r) ?? (
+          <div className="relatorio__capa-cartoes">
+            <div className="relatorio__cartao relatorio__cartao--medidor">
+              <p className="relatorio__cartao-titulo">
+                Média das respostas
+                <span>{plural(escalas.length, "pergunta", "perguntas")}</span>
+              </p>
+              <Medidor
+                valor={ind.media}
+                rotulo={`Média da resposta ${ind.media === null ? "sem dados" : umaCasa(ind.media)} de 1 a 10`}
+              />
+              {comparado !== null ? (
+                <span
+                  className="relatorio__selo"
+                  data-faixa={comparado >= 0 ? "alta" : "baixa"}
+                >
+                  <span className="relatorio__selo-ponto" aria-hidden="true" />
+                  {`${comparado >= 0 ? "Acima do time" : "Abaixo do time"} · ${umaCasa(ind.mediaTime!)}`}
+                </span>
+              ) : null}
+            </div>
+            <div className="relatorio__cartao">
+              <p className="relatorio__cartao-titulo">
+                Por pergunta<span>resposta · traço = média do time</span>
+              </p>
+              <ul
+                className="relatorio__lista-perguntas"
+                aria-label="Nota por pergunta"
               >
-                <span className="relatorio__selo-ponto" aria-hidden="true" />
-                {`${comparado >= 0 ? "Acima do time" : "Abaixo do time"} · ${umaCasa(ind.mediaTime!)}`}
-              </span>
-            ) : null}
-          </div>
-          <div className="relatorio__cartao">
-            <p className="relatorio__cartao-titulo">
-              Por pergunta<span>resposta · traço = média do time</span>
-            </p>
-            <ul
-              className="relatorio__lista-perguntas"
-              aria-label="Nota por pergunta"
-            >
-              {escalas.map((p) => (
-                <li key={p.id}>
-                  <span
-                    className="relatorio__ponto"
-                    style={{
-                      background:
-                        p.nota === null
-                          ? undefined
-                          : COR_DA_FAIXA[faixaDaMedia10(p.nota)],
-                    }}
-                    aria-hidden="true"
-                  />
-                  <span className="relatorio__rotulo">{p.rotulo}</span>
-                  <BarraDaMedia valor={p.nota} time={p.time} />
-                  <strong>{p.nota === null ? "—" : umaCasa(p.nota)}</strong>
+                {escalas.map((p) => (
+                  <li key={p.id}>
+                    <span
+                      className="relatorio__ponto"
+                      style={{
+                        background:
+                          p.nota === null
+                            ? undefined
+                            : COR_DA_FAIXA[faixaDaMedia10(p.nota)],
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span className="relatorio__rotulo">{p.rotulo}</span>
+                    <BarraDaMedia valor={p.nota} time={p.time} />
+                    <strong>{p.nota === null ? "—" : umaCasa(p.nota)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="relatorio__cartao">
+              <p className="relatorio__cartao-titulo">Destaques</p>
+              <ul className="relatorio__destaques" aria-label="Destaques">
+                <li>
+                  <span>↑ Maior nota</span>
+                  <span className="relatorio__rotulo">
+                    {textoDe(ind.maior?.perguntaId)}
+                  </span>
+                  <strong data-faixa="alta">
+                    {ind.maior ? umaCasa(ind.maior.valor) : "—"}
+                  </strong>
                 </li>
-              ))}
-            </ul>
+                <li>
+                  <span>↓ Menor nota</span>
+                  <span className="relatorio__rotulo">
+                    {textoDe(ind.menor?.perguntaId)}
+                  </span>
+                  <strong data-faixa="baixa">
+                    {ind.menor ? umaCasa(ind.menor.valor) : "—"}
+                  </strong>
+                </li>
+                <li>
+                  <span>Comparado ao time</span>
+                  <span className="relatorio__rotulo">Média geral</span>
+                  <strong>{comparado === null ? "—" : sinal(comparado)}</strong>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="relatorio__cartao">
-            <p className="relatorio__cartao-titulo">Destaques</p>
-            <ul className="relatorio__destaques" aria-label="Destaques">
-              <li>
-                <span>↑ Maior nota</span>
-                <span className="relatorio__rotulo">
-                  {textoDe(ind.maior?.perguntaId)}
-                </span>
-                <strong data-faixa="alta">
-                  {ind.maior ? umaCasa(ind.maior.valor) : "—"}
-                </strong>
-              </li>
-              <li>
-                <span>↓ Menor nota</span>
-                <span className="relatorio__rotulo">
-                  {textoDe(ind.menor?.perguntaId)}
-                </span>
-                <strong data-faixa="baixa">
-                  {ind.menor ? umaCasa(ind.menor.valor) : "—"}
-                </strong>
-              </li>
-              <li>
-                <span>Comparado ao time</span>
-                <span className="relatorio__rotulo">Média geral</span>
-                <strong>{comparado === null ? "—" : sinal(comparado)}</strong>
-              </li>
-            </ul>
-          </div>
-        </div>
+        )}
         <RodapeDaCapa
           itens={[
             ["Empresa", empresa || "—"],

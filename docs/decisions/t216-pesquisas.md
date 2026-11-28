@@ -1408,3 +1408,68 @@ Contrato novo (web):
   encontrada" com a volta; outra falha → "Tentar novamente".
 - **Assistentes:** trocar de etapa e a tela final voltam ao topo; com pouco conteúdo, o rodapé
   fica no pé da tela.
+
+## Pulso e Clima e Motivação (TAD): régua do modelo em todas as telas (revisão 3, 28/11/2026)
+
+Contrato acrescentado (só campos novos; nada muda para os outros modelos):
+
+```ts
+// GET /pesquisas/:id/respostas — `resumoDoModelo` ganha os dois modelos
+type ResumoDaRespostaDoModelo =
+  | ResumoDaRespostaClima
+  | { modelo: "tad"; valor: number | null; nivel: NivelTad | null } // 1 a 7
+  | { modelo: "pulso_clima"; valor: number | null; faixa: FaixaDeScore | null }; // 0–100
+
+// GET /pesquisas/:id/respostas/:respostaId — `modelo`
+interface ResultadoIndividualTad {
+  // ...geral, nivel, pilares
+  time: { geral: number | null; pilares: (number | null)[] } | null; // média das pessoas
+}
+interface ResultadoIndividualPulsoClima {
+  modelo: "pulso_clima";
+  score: number | null; // média dos scores das afirmações respondidas
+  faixa: FaixaDeScore | null;
+  scoreTime: number | null;
+  favoraveis: number; neutras: number; desfavoraveis: number; // contagens 4–5, 3, 1–2
+  dimensoes: { chave: string; rotulo: string; score: number | null;
+               faixa: FaixaDeScore | null; scoreTime: number | null }[];
+  distribuicao: { valor: number; resposta: number; time: number }[]; // 1–5; time em %
+  enps: { nota: number | null; indiceTime: number | null };
+  lnps: { nota: number | null; indiceTime: number | null };
+  comentarios: { dimensao: string; texto: string }[];
+}
+
+// GET /pesquisas/:id/resultados — Pulso e Clima, `modelo.comentarios[]`
+interface ComentarioDoModelo {
+  // ...dimensao, perguntaId, quantidade
+  textos: { texto: string; mes: string | null; departamento: string | null }[];
+}
+```
+
+Regras:
+
+- Comentários do Pulso e Clima: do mês mais recente ao mais antigo (mês de
+  Brasília, `AAAA-MM`) e, no mesmo mês, em ordem alfabética (a ordem de
+  chegada ligaria o texto a quem respondeu). O departamento só vai quando o
+  grupo dele aparece pelo mínimo por grupo (com a supressão secundária);
+  fora disso, `null` ("Departamento oculto").
+- O registro (`modelos/indice.ts`) usa o mesmo `resumoDaResposta` do Clima;
+  a tela usa os ganchos `listaDeRespostasDoModelo` e
+  `visaoIndividualDoModelo` (`modelos/RespostasNaRegua.tsx`).
+- Tela: aba Respostas com a coluna do modelo; resultado individual na régua
+  do modelo (sem a média de 0 a 10); aba Comentários no Pulso e Clima
+  (`?aba=comentarios`), com o atalho "Ver em Comentários" no detalhe por
+  pergunta; página pública do Pulso e Clima por dimensão (abertura, selo,
+  "Pergunta N de T" só das perguntas, comentário em tela própria e o do
+  LNPS/eNPS na tela da nota, até 2000 caracteres); resultado da TAD ao fim
+  da página pública, calculado no navegador com a regra da API, sem gravar.
+- Exportações: a planilha do Pulso e Clima (Dimensões, Visão geral,
+  Resultados por pergunta, eNPS e LNPS, Respondentes × perguntas, Matriz de
+  distribuição, Ranking, Alertas, Por grupo com recorte, Comentários,
+  Metodologia) e a da TAD (Resumo, Afirmações com a média pontuada
+  `8 − média` nas invertidas, Respostas individuais, Metodologia) trocam as
+  abas genéricas; com números ocultos, vale a planilha comum. PDF próprio de
+  cada modelo e, no PDF de uma resposta, os cartões na régua do modelo.
+- Zona da afirmação (planilha/PDF): média ≥ 4 favorável, 3–3,99 neutra,
+  abaixo desfavorável. Alerta: atenção com desfavorável ≥ 30% ou média < 3;
+  alto com ≥ 50% ou média < 2,5.

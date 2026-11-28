@@ -8,12 +8,16 @@
  */
 import type {
   DimensaoDoModelo,
+  PesquisaDetalhe,
   RecomendacaoDoModelo,
   RespostaDetalhe,
   ResultadosPesquisa,
   Secao,
 } from "../../../api/pesquisasClient";
 import { abasDaPlanilhaIsfb, abasDaPlanilhaNr1 } from "./planilhasDosModelos";
+import { abasDoPulsoClima } from "./pulso_clima/exportarPulsoClima";
+import { abasDaTad } from "./tad/exportarTad";
+import type { RelatorioDeResultados } from "../dadosDoRelatorio";
 import type {
   AbaXlsx,
   CelulaXlsx,
@@ -185,4 +189,23 @@ export function abasDoModelo(
     default:
       return [];
   }
+}
+
+/**
+ * A planilha inteira do modelo, no lugar das abas genéricas de 0 a 10
+ * (Pulso e Clima e TAD); `null` quando o modelo usa as abas comuns ou os
+ * números estão ocultos.
+ */
+export function planilhaPropriaDoModelo(
+  rel: RelatorioDeResultados,
+  detalhe: PesquisaDetalhe,
+  geral: ResultadosPesquisa,
+  respostas: readonly RespostaDetalhe[] | null,
+): AbaXlsx[] | null {
+  const r = geral.modelo;
+  if (!r || rel.numerosOcultos) return null;
+  if (r.modelo === "pulso_clima")
+    return abasDoPulsoClima(rel, detalhe, geral, r, respostas);
+  if (r.modelo === "tad") return abasDaTad(rel, detalhe, geral, r, respostas);
+  return null;
 }

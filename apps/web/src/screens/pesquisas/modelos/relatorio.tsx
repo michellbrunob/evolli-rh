@@ -67,6 +67,8 @@ import {
 } from "./isfb/textos";
 import { leituraAutomatica } from "./isfb/VisaoGeralIsfb";
 import { painelDe } from "./registro";
+import { DocumentoPulsoClima } from "./pulso_clima/RelatorioPulsoClima";
+import { DocumentoTad } from "./tad/RelatorioTad";
 import {
   BarraDeFaixas,
   BarraPercentual,
@@ -76,7 +78,7 @@ import {
 import "./Modelos.css";
 
 export const temRelatorioProprio = (m: ModeloPesquisa): boolean =>
-  m === "copsoq" || m === "isfb";
+  m === "copsoq" || m === "isfb" || m === "pulso_clima" || m === "tad";
 
 const MESES = [
   "JANEIRO",
@@ -136,7 +138,25 @@ export function RelatorioDoModelo({
   );
   return (
     <Impressao titulo={titulo} imprimir={imprimir}>
-      {detalhe.modelo === "copsoq" ? (
+      {detalhe.modelo === "pulso_clima" ? (
+        <DocumentoPulsoClima
+          carregado={carregado}
+          r={
+            carregado.geral.modelo?.modelo === "pulso_clima"
+              ? carregado.geral.modelo
+              : null
+          }
+        />
+      ) : detalhe.modelo === "tad" ? (
+        <DocumentoTad
+          carregado={carregado}
+          r={
+            carregado.geral.modelo?.modelo === "tad"
+              ? carregado.geral.modelo
+              : null
+          }
+        />
+      ) : detalhe.modelo === "copsoq" ? (
         <DocumentoNr1 carregado={carregado} {...dados} />
       ) : (
         <DocumentoIsfb carregado={carregado} resultado={dados.resultado} />
