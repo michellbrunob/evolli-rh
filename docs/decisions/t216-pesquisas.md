@@ -573,6 +573,27 @@ Decisões:
 - **Exportação:** a planilha ganha, logo depois do Resumo, a aba do modelo ("Dimensões" no Pulso e
   Clima e no Clima; "Pilares" na TAD).
 
+Perfil comportamental (DISC) — modelo `disc` (27/11/2026):
+
+- **Questionário:** 28 blocos de escolha forçada, textos do Evolli (`modelos/disc/blocos.ts` na tela). Cada
+  bloco tem o enunciado fixo e 4 frases, uma por fator (D, I, S, C); quem responde escolhe a que mais
+  combina com ela. A página de resposta embaralha as frases de cada bloco (ordem estável por bloco). A
+  empresa pode trocar os textos mantendo o fator de cada frase. Os blocos não são editáveis no assistente.
+- **Cálculo** (`apps/api/src/pesquisas/modelos/disc/calculo-disc.ts`): 1 ponto por bloco no fator da
+  frase; percentual `round(pontos ÷ blocos respondidos × 100)`; predominante pelo maior número de pontos
+  (empate D, I, S, C). Classificação sobre os percentuais ordenados: mono (1º ≥ 45 e 15 à frente; puro
+  ≥ 60, acentuado ≥ 50, moderado), bi (1º − 2º < 15 e 2º − 3º ≥ 10; acentuado com 1º ≥ 40), tri
+  (1º − 3º < 20, equilibrado), senão bi moderado. Mapa de talentos: `x = 50 + ((S+C) − (D+I)) ÷ 2`,
+  `y = 50 − ((I+S) − (D+C)) ÷ 2`, limitados a 2..98, em 13 áreas. Time: soma dos pontos de todas as
+  pessoas; pessoas por predominante; intensidades; diversidade = entropia de Shannon da distribuição de
+  pessoas por predominante ÷ 2 × 100 (um só critério, também na planilha), faixas 0–39/40–59/60–79/
+  80–100; fatores ausentes; lacunas (< 20% das pessoas, até 2); compatibilidade por pares de pessoas
+  (mesmo fator n(n−1)/2, fatores diferentes nA × nB; mesmo fator = mesma linguagem, atrito D×S e I×C =
+  pede atenção, demais = complementar).
+- **Resultado da própria pessoa:** logo depois do envio, na página pública, calculado no navegador pela
+  mesma regra (percentuais e predominante); nada é gravado; "Salvar em PDF" usa a impressão.
+- **Fora desta fatia:** análise por IA, gestor × time e líderes × demais (dependem da hierarquia).
+
 Contrato (acréscimos):
 
 ```ts
@@ -698,3 +719,46 @@ comentário depois da nota seguem como perguntas comuns (uma por tela); a trilha
 modelo" mostra "Pesquisas / {tema}" (o nível "Nova pesquisa" do meio depende de a trilha aceitar dois
 níveis declarados); os comentários do Pulso e Clima ficam na Visão geral (sem aba própria) para não
 mexer nas rotas compartilhadas.
+
+type TipoPergunta = /* … */ | "escolha_forcada"; // só no modelo `disc`
+interface Opcao { id: string; texto: string; fator?: "D" | "I" | "S" | "C" } // `fator` só nos blocos
+// Bloco: config = { opcoes: 4 frases, cada fator uma vez (texto até 200) }; resposta = { opcao: id }.
+// POST/PUT /pesquisas com modelo `disc`: exatamente 28 blocos obrigatórios, sem condição
+//   (422 `secoes`/`limite`; pergunta de outro tipo, opcional ou com condição: 422 `<id>`/`invalido`).
+// Outro modelo com bloco: 422 `<id>`/`nao_se_aplica`. Os resultados comuns contam as frases (`opcoes`).
+
+// GET /pesquisas/:id/perfil-comportamental?campo=&grupoId=   (leitura de pesquisa; outro modelo: 422 `modelo`)
+type Pontos = Record<"D" | "I" | "S" | "C", number>;
+interface PerfilDisc {
+  pontos: Pontos; total: number; percentuais: Pontos; predominante: "D" | "I" | "S" | "C";
+  classe: { tipo: "mono" | "bi" | "tri"; fatores: string[]; codigo: string;
+            intensidade: "puro" | "acentuado" | "moderado" | "equilibrado" };
+  posicao: { x: number; y: number; area: number };
+}
+interface ResultadoDisc {
+  pesquisaId: string; respostas: number; recortes: CampoGrupo[];
+  grupos: Partial<Record<CampoGrupo, DepartamentoDoResultado[]>>;
+  filtro: { campo: CampoGrupo | null; grupoId: string | null; respostas: number; visivel: boolean };
+  perfil: PerfilDisc | null;            // o time; null sem perfis ou com o recorte oculto
+  totalDePessoas: number; porPredominante: Pontos;
+  intensidades: Record<"puro" | "acentuado" | "moderado" | "equilibrado", number>;
+  areas: { area: number; pessoas: number }[];           // da mais cheia para a mais vazia
+  diversidade: { score: number; faixa: "pouco_diverso" | "moderado" | "equilibrado" | "altamente_diverso";
+                 ausentes: string[] };
+  lacunas: string[];
+  compatibilidade: { matriz: { a; b; relacao: "sinergia" | "neutro" | "atrito";
+                               tipo: "mesma_linguagem" | "complementar" | "pede_atencao"; pares: number }[];
+                     totalDePares: number; porTipo: Record<tipo, { pares: number; percentual: number }>;
+                     maiorAtencao: { a; b; pares: number } | null };
+  pontos: { x: number; y: number; area: number; fator: string }[]; // ordenados pela posição, sem a pessoa
+  pessoas: { respostaId: string; numero: number; nome: string | null; departamento: string | null;
+             respondidaEm: string; perfil: PerfilDisc }[];
+}
+// Recorte e mínimo como nos resultados (na confidencial, a visão geral também exige o mínimo).
+// `pessoas`: só RH e DP, na identificada (com o nome) e na anônima (numeradas); vazio na confidencial
+// e para o master. Com pessoas, a leitura é auditada (`pesquisas_respostas_consultadas`).
+```
+
+Tela: registro do modelo em `apps/web/src/screens/pesquisas/modelos/disc/definicao.ts` (`MODELO_DISC`,
+para a galeria incluir em `MODELOS_DE_PESQUISA`); resultados, perfil individual, planilha (7 abas) e
+relatório em PDF em `modelos/disc/`.
