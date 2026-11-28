@@ -208,6 +208,12 @@ export type BlocoDoSobre =
     };
 
 export interface PaginaSobre {
+  /**
+   * "perguntas": a página das perguntas agrupadas pelo jeito de responder,
+   * com "Como a pessoa responde" e "O que o RH vê" (Pulso); usa daqui o
+   * título, o selo, o texto, os botões e os números.
+   */
+  readonly layout?: "perguntas";
   /** "Pulso e Clima · Leitura completa do clima". */
   readonly titulo: string;
   /** Selo cinza ao lado do título ("24 perguntas"). */

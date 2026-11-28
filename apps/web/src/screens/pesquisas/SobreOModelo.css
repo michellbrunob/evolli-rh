@@ -1,0 +1,40 @@
+/* T216 — "Sobre o modelo": a prévia da escala em que dá para marcar uma nota. */
+.pesquisas__previa-escala--viva label {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-botao, var(--radius-sm));
+  background: var(--surface-canvas);
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pesquisas__previa-escala--viva label:hover {
+  background: var(--surface-neutral);
+}
+
+.pesquisas__previa-escala--viva label[data-marcada] {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.pesquisas__previa-escala--viva label:focus-within {
+  outline: var(--foco-anel);
+  outline-offset: 2px;
+}
+
+.pesquisas__previa-escala--viva input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}

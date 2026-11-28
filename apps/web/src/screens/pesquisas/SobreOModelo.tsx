@@ -9,7 +9,7 @@ import { plural } from "../../format/plural";
 import { IconButton } from "../../ui";
 import { IconeTempo, IconeVer, IconeVoltar } from "../../ui/icones";
 import type { Pergunta } from "../../api/pesquisasClient";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { CartaoDeSecao, IconeDoModelo } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { GavetaDoModelo } from "./GaleriaDeModelos";
@@ -24,6 +24,8 @@ import {
 import { minutosEstimados } from "./PreVisualizacao";
 import { PESQUISAS_TITULO_ID } from "./tituloDasPesquisas";
 import { PaginaDoModelo } from "./modelos/PaginaDoModelo";
+import { textoParaOPainel } from "./modelos/empresa";
+import "./SobreOModelo.css";
 
 /** Primeira letra minúscula, sem estragar siglas ("Recomendação (eNPS)"). */
 function minusculaSemSigla(texto: string): string {
@@ -71,7 +73,12 @@ export function SobreOModelo({
 }) {
   const m = modeloDaGaleria(id);
   const [gaveta, setGaveta] = useState(false);
-  if (m.pagina) {
+  const [nota, setNota] = useState<number | null>(null);
+  const idDaPrevia = useId();
+  // A página das perguntas (layout "perguntas") usa este corpo, com o
+  // cabeçalho e os números do catálogo.
+  const pg = m.pagina?.layout === "perguntas" ? m.pagina : null;
+  if (m.pagina && !pg) {
     return (
       <PaginaDoModelo
         modelo={m}
@@ -90,7 +97,7 @@ export function SobreOModelo({
   }
   const exemplo = principais.find((p) => p.tipo === "escala") ?? principais[0];
   const total = totalDePerguntas(m);
-  const numeros: { valor: string; rotulo: string }[] = [
+  const numeros: readonly { valor: string; rotulo: string }[] = pg?.numeros ?? [
     ...[...grupos.entries()].slice(0, 2).map(([g, ps]) => ({
       valor: String(ps.length),
       rotulo: `${ps.length === 1 ? "pergunta" : "perguntas"} · ${minusculaSemSigla(g)}`,
@@ -116,23 +123,28 @@ export function SobreOModelo({
             className="pesquisas__titulo"
             tabIndex={-1}
           >
-            {m.nome}
+            {pg?.titulo ?? m.nome}
             <span className="pesquisas__selo pesquisas__selo--destaque">
-              {m.ritmo}
+              {pg?.selo ?? m.ritmo}
             </span>
           </h1>
-          <p className="pesquisas__subtitulo">{m.sobre}</p>
+          <p className="pesquisas__subtitulo">{pg?.texto ?? m.sobre}</p>
         </div>
         <div className="pesquisas__acoes-topo">
           <Button variant="secondary" onClick={() => setGaveta(true)}>
             <IconeVer tamanho={16} />
-            Ver perguntas
+            {pg?.botaoVer ?? "Ver perguntas"}
           </Button>
-          <Button onClick={() => onUsar(m.id)}>Criar pesquisa →</Button>
+          <Button onClick={() => onUsar(m.id)}>
+            {pg?.botaoCriar ?? "Criar pesquisa →"}
+          </Button>
         </div>
       </header>
 
-      <dl className="pesquisas__faixa" aria-label="Resumo do modelo">
+      <dl
+        className="pesquisas__faixa"
+        aria-label={pg ? "Em números" : "Resumo do modelo"}
+      >
         {numeros.map((x) => (
           <div key={x.rotulo}>
             <dt>{x.rotulo}</dt>
@@ -172,7 +184,7 @@ export function SobreOModelo({
                       >
                         {String(n).padStart(2, "0")}
                       </span>
-                      <span>{p.texto}</span>
+                      <span>{textoParaOPainel(p.texto)}</span>
                     </li>
                   );
                 })}
@@ -211,16 +223,22 @@ export function SobreOModelo({
             }
           >
             {exemplo ? (
-              <div className="pesquisas__mock-resposta" aria-hidden="true">
+              <div className="pesquisas__mock-resposta">
                 <p className="pesquisas__suave">{`Pergunta 1 de ${total}`}</p>
                 <span className="pesquisas__progresso-fino">
                   <span
                     style={{ width: `${(1 / Math.max(1, total)) * 100}%` }}
                   />
                 </span>
-                <strong>{exemplo.texto}</strong>
+                <strong id={`${idDaPrevia}-texto`}>
+                  {textoParaOPainel(exemplo.texto)}
+                </strong>
                 {exemplo.tipo === "escala" ? (
-                  <span className="pesquisas__previa-escala">
+                  <span
+                    role="radiogroup"
+                    aria-label="Prévia: escolha uma nota"
+                    className="pesquisas__previa-escala pesquisas__previa-escala--viva"
+                  >
                     {Array.from(
                       {
                         length:
@@ -230,11 +248,22 @@ export function SobreOModelo({
                       },
                       (_, i) => (exemplo.config.minimo ?? 1) + i,
                     ).map((v) => (
-                      <span key={v}>{v}</span>
+                      <label key={v} data-marcada={nota === v ? "" : undefined}>
+                        <input
+                          type="radio"
+                          name={idDaPrevia}
+                          value={v}
+                          checked={nota === v}
+                          onChange={() => setNota(v)}
+                        />
+                        {v}
+                      </label>
                     ))}
                   </span>
                 ) : null}
-                <span className="pesquisas__mock-botao">Próxima →</span>
+                <span className="pesquisas__mock-botao" aria-hidden="true">
+                  Próxima →
+                </span>
               </div>
             ) : (
               <p className="pesquisas__suave">
