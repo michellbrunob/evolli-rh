@@ -63,7 +63,11 @@ export interface CampoDaPerguntaProps {
    * 2 quando aparece dentro de uma seção (Personalizada).
    */
   readonly nivel?: 1 | 2;
+  /** Comentário final (opcional) de um modelo: caixa de várias linhas. */
+  readonly comentario?: boolean;
 }
+
+const PLACEHOLDER_DO_COMENTARIO = "Escreva aqui, se quiser.";
 
 function intervalo(de: number, ate: number): number[] {
   const saida: number[] = [];
@@ -292,6 +296,7 @@ export function CampoDaPergunta({
   aoMudar,
   tituloRef,
   nivel = 1,
+  comentario = false,
 }: CampoDaPerguntaProps) {
   const Titulo = nivel === 1 ? "h1" : "h2";
   const { tipo, config } = pergunta;
@@ -319,7 +324,17 @@ export function CampoDaPergunta({
   let controle: ReactNode;
   switch (tipo) {
     case "texto_curto":
-      controle = (
+      // O comentário final ganha uma caixa de várias linhas (mesmo limite).
+      controle = comentario ? (
+        <textarea
+          rows={4}
+          maxLength={LIMITE_TEXTO_CURTO}
+          placeholder={PLACEHOLDER_DO_COMENTARIO}
+          value={typeof valor === "string" ? valor : ""}
+          onChange={(e) => aoMudar(e.target.value)}
+          {...doCampo}
+        />
+      ) : (
         <input
           type="text"
           maxLength={LIMITE_TEXTO_CURTO}
@@ -334,6 +349,7 @@ export function CampoDaPergunta({
       controle = (
         <textarea
           rows={6}
+          {...(comentario ? { placeholder: PLACEHOLDER_DO_COMENTARIO } : {})}
           maxLength={LIMITE_PARAGRAFO}
           value={typeof valor === "string" ? valor : ""}
           onChange={(e) => aoMudar(e.target.value)}

@@ -56,11 +56,11 @@
   background: var(--color-action);
 }
 
+/*
+ * A barra muda de largura sem transição: na última tela ela já aparece cheia
+ * (uma transição deixava a captura da tela no meio do caminho).
+ */
 @media (prefers-reduced-motion: no-preference) {
-  .pesquisa-progresso__preenchido {
-    transition: width var(--movimento-curto) ease-out;
-  }
-
   .pesquisa-publica__cartao > * {
     animation: pesquisa-entrada var(--movimento-curto) ease-out;
   }

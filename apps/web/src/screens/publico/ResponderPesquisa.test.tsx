@@ -1238,15 +1238,18 @@ describe("T216 — Personalizada: uma seção por vez", () => {
   it("Próximo espera todas as obrigatórias da seção, inclusive a condicional", async () => {
     await comecar();
     const proximoBotao = () => screen.getByRole("button", { name: "Próximo" });
+    // Seção inteira: o botão fica ativo e a tela diz quantas faltam.
+    const faltam = () => screen.queryByText(/^Falta responder/)?.textContent;
     marcar(/Tenho clareza/, "Concordo");
     marcar(/De 0 a 10/, "9");
-    expect(proximoBotao()).toBeDisabled();
+    expect(faltam()).toBe("Falta responder 1 pergunta obrigatória.");
     marcar(/Participou/, "Sim");
     expect(screen.getByLabelText(/Qual treinamento/)).toBeInTheDocument();
-    expect(proximoBotao()).toBeDisabled();
+    expect(faltam()).toBe("Falta responder 1 pergunta obrigatória.");
     fireEvent.change(screen.getByLabelText(/Qual treinamento/), {
       target: { value: "Primeiros socorros" },
     });
+    expect(faltam()).toBeUndefined();
     expect(proximoBotao()).toBeEnabled();
     marcar(/Participou/, "Não");
     expect(screen.queryByLabelText(/Qual treinamento/)).not.toBeInTheDocument();

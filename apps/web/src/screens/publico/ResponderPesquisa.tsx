@@ -13,7 +13,9 @@
  * - Personalizada: UMA SEÇÃO POR VEZ, com "Seção N de M".
  * A contagem e a barra de progresso contam só o que está VISÍVEL — a pergunta
  * escondida pela condição não entra (e a seção sem pergunta visível some).
- * "Próximo" fica desabilitado enquanto falta obrigatória na tela; Enter
+ * Uma pergunta por tela: "Próximo" fica desabilitado enquanto falta a
+ * obrigatória. Seção inteira: o botão fica ativo, a tela diz quantas
+ * obrigatórias faltam e o clique marca as pendentes e leva à primeira. Enter
  * avança quando as respostas são válidas (e mostra o erro quando não são).
  *
  * Guardado no navegador (fora da prévia), sempre com try/catch:
@@ -433,6 +435,8 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
       "[aria-invalid='true'] input:not(:disabled), input[aria-invalid='true'], textarea[aria-invalid='true']",
     );
     alvo?.focus();
+    // Na seção inteira, a primeira pendente vem para o meio da tela.
+    alvo?.closest(".pesquisa-pergunta")?.scrollIntoView?.({ block: "center" });
   }, [focarErro]);
 
   const secoes = useMemo(() => pesquisa?.secoes ?? [], [pesquisa]);
@@ -446,9 +450,13 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
     () => perguntasVisiveis(secoes, respostas),
     [secoes, respostas],
   );
+  const ordemDasPerguntas = useMemo(
+    () => perguntasEmOrdem(secoes, visiveis),
+    [secoes, visiveis],
+  );
   const telas = useMemo(
-    () => montarTelas(perguntasEmOrdem(secoes, visiveis), porSecao),
-    [secoes, visiveis, porSecao],
+    () => montarTelas(ordemDasPerguntas, porSecao),
+    [ordemDasPerguntas, porSecao],
   );
 
   function irParaTela(id: string | undefined) {
@@ -975,10 +983,14 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
       const atual = telas[posicao]!;
       const total = telas.length;
       const ultima = posicao === total - 1;
-      const bloqueado = atual.perguntas.some(
+      const pendentes = atual.perguntas.filter(
         ({ pergunta }) =>
           pergunta.obrigatoria && !respondida(respostas[pergunta.id]),
-      );
+      ).length;
+      // Uma pergunta por tela: "Próximo" espera a resposta. Seção inteira: o
+      // botão fica ativo, diz quantas faltam e, no clique, marca as pendentes.
+      const bloqueado = pendentes > 0 && !porSecao;
+      const ultimaPergunta = ordemDasPerguntas.at(-1)?.pergunta.id;
       const rotulo = porSecao ? "Seção" : "Pergunta";
       progresso = { posicao: posicao + 1, total, rotulo };
       const primeira = atual.perguntas[0]!;
@@ -1038,10 +1050,20 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
                 erro={erros[pergunta.id] ?? null}
                 aoMudar={(v) => mudarResposta(pergunta.id, v)}
                 nivel={porSecao ? 2 : 1}
+                comentario={
+                  !porSecao &&
+                  pergunta.id === ultimaPergunta &&
+                  !pergunta.obrigatoria
+                }
                 {...(porSecao ? {} : { tituloRef })}
               />
             ))}
           </div>
+          {porSecao && pendentes > 0 ? (
+            <p className="pesquisa-publica__legenda" aria-live="polite">
+              {`Falta responder ${plural(pendentes, "pergunta obrigatória", "perguntas obrigatórias")}.`}
+            </p>
+          ) : null}
           <div className="pesquisa-publica__navegacao">
             <Button
               variant="subtle"
