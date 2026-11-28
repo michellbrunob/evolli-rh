@@ -37,7 +37,12 @@ import {
   TEXTO_DA_DIVERSIDADE,
 } from "./graficosDisc";
 import { PerfilDaPessoa } from "./PerfilDaPessoa";
-import { codigoDoPerfil, conteudoDoPerfil } from "./perfis";
+import {
+  codigoDoPerfil,
+  conteudoDoPerfil,
+  fatorMaisAusente,
+  resumoDoTime,
+} from "./perfis";
 import { nomeDaPessoa } from "./ResultadosDisc";
 import { perfilComportamental, type ResultadoDisc } from "./tiposDisc";
 import "./Disc.css";
@@ -117,6 +122,9 @@ export function DocumentoDisc({
 
   const time = dados.perfil;
   const c = time ? conteudoDoPerfil(time.classe) : null;
+  const ausente = time
+    ? fatorMaisAusente(dados.diversidade.ausentes, time.percentuais)
+    : null;
   const pessoas = dados.totalDePessoas;
   const total = 4;
   const cabecalho = {
@@ -211,7 +219,7 @@ export function DocumentoDisc({
                 <p>{`${empresa || "Empresa"} · ${plural(pessoas, "pessoa", "pessoas")}`}</p>
               </div>
               <Secao numero="01" titulo="Composição do perfil">
-                <p>{`${c.titulo} (${codigoDoPerfil(time.classe)}): ${c.resumo}`}</p>
+                <p>{`${c.titulo} (${codigoDoPerfil(time.classe)}): ${resumoDoTime(time.classe)}`}</p>
                 <BarraDisc
                   percentuais={time.percentuais}
                   rotulo="Composição do time"
@@ -252,11 +260,9 @@ export function DocumentoDisc({
                 </p>
                 <ReguaDaDiversidade score={dados.diversidade.score} />
                 <p>{TEXTO_DA_DIVERSIDADE[dados.diversidade.faixa]}</p>
-                {dados.diversidade.ausentes.map((f) => (
-                  <p
-                    key={f}
-                  >{`Fator ausente — ${FATOR[f].nome}: ${FATOR[f].risco}`}</p>
-                ))}
+                {ausente ? (
+                  <p>{`Fator ausente — ${FATOR[ausente].nome}: ${FATOR[ausente].risco}`}</p>
+                ) : null}
               </Secao>
               <Secao numero="04" titulo="Pontos fortes e de atenção">
                 <div className="disc__grade">

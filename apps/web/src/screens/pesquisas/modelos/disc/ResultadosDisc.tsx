@@ -37,8 +37,11 @@ import {
 import {
   ROTULO_DA_INTENSIDADE,
   TEXTO_DA_INTENSIDADE,
+  chipsDoTime,
   codigoDoPerfil,
-  conteudoDoPerfil,
+  fatorMaisAusente,
+  nomesDosFatores,
+  resumoDoTime,
   tituloDoPerfil,
 } from "./perfis";
 import {
@@ -206,8 +209,11 @@ function VisaoGeralDisc({
   readonly onIrParaAnalises?: (() => void) | undefined;
 }) {
   const time = dados.perfil!;
-  const c = conteudoDoPerfil(time.classe);
   const pessoas = dados.totalDePessoas;
+  const ausente = fatorMaisAusente(
+    dados.diversidade.ausentes,
+    time.percentuais,
+  );
   const centro = areaPorId(time.posicao.area);
   const contagem = new Map(dados.areas.map((a) => [a.area, a.pessoas]));
   return (
@@ -227,7 +233,7 @@ function VisaoGeralDisc({
               </span>
             </h3>
           </div>
-          <p>{c.resumo}</p>
+          <p>{resumoDoTime(time.classe)}</p>
           <BarraDisc
             percentuais={time.percentuais}
             rotulo="Composição do time"
@@ -328,17 +334,11 @@ function VisaoGeralDisc({
         </p>
         <ReguaDaDiversidade score={dados.diversidade.score} />
         <p>{TEXTO_DA_DIVERSIDADE[dados.diversidade.faixa]}</p>
-        {dados.diversidade.ausentes.length > 0 ? (
+        {ausente ? (
           <div className="disc__destaque">
             <div>
-              <p className="disc__destaque-titulo">
-                {dados.diversidade.ausentes.length === 1
-                  ? "Fator ausente no time"
-                  : "Fatores ausentes no time"}
-              </p>
-              {dados.diversidade.ausentes.map((f) => (
-                <p key={f}>{`${FATOR[f].nome}: ${FATOR[f].risco}`}</p>
-              ))}
+              <p className="disc__destaque-titulo">Fator ausente no time</p>
+              <p>{`${FATOR[ausente].nome}: ${FATOR[ausente].risco}`}</p>
             </div>
           </div>
         ) : null}
@@ -346,22 +346,22 @@ function VisaoGeralDisc({
 
       <CartaoDeSecao
         titulo="Como o time funciona"
-        descricao={`Leitura a partir do fator principal do time (${FATOR[c.principal].nome}).`}
+        descricao={`Leitura a partir ${time.classe.fatores.length > 1 ? "dos fatores principais" : "do fator principal"} do time (${nomesDosFatores(time.classe.fatores)}).`}
       >
         <dl className="disc__linhas">
           {(
             [
-              ["Pontos fortes", c.fortes],
-              ["Pontos de atenção", c.atencao],
-              ["Como se comunicar", c.feedback],
-              ["O que gera estresse", c.estresse],
+              ["Pontos fortes", "fortes"],
+              ["Pontos de atenção", "atencao"],
+              ["Como se comunicar", "feedback"],
+              ["O que gera estresse", "estresse"],
             ] as const
-          ).map(([rotulo, itens]) => (
+          ).map(([rotulo, campo]) => (
             <div key={rotulo}>
               <dt>{rotulo}</dt>
               <dd>
                 <ul className="disc__chips">
-                  {itens.slice(0, 3).map((t) => (
+                  {chipsDoTime(time.classe, campo).map((t) => (
                     <li key={t}>{t}</li>
                   ))}
                 </ul>

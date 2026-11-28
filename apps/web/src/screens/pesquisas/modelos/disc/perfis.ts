@@ -5,7 +5,7 @@
  * o fator principal com o secundário.
  */
 import { FATOR, type ConteudoDoFator, type FatorDisc } from "./fatores";
-import type { ClasseDisc, Intensidade } from "./tiposDisc";
+import type { ClasseDisc, Intensidade, Pontos } from "./tiposDisc";
 
 export interface Combinacao {
   readonly nome: string;
@@ -169,4 +169,67 @@ export function conteudoDoPerfil(classe: ClasseDisc): ConteudoDoPerfil {
     feedback: juntar(p.feedback, s.feedback, 2, 1),
     motivar: juntar(p.motivar, s.motivar, 2, 1),
   };
+}
+
+/** "dominância, conformidade e estabilidade". */
+export function nomesDosFatores(
+  fatores: readonly FatorDisc[],
+  minusculas = false,
+): string {
+  const nomes = fatores.map((f) =>
+    minusculas ? FATOR[f].nome.toLowerCase() : FATOR[f].nome,
+  );
+  return nomes.length > 1
+    ? `${nomes.slice(0, -1).join(", ")} e ${nomes.at(-1)}`
+    : (nomes[0] ?? "");
+}
+
+/**
+ * O perfil do time em uma frase. O time equilibrado (três fatores perto
+ * um do outro) tem texto próprio: o do fator principal falaria de um
+ * estilo que não domina.
+ */
+export function resumoDoTime(classe: ClasseDisc): string {
+  if (classe.tipo !== "tri") return conteudoDoPerfil(classe).resumo;
+  return `Time equilibrado: ${nomesDosFatores(classe.fatores, true)} aparecem em proporções parecidas, sem um estilo que domine. O grupo se adapta a situações diferentes; deixe claros os papéis para que cada estilo entre na hora certa.`;
+}
+
+export type CampoDoTime = "fortes" | "atencao" | "feedback" | "estresse";
+
+/**
+ * Os pontos do time numa linha de "Como o time funciona": um de cada fator
+ * principal, em rodízio, sem repetir (com um fator só, os 3 primeiros dele).
+ */
+export function chipsDoTime(
+  classe: ClasseDisc,
+  campo: CampoDoTime,
+  quantos = 3,
+): string[] {
+  const listas = classe.fatores.map((f) => FATOR[f][campo]);
+  const maior = Math.max(0, ...listas.map((l) => l.length));
+  const saida: string[] = [];
+  for (let i = 0; i < maior && saida.length < quantos; i++) {
+    for (const l of listas) {
+      const t = l[i];
+      if (t && !saida.includes(t) && saida.length < quantos) saida.push(t);
+    }
+  }
+  return saida;
+}
+
+/**
+ * Entre os fatores ausentes (predominantes em ninguém), o que o time menos
+ * tem na composição (empate: D, I, S, C); `null` sem ausentes.
+ */
+export function fatorMaisAusente(
+  ausentes: readonly FatorDisc[],
+  percentuais: Pontos,
+): FatorDisc | null {
+  const ordem = ["D", "I", "S", "C"] as const;
+  return (
+    [...ausentes].sort(
+      (a, b) =>
+        percentuais[a] - percentuais[b] || ordem.indexOf(a) - ordem.indexOf(b),
+    )[0] ?? null
+  );
 }
