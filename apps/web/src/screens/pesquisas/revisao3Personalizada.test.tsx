@@ -314,7 +314,6 @@ describe("R3-A-32 — cartões da personalizada dizem quem responde", () => {
         servico={servicoFalso()}
         onVoltar={vi.fn()}
         onComecar={vi.fn()}
-        onSobre={vi.fn()}
       />,
     );
     const cartao = (nome: string) =>
