@@ -1000,3 +1000,80 @@ na página pública da saúde financeira.
   1 comentário · Mensal), as perguntas agrupadas pelo jeito de responder (obrigatórias e opcionais),
   "Como a pessoa responde" com uma prévia em que dá para marcar a nota e "O que o RH vê" (rosca e
   barras). Sem "O que você recebe", ficha técnica ou janela de exemplo.
+
+## Pesquisa de Clima — revisão 3 (28/11/2026)
+
+- **Faixas do índice** (% de respostas favoráveis, 4 e 5): crítica < 50 · atenção 50–64 · boa 65–79 ·
+  excelente ≥ 80 — no geral, em cada dimensão e subdimensão, na tela, no "Sobre o modelo", na planilha
+  e no PDF. Não há score 0–100 nas telas do Clima (o campo `score` continua no contrato).
+- **Perguntas editáveis:** o RH muda o texto, remove e acrescenta afirmações (numa dimensão) ou perguntas
+  de texto livre. A API confere só chave e tipo (`conferirEstruturaDoClima`, registrada em `conferir`):
+  `clima_01`…`clima_60` e `clima_<dimensão>_<sufixo>` são concordância; `clima_aberta_*` é texto livre;
+  cada chave uma vez; pelo menos uma afirmação. As abertas do modelo são obrigatórias.
+- **Telas:** Visão geral (medidor do índice, todas as notas, anéis das dimensões por resultado ou na
+  ordem do modelo, puxa para cima / pede atenção, destaques, resultado por afirmação com filtro, "menor
+  favorável primeiro" e 8 por página, respostas abertas); Análises (resultado por departamento ou outro
+  recorte, evolução desde a Pesquisa de Clima anterior, "Duplicar para o próximo ciclo"; fora da
+  identificada, o aviso das leituras que exigem identificação; na identificada, pessoas por faixa);
+  Respostas (índice e departamento de cada resposta) e o resultado individual próprio.
+- **Exportações:** planilha própria (Resumo, Dimensões, Ranking, Respostas individuais com a linha da
+  média; nunca individuais na confidencial; na anônima sem nome e sem data) e PDF próprio em 8 páginas.
+  As telas e exportações próprias valem quando a API manda `ResultadosPesquisa.modelo` (mesmo `null`).
+
+```ts
+type FaixaClima = "critica" | "atencao" | "boa" | "excelente";
+
+interface DimensaoClima extends Omit<
+  DimensaoDoModelo,
+  "faixa" | "subdimensoes"
+> {
+  faixa: FaixaClima | null; // pelo % favorável
+  subdimensoes?: DimensaoClima[]; // as 3 do modelo; acrescentadas não têm subdimensão
+}
+
+interface ResultadoClima {
+  modelo: "clima";
+  favoravel: number | null; // o índice do time
+  neutro: number | null;
+  desfavoravel: number | null;
+  notas: { favoraveis: number; neutras: number; desfavoraveis: number };
+  score: number | null;
+  faixa: FaixaClima | null;
+  dimensoes: DimensaoClima[];
+  afirmacoes: AfirmacaoDoModelo[]; // na ordem da pesquisa (com as acrescentadas)
+}
+
+// RespostaResumo.resumoDoModelo (GET /pesquisas/:id/respostas e a resposta individual)
+interface ResumoDaRespostaClima {
+  modelo: "clima";
+  indice: number | null;
+  faixa: FaixaClima | null;
+}
+
+// RespostaDetalhe.modelo
+interface ResultadoIndividualClima {
+  modelo: "clima";
+  indice: number | null;
+  faixa: FaixaClima | null;
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number;
+  time: { indice: number | null; faixa: FaixaClima | null } | null;
+  dimensoes: {
+    chave: string;
+    rotulo: string;
+    indice: number | null;
+    faixa: FaixaClima | null;
+    time: number | null;
+  }[];
+  afirmacoes: {
+    chave: string;
+    perguntaId: string;
+    dimensao: string;
+    nota: number | null;
+    mediaTime: number | null;
+    favoravelTime: number | null;
+  }[];
+  distribuicao: { resposta: number[]; time: number[] | null }; // notas 1 a 5: quantas da pessoa; % do time
+}
+```
