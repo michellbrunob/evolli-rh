@@ -3643,13 +3643,21 @@ lastRecordedTask]` declarada em `sync-state.json` — lida, não inferida a part
         estaduais e municipais no cálculo de dias úteis.
 
 113.  **T216 - Pesquisas (módulo do menu e aba da ficha)**
-      - **Estado:** em andamento na branch `codex/t216-pesquisas`, a partir do squash da T215 em
-        `main` (`7ff3a2a`, PR #207). Sem PR.
+      - **Estado:** **integrada** em `main` pela PR #208 (squash `41a586c`, 28/11/2026), com a CI
+        de push 3/3 verde (run 46158687933).
       - **Objetivo:** lista, galeria de modelos próprios, assistente em 5 etapas, resultados,
         resposta pelo link público e aba Pesquisas da ficha, conforme o
         [documento de decisão](../docs/decisions/t216-pesquisas.md).
       - **Fora de escopo:** avaliações pelo gestor (90° e 180°), e-mail e lembretes, instrumentos
         de terceiros com licença, IA, evolução entre pesquisas e banco de perguntas.
+
+114.  **T217 - Documentos da ficha (revisão completa)**
+      - **Estado:** em andamento na branch `codex/t217-documentos`, a partir do squash da T216 em
+        `main` (`41a586c`, PR #208). Sem PR.
+      - **Objetivo:** revisar e completar a aba Documentos da ficha do colaborador (T213):
+        funcionalidades, regras de negócio, estados e mensagens, conferidos com cenários reais,
+        conforme o [documento de decisão](../docs/decisions/t217-documentos-ficha.md).
+      - **Fora de escopo:** envio de e-mail, assinatura eletrônica, OCR e leitura automática.
 
 ## Regra obrigatória para as próximas tarefas
 

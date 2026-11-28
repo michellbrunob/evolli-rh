@@ -1,6 +1,6 @@
 # Estado de execução do Spec Kit — Evolli RH
 
-**Última convergência:** 2026-11-27
+**Última convergência:** 2026-11-28
 
 **Base Git verificada:** `origin/main` em `8c3d8c3` (T140 e T142 integradas)
 
@@ -3464,10 +3464,20 @@ verde (run 45995281985). A branch de trabalho reunia commits das três; a integr
 com a declaração `Spec-Kit-Entrega: T213, T214, T215`. A PR #206 (rascunho da T213) ficou redundante.
 Os registros acima de "aguarda publicação", "empilhada" e "só local" valem como histórico.
 
-## Pesquisas — T216 (em andamento; sem PR)
+## Pesquisas — T216 (integrada)
 
-| Tarefa | Estado           | Escopo                                                                     |
-| ------ | ---------------- | -------------------------------------------------------------------------- |
-| T216   | **Em andamento** | Lista, modelos, assistente, resultados, resposta pelo link e aba da ficha. |
+| Tarefa | Estado                                    | Escopo                                                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| T216   | **Integrada** (PR #208, squash `41a586c`) | Lista, 12 modelos, assistentes, resultados, exportações, resposta pelo link e aba da ficha. |
 
 **Decisão:** [t216-pesquisas.md](../docs/decisions/t216-pesquisas.md).
+
+**Integração:** PR #208, squash `41a586c` (28/11/2026), CI de push 3/3 verde (run 46158687933).
+
+## Documentos da ficha — T217 (em andamento; sem PR)
+
+| Tarefa | Estado           | Escopo                                                                                 |
+| ------ | ---------------- | -------------------------------------------------------------------------------------- |
+| T217   | **Em andamento** | Revisão completa da aba Documentos da ficha: funcionalidades, regras e cenários reais. |
+
+**Decisão:** [t217-documentos-ficha.md](../docs/decisions/t217-documentos-ficha.md).
