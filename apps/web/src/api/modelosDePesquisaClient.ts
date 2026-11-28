@@ -25,8 +25,7 @@ import { pedir } from "./pesquisasClient";
 import { ApiError } from "./colaboradoresClient";
 import {
   clearCsrfToken,
-  descartarTokenSeDesatualizado,
-  getCsrfToken,
+  repetirSeTokenDesatualizado,
   tokenCsrfParaGravacao,
 } from "./csrfClient";
 
@@ -166,22 +165,17 @@ function extensaoDe(nome: string): string {
 }
 
 /**
- * Uma gravação com o token CSRF da aba. Num 403 `csrf_invalido` (outra aba
- * renovou o token desta sessão), o token local é descartado, renovado e o
- * MESMO pedido sai UMA vez de novo — a recusa vem antes de gravar, então
- * repetir é seguro. O 403 de permissão e o 401 não repetem.
+ * Uma gravação com o token CSRF da aba: o mesmo mecanismo do `pedir` das
+ * pesquisas (403 `csrf_invalido` renova o token e repete UMA vez); o 401
+ * descarta o token.
  */
 async function gravarComToken(
   enviar: (token: string) => Promise<Response>,
 ): Promise<Response> {
-  let res = await enviar(await tokenCsrfParaGravacao());
+  const res = await repetirSeTokenDesatualizado(async () =>
+    enviar(await tokenCsrfParaGravacao()),
+  );
   if (res.status === 401) clearCsrfToken();
-  await descartarTokenSeDesatualizado(res);
-  if (res.status === 403 && getCsrfToken() === null) {
-    res = await enviar(await tokenCsrfParaGravacao());
-    if (res.status === 401) clearCsrfToken();
-    await descartarTokenSeDesatualizado(res);
-  }
   return res;
 }
 

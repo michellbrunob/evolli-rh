@@ -10,7 +10,7 @@
 import { ApiError } from "./colaboradoresClient";
 import {
   clearCsrfToken,
-  descartarTokenSeDesatualizado,
+  repetirSeTokenDesatualizado,
   getCsrfToken,
   refreshCsrfToken,
 } from "./csrfClient";
@@ -454,14 +454,9 @@ export async function pedir<T>(
       },
       ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}),
     });
-  let res = await enviar();
-  if (escrita) {
-    await descartarTokenSeDesatualizado(res);
-    if (res.status === 403 && getCsrfToken() === null) {
-      res = await enviar();
-      await descartarTokenSeDesatualizado(res);
-    }
-  }
+  const res = escrita
+    ? await repetirSeTokenDesatualizado(enviar)
+    : await enviar();
   if (res.status === 401) clearCsrfToken();
   if (!res.ok) {
     const erro: unknown = await res.json().catch(() => ({}));
