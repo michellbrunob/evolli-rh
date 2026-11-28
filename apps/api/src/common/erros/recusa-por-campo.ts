@@ -257,6 +257,8 @@ export type CodigoDeRecusa =
   | "documento_arquivo_grande_demais"
   | "documento_formato_invalido"
   | "documento_arquivo_malformado"
+  // T217 — DOC ou DOCX com macro.
+  | "documento_com_macro"
   | "documento_categoria_invalida"
   | "documento_nome_obrigatorio"
   | "documento_nome_invalido"

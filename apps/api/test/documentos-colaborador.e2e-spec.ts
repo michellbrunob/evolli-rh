@@ -185,6 +185,8 @@ describe("T213 — documentos do colaborador (e2e)", () => {
       extensao?: string;
       chave?: string;
       contentType?: string;
+      /** T217 — nome original do arquivo (cabeçalho codificado). */
+      arquivo?: string;
     } = {},
   ) {
     const req = post(rota(colaboradorId), cred)
@@ -194,6 +196,9 @@ describe("T213 — documentos do colaborador (e2e)", () => {
       .set("x-evolli-documento-extensao", opcoes.extensao ?? "pdf");
     if (opcoes.nome !== undefined) {
       req.set("x-evolli-documento-nome", encodeURIComponent(opcoes.nome));
+    }
+    if (opcoes.arquivo !== undefined) {
+      req.set("x-evolli-documento-arquivo", encodeURIComponent(opcoes.arquivo));
     }
     if (opcoes.chave) req.set("Idempotency-Key", opcoes.chave);
     return req.send(corpo);
@@ -430,6 +435,8 @@ describe("T213 — documentos do colaborador (e2e)", () => {
         id: expect.any(String),
         categoria: "rg",
         nome: null,
+        nomeArquivo: null,
+        enviadoPor: { nome: null, papel: "rh" },
         estado: "aprovado",
         formato: "pdf",
         tamanhoBytes: corpo.length,
@@ -465,6 +472,76 @@ describe("T213 — documentos do colaborador (e2e)", () => {
       expect(outros.body.nome).toBe("Contrato de experiência");
     });
 
+    it("T217 — guarda o nome original saneado e mostra quem enviou", async () => {
+      const r = await enviar(dpA, colaboradorA, pdf(), {
+        categoria: "certidoes",
+        arquivo: "C:\\pasta\\Certidão de nascimento.pdf",
+      }).expect(201);
+      expect(r.body.nomeArquivo).toBe("Certidão de nascimento.pdf");
+      expect(r.body.enviadoPor).toEqual({ nome: null, papel: "dp" });
+      const versao = await prisma.versaoDocumentoColaborador.findFirstOrThrow({
+        where: { documentoId: r.body.id },
+      });
+      expect(versao.nomeOriginal).toBe("Certidão de nascimento.pdf");
+      const lista = await listar(rhA, colaboradorA).expect(200);
+      const item = lista.body.find((d: { id: string }) => d.id === r.body.id);
+      expect(item.nomeArquivo).toBe("Certidão de nascimento.pdf");
+      expect(item.enviadoPor).toEqual({ nome: null, papel: "dp" });
+    });
+
+    it("T217 — aceita DOCX e WebP conferidos pelo conteúdo; DOCX com macro é recusado", async () => {
+      const docx = Buffer.concat([
+        Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+        Buffer.alloc(26),
+        Buffer.from("[Content_Types].xml"),
+        Buffer.from("word/document.xml"),
+        Buffer.alloc(32, 3),
+        Buffer.from([0x50, 0x4b, 0x05, 0x06]),
+        Buffer.alloc(18),
+      ]);
+      const tipoDocx =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const okDocx = await enviar(rhA, colaboradorA2, docx, {
+        categoria: "outros",
+        nome: "Contrato sintético",
+        tipo: tipoDocx,
+        extensao: "docx",
+        arquivo: "contrato.docx",
+      }).expect(201);
+      expect(okDocx.body.formato).toBe("docx");
+      const corpoWebp = Buffer.concat([Buffer.from("VP8 "), Buffer.alloc(12)]);
+      const tamanho = Buffer.alloc(4);
+      tamanho.writeUInt32LE(corpoWebp.length + 4);
+      const webp = Buffer.concat([
+        Buffer.from("RIFF"),
+        tamanho,
+        Buffer.from("WEBP"),
+        corpoWebp,
+      ]);
+      const okWebp = await enviar(rhA, colaboradorA2, webp, {
+        categoria: "rg",
+        tipo: "image/webp",
+        extensao: "webp",
+      }).expect(201);
+      expect(okWebp.body.formato).toBe("webp");
+      const baixado = await baixar(rhA, colaboradorA2, okWebp.body.id).expect(
+        200,
+      );
+      expect(baixado.headers["content-type"]).toBe("image/webp");
+      const comMacro = Buffer.concat([
+        docx.subarray(0, docx.length - 22),
+        Buffer.from("word/vbaProject.bin"),
+        docx.subarray(docx.length - 22),
+      ]);
+      const recusa = await enviar(rhA, colaboradorA2, comMacro, {
+        categoria: "outros",
+        nome: "Com macro",
+        tipo: tipoDocx,
+        extensao: "docx",
+      }).expect(422);
+      expect(recusa.body.codigo).toBe("documento_com_macro");
+    });
+
     it("RH e DP baixam o aprovado: nome neutro, sem cache, nosniff, com trilha", async () => {
       const corpo = pdf();
       const { body } = await enviar(rhA, colaboradorA, corpo, {
@@ -495,8 +572,10 @@ describe("T213 — documentos do colaborador (e2e)", () => {
             "enviadoEm",
             "estado",
             "formato",
+            "enviadoPor",
             "id",
             "nome",
+            "nomeArquivo",
             "tamanhoBytes",
             "verificadoEm",
             "versao",
@@ -514,6 +593,7 @@ describe("T213 — documentos do colaborador (e2e)", () => {
         await enviar(rhA, colaboradorA, pdf(), {
           categoria: "outros",
           nome: "Laudo sintético",
+          arquivo: "laudo.pdf",
         }).expect(201)
       ).body.id;
     });
@@ -530,6 +610,9 @@ describe("T213 — documentos do colaborador (e2e)", () => {
       const item = r.body.find((d: { id: string }) => d.id === documentoId);
       expect(item.estado).toBe("aprovado");
       expect(item.nome).toBeNull();
+      // T217 — sem o nome do arquivo, mas com quem enviou.
+      expect(item.nomeArquivo).toBeNull();
+      expect(item.enviadoPor).toEqual({ nome: null, papel: "rh" });
     });
 
     it("nunca baixa nem escreve", async () => {

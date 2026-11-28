@@ -3096,11 +3096,14 @@ enum CategoriaDocumentoColaborador {
 }
 
 /// T213 — formatos aceitos (conferidos pela extensão, pelo tipo declarado e
-/// pelo conteúdo real).
+/// pelo conteúdo real). T217: também DOC, DOCX (sem macro) e WebP.
 enum FormatoDocumentoColaborador {
   pdf
   jpg
   png
+  doc
+  docx
+  webp
 }
 
 /// T213 — quarentena: toda versão nasce `em_verificacao`; só `aprovado` pode
@@ -3113,7 +3116,7 @@ enum EstadoVerificacaoDocumento {
 
 /// T213 — documento do colaborador naquela empresa (ADR 0021). Opcional:
 /// nunca condiciona a admissão. Remoção LÓGICA (`removidoEm`); os bytes
-/// ficam no R2 privado. O nome original do arquivo nunca é guardado.
+/// ficam no R2 privado. T217: o nome original fica na versão (`nome_original`).
 model DocumentoColaborador {
   id            String                        @id @default(uuid())
   empresaId     String                        @map("empresa_id")
@@ -3150,6 +3153,9 @@ model VersaoDocumentoColaborador {
   formato           FormatoDocumentoColaborador
   tamanhoBytes      Int                         @map("tamanho_bytes")
   hashSha256        String                      @map("hash_sha256")
+  /// T217 — nome original do arquivo, saneado (só exibição; o download
+  /// pela API continua com nome neutro). Nulo nos envios anteriores.
+  nomeOriginal      String?                     @map("nome_original") @db.VarChar(255)
   estado            EstadoVerificacaoDocumento  @default(em_verificacao)
   verificadoEm      DateTime?                   @map("verificado_em")
   enviadaPorId      String                      @map("enviada_por_id")

@@ -9,7 +9,6 @@ import {
   Prisma,
   type CategoriaDocumentoColaborador,
   type EstadoVerificacaoDocumento,
-  type FormatoDocumentoColaborador,
 } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import {
@@ -43,6 +42,13 @@ import {
   type ArquivoConferido,
   type ArquivoDoDocumento,
 } from "./documento-colaborador.arquivo";
+import {
+  AUTOR_DA_VERSAO,
+  projetarDocumento,
+  type DocumentoColaboradorDto,
+} from "./documento-colaborador.projecao";
+
+export type { DocumentoColaboradorDto } from "./documento-colaborador.projecao";
 
 /** Chave do objeto: só ids internos (ADR 0021). */
 export function chaveDoDocumento(
@@ -61,19 +67,6 @@ export function chaveDoDocumento(
 export const LIMPEZA_ENVIO_PARADO_MS = 15 * 60 * 1000;
 const LIMPEZAS_POR_VEZ = 20;
 
-export interface DocumentoColaboradorDto {
-  readonly id: string;
-  readonly categoria: CategoriaDocumentoColaborador;
-  /** Só em "outros", e nunca para o `master_tecnico`. */
-  readonly nome: string | null;
-  readonly estado: EstadoVerificacaoDocumento;
-  readonly formato: FormatoDocumentoColaborador;
-  readonly tamanhoBytes: number;
-  readonly versao: number;
-  readonly enviadoEm: string;
-  readonly verificadoEm: string | null;
-}
-
 export interface ResultadoDoEnvio {
   readonly documento: DocumentoColaboradorDto;
   readonly reenvio: boolean;
@@ -91,7 +84,7 @@ interface Alvo {
 }
 
 type VersaoComDocumento = Prisma.VersaoDocumentoColaboradorGetPayload<{
-  include: { documento: true };
+  include: { documento: true; enviadaPor: typeof AUTOR_DA_VERSAO };
 }>;
 
 /** O que o antivírus respondeu, antes de qualquer gravação. */
@@ -215,7 +208,13 @@ export class DocumentoColaboradorService {
         empresaId: alvo.empresaId,
         removidoEm: null,
       },
-      include: { versoes: { orderBy: { numero: "desc" }, take: 1 } },
+      include: {
+        versoes: {
+          orderBy: { numero: "desc" },
+          take: 1,
+          include: { enviadaPor: AUTOR_DA_VERSAO },
+        },
+      },
     });
     if (!documento || documento.versoes.length === 0) {
       throw new NotFoundException();
@@ -240,7 +239,13 @@ export class DocumentoColaboradorService {
         empresaId: alvo.empresaId,
         removidoEm: null,
       },
-      include: { versoes: { orderBy: { numero: "desc" }, take: 1 } },
+      include: {
+        versoes: {
+          orderBy: { numero: "desc" },
+          take: 1,
+          include: { enviadaPor: AUTOR_DA_VERSAO },
+        },
+      },
       orderBy: { criadoEm: "asc" },
     });
     const mostrarNome = ctx.actor.role !== "master_tecnico";
@@ -291,6 +296,8 @@ export class DocumentoColaboradorService {
       readonly categoria: string | undefined;
       readonly nome: string | undefined;
       readonly arquivo: ArquivoDoDocumento;
+      /** T217 — nome original já saneado (só exibição). */
+      readonly nomeOriginal?: string | null;
     },
     chaveIdempotencia: string | undefined,
     ctx: PessoasAuditContext,
@@ -354,6 +361,7 @@ export class DocumentoColaboradorService {
           conferido,
           verificacao,
           chaveIdempotencia,
+          nomeOriginal: pedido.nomeOriginal ?? null,
           alvo,
           ctx,
         });
@@ -393,6 +401,7 @@ export class DocumentoColaboradorService {
     arquivo: ArquivoDoDocumento,
     chaveIdempotencia: string | undefined,
     ctx: PessoasAuditContext,
+    nomeOriginal: string | null = null,
   ): Promise<ResultadoDoEnvio> {
     const alvo = await this.alvoDeEscrita(colaboradorId, "alter", ctx);
     await this.tentarLimpezasPendentes(alvo.empresaId);
@@ -437,6 +446,7 @@ export class DocumentoColaboradorService {
           conferido,
           verificacao,
           chaveIdempotencia,
+          nomeOriginal,
           alvo,
           ctx,
         });
@@ -548,6 +558,7 @@ export class DocumentoColaboradorService {
       conferido: ArquivoConferido;
       verificacao: VerificacaoFeita;
       chaveIdempotencia: string | undefined;
+      nomeOriginal: string | null;
       alvo: Alvo;
       ctx: PessoasAuditContext;
     },
@@ -563,13 +574,14 @@ export class DocumentoColaboradorService {
           formato: dados.conferido.formato,
           tamanhoBytes: dados.conferido.tamanhoBytes,
           hashSha256: dados.conferido.hashSha256,
+          nomeOriginal: dados.nomeOriginal,
           // O antivírus já respondeu: a versão nasce com o resultado.
           estado: dados.verificacao.resultado,
           verificadoEm: dados.verificacao.verificadoEm,
           enviadaPorId: dados.ctx.actor.id,
           chaveIdempotencia: dados.chaveIdempotencia ?? null,
         },
-        include: { documento: true },
+        include: { documento: true, enviadaPor: AUTOR_DA_VERSAO },
       })
       .then(async (versao) => {
         // Registro concluído: o objeto deixa de ser candidato à limpeza.
@@ -599,7 +611,7 @@ export class DocumentoColaboradorService {
           chaveIdempotencia,
         },
       },
-      include: { documento: true },
+      include: { documento: true, enviadaPor: AUTOR_DA_VERSAO },
     });
     if (!existente) return null;
     if (
@@ -611,6 +623,7 @@ export class DocumentoColaboradorService {
     const atual = await this.prisma.versaoDocumentoColaborador.findFirst({
       where: { documentoId: existente.documentoId },
       orderBy: { numero: "desc" },
+      include: { enviadaPor: AUTOR_DA_VERSAO },
     });
     return {
       documento: this.dto(existente.documento, atual ?? existente, true),
@@ -846,31 +859,10 @@ export class DocumentoColaboradorService {
   }
 
   private dto(
-    documento: {
-      id: string;
-      categoria: CategoriaDocumentoColaborador;
-      nomeOutros: string | null;
-    },
-    versao: {
-      estado: EstadoVerificacaoDocumento;
-      formato: FormatoDocumentoColaborador;
-      tamanhoBytes: number;
-      numero: number;
-      criadoEm: Date;
-      verificadoEm: Date | null;
-    },
-    mostrarNome: boolean,
+    documento: Parameters<typeof projetarDocumento>[0],
+    versao: Parameters<typeof projetarDocumento>[1],
+    mostrarNomes: boolean,
   ): DocumentoColaboradorDto {
-    return {
-      id: documento.id,
-      categoria: documento.categoria,
-      nome: mostrarNome ? documento.nomeOutros : null,
-      estado: versao.estado,
-      formato: versao.formato,
-      tamanhoBytes: versao.tamanhoBytes,
-      versao: versao.numero,
-      enviadoEm: versao.criadoEm.toISOString(),
-      verificadoEm: versao.verificadoEm?.toISOString() ?? null,
-    };
+    return projetarDocumento(documento, versao, { mostrarNomes });
   }
 }

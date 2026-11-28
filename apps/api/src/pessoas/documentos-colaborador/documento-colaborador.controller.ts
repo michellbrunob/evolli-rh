@@ -28,7 +28,10 @@ import {
   CABECALHO_REENVIO,
   chaveDeIdempotencia,
 } from "../colaborador/colaborador.controller";
-import { DOCUMENTO_LIMITE_BYTES } from "./documento-colaborador.arquivo";
+import {
+  DOCUMENTO_LIMITE_BYTES,
+  nomeOriginalDoCabecalho,
+} from "./documento-colaborador.arquivo";
 import {
   DocumentoColaboradorService,
   type ResultadoDoEnvio,
@@ -40,8 +43,13 @@ export const CABECALHO_CATEGORIA_DO_DOCUMENTO = "x-evolli-documento-categoria";
 export const CABECALHO_NOME_DO_DOCUMENTO = "x-evolli-documento-nome";
 /** Tipo declarado do arquivo escolhido. */
 export const CABECALHO_TIPO_DO_DOCUMENTO = "x-evolli-documento-tipo";
-/** Extensão do arquivo escolhido — o nome original nunca é enviado. */
+/** Extensão do arquivo escolhido (a conferência do formato é por ela). */
 export const CABECALHO_EXTENSAO_DO_DOCUMENTO = "x-evolli-documento-extensao";
+/**
+ * T217 — nome original do arquivo, codificado com `encodeURIComponent`. Só
+ * exibição: opcional, saneado e nunca motivo de recusa.
+ */
+export const CABECALHO_ARQUIVO_DO_DOCUMENTO = "x-evolli-documento-arquivo";
 
 function decodificarNome(bruto: string | undefined): string | undefined {
   if (bruto === undefined) return undefined;
@@ -58,8 +66,8 @@ function decodificarNome(bruto: string | undefined): string | undefined {
  *
  * - `GET /documentos`: lista e estado.
  * - `POST /documentos`: novo documento (corpo `application/octet-stream`, até
- *   10 MB, categoria, nome de "outros", tipo e extensão nos cabeçalhos;
- *   `Idempotency-Key` opcional).
+ *   10 MB, categoria, nome de "outros", tipo, extensão e — T217 — nome
+ *   original do arquivo nos cabeçalhos; `Idempotency-Key` opcional).
  * - `POST /documentos/:id/versoes`: troca (versão nova).
  * - `POST /documentos/:id/verificacao`: nova tentativa do antivírus.
  * - `DELETE /documentos/:id`: remoção lógica.
@@ -96,6 +104,8 @@ export class DocumentoColaboradorController {
     @Headers(CABECALHO_NOME_DO_DOCUMENTO) nome: string | undefined,
     @Headers(CABECALHO_TIPO_DO_DOCUMENTO) tipoDeclarado: string | undefined,
     @Headers(CABECALHO_EXTENSAO_DO_DOCUMENTO) extensao: string | undefined,
+    @Headers(CABECALHO_ARQUIVO_DO_DOCUMENTO)
+    arquivoOriginal: string | undefined,
     @Headers(CABECALHO_IDEMPOTENCIA) chave: string | undefined,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
@@ -113,6 +123,7 @@ export class DocumentoColaboradorController {
           tipoDeclarado: tipoDeclarado ?? "",
           extensao: extensao ?? "",
         },
+        nomeOriginal: nomeOriginalDoCabecalho(arquivoOriginal),
       },
       chaveValida,
       { actor, metadata: extractRequestMetadata(req) },
@@ -129,6 +140,8 @@ export class DocumentoColaboradorController {
     @Param("documentoId", ParseUUIDPipe) documentoId: string,
     @Headers(CABECALHO_TIPO_DO_DOCUMENTO) tipoDeclarado: string | undefined,
     @Headers(CABECALHO_EXTENSAO_DO_DOCUMENTO) extensao: string | undefined,
+    @Headers(CABECALHO_ARQUIVO_DO_DOCUMENTO)
+    arquivoOriginal: string | undefined,
     @Headers(CABECALHO_IDEMPOTENCIA) chave: string | undefined,
     @CurrentUser() actor: AccessUser,
     @Req() req: Request,
@@ -142,6 +155,7 @@ export class DocumentoColaboradorController {
       { bytes, tipoDeclarado: tipoDeclarado ?? "", extensao: extensao ?? "" },
       chaveValida,
       { actor, metadata: extractRequestMetadata(req) },
+      nomeOriginalDoCabecalho(arquivoOriginal),
     );
     return this.responder(resultado, res);
   }
