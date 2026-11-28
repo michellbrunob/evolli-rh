@@ -1,0 +1,195 @@
+/* T216 — Saúde financeira: resultado público da pessoa. */
+.isfb-publico {
+  display: grid;
+  gap: var(--space-md);
+  justify-items: center;
+  text-align: center;
+}
+
+.isfb-publico__nota,
+.isfb-publico__bloco {
+  width: 100%;
+  padding: var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  text-align: left;
+}
+
+.isfb-publico__nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.isfb-publico__nota-texto {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: var(--space-xxs);
+}
+
+.isfb-publico__nota-texto p {
+  margin: 0;
+}
+
+.isfb-publico__subtitulo {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.isfb-publico__selo {
+  justify-self: start;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--cor-da-faixa);
+  border-radius: var(--radius-pill);
+  color: var(--cor-da-faixa);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.isfb-publico__diferenca {
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.isfb-publico__barras ul {
+  display: grid;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.isfb-publico__barras li {
+  display: grid;
+  grid-template-columns: 8rem 1fr 2.5rem;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-caption);
+}
+
+.isfb-publico__barras li strong {
+  text-align: right;
+}
+
+.isfb-publico__trilho {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-neutral);
+}
+
+.isfb-publico__trilho > span:first-child {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.isfb-publico__media {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  border-left: 2px dashed var(--color-ink-muted);
+}
+
+.isfb-publico__legenda {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-caption);
+}
+
+.isfb-publico__traco {
+  display: inline-block;
+  width: 16px;
+  border-top: 2px dashed var(--color-ink-muted);
+}
+
+.isfb-publico__cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-sm);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.isfb-publico__cartao {
+  display: grid;
+  align-content: start;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--divisor-cor);
+  border-top: 3px solid var(--cor-da-dimensao);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+  font-size: var(--text-caption);
+}
+
+.isfb-publico__cartao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.isfb-publico__cartao h3 {
+  margin: 0;
+  font-size: var(--text-ui);
+}
+
+.isfb-publico__cartao strong {
+  font-size: 1.5rem;
+  color: var(--cor-da-dimensao);
+}
+
+.isfb-publico__cartao p {
+  margin: 0;
+}
+
+.isfb-publico__suave,
+.isfb-publico__sobre {
+  color: var(--color-ink-muted);
+}
+
+.isfb-publico__sobre {
+  width: 100%;
+  margin: 0;
+  font-size: var(--text-caption);
+  text-align: left;
+}
+
+.isfb-publico__aviso {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-surface);
+  color: var(--status-warning-ink);
+  font-size: var(--text-caption);
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .isfb-publico__barras li {
+    grid-template-columns: 6.5rem 1fr 2.25rem;
+  }
+}
+
+@media print {
+  .isfb-publico__acoes,
+  .isfb-publico__aviso,
+  .pesquisa-publica__rodape {
+    display: none;
+  }
+}

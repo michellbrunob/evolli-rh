@@ -73,6 +73,8 @@ import { minutosEstimados } from "../pesquisas/tempoEstimado";
 import { CampoDaPergunta } from "./CampoDaPergunta";
 import { perfilDasEscolhas } from "../pesquisas/modelos/disc/perfilLocal";
 import { ResultadoPublicoDisc } from "../pesquisas/modelos/disc/ResultadoPublicoDisc";
+import { ResultadoPublicoIsfb } from "../pesquisas/modelos/isfb/ResultadoPublicoIsfb";
+import { resultadoIsfbDasRespostas } from "../pesquisas/modelos/isfb/resultadoLocal";
 import { rodadaDaPesquisaPublica } from "../../app/rotaPublica";
 import { ehAvaliacao } from "../pesquisas/modelos/avaliacao/catalogo";
 import { ResponderAvaliacao } from "../pesquisas/modelos/avaliacao/ResponderAvaliacao";
@@ -1128,6 +1130,24 @@ export function ResponderPesquisa(props: ResponderPesquisaProps) {
         conteudo = (
           <ResultadoPublicoDisc
             perfil={perfilDisc}
+            previa={previa !== null}
+            titulo={titulo(
+              "Respostas enviadas!",
+              "pesquisa-publica__titulo pesquisa-publica__titulo--grande",
+            )}
+          />
+        );
+        break;
+      }
+      // Saúde financeira: a nota da própria pessoa.
+      const notaIsfb =
+        pesquisa?.modelo === "isfb"
+          ? resultadoIsfbDasRespostas(secoes, respostas)
+          : null;
+      if (notaIsfb) {
+        conteudo = (
+          <ResultadoPublicoIsfb
+            resultado={notaIsfb}
             previa={previa !== null}
             titulo={titulo(
               "Respostas enviadas!",
