@@ -82,7 +82,6 @@ import { Avatar, IconeDoModelo, iniciaisDe, Pilulas } from "./componentes";
 import { perguntasEmOrdem } from "./estadoDaPesquisa";
 import { carregarRelatorio, respostasCompletas } from "./carregarRelatorio";
 import { nomeDaExportacao, planilhaDosResultados } from "./exportarResultados";
-import { enderecoDaRota } from "./rotasDePesquisas";
 import { planilhaDisc } from "./modelos/disc/exportarDisc";
 import { perfilComportamental } from "./modelos/disc/tiposDisc";
 import { enderecoDaRota, type AbaDosResultados } from "./rotasDePesquisas";
@@ -355,7 +354,8 @@ function ResultadosInterno({
       ? null
       : abasDoModelo({
           detalhe,
-          aba,
+          // As abas próprias da NR-1 (plano, conformidade) não existem no DISC.
+          aba: aba === "plano" || aba === "conformidade" ? "geral" : aba,
           carregarPerfil: servico.perfilComportamental,
           onAbrirResposta: (id) => onAbrirResposta?.(id),
           onIrParaAnalises: () => setAba("analises"),
