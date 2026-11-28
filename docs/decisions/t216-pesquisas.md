@@ -594,6 +594,46 @@ Perfil comportamental (DISC) — modelo `disc` (27/11/2026):
   mesma regra (percentuais e predominante); nada é gravado; "Salvar em PDF" usa a impressão.
 - **Fora desta fatia:** análise por IA, gestor × time e líderes × demais (dependem da hierarquia).
 
+## Avaliação 90°/180° e Onboarding automático (frente M4, 27/11/2026)
+
+Decisões:
+
+- **Avaliação 90°/180°** (`avaliacao90`, `avaliacao180`): sempre nominal (identificada por CPF +
+  nascimento). Catálogo fixo de 24 afirmações (8 competências × 3, escala 1–5 com o rótulo de cada
+  ponto), gravado pela API a cada `PUT …/avaliacao` enquanto não houver resposta. Quem avalia quem vem
+  da liderança: o gestor de cada pessoa é o gestor (principal; sem principal, o substituto) da equipe
+  da lotação vigente. Uma pessoa por time; o gestor nunca se avalia. Na 180°, cada pessoa avaliada que
+  tem CPF e nascimento também se autoavalia (sem CPF, só o gestor avalia). Não há a opção de o liderado
+  avaliar o gestor (não faz parte destes modelos).
+- **Cálculo** (API, `modelos/avaliacao/calculo-avaliacao.ts`): competência = média das 3; nota geral =
+  média das 8; eixos Entrega (Responsabilidade, Organização, Proatividade, Resolução de problemas) e
+  Pessoas (Comunicação, Trabalho em equipe, Liderança, Adaptabilidade); 1 casa, arredondamento
+  simétrico. Níveis Insuficiente 1,0–1,9 · Em desenvolvimento 2,0–2,9 · Bom 3,0–3,9 · Excelente
+  4,0–4,4 · Excepcional 4,5–5,0. Mapa de talentos 3×3 (alto ≥ 4, médio 3–3,9, baixo < 3). Calibração:
+  média do gestor − média da empresa, com ≥ 5 avaliados; |dif| ≥ 0,4 generoso ou exigente. 180°:
+  diferença = autoavaliação − gestor; |dif| < 0,5 alinhada; mapa da conversa com limiar de 1 ponto
+  ("bem acima"). Recortes (tempo de casa, departamento) com mínimo de 3. Alertas: as 24 notas iguais e
+  notas extremas (< 2,5 ou = 5) sem comentário. Sem plano por IA (o Evolli não tem IA): no lugar, "O
+  que desenvolver" (competências < 3) e o roteiro de feedback.
+- **Comentários** por competência: opcionais, pedidos nas notas extremas (padrão) ou obrigatórios;
+  gravados na resposta como `comentario_<competência>`.
+- **Onboarding automático**: envio agora, agendado ou automático aos 30/60/90 dias de casa (padrão
+  30 e 60, só em dias úteis — nacionais e feriados locais sem unidade —, 09:00, prazo de 7 dias,
+  lembrete 3 dias depois; a anônima não tem lembrete). Público: todos, por grupo (departamento, cargo,
+  unidade, centro de custo; todas as condições) ou pessoas escolhidas, conferido ao criar o convite.
+  Uma resposta por pessoa e rodada (`pesquisa_resposta.rodada`; 0 = envio único e as demais
+  pesquisas). Identificada e confidencial: a rodada sai do convite aberto da pessoa; anônima: do link
+  (`#/p/<token>?rodada=30`). Na confidencial, o convite fica "respondido" só com o dia e nada liga o
+  convite à resposta; por isso o fluxo da intenção entre rodadas só existe na identificada.
+- **Processo periódico** (`ProcessadorDePesquisas`; agendador com `PESQUISAS_AGENDADOR_INTERVALO_MS`,
+  padrão 5 minutos, `0` desliga, desligado nos testes): cria os convites até 30 dias antes da data,
+  avisa os que venceram no horário, manda o lembrete uma vez e, na avaliação com envio por e-mail,
+  o convite de cada participante e os lembretes (7 e 3 dias antes, no dia e depois do prazo, às
+  09:00). Idempotente: um convite por pessoa e rodada/marco (único no banco), transições condicionais.
+- **E-mail**: o ponto de notificação existe (`NOTIFICADOR_DE_PESQUISAS`), mas sem provedor nada sai:
+  o convite fica `aguardando_email` (ou `sem_email`, sem e-mail no cadastro). O e-mail entra na
+  próxima etapa do projeto (troca do provedor do token), junto com logo e cores do e-mail personalizado.
+
 Contrato (acréscimos):
 
 ```ts
@@ -764,3 +804,86 @@ Tela: os blocos entram no catálogo (`modelos/disc/catalogo.ts`, `secoes`); as a
 perfil individual próprios são registrados em `modelos/resultados.tsx` (`abasDoModelo`,
 `paginaIndividualDoModelo`), porque o resultado vem da rota própria; planilha (7 abas) e relatório em
 PDF em `modelos/disc/`.
+
+// Banco: pesquisa.config_modelo (JSON); pesquisa_resposta.rodada (0|30|60|90; único por
+// pesquisa+colaborador+rodada); pesquisa_avaliacao_par (avaliador, avaliado, papel
+// gestor|autoavaliacao, resposta; único por pesquisa+avaliado+papel); pesquisa_envio (pessoa,
+// rodada ou marco, data prevista, situação; único por pesquisa+pessoa+rodada).
+// A resposta da avaliação não guarda a pessoa: o par liga avaliado e avaliador.
+
+// ConfigPergunta (escala): rotulos?: string[] (um por ponto, do mínimo ao máximo).
+
+// Avaliação (autenticadas; resultados e ficha pedem resposta_pesquisa e são auditados)
+// GET  /pesquisas/avaliacoes/organograma → { times: {gestor, pessoas}[], semGestor: {pessoa,
+//      motivo: "sem_gestor"|"gestor_sem_cpf"|"gestor_inativo", gestorNome}[], ativos }
+//      (pessoa: { id, nome, cargo, departamento, identificavel, temEmail }; sem CPF nem e-mail)
+// GET  /pesquisas/:id/avaliacao → { config, prazo, times, totais, lembretes, convites }
+// PUT  /pesquisas/:id/avaliacao { config?: ConfigAvaliacao, times: { gestorId, avaliadoIds[] }[] }
+//      422 times: repetida | indisponivel | gestor_nao_identificavel | invalido | sem_pessoas;
+//      prazoAutoavaliacao: fora_do_prazo | fora_de_ordem | nao_se_aplica; 409 times com_respostas
+// GET  /pesquisas/:id/avaliacao/resultados → time, pessoas, itens, calibracao, recortes, comparativo
+// GET  /pesquisas/:id/avaliacao/pessoas/:colaboradorId → gestorAvaliacao, autoavaliacao,
+//      comparativo, roteiro, desenvolver, time
+// GET  /colaboradores/:id/avaliacoes → { pesquisaId, nome, modelo, respondidaEm, gestor, geral,
+//      nivel, autoavaliacao }[]
+interface ConfigAvaliacao {
+  comentarios: "opcionais" | "extremos" | "obrigatorios"; // padrão: extremos
+  liberarNoPortal: boolean;
+  visibilidade: "depois_do_gestor" | "so_rh"; // só na 180°
+  prazoAutoavaliacao: string | null; // 180°: AAAA-MM-DDTHH:mm, ≥ 1 h e antes do prazo
+  lembretes: ("7_dias" | "3_dias" | "no_dia" | "depois")[];
+  envio: "email" | "link";
+}
+// Públicas (depois de POST …/identificar)
+// POST /publico/pesquisas/:token/avaliacao/pendentes { passe } → { modelo, comentarios, prazo,
+//      prazoAutoavaliacao, itens: { parId, papel, avaliado: {nome, cargo}, respondida, aberta,
+//      comparativo }[] } (comparativo: 180°, gestor que já enviou, visibilidade depois_do_gestor)
+// POST /publico/pesquisas/:token/avaliacao/pares/:parId { passe, respostas (24), comentarios? }
+//      → 201 { ok, restantes }; o passe vale até a última avaliação da pessoa (2 horas).
+
+// Onboarding (autenticadas)
+// GET  /pesquisas/:id/onboarding → { config, ativa, ativadaEm, publico, proximas, funil,
+//      proximoEnvio, link }
+// PUT  /pesquisas/:id/onboarding { config: ConfigOnboarding } (o modo não muda depois de ativar)
+// POST /pesquisas/onboarding/publico { publico, soDiasUteis } → { total, semEmail, proximas, pessoas }
+// POST /pesquisas/:id/onboarding/ativar → ativa sem exigir participante (no lugar de /publicar)
+// GET  /pesquisas/:id/onboarding/envios → { identificacao, horario, itens: { id, colaboradorId,
+//      nome, rodada, dataPrevista, prazo, situacao, enviadoEm, lembreteEm }[] }
+// POST /pesquisas/:id/onboarding/envios/:envioId/pular → 204 (só agendado; senão 409)
+// GET  /pesquisas/:id/onboarding/resultados?campo=&grupoId= → rodadas, comparacoes, peso, fluxo,
+//      contatos, melhorar, gosta, funil, grupos
+interface ConfigOnboarding {
+  modo: "agora" | "agendar" | "automatizar";
+  rodadas: (30 | 60 | 90)[];
+  horario: string; // 06:00 a 21:00, de 30 em 30 minutos
+  agendadoPara: string | null;
+  prazoDias: 3 | 5 | 7 | 10 | 15;
+  lembreteDias: 2 | 3 | 5 | null;
+  soDiasUteis: boolean;
+  incluirAtrasados: boolean;
+  publico:
+    | { tipo: "todos" }
+    | { tipo: "pessoas"; colaboradorIds: string[] }
+    | {
+        tipo: "grupo";
+        condicoes: {
+          campo: "departamento" | "cargo" | "unidade" | "centroCusto";
+          operador: "e" | "uma_destas";
+          valores: string[];
+        }[];
+      };
+  email: {
+    modelo: "padrao" | "personalizado";
+    assunto: string | null; // até 80
+    titulo: string | null; // até 60
+    mensagem: string | null; // até 600
+  };
+}
+// Pública: POST /publico/pesquisas/:token/onboarding/respostas { passe?, rodada?, grupos?,
+//      respostas } → 201 { ok, rodada }; 409 rodada já respondida; 410 sem convite aberto.
+```
+
+Telas: `apps/web/src/screens/pesquisas/modelos/{avaliacao,onboarding}/`; pontos de registro em
+`modelos/{avaliacao90,avaliacao180,onboarding}/definicao.ts` (o objeto `definicao`: card, "Sobre o
+modelo", seções, assistente e resultados). A rota `#/pesquisas/nova/<modelo>` abre o assistente
+próprio e a página da pesquisa mostra os resultados próprios (`modelos/integracao.tsx`).
