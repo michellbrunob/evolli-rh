@@ -1390,7 +1390,7 @@ Contrato novo (web):
 
 - **Finalizada edita:** `PUT /v1/pesquisas/:id` aceita a finalizada (nome, boas-vindas,
   participantes); mudar ou tirar `encerraEm` dela é 422 `{ campo: "encerraEm", motivo:
-  "nao_editavel" }` (reabriria o link de uma pesquisa encerrada pelo prazo). Cancelada continua 409.
+"nao_editavel" }` (reabriria o link de uma pesquisa encerrada pelo prazo). Cancelada continua 409.
   Na tela, a finalizada mantém "Editar" (cabeçalho e menu da linha) e mostra "Copiar link"
   desabilitado; a página Editar troca o cartão de encerramento por um aviso.
 - **Aviso flutuante:** `ConteudoDoAviso.tom?: "sucesso" | "erro"` (componente do sistema). Erro:
@@ -1430,9 +1430,16 @@ interface ResultadoIndividualPulsoClima {
   score: number | null; // média dos scores das afirmações respondidas
   faixa: FaixaDeScore | null;
   scoreTime: number | null;
-  favoraveis: number; neutras: number; desfavoraveis: number; // contagens 4–5, 3, 1–2
-  dimensoes: { chave: string; rotulo: string; score: number | null;
-               faixa: FaixaDeScore | null; scoreTime: number | null }[];
+  favoraveis: number;
+  neutras: number;
+  desfavoraveis: number; // contagens 4–5, 3, 1–2
+  dimensoes: {
+    chave: string;
+    rotulo: string;
+    score: number | null;
+    faixa: FaixaDeScore | null;
+    scoreTime: number | null;
+  }[];
   distribuicao: { valor: number; resposta: number; time: number }[]; // 1–5; time em %
   enps: { nota: number | null; indiceTime: number | null };
   lnps: { nota: number | null; indiceTime: number | null };
