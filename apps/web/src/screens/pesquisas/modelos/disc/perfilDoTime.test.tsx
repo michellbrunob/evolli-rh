@@ -8,7 +8,12 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DETALHE } from "../../dadosDeTeste";
 import { FATOR } from "./fatores";
-import { chipsDoTime, fatorMaisAusente, resumoDoTime } from "./perfis";
+import {
+  chipsDoTime,
+  fatorMaisAusente,
+  intensidadeDoTime,
+  resumoDoTime,
+} from "./perfis";
 import { ResultadosDisc } from "./ResultadosDisc";
 import { resultadoDeTeste } from "./resultadoDeTeste";
 import type { ClasseDisc, ResultadoDisc } from "./tiposDisc";
@@ -111,5 +116,31 @@ describe("DISC — Visão geral do time", () => {
     expect(within(div).getByText(/^Influência: /)).toBeInTheDocument();
     expect(within(div).queryByText(/^Conformidade: /)).toBeNull();
     expect(within(div).queryByText("Fatores ausentes no time")).toBeNull();
+  });
+});
+
+describe("DISC — intensidade do perfil do time (4ª revisão)", () => {
+  it("alta para puro e acentuado, moderada e baixa para equilibrado", () => {
+    expect(intensidadeDoTime("puro")).toBe("Intensidade alta");
+    expect(intensidadeDoTime("acentuado")).toBe("Intensidade alta");
+    expect(intensidadeDoTime("moderado")).toBe("Intensidade moderada");
+    expect(intensidadeDoTime("equilibrado")).toBe("Intensidade baixa");
+  });
+
+  it("aparece sob o título do cartão 'Perfil do time'", async () => {
+    render(
+      <ResultadosDisc
+        detalhe={{ ...DETALHE, modelo: "disc" }}
+        aba="geral"
+        carregar={() => Promise.resolve(resultadoDeTeste())}
+      />,
+    );
+    const time = await screen.findByRole("region", { name: "Perfil do time" });
+    const titulo = within(time).getByRole("heading", { level: 3 });
+    const intensidade = within(time).getByText("Intensidade baixa");
+    expect(
+      titulo.compareDocumentPosition(intensidade) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

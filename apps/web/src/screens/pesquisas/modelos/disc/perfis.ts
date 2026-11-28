@@ -95,6 +95,22 @@ export const ROTULO_DA_INTENSIDADE: Readonly<Record<Intensidade, string>> = {
   equilibrado: "Equilibrado",
 };
 
+/**
+ * A intensidade do perfil do time, em três graus (sob o título do cartão
+ * "Perfil do time"): um fator dominando (puro) ou um ou dois destacados
+ * (acentuado) = alta; moderado = moderada; três fatores parecidos
+ * (equilibrado) = baixa.
+ */
+export function intensidadeDoTime(i: Intensidade): string {
+  const grau =
+    i === "puro" || i === "acentuado"
+      ? "alta"
+      : i === "moderado"
+        ? "moderada"
+        : "baixa";
+  return `Intensidade ${grau}`;
+}
+
 /** O que cada intensidade quer dizer (cartões e planilha). */
 export const TEXTO_DA_INTENSIDADE: Readonly<Record<Intensidade, string>> = {
   puro: "Um fator domina com folga: o comportamento é bem marcado e previsível.",

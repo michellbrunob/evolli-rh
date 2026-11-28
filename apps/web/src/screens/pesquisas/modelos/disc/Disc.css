@@ -352,6 +352,14 @@
   gap: var(--space-sm);
 }
 
+/* "Intensidade alta/moderada/baixa" logo sob o título do perfil do time. */
+.disc__intensidade {
+  margin: calc(-1 * var(--space-xs)) 0 0;
+  color: var(--texto-suave, var(--color-ink));
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
 .disc__time-titulo {
   margin: 0;
   font-size: 1.25rem;

@@ -40,6 +40,7 @@ import {
   chipsDoTime,
   codigoDoPerfil,
   fatorMaisAusente,
+  intensidadeDoTime,
   nomesDosFatores,
   resumoDoTime,
   tituloDoPerfil,
@@ -233,6 +234,9 @@ function VisaoGeralDisc({
               </span>
             </h3>
           </div>
+          <p className="disc__intensidade">
+            {intensidadeDoTime(time.classe.intensidade)}
+          </p>
           <p>{resumoDoTime(time.classe)}</p>
           <BarraDisc
             percentuais={time.percentuais}
