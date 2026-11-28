@@ -290,6 +290,9 @@ export const IconeSimNao = decorativo(LikeDislike, "Bulk");
 export const IconeEscala = decorativo(Slider, "Bulk");
 export const IconeNota = decorativo(Speedometer, "Bulk");
 export const IconeConcordancia = decorativo(Smileys, "Bulk");
+/** T216 — os tipos de 4 pontos (concordância e satisfação, sem o neutro). */
+export const IconeConcordancia4 = decorativo(Like1, "Linear");
+export const IconeSatisfacao4 = decorativo(EmojiHappy, "Linear");
 export const IconeNumero = decorativo(Hashtag, "Bulk");
 
 // ---- T216 — Pesquisas: os modelos da galeria e os fatos dos cards (Bulk) ----

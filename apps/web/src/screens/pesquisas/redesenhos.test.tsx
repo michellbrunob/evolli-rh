@@ -732,8 +732,8 @@ describe("B18 — personalizada, etapa Perguntas", () => {
     const icones = within(lista)
       .getAllByRole("button")
       .map((b) => b.querySelector("svg")!.innerHTML);
-    expect(icones).toHaveLength(11);
-    expect(new Set(icones).size).toBe(11);
+    expect(icones).toHaveLength(13);
+    expect(new Set(icones).size).toBe(13);
     fireEvent.keyDown(lista, { key: "Escape" });
     expect(
       screen.queryByRole("group", { name: "Tipo da nova pergunta" }),
