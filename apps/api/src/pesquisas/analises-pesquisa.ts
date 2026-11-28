@@ -70,7 +70,8 @@ export interface PesquisaDaEvolucao {
 /**
  * A evolução entre pesquisas do mesmo modelo, na ordem recebida: uma entrada
  * por pesquisa com média geral visível. Cancelada nunca conta; sem resposta
- * ou sem média (confidencial abaixo do mínimo) fica fora.
+ * ou sem média (confidencial abaixo do mínimo) fica fora. Com a pergunta de
+ * recomendação respondida, o ponto traz também o eNPS da pesquisa.
  */
 export function montarEvolucao(
   pesquisas: readonly PesquisaDaEvolucao[],
@@ -79,22 +80,31 @@ export function montarEvolucao(
   const pontos: AnalisesPesquisa["evolucao"] = [];
   for (const m of pesquisas) {
     if (m.status === "cancelada" || m.publicadaEm === null) continue;
-    const dela = respostas.filter((v) => v.pesquisaId === m.id);
+    const secoes = m.secoes as Secao[];
+    const dela = respostas
+      .filter((v) => v.pesquisaId === m.id)
+      .map((v) => ({ valores: v.valores as ValorRespondido[], grupos: {} }));
     const mediaGeral = mediaGeralVisivel(
-      m.secoes as Secao[],
-      dela.map((v) => ({
-        valores: v.valores as ValorRespondido[],
-        grupos: {},
-      })),
+      secoes,
+      dela,
       m.minimoPorGrupo,
       m.identificacao === "confidencial",
     );
     if (mediaGeral === null) continue;
+    // O mínimo já foi conferido pela média: o eNPS segue a mesma regra.
+    const enps = calcularIndicadores(
+      secoes,
+      resultadoDasPerguntas(
+        secoes,
+        dela.map((r) => ({ valores: r.valores, autor: null })),
+      ),
+    ).enps?.indice;
     pontos.push({
       pesquisaId: m.id,
       nome: m.nome,
       publicadaEm: m.publicadaEm.toISOString(),
       mediaGeral,
+      ...(typeof enps === "number" ? { enps } : {}),
     });
   }
   return pontos;

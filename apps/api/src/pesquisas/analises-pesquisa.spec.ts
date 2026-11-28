@@ -195,8 +195,35 @@ describe("T216 — montarEvolucao", () => {
         nome: "Pesquisa p3",
         publicadaEm: "2026-03-01T12:00:00.000Z",
         mediaGeral: 6.5,
+        // 2 promotores e 1 detrator nas 3 notas de recomendação.
+        enps: 33,
       },
     ]);
+  });
+
+  it("o eNPS de cada pesquisa só vem quando há índice (com a regra do mínimo)", () => {
+    const semRecomendacao: Secao[] = [
+      { ...secoes[0]!, perguntas: secoes[0]!.perguntas.slice(0, 2) },
+    ];
+    const pontos = montarEvolucao(
+      [
+        { ...pesquisa("p1", "finalizada"), secoes: semRecomendacao },
+        pesquisa("p2", "finalizada"),
+        pesquisa("p3", "finalizada", "confidencial"),
+      ],
+      [
+        ...valoresDe("p1"),
+        ...valoresDe("p2", [respostas[3]!]),
+        ...valoresDe("p3"),
+      ],
+    );
+    expect(pontos.map((x) => [x.pesquisaId, x.enps])).toEqual([
+      ["p1", undefined],
+      // Respondeu, mas sem nota de recomendação: sem índice.
+      ["p2", undefined],
+      ["p3", 33],
+    ]);
+    expect(pontos[0]).not.toHaveProperty("enps");
   });
 
   it("mantém a ordem recebida e a média de cada pesquisa", () => {

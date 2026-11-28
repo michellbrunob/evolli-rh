@@ -32,7 +32,6 @@ import {
 } from "./analises-pesquisa";
 import {
   ativosDaEmpresa,
-  departamentosVigentes,
   lotacoesVigentes,
   nomesDosGrupos,
 } from "./pessoas-da-pesquisa";
@@ -471,12 +470,12 @@ export class PesquisasService {
       }));
     }
     const ids = lista.map((l) => l.colaboradorId);
-    const [nomes, deps, perfis] = await Promise.all([
+    const [nomes, lotacoes, perfis] = await Promise.all([
       db.colaborador.findMany({
         where: { id: { in: ids } },
         select: { id: true, nome: true },
       }),
-      departamentosVigentes(db, p.empresaId, ids),
+      lotacoesVigentes(db, p.empresaId, ids),
       // Só para saber se o link consegue identificar a pessoa: CPF e
       // nascimento nunca saem na resposta.
       db.perfilPessoalColaborador.findMany({
@@ -486,11 +485,27 @@ export class PesquisasService {
     ]);
     const nomeDe = new Map(nomes.map((c) => [c.id, c.nome]));
     const perfilDe = new Map(perfis.map((x) => [x.colaboradorId, x]));
+    // Os grupos da lotação, com o código quando o nome se repete.
+    const nomeDoGrupo = await nomesDosGrupos(
+      db,
+      p.empresaId,
+      [...lotacoes.values()].flatMap((g) =>
+        [g.departamento, g.centroCusto, g.unidade].flatMap((x) =>
+          x ? [x.id] : [],
+        ),
+      ),
+    );
+    const grupoDa = (colaboradorId: string, campo: CampoGrupo) => {
+      const g = lotacoes.get(colaboradorId)?.[campo];
+      return g ? (nomeDoGrupo.get(g.id) ?? g.nome) : null;
+    };
     const participantesLista: ParticipanteDaLista[] = lista
       .map((l) => ({
         colaboradorId: l.colaboradorId,
         nome: nomeDe.get(l.colaboradorId) ?? "",
-        departamento: deps.get(l.colaboradorId)?.nome ?? null,
+        departamento: grupoDa(l.colaboradorId, "departamento"),
+        centroCusto: grupoDa(l.colaboradorId, "centroCusto"),
+        unidade: grupoDa(l.colaboradorId, "unidade"),
         respondeu: l.respondeu,
         identificavel: identificavelPeloLink(
           p.identificacao,
@@ -1256,9 +1271,12 @@ export class PesquisasService {
     // de ocultação dos resultados (mínimo e proteção do grupo menor).
     const campos =
       p.identificacao === "anonima" ? (p.separarPor as CampoGrupo[]) : [];
-    const nomes = campos.length
-      ? await this.nomesDosGruposDe(empresaId, respostas)
-      : new Map<string, string>();
+    const identificada = p.identificacao === "identificada";
+    // Identificada: o departamento com o código quando o nome se repete.
+    const nomes =
+      campos.length || identificada
+        ? await this.nomesDosGruposDe(empresaId, respostas)
+        : new Map<string, string>();
     const situacao = new Map(
       campos.map((campo) => [
         campo,
@@ -1288,7 +1306,10 @@ export class PesquisasService {
           numero: i + 1,
           colaboradorId: r.colaboradorId,
           nome: r.autor,
-          departamento: r.departamento,
+          departamento:
+            identificada && r.grupos.departamento
+              ? (nomes.get(r.grupos.departamento) ?? r.departamento)
+              : r.departamento,
           respondidaEm: r.respondidaEm.toISOString(),
           media: mediaDaResposta(secoes, valores),
           grupos: gruposDe(r),

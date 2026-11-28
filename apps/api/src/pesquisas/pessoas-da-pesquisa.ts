@@ -112,19 +112,32 @@ export async function catalogoAtivo(
   }
 }
 
-/** id → nome de grupos de qualquer catálogo da empresa. */
+/**
+ * id → nome de grupos de qualquer catálogo da empresa (resultados, análises,
+ * participantes e exportações). Nome repetido no catálogo — o ativo e os
+ * grupos pedidos, mesmo inativos — ganha o código, como na escolha de grupo
+ * da página pública: "Comercial (D02)".
+ */
 export async function nomesDosGrupos(
   db: Db,
   empresaId: string,
   ids: readonly string[],
 ): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const onde = { empresaId, id: { in: [...ids] } };
-  const select = { id: true, nome: true };
-  const [d, c, u] = await Promise.all([
-    db.departamento.findMany({ where: onde, select }),
-    db.centroCusto.findMany({ where: onde, select }),
-    db.unidadeOrganizacional.findMany({ where: onde, select }),
+  const where = {
+    empresaId,
+    OR: [{ status: "ativo" as const }, { id: { in: [...ids] } }],
+  };
+  const select = { id: true, nome: true, codigo: true };
+  const catalogos = await Promise.all([
+    db.departamento.findMany({ where, select }),
+    db.centroCusto.findMany({ where, select }),
+    db.unidadeOrganizacional.findMany({ where, select }),
   ]);
-  return new Map([...d, ...c, ...u].map((g) => [g.id, g.nome]));
+  const pedidos = new Set(ids);
+  const mapa = new Map<string, string>();
+  for (const catalogo of catalogos)
+    for (const g of distinguirNomesRepetidos(catalogo))
+      if (pedidos.has(g.id)) mapa.set(g.id, g.nome);
+  return mapa;
 }

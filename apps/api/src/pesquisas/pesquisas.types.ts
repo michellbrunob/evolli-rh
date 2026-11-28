@@ -177,6 +177,9 @@ export interface ParticipanteDaLista {
   colaboradorId: string;
   nome: string;
   departamento: string | null;
+  /** Centro de custo e unidade da lotação vigente (preenchimento por grupo). */
+  centroCusto: string | null;
+  unidade: string | null;
   respondeu: boolean | null;
   /** Tem CPF e nascimento no perfil (o link exige); anônima: sempre. */
   identificavel: boolean;
@@ -321,7 +324,10 @@ export interface AnalisesPesquisa {
     nome: string;
     publicadaEm: string;
     mediaGeral: number | null;
-    /** eNPS da pesquisa (só no modelo eNPS; `null` sem nota ou oculto). */
+    /**
+     * eNPS da pesquisa: no modelo eNPS, sempre (`null` sem nota ou oculto);
+     * nos outros, só quando há índice (pergunta de recomendação respondida).
+     */
     enps?: number | null;
   }[];
 }

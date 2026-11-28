@@ -1866,7 +1866,19 @@ describe("T216 — Pesquisas (e2e)", () => {
         nome: "Pesquisa de clima sintética",
         publicadaEm: expect.any(String),
         mediaGeral: 8,
+        // Todos deram 9 na recomendação.
+        enps: 100,
       });
+      // Os participantes trazem também o centro de custo e a unidade.
+      const det = await get(`/v1/pesquisas/${id}`, rhA).expect(200);
+      const participante = det.body.participantesLista.find(
+        (x: { colaboradorId: string }) => x.colaboradorId === grandes[0]!.id,
+      );
+      expect(participante).toMatchObject({
+        departamento: "Departamento T179 Sintetico",
+        centroCusto: "Centro T216 Sintetico",
+      });
+      expect(participante).toHaveProperty("unidade");
       await get(`/v1/pesquisas/${id}/analises`, rhA).expect(400);
       // A evolução sem recorte: a mesma lista, sem pedir o campo.
       const semRecorte = await get(`/v1/pesquisas/${id}/evolucao`, rhA).expect(
