@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { semDesativacaoVigente } from "../pessoas/colaborador/desativacao";
+import { distinguirNomesRepetidos } from "./nomes-dos-grupos";
 import type { CampoGrupo } from "./pesquisas.types";
 
 /**
@@ -85,22 +86,29 @@ export async function departamentosVigentes(
   return new Map([...lotacoes].map(([id, g]) => [id, g.departamento]));
 }
 
-/** Os itens ATIVOS de um catálogo da empresa, por nome. */
+/** Os itens ATIVOS de um catálogo da empresa, por nome (o repetido, com o código). */
 export async function catalogoAtivo(
   db: Db,
   empresaId: string,
   campo: CampoGrupo,
 ): Promise<Grupo[]> {
   const where = { empresaId, status: "ativo" as const };
-  const select = { id: true, nome: true };
-  const orderBy = { nome: "asc" as const };
+  const select = { id: true, nome: true, codigo: true };
+  const orderBy = [{ nome: "asc" as const }, { codigo: "asc" as const }];
+  // Nome repetido ganha o código, para quem escolhe diferenciar.
   switch (campo) {
     case "departamento":
-      return db.departamento.findMany({ where, select, orderBy });
+      return distinguirNomesRepetidos(
+        await db.departamento.findMany({ where, select, orderBy }),
+      );
     case "centroCusto":
-      return db.centroCusto.findMany({ where, select, orderBy });
+      return distinguirNomesRepetidos(
+        await db.centroCusto.findMany({ where, select, orderBy }),
+      );
     case "unidade":
-      return db.unidadeOrganizacional.findMany({ where, select, orderBy });
+      return distinguirNomesRepetidos(
+        await db.unidadeOrganizacional.findMany({ where, select, orderBy }),
+      );
   }
 }
 

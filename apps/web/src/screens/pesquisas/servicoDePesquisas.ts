@@ -20,6 +20,7 @@ import { listarEmpresasDoContexto } from "../../api/contextoEmpresarialClient";
 import { listarEmpresas } from "../../api/organizacaoClient";
 import * as cliente from "../../api/pesquisasClient";
 import type { CampoGrupo } from "../../api/pesquisasClient";
+import { distinguirNomesRepetidos } from "./nomesDosGrupos";
 import {
   perfilComportamental,
   type CarregarPerfil,
@@ -105,8 +106,10 @@ export async function todosOsCandidatos(
 const ativos = (query: Parameters<ServicoDePesquisas["listarAtivos"]>[0]) =>
   listarColaboradores({ ...query, grupo: "ativos" });
 
-const opcoes = (itens: readonly { id: string; nome: string }[]) =>
-  itens.map(({ id, nome }) => ({ id, nome }));
+/** Nomes repetidos ganham o código do cadastro (ex.: "Comercial (D02)"). */
+const opcoes = (
+  itens: readonly { id: string; nome: string; codigo?: string | null }[],
+) => distinguirNomesRepetidos(itens);
 
 export const servicoDePesquisasDoServidor: ServicoDePesquisas = {
   listarPesquisas: cliente.listarPesquisas,
