@@ -153,17 +153,19 @@ describe("T216 — TAD: aba Respostas e resposta individual", () => {
   it("sem o time, só o painel; outros modelos não trocam a Visão geral", () => {
     render(
       <>
-        {visaoIndividualDoModelo({
-          ...RESPOSTA_DETALHE,
-          modelo: { ...individual, time: null },
-        })}
+        {visaoIndividualDoModelo(
+          { ...RESPOSTA_DETALHE, modelo: { ...individual, time: null } },
+          DETALHE_TAD.secoes,
+        )}
       </>,
     );
     expect(screen.queryByRole("table")).toBeNull();
     expect(
       screen.getByRole("region", { name: "Score geral de motivação" }),
     ).toBeInTheDocument();
-    expect(visaoIndividualDoModelo(RESPOSTA_DETALHE)).toBeNull();
+    expect(
+      visaoIndividualDoModelo(RESPOSTA_DETALHE, DETALHE_TAD.secoes),
+    ).toBeNull();
   });
 
   it("diferença com duas casas e sinal", () => {
