@@ -223,6 +223,7 @@ describe("T216 — Clima: perguntas no assistente", () => {
 
   it("agrupadas por dimensão com 12 afirmações e as abertas com o selo Texto livre", () => {
     montar();
+    fireEvent.click(screen.getByRole("button", { name: "Expandir todas" }));
     for (const [, rotulo] of DIMS)
       expect(screen.getByRole("region", { name: rotulo })).toHaveTextContent(
         `${rotulo} · 12 afirmações`,
@@ -263,6 +264,92 @@ describe("T216 — Clima: perguntas no assistente", () => {
     );
   });
 
+  it("grupos recolhíveis: só o primeiro aberto, com a faixa das afirmações, e 'Expandir todas'", () => {
+    montar();
+    const gatilho = (nome: string) =>
+      screen.getByRole("button", { name: new RegExp(`^${nome}`) });
+    expect(gatilho("Credibilidade")).toHaveAttribute("aria-expanded", "true");
+    expect(gatilho("Respeito")).toHaveAttribute("aria-expanded", "false");
+    expect(gatilho("Credibilidade")).toHaveTextContent("Afirmações 1–12");
+    expect(gatilho("Respeito")).toHaveTextContent("Afirmações 13–24");
+    expect(gatilho("Perguntas abertas")).toHaveTextContent("Perguntas 61–62");
+    expect(
+      screen.queryByRole("button", { name: "Editar pergunta 13" }),
+    ).toBeNull();
+    fireEvent.click(gatilho("Respeito"));
+    expect(
+      screen.getByRole("button", { name: "Editar pergunta 13" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expandir todas" }));
+    expect(
+      screen.getByRole("button", { name: "Editar pergunta 62" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Recolher todas" }));
+    expect(
+      screen.queryByRole("button", { name: /Editar pergunta/ }),
+    ).toBeNull();
+  });
+
+  it("arrastar reordena dentro da dimensão; para outra dimensão, não", () => {
+    const { onMudar, secoes } = montar();
+    fireEvent.click(screen.getByRole("button", { name: "Expandir todas" }));
+    const ids = perguntasEmOrdem(secoes).map((p) => p.id);
+    const linha = (n: number) =>
+      screen
+        .getByRole("button", { name: `Arrastar pergunta ${n}` })
+        .closest("li")!;
+    expect(linha(3)).toHaveAttribute("draggable", "true");
+    fireEvent.dragStart(linha(3));
+    fireEvent.dragOver(linha(1));
+    fireEvent.drop(linha(1));
+    const ordem = perguntasEmOrdem(onMudar.mock.calls[0]![0]).map((p) => p.id);
+    expect(ordem.slice(0, 3)).toEqual([ids[2], ids[0], ids[1]]);
+    // Para a dimensão vizinha, nada muda.
+    fireEvent.dragStart(linha(12));
+    fireEvent.drop(linha(13));
+    expect(onMudar).toHaveBeenCalledTimes(1);
+  });
+
+  it("pelo teclado: a alça sobe e desce dentro da dimensão, sem sair dela", () => {
+    const { onMudar, secoes } = montar();
+    const ids = perguntasEmOrdem(secoes).map((p) => p.id);
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Arrastar pergunta 2" }),
+      { key: "ArrowUp" },
+    );
+    expect(
+      perguntasEmOrdem(onMudar.mock.calls[0]![0])
+        .slice(0, 2)
+        .map((p) => p.id),
+    ).toEqual([ids[1], ids[0]]);
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Arrastar pergunta 1" }),
+      { key: "ArrowDown" },
+    );
+    expect(
+      perguntasEmOrdem(onMudar.mock.calls[1]![0])
+        .slice(0, 2)
+        .map((p) => p.id),
+    ).toEqual([ids[1], ids[0]]);
+    // A 1ª não sobe e a 12ª não desce para a dimensão seguinte.
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Arrastar pergunta 1" }),
+      { key: "ArrowUp" },
+    );
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Arrastar pergunta 12" }),
+      { key: "ArrowDown" },
+    );
+    expect(onMudar).toHaveBeenCalledTimes(2);
+  });
+
+  it("travado: sem a alça de arrastar", () => {
+    montar(true);
+    expect(
+      screen.queryByRole("button", { name: /Arrastar pergunta/ }),
+    ).toBeNull();
+  });
+
   it("dimensão sem afirmações volta como seção nova antes das abertas", () => {
     const secoes = estadoDoModelo("clima").secoes.filter(
       (s) => s.titulo !== "Respeito",
@@ -287,6 +374,7 @@ describe("T216 — Clima: perguntas no assistente", () => {
     expect(perguntasEmOrdem(onMudar.mock.calls[0]![0])[0]!.texto).toBe(
       "Texto novo",
     );
+    fireEvent.click(screen.getByRole("button", { name: "Expandir todas" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Remover pergunta 62" }),
     );
@@ -320,6 +408,7 @@ describe("T216 — Clima: perguntas no assistente", () => {
         <PerguntasDoClima secoes={secoes} travado={false} onMudar={vi.fn()} />
       </GarantirAvisos>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Expandir todas" }));
     expect(
       screen.getByRole("button", { name: "Remover pergunta 1" }),
     ).toBeDisabled();

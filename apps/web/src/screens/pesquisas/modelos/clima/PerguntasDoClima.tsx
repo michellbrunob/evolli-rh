@@ -3,8 +3,11 @@
  * dimensão ("Credibilidade · 12 afirmações") e, por último, as perguntas
  * abertas (selo "Texto livre"). Cada linha pode ser editada (até 300
  * caracteres) ou removida; "Adicionar pergunta" pede o texto e a dimensão
- * (ou "Texto livre"). Com respostas, nada muda. Sempre fica ao menos uma
- * afirmação (o índice precisa dela).
+ * (ou "Texto livre"). Os grupos são recolhíveis (só o primeiro aberto,
+ * com a faixa das afirmações e "Expandir todas"); a alça "Arrastar pergunta
+ * N" reordena dentro da dimensão (arrastando ou pelas setas do teclado).
+ * Com respostas, nada muda. Sempre fica ao menos uma afirmação (o índice
+ * precisa dela).
  */
 import { useId, useState } from "react";
 import type { Pergunta, Secao } from "../../../../api/pesquisasClient";
@@ -12,6 +15,8 @@ import { Button } from "../../../../components";
 import { plural } from "../../../../format/plural";
 import { IconButton } from "../../../../ui";
 import {
+  IconeAbrir,
+  IconeArrastar,
   IconeEditar,
   IconeFechar,
   IconeMais,
@@ -20,7 +25,7 @@ import {
 } from "../../../../ui/icones";
 import { useAvisar } from "../../avisos";
 import { CartaoDeSecao } from "../../componentes";
-import { excluirPergunta } from "../../estadoDaPesquisa";
+import { excluirPergunta, levarPerguntaPara } from "../../estadoDaPesquisa";
 import { LIMITES, novoId } from "../../textosDasPesquisas";
 import { textoParaOPainel } from "../empresa";
 import {
@@ -30,12 +35,17 @@ import {
   chaveNova,
   dimensaoDaChave,
 } from "./catalogo";
+import "../PerguntasFixas.css";
 import "./Clima.css";
 
 const TEXTO_LIVRE = "texto_livre";
 
 const ehAberta = (p: Pergunta) =>
   p.tipo === "paragrafo" && Boolean(p.chave?.startsWith(PREFIXO_DAS_ABERTAS));
+
+/** O grupo da pergunta no assistente: a dimensão ou o texto livre. */
+const grupoDaPergunta = (p: Pergunta) =>
+  ehAberta(p) ? TEXTO_LIVRE : dimensaoDaChave(p.chave);
 
 /** "60 afirmações · 2 abertas" (resumo da etapa Enviar). */
 export function resumoDasPerguntasDoClima(
@@ -111,6 +121,10 @@ export function PerguntasDoClima({
     id: string;
     texto: string;
   } | null>(null);
+  const [abertos, setAbertos] = useState<ReadonlySet<string>>(
+    () => new Set([DIMENSOES_CLIMA[0].chave]),
+  );
+  const [arrastando, setArrastando] = useState<string | null>(null);
   const todas = secoes.flatMap((s) => s.perguntas);
   const numero = new Map(todas.map((p, i) => [p.id, i + 1]));
   const afirmacoes = todas.filter((p) => p.tipo === "concordancia");
@@ -121,6 +135,7 @@ export function PerguntasDoClima({
       cor: d.cor as string,
       perguntas: todas.filter((p) => dimensaoDaChave(p.chave) === d.chave),
       contagem: (n: number) => plural(n, "afirmação", "afirmações"),
+      faixa: ["Afirmação", "Afirmações"] as const,
     })),
     {
       chave: TEXTO_LIVRE,
@@ -128,8 +143,47 @@ export function PerguntasDoClima({
       cor: "--modelo-cinza",
       perguntas: todas.filter(ehAberta),
       contagem: (n: number) => plural(n, "pergunta", "perguntas"),
+      faixa: ["Pergunta", "Perguntas"] as const,
     },
   ];
+  const todosAbertos = grupos.every((g) => abertos.has(g.chave));
+  /** "Afirmações 13–24" (ou "Afirmação 5" com uma só). */
+  const faixaDo = (g: (typeof grupos)[number]) => {
+    const n = g.perguntas.map((p) => numero.get(p.id) ?? 0);
+    if (n.length === 0) return "";
+    return n.length === 1
+      ? `${g.faixa[0]} ${n[0]}`
+      : `${g.faixa[1]} ${n[0]}–${n.at(-1)}`;
+  };
+  const alternar = (chave: string) =>
+    setAbertos((a) => {
+      const n = new Set(a);
+      if (n.has(chave)) n.delete(chave);
+      else n.add(chave);
+      return n;
+    });
+
+  /** Leva a pergunta para o lugar da outra, só dentro do mesmo grupo. */
+  function levar(perguntaId: string, destinoId: string) {
+    const de = todas.find((p) => p.id === perguntaId);
+    const para = todas.find((p) => p.id === destinoId);
+    if (!de || !para || perguntaId === destinoId) return;
+    if (grupoDaPergunta(de) !== grupoDaPergunta(para)) return;
+    onMudar(levarPerguntaPara(secoes, perguntaId, destinoId));
+  }
+
+  /** Setas do teclado na alça: sobe ou desce uma posição na dimensão. */
+  function moverPelaSeta(p: Pergunta, passo: -1 | 1) {
+    const doGrupo = todas.filter(
+      (x) => grupoDaPergunta(x) === grupoDaPergunta(p),
+    );
+    const i = doGrupo.findIndex((x) => x.id === p.id);
+    const vizinha = doGrupo[i + passo];
+    if (!vizinha) return;
+    // Subir: vai para antes da anterior; descer: a seguinte vem para antes.
+    if (passo < 0) levar(p.id, vizinha.id);
+    else levar(vizinha.id, p.id);
+  }
   const noLimite = todas.length >= LIMITES.perguntas;
 
   function salvarEdicao() {
@@ -151,6 +205,8 @@ export function PerguntasDoClima({
     onMudar(
       acrescentarNoClima(secoes, destino === TEXTO_LIVRE ? null : destino, t),
     );
+    // O grupo que recebeu a pergunta fica aberto.
+    setAbertos((a) => new Set([...a, destino]));
     setTexto("");
     setAdicionando(false);
   }
@@ -238,113 +294,197 @@ export function PerguntasDoClima({
           </div>
         </div>
       ) : null}
+      <div className="fixas__cabeca">
+        <span className="pesquisas__suave">Agrupadas por dimensão</span>
+        <button
+          type="button"
+          className="pesquisas__acao-texto pesquisas__acao-texto--primaria"
+          onClick={() =>
+            setAbertos(
+              todosAbertos ? new Set() : new Set(grupos.map((g) => g.chave)),
+            )
+          }
+        >
+          {todosAbertos ? "Recolher todas" : "Expandir todas"}
+        </button>
+      </div>
       <ul className="fixas__grupos">
-        {grupos.map((g) => (
-          <li key={g.chave} className="fixas__grupo">
-            <section aria-label={g.titulo}>
-              <h3 className="fixas__gatilho">
-                <span
-                  className="galeria__bolinha"
-                  style={{ background: `var(${g.cor})` }}
-                  aria-hidden="true"
-                />
-                <strong>{g.titulo}</strong>
-                <span className="pesquisas__suave">
-                  {` · ${g.contagem(g.perguntas.length)}`}
-                </span>
-              </h3>
-              <ol className="fixas__perguntas">
-                {g.perguntas.map((p) => {
-                  const n = numero.get(p.id) ?? 0;
-                  const ultimaAfirmacao =
-                    p.tipo === "concordancia" && afirmacoes.length <= 1;
-                  return (
-                    <li key={p.id}>
-                      <span
-                        className="pesquisas__numero-pergunta"
-                        aria-hidden="true"
-                      >
-                        {String(n).padStart(2, "0")}
+        {grupos.map((g) => {
+          const aberto = abertos.has(g.chave);
+          const idCorpo = `${ids}-grupo-${g.chave}`;
+          return (
+            <li key={g.chave} className="fixas__grupo">
+              <section aria-label={g.titulo}>
+                <h3 className="clima-perguntas__grupo-titulo">
+                  <button
+                    type="button"
+                    className="fixas__gatilho"
+                    aria-expanded={aberto}
+                    aria-controls={idCorpo}
+                    onClick={() => alternar(g.chave)}
+                  >
+                    <span
+                      className="galeria__bolinha"
+                      style={{ background: `var(${g.cor})` }}
+                      aria-hidden="true"
+                    />
+                    <strong>{g.titulo}</strong>
+                    <span className="pesquisas__suave">
+                      {` · ${g.contagem(g.perguntas.length)}`}
+                    </span>
+                    {g.perguntas.length > 0 ? (
+                      <span className="pesquisas__suave clima-perguntas__faixa">
+                        {faixaDo(g)}
                       </span>
-                      {editando?.id === p.id ? (
-                        <span className="pesquisas__caixa-inline pesquisas__caixa-inline--linha">
-                          <input
-                            className="pesquisas__campo"
-                            aria-label={`Texto da pergunta ${n}`}
-                            maxLength={LIMITES.textoPergunta}
-                            value={editando.texto}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                salvarEdicao();
-                              } else if (e.key === "Escape") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setEditando(null);
-                              }
-                            }}
-                            onChange={(e) =>
-                              setEditando({ id: p.id, texto: e.target.value })
-                            }
-                          />
-                          <span className="pesquisas__suave">{`${editando.texto.length}/${LIMITES.textoPergunta}`}</span>
-                          <IconButton
-                            label="Salvar a pergunta"
-                            icon={<IconeVisto tamanho={14} />}
-                            variant="subtle"
-                            disabled={!editando.texto.trim()}
-                            onClick={salvarEdicao}
-                          />
-                          <IconButton
-                            label="Cancelar a edição"
-                            icon={<IconeFechar tamanho={14} />}
-                            variant="subtle"
-                            onClick={() => setEditando(null)}
-                          />
-                        </span>
-                      ) : (
-                        <span className="fixas__texto">
-                          {textoParaOPainel(p.texto) || "Pergunta sem texto"}
-                        </span>
-                      )}
-                      <span className="pesquisas__selo">
-                        {p.tipo === "concordancia" ? "1–5" : "Texto livre"}
-                      </span>
-                      {travado || editando?.id === p.id ? null : (
-                        <span className="pesquisas__linha-acoes">
-                          <IconButton
-                            label={`Editar pergunta ${n}`}
-                            icon={<IconeEditar tamanho={14} />}
-                            variant="subtle"
-                            onClick={() =>
-                              setEditando({ id: p.id, texto: p.texto })
-                            }
-                          />
-                          <IconButton
-                            label={`Remover pergunta ${n}`}
-                            icon={<IconeRemover tamanho={14} />}
-                            variant="subtle"
-                            disabled={ultimaAfirmacao}
-                            onClick={() => {
-                              const antes = [...secoes];
-                              onMudar(excluirPergunta(secoes, p.id));
-                              avisar("Pergunta removida.", {
-                                acao: {
-                                  rotulo: "Desfazer",
-                                  onClick: () => onMudar(antes),
-                                },
-                              });
-                            }}
-                          />
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          </li>
-        ))}
+                    ) : null}
+                    <IconeAbrir
+                      tamanho={16}
+                      className={
+                        aberto
+                          ? "fixas__seta fixas__seta--aberta"
+                          : "fixas__seta"
+                      }
+                    />
+                  </button>
+                </h3>
+                {aberto ? (
+                  <ol id={idCorpo} className="fixas__perguntas">
+                    {g.perguntas.map((p) => {
+                      const n = numero.get(p.id) ?? 0;
+                      const ultimaAfirmacao =
+                        p.tipo === "concordancia" && afirmacoes.length <= 1;
+                      return (
+                        <li
+                          key={p.id}
+                          draggable={!travado}
+                          {...(arrastando === p.id
+                            ? { "data-arrastando": "" }
+                            : {})}
+                          onDragStart={(e) => {
+                            setArrastando(p.id);
+                            e.dataTransfer?.setData("text/plain", p.id);
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (arrastando) levar(arrastando, p.id);
+                            setArrastando(null);
+                          }}
+                          onDragEnd={() => setArrastando(null)}
+                        >
+                          {travado ? null : (
+                            <button
+                              type="button"
+                              className="pesquisas__pegador clima-perguntas__alca"
+                              aria-label={`Arrastar pergunta ${n}`}
+                              title="Arraste ou use as setas para mudar a ordem na dimensão"
+                              onKeyDown={(e) => {
+                                if (
+                                  e.key === "ArrowUp" ||
+                                  e.key === "ArrowDown"
+                                ) {
+                                  e.preventDefault();
+                                  moverPelaSeta(
+                                    p,
+                                    e.key === "ArrowUp" ? -1 : 1,
+                                  );
+                                }
+                              }}
+                            >
+                              <IconeArrastar tamanho={14} />
+                            </button>
+                          )}
+                          <span
+                            className="pesquisas__numero-pergunta"
+                            aria-hidden="true"
+                          >
+                            {String(n).padStart(2, "0")}
+                          </span>
+                          {editando?.id === p.id ? (
+                            <span className="pesquisas__caixa-inline pesquisas__caixa-inline--linha">
+                              <input
+                                className="pesquisas__campo"
+                                aria-label={`Texto da pergunta ${n}`}
+                                maxLength={LIMITES.textoPergunta}
+                                value={editando.texto}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    salvarEdicao();
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setEditando(null);
+                                  }
+                                }}
+                                onChange={(e) =>
+                                  setEditando({
+                                    id: p.id,
+                                    texto: e.target.value,
+                                  })
+                                }
+                              />
+                              <span className="pesquisas__suave">{`${editando.texto.length}/${LIMITES.textoPergunta}`}</span>
+                              <IconButton
+                                label="Salvar a pergunta"
+                                icon={<IconeVisto tamanho={14} />}
+                                variant="subtle"
+                                disabled={!editando.texto.trim()}
+                                onClick={salvarEdicao}
+                              />
+                              <IconButton
+                                label="Cancelar a edição"
+                                icon={<IconeFechar tamanho={14} />}
+                                variant="subtle"
+                                onClick={() => setEditando(null)}
+                              />
+                            </span>
+                          ) : (
+                            <span className="fixas__texto">
+                              {textoParaOPainel(p.texto) ||
+                                "Pergunta sem texto"}
+                            </span>
+                          )}
+                          <span className="pesquisas__selo">
+                            {p.tipo === "concordancia" ? "1–5" : "Texto livre"}
+                          </span>
+                          {travado || editando?.id === p.id ? null : (
+                            <span className="pesquisas__linha-acoes">
+                              <IconButton
+                                label={`Editar pergunta ${n}`}
+                                icon={<IconeEditar tamanho={14} />}
+                                variant="subtle"
+                                onClick={() =>
+                                  setEditando({ id: p.id, texto: p.texto })
+                                }
+                              />
+                              <IconButton
+                                label={`Remover pergunta ${n}`}
+                                icon={<IconeRemover tamanho={14} />}
+                                variant="subtle"
+                                disabled={ultimaAfirmacao}
+                                onClick={() => {
+                                  const antes = [...secoes];
+                                  onMudar(excluirPergunta(secoes, p.id));
+                                  avisar("Pergunta removida.", {
+                                    acao: {
+                                      rotulo: "Desfazer",
+                                      onClick: () => onMudar(antes),
+                                    },
+                                  });
+                                }}
+                              />
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                ) : null}
+              </section>
+            </li>
+          );
+        })}
       </ul>
     </CartaoDeSecao>
   );

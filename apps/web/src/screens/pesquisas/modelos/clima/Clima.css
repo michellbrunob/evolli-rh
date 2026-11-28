@@ -240,3 +240,25 @@
   align-items: center;
   gap: var(--space-xs);
 }
+
+/* Assistente: grupos recolhíveis e a alça de arrastar. */
+.clima-perguntas__grupo-titulo {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.clima-perguntas__faixa {
+  margin-left: auto;
+}
+
+.clima-perguntas__alca {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: grab;
+}
+
+.fixas__perguntas li[data-arrastando] {
+  opacity: 0.5;
+}

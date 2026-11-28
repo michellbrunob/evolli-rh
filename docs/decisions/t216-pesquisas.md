@@ -1526,3 +1526,6 @@ Regras:
   dimensão nas perguntas. **Assistentes** (modelo e personalizada): `maxLength` 120 no nome e 1000 na
   descrição/boas-vindas, os limites que a API já confere (`LIMITE_NOME`, `LIMITE_BOAS_VINDAS`, 422
   `limite`).
+- **Assistente do Clima:** grupos por dimensão recolhíveis (só o primeiro aberto; o cabeçalho mostra
+  "Afirmações 13–24"; "Expandir todas"/"Recolher todas"; o grupo que recebe uma pergunta nova abre) e a
+  alça "Arrastar pergunta N" reordena só dentro da mesma dimensão (arrastar ou setas ↑/↓).
