@@ -12,7 +12,9 @@ import { EVIDENCIAS_POR_ETAPA, type FormatoDaEvidencia } from "./evidencias";
  *
  * - Etapa 1 (mapear) conclui sozinha: anônima com a 1ª resposta; as demais
  *   quando todos os convidados responderam.
- * - Etapa 2 (plano) conclui sozinha com a 1ª medida no plano.
+ * - Etapa 2 (plano) conclui sozinha quando há resultado (1ª resposta): a
+ *   biblioteca de medidas sugeridas é fixa, então o plano sugerido existe
+ *   desde então; as medidas que o RH registra não mudam a etapa.
  * - Etapas 3 a 7: a empresa marca os itens, descreve as evidências, anexa
  *   os arquivos (`evidencias.ts`) e conclui (exige um item marcado, a
  *   descrição ou um arquivo). O PUT nunca mexe nos arquivos.
@@ -464,7 +466,7 @@ export function detalharAcompanhamento(
       e.id === "mapear"
         ? mapeado
         : e.id === "plano"
-          ? a.plano.length > 0
+          ? contexto.respostas > 0
           : e.concluidaEm !== null;
     return {
       ...e,

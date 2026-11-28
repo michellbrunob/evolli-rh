@@ -173,8 +173,10 @@ describe("detalharAcompanhamento", () => {
       publicadaEm,
     });
     expect(anon.etapas[0]!.concluida).toBe(true);
-    expect(anon.concluidas).toBe(1);
-    expect(anon.proxima).toBe("plano");
+    // O plano sugerido (biblioteca fixa) existe assim que há resultado.
+    expect(anon.etapas[1]!.concluida).toBe(true);
+    expect(anon.concluidas).toBe(2);
+    expect(anon.proxima).toBe("comunicar");
     expect(anon.revisarEm).toBe("2027-11");
     const parcial = detalharAcompanhamento(vazio, {
       anonima: false,
@@ -183,6 +185,9 @@ describe("detalharAcompanhamento", () => {
       publicadaEm: null,
     });
     expect(parcial.etapas[0]!.concluida).toBe(false);
+    // Identificada com parte das respostas: já há resultado, logo o plano.
+    expect(parcial.etapas[1]!.concluida).toBe(true);
+    expect(parcial.concluidas).toBe(1);
     expect(parcial.proxima).toBe("mapear");
     expect(parcial.revisarEm).toBeNull();
     const todos = detalharAcompanhamento(vazio, {
@@ -199,9 +204,11 @@ describe("detalharAcompanhamento", () => {
       publicadaEm,
     });
     expect(nenhum.etapas[0]!.concluida).toBe(false);
+    expect(nenhum.etapas[1]!.concluida).toBe(false);
+    expect(nenhum.concluidas).toBe(0);
   });
 
-  it("plano conclui com a 1ª medida; manuais pela data de conclusão", () => {
+  it("plano: sem resposta não conclui, nem com medida; manuais pela data de conclusão", () => {
     const a = lerAcompanhamento({
       ...acompanhamentoVazio(),
       plano: [medida],
@@ -223,7 +230,7 @@ describe("detalharAcompanhamento", () => {
     });
     expect(d.etapas.map((e) => e.concluida)).toEqual([
       false,
-      true,
+      false,
       true,
       false,
       false,
@@ -232,7 +239,17 @@ describe("detalharAcompanhamento", () => {
     ]);
     expect(d.etapas[1]!.automatica).toBe(true);
     expect(d.etapas[2]!.automatica).toBe(false);
-    expect(d.concluidas).toBe(2);
+    expect(d.concluidas).toBe(1);
+    expect(d.proxima).toBe("mapear");
+    // Com a 1ª resposta, as duas automáticas concluem (com ou sem medida).
+    const comResposta = detalharAcompanhamento(a, {
+      anonima: true,
+      respostas: 1,
+      participantes: 0,
+      publicadaEm,
+    });
+    expect(comResposta.concluidas).toBe(3);
+    expect(comResposta.proxima).toBe("validar");
   });
 
   it("lê o que estiver gravado, mesmo vazio ou antigo", () => {

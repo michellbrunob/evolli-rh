@@ -2839,13 +2839,14 @@ describe("T216 — Pesquisas (e2e)", () => {
         comparacao: "abaixo",
       });
 
-      // Acompanhamento: a 1ª etapa conclui com a 1ª resposta (anônima).
+      // Acompanhamento: com a 1ª resposta (anônima) concluem a 1ª etapa e
+      // a 2ª (o plano sugerido existe assim que há resultado).
       const a0 = await get(
         `/v1/pesquisas/${id}/modelo/acompanhamento`,
         rhA,
       ).expect(200);
       expect(a0.body.etapas).toHaveLength(7);
-      expect(a0.body).toMatchObject({ concluidas: 1, proxima: "plano" });
+      expect(a0.body).toMatchObject({ concluidas: 2, proxima: "comunicar" });
       expect(a0.body.revisarEm).toMatch(/^\d{4}-\d{2}$/);
       const etapas = (concluir: boolean, marcar: boolean) => [
         {
