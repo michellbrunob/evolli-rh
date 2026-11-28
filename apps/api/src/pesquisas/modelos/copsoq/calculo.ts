@@ -4,8 +4,10 @@ import type { ContextoDoModelo, RespostaDoModelo } from "../tipos";
 import {
   DIMENSOES_NR1,
   DOMINIOS_NR1,
+  ITEM_DA_SAUDE,
   ITENS_NR1,
   ITENS_OFENSIVOS,
+  ROTULOS_DA_SAUDE_LEGADA,
   dimensaoNr1,
   type DominioNr1,
   type ItemNr1,
@@ -15,8 +17,9 @@ import {
 /**
  * T216 — cálculo dos riscos psicossociais (NR-1). Funções puras.
  *
- * - Pontuação do item: a posição marcada (1 a 5); invertidos e a escala de
- *   saúde valem `6 − posição`.
+ * - Pontuação do item: o valor marcado (1 a 5); invertidos valem
+ *   `6 − valor`. Saúde: 5 = "Excelente"; nas pesquisas gravadas antes da
+ *   troca (1 = "Excelente", sem `decrescente`), também `6 − valor`.
  * - Escore da dimensão por pessoa: a média dos itens respondidos (1 a 5).
  * - Faixa da pessoa por tercil do escore: ≤ 2,33 → T1; ≤ 3,66 → T2; acima →
  *   T3. Risco: T1 favorável, T2 intermediário, T3 risco. Proteção: o
@@ -88,12 +91,32 @@ const uma = (n: number) => Math.round(n * 10) / 10 || 0;
 const media = (xs: readonly number[]): number | null =>
   xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 
-/** A pontuação (1 a 5) de um item, ou `null` sem resposta válida. */
-export function pontuacaoDoItem(item: ItemNr1, bruto: unknown): number | null {
+/**
+ * A pontuação (1 a 5) de um item, ou `null` sem resposta válida.
+ * `saudeLegada`: a pesquisa gravou a saúde com 1 = "Excelente".
+ */
+export function pontuacaoDoItem(
+  item: ItemNr1,
+  bruto: unknown,
+  saudeLegada = false,
+): number | null {
   if (!Number.isInteger(bruto)) return null;
   const v = bruto as number;
   if (v < 1 || v > 5) return null;
-  return item.invertido || item.escala === "saude" ? 6 - v : v;
+  return item.invertido || (saudeLegada && item.escala === "saude") ? 6 - v : v;
+}
+
+/**
+ * A pesquisa foi gravada com a saúde antiga? Lá o 1º ponto do Q64 era
+ * "Excelente" (1 = Excelente); na nova, o 1º é "Fraca" (5 = Excelente).
+ * Sem o item, vale a regra nova.
+ */
+export function saudeLegadaDe(secoes: readonly Secao[]): boolean {
+  for (const s of secoes) {
+    const p = s.perguntas.find((x) => x.chave === ITEM_DA_SAUDE);
+    if (p) return p.config.rotulos?.[0]?.trim() === ROTULOS_DA_SAUDE_LEGADA[0];
+  }
+  return false;
 }
 
 /** O mapa pergunta → valor de uma resposta. */
@@ -106,10 +129,11 @@ export function valoresDe(
 /** O escore de cada dimensão da pessoa (média dos itens respondidos). */
 export function escoresDaPessoa(
   valores: ReadonlyMap<string, unknown>,
+  saudeLegada = false,
 ): Map<string, number> {
   const somas = new Map<string, number[]>();
   for (const item of ITENS_NR1) {
-    const p = pontuacaoDoItem(item, valores.get(item.id));
+    const p = pontuacaoDoItem(item, valores.get(item.id), saudeLegada);
     if (p === null) continue;
     const lista = somas.get(item.dimensao) ?? [];
     lista.push(p);
@@ -254,6 +278,8 @@ export interface ResultadoNr1 {
 export interface OpcoesNr1 {
   /** Contagens abaixo deste mínimo somem (anônima e confidencial). */
   readonly sigilo: number | null;
+  /** A saúde gravada com 1 = "Excelente" (pesquisas antigas). */
+  readonly saudeLegada?: boolean;
 }
 
 function sigiloso(n: number, sigilo: number | null): ContagemSigilosa {
@@ -364,6 +390,27 @@ export function montarMatriz(
   return matriz;
 }
 
+/**
+ * As frequências de um tipo com o sigilo por célula e o complementar: se só
+ * UMA ficar oculta e o total do tipo aparecer, ela sairia por subtração —
+ * então a menor contagem positiva visível também some.
+ */
+export function frequenciasProtegidas(
+  brutas: readonly number[],
+  totalVisivel: boolean,
+  sigilo: number | null,
+): ContagemSigilosa[] {
+  const celulas = brutas.map((n) => sigiloso(n, sigilo));
+  const ocultas = celulas.filter((c) => c === null).length;
+  if (sigilo === null || !totalVisivel || ocultas !== 1) return celulas;
+  let menor = -1;
+  celulas.forEach((c, i) => {
+    if (c !== null && c > 0 && (menor < 0 || c < celulas[menor]!)) menor = i;
+  });
+  if (menor >= 0) celulas[menor] = null;
+  return celulas;
+}
+
 /** Comportamentos ofensivos: as respostas de cada pessoa (1 a 5). */
 function montarOfensivos(
   respostas: readonly ReadonlyMap<string, unknown>[],
@@ -392,13 +439,23 @@ function montarOfensivos(
     tipos: ITENS_OFENSIVOS.map((id, i) => {
       const vs = comResposta.map((x) => x[i]).filter((v) => v !== null);
       const conta = (f: (v: number) => boolean) =>
-        sigiloso(vs.filter((v) => f(v!)).length, sigilo);
+        vs.filter((v) => f(v!)).length;
+      const relataramDoTipo = sigiloso(
+        conta((v) => v >= 2),
+        sigilo,
+      );
+      const [raramente, asVezes, frequentementeOuSempre] =
+        frequenciasProtegidas(
+          [conta((v) => v === 2), conta((v) => v === 3), conta((v) => v >= 4)],
+          relataramDoTipo !== null,
+          sigilo,
+        );
       return {
         id,
-        raramente: conta((v) => v === 2),
-        asVezes: conta((v) => v === 3),
-        frequentementeOuSempre: conta((v) => v >= 4),
-        relataram: conta((v) => v >= 2),
+        raramente: raramente!,
+        asVezes: asVezes!,
+        frequentementeOuSempre: frequentementeOuSempre!,
+        relataram: relataramDoTipo,
       };
     }),
   };
@@ -410,7 +467,9 @@ export function calcularNr1(
   opcoes: OpcoesNr1 = { sigilo: null },
 ): ResultadoNr1 {
   const mapas = respostas.map((r) => valoresDe(r.valores));
-  const escores = mapas.map(escoresDaPessoa);
+  const escores = mapas.map((m) =>
+    escoresDaPessoa(m, opcoes.saudeLegada === true),
+  );
   const dimensoes = DIMENSOES_NR1.map((x) => dimensaoDoGrupo(x.id, escores));
   const niveis = contarNiveis(dimensoes);
   const porId = new Map(dimensoes.map((x) => [x.id, x]));
@@ -492,9 +551,10 @@ const PREVALENCIA_DA_FAIXA: Readonly<Record<FaixaNr1, Grau>> = {
 export function individualNr1(
   valores: readonly ValorRespondido[],
   time: ResultadoNr1 | null,
+  saudeLegada = false,
 ): IndividualNr1 {
   const mapa = valoresDe(valores);
-  const escores = escoresDaPessoa(mapa);
+  const escores = escoresDaPessoa(mapa, saudeLegada);
   const doTime = new Map(time?.dimensoes.map((x) => [x.id, x.escore]) ?? []);
   const dimensoes: DimensaoIndividual[] = DIMENSOES_NR1.map((dim) => {
     const escore = escores.get(dim.id);
@@ -573,7 +633,7 @@ export function calcularNr1DoModelo(
 ): ResultadoNr1DoModelo {
   const r = calcularNr1(
     respostas.map((x) => ({ valores: respostaPorChave(secoes, x.valores) })),
-    { sigilo: contexto?.sigilo ?? null },
+    { sigilo: contexto?.sigilo ?? null, saudeLegada: saudeLegadaDe(secoes) },
   );
   return { modelo: "copsoq", ...r, ...pressaoERecursos(r) };
 }
@@ -584,15 +644,17 @@ export function individualNr1DoModelo(
   valores: ReadonlyMap<string, unknown>,
   respostas?: readonly RespostaDoModelo[],
 ): IndividualNr1DoModelo {
+  const saudeLegada = saudeLegadaDe(secoes);
   const time = respostas
     ? calcularNr1(
         respostas.map((x) => ({
           valores: respostaPorChave(secoes, x.valores),
         })),
+        { sigilo: null, saudeLegada },
       )
     : null;
   return {
     modelo: "copsoq",
-    ...individualNr1(respostaPorChave(secoes, valores), time),
+    ...individualNr1(respostaPorChave(secoes, valores), time, saudeLegada),
   };
 }

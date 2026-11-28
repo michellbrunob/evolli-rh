@@ -292,6 +292,35 @@ describe("T216 — rótulo curto da pergunta", () => {
     ]);
   });
 
+  it("escala com rótulos: guarda a exibição do maior para o menor", () => {
+    const conf = (extra: Record<string, unknown>) =>
+      conferirSecoes([
+        secao("s1", [
+          pergunta("e7", {
+            tipo: "escala",
+            config: {
+              minimo: 1,
+              maximo: 3,
+              rotulos: ["Ruim", "Boa", "Ótima"],
+              ...extra,
+            },
+          }),
+        ]),
+      ]);
+    const r = conf({ decrescente: true });
+    expect(r.erros).toEqual([]);
+    expect(r.secoes[0]!.perguntas[0]!.config.decrescente).toBe(true);
+    expect(
+      conf({ decrescente: false }).secoes[0]!.perguntas[0]!.config,
+    ).not.toHaveProperty("decrescente");
+    expect(conf({}).secoes[0]!.perguntas[0]!.config).not.toHaveProperty(
+      "decrescente",
+    );
+    expect(conf({ decrescente: "sim" }).erros).toEqual([
+      { campo: "e7", motivo: "invalido" },
+    ]);
+  });
+
   it("escala: sem rótulos por ponto, a configuração fica como antes", () => {
     const r = conferirSecoes([
       secao("s1", [pergunta("e5", { tipo: "escala", config: { maximo: 5 } })]),

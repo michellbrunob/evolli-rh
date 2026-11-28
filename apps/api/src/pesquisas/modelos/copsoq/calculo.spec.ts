@@ -1,5 +1,6 @@
 import {
   calcularNr1,
+  calcularNr1DoModelo,
   compararEscore,
   escoresDaPessoa,
   faixaDoEscore,
@@ -10,6 +11,7 @@ import {
   pontuacaoDoItem,
   prevalenciaDo,
   pressaoERecursos,
+  saudeLegadaDe,
   severidadeDo,
   tercilDo,
   valoresDe,
@@ -20,8 +22,9 @@ import {
   ESTRUTURA_NR1,
   ITENS_NR1,
   ROTULOS_DA_ESCALA,
+  ROTULOS_DA_SAUDE_LEGADA,
 } from "./definicao";
-import type { ValorRespondido } from "../../pesquisas.types";
+import type { Secao, ValorRespondido } from "../../pesquisas.types";
 
 /** T216 — riscos psicossociais (NR-1): estrutura e cálculo. */
 
@@ -98,15 +101,27 @@ describe("estrutura NR-1", () => {
     expect(q64.chave).toBe("Q64");
     expect(q64.tipo).toBe("escala");
     expect(q64.obrigatoria).toBe(true);
+    // Do pior ao melhor: a posição 5 é "Excelente" (exibida de 5 a 1).
     const rotulos = [...ROTULOS_DA_ESCALA.saude];
     expect(rotulos).toEqual([
-      "Excelente",
-      "Muito boa",
-      "Boa",
-      "Regular",
       "Fraca",
+      "Regular",
+      "Boa",
+      "Muito boa",
+      "Excelente",
     ]);
-    expect(q64.config!({ minimo: 1, maximo: 5, rotulos })).toBe(true);
+    expect(
+      q64.config!({ minimo: 1, maximo: 5, rotulos, decrescente: true }),
+    ).toBe(true);
+    // As pesquisas já gravadas (1 = Excelente) continuam aceitas.
+    expect(
+      q64.config!({
+        minimo: 1,
+        maximo: 5,
+        rotulos: [...ROTULOS_DA_SAUDE_LEGADA],
+      }),
+    ).toBe(true);
+    expect(ROTULOS_DA_SAUDE_LEGADA[0]).toBe("Excelente");
     expect(
       q64.config!({ minimo: 1, maximo: 5, rotulos: rotulos.slice(1) }),
     ).toBe(false);
@@ -131,7 +146,13 @@ describe("pontuação, tercis, severidade e prevalência", () => {
     expect(pontuacaoDoItem(item("Q1"), 4)).toBe(4);
     expect(pontuacaoDoItem(item("Q53"), 5)).toBe(1);
     expect(pontuacaoDoItem(item("Q54"), 2)).toBe(4);
-    expect(pontuacaoDoItem(item("Q64"), 1)).toBe(5);
+    // Saúde: 5 = Excelente vale 5; nas pesquisas já gravadas, espelhada.
+    expect(pontuacaoDoItem(item("Q64"), 5)).toBe(5);
+    expect(pontuacaoDoItem(item("Q64"), 2)).toBe(2);
+    expect(pontuacaoDoItem(item("Q64"), 1, true)).toBe(5);
+    expect(pontuacaoDoItem(item("Q64"), 4, true)).toBe(2);
+    expect(pontuacaoDoItem(item("Q53"), 5, true)).toBe(1);
+    expect(pontuacaoDoItem(item("Q1"), 4, true)).toBe(4);
     expect(pontuacaoDoItem(item("Q1"), 0)).toBeNull();
     expect(pontuacaoDoItem(item("Q1"), 6)).toBeNull();
     expect(pontuacaoDoItem(item("Q1"), 2.5)).toBeNull();
@@ -368,6 +389,144 @@ describe("resultado do grupo", () => {
       })),
     );
     expect(ordem[0]).toBe("apoio_social_colegas");
+  });
+});
+
+describe("escala de saúde: 5 = Excelente, com as pesquisas já gravadas", () => {
+  /** As seções com o Q64 configurado (nova: decrescente; antiga: sem). */
+  function secoesCom(config: Record<string, unknown>): Secao[] {
+    return [
+      {
+        id: "s1",
+        titulo: null,
+        descricao: null,
+        perguntas: ITENS_NR1.map((i) => ({
+          id: `p-${i.id}`,
+          chave: i.id,
+          tipo: "escala" as const,
+          texto: i.id,
+          rotulo: null,
+          descricao: null,
+          obrigatoria: true,
+          config:
+            i.id === "Q64"
+              ? config
+              : {
+                  minimo: 1,
+                  maximo: 5,
+                  rotulos: [...ROTULOS_DA_ESCALA[i.escala]],
+                },
+          condicao: null,
+        })),
+      },
+    ];
+  }
+  const NOVA = secoesCom({
+    minimo: 1,
+    maximo: 5,
+    rotulos: [...ROTULOS_DA_ESCALA.saude],
+    decrescente: true,
+  });
+  const ANTIGA = secoesCom({
+    minimo: 1,
+    maximo: 5,
+    rotulos: [...ROTULOS_DA_SAUDE_LEGADA],
+  });
+  const respostaCom = (q64: number) => ({
+    valores: new Map<string, unknown>(
+      ITENS_NR1.map((i) => [`p-${i.id}`, i.id === "Q64" ? q64 : 3]),
+    ),
+  });
+
+  it("reconhece a pesquisa gravada antes da mudança pela configuração do Q64", () => {
+    expect(saudeLegadaDe(NOVA)).toBe(false);
+    expect(saudeLegadaDe(ANTIGA)).toBe(true);
+    // A ordem dos rótulos decide (a exibição decrescente é só visual).
+    expect(
+      saudeLegadaDe(
+        secoesCom({
+          minimo: 1,
+          maximo: 5,
+          rotulos: [...ROTULOS_DA_ESCALA.saude],
+        }),
+      ),
+    ).toBe(false);
+    // Sem o item (estrutura incompleta): a regra nova.
+    expect(saudeLegadaDe([])).toBe(false);
+  });
+
+  it("a mesma saúde dá o mesmo escore nas duas orientações", () => {
+    // "Excelente": posição 5 na nova, posição 1 na antiga.
+    const nova = calcularNr1DoModelo(NOVA, [respostaCom(5)]);
+    const antiga = calcularNr1DoModelo(ANTIGA, [respostaCom(1)]);
+    const saude = (r: typeof nova) =>
+      r.dimensoes.find((d) => d.id === "saude_geral")!;
+    expect(saude(nova).escore).toBe(5);
+    expect(saude(antiga).escore).toBe(5);
+    expect(saude(nova).faixa).toBe("favoravel");
+    // "Fraca": posição 1 na nova é risco (proteção baixa).
+    const fraca = calcularNr1DoModelo(NOVA, [respostaCom(1)]);
+    expect(saude(fraca).escore).toBe(1);
+    expect(saude(fraca).faixa).toBe("risco");
+    expect(saude(calcularNr1DoModelo(ANTIGA, [respostaCom(5)])).faixa).toBe(
+      "risco",
+    );
+  });
+});
+
+describe("comportamentos ofensivos: sigilo complementar por tipo", () => {
+  /** Respostas com a posição de Q73 de cada pessoa. */
+  const comQ73 = (...posicoes: number[]) =>
+    calcularNr1(
+      posicoes.map((v) => resposta(1, { Q73: v })),
+      { sigilo: 3 },
+    ).ofensivos.tipos[0]!;
+
+  it("uma frequência só abaixo do sigilo esconde também a menor visível", () => {
+    // Raramente 1 (oculta), às vezes 3, frequentemente 4: sem a regra, o 1
+    // sairia por subtração (8 − 3 − 4).
+    const t = comQ73(2, 3, 3, 3, 4, 4, 4, 4);
+    expect(t.relataram).toBe(8);
+    expect(t.raramente).toBeNull();
+    expect(t.asVezes).toBeNull();
+    expect(t.frequentementeOuSempre).toBe(4);
+  });
+
+  it("duas frequências ocultas ou nenhuma: nada a mais some", () => {
+    const duas = comQ73(2, 3, 4, 4, 4);
+    expect(duas.relataram).toBe(5);
+    expect(duas.raramente).toBeNull();
+    expect(duas.asVezes).toBeNull();
+    expect(duas.frequentementeOuSempre).toBe(3);
+    const nenhuma = comQ73(2, 2, 2, 3, 3, 3);
+    expect(nenhuma.raramente).toBe(3);
+    expect(nenhuma.asVezes).toBe(3);
+    expect(nenhuma.frequentementeOuSempre).toBe(0);
+  });
+
+  it("o zero não protege: esconde a menor contagem positiva", () => {
+    // Raramente 2 (oculta), às vezes 0, frequentemente 3.
+    const t = comQ73(2, 2, 4, 4, 4);
+    expect(t.relataram).toBe(5);
+    expect(t.raramente).toBeNull();
+    expect(t.asVezes).toBe(0);
+    expect(t.frequentementeOuSempre).toBeNull();
+  });
+
+  it("sem sigilo (identificada) e com o total oculto: nada muda", () => {
+    const semSigilo = calcularNr1([
+      resposta(1, { Q73: 2 }),
+      resposta(1, { Q73: 3 }),
+      resposta(1, { Q73: 3 }),
+      resposta(1, { Q73: 3 }),
+    ]).ofensivos.tipos[0]!;
+    expect(semSigilo.raramente).toBe(1);
+    expect(semSigilo.asVezes).toBe(3);
+    const poucos = comQ73(2, 3);
+    expect(poucos.relataram).toBeNull();
+    expect(poucos.raramente).toBeNull();
+    expect(poucos.asVezes).toBeNull();
+    expect(poucos.frequentementeOuSempre).toBe(0);
   });
 });
 

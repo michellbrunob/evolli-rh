@@ -170,10 +170,17 @@ export function conferirConfig(
         typeof c.somenteRotulos !== "boolean"
       )
         return null;
+      if (c.decrescente !== undefined && typeof c.decrescente !== "boolean")
+        return null;
       if (!rotulos) return null;
-      return c.somenteRotulos === true
-        ? { minimo, maximo, ...pontas, rotulos, somenteRotulos: true }
-        : { minimo, maximo, ...pontas, rotulos };
+      return {
+        minimo,
+        maximo,
+        ...pontas,
+        rotulos,
+        ...(c.somenteRotulos === true ? { somenteRotulos: true } : {}),
+        ...(c.decrescente === true ? { decrescente: true } : {}),
+      };
     }
     case "numero": {
       const minimo = c.minimo ?? null;

@@ -3,10 +3,12 @@ import type { EstruturaFixa, ItemFixo } from "../tipos";
 /**
  * T216 — Riscos psicossociais (NR-1): 76 perguntas em 8 domínios e 29
  * dimensões, cinco escalas de 5 pontos. Cada pergunta leva a chave do item
- * (`Q1` a `Q76`). O valor gravado é a posição do ponto na escala como
- * aparece (1 a 5); itens invertidos valem `6 − posição` e a escala de
- * saúde, exibida do melhor para o pior, também. Metodologia fixa: a API
- * confere os itens (escala de 1 a 5 com os 5 rótulos, obrigatória).
+ * (`Q1` a `Q76`). O valor gravado é o número do ponto (1 a 5); itens
+ * invertidos valem `6 − valor`. A escala de saúde grava 5 = "Excelente" e
+ * aparece do melhor para o pior (`decrescente`); as pesquisas gravadas antes
+ * (1º rótulo "Excelente": 1 = Excelente) continuam espelhadas no cálculo
+ * (`saudeLegadaDe`). Metodologia fixa: a API confere os itens (escala de 1 a
+ * 5 com os 5 rótulos, obrigatória).
  */
 
 export type EscalaNr1 =
@@ -43,9 +45,21 @@ export const ROTULOS_DA_ESCALA: Readonly<Record<EscalaNr1, readonly string[]>> =
       "Satisfeito(a)",
       "Muito satisfeito(a)",
     ],
-    // Do melhor para o pior: a posição 1 (Excelente) vale 5.
-    saude: ["Excelente", "Muito boa", "Boa", "Regular", "Fraca"],
+    // Do pior ao melhor (5 = Excelente); aparece de 5 a 1 (`decrescente`).
+    saude: ["Fraca", "Regular", "Boa", "Muito boa", "Excelente"],
   };
+
+/** A saúde das pesquisas gravadas antes: 1 = "Excelente" (espelhada). */
+export const ROTULOS_DA_SAUDE_LEGADA: readonly string[] = [
+  "Excelente",
+  "Muito boa",
+  "Boa",
+  "Regular",
+  "Fraca",
+];
+
+/** O item da autoavaliação de saúde. */
+export const ITEM_DA_SAUDE = "Q64";
 
 export const DOMINIOS_NR1 = [
   { id: "exigencias_laborais", rotulo: "Exigências Laborais" },
