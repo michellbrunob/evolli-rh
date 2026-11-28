@@ -90,9 +90,7 @@ export async function carregarRelatorio(
       empresa: nomeDaEmpresa,
       hoje,
       respostas: lista,
-      analises: analises
-        ? analisesParaOPainel(analises, nomeDaEmpresa)
-        : null,
+      analises: analises ? analisesParaOPainel(analises, nomeDaEmpresa) : null,
       evolucao,
       emitidoPor,
       porGrupo,
