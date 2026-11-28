@@ -48,6 +48,7 @@ import {
   ROTULO_DA_PREVALENCIA,
   ROTULO_DO_GRAU,
   ROTULO_DO_INDICADOR,
+  COR_DA_FREQUENCIA,
   decimal,
   porcento,
 } from "./textos";
@@ -501,7 +502,7 @@ export function VisaoGeralNr1({
                         .map((d) => (
                           <tr key={d.id}>
                             <td>{dimensaoNr1(d.id).rotulo}</td>
-                            <td className="modelos__num">{`${decimal(d.escore)}/5`}</td>
+                            <td className="modelos__num">{`${decimal(d.escore)} de 5`}</td>
                             <td className="modelos__num">
                               {porcento(d.percentuais.risco)}
                             </td>
@@ -555,7 +556,7 @@ export function TabelaDePrioridades({
                     {legendaDaDimensao(id)}
                   </span>
                 </td>
-                <td>{`${d.severidade ? ROTULO_DO_GRAU[d.severidade] : "—"} · ${decimal(d.escore)}/5`}</td>
+                <td>{`${d.severidade ? ROTULO_DO_GRAU[d.severidade] : "—"} · ${decimal(d.escore)} de 5`}</td>
                 <td className="modelos__num">{`${porcento(d.percentuais.risco)} em risco`}</td>
                 <td className="modelos__celula-barra">
                   <BarraDeFaixas
@@ -605,12 +606,20 @@ export function OfensivosNr1({
         {TIPOS_DE_OFENSA.map((t) => {
           const x = o.tipos.find((y) => y.id === t.id);
           const partes = [
-            { rotulo: "Raramente", valor: x?.raramente ?? 0, cor: "#F2B23E" },
-            { rotulo: "Às vezes", valor: x?.asVezes ?? 0, cor: "#EA580C" },
+            {
+              rotulo: "Raramente",
+              valor: x?.raramente ?? 0,
+              cor: COR_DA_FREQUENCIA.raramente,
+            },
+            {
+              rotulo: "Às vezes",
+              valor: x?.asVezes ?? 0,
+              cor: COR_DA_FREQUENCIA.asVezes,
+            },
             {
               rotulo: "Frequentemente ou sempre",
               valor: x?.frequentementeOuSempre ?? 0,
-              cor: "#DC2626",
+              cor: COR_DA_FREQUENCIA.frequente,
             },
           ];
           const protegido = x
@@ -642,7 +651,7 @@ export function OfensivosNr1({
         <span>
           <span
             className="modelos__ponto"
-            style={{ ["--cor" as string]: "#F2B23E" }}
+            style={{ ["--cor" as string]: COR_DA_FREQUENCIA.raramente }}
             aria-hidden="true"
           />
           Raramente
@@ -650,7 +659,7 @@ export function OfensivosNr1({
         <span>
           <span
             className="modelos__ponto"
-            style={{ ["--cor" as string]: "#EA580C" }}
+            style={{ ["--cor" as string]: COR_DA_FREQUENCIA.asVezes }}
             aria-hidden="true"
           />
           Às vezes
@@ -658,7 +667,7 @@ export function OfensivosNr1({
         <span>
           <span
             className="modelos__ponto"
-            style={{ ["--cor" as string]: "#DC2626" }}
+            style={{ ["--cor" as string]: COR_DA_FREQUENCIA.frequente }}
             aria-hidden="true"
           />
           Frequentemente ou sempre

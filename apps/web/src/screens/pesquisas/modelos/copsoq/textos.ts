@@ -223,10 +223,16 @@ export const ROTULO_DA_SITUACAO: Readonly<Record<SituacaoDaMedida, string>> = {
 export const decimal = (n: number | null, casas = 1): string =>
   n === null
     ? "—"
-    : n.toLocaleString("pt-BR", {
-        minimumFractionDigits: casas,
-        maximumFractionDigits: casas,
-      });
+    : (Math.round(n * 10 ** casas) / 10 ** casas)
+        .toFixed(casas)
+        .replace(".", ",");
+
+/** Cores das frequências dos comportamentos ofensivos. */
+export const COR_DA_FREQUENCIA = {
+  raramente: "#F2B23E",
+  asVezes: "#EA580C",
+  frequente: "#DC2626",
+} as const;
 
 /** "33%". */
 export const porcento = (n: number | null): string =>

@@ -246,15 +246,17 @@ export const GRUPOS_DE_PRODUTOS: readonly {
 
 /** Diferença com sinal e uma casa ("+2,3", "−3,7"). */
 export function diferenca(n: number): string {
-  const t = Math.abs(n).toLocaleString("pt-BR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  const t = umaCasaBr(Math.abs(n));
   return n > 0 ? `+${t}` : n < 0 ? `−${t}` : t;
 }
 
-export const umaCasaBr = (n: number): string =>
-  n.toLocaleString("pt-BR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+export function umaCasaBr(n: number): string {
+  return (Math.round(n * 10) / 10).toFixed(1).replace(".", ",");
+}
+
+/** Desfavorável, neutro e favorável nas barras por pergunta. */
+export const COR_DA_RESPOSTA = {
+  desfavoravel: "#E5484D",
+  neutro: "#D4D4DA",
+  favoravel: "#3DB46D",
+} as const;

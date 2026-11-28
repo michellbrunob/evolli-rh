@@ -61,6 +61,7 @@ import {
   SINAIS,
   SINAL,
   TEMA,
+  COR_DA_RESPOSTA,
   diferenca,
   umaCasaBr,
 } from "./isfb/textos";
@@ -571,7 +572,7 @@ export function DocumentoNr1({
                     <td>
                       <BarraPercentual
                         valor={s.percentualEmRisco}
-                        cor="#E5484D"
+                        cor={COR_DA_RESPOSTA.desfavoravel}
                         rotulo={ROTULO_DO_INDICADOR[s.id]?.titulo ?? s.id}
                       />
                     </td>
@@ -697,7 +698,7 @@ export function DocumentoNr1({
                           ? `Concluída em ${formatarInstante(e.concluidaEm)}`
                           : "Concluída"
                         : def.id === "revisar" && acompanhamento?.revisarEm
-                          ? `Prevista para ${acompanhamento.revisarEm.split("-").reverse().join("/")}`
+                          ? `Prevista para ${formatarDiaCivil(`${acompanhamento.revisarEm}-01`).slice(3)}`
                           : "Pendente"}
                     </td>
                     <td>{e?.evidencias ?? "—"}</td>

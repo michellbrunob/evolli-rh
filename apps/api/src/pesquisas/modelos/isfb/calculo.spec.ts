@@ -243,6 +243,23 @@ describe("nota de uma pessoa", () => {
     expect(calcularPessoaIsfb(semProdutos)!.sinais).toEqual(["sem_reserva"]);
   });
 
+  it("sinais no limite: 'Muito' (1 ponto) já conta; 'Mais ou menos' não", () => {
+    const comPosicao = (q1: string, q2: number, q4: number) =>
+      calcularPessoaIsfb(
+        valores({
+          ...MEIO,
+          q1,
+          escalas: [q2, 2, q4, 2, 2, 2, 2, 2, 2, 2, 2],
+        }),
+      )!.sinais;
+    expect(comPosicao("pouco_maiores", 3, 3)).toEqual([
+      "gasta_mais",
+      "estresse",
+      "apertado",
+    ]);
+    expect(comPosicao("iguais", 2, 2)).toEqual([]);
+  });
+
   it("temas de educação financeira", () => {
     const p = calcularPessoaIsfb(valores(RUIM))!;
     expect(temasDa(p)).toEqual([

@@ -29,6 +29,7 @@ import {
   SINAIS,
   SINAL,
   TEMA,
+  COR_DA_RESPOSTA,
   diferenca,
   umaCasaBr,
 } from "./textos";
@@ -440,7 +441,7 @@ export function VisaoGeralIsfb({
                         {
                           rotulo: "Desfavorável",
                           valor: p.desfavoravel,
-                          cor: "#E5484D",
+                          cor: COR_DA_RESPOSTA.desfavoravel,
                         },
                         {
                           rotulo: "Neutro",
@@ -448,12 +449,12 @@ export function VisaoGeralIsfb({
                             0,
                             100 - p.desfavoravel - p.favoravel,
                           ),
-                          cor: "#D4D4DA",
+                          cor: COR_DA_RESPOSTA.neutro,
                         },
                         {
                           rotulo: "Favorável",
                           valor: p.favoravel,
-                          cor: "#3DB46D",
+                          cor: COR_DA_RESPOSTA.favoravel,
                         },
                       ]}
                     />
@@ -605,7 +606,13 @@ export function AnalisesIsfb({
               </span>
               <BarraPercentual
                 valor={(q * 100) / maior}
-                cor={i >= 3 ? "#DC2626" : i ? "#F2B23E" : "#3DB46D"}
+                cor={
+                  i >= 3
+                    ? SAUDE.baixa.cor
+                    : i
+                      ? SAUDE.no_limite.cor
+                      : COR_DA_RESPOSTA.favoravel
+                }
                 rotulo={`${i} sinais: ${q}`}
               />
               <span className="modelos__num">{q}</span>
@@ -705,7 +712,7 @@ export function AnalisesIsfb({
           <div
             role="cell"
             className="modelos__quadrante modelos__quadrante--alerta"
-            style={{ ["--cor-celula" as string]: "#DC2626" }}
+            style={{ ["--cor-celula" as string]: SAUDE.baixa.cor }}
           >
             <strong>Usa crédito e sem reserva</strong>
             <span className="modelos__mini-valor">{cr.creditoSemReserva}</span>
@@ -714,7 +721,7 @@ export function AnalisesIsfb({
           <div
             role="cell"
             className="modelos__quadrante"
-            style={{ ["--cor-celula" as string]: "#3DB46D" }}
+            style={{ ["--cor-celula" as string]: COR_DA_RESPOSTA.favoravel }}
           >
             <strong>Usa crédito e tem reserva</strong>
             <span className="modelos__mini-valor">{cr.creditoComReserva}</span>
@@ -722,7 +729,7 @@ export function AnalisesIsfb({
           <div
             role="cell"
             className="modelos__quadrante"
-            style={{ ["--cor-celula" as string]: "#F2B23E" }}
+            style={{ ["--cor-celula" as string]: SAUDE.no_limite.cor }}
           >
             <strong>Sem crédito e sem reserva</strong>
             <span className="modelos__mini-valor">
@@ -732,7 +739,7 @@ export function AnalisesIsfb({
           <div
             role="cell"
             className="modelos__quadrante"
-            style={{ ["--cor-celula" as string]: "#3DB46D" }}
+            style={{ ["--cor-celula" as string]: COR_DA_RESPOSTA.favoravel }}
           >
             <strong>Sem crédito e com reserva</strong>
             <span className="modelos__mini-valor">
